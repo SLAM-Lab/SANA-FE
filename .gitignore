@@ -1,0 +1,5 @@
+*.o
+*.yaml
+*.png
+.vscode
+sim
