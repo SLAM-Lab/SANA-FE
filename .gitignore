@@ -1,5 +1,7 @@
+*.swp
 *.o
 *.yaml
 *.png
+*.csv
 .vscode
 sim
