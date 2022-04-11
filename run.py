@@ -13,7 +13,6 @@ MAX_COMPARTMENTS = 1024
 MAX_CORES = 128
 NETWORK_FILENAME = "connected_layer.csv"
 
-
 def run_sim(network, core_count):
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset", "Is Input",
               "Log Spikes", "Log Voltage", "Synapse Info..."]
@@ -90,10 +89,11 @@ def empty(neurons, max_compartments=MAX_COMPARTMENTS):
 
     return network, core_count
 
+
 if __name__ == "__main__":
     core_count = [1, 2, 4, 8, 16, 32, 64, 128]
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
-    energy = {0: [], 256: [], 512: [], 768: [], 1024: []
+    energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):
@@ -124,9 +124,10 @@ if __name__ == "__main__":
     plt.savefig("empty_energy.png")
     """
     # This experiment looks at two fully connected layers, spiking
+
     neurons = []
-    times = []
-    energy = []
+    spiking_times = []
+    spiking_energy = []
 
     for i in range(1, 31):
         layer_neurons = i*i
@@ -136,38 +137,23 @@ if __name__ == "__main__":
         results = run_sim(network, core_count)
 
         neurons.append(len(network))
-        times.append(results["time"])
-        energy.append(results["energy"])
+        spiking_times.append(results["time"])
+        spiking_energy.append(results["energy"])
 
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neurons, times, "-o")
-    plt.plot(neurons, loihi_times_spikes, "--x")
-    plt.ylabel("Time (s)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated", "Measured"))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("connected_spiking_time.png")
-
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neurons, energy, "-o")
-    plt.plot(neurons, loihi_energy_spikes, "--x", color="orange")
-    plt.ylabel("Energy (J)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated", "Measured"))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("connected_spiking_energy.png")
-
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neurons, energy, "-o")
-    plt.ylabel("Energy (J)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated",))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("connected_spiking_energy_sim_only.png")
+    # Write all the simulation data to csv
+    with open("sim_spiking.csv", "w") as spiking_csv:
+        spiking_writer = csv.DictWriter(spiking_csv,
+                                        ("neurons", "energy", "time"))
+        spiking_writer.writeheader()
+        for neuron_count, time, energy_val in zip(neurons, spiking_times,
+                                                  spiking_energy):
+            spiking_writer.writerow({"neurons": neuron_count,
+                                     "energy": energy_val,
+                                     "time": time})
 
     neurons = []
-    times = []
-    energy = []
+    nonspiking_times = []
+    nonspiking_energy = []
 
     # The second experiment looks at two fully connected layers, not spiking
     for i in range(1, 31):
@@ -178,11 +164,65 @@ if __name__ == "__main__":
         results = run_sim(network, core_count)
 
         neurons.append(len(network))
-        times.append(results["time"])
-        energy.append(results["energy"])
+        nonspiking_times.append(results["time"])
+        nonspiking_energy.append(results["energy"])
+
+    with open("sim_nonspiking.csv", "w") as nonspiking_csv:
+        nonspiking_writer = csv.DictWriter(nonspiking_csv,
+                                           ("neurons", "energy", "time"))
+        nonspiking_writer.writeheader()
+        for neuron_count, time, energy_val in zip(neurons, nonspiking_times,
+                                                  nonspiking_energy):
+            nonspiking_writer.writerow({"neurons": neuron_count,
+                                        "energy": energy_val,
+                                        "time": time})
+
+    # Read Loihi measurement data from csv, this is only available to me locally
+    #  since this is restricted data!
+    loihi_times_spikes = []
+    loihi_energy_spikes = []
+    with open("spiking.csv", "r") as spiking_csv:
+        spiking_reader = csv.DictReader(spiking_csv)
+        for row in spiking_reader:
+            loihi_times_spikes.append(row["time"])
+            loihi_energy_spikes.append(row["energy"])
+
+    loihi_times_no_spikes = []
+    loihi_energy_no_spikes = []
+    with open("nonspiking.csv", "r") as nonspiking_csv:
+        nonspiking_reader = csv.DictReader(nonspiking_csv)
+        for row in nonspiking_reader:
+            loihi_times_no_spikes.append(row["time"])
+            loihi_energy_no_spikes.append(row["energy"])
 
     plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neurons, times, "-o")
+    plt.plot(neurons, spiking_times, "-o")
+    plt.plot(neurons, loihi_times_spikes, "--x")
+    plt.ylabel("Time (s)")
+    plt.xlabel("Neurons")
+    plt.legend(("Simulated", "Measured"))
+    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+    plt.savefig("connected_spiking_time.png")
+
+    plt.figure(figsize=(5.5, 5.5))
+    plt.plot(neurons, spiking_energy, "-o")
+    plt.plot(neurons, loihi_energy_spikes, "--x", color="orange")
+    plt.ylabel("Energy (J)")
+    plt.xlabel("Neurons")
+    plt.legend(("Simulated", "Measured"))
+    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+    plt.savefig("connected_spiking_energy.png")
+
+    plt.figure(figsize=(5.5, 5.5))
+    plt.plot(neurons, nonspiking_energy, "-o")
+    plt.ylabel("Energy (J)")
+    plt.xlabel("Neurons")
+    plt.legend(("Simulated",))
+    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+    plt.savefig("connected_spiking_energy_sim_only.png")
+
+    plt.figure(figsize=(5.5, 5.5))
+    plt.plot(neurons, nonspiking_times, "-o")
     plt.plot(neurons, loihi_times_no_spikes, "--x")
     plt.ylabel("Time (s)")
     plt.xlabel("Neurons")
@@ -191,7 +231,7 @@ if __name__ == "__main__":
     plt.savefig("connected_not_spiking_time.png")
 
     plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neurons, energy, "-o")
+    plt.plot(neurons, nonspiking_energy, "-o")
     plt.plot(neurons, loihi_energy_no_spikes, "--x")
     plt.ylabel("Energy (J)")
     plt.xlabel("Neurons")
@@ -200,14 +240,6 @@ if __name__ == "__main__":
     plt.savefig("connected_not_spiking_energy.png")
 
     # Some additional plots to highlight trends
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neurons, energy, "-o")
-    plt.ylabel("Energy (J)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated",))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("connected_not_spiking_energy_sim_only.png")
-
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neurons, loihi_times_spikes, "--x", color="orange")
     plt.ylabel("Time (s)")
