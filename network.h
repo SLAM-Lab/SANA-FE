@@ -18,7 +18,7 @@ enum neuron_config_format
 	CORE_ID, // Which core to map to
 	THRESHOLD_VOLTAGE, // Spiking threshold value
 	RESET_VOLTAGE,
-	IS_INPUT, // Seed input spikes with given Poisson probability
+	INPUT_RATE, // Seed input spikes with given Poisson probability
 	RECORD_SPIKES, // Record any spikes to a CSV file
 	RECORD_VOLTAGE, // Write the voltage to a CSV file every timestep
 	NEURON_FIELDS,
@@ -37,6 +37,5 @@ enum synapse_config_format
 #include "sim.h"
 void network_create_empty(struct core *cores);
 void network_read_csv(FILE *fp, struct core *cores);
-
 
 #endif

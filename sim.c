@@ -30,13 +30,14 @@ struct sim_results sim_run(const unsigned int timesteps, struct core *cores,
 	results.wall_time = 0.0; // Seconds
 	results.time_steps = timesteps;
 	results.total_spikes = 0;
-	sim_seed_spikes(cores, max_cores);
 
 	for (int i = 0; i < timesteps; i++)
 	{
 		INFO("*** Time-step %d ***\n", i+1);
 		clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
 		sim_reset_measurements(cores, max_cores);
+		sim_seed_input_spikes(cores, max_cores);
 
 		spikes_sent = sim_route_spikes(cores, max_cores);
 		results.total_spikes += spikes_sent;
@@ -80,12 +81,12 @@ void sim_update_neurons(struct core *cores, const int max_cores)
 		}
 
 		// Update the remainder of the neurons in the core (inactive)
-		for (int j = c->compartments; j < MAX_COMPARTMENTS; j++)
-		{
-			struct neuron *n = &(c->neurons[j]);
-			n->energy += INACTIVE_NEURON_UPDATE_ENERGY;
-			n->time += INACTIVE_NEURON_UPDATE_TIME;
-		}
+		//for (int j = c->compartments; j < MAX_COMPARTMENTS; j++)
+		//{
+		//	struct neuron *n = &(c->neurons[j]);
+		//	n->energy += INACTIVE_NEURON_UPDATE_ENERGY;
+		//	n->time += INACTIVE_NEURON_UPDATE_TIME;
+		//}
 
 		// Check to see which neurons have fired
 		for (int j = 0; j < c->compartments; j++)
@@ -226,10 +227,10 @@ void sim_send_spike(struct synapse *s)
 	post_neuron->time += SPIKE_OP_TIME;
 }
 
-void sim_seed_spikes(struct core *cores, const int max_cores)
+void sim_seed_input_spikes(struct core *cores, const int max_cores)
 {
-	// TODO: call every time step, generate Poisson spike train
-	INFO("Seeding spikes.\n");
+	// Seed all externally input spikes in the network for this timestep
+	#pragma omp parallel for
 	for (int i = 0; i < max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
@@ -237,10 +238,11 @@ void sim_seed_spikes(struct core *cores, const int max_cores)
 		for (int j = 0; j < c->compartments; j++)
 		{
 			struct neuron *n = &(c->neurons[j]);
+			int is_input = (n->input_rate > 0);
 
-			if (n->is_input)
+			if (is_input)
 			{
-				n->fired = 1;
+				n->fired |= sim_input(n->input_rate);
 			}
 		}
 	}
@@ -350,7 +352,7 @@ void sim_init_cores(struct core *cores, const int max_cores)
 			n->compartment = j;
 			n->core_id = c->id;
 			n->post_connection_count = 0;
-                        n->is_input = 0;
+                        n->input_rate = 0;
                         n->log_spikes = 0;
                         n->log_voltage = 0;
 		}
@@ -372,6 +374,19 @@ void sim_reset_measurements(struct core *cores, const int max_cores)
 			n->energy = 0.0; // Joules
 		}
 	}
+}
+
+int sim_input(const double firing_probability)
+{
+	// Simulate a single external input (as one neuron) for a timestep
+	//  Return 1 if the input fires, 0 otherwise
+	double rand_uniform;
+	int input_fired;
+
+	rand_uniform = rand() / RAND_MAX;
+	input_fired = (rand_uniform < firing_probability);
+
+	return input_fired;
 }
 
 struct timespec sim_calculate_elapsed_time(struct timespec ts_start,
@@ -399,3 +414,4 @@ void sim_write_results(FILE *fp, struct sim_results *results)
 	fprintf(fp, "total_spikes: %ld\n", results->total_spikes);
 	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
 }
+

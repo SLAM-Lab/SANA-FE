@@ -143,7 +143,7 @@ void network_read_csv(FILE *fp, struct core *cores)
 		sscanf(neuron_fields[THRESHOLD_VOLTAGE], "%lf",
 							&(n->threshold));
 		sscanf(neuron_fields[RESET_VOLTAGE], "%lf", &(n->reset));
-		sscanf(neuron_fields[IS_INPUT], "%d", &(n->is_input));
+		sscanf(neuron_fields[INPUT_RATE], "%lf", &(n->input_rate));
 		sscanf(neuron_fields[RECORD_SPIKES], "%d", &(n->log_spikes));
 		sscanf(neuron_fields[RECORD_VOLTAGE], "%d", &(n->log_voltage));
 
