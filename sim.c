@@ -341,7 +341,7 @@ int sim_input(const double firing_probability)
 	double rand_uniform;
 	int input_fired;
 
-	rand_uniform = rand() / RAND_MAX;
+	rand_uniform = (double) rand() / RAND_MAX;
 	input_fired = (rand_uniform < firing_probability);
 
 	return input_fired;
@@ -372,4 +372,3 @@ void sim_write_results(FILE *fp, struct sim_results *results)
 	fprintf(fp, "total_spikes: %ld\n", results->total_spikes);
 	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
 }
-
