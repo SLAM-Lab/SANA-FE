@@ -82,7 +82,7 @@ struct sim_results
 	long int total_spikes;
 };
 
-struct sim_results sim_run(unsigned int timesteps, struct core *cores, const int max_cores);
+void sim_run(const int timesteps, struct core *cores, const int max_cores, struct sim_results *results);
 void sim_update_neurons(struct core *cores, const int max_cores);
 int sim_route_spikes(struct core *cores, const int max_cores);
 void sim_update_potential(struct neuron *n);
@@ -91,9 +91,9 @@ void sim_seed_input_spikes(struct core *cores, const int max_cores);
 double sim_calculate_time(struct core *cores, const int max_cores);
 void sim_reset_measurements(struct core *cores, const int max_cores);
 double sim_calculate_energy(struct core *cores, const int max_cores);
-void sim_init_cores(struct core *cores, const int max_cores);
 struct timespec sim_calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 void sim_write_results(FILE *fp, struct sim_results *results);
 int sim_input(const double firing_probability);
+void sim_timestep(struct sim_results *results, struct core *cores, const int max_cores);
 
 #endif

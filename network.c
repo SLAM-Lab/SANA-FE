@@ -13,7 +13,8 @@
 //  dt seconds. This relates to the LIF time constant.
 const double dt = 1.0e-3; // Seconds
 
-void network_read_csv(FILE *fp, struct core *cores)
+void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
+							const int max_cores)
 {
 	// Build arbitrary spiking network from a csv file
 	//
@@ -31,7 +32,6 @@ void network_read_csv(FILE *fp, struct core *cores)
 	// See network.h to see all the fields and what they mean
 	char neuron_fields[NEURON_FIELDS + (FAN_OUT*SYNAPSE_FIELDS)]
 							[MAX_FIELD_LEN];
-	struct neuron **neurons;
 	struct core *c;
 	struct neuron *n, *src, *dest;
 	struct synapse *s;
@@ -40,18 +40,13 @@ void network_read_csv(FILE *fp, struct core *cores)
         int neuron_count, core_id, field_count, ret, neuron_id, dest_id;
 	const int max_fields = NEURON_FIELDS + (FAN_OUT*SYNAPSE_FIELDS);
 
-	neurons = (struct neuron **)
-				malloc(sizeof(struct neuron *) * MAX_NEURONS);
+	network_init(cores, max_cores);
 	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
-	if ((line == NULL) || (neurons == NULL))
+	if (line == NULL)
 	{
-		INFO("Error: Couldn't allocate memory for neurons.\n");
+		INFO("Error: Couldn't allocate memory for network inputs.\n");
 		exit(1);
 	}
-        for (int i = 0; i < MAX_NEURONS; i++)
-        {
-            neurons[i] = NULL;
-        }
 
 	neuron_count = 0;
 	while (fgets(line, MAX_CSV_LINE, fp))
@@ -150,7 +145,7 @@ void network_read_csv(FILE *fp, struct core *cores)
 		// Keep track of which CSV line corresponds to which physical
 		//  neuron in the hardware.  This info will be important for
 		//  linking the synapse data to neuron compartments
-		neurons[neuron_count] = n;
+		neuron_ptrs[neuron_count] = n;
 
 		TRACE("Added nid:%d cid:%d vt:%lf r%lf in:%d log_s:%d "
                         "log_v:%d\n", n->id, n->core_id, n->threshold, n->reset,
@@ -171,7 +166,7 @@ void network_read_csv(FILE *fp, struct core *cores)
 		// Read all csv fields into a buffer
 		field_count = 0;
 		token = strtok(line, ",");
-		while ((token != NULL))
+		while (token != NULL)
 		{
 			// This time read all the fields in the line, we're
 			//  interested in the synapse data
@@ -200,7 +195,7 @@ void network_read_csv(FILE *fp, struct core *cores)
 
 		// Now parse all the outgoing synaptic connections for this
 		//  neuron
-		src = neurons[neuron_id];
+		src = neuron_ptrs[neuron_id];
 		c = &(cores[src->core_id]);
 
 		for (int i = 0; i < field_count; i++)
@@ -243,7 +238,7 @@ void network_read_csv(FILE *fp, struct core *cores)
 			sscanf(neuron_fields[curr_synapse_field +
 								SYNAPSE_WEIGHT],
 								"%f", &weight);
-			dest = neurons[dest_id];
+			dest = neuron_ptrs[dest_id];
 			// Create the new synapse and add it to the end out
 			//  the fan-out list
 			//  core
@@ -261,10 +256,47 @@ void network_read_csv(FILE *fp, struct core *cores)
 		}
 	}
 
-	free(neurons);
 	free(line);
-
 	return;
+}
+
+void network_init(struct core *cores, const int max_cores)
+{
+	// Initialize state of neuromorphic cores and all their compartments
+	INFO("Initializing %d cores.\n", max_cores);
+	for (int i = 0; i < max_cores; i++)
+	{
+		struct core *c = &(cores[i]);
+
+		c->id = i;
+		c->spike_count = 0;
+		c->compartments = 0;
+
+		// Loihi is organised in a 2D mesh of 32 tiles (8x4)
+		//  Groups of 4 cores share a router, forming a tile
+		//  Routers are then connected in the mesh, allowing multi-hop
+		c->x = (i / CORES_PER_TILE) % 8;
+		c->y = (i / CORES_PER_TILE) / 8;
+
+		for (int j = 0; j < MAX_COMPARTMENTS; j++)
+		{
+			struct neuron *n;
+			int neuron_id;
+
+			n = &(c->neurons[j]);
+			n->core_id = c->id;
+
+			// Simply assign neurons in ascending order from core 0
+			neuron_id = (i * MAX_COMPARTMENTS) + j;
+			n->id = neuron_id;
+			n->compartment = j;
+
+			n->post_connection_count = 0;
+                        n->input_rate = 0;
+                        n->log_spikes = 0;
+                        n->log_voltage = 0;
+		}
+	}
 }
 
 void network_create_empty(struct core *cores)
@@ -300,3 +332,4 @@ void network_create_empty(struct core *cores)
 		}
 	}
 }
+

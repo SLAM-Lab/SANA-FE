@@ -17,51 +17,46 @@
 #include "sim.h"
 #include "network.h"
 
-struct sim_results sim_run(const unsigned int timesteps, struct core *cores,
-                            const int max_cores)
+void sim_run(const int timesteps, struct core *cores,
+                            const int max_cores, struct sim_results *results)
 {
 	// Run neuromorphic hardware simulation
-	struct sim_results results;
-	struct timespec ts_start, ts_end, ts_elapsed;
-	long int spikes_sent;
-
-	results.total_energy = 0.0; // Joules
-	results.total_sim_time = 0.0; // Seconds
-	results.wall_time = 0.0; // Seconds
-	results.time_steps = timesteps;
-	results.total_spikes = 0;
-
 	for (int i = 0; i < timesteps; i++)
 	{
+		struct timespec ts_start, ts_end, ts_elapsed;
+
 		INFO("*** Time-step %d ***\n", i+1);
+		// Measure the wall-clock time taken to run the simulation
+		//  on the host machine
 		clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-		sim_reset_measurements(cores, max_cores);
-		sim_seed_input_spikes(cores, max_cores);
+		sim_timestep(results, cores, max_cores);
 
-		spikes_sent = sim_route_spikes(cores, max_cores);
-		results.total_spikes += spikes_sent;
-		sim_update_neurons(cores, max_cores);
-
-		results.total_energy += sim_calculate_energy(cores, max_cores);
-		results.total_sim_time += sim_calculate_time(cores, max_cores);
-
+		// Calculate elapsed time
 		clock_gettime(CLOCK_MONOTONIC, &ts_end);
 		ts_elapsed = sim_calculate_elapsed_time(ts_start, ts_end);
-		results.wall_time +=
+		results->wall_time +=
 			(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
-		INFO("Spikes sent: %ld\n", spikes_sent);
-		INFO("Time-step %d took: %fs.\n", i+1,
+		INFO("Time-step took: %fs.\n",
 			(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
 	}
+}
 
-	INFO("Total simulated time: %es.\n", results.total_sim_time);
-	INFO("Total energy calculated: %eJ.\n", results.total_energy);
-	INFO("Average power consumption: %fW.\n",
-				results.total_energy / results.total_sim_time);
-	INFO("Run finished.\n");
+void sim_timestep(struct sim_results *results, struct core *cores,
+			const int max_cores)
+{
+	long int spikes_sent;
 
-	return results;
+	sim_reset_measurements(cores, max_cores);
+	sim_seed_input_spikes(cores, max_cores);
+
+	spikes_sent = sim_route_spikes(cores, max_cores);
+	results->total_spikes += spikes_sent;
+	INFO("Spikes sent: %ld\n", spikes_sent);
+	sim_update_neurons(cores, max_cores);
+
+	results->total_energy += sim_calculate_energy(cores, max_cores);
+	results->total_sim_time += sim_calculate_time(cores, max_cores);
 }
 
 void sim_update_neurons(struct core *cores, const int max_cores)
@@ -320,43 +315,6 @@ double sim_calculate_energy(struct core *cores, const int max_cores)
 	}
 
 	return total_energy;
-}
-
-void sim_init_cores(struct core *cores, const int max_cores)
-{
-	// Initialize state of neuromorphic cores and all their compartments
-	INFO("Initializing %d cores.\n", max_cores);
-	for (int i = 0; i < max_cores; i++)
-	{
-		struct core *c = &(cores[i]);
-
-		c->id = i;
-		c->spike_count = 0;
-		c->compartments = 0;
-
-		// Loihi is organised in a 2D mesh of 32 tiles (8x4)
-		//  Groups of 4 cores share a router, forming a tile
-		//  Routers are then connected in the mesh, allowing multi-hop
-		c->x = (i / CORES_PER_TILE) % 8;
-		c->y = (i / CORES_PER_TILE) / 8;
-
-		for (int j = 0; j < MAX_COMPARTMENTS; j++)
-		{
-			struct neuron *n;
-			int neuron_id;
-
-			// Simply assign neurons in ascending order from core 0
-			neuron_id = (i * MAX_COMPARTMENTS) + j;
-			n = &(c->neurons[j]);
-			n->id = neuron_id;
-			n->compartment = j;
-			n->core_id = c->id;
-			n->post_connection_count = 0;
-                        n->input_rate = 0;
-                        n->log_spikes = 0;
-                        n->log_voltage = 0;
-		}
-	}
 }
 
 void sim_reset_measurements(struct core *cores, const int max_cores)
