@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 	INFO("Allocating memory for %d cores.\n", max_cores);
 	cores = (struct core *) malloc(max_cores * sizeof(struct core));
 
-	INFO("Allocating memory to track %d neurons", max_neurons);
+	INFO("Allocating memory to track %d neurons.\n", max_neurons);
 	neuron_ptrs = (struct neuron **)
 				malloc(MAX_NEURONS * sizeof(struct neuron *));
 	if ((neuron_ptrs == NULL) || (cores == NULL))
@@ -192,7 +192,7 @@ void next_inputs(char *buffer, struct core *cores, const int max_cores,
 			INFO("Error: invalid input format (%s)", buffer);
 			exit(1);
 		}
-		if ((firing_rate < 0) || (firing_rate > 1))
+		if ((firing_rate < 0.0) || (firing_rate > 1.0))
 		{
 			INFO("Warning: input rate not in range [0,1] (%f)",
 								firing_rate);

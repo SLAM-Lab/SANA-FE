@@ -52,7 +52,7 @@ struct neuron
 {
 	int fired, post_connection_count, core_id, id, compartment;
 	int log_spikes, log_voltage;
-	double potential, current, bias, threshold, reset, energy, time;
+	double potential, current, bias, threshold, reset;
 	double potential_decay, current_decay, potential_time_const;
 	double current_time_const, input_rate;
 };
@@ -71,6 +71,7 @@ struct spike
 struct core
 {
 	int id, x, y, spike_count, compartments;
+	double energy, time;
 	struct neuron neurons[MAX_COMPARTMENTS];
 	struct synapse synapses[MAX_COMPARTMENTS][FAN_OUT];
 };
@@ -85,8 +86,7 @@ struct sim_results
 void sim_run(const int timesteps, struct core *cores, const int max_cores, struct sim_results *results);
 void sim_update_neurons(struct core *cores, const int max_cores);
 int sim_route_spikes(struct core *cores, const int max_cores);
-void sim_update_potential(struct neuron *n);
-void sim_send_spike(struct synapse *s);
+void sim_update_potential(struct neuron *n, struct core *c);
 void sim_seed_input_spikes(struct core *cores, const int max_cores);
 double sim_calculate_time(struct core *cores, const int max_cores);
 void sim_reset_measurements(struct core *cores, const int max_cores);
