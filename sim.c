@@ -18,7 +18,7 @@
 #include "network.h"
 
 void sim_run(const int timesteps, struct technology *tech, struct core *cores,
-                            const int max_cores, struct sim_results *results)
+                				struct sim_results *results)
 {
 	// Run neuromorphic hardware simulation
 	for (int i = 0; i < timesteps; i++)
@@ -30,7 +30,7 @@ void sim_run(const int timesteps, struct technology *tech, struct core *cores,
 		//  on the host machine
 		clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-		sim_timestep(tech, results, cores, max_cores);
+		sim_timestep(tech, results, cores);
 
 		// Calculate elapsed time
 		clock_gettime(CLOCK_MONOTONIC, &ts_end);
@@ -43,27 +43,26 @@ void sim_run(const int timesteps, struct technology *tech, struct core *cores,
 }
 
 void sim_timestep(const struct technology *tech, struct sim_results *results,
-					struct core *cores, const int max_cores)
+							struct core *cores)
 {
 	long int spikes_sent;
 
-	sim_reset_measurements(cores, max_cores);
-	sim_seed_input_spikes(cores, max_cores);
+	sim_reset_measurements(cores, tech->max_cores);
+	sim_seed_input_spikes(cores, tech->max_cores);
 
-	spikes_sent = sim_route_spikes(tech, cores, max_cores);
+	spikes_sent = sim_route_spikes(tech, cores);
 	results->total_spikes += spikes_sent;
 	INFO("Spikes sent: %ld\n", spikes_sent);
-	sim_update_neurons(tech, cores, max_cores);
+	sim_update_neurons(tech, cores);
 
-	results->total_energy += sim_calculate_energy(cores, max_cores);
-	results->total_sim_time += sim_calculate_time(tech, cores, max_cores);
+	results->total_energy += sim_calculate_energy(cores, tech->max_cores);
+	results->total_sim_time += sim_calculate_time(tech, cores);
 }
 
-void sim_update_neurons(const struct technology *tech, struct core *cores,
-                                                        const int max_cores)
+void sim_update_neurons(const struct technology *tech, struct core *cores)
 {
 	#pragma omp parallel for
-	for (int i = 0; i < max_cores; i++)
+	for (int i = 0; i < tech->max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 		TRACE("Processing %d spikes.\n", c->spike_count);
@@ -101,8 +100,7 @@ void sim_update_neurons(const struct technology *tech, struct core *cores,
 	}
 }
 
-int sim_route_spikes(const struct technology *tech, struct core *cores,
-                                                        const int max_cores)
+int sim_route_spikes(const struct technology *tech, struct core *cores)
 {
 	const long int max_spikes = tech->max_compartments * tech->fan_out;
 	int total_spike_count, total_neurons_fired;
@@ -111,7 +109,7 @@ int sim_route_spikes(const struct technology *tech, struct core *cores,
 	total_neurons_fired = 0;
 
 	#pragma omp parallel for
-	for (int i = 0; i < max_cores; i++)
+	for (int i = 0; i < tech->max_cores; i++)
 	{
 		struct neuron *n, *post_neuron;
 		struct core *post_core, *c;
@@ -121,7 +119,7 @@ int sim_route_spikes(const struct technology *tech, struct core *cores,
 		//  MAX_CORES define, and the technology file must be <= this
 		//  limit. To avoid quite as much dynamic allocation
 		unsigned int *spike_packets = (unsigned int *)
-				malloc(max_cores * sizeof(unsigned int));
+				malloc(tech->max_cores * sizeof(unsigned int));
 		if (spike_packets == NULL)
 		{
 			INFO("Error: Failed to allocate memory.\n");
@@ -131,7 +129,7 @@ int sim_route_spikes(const struct technology *tech, struct core *cores,
 		c = &(cores[i]);
 		for (int j = 0; j < c->compartments; j++)
 		{
-			for (int k = 0; k < max_cores; k++)
+			for (int k = 0; k < tech->max_cores; k++)
 			{
 				spike_packets[k] = 0;
 			}
@@ -190,7 +188,7 @@ int sim_route_spikes(const struct technology *tech, struct core *cores,
 			}
 
 			// Estimate the energy needed to send spike packets
-			for (int k = 0; k < max_cores; k++)
+			for (int k = 0; k < tech->max_cores; k++)
 			{
 				int x_hops, y_hops;
 
@@ -279,8 +277,7 @@ void sim_update_potential(const struct technology *tech, struct neuron *n,
 	c->time += tech->time_active_neuron_update;
 }
 
-double sim_calculate_time(const struct technology *tech, struct core *cores,
-							const int max_cores)
+double sim_calculate_time(const struct technology *tech, struct core *cores)
 {
 	// Returns the simulation time of the current timestep.
 	//  This is calculated by finding the simulation time of each core,
@@ -289,7 +286,7 @@ double sim_calculate_time(const struct technology *tech, struct core *cores,
 	//  I'll just add an upper bound..
 	double max_time = 0; // s
 
-	for (int i = 0; i < max_cores; i++)
+	for (int i = 0; i < tech->max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 		max_time = fmax(max_time, c->time);

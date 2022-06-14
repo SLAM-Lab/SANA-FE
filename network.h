@@ -37,7 +37,7 @@ enum synapse_config_format
 #include "sim.h"
 #include "tech.h"
 void network_create_empty(struct core *cores, const struct technology *tech);
-void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores, const int max_cores, const struct technology *tech);
-void network_init(struct core *cores, const int max_cores, const struct technology *tech);
+void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores, const struct technology *tech);
+void network_init(struct core *cores, const struct technology *tech);
 
 #endif

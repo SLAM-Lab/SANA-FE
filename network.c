@@ -14,7 +14,7 @@
 const double dt = 1.0e-3; // Seconds
 
 void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
-			const int max_cores, const struct technology *tech)
+			const struct technology *tech)
 {
 	// Build arbitrary spiking network from a csv file
 	//
@@ -58,7 +58,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		}
 	}
 
-	network_init(cores, max_cores, tech);
+	network_init(cores, tech);
 	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
 	if (line == NULL)
 	{
@@ -284,12 +284,11 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	return;
 }
 
-void network_init(struct core *cores, const int max_cores,
-						const struct technology *tech)
+void network_init(struct core *cores, const struct technology *tech)
 {
 	// Initialize state of neuromorphic cores and all their compartments
-	INFO("Initializing %d cores.\n", max_cores);
-	for (int i = 0; i < max_cores; i++)
+	INFO("Initializing %d cores.\n", tech->max_cores);
+	for (int i = 0; i < tech->max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 
@@ -317,9 +316,9 @@ void network_init(struct core *cores, const int max_cores,
 			n->compartment = j;
 
 			n->post_connection_count = 0;
-                        n->input_rate = 0;
-                        n->log_spikes = 0;
-                        n->log_voltage = 0;
+			n->input_rate = 0;
+			n->log_spikes = 0;
+			n->log_voltage = 0;
 		}
 	}
 }

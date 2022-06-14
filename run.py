@@ -24,7 +24,7 @@ def run_sim(network, core_count):
 
     timesteps = 1
     command = ("./sim", "{0}".format(TECH_FILENAME), "{0}".format(timesteps),
-               "{0}".format(core_count), NETWORK_FILENAME)
+               NETWORK_FILENAME)
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
 
@@ -249,4 +249,4 @@ if __name__ == "__main__":
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("connected_spiking_time_loihi_only.png")
 
-    plt.show()
+    #plt.show()

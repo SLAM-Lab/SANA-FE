@@ -15,7 +15,6 @@ enum program_args
 {
 	TECHNOLOGY_FILENAME,
 	TIMESTEPS,
-	N_CORES,
 	NETWORK_FILENAME,
 	PROGRAM_NARGS,
 };
@@ -28,7 +27,7 @@ int main(int argc, char *argv[])
 	struct neuron **neuron_ptrs;
 	struct sim_results results;
 	char *filename, *input_buffer;
-	int timesteps, max_cores, max_neurons, max_input_line;
+	int timesteps, max_neurons, max_input_line;
 
 	filename = NULL;
 	input_fp = NULL;
@@ -97,15 +96,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-		sscanf(argv[N_CORES], "%d", &max_cores);
-	if ((max_cores <= 0) || (max_cores > tech.max_cores))
-	{
-		INFO("Cores must be > 0 and < %d (%d)\n", tech.max_cores,
-								max_cores);
-		exit(1);
-	}
-
-	max_neurons = max_cores * tech.max_compartments;
+	max_neurons = tech.max_cores * tech.max_compartments;
 	// Input line must be long enough to encode inputs for all neurons
 	//  simultaneously
 	max_input_line = 32 + (max_neurons*32);
@@ -119,9 +110,9 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	INFO("Allocating memory for %d cores.\n", max_cores);
-	cores = (struct core *) malloc(max_cores * sizeof(struct core));
-	for (int i = 0; i < max_cores; i++)
+	INFO("Allocating memory for %d cores.\n", tech.max_cores);
+	cores = (struct core *) malloc(tech.max_cores * sizeof(struct core));
+	for (int i = 0; i < tech.max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 		// Allocate each core, creating memory for the compartments i.e.
@@ -174,7 +165,7 @@ int main(int argc, char *argv[])
         {
             neuron_ptrs[i] = NULL;
         }
-	network_read_csv(network_fp, neuron_ptrs, cores, max_cores, &tech);
+	network_read_csv(network_fp, neuron_ptrs, cores, &tech);
 	fclose(network_fp);
 
 	// TODO: eventually we could have some simple commands like
@@ -198,16 +189,16 @@ int main(int argc, char *argv[])
 		//  same number of timesteps
 		while (fgets(input_buffer, max_input_line, input_fp))
 		{
-			next_inputs(input_buffer, cores, max_cores,
+			next_inputs(input_buffer, cores, tech.max_cores,
 								neuron_ptrs);
 			INFO("Next inputs set.\n");
-			sim_run(timesteps, &tech, cores, max_cores, &results);
+			sim_run(timesteps, &tech, cores, &results);
 		}
 	}
 	else
 	{
 		// Single step simulation, based on initial state of network
-		sim_run(timesteps, &tech, cores, max_cores, &results);
+		sim_run(timesteps, &tech, cores, &results);
 	}
 
 	INFO("Total simulated time: %es.\n", results.total_sim_time);
@@ -224,7 +215,7 @@ int main(int argc, char *argv[])
 	fclose(results_fp);
 
 	// Cleanup
-        for (int i = 0; i < max_cores; i++)
+        for (int i = 0; i < tech.max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 

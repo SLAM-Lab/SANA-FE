@@ -90,18 +90,18 @@ struct sim_results
 
 #include "tech.h"
 
-void sim_run(const int timesteps, struct technology *tech, struct core *cores, const int max_cores, struct sim_results *results);
-void sim_update_neurons(const struct technology *tech, struct core *cores, const int max_cores);
-int sim_route_spikes(const struct technology *tech, struct core *cores, const int max_cores);
+void sim_run(const int timesteps, struct technology *tech, struct core *cores, struct sim_results *results);
+void sim_update_neurons(const struct technology *tech, struct core *cores);
+int sim_route_spikes(const struct technology *tech, struct core *cores);
 void sim_update_potential(const struct technology *tech, struct neuron *n, struct core *c);
 void sim_seed_input_spikes(struct core *cores, const int max_cores);
-double sim_calculate_time(const struct technology *tech, struct core *cores, const int max_cores);
+double sim_calculate_time(const struct technology *tech, struct core *cores);
 void sim_reset_measurements(struct core *cores, const int max_cores);
 double sim_calculate_energy(struct core *cores, const int max_cores);
 struct timespec sim_calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 void sim_write_results(FILE *fp, struct sim_results *results);
 int sim_input(const double firing_probability);
-void sim_timestep(const struct technology *tech, struct sim_results *results, struct core *cores, const int max_cores);
+void sim_timestep(const struct technology *tech, struct sim_results *results, struct core *cores);
 
 
 #endif

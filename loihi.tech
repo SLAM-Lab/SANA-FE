@@ -4,7 +4,8 @@
 #  M. Davies et al
 
 # Loihi chip parameters
-max_cores 128
+#max_cores 128
+max_cores 2
 cores_per_tile 4
 max_compartments 1024
 fan_out 4096
