@@ -1,0 +1,30 @@
+# Energy and time estimates of different events, generated from SPICE
+#  simulations of Loihi.  All numbers were taken from:
+#  "Loihi: A Neuromorphic Manycore Processor with On-Chip Learning" (2018)
+#  M. Davies et al
+
+# Loihi chip parameters
+max_cores 128
+cores_per_tile 4
+max_compartments 1024
+fan_out 4096
+
+# Energy estimates in Joules
+energy_active_neuron_update 81.0e-12
+energy_inactive_neuron_update 52.0e-12
+energy_spike_op 23.6e-12
+energy_spike_within_tile 1.7e-12
+energy_east_west_hop 3.0e-12
+energy_north_south_hop 4.0e-12
+
+# Time estimates in seconds
+time_active_neuron_update 8.4e-9
+time_inactive_neuron_update 5.3e-9
+time_spike_op 3.5e-9
+time_spike_within_tile 2.1e-9
+time_east_west_hop 4.1e-9
+time_north_south_hop 6.5e-9
+# TODO: replace with a function that calculates based on the number of tiles
+#  used, the range is 113-465 ns (1-32 tiles).  At the moment most of my
+#  experiments are just using a single tile
+time_mesh_barrier 113.0e-9

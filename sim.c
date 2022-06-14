@@ -14,9 +14,10 @@
 #include <omp.h>
 
 #include "sim.h"
+#include "tech.h"
 #include "network.h"
 
-void sim_run(const int timesteps, struct core *cores,
+void sim_run(const int timesteps, struct technology *tech, struct core *cores,
                             const int max_cores, struct sim_results *results)
 {
 	// Run neuromorphic hardware simulation
@@ -29,7 +30,7 @@ void sim_run(const int timesteps, struct core *cores,
 		//  on the host machine
 		clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-		sim_timestep(results, cores, max_cores);
+		sim_timestep(tech, results, cores, max_cores);
 
 		// Calculate elapsed time
 		clock_gettime(CLOCK_MONOTONIC, &ts_end);
@@ -41,24 +42,25 @@ void sim_run(const int timesteps, struct core *cores,
 	}
 }
 
-void sim_timestep(struct sim_results *results, struct core *cores,
-			const int max_cores)
+void sim_timestep(const struct technology *tech, struct sim_results *results,
+					struct core *cores, const int max_cores)
 {
 	long int spikes_sent;
 
 	sim_reset_measurements(cores, max_cores);
 	sim_seed_input_spikes(cores, max_cores);
 
-	spikes_sent = sim_route_spikes(cores, max_cores);
+	spikes_sent = sim_route_spikes(tech, cores, max_cores);
 	results->total_spikes += spikes_sent;
 	INFO("Spikes sent: %ld\n", spikes_sent);
-	sim_update_neurons(cores, max_cores);
+	sim_update_neurons(tech, cores, max_cores);
 
 	results->total_energy += sim_calculate_energy(cores, max_cores);
-	results->total_sim_time += sim_calculate_time(cores, max_cores);
+	results->total_sim_time += sim_calculate_time(tech, cores, max_cores);
 }
 
-void sim_update_neurons(struct core *cores, const int max_cores)
+void sim_update_neurons(const struct technology *tech, struct core *cores,
+                                                        const int max_cores)
 {
 	#pragma omp parallel for
 	for (int i = 0; i < max_cores; i++)
@@ -71,15 +73,15 @@ void sim_update_neurons(struct core *cores, const int max_cores)
 		{
 			struct neuron *n = &(c->neurons[j]);
 			// Add synaptic current and apply leak to all neurons
-			sim_update_potential(n, c);
+			sim_update_potential(tech, n, c);
 		}
 
 		// Update the remainder of the neurons in the core (inactive)
 		//for (int j = c->compartments; j < MAX_COMPARTMENTS; j++)
 		//{
 		//	struct neuron *n = &(c->neurons[j]);
-		//	n->energy += INACTIVE_NEURON_UPDATE_ENERGY;
-		//	n->time += INACTIVE_NEURON_UPDATE_TIME;
+		//	n->energy += tech->energy_inactive_neuron_update;
+		//	n->time += tech->time_inactive_neuron_update;
 		//}
 
 		// Check to see which neurons have fired
@@ -92,15 +94,17 @@ void sim_update_neurons(struct core *cores, const int max_cores)
 				n->potential = n->reset;
 				// Add the "within-tile" spike energy, this is
 				//  the minimum cost of sending a spike
-				c->energy += SPIKE_WITHIN_TILE_ENERGY;
-				c->time += SPIKE_WITHIN_TILE_TIME;
+				c->energy += tech->energy_spike_within_tile;
+				c->time += tech->time_spike_within_tile;
 			}
 		}
 	}
 }
 
-int sim_route_spikes(struct core *cores, const int max_cores)
+int sim_route_spikes(const struct technology *tech, struct core *cores,
+                                                        const int max_cores)
 {
+	const long int max_spikes = tech->max_compartments * tech->fan_out;
 	int total_spike_count, total_neurons_fired;
 
 	total_spike_count = 0;
@@ -113,11 +117,20 @@ int sim_route_spikes(struct core *cores, const int max_cores)
 		struct core *post_core, *c;
 		struct synapse *synapse_ptr;
 
+		// TODO: this is kind of horrible, maybe we should enforce a
+		//  MAX_CORES define, and the technology file must be <= this
+		//  limit. To avoid quite as much dynamic allocation
+		unsigned int *spike_packets = (unsigned int *)
+				malloc(max_cores * sizeof(unsigned int));
+		if (spike_packets == NULL)
+		{
+			INFO("Error: Failed to allocate memory.\n");
+			exit(1);
+		}
+
 		c = &(cores[i]);
 		for (int j = 0; j < c->compartments; j++)
 		{
-			unsigned int spike_packets[MAX_CORES_LOIHI];
-
 			for (int k = 0; k < max_cores; k++)
 			{
 				spike_packets[k] = 0;
@@ -136,7 +149,7 @@ int sim_route_spikes(struct core *cores, const int max_cores)
 			//  Only generate one spike packet per core, that the
 			//  neuron is broadcasting to
 			assert(n->post_connection_count >= 0);
-			assert(n->post_connection_count <= FAN_OUT);
+			assert(n->post_connection_count <= tech->fan_out);
 
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
@@ -160,13 +173,13 @@ int sim_route_spikes(struct core *cores, const int max_cores)
 				#pragma omp atomic
 				post_neuron->current += synapse_ptr->weight;
 				#pragma omp atomic
-				post_core->energy += SPIKE_OP_ENERGY;
+				post_core->energy += tech->energy_spike_op;
 				#pragma omp atomic
-				post_core->time += SPIKE_OP_TIME;
+				post_core->time += tech->time_spike_op;
 
 				#pragma omp atomic
 				post_core->spike_count++;
-				assert(post_core->spike_count <= MAX_SPIKES);
+				assert(post_core->spike_count <= max_spikes);
 				#pragma omp atomic
 				total_spike_count++;
 
@@ -193,23 +206,24 @@ int sim_route_spikes(struct core *cores, const int max_cores)
 					y_hops = abs(post_core->y - c->y);
 					// E-W hops
 					#pragma omp atomic
-					post_core->energy +=
-						x_hops * EAST_WEST_HOP_ENERGY;
+					post_core->energy += x_hops *
+						tech->energy_east_west_hop;
 					#pragma omp atomic
-					post_core->time +=
-						x_hops * EAST_WEST_HOP_TIME;
+					post_core->time += x_hops *
+						tech->time_east_west_hop;
 					// N-S hops
 					#pragma omp atomic
-					post_core->energy +=
-						y_hops * NORTH_SOUTH_HOP_ENERGY;
+					post_core->energy += y_hops *
+						tech->energy_north_south_hop;
 					#pragma omp atomic
-					post_core->time +=
-						y_hops * NORTH_SOUTH_HOP_TIME;
+					post_core->time += y_hops *
+						tech->time_north_south_hop;
 				}
 			}
 
 			n->fired = 0; // Reset the neuron for the next time step
 		}
+		free(spike_packets);
 	}
 	INFO("Total neurons firing: %d\n", total_neurons_fired);
 
@@ -242,7 +256,8 @@ void sim_seed_input_spikes(struct core *cores, const int max_cores)
 	}
 }
 
-void sim_update_potential(struct neuron *n, struct core *c)
+void sim_update_potential(const struct technology *tech, struct neuron *n,
+                          					struct core *c)
 {
 	// Current based (CUBA) LIF neuron model as implemented by Loihi
 	n->current *= n->current_decay;
@@ -260,11 +275,12 @@ void sim_update_potential(struct neuron *n, struct core *c)
 
 	TRACE("Updating potential, after:%f\n", n->potential);
 
-	c->energy += ACTIVE_NEURON_UPDATE_ENERGY;
-	c->time += ACTIVE_NEURON_UPDATE_TIME;
+	c->energy += tech->energy_active_neuron_update;
+	c->time += tech->time_active_neuron_update;
 }
 
-double sim_calculate_time(struct core *cores, const int max_cores)
+double sim_calculate_time(const struct technology *tech, struct core *cores,
+							const int max_cores)
 {
 	// Returns the simulation time of the current timestep.
 	//  This is calculated by finding the simulation time of each core,
@@ -280,7 +296,7 @@ double sim_calculate_time(struct core *cores, const int max_cores)
 	}
 
 	// Add the mesh-wide barrier sync time (assuming worst case of 32 tiles)
-	max_time += MESH_BARRIER_TIME;
+	max_time += tech->time_mesh_barrier;
 	INFO("Simulated time for step is:%es\n", max_time);
 
 	return max_time;

@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 MAX_COMPARTMENTS = 1024
 MAX_CORES = 128
 NETWORK_FILENAME = "connected_layer.csv"
+TECH_FILENAME = "loihi.tech"
 
 def run_sim(network, core_count):
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset", "Is Input",
@@ -22,8 +23,8 @@ def run_sim(network, core_count):
         writer.writerows(network)
 
     timesteps = 1
-    command = ("./sim", "{0}".format(timesteps), "{0}".format(core_count),
-               NETWORK_FILENAME)
+    command = ("./sim", "{0}".format(TECH_FILENAME), "{0}".format(timesteps),
+               "{0}".format(core_count), NETWORK_FILENAME)
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
 

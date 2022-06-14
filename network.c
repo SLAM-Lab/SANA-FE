@@ -14,7 +14,7 @@
 const double dt = 1.0e-3; // Seconds
 
 void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
-							const int max_cores)
+			const int max_cores, const struct technology *tech)
 {
 	// Build arbitrary spiking network from a csv file
 	//
@@ -30,17 +30,35 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	//  synapses each with a smaller number of fields.
 	//
 	// See network.h to see all the fields and what they mean
-	char neuron_fields[NEURON_FIELDS + (FAN_OUT*SYNAPSE_FIELDS)]
-							[MAX_FIELD_LEN];
 	struct core *c;
 	struct neuron *n, *src, *dest;
 	struct synapse *s;
 	char *token, *line;
 	float weight;
         int neuron_count, core_id, field_count, ret, neuron_id, dest_id;
-	const int max_fields = NEURON_FIELDS + (FAN_OUT*SYNAPSE_FIELDS);
 
-	network_init(cores, max_cores);
+	const int max_fields = NEURON_FIELDS + (tech->fan_out * SYNAPSE_FIELDS);
+	const int max_neurons = tech->max_compartments * tech->max_cores;
+
+	// Allocate memory to hold the string fields for each neuron description
+	//  In the file, one line describes one neuron
+	char **neuron_fields = (char **) malloc(max_fields * sizeof(char *));
+	if (neuron_fields == NULL)
+	{
+		INFO("Error: Failed to allocate memory for network inputs.\n");
+		exit(1);
+	}
+	for (int i = 0; i < max_fields; i++)
+	{
+		neuron_fields[i] = (char *) malloc(MAX_FIELD_LEN * sizeof(char));
+		if (neuron_fields[i] == NULL)
+		{
+			INFO("Error: Failed to allocate memory of network inputs.\n");
+			exit(1);
+		}
+	}
+
+	network_init(cores, max_cores, tech);
 	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
 	if (line == NULL)
 	{
@@ -49,12 +67,13 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	}
 
 	neuron_count = 0;
+
 	while (fgets(line, MAX_CSV_LINE, fp))
 	{
-		if (neuron_count >= MAX_NEURONS)
+		if (neuron_count >= max_neurons)
 		{
 			INFO("Error: inputting too many neurons, max is %d",
-								MAX_NEURONS);
+								max_neurons);
 			exit(1);
 		}
 
@@ -128,10 +147,10 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		n = &(c->neurons[c->compartments]);
 
 		c->compartments++;
-		if (c->compartments > MAX_COMPARTMENTS)
+		if (c->compartments > tech->max_compartments)
 		{
 			INFO("Error: For core %d, #compartments (%d) > %d.\n",
-				c->id, c->compartments, MAX_COMPARTMENTS);
+				c->id, c->compartments, tech->max_compartments);
 		}
 
 		// Parse related neuron parameters
@@ -204,7 +223,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 							neuron_fields[i]);
 		}
 
-		for (int i = 0; i < FAN_OUT; i++)
+		for (int i = 0; i < tech->fan_out; i++)
 		{
 			const int curr_synapse_field = NEURON_FIELDS +
 							(i*SYNAPSE_FIELDS);
@@ -256,11 +275,17 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		}
 	}
 
+	for (int i = 0; i < max_fields; i++)
+	{
+		free(neuron_fields[i]);
+	}
+	free(neuron_fields);
 	free(line);
 	return;
 }
 
-void network_init(struct core *cores, const int max_cores)
+void network_init(struct core *cores, const int max_cores,
+						const struct technology *tech)
 {
 	// Initialize state of neuromorphic cores and all their compartments
 	INFO("Initializing %d cores.\n", max_cores);
@@ -275,10 +300,10 @@ void network_init(struct core *cores, const int max_cores)
 		// Loihi is organised in a 2D mesh of 32 tiles (8x4)
 		//  Groups of 4 cores share a router, forming a tile
 		//  Routers are then connected in the mesh, allowing multi-hop
-		c->x = (i / CORES_PER_TILE) % 8;
-		c->y = (i / CORES_PER_TILE) / 8;
+		c->x = (i / tech->cores_per_tile) % 8;
+		c->y = (i / tech->cores_per_tile) / 8;
 
-		for (int j = 0; j < MAX_COMPARTMENTS; j++)
+		for (int j = 0; j < tech->max_compartments; j++)
 		{
 			struct neuron *n;
 			int neuron_id;
@@ -287,7 +312,7 @@ void network_init(struct core *cores, const int max_cores)
 			n->core_id = c->id;
 
 			// Simply assign neurons in ascending order from core 0
-			neuron_id = (i * MAX_COMPARTMENTS) + j;
+			neuron_id = (i * tech->max_compartments) + j;
 			n->id = neuron_id;
 			n->compartment = j;
 
@@ -299,14 +324,14 @@ void network_init(struct core *cores, const int max_cores)
 	}
 }
 
-void network_create_empty(struct core *cores)
+void network_create_empty(struct core *cores, const struct technology *tech)
 {
 	// Initialize an empty network, where cores have no connections between
 	//  neurons
-	INFO("Creating empty network with %d cores.\n", MAX_CORES_LOIHI);
+	INFO("Creating empty network with %d cores.\n", tech->max_cores);
 
 	// Initialise network with no connections
-	for (int i = 0; i < MAX_CORES_LOIHI; i++)
+	for (int i = 0; i < tech->max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 		for (int j = 0; j < c->compartments; j++)
