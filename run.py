@@ -15,7 +15,7 @@ NETWORK_FILENAME = "connected_layer.csv"
 TECH_FILENAME = "loihi.tech"
 
 def run_sim(network, core_count):
-    fields = ["Neuron ID", "Core ID", "Threshold", "Reset", "Is Input",
+    fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
               "Log Spikes", "Log Voltage", "Synapse Info..."]
     with open(NETWORK_FILENAME, "w") as csv_file:
         writer = csv.writer(csv_file)
@@ -37,12 +37,10 @@ def run_sim(network, core_count):
 def fully_connected(layer_neurons, spiking=True):
     # Two layers, fully connected
     network = []
-    if spiking:
+    if spiking:  # always spike
         threshold = -1.0
-        is_input = 1
     else:  # never spike
         threshold = 2*layer_neurons
-        is_input = 0
 
     weight = 1.0
     reset = 0

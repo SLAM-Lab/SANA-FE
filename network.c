@@ -14,7 +14,7 @@
 const double dt = 1.0e-3; // Seconds
 
 void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
-			const struct technology *tech)
+			const struct technology *tech, struct input *inputs)
 {
 	// Build arbitrary spiking network from a csv file
 	//
@@ -32,10 +32,12 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	// See network.h to see all the fields and what they mean
 	struct core *c;
 	struct neuron *n, *src, *dest;
+	struct input *input_ptr;
 	struct synapse *s;
 	char *token, *line;
 	float weight;
-        int neuron_count, core_id, field_count, ret, neuron_id, dest_id;
+        int neuron_count, input_count, core_id, field_count, ret, neuron_id;
+	int dest_id, curr_input, is_input;
 
 	const int max_fields = NEURON_FIELDS + (tech->fan_out * SYNAPSE_FIELDS);
 	const int max_neurons = tech->max_compartments * tech->max_cores;
@@ -50,10 +52,11 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	}
 	for (int i = 0; i < max_fields; i++)
 	{
-		neuron_fields[i] = (char *) malloc(MAX_FIELD_LEN * sizeof(char));
+		neuron_fields[i] =
+				(char *) malloc(MAX_FIELD_LEN * sizeof(char));
 		if (neuron_fields[i] == NULL)
 		{
-			INFO("Error: Failed to allocate memory of network inputs.\n");
+			INFO("Error: Failed to allocate memory for text.\n");
 			exit(1);
 		}
 	}
@@ -62,11 +65,12 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
 	if (line == NULL)
 	{
-		INFO("Error: Couldn't allocate memory for network inputs.\n");
+		INFO("Error: Couldn't allocate memory for text input.\n");
 		exit(1);
 	}
 
 	neuron_count = 0;
+	input_count = 0;
 
 	while (fgets(line, MAX_CSV_LINE, fp))
 	{
@@ -111,9 +115,21 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 							neuron_fields[i]);
 		}
 
-		ret = sscanf(neuron_fields[NEURON_ID], "%d", &neuron_id);
-		// The first field in the CSV is mostly just a label for
-		//  readability.  It won't have any effect on the input
+		is_input = (neuron_fields[NEURON_ID][0] == 'i');
+		if (is_input)
+		{
+			TRACE("Creating network input %d.\n", input_count);
+			input_count++;
+			assert(input_count < tech->max_inputs);
+			continue;
+		}
+		else // This line is defining a neuron
+		{
+			ret = sscanf(neuron_fields[NEURON_ID], "%d",
+								&neuron_id);
+		}
+
+		// Parse the neuron id
 		if (ret <= 0)
 		{
 			// Couldn't parse the neuron id field
@@ -130,7 +146,6 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 						neuron_fields[NEURON_ID]);
 				exit(1);
 			}
-			continue;
 		}
 		else if (neuron_id != neuron_count)
 		{
@@ -157,7 +172,6 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		sscanf(neuron_fields[THRESHOLD_VOLTAGE], "%lf",
 							&(n->threshold));
 		sscanf(neuron_fields[RESET_VOLTAGE], "%lf", &(n->reset));
-		sscanf(neuron_fields[INPUT_RATE], "%lf", &(n->input_rate));
 		sscanf(neuron_fields[RECORD_SPIKES], "%d", &(n->log_spikes));
 		sscanf(neuron_fields[RECORD_VOLTAGE], "%d", &(n->log_voltage));
 
@@ -173,6 +187,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	}
 	INFO("Created %d neurons.\n", neuron_count);
 
+	curr_input = 0;
 	// Next parse the whole file again, but this time read the synapse data
 	fseek(fp, 0, SEEK_SET);
 	while (fgets(line, MAX_CSV_LINE, fp))
@@ -187,8 +202,8 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		token = strtok(line, ",");
 		while (token != NULL)
 		{
-			// This time read all the fields in the line, we're
-			//  interested in the synapse data
+			// This time read all the fields in the line, but we're
+			//  only interested in the synapse data
 			strncpy(neuron_fields[field_count], token,
 								MAX_FIELD_LEN);
 			token = strtok(NULL, ",");
@@ -204,23 +219,38 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		// Use the first field (the neuron number) to figure if this
 		//  is a valid formatted line or not. Since this is the
 		//  second pass we know this field is valid
-		ret = sscanf(neuron_fields[NEURON_ID], "%d", &neuron_id);
-		if (ret <= 0)
+		is_input = (neuron_fields[NEURON_ID][0] == 'i');
+		if (is_input)
 		{
-			// Couldn't parse the neuron id field
-			TRACE("Header detected, skipping.\n");
-			continue;
+			// An input is a virtual connnection - it isn't
+			//  associated with a neuron on the chip, but is
+			//  connected to other on chip neurons
+			src = NULL;
+			c = NULL;
+			input_ptr = &(inputs[curr_input]);
+			TRACE("Parsing network input: %d.\n", curr_input);
+			curr_input++;
 		}
-
-		// Now parse all the outgoing synaptic connections for this
-		//  neuron
-		src = neuron_ptrs[neuron_id];
-		c = &(cores[src->core_id]);
-
-		for (int i = 0; i < field_count; i++)
+		else
 		{
-			TRACE("nid:%ld Parsed field: %s\n", neuron_id,
+			ret = sscanf(neuron_fields[NEURON_ID], "%d",
+								&neuron_id);
+			if (ret <= 0)
+			{
+				// Couldn't parse the neuron id field
+				TRACE("Header detected, skipping.\n");
+				continue;
+			}
+			// Now parse all the outgoing synaptic connections for
+			//  this neuron
+			src = neuron_ptrs[neuron_id];
+			c = &(cores[src->core_id]);
+
+			for (int i = 0; i < field_count; i++)
+			{
+				TRACE("nid:%ld Parsed field: %s\n", neuron_id,
 							neuron_fields[i]);
+			}
 		}
 
 		for (int i = 0; i < tech->fan_out; i++)
@@ -259,16 +289,24 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 								"%f", &weight);
 			dest = neuron_ptrs[dest_id];
 			// Create the new synapse and add it to the end out
-			//  the fan-out list
-			//  core
-			s = &(c->synapses[src->compartment]
+			//  the fan-out list core
+			if (is_input)
+			{
+				s = &(input_ptr->synapses[
+					input_ptr->post_connection_count]);
+				s->pre_neuron = NULL;
+				s->post_neuron = dest;
+				input_ptr->post_connection_count++;
+			}
+			else
+			{
+				s = &(c->synapses[src->compartment]
 						[src->post_connection_count]);
-			s->pre_neuron = src;
-			s->post_neuron = dest;
+				s->pre_neuron = src;
+				s->post_neuron = dest;
+				src->post_connection_count++;
+			}
 			s->weight = weight;
-			// Now log the extra connection in the presynaptic
-			//  neuron
-			src->post_connection_count++;
 			TRACE("Created synapse %d->%d (w:%f)\n",
 				s->pre_neuron->id, s->post_neuron->id,
 				s->weight);
@@ -286,9 +324,11 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 
 void network_init(struct core *cores, const struct technology *tech)
 {
+	const int max_cores = tech->max_cores;
+
 	// Initialize state of neuromorphic cores and all their compartments
-	INFO("Initializing %d cores.\n", tech->max_cores);
-	for (int i = 0; i < tech->max_cores; i++)
+	INFO("Initializing %d cores.\n", max_cores);
+	for (int i = 0; i < max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 

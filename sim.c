@@ -18,19 +18,24 @@
 #include "network.h"
 
 void sim_run(const int timesteps, struct technology *tech, struct core *cores,
-                				struct sim_results *results)
+                	struct sim_results *results, struct input *inputs)
 {
 	// Run neuromorphic hardware simulation
 	for (int i = 0; i < timesteps; i++)
 	{
 		struct timespec ts_start, ts_end, ts_elapsed;
+		struct sim_results timestep_results;
 
 		INFO("*** Time-step %d ***\n", i+1);
 		// Measure the wall-clock time taken to run the simulation
 		//  on the host machine
 		clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-		sim_timestep(tech, results, cores);
+		timestep_results = sim_timestep(tech, cores, inputs);
+		// Accumulate totals for the entire simulation
+		results->total_energy += timestep_results.total_energy;
+		results->total_sim_time += timestep_results.total_sim_time;
+		results->total_spikes += timestep_results.total_spikes;
 
 		// Calculate elapsed time
 		clock_gettime(CLOCK_MONOTONIC, &ts_end);
@@ -42,21 +47,25 @@ void sim_run(const int timesteps, struct technology *tech, struct core *cores,
 	}
 }
 
-void sim_timestep(const struct technology *tech, struct sim_results *results,
-							struct core *cores)
+struct sim_results sim_timestep(const struct technology *tech,
+				struct core *cores, const struct input *inputs)
 {
+	struct sim_results results;
 	long int spikes_sent;
 
+	spikes_sent = sim_input_spikes(tech, cores, inputs);
 	sim_reset_measurements(cores, tech->max_cores);
-	sim_seed_input_spikes(cores, tech->max_cores);
+	spikes_sent += sim_route_spikes(tech, cores);
 
-	spikes_sent = sim_route_spikes(tech, cores);
-	results->total_spikes += spikes_sent;
-	INFO("Spikes sent: %ld\n", spikes_sent);
+
 	sim_update_neurons(tech, cores);
 
-	results->total_energy += sim_calculate_energy(cores, tech->max_cores);
-	results->total_sim_time += sim_calculate_time(tech, cores);
+	results.total_energy = sim_calculate_energy(cores, tech->max_cores);
+	results.total_sim_time = sim_calculate_time(tech, cores);
+	INFO("Spikes sent: %ld\n", spikes_sent);
+	results.total_spikes = spikes_sent;
+
+	return results;
 }
 
 void sim_update_neurons(const struct technology *tech, struct core *cores)
@@ -111,24 +120,22 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 	#pragma omp parallel for
 	for (int i = 0; i < tech->max_cores; i++)
 	{
-		struct neuron *n, *post_neuron;
-		struct core *post_core, *c;
-		struct synapse *synapse_ptr;
+		struct core *c;
+		// TODO: move spike_packets into core struct
+		unsigned int *spike_packets;
 
-		// TODO: this is kind of horrible, maybe we should enforce a
-		//  MAX_CORES define, and the technology file must be <= this
-		//  limit. To avoid quite as much dynamic allocation
-		unsigned int *spike_packets = (unsigned int *)
+		spike_packets = (unsigned int *)
 				malloc(tech->max_cores * sizeof(unsigned int));
 		if (spike_packets == NULL)
 		{
 			INFO("Error: Failed to allocate memory.\n");
 			exit(1);
 		}
-
 		c = &(cores[i]);
 		for (int j = 0; j < c->compartments; j++)
 		{
+			struct neuron *n;
+
 			for (int k = 0; k < tech->max_cores; k++)
 			{
 				spike_packets[k] = 0;
@@ -151,6 +158,10 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
+				struct core *post_core;
+				struct neuron *post_neuron;
+				struct synapse *synapse_ptr;
+
 				synapse_ptr = &(c->synapses[j][k]);
 				assert(n);
 				assert(synapse_ptr);
@@ -190,8 +201,6 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 			// Estimate the energy needed to send spike packets
 			for (int k = 0; k < tech->max_cores; k++)
 			{
-				int x_hops, y_hops;
-
 				// TODO: I think the code below should be a
 				//  function and sim_send_spike can be inlined
 				//  again?
@@ -199,7 +208,9 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 				{
 					// Calculate the energy and time for
 					//  sending spike packets
-					post_core = &(cores[k]);
+					struct core *post_core = &(cores[k]);
+					int x_hops, y_hops;
+
 					x_hops = abs(post_core->x - c->x);
 					y_hops = abs(post_core->y - c->y);
 					// E-W hops
@@ -228,30 +239,52 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 	return total_spike_count;
 }
 
-void sim_send_spike(struct synapse *s)
-{
+//void sim_send_spike(struct synapse *s)
+//{
+//
+//}
 
-}
-
-void sim_seed_input_spikes(struct core *cores, const int max_cores)
+int sim_input_spikes(const struct technology *tech, struct core *cores,
+			const struct input *inputs)
 {
+	int input_spike_count = 0;
+
 	// Seed all externally input spikes in the network for this timestep
-	#pragma omp parallel for
-	for (int i = 0; i < max_cores; i++)
+	INFO("Seeding %d inputs.\n", tech->max_inputs);
+	for (int i = 0; i < tech->max_inputs; i++)
 	{
-		struct core *c = &(cores[i]);
+		const struct input *in = &(inputs[i]);
 
-		for (int j = 0; j < c->compartments; j++)
+		if ((in == NULL) || (!in->send_spike))
 		{
-			struct neuron *n = &(c->neurons[j]);
-			int is_input = (n->input_rate > 0);
+			continue;
+		}
 
-			if (is_input)
-			{
-				n->fired |= sim_input(n->input_rate);
-			}
+		for (int j = 0; j < in->post_connection_count; j++)
+		{
+			// Send a spike to all neurons connected to this input
+			//  Normally, we would have a number of input dimensions
+			//  for a given network
+			struct core *post_core;
+			struct neuron *post_neuron;
+			struct synapse *synapse_ptr;
+
+			synapse_ptr = &(in->synapses[j]);
+			assert(synapse_ptr);
+
+			post_neuron = synapse_ptr->post_neuron;
+			post_core = &(cores[post_neuron->core_id]);
+
+			post_neuron->current += synapse_ptr->weight;
+			post_core->energy += tech->energy_spike_op;
+			post_core->time += tech->time_spike_op;
+
+			post_core->spike_count++;
+			input_spike_count++;
 		}
 	}
+
+	return input_spike_count;
 }
 
 void sim_update_potential(const struct technology *tech, struct neuron *n,
@@ -322,19 +355,6 @@ void sim_reset_measurements(struct core *cores, const int max_cores)
 		c->energy = 0;
 		c->time = 0;
 	}
-}
-
-int sim_input(const double firing_probability)
-{
-	// Simulate a single external input (as one neuron) for a timestep
-	//  Return 1 if the input fires, 0 otherwise
-	double rand_uniform;
-	int input_fired;
-
-	rand_uniform = (double) rand() / RAND_MAX;
-	input_fired = (rand_uniform < firing_probability);
-
-	return input_fired;
 }
 
 struct timespec sim_calculate_elapsed_time(struct timespec ts_start,

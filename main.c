@@ -24,10 +24,11 @@ int main(int argc, char *argv[])
 	FILE *input_fp, *network_fp, *results_fp, *tech_fp;
 	struct technology tech;
 	struct core *cores;
+	struct input *inputs;
 	struct neuron **neuron_ptrs;
 	struct sim_results results;
 	char *filename, *input_buffer;
-	int timesteps, max_neurons, max_input_line;
+	int timesteps, max_neurons, max_input_line, max_cores;
 
 	filename = NULL;
 	input_fp = NULL;
@@ -69,7 +70,7 @@ int main(int argc, char *argv[])
 	if (argc < PROGRAM_NARGS)
 	{
 		INFO("Usage: ./sim [-i <input vectors>] <tech file> <timesteps>"
-						"<cores> <neuron config>\n");
+						" <neuron config>\n");
 		exit(1);
 	}
 
@@ -88,6 +89,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	tech_read_file(&tech, tech_fp);
+	max_cores = tech.max_cores;
 
 	sscanf(argv[TIMESTEPS], "%d", &timesteps);
 	if (timesteps <= 0)
@@ -96,7 +98,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	max_neurons = tech.max_cores * tech.max_compartments;
+	max_neurons = max_cores * tech.max_compartments;
 	// Input line must be long enough to encode inputs for all neurons
 	//  simultaneously
 	max_input_line = 32 + (max_neurons*32);
@@ -110,9 +112,36 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	INFO("Allocating memory for %d cores.\n", tech.max_cores);
-	cores = (struct core *) malloc(tech.max_cores * sizeof(struct core));
-	for (int i = 0; i < tech.max_cores; i++)
+	// Create all the input nodes, where we can feed input spikes into the
+	//  network if needed
+	INFO("Allocating memory for %d inputs.\n", tech.max_inputs);
+	inputs = (struct input *)
+				malloc(tech.max_inputs * sizeof(struct input));
+	if (inputs == NULL)
+	{
+		INFO("Failed to allocate input memory.\n");
+		exit(1);
+	}
+	// Zero initialize the inputs
+	for (int i = 0; i < tech.max_inputs; i++)
+	{
+		struct input *in = &(inputs[i]);
+
+		in->synapses = (struct synapse *) malloc(tech.fan_out *
+							sizeof(struct synapse));
+		in->post_connection_count = 0;
+		in->send_spike = 0;
+		if (in->synapses == NULL)
+		{
+			INFO("Failed to allocate input synapse memory.\n");
+			exit(1);
+		}
+	}
+
+	INFO("Allocating memory for %d cores.\n", max_cores);
+	cores = (struct core *) malloc(max_cores * sizeof(struct core));
+
+	for (int i = 0; i < max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 		// Allocate each core, creating memory for the compartments i.e.
@@ -165,7 +194,7 @@ int main(int argc, char *argv[])
         {
             neuron_ptrs[i] = NULL;
         }
-	network_read_csv(network_fp, neuron_ptrs, cores, &tech);
+	network_read_csv(network_fp, neuron_ptrs, cores, &tech, inputs);
 	fclose(network_fp);
 
 	// TODO: eventually we could have some simple commands like
@@ -191,18 +220,18 @@ int main(int argc, char *argv[])
 		{
 			next_inputs(input_buffer, cores, tech.max_cores,
 								neuron_ptrs);
-			INFO("Next inputs set.\n");
-			sim_run(timesteps, &tech, cores, &results);
+			sim_run(timesteps, &tech, cores, &results, inputs);
 		}
 	}
 	else
 	{
 		// Single step simulation, based on initial state of network
-		sim_run(timesteps, &tech, cores, &results);
+		sim_run(timesteps, &tech, cores, &results, inputs);
 	}
 
 	INFO("Total simulated time: %es.\n", results.total_sim_time);
 	INFO("Total energy calculated: %eJ.\n", results.total_energy);
+	INFO("Total spikes processed: %ld.\n", results.total_spikes);
 	INFO("Average power consumption: %fW.\n",
 				results.total_energy / results.total_sim_time);
 	INFO("Run finished.\n");
@@ -215,7 +244,7 @@ int main(int argc, char *argv[])
 	fclose(results_fp);
 
 	// Cleanup
-        for (int i = 0; i < tech.max_cores; i++)
+        for (int i = 0; i < max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 
@@ -226,9 +255,16 @@ int main(int argc, char *argv[])
 		}
 		free(c->synapses);
 	}
+	for (int i = 0; i < tech.max_inputs; i++)
+	{
+		struct input *in = &(inputs[i]);
+
+		free(in->synapses);
+	}
 	free(cores);
 	free(neuron_ptrs);
 	free(input_buffer);
+	free(inputs);
 
 	return 0;
 }
@@ -262,6 +298,19 @@ void next_inputs(char *buffer, struct core *cores, const int max_cores,
 		token = strtok(NULL, ",");
 		neuron_count++;
 	}
+}
+
+int sim_input(const double firing_probability)
+{
+	// Simulate a single external input (as one neuron) for a timestep
+	//  Return 1 if the input fires, 0 otherwise
+	double rand_uniform;
+	int input_fired;
+
+	rand_uniform = (double) rand() / RAND_MAX;
+	input_fired = (rand_uniform < firing_probability);
+
+	return input_fired;
 }
 
 void init_results(struct sim_results *results)

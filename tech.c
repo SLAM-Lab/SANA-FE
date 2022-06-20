@@ -11,6 +11,7 @@
 void tech_init(struct technology *tech)
 {
         tech->max_cores = 0;
+	tech->max_inputs = 0;
         tech->cores_per_tile = 0;
         tech->max_compartments = 0;
         tech->fan_out = 0;
@@ -75,6 +76,10 @@ void tech_read_parameter(struct technology *tech, char *line)
 	else if (strcmp("max_compartments", metric_str) == 0)
 	{
 		sscanf(value_str, "%d", &tech->max_compartments);
+	}
+	else if (strcmp("max_inputs", metric_str) == 0)
+	{
+		sscanf(value_str, "%d", &(tech->max_inputs));
 	}
 	else if (strcmp("cores_per_tile", metric_str) == 0)
 	{

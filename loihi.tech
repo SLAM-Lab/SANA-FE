@@ -9,6 +9,7 @@ max_cores 2
 cores_per_tile 4
 max_compartments 1024
 fan_out 4096
+max_inputs 1024
 
 # Energy estimates in Joules
 energy_active_neuron_update 81.0e-12
