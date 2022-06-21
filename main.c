@@ -3,13 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "sim.h"
 #include "tech.h"
 #include "network.h"
 
 void init_results(struct sim_results *results);
+void run(struct technology *tech, struct core *cores, struct sim_results *results, struct input *inputs, FILE *probe_spikes_fp, FILE *probe_potential_fp);
 //void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
+struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
+int parse_dvs(FILE *fp, struct input *inputs, const int max_inputs);
 
 enum program_args
 {
@@ -22,6 +26,7 @@ enum program_args
 int main(int argc, char *argv[])
 {
 	FILE *input_fp, *network_fp, *results_fp, *tech_fp;
+	FILE *probe_spikes_fp, *probe_potential_fp;
 	struct technology tech;
 	struct core *cores;
 	struct input *inputs;
@@ -35,6 +40,8 @@ int main(int argc, char *argv[])
 	network_fp = NULL;
 	results_fp = NULL;
 	input_buffer = NULL;
+	probe_spikes_fp = NULL;
+	probe_potential_fp = NULL;
 
 	if (argc < 1)
 	{
@@ -76,8 +83,6 @@ int main(int argc, char *argv[])
 
 	// Initialize the technology parameters - the chip parameters and key
 	//  metrics
-	// TODO: now we have fully parameterized technology variables, N_CORES
-	//  is redundant - we can just set this correctly in the file
 	tech_init(&tech);
 
 	// Read in program args, sanity check and parse inputs
@@ -112,8 +117,8 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	// Create all the input nodes, where we can feed input spikes into the
-	//  network if needed
+	// Create all the input nodes, which are the interface between
+	//  externally generated spike trains and our spiking network
 	INFO("Allocating memory for %d inputs.\n", tech.max_inputs);
 	inputs = (struct input *)
 				malloc(tech.max_inputs * sizeof(struct input));
@@ -122,7 +127,7 @@ int main(int argc, char *argv[])
 		INFO("Failed to allocate input memory.\n");
 		exit(1);
 	}
-	// Zero initialize the inputs
+	// Zero initialize the input nodes
 	for (int i = 0; i < tech.max_inputs; i++)
 	{
 		struct input *in = &(inputs[i]);
@@ -136,6 +141,16 @@ int main(int argc, char *argv[])
 			INFO("Failed to allocate input synapse memory.\n");
 			exit(1);
 		}
+	}
+
+	// Open the probe output files for writing, for now hard code filenames
+	//  TODO: add option to command line argument
+	probe_potential_fp = fopen("probe_potential.csv", "w");
+	probe_spikes_fp = fopen("probe_spikes.csv", "w");
+	if ((probe_potential_fp == NULL) || (probe_spikes_fp == NULL))
+	{
+		INFO("Error: Couldn't open probe output files for writing.\n");
+		exit(1);
 	}
 
 	INFO("Allocating memory for %d cores.\n", max_cores);
@@ -193,23 +208,19 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	//INFO("Allocated %ld bytes\n", max_cores * sizeof(struct core));
-        for (int i = 0; i < max_neurons; i++)
-        {
-            neuron_ptrs[i] = NULL;
-        }
+	for (int i = 0; i < max_neurons; i++)
+	{
+		neuron_ptrs[i] = NULL;
+	}
 	network_read_csv(network_fp, neuron_ptrs, cores, &tech, inputs);
 	fclose(network_fp);
 
-	// TODO: eventually we could have some simple commands like
-	//  run <n timesteps>
-	//  set rate[neuron #] <firing rate>
-	//  set threshold[neuron #] <threshold>
-	//  That can either be input from the command line or a file
-	//  This could replace having a separate input vector file format
-	//  It would also be more general / powerful
 	init_results(&results);
+	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, cores,
+								tech.max_cores);
 	if (input_fp != NULL)
 	{
+
 		// Allocate a buffer for the inputs
 		input_buffer = (char *) malloc(sizeof(char) * max_input_line);
 		if (input_buffer == NULL)
@@ -217,19 +228,27 @@ int main(int argc, char *argv[])
 			INFO("Error: Couldn't allocate memory for inputs.\n");
 			exit(1);
 		}
-		// Run set of input vectors, each one is presented for the
-		//  same number of timesteps
-		while (fgets(input_buffer, max_input_line, input_fp))
+		// Parse DVS128 gesture input
+		// TODO: make this parameterised so we can parse different input
+		//  formats
+		//while (fgets(input_buffer, max_input_line, input_fp))
+		while (parse_dvs(input_fp, inputs, tech.max_inputs))
 		{
-			//next_inputs(input_buffer, cores, tech.max_cores,
-			//					neuron_ptrs);
-			sim_run(timesteps, &tech, cores, &results, inputs);
+			run(&tech, cores, &results, inputs, probe_spikes_fp,
+							probe_potential_fp);
 		}
 	}
+	// TODO: another option to generate rate based / poisson spike trains
 	else
 	{
-		// Single step simulation, based on initial state of network
-		sim_run(timesteps, &tech, cores, &results, inputs);
+		// Single step simulation, based on initial network state and
+		//  no inputs
+		for (int i = 0; i < timesteps; i++)
+		{
+			INFO("*** Time-step %d ***\n", i+1);
+			run(&tech, cores, &results, inputs, probe_spikes_fp,
+							probe_potential_fp);
+		}
 	}
 
 	INFO("Total simulated time: %es.\n", results.total_sim_time);
@@ -247,7 +266,7 @@ int main(int argc, char *argv[])
 	fclose(results_fp);
 
 	// Cleanup
-        for (int i = 0; i < max_cores; i++)
+	for (int i = 0; i < max_cores; i++)
 	{
 		struct core *c = &(cores[i]);
 
@@ -270,7 +289,41 @@ int main(int argc, char *argv[])
 	free(input_buffer);
 	free(inputs);
 
+	// Close any open files
+	fclose(probe_potential_fp);
+	fclose(probe_spikes_fp);
+
 	return 0;
+}
+
+void run(struct technology *tech, struct core *cores,
+			struct sim_results *results, struct input *inputs,
+			FILE *probe_spikes_fp, FILE *probe_potential_fp)
+{
+	// Run neuromorphic hardware simulation for one timestep
+	//  Measure the CPU time it takes and accumulate the results
+	struct timespec ts_start, ts_end, ts_elapsed;
+	struct sim_results timestep_results;
+
+	// Measure the wall-clock time taken to run the simulation
+	//  on the host machine
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
+	timestep_results = sim_timestep(tech, cores, inputs,
+					probe_spikes_fp, probe_potential_fp);
+	// Accumulate totals for the entire simulation
+	// TODO: make a function
+	results->total_energy += timestep_results.total_energy;
+	results->total_sim_time += timestep_results.total_sim_time;
+	results->total_spikes += timestep_results.total_spikes;
+
+	// Calculate elapsed time
+	clock_gettime(CLOCK_MONOTONIC, &ts_end);
+	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
+	results->wall_time +=
+		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
+	INFO("Time-step took: %fs.\n",
+		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
 }
 
 /*
@@ -319,4 +372,27 @@ void init_results(struct sim_results *results)
 	results->wall_time = 0.0; // Seconds
 	results->time_steps = 0;
 	results->total_spikes = 0;
+}
+
+struct timespec calculate_elapsed_time(struct timespec ts_start,
+							struct timespec ts_end)
+{
+	// Calculate elapsed wall-clock time between ts_start and ts_end
+	struct timespec ts_elapsed;
+
+	ts_elapsed.tv_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	ts_elapsed.tv_sec = ts_end.tv_sec - ts_start.tv_sec;
+	if (ts_end.tv_nsec < ts_start.tv_nsec)
+	{
+		ts_elapsed.tv_sec--;
+		ts_elapsed.tv_nsec += 1000000000UL;
+	}
+
+	return ts_elapsed;
+}
+
+int parse_dvs(FILE *fp, struct input *inputs, const int max_inputs)
+{
+	// TODO
+	return 0;
 }

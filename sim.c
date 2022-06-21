@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <time.h>
 #include <math.h>
 #include <omp.h>
 
@@ -17,48 +16,9 @@
 #include "tech.h"
 #include "network.h"
 
-
-// TODO: move this out to main
-//  Inside this routine is probably where we either generate our spike train
-//   or read in a spike train from a file and pass it into the model (assuming
-//   we almost always just do this a step at a time). The only thing worth
-//   having a wrapper for is timing the step. I guess some cases may not need
-//   any inputs at all (just empty inputs vector).
-void sim_run(const int timesteps, struct technology *tech, struct core *cores,
-			struct sim_results *results, struct input *inputs)
-{
-	// Run neuromorphic hardware simulation
-	for (int i = 0; i < timesteps; i++)
-	{
-		struct timespec ts_start, ts_end, ts_elapsed;
-		struct sim_results timestep_results;
-
-		INFO("*** Time-step %d ***\n", i+1);
-		// Measure the wall-clock time taken to run the simulation
-		//  on the host machine
-		clock_gettime(CLOCK_MONOTONIC, &ts_start);
-
-		timestep_results = sim_timestep(tech, cores, inputs);
-		// Accumulate totals for the entire simulation
-		// TODO: make a function
-		results->total_energy += timestep_results.total_energy;
-		results->total_sim_time += timestep_results.total_sim_time;
-		results->total_spikes += timestep_results.total_spikes;
-
-		// Calculate elapsed time
-		clock_gettime(CLOCK_MONOTONIC, &ts_end);
-		ts_elapsed = sim_calculate_elapsed_time(ts_start, ts_end);
-		results->wall_time +=
-			(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
-		INFO("Time-step took: %fs.\n",
-			(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
-	}
-}
-
-
-// TODO: make inputs not const and then we can reset them after sending the spike?
 struct sim_results sim_timestep(const struct technology *tech,
-				struct core *cores, const struct input *inputs)
+				struct core *cores, struct input *inputs,
+				FILE *probe_spike_fp, FILE *probe_potential_fp)
 {
 	struct sim_results results;
 	long int spikes_sent;
@@ -66,14 +26,16 @@ struct sim_results sim_timestep(const struct technology *tech,
 	spikes_sent = sim_input_spikes(tech, cores, inputs);
 	sim_reset_measurements(cores, tech->max_cores);
 	spikes_sent += sim_route_spikes(tech, cores);
-
 	sim_update_neurons(tech, cores);
 
+	// Return results for this timestep
 	results.total_energy = sim_calculate_energy(cores, tech->max_cores);
 	results.total_sim_time = sim_calculate_time(tech, cores);
-	INFO("Spikes sent: %ld\n", spikes_sent);
 	results.total_spikes = spikes_sent;
+	INFO("Spikes sent: %ld\n", spikes_sent);
 
+	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, cores,
+							tech->max_cores);
 	return results;
 }
 
@@ -98,7 +60,7 @@ void sim_update_neurons(const struct technology *tech, struct core *cores)
 		// TODO: figure what inactive neuron update even means...
 		// Uncomment this in some form
 		// Update the remainder of the neurons in the core (inactive)
-		//for (int j = c->compartments; j < MAX_COMPARTMENTS; j++)
+	 	//for (int j = c->compartments; j < MAX_COMPARTMENTS; j++)
 		//{
 		//	struct neuron *n = &(c->neurons[j]);
 		//	n->energy += tech->energy_inactive_neuron_update;
@@ -232,16 +194,16 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 //}
 
 int sim_input_spikes(const struct technology *tech, struct core *cores,
-			const struct input *inputs)
+							struct input *inputs)
 {
 	int input_spike_count = 0;
 
 	// Seed all externally input spikes in the network for this timestep
 	for (int i = 0; i < tech->max_inputs; i++)
 	{
-		const struct input *in = &(inputs[i]);
+		struct input *in = &(inputs[i]);
 
-		if ((in == NULL) || !in->send_spike)
+		if ((in == NULL) || (!in->send_spike))
 		{
 			continue;
 		}
@@ -268,8 +230,11 @@ int sim_input_spikes(const struct technology *tech, struct core *cores,
 			post_core->spike_count++;
 			input_spike_count++;
 		}
+
+		// Reset the input ready for the next timestep
+		in->send_spike = 0;
 	}
-	TRACE("Processed %d inputs.\n", total_inputs);
+	TRACE("Processed %d inputs.\n", tech->max_inputs);
 
 	return input_spike_count;
 }
@@ -299,7 +264,9 @@ void sim_update_synapse_cuba(const struct technology *tech, struct core *c,
 	//  track total current. This is what nengo-loihi did, I'm not sure if
 	//  this would have to be changed if we had a more complicated synapse
 	//  model
+	TRACE("Current before: %lf.\n", n->current);
 	n->current *= n->current_decay;
+	TRACE("Current after: %lf.\n", n->current);
 
 	return;
 }
@@ -326,7 +293,6 @@ void sim_update_lif(const struct technology *tech, struct core *c,
 
 	TRACE("Updating potential, after:%f\n", n->potential);
 
-	// TODO: do fire here as well
 	if (n->potential > n->threshold)
 	{
 		n->fired = 1;
@@ -395,28 +361,92 @@ void sim_reset_measurements(struct core *cores, const int max_cores)
 	}
 }
 
-struct timespec sim_calculate_elapsed_time(struct timespec ts_start,
-							struct timespec ts_end)
-{
-	// Calculate elapsed wall-clock time between ts_start and ts_end
-	struct timespec ts_elapsed;
-
-	ts_elapsed.tv_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
-	ts_elapsed.tv_sec = ts_end.tv_sec - ts_start.tv_sec;
-	if (ts_end.tv_nsec < ts_start.tv_nsec)
-	{
-		ts_elapsed.tv_sec--;
-		ts_elapsed.tv_nsec += 1000000000UL;
-	}
-
-	return ts_elapsed;
-}
-
-void sim_write_results(FILE *fp, struct sim_results *results)
+void sim_write_results(FILE *fp, const struct sim_results *results)
 {
 	// Write the simulation result to file
 	fprintf(fp, "energy: %e\n", results->total_energy);
 	fprintf(fp, "time: %e\n", results->total_sim_time);
 	fprintf(fp, "total_spikes: %ld\n", results->total_spikes);
 	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
+}
+
+void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp,
+				const struct core *cores, const int max_cores)
+{
+	// Write csv header for probe outputs - record which neurons have been
+	//  probed
+	for (int i = 0; i < max_cores; i++)
+	{
+		const struct core *c = &(cores[i]);
+		for (int j = 0; j < c->compartments; j++)
+		{
+			const struct neuron *n = &(c->neurons[j]);
+
+			if (spike_fp && n->log_spikes)
+			{
+				fprintf(spike_fp, "%d,", n->id);
+			}
+			if (potential_fp && n->log_voltage)
+			{
+				fprintf(potential_fp, "%d,", n->id);
+			}
+		}
+	}
+
+	if (spike_fp)
+	{
+		fputc('\n', spike_fp);
+	}
+	if (potential_fp)
+	{
+		fputc('\n', potential_fp);
+	}
+
+	return;
+}
+
+void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp,
+				const struct core *cores, const int max_cores)
+{
+	// Each line of this csv file is the output of each probed neuron
+	//  Currently we only probe the voltage / potential and the spikes
+	//  (e.g. for a spike raster plot).
+	//
+	// In the future, we might want to generalise this to probe any of the
+	//  variable parameters
+	int spike_probe_count, potential_probe_count;
+
+	spike_probe_count = 0;
+	potential_probe_count = 0;
+	for (int i = 0; i < max_cores; i++)
+	{
+		const struct core *c = &(cores[i]);
+		for (int j = 0; j < c->compartments; j++)
+		{
+			const struct neuron *n = &(c->neurons[j]);
+
+			if (spike_fp && n->log_spikes)
+			{
+				fprintf(spike_fp, "%d,", n->fired);
+				spike_probe_count++;
+			}
+			if (potential_fp && n->log_voltage)
+			{
+				fprintf(potential_fp, "%lf,", n->potential);
+				potential_probe_count++;
+			}
+		}
+	}
+
+	// Each timestep takes up a line in the respective csv file
+	if (spike_fp && (spike_probe_count > 0))
+	{
+		fputc('\n', spike_fp);
+	}
+	if (potential_fp && (potential_probe_count > 0))
+	{
+		fputc('\n', potential_fp);
+	}
+
+	return;
 }

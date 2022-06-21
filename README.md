@@ -10,12 +10,11 @@ This project uses a Makefile based build.  To build use:
 Make sure that GCC is supported and working on your system.
 
 # To Run an Example
-`./sim 20 1 examples/random_network.csv`
-This simulates 20 time-steps of a randomly connected network with 131,072
-neurons.
+`./sim loihi.tech 20 examples/random_network.csv`
+This simulates 20 time-steps of a small randomly connected network neurons.
 
 General usage:
-`./sim <N timesteps> <cores> <neuron list.csv>`
+`./sim <tech file> <N timesteps> <neuron list.csv>`
 
 # Input Format
 The simulator uses csv (comma separated values) to define the
@@ -30,18 +29,13 @@ The csv files can optionally have a header row.  To see an example see
 One slightly awkward thing is the columns must exactly match what the simulator
 is expecting; to see the column formats for both neurons / synapses see:
 
-## Neurons list
-Each line in the neuron file defines a different neuron.
-
-## Synapses list
-defines a different synapse.
-
 # Project Code
 This project has been written in C.
 
 main.c
 sim.c
 network.c
+tech.c
 
 # Contact
 James Boyle: james.boyle@utexas.edu

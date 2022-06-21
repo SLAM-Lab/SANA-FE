@@ -177,6 +177,14 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		n->fired = 0;
 		n->potential = n->reset;
 
+		// Hard coded LIF / CUBA time constants for now
+		// TODO: parameterize based on network description (csv)
+		n->current_time_const = 1.0e-3;
+		n->potential_time_const = 2.0e-3;
+		n->current_decay = -(exp(-dt / n->current_time_const) - 1.0);
+		n->potential_decay =
+				-(exp(-dt / n->potential_time_const) - 1.0);
+
 		// Keep track of which CSV line corresponds to which physical
 		//  neuron in the hardware.  This info will be important for
 		//  linking the synapse data to neuron compartments
