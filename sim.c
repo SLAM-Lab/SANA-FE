@@ -17,8 +17,15 @@
 #include "tech.h"
 #include "network.h"
 
+
+// TODO: move this out to main
+//  Inside this routine is probably where we either generate our spike train
+//   or read in a spike train from a file and pass it into the model (assuming
+//   we almost always just do this a step at a time). The only thing worth
+//   having a wrapper for is timing the step. I guess some cases may not need
+//   any inputs at all (just empty inputs vector).
 void sim_run(const int timesteps, struct technology *tech, struct core *cores,
-                	struct sim_results *results, struct input *inputs)
+			struct sim_results *results, struct input *inputs)
 {
 	// Run neuromorphic hardware simulation
 	for (int i = 0; i < timesteps; i++)
@@ -33,6 +40,7 @@ void sim_run(const int timesteps, struct technology *tech, struct core *cores,
 
 		timestep_results = sim_timestep(tech, cores, inputs);
 		// Accumulate totals for the entire simulation
+		// TODO: make a function
 		results->total_energy += timestep_results.total_energy;
 		results->total_sim_time += timestep_results.total_sim_time;
 		results->total_spikes += timestep_results.total_spikes;
@@ -47,6 +55,8 @@ void sim_run(const int timesteps, struct technology *tech, struct core *cores,
 	}
 }
 
+
+// TODO: make inputs not const and then we can reset them after sending the spike?
 struct sim_results sim_timestep(const struct technology *tech,
 				struct core *cores, const struct input *inputs)
 {
@@ -56,7 +66,6 @@ struct sim_results sim_timestep(const struct technology *tech,
 	spikes_sent = sim_input_spikes(tech, cores, inputs);
 	sim_reset_measurements(cores, tech->max_cores);
 	spikes_sent += sim_route_spikes(tech, cores);
-
 
 	sim_update_neurons(tech, cores);
 
@@ -80,10 +89,14 @@ void sim_update_neurons(const struct technology *tech, struct core *cores)
 		for (int j = 0; j < c->compartments; j++)
 		{
 			struct neuron *n = &(c->neurons[j]);
-			// Add synaptic current and apply leak to all neurons
+			// Update simulation state, updating synaps current,
+			//  neuron potential and TODO dendrite / axon
+			//  currents
 			sim_update_potential(tech, n, c);
 		}
 
+		// TODO: figure what inactive neuron update even means...
+		// Uncomment this in some form
 		// Update the remainder of the neurons in the core (inactive)
 		//for (int j = c->compartments; j < MAX_COMPARTMENTS; j++)
 		//{
@@ -91,21 +104,6 @@ void sim_update_neurons(const struct technology *tech, struct core *cores)
 		//	n->energy += tech->energy_inactive_neuron_update;
 		//	n->time += tech->time_inactive_neuron_update;
 		//}
-
-		// Check to see which neurons have fired
-		for (int j = 0; j < c->compartments; j++)
-		{
-			struct neuron *n = &(c->neurons[j]);
-			if (n->potential > n->threshold)
-			{
-				n->fired = 1;
-				n->potential = n->reset;
-				// Add the "within-tile" spike energy, this is
-				//  the minimum cost of sending a spike
-				c->energy += tech->energy_spike_within_tile;
-				c->time += tech->time_spike_within_tile;
-			}
-		}
 	}
 }
 
@@ -120,25 +118,15 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 	#pragma omp parallel for
 	for (int i = 0; i < tech->max_cores; i++)
 	{
-		struct core *c;
-		// TODO: move spike_packets into core struct
-		unsigned int *spike_packets;
+		struct core *c = &(cores[i]);
 
-		spike_packets = (unsigned int *)
-				malloc(tech->max_cores * sizeof(unsigned int));
-		if (spike_packets == NULL)
-		{
-			INFO("Error: Failed to allocate memory.\n");
-			exit(1);
-		}
-		c = &(cores[i]);
 		for (int j = 0; j < c->compartments; j++)
 		{
 			struct neuron *n;
 
 			for (int k = 0; k < tech->max_cores; k++)
 			{
-				spike_packets[k] = 0;
+				c->packets_sent[k] = 0;
 			}
 
 			n = &(c->neurons[j]);
@@ -195,7 +183,7 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 				// Mark a packet as sent to the
 				//  core. We will only send one packet per core
 				#pragma omp atomic
-				spike_packets[post_core->id]++;
+				c->packets_sent[post_core->id]++;
 			}
 
 			// Estimate the energy needed to send spike packets
@@ -204,7 +192,7 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 				// TODO: I think the code below should be a
 				//  function and sim_send_spike can be inlined
 				//  again?
-				if (spike_packets[k])
+				if (c->packets_sent[k])
 				{
 					// Calculate the energy and time for
 					//  sending spike packets
@@ -232,9 +220,8 @@ int sim_route_spikes(const struct technology *tech, struct core *cores)
 
 			n->fired = 0; // Reset the neuron for the next time step
 		}
-		free(spike_packets);
 	}
-	INFO("Total neurons firing: %d\n", total_neurons_fired);
+	INFO("Neurons fired: %d\n", total_neurons_fired);
 
 	return total_spike_count;
 }
@@ -250,12 +237,11 @@ int sim_input_spikes(const struct technology *tech, struct core *cores,
 	int input_spike_count = 0;
 
 	// Seed all externally input spikes in the network for this timestep
-	INFO("Seeding %d inputs.\n", tech->max_inputs);
 	for (int i = 0; i < tech->max_inputs; i++)
 	{
 		const struct input *in = &(inputs[i]);
 
-		if ((in == NULL) || (!in->send_spike))
+		if ((in == NULL) || !in->send_spike)
 		{
 			continue;
 		}
@@ -283,6 +269,7 @@ int sim_input_spikes(const struct technology *tech, struct core *cores,
 			input_spike_count++;
 		}
 	}
+	TRACE("Processed %d inputs.\n", total_inputs);
 
 	return input_spike_count;
 }
@@ -290,14 +277,47 @@ int sim_input_spikes(const struct technology *tech, struct core *cores,
 void sim_update_potential(const struct technology *tech, struct neuron *n,
                           					struct core *c)
 {
+	// The neuron (state update) contains four main components
+	// 1) synapse updates
+	// 2) dendrite updates
+	// 3) LIF (soma) updates
+	// 4) Axon updates
+	sim_update_synapse_cuba(tech, c, n);
+	sim_update_dendrite(tech, c, n);
+	sim_update_lif(tech, c, n);
+	sim_update_axon(tech, c, n);
+
+	c->energy += tech->energy_active_neuron_update;
+	c->time += tech->time_active_neuron_update;
+}
+
+void sim_update_synapse_cuba(const struct technology *tech, struct core *c,
+							struct neuron *n)
+{
 	// Current based (CUBA) LIF neuron model as implemented by Loihi
+	//  Rather than iterate over all synapses we can simplify and just
+	//  track total current. This is what nengo-loihi did, I'm not sure if
+	//  this would have to be changed if we had a more complicated synapse
+	//  model
 	n->current *= n->current_decay;
 
+	return;
+}
+
+void sim_update_dendrite(const struct technology *tech, struct core *c,
+							struct neuron *n)
+{
+	// TODO
+	return;
+}
+
+void sim_update_lif(const struct technology *tech, struct core *c,
+							struct neuron *n)
+{
 	// Calculate the decay in potential since the last update i.e. the
 	//  leak
 	TRACE("Updating potential, before:%f\n", n->potential);
 	n->potential *= n->potential_decay;
-
 	// Add the spike potential
 	n->potential += n->current + n->bias;
 	// Clamp min potential
@@ -306,8 +326,26 @@ void sim_update_potential(const struct technology *tech, struct neuron *n,
 
 	TRACE("Updating potential, after:%f\n", n->potential);
 
-	c->energy += tech->energy_active_neuron_update;
-	c->time += tech->time_active_neuron_update;
+	// TODO: do fire here as well
+	if (n->potential > n->threshold)
+	{
+		n->fired = 1;
+		n->potential = n->reset;
+		// Add the "within-tile" spike energy, this is
+		//  the minimum cost of sending a spike
+		c->energy += tech->energy_spike_within_tile;
+		c->time += tech->time_spike_within_tile;
+		TRACE("nid %d fired.\n", n->id);
+	}
+
+	return;
+}
+
+void sim_update_axon(const struct technology *tech, struct core *c,
+							struct neuron *n)
+{
+	// TODO
+	return;
 }
 
 double sim_calculate_time(const struct technology *tech, struct core *cores)

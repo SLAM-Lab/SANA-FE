@@ -174,15 +174,17 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		sscanf(neuron_fields[RESET_VOLTAGE], "%lf", &(n->reset));
 		sscanf(neuron_fields[RECORD_SPIKES], "%d", &(n->log_spikes));
 		sscanf(neuron_fields[RECORD_VOLTAGE], "%d", &(n->log_voltage));
+		n->fired = 0;
+		n->potential = n->reset;
 
 		// Keep track of which CSV line corresponds to which physical
 		//  neuron in the hardware.  This info will be important for
 		//  linking the synapse data to neuron compartments
 		neuron_ptrs[neuron_count] = n;
 
-		TRACE("Added nid:%d cid:%d vt:%lf r%lf in:%d log_s:%d "
+		TRACE("Added nid:%d cid:%d vt:%lf r%lf log_s:%d "
                         "log_v:%d\n", n->id, n->core_id, n->threshold, n->reset,
-			n->is_input, n->log_spikes, n->log_voltage);
+			n->log_spikes, n->log_voltage);
 		neuron_count++;
 	}
 	INFO("Created %d neurons.\n", neuron_count);
@@ -248,7 +250,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 
 			for (int i = 0; i < field_count; i++)
 			{
-				TRACE("nid:%ld Parsed field: %s\n", neuron_id,
+				TRACE("nid:%d Parsed field: %s\n", neuron_id,
 							neuron_fields[i]);
 			}
 		}
@@ -356,9 +358,19 @@ void network_init(struct core *cores, const struct technology *tech)
 			n->compartment = j;
 
 			n->post_connection_count = 0;
-			n->input_rate = 0;
 			n->log_spikes = 0;
 			n->log_voltage = 0;
+
+			n->fired = 0;
+			n->potential = 0.0;
+			n->current = 0.0;
+			n->bias = 0.0;
+			n->threshold = 0.0;
+			n->reset = 0.0;
+			n->potential_decay = 0.0;
+			n->current_decay = 0.0;
+			n->potential_time_const = 0.0;
+			n->current_time_const = 0.0;
 		}
 	}
 }

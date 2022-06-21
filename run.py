@@ -22,7 +22,7 @@ def run_sim(network, core_count):
         writer.writerow(fields)
         writer.writerows(network)
 
-    timesteps = 1
+    timesteps = 2
     command = ("./sim", "{0}".format(TECH_FILENAME), "{0}".format(timesteps),
                NETWORK_FILENAME)
     print("Command: {0}".format(" ".join(command)))
@@ -47,14 +47,14 @@ def fully_connected(layer_neurons, spiking=True):
     for n in range(0, layer_neurons):
         core_id = n / MAX_COMPARTMENTS
 
-        neuron = [n, core_id, threshold, reset, is_input, 0, 0]
+        neuron = [n, core_id, threshold, reset, 0, 0]
         for dest in range(layer_neurons, 2*layer_neurons):
             neuron.extend((dest, weight))  # Same weight for all connections
         network.append(neuron)
 
     for n in range(layer_neurons, 2*layer_neurons):
         core_id = n / MAX_COMPARTMENTS
-        neuron = [n, core_id, threshold, reset, is_input, 0, 0]
+        neuron = [n, core_id, threshold, reset, 0, 0]
         network.append(neuron)
 
     core_count = core_id + 1
@@ -66,7 +66,6 @@ def empty(neurons, max_compartments=MAX_COMPARTMENTS):
     network = []
     threshold = -1.0  # never spike
     reset = 0.0
-    is_input = 1
 
     core_id = 0
     compartment = 0
@@ -80,7 +79,7 @@ def empty(neurons, max_compartments=MAX_COMPARTMENTS):
             core_id += 1
             compartment = 0
 
-        neuron = [n, core_id, threshold, reset, is_input, 0, 0]
+        neuron = [n, core_id, threshold, reset, 0, 0]
         network.append(neuron)
         compartment += 1
 

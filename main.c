@@ -9,7 +9,7 @@
 #include "network.h"
 
 void init_results(struct sim_results *results);
-void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
+//void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
 
 enum program_args
 {
@@ -149,7 +149,10 @@ int main(int argc, char *argv[])
 		//  defined at runtime, this must be done dynamically
 		c->neurons = (struct neuron *) malloc(tech.max_compartments *
 							sizeof(struct neuron));
-		if (c->neurons == NULL)
+		c->packets_sent = (unsigned int *)
+				malloc(max_cores * sizeof(unsigned int));
+
+		if ((c->neurons == NULL) || (c->packets_sent == NULL))
 		{
 			INFO("Error: failed to allocate neuron.\n");
 			exit(1);
@@ -218,8 +221,8 @@ int main(int argc, char *argv[])
 		//  same number of timesteps
 		while (fgets(input_buffer, max_input_line, input_fp))
 		{
-			next_inputs(input_buffer, cores, tech.max_cores,
-								neuron_ptrs);
+			//next_inputs(input_buffer, cores, tech.max_cores,
+			//					neuron_ptrs);
 			sim_run(timesteps, &tech, cores, &results, inputs);
 		}
 	}
@@ -249,6 +252,7 @@ int main(int argc, char *argv[])
 		struct core *c = &(cores[i]);
 
 		free(c->neurons);
+		free(c->packets_sent);
 		for (int j = 0; j < tech.max_compartments; j++)
 		{
 			free(c->synapses[j]);
@@ -269,11 +273,11 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
+/*
 void next_inputs(char *buffer, struct core *cores, const int max_cores,
 						struct neuron **neuron_ptrs)
 {
 	char *token;
-	double firing_rate;
 	int neuron_count;
 
 	neuron_count = 0;
@@ -288,17 +292,12 @@ void next_inputs(char *buffer, struct core *cores, const int max_cores,
 			INFO("Error: invalid input format (%s)", buffer);
 			exit(1);
 		}
-		if ((firing_rate < 0.0) || (firing_rate > 1.0))
-		{
-			INFO("Warning: input rate not in range [0,1] (%f)",
-								firing_rate);
-		}
 
-		neuron_ptrs[neuron_count]->input_rate = firing_rate;
 		token = strtok(NULL, ",");
 		neuron_count++;
 	}
 }
+*/
 
 int sim_input(const double firing_probability)
 {
