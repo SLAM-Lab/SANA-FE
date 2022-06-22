@@ -179,7 +179,7 @@ if __name__ == "__main__":
     #  since this is restricted data!
     loihi_times_spikes = []
     loihi_energy_spikes = []
-    with open("spiking.csv", "r") as spiking_csv:
+    with open("sim_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
             loihi_times_spikes.append(row["time"])
@@ -187,7 +187,7 @@ if __name__ == "__main__":
 
     loihi_times_no_spikes = []
     loihi_energy_no_spikes = []
-    with open("nonspiking.csv", "r") as nonspiking_csv:
+    with open("sim_nonspiking.csv", "r") as nonspiking_csv:
         nonspiking_reader = csv.DictReader(nonspiking_csv)
         for row in nonspiking_reader:
             loihi_times_no_spikes.append(row["time"])
