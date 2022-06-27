@@ -10,24 +10,19 @@
 // Zero initialize all technology parameters
 void tech_init(struct technology *tech)
 {
-        tech->max_cores = 0;
-	tech->max_inputs = 0;
-        tech->cores_per_tile = 0;
-        tech->max_compartments = 0;
-        tech->fan_out = 0;
-        tech->energy_active_neuron_update = 0.0;
-        tech->energy_inactive_neuron_update = 0.0;
-        tech->energy_spike_op = 0.0;
-        tech->energy_spike_within_tile = 0.0;
-        tech->energy_east_west_hop = 0.0;
-        tech->energy_north_south_hop = 0.0;
-        tech->time_active_neuron_update = 0.0;
-        tech->time_inactive_neuron_update = 0.0;
-        tech->time_spike_op = 0.0;
-        tech->time_spike_within_tile = 0.0;
-        tech->time_east_west_hop = 0.0;
-        tech->time_north_south_hop = 0.0;
-        tech->time_mesh_barrier = 0.0;
+	tech->energy_active_neuron_update = 0.0;
+	tech->energy_inactive_neuron_update = 0.0;
+	tech->energy_spike_op = 0.0;
+	tech->energy_spike_within_tile = 0.0;
+	tech->energy_east_west_hop = 0.0;
+	tech->energy_north_south_hop = 0.0;
+	tech->time_active_neuron_update = 0.0;
+	tech->time_inactive_neuron_update = 0.0;
+	tech->time_spike_op = 0.0;
+	tech->time_spike_within_tile = 0.0;
+	tech->time_east_west_hop = 0.0;
+	tech->time_north_south_hop = 0.0;
+	tech->time_mesh_barrier = 0.0;
 }
 
 // Read technology file, containing a simple list of parameters and values
@@ -69,27 +64,7 @@ void tech_read_parameter(struct technology *tech, char *line)
 
 	// Note: for now, the case does matter - the field must be all
 	//  lowercase
-	if (strcmp("max_cores", metric_str) == 0)
-	{
-		sscanf(value_str, "%d", &tech->max_cores);
-	}
-	else if (strcmp("max_compartments", metric_str) == 0)
-	{
-		sscanf(value_str, "%d", &tech->max_compartments);
-	}
-	else if (strcmp("max_inputs", metric_str) == 0)
-	{
-		sscanf(value_str, "%d", &(tech->max_inputs));
-	}
-	else if (strcmp("cores_per_tile", metric_str) == 0)
-	{
-		sscanf(value_str, "%d", &tech->cores_per_tile);
-	}
-	else if (strcmp("fan_out", metric_str) == 0)
-	{
-		sscanf(value_str, "%d", &tech->fan_out);
-	}
-	else if (strcmp("energy_active_neuron_update", metric_str) == 0)
+	if (strcmp("energy_active_neuron_update", metric_str) == 0)
 	{
 		sscanf(value_str, "%lf", &tech->energy_active_neuron_update);
 	}
@@ -146,6 +121,6 @@ void tech_read_parameter(struct technology *tech, char *line)
 		INFO("Error: field not recognized (%s).\n", metric_str);
 	}
 
-return;
+	return;
 }
 

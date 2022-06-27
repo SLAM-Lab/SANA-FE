@@ -36,6 +36,7 @@ main.c
 sim.c
 network.c
 tech.c
+arch.c
 
 # Contact
 James Boyle: james.boyle@utexas.edu

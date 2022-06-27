@@ -10,30 +10,30 @@
 #include "network.h"
 
 void init_results(struct sim_results *results);
-void run(struct technology *tech, struct core *cores, struct sim_results *results, struct input *inputs, FILE *probe_spikes_fp, FILE *probe_potential_fp);
+void run(struct technology *tech, struct architecture *arch, struct sim_results *results, FILE *probe_spikes_fp, FILE *probe_potential_fp);
 //void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
-int parse_dvs(FILE *fp, struct input *inputs, const int max_inputs);
+int parse_dvs(FILE *fp, struct architecture *arch);
 
 enum program_args
 {
 	TECHNOLOGY_FILENAME,
-	TIMESTEPS,
+	ARCH_FILENAME,
 	NETWORK_FILENAME,
+	TIMESTEPS,
 	PROGRAM_NARGS,
 };
 
 int main(int argc, char *argv[])
 {
-	FILE *input_fp, *network_fp, *results_fp, *tech_fp;
+	FILE *input_fp, *network_fp, *results_fp, *tech_fp, *arch_fp;
 	FILE *probe_spikes_fp, *probe_potential_fp;
+	struct architecture arch;
 	struct technology tech;
-	struct core *cores;
-	struct input *inputs;
 	struct neuron **neuron_ptrs;
 	struct sim_results results;
 	char *filename, *input_buffer;
-	int timesteps, max_neurons, max_input_line, max_cores;
+	int timesteps, max_input_line;
 
 	filename = NULL;
 	input_fp = NULL;
@@ -76,8 +76,8 @@ int main(int argc, char *argv[])
 
 	if (argc < PROGRAM_NARGS)
 	{
-		INFO("Usage: ./sim [-i <input vectors>] <tech file> <timesteps>"
-						" <neuron config>\n");
+		INFO("Usage: ./sim [-i <input vectors>] <tech file> <arch description>"
+				" <neuron config> <timesteps>\n");
 		exit(1);
 	}
 
@@ -90,11 +90,19 @@ int main(int argc, char *argv[])
 	tech_fp = fopen(filename, "r");
 	if (tech_fp == NULL)
 	{
-		INFO("Error: Tech file failed to open.\n");
+		INFO("Error: Technology file failed to open.\n");
 		exit(1);
 	}
 	tech_read_file(&tech, tech_fp);
-	max_cores = tech.max_cores;
+
+	filename = argv[ARCH_FILENAME];
+	arch_fp = fopen(filename, "r");
+	if (arch_fp == NULL)
+	{
+		INFO("Error: Architecture file failed to open.\n");
+		exit(1);
+	}
+	arch = arch_read_file(arch_fp);
 
 	sscanf(argv[TIMESTEPS], "%d", &timesteps);
 	if (timesteps <= 0)
@@ -103,10 +111,10 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	max_neurons = max_cores * tech.max_compartments;
+	//max_neurons = max_cores * tech.max_compartments;
 	// Input line must be long enough to encode inputs for all neurons
 	//  simultaneously
-	max_input_line = 32 + (max_neurons*32);
+	max_input_line = 32 + (arch.max_neurons*32);
 
 	filename = argv[NETWORK_FILENAME];
 	// Create the network
@@ -115,32 +123,6 @@ int main(int argc, char *argv[])
 	{
 		INFO("Neuron data (%s) failed to open.\n", filename);
 		exit(1);
-	}
-
-	// Create all the input nodes, which are the interface between
-	//  externally generated spike trains and our spiking network
-	INFO("Allocating memory for %d inputs.\n", tech.max_inputs);
-	inputs = (struct input *)
-				malloc(tech.max_inputs * sizeof(struct input));
-	if (inputs == NULL)
-	{
-		INFO("Failed to allocate input memory.\n");
-		exit(1);
-	}
-	// Zero initialize the input nodes
-	for (int i = 0; i < tech.max_inputs; i++)
-	{
-		struct input *in = &(inputs[i]);
-
-		in->synapses = (struct synapse *) malloc(tech.fan_out *
-							sizeof(struct synapse));
-		in->post_connection_count = 0;
-		in->send_spike = 0;
-		if (in->synapses == NULL)
-		{
-			INFO("Failed to allocate input synapse memory.\n");
-			exit(1);
-		}
 	}
 
 	// Open the probe output files for writing, for now hard code filenames
@@ -153,71 +135,24 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	INFO("Allocating memory for %d cores.\n", max_cores);
-	cores = (struct core *) malloc(max_cores * sizeof(struct core));
-
-	for (int i = 0; i < max_cores; i++)
-	{
-		struct core *c = &(cores[i]);
-		// Allocate each core, creating memory for the compartments i.e.
-		//  neurons, and all the synaptic data. Since the parameters are
-		//  defined at runtime, this must be done dynamically
-		c->neurons = (struct neuron *) malloc(tech.max_compartments *
-							sizeof(struct neuron));
-		c->packets_sent = (unsigned int *)
-				malloc(max_cores * sizeof(unsigned int));
-
-		if ((c->neurons == NULL) || (c->packets_sent == NULL))
-		{
-			INFO("Error: failed to allocate neuron.\n");
-			exit(1);
-		}
-
-		c->synapses = (struct synapse **) malloc(tech.max_compartments *
-						sizeof(struct synapse *));
-		if (c->synapses == NULL)
-		{
-			INFO("Error: failed to allocate synapse ptr.\n");
-			exit(1);
-		}
-		// For each compartment, allocate a certain amount of synaptic
-		//  memory
-		// TODO: this isn't really how it works in the wild. What would
-		//  be better is to allocate a single block of synaptic memory
-		//  per core. Then each neuron compartment has an index into
-		//  its memory within the block. This defines way too much
-		//  synaptic memory (GB) when it should be MB.
-		for (int j = 0; j < tech.max_compartments; j++)
-		{
-			c->synapses[j] =
-				(struct synapse *) malloc(tech.fan_out *
-							sizeof(struct synapse));
-			if (c->synapses[j] == NULL)
-			{
-				INFO("Error: failed to allocate synapse.\n");
-			}
-		}
-	}
-
-	INFO("Allocating memory to track %d neurons.\n", max_neurons);
+	INFO("Allocating memory to track %d neurons.\n", arch.max_neurons);
 	neuron_ptrs = (struct neuron **)
-				malloc(max_neurons * sizeof(struct neuron *));
-	if ((neuron_ptrs == NULL) || (cores == NULL))
+			malloc(arch.max_neurons * sizeof(struct neuron *));
+	if (neuron_ptrs == NULL)
 	{
 		INFO("Error: failed to allocate memory.\n");
 		exit(1);
 	}
 	//INFO("Allocated %ld bytes\n", max_cores * sizeof(struct core));
-	for (int i = 0; i < max_neurons; i++)
+	for (int i = 0; i < arch.max_neurons; i++)
 	{
 		neuron_ptrs[i] = NULL;
 	}
-	network_read_csv(network_fp, neuron_ptrs, cores, &tech, inputs);
+	network_read_csv(network_fp, &tech, &arch, neuron_ptrs);
 	fclose(network_fp);
 
 	init_results(&results);
-	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, cores,
-								tech.max_cores);
+	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, &arch);
 	if (input_fp != NULL)
 	{
 
@@ -232,9 +167,9 @@ int main(int argc, char *argv[])
 		// TODO: make this parameterised so we can parse different input
 		//  formats
 		//while (fgets(input_buffer, max_input_line, input_fp))
-		while (parse_dvs(input_fp, inputs, tech.max_inputs))
+		while (parse_dvs(input_fp, &arch))
 		{
-			run(&tech, cores, &results, inputs, probe_spikes_fp,
+			run(&tech, &arch, &results, probe_spikes_fp,
 							probe_potential_fp);
 		}
 	}
@@ -246,7 +181,7 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < timesteps; i++)
 		{
 			INFO("*** Time-step %d ***\n", i+1);
-			run(&tech, cores, &results, inputs, probe_spikes_fp,
+			run(&tech, &arch, &results, probe_spikes_fp,
 							probe_potential_fp);
 		}
 	}
@@ -266,28 +201,8 @@ int main(int argc, char *argv[])
 	fclose(results_fp);
 
 	// Cleanup
-	for (int i = 0; i < max_cores; i++)
-	{
-		struct core *c = &(cores[i]);
-
-		free(c->neurons);
-		free(c->packets_sent);
-		for (int j = 0; j < tech.max_compartments; j++)
-		{
-			free(c->synapses[j]);
-		}
-		free(c->synapses);
-	}
-	for (int i = 0; i < tech.max_inputs; i++)
-	{
-		struct input *in = &(inputs[i]);
-
-		free(in->synapses);
-	}
-	free(cores);
+	arch_free(&arch);
 	free(neuron_ptrs);
-	free(input_buffer);
-	free(inputs);
 
 	// Close any open files
 	fclose(probe_potential_fp);
@@ -296,9 +211,9 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void run(struct technology *tech, struct core *cores,
-			struct sim_results *results, struct input *inputs,
-			FILE *probe_spikes_fp, FILE *probe_potential_fp)
+void run(struct technology *tech, struct architecture *arch,
+				struct sim_results *results,
+				FILE *probe_spikes_fp, FILE *probe_potential_fp)
 {
 	// Run neuromorphic hardware simulation for one timestep
 	//  Measure the CPU time it takes and accumulate the results
@@ -309,8 +224,8 @@ void run(struct technology *tech, struct core *cores,
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-	timestep_results = sim_timestep(tech, cores, inputs,
-					probe_spikes_fp, probe_potential_fp);
+	timestep_results = sim_timestep(tech, arch, probe_spikes_fp,
+							probe_potential_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function
 	results->total_energy += timestep_results.total_energy;
@@ -391,7 +306,7 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	return ts_elapsed;
 }
 
-int parse_dvs(FILE *fp, struct input *inputs, const int max_inputs)
+int parse_dvs(FILE *fp, struct architecture *arch)
 {
 	// TODO
 	return 0;

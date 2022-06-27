@@ -16,37 +16,60 @@
 
 struct neuron
 {
-	int fired, post_connection_count, core_id, id, compartment;
-	int log_spikes, log_voltage;
+	struct synapse *synapses;
+	int fired, post_connection_count, id;
+	int log_spikes, log_voltage, active;
 	double potential, current, bias, threshold, reset;
 	double potential_decay, current_decay, potential_time_const;
-	double current_time_const;
+	double current_time_const, time, energy;
+
+	// Pointers to other units associated with the neuron
+	struct axon_output *axon_out;
+	struct axon_input *axon_in;
+	struct synapse_mem *mem_block;
 };
 
 struct synapse
 {
 	struct neuron *post_neuron, *pre_neuron;
 	float weight;
+	struct synapse_mem *memory;
 };
 
-//struct spike
-//{
-//	struct synapse *synapse;
-//};
-
-struct core
+struct synapse_mem
 {
-	int id, x, y, spike_count, compartments;
+	int id, memory_size_bytes, weight_bits, max_synapses;
+};
+
+struct axon_output
+{
+	int id;
+	struct router *r;
 	unsigned int *packets_sent;
-	double energy, time;
-	struct neuron *neurons;
-	struct synapse **synapses;
+};
+
+struct axon_input
+{
+	int id;
+	struct router *r;
+};
+
+struct router
+{
+	int x, y, id;
+	int max_dimensions; // For now just support 2 dimensions
 };
 
 struct input
 {
 	int send_spike, post_connection_count;
 	struct synapse *synapses;
+};
+
+struct timer
+{
+	int id;
+	struct timer *parent;
 };
 
 struct sim_results
@@ -57,24 +80,26 @@ struct sim_results
 };
 
 #include "tech.h"
-struct sim_results sim_timestep(const struct technology *tech, struct core *cores, struct input *inputs, FILE *probe_spike_fp, FILE *probe_potential_fp);
+#include "arch.h"
+struct sim_results sim_timestep(const struct technology *tech, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp);
 
-int sim_route_spikes(const struct technology *tech, struct core *cores);
-int sim_input_spikes(const struct technology *tech, struct core *cores, struct input *inputs);
+int sim_route_spikes(const struct technology *tech, struct architecture *arch);
+int sim_input_spikes(const struct technology *tech, struct architecture *arch);
 
-void sim_update_neurons(const struct technology *tech, struct core *cores);
-void sim_update_potential(const struct technology *tech, struct neuron *n, struct core *c);
-void sim_update_synapse_cuba(const struct technology *tech, struct core *c, struct neuron *n);
-void sim_update_dendrite(const struct technology *tech, struct core *c, struct neuron *n);
-void sim_update_lif(const struct technology *tech, struct core *c, struct neuron *n);
-void sim_update_axon(const struct technology *tech, struct core *c, struct neuron *n);
+void sim_update_state(const struct technology *tech, struct architecture *arch);
+void sim_update_active(const struct technology *tech, struct neuron *n);
+void sim_update_inactive(const struct technology *tech, struct neuron *n);
+void sim_update_synapse_cuba(const struct technology *tech, struct neuron *n);
+void sim_update_dendrite(const struct technology *tech, struct neuron *n);
+void sim_update_lif(const struct technology *tech, struct neuron *n);
+void sim_update_axon(const struct technology *tech, struct neuron *n);
 
-void sim_reset_measurements(struct core *cores, const int max_cores);
-double sim_calculate_energy(struct core *cores, const int max_cores);
-double sim_calculate_time(const struct technology *tech, struct core *cores);
+void sim_reset_measurements(struct architecture *arch);
+double sim_calculate_energy(struct architecture *arch);
+double sim_calculate_time(const struct technology *tech, struct architecture *arch);
 
 void sim_write_results(FILE *fp, const struct sim_results *results);
-void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp, const struct core *cores, const int max_cores);
-void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct core *cores, const int max_cores);
+void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
+void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
 int sim_input(const double firing_probability);
 #endif

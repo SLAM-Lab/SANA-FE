@@ -5,8 +5,6 @@
 
 struct technology
 {
-	int max_cores, cores_per_tile, max_compartments;
-	int fan_out, max_inputs;
 	double energy_active_neuron_update, energy_inactive_neuron_update;
 	double energy_spike_op, energy_spike_within_tile;
 	double energy_east_west_hop, energy_north_south_hop;

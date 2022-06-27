@@ -13,8 +13,8 @@
 //  dt seconds. This relates to the LIF time constant.
 const double dt = 1.0e-3; // Seconds
 
-void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
-			const struct technology *tech, struct input *inputs)
+void network_read_csv(FILE *fp, const struct technology *tech,
+			struct architecture *arch, struct neuron **neuron_ptrs)
 {
 	// Build arbitrary spiking network from a csv file
 	//
@@ -30,17 +30,14 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	//  synapses each with a smaller number of fields.
 	//
 	// See network.h to see all the fields and what they mean
-	struct core *c;
-	struct neuron *n, *src, *dest;
 	struct input *input_ptr;
 	struct synapse *s;
-	char *token, *line;
-	float weight;
-        int neuron_count, input_count, core_id, field_count, ret, neuron_id;
-	int dest_id, curr_input, is_input;
+	char *line;
+        int neuron_count, input_count, compartment_id, ret;
+	int neuron_id, dest_id, curr_input, is_input;
 
-	const int max_fields = NEURON_FIELDS + (tech->fan_out * SYNAPSE_FIELDS);
-	const int max_neurons = tech->max_compartments * tech->max_cores;
+	const int max_fields = NEURON_FIELDS + (4096 * SYNAPSE_FIELDS);
+	const int max_neurons = arch->max_neurons;
 
 	// Allocate memory to hold the string fields for each neuron description
 	//  In the file, one line describes one neuron
@@ -61,7 +58,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		}
 	}
 
-	network_init(cores, tech);
+	network_init(tech, arch);
 	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
 	if (line == NULL)
 	{
@@ -72,11 +69,17 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	neuron_count = 0;
 	input_count = 0;
 
+	// Step 1 - Create all neurons and map these to the hardware. Initialize
+	//  the neuron and count the number of synapses to allocate.
 	while (fgets(line, MAX_CSV_LINE, fp))
 	{
+		struct neuron *n;
+		char *token;
+		int synapse_count, field_count;
+
 		if (neuron_count >= max_neurons)
 		{
-			INFO("Error: inputting too many neurons, max is %d",
+			INFO("Error: inputting too many neurons, max is %d.\n",
 								max_neurons);
 			exit(1);
 		}
@@ -92,7 +95,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 
 		field_count = 0;
 		token = strtok(line, ",");
-		while ((token != NULL) && (field_count < NEURON_FIELDS))
+		while (token != NULL)
 		{
 			// Only parse the neuron fields, the rest of the fields
 			//  contain the synaptic data which we'll read next pass
@@ -108,6 +111,8 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 								NEURON_FIELDS);
 			continue;
 		}
+		synapse_count = field_count - NEURON_FIELDS;
+		assert(synapse_count >= 0);
 
 		for (int i = 0; i < field_count; i++)
 		{
@@ -120,7 +125,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		{
 			TRACE("Creating network input %d.\n", input_count);
 			input_count++;
-			assert(input_count < tech->max_inputs);
+			assert(input_count <= arch->max_external_inputs);
 			continue;
 		}
 		else // This line is defining a neuron
@@ -154,19 +159,9 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 			exit(1);
 		}
 
-		sscanf(neuron_fields[CORE_ID], "%d", &core_id);
-		c = &(cores[core_id]);
-		assert(c->id == core_id);
-
+		sscanf(neuron_fields[COMPARTMENT_ID], "%d", &compartment_id);
 		// Add neuron to specified neuromorphic core
-		n = &(c->neurons[c->compartments]);
-
-		c->compartments++;
-		if (c->compartments > tech->max_compartments)
-		{
-			INFO("Error: For core %d, #compartments (%d) > %d.\n",
-				c->id, c->compartments, tech->max_compartments);
-		}
+		n = &(arch->neurons[compartment_id]);
 
 		// Parse related neuron parameters
 		sscanf(neuron_fields[THRESHOLD_VOLTAGE], "%lf",
@@ -176,6 +171,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		sscanf(neuron_fields[RECORD_VOLTAGE], "%d", &(n->log_voltage));
 		n->fired = 0;
 		n->potential = n->reset;
+		n->active = 1;
 
 		// Hard coded LIF / CUBA time constants for now
 		// TODO: parameterize based on network description (csv)
@@ -185,13 +181,30 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		n->potential_decay =
 				-(exp(-dt / n->potential_time_const) - 1.0);
 
+		// Allocate synaptic memory
+		// TODO: use the memory block to model the space available for
+		//  synaptic memory
+		//assert(n->synapses == NULL);
+		INFO("synapse_count: %d\n", synapse_count);
+		if (synapse_count)
+		{
+			n->synapses = (struct synapse *) malloc(synapse_count *
+							sizeof(struct synapse));
+			if (n->synapses == NULL)
+			{
+				INFO("Error: couldn't allocate synapse mem "
+							"for nid:%u.\n", n->id);
+				exit(1);
+			}
+		}
+
 		// Keep track of which CSV line corresponds to which physical
 		//  neuron in the hardware.  This info will be important for
 		//  linking the synapse data to neuron compartments
 		neuron_ptrs[neuron_count] = n;
 
-		TRACE("Added nid:%d cid:%d vt:%lf r%lf log_s:%d "
-                        "log_v:%d\n", n->id, n->core_id, n->threshold, n->reset,
+		TRACE("Added nid:%d vt:%lf r%lf log_s:%d "
+                        "log_v:%d\n", n->id, n->threshold, n->reset,
 			n->log_spikes, n->log_voltage);
 		neuron_count++;
 	}
@@ -202,6 +215,10 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	fseek(fp, 0, SEEK_SET);
 	while (fgets(line, MAX_CSV_LINE, fp))
 	{
+		struct neuron *src, *dest;
+		char *token;
+		int field_count, synapse_count;
+
 		for (int i = 0; i < max_fields; i++)
 		{
 			neuron_fields[i][0] = '\0';
@@ -225,6 +242,7 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 				"ignoring line.\n", NEURON_FIELDS);
 			continue;
 		}
+		synapse_count = field_count - NEURON_FIELDS;
 
 		// Use the first field (the neuron number) to figure if this
 		//  is a valid formatted line or not. Since this is the
@@ -234,10 +252,9 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 		{
 			// An input is a virtual connnection - it isn't
 			//  associated with a neuron on the chip, but is
-			//  connected to other on chip neurons
+			//  connected to other neurons on the chip
 			src = NULL;
-			c = NULL;
-			input_ptr = &(inputs[curr_input]);
+			input_ptr = &(arch->external_inputs[curr_input]);
 			TRACE("Parsing network input: %d.\n", curr_input);
 			curr_input++;
 		}
@@ -254,8 +271,6 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 			// Now parse all the outgoing synaptic connections for
 			//  this neuron
 			src = neuron_ptrs[neuron_id];
-			c = &(cores[src->core_id]);
-
 			for (int i = 0; i < field_count; i++)
 			{
 				TRACE("nid:%d Parsed field: %s\n", neuron_id,
@@ -263,8 +278,9 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 			}
 		}
 
-		for (int i = 0; i < tech->fan_out; i++)
+		for (int i = 0; i < synapse_count; i++)
 		{
+			float weight;
 			const int curr_synapse_field = NEURON_FIELDS +
 							(i*SYNAPSE_FIELDS);
 			// The list of synapse input strings is null terminted
@@ -310,8 +326,8 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 			}
 			else
 			{
-				s = &(c->synapses[src->compartment]
-						[src->post_connection_count]);
+				s = &(src->synapses[
+						src->post_connection_count]);
 				s->pre_neuron = src;
 				s->post_neuron = dest;
 				src->post_connection_count++;
@@ -332,88 +348,66 @@ void network_read_csv(FILE *fp, struct neuron **neuron_ptrs, struct core *cores,
 	return;
 }
 
-void network_init(struct core *cores, const struct technology *tech)
+void network_init(const struct technology *tech, struct architecture *arch)
 {
-	const int max_cores = tech->max_cores;
-
-	// Initialize state of neuromorphic cores and all their compartments
-	INFO("Initializing %d cores.\n", max_cores);
-	for (int i = 0; i < max_cores; i++)
+	for (int i = 0; i < arch->max_neurons; i++)
 	{
-		struct core *c = &(cores[i]);
+		struct neuron *n = &(arch->neurons[i]);
 
-		c->id = i;
-		c->spike_count = 0;
-		c->compartments = 0;
+		n->id = i;
+		n->post_connection_count = 0;
+		n->log_spikes = 0;
+		n->log_voltage = 0;
+
+		n->fired = 0;
+		n->potential = 0.0;
+		n->current = 0.0;
+		n->bias = 0.0;
+		n->threshold = 0.0;
+		n->reset = 0.0;
+		n->potential_decay = 0.0;
+		n->current_decay = 0.0;
+		n->potential_time_const = 0.0;
+		n->current_time_const = 0.0;
+	}
+
+	for (int i = 0; i < arch->max_routers; i++)
+	{
+		struct router *r = &(arch->routers[i]);
 
 		// Loihi is organised in a 2D mesh of 32 tiles (8x4)
 		//  Groups of 4 cores share a router, forming a tile
-		//  Routers are then connected in the mesh, allowing multi-hop
-		c->x = (i / tech->cores_per_tile) % 8;
-		c->y = (i / tech->cores_per_tile) / 8;
-
-		for (int j = 0; j < tech->max_compartments; j++)
-		{
-			struct neuron *n;
-			int neuron_id;
-
-			n = &(c->neurons[j]);
-			n->core_id = c->id;
-
-			// Simply assign neurons in ascending order from core 0
-			neuron_id = (i * tech->max_compartments) + j;
-			n->id = neuron_id;
-			n->compartment = j;
-
-			n->post_connection_count = 0;
-			n->log_spikes = 0;
-			n->log_voltage = 0;
-
-			n->fired = 0;
-			n->potential = 0.0;
-			n->current = 0.0;
-			n->bias = 0.0;
-			n->threshold = 0.0;
-			n->reset = 0.0;
-			n->potential_decay = 0.0;
-			n->current_decay = 0.0;
-			n->potential_time_const = 0.0;
-			n->current_time_const = 0.0;
-		}
+		// TODO: generalize (i.e. where does 8 come from)
+		r->x = i % 8;
+		r->y = i / 8;
 	}
 }
 
-void network_create_empty(struct core *cores, const struct technology *tech)
+void network_create_empty(const struct technology *tech,
+						struct architecture *arch)
 {
 	// Initialize an empty network, where cores have no connections between
 	//  neurons
-	INFO("Creating empty network with %d cores.\n", tech->max_cores);
-
-	// Initialise network with no connections
-	for (int i = 0; i < tech->max_cores; i++)
+	for (int i = 0; i < arch->max_neurons; i++)
 	{
-		struct core *c = &(cores[i]);
-		for (int j = 0; j < c->compartments; j++)
-		{
-			struct neuron *n = &(c->neurons[j]);
+		struct neuron *n = &(arch->neurons[i]);
 
-			n->fired = 0;
-			n->post_connection_count = 0;
-			n->reset = 0.0;
-			n->potential = n->reset;
-			n->current = 0.0;
+		n->fired = 0;
+		n->post_connection_count = 0;
+		n->reset = 0.0;
+		n->potential = n->reset;
+		n->current = 0.0;
 
-			// No connections so these parameters don't matter
-			n->current_time_const = 1.0e-3;
-			n->potential_time_const = 2.0e-3;
-			n->current_decay =
-				-(exp(-dt / n->current_time_const) - 1.0);
-			n->potential_decay =
-				-(exp(-dt / n->potential_time_const) - 1.0);
+		// No connections so these parameters don't matter
+		n->current_time_const = 1.0e-3;
+		n->potential_time_const = 2.0e-3;
+		n->current_decay =
+			-(exp(-dt / n->current_time_const) - 1.0);
+		n->potential_decay =
+			-(exp(-dt / n->potential_time_const) - 1.0);
 
-			n->threshold = -1.0; // Negative threshold always fires
-			n->bias = 0.0;
-		}
+		n->threshold = -1.0; // Negative threshold always fires
+		n->bias = 0.0;
 	}
 }
 
