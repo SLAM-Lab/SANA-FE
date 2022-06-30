@@ -89,19 +89,20 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 			continue;
 		}
 
+
+		assert(axon_out != NULL);
 		for (int j = 0; j < arch->max_axon_inputs; j++)
 		{
-			assert(axon_out != NULL);
 			axon_out->packets_sent[j] = 0;
 		}
-
 		total_neurons_fired++;
 
 		// Generate all the spikes for a spiking neuron
 		//  Only generate one spike packet per core, that the
 		//  neuron is broadcasting to
 		assert(n->post_connection_count >= 0);
-		//TRACE("n:%d post_connection_count:%d\n", n->id, n->post_connection_count);
+		//TRACE("n:%d post_connection_count:%d\n", n->id,
+		//				n->post_connection_count);
 
 		for (int j = 0; j < n->post_connection_count; j++)
 		{
@@ -127,14 +128,11 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 
 			post_neuron = synapse_ptr->post_neuron;
 			axon_in = post_neuron->axon_in;
-			//post_core = &(cores[post_neuron->core_id]);
 
 			post_neuron->current += synapse_ptr->weight;
 			post_neuron->energy += tech->energy_spike_op;
 			post_neuron->time += tech->time_spike_op;
 
-			//post_core->spike_count++;
-			//assert(post_core->spike_count <= max_spikes);
 			total_spike_count++;
 
 			// Mark a packet as sent to the
@@ -157,10 +155,8 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 
 				// Calculate the energy and time for
 				//  sending spike packets
-				//struct core *post_core = &(cores[k]);
 				int x_hops, y_hops;
 
-				// TODO: need to get the router
 				x_hops = abs(router_pre->x - router_post->x);
 				y_hops = abs(router_pre->y - router_post->y);
 				// E-W hops
@@ -181,11 +177,6 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 
 	return total_spike_count;
 }
-
-//void sim_send_spike(struct synapse *s)
-//{
-//
-//}
 
 int sim_input_spikes(const struct technology *tech, struct architecture *arch)
 {

@@ -1,8 +1,12 @@
 // arch.c: Create a neuromorphic design based on an architecture description
 //  In this simulator and architecture description is a list of different
 //  blocks.
+
 // TODO: in the future we might be able to skip this whole step, and use a
 //  Python interface to directly initialize the C structures
+// TODO: get rid of the tokenization code, I think its safe just to assume that
+//  each entry is separated by a single space (it's meant to be a dumb machine
+//  readable format anyway)
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -19,8 +23,9 @@ static void arch_parse_neuron(struct architecture *arch, char fields[][ARCH_MAX_
 //static void arch_parse_synapse(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
 static void arch_parse_axon_input(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
 static void arch_parse_axon_output(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
+static void arch_parse_router(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
 
-
+/*
 enum block_type
 {
 	NEURON = 0,
@@ -33,6 +38,7 @@ enum block_type
 	EXTERNAL_INPUT,
 	N_BLOCKS,
 };
+*/
 
 /*
 const char block_letters[] =
@@ -182,7 +188,7 @@ static void arch_read_line(struct architecture *arch, char *line)
 		//arch_parse_synapse(arch, fields);
 		break;
 	case 'r':
-		//arch_parse_router(arch, id_list, line);
+		arch_parse_router(arch, fields);
 		break;
 	case 'i':
 		arch_parse_axon_input(arch, fields);
@@ -434,7 +440,7 @@ void arch_free(struct architecture *arch)
 	//  the structure as uninitialized
 	arch->initialized = 0;
 
-	// Free any data inside the neuron
+	// Free any neuron data
 	for (int i = 0; i < arch->max_neurons; i++)
 	{
 		struct neuron *n = &(arch->neurons[i]);
@@ -494,7 +500,7 @@ static void arch_parse_neuron(struct architecture *arch,
 	block_type = fields[0][0];
 	assert(block_type == 'n');
 
-	ret = sscanf(fields[2], "%u", &mem_id);
+	ret = sscanf(fields[2], "%d", &mem_id);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't mem block (%s).\n", fields[2]);
@@ -503,7 +509,7 @@ static void arch_parse_neuron(struct architecture *arch,
 	assert(mem_id < arch->max_mem_blocks);
 	mem_block = &(arch->mem_blocks[mem_id]);
 
-	ret = sscanf(fields[3], "%u", &axon_in_id);
+	ret = sscanf(fields[3], "%d", &axon_in_id);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't parse axon in (%s).\n", fields[2]);
@@ -512,7 +518,7 @@ static void arch_parse_neuron(struct architecture *arch,
 	assert(axon_in_id < arch->max_axon_inputs);
 	axon_in = &(arch->axon_inputs[axon_in_id]);
 
-	ret = sscanf(fields[4], "%u", &axon_out_id);
+	ret = sscanf(fields[4], "%d", &axon_out_id);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't parse axon out (%s).\n", fields[2]);
@@ -529,7 +535,7 @@ static void arch_parse_neuron(struct architecture *arch,
 		struct range *r = &(field_list[i]);
 
 		TRACE("min:%u max%u\n", r->min, r->max);
-		for (unsigned int id = r->min; id <= r->max; id++)
+		for (int id = r->min; id <= r->max; id++)
 		{
 			struct neuron *n;
 
@@ -539,9 +545,9 @@ static void arch_parse_neuron(struct architecture *arch,
 			n->mem_block = mem_block;
 			n->axon_in = axon_in;
 			n->axon_out = axon_out;
-
-			TRACE("Neuron parsed n:%d\n", id);
 		}
+		TRACE("Compartment parsed n:%d-%d mem(%d) i(%d) o(%d).\n",
+			r->min, r->max, mem_id, axon_in_id, axon_out_id);
 	}
 }
 
@@ -576,7 +582,7 @@ static void arch_parse_axon_input(struct architecture *arch,
 	assert(router_id < arch->max_routers);
 	axon_in->r = &(arch->routers[router_id]);
 
-	ret = sscanf(fields[3], "%u", &axon_in->fan_in);
+	ret = sscanf(fields[3], "%d", &axon_in->fan_in);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't parse axon input fan in (%s).\n",
@@ -584,7 +590,8 @@ static void arch_parse_axon_input(struct architecture *arch,
 		exit(1);
 	}
 
-	TRACE("Axon input parsed i:%u\n", axon_in->id);
+	TRACE("Axon input parsed i:%d r(%d) fan_in(%d)\n", axon_in->id,
+					axon_in->r->id, axon_in->fan_in);
 }
 
 
@@ -601,7 +608,7 @@ static void arch_parse_axon_output(struct architecture *arch,
 	type = fields[0][0];
 	assert(type == 'o');
 
-	ret = sscanf(fields[1], "%u", &id);
+	ret = sscanf(fields[1], "%d", &id);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't parse axon output id (%s).\n", fields[1]);
@@ -611,7 +618,7 @@ static void arch_parse_axon_output(struct architecture *arch,
 	axon_out = &(arch->axon_outputs[id]);
 	axon_out->id = id;
 
-	ret = sscanf(fields[2], "%u", &router_id);
+	ret = sscanf(fields[2], "%d", &router_id);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't parse axon router (%s).\n", fields[2]);
@@ -620,7 +627,7 @@ static void arch_parse_axon_output(struct architecture *arch,
 	assert(router_id < arch->max_routers);
 	axon_out->r = &(arch->routers[router_id]);
 
-	ret = sscanf(fields[3], "%u", &axon_out->fan_out);
+	ret = sscanf(fields[3], "%d", &axon_out->fan_out);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't parse axon output fan out (%s).\n",
@@ -628,7 +635,35 @@ static void arch_parse_axon_output(struct architecture *arch,
 		exit(1);
 	}
 
-	TRACE("Axon output parsed o:%u\n", axon_out->id);
+	TRACE("Axon output parsed o:%d r(%d) fan_out(%d)\n", axon_out->id,
+					axon_out->r->id, axon_out->fan_out);
+}
+
+static void arch_parse_router(struct architecture *arch,
+					char fields[][ARCH_MAX_FIELD_LEN])
+{
+	struct router *r;
+	int id, ret;
+
+	ret = sscanf(fields[1], "%u", &id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon output id (%s).\n", fields[1]);
+		exit(1);
+	}
+	assert(id < arch->max_routers);
+	r = &(arch->routers[id]);
+	r->id = id;
+
+	// TODO: change to single scanf (everywhere, not just in this function)
+	ret = sscanf(fields[2], "%u", &(r->x));
+	ret += sscanf(fields[3], "%u", &(r->y));
+	if (ret < 2)
+	{
+		INFO("Error: couldn't parse router r:%d.\n", id);
+		exit(1);
+	}
+	TRACE("Router parsed r:%u x(%d) y(%d).\n", r->id, r->x, r->y);
 }
 
 /*
@@ -638,11 +673,6 @@ static void arch_parse_external_inputs(struct architecture *arch, char *line)
 }
 
 void arch_parse_synapse(struct architecture *arch, char *line)
-{
-
-}
-
-void arch_parse_router(struct architecture *arch, char *line)
 {
 
 }
