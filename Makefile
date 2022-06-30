@@ -1,7 +1,7 @@
 #CC=clang-3.8
 CC=gcc
-#CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -Ofast -g
-CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -O0 -g -DDEBUG
+CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -Ofast -g
+#CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -O0 -g -DDEBUG
 #CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -O0 -g
 GIT_COMMIT=$(shell ./git_status.sh)
 #TODO: add "-dirty" if the working dir has local changes

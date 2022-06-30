@@ -43,14 +43,14 @@ struct synapse_mem
 
 struct axon_output
 {
-	int id;
+	int id, fan_out;
 	struct router *r;
 	unsigned int *packets_sent;
 };
 
 struct axon_input
 {
-	int id;
+	int id, fan_in;
 	struct router *r;
 };
 

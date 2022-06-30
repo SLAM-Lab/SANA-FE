@@ -17,6 +17,9 @@ static struct architecture arch_init(FILE *fp);
 
 static void arch_parse_neuron(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
 //static void arch_parse_synapse(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
+static void arch_parse_axon_input(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
+static void arch_parse_axon_output(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
+
 
 enum block_type
 {
@@ -81,7 +84,7 @@ static int arch_parse_list(const char *field, struct range *list)
 		if ((field[curr_char] == ',') || (field[curr_char] == '\0'))
 		{
 			struct range *curr_range = &(list[list_entries]);
-			
+
 			value[v] = '\0';
 			// Parse the previous number
 			if (is_range)
@@ -111,7 +114,7 @@ static int arch_parse_list(const char *field, struct range *list)
 				curr_range->max = curr_range->min;
 				TRACE("Parsed value (%u)\n", curr_range->min);
 			}
-			
+
 			v = 0;
 			is_range = 0;
 			list_entries++;
@@ -157,7 +160,7 @@ static void arch_read_line(struct architecture *arch, char *line)
 	{
 		if (curr_field == NULL)
 		{
-			INFO("Parsed %d fields.\n", i);
+			TRACE("Parsed %d fields.\n", i);
 			break;
 		}
 		strncpy(fields[i], curr_field, ARCH_MAX_FIELD_LEN);
@@ -182,10 +185,10 @@ static void arch_read_line(struct architecture *arch, char *line)
 		//arch_parse_router(arch, id_list, line);
 		break;
 	case 'i':
-		//arch_parse_axon_input(arch, id_list, line);
+		arch_parse_axon_input(arch, fields);
 		break;
 	case 'o':
-		//arch_parse_axon_output(arch, id_list, line);
+		arch_parse_axon_output(arch, fields);
 		break;
 	case 't':
 		//arch_parse_timer(arch, id_list, line);
@@ -244,23 +247,23 @@ static unsigned int arch_get_count(const char *field)
 				// Calculate the range (inclusive), e.g.
 				// 1..3 -> 1,2,3 which is 3 values
 				values = (rval - lval) + 1;
-				INFO("Parsed range (%d..%d).\n", lval, rval);
+				TRACE("Parsed range (%d..%d).\n", lval, rval);
 			}
 			else
 			{
 				values = 0;
-				INFO("Error: invalid range (%s).\n", curr);
+				TRACE("Warning: invalid range (%s).\n", curr);
 			}
 			break;
 		}
 		else
 		{
-			INFO("Error: invalid field (%s).\n", field);
+			TRACE("Warning: invalid field (%s).\n", field);
 			break;
 		}
 	}
 
-	INFO("Parsed %d values.\n", values);
+	TRACE("Parsed %d values.\n", values);
 	return values;
 }
 
@@ -296,9 +299,8 @@ static struct architecture arch_init(FILE *fp)
 
 		field = strtok(line, " ");
 		field = strtok(NULL, " ");
-		INFO("debug: field: %s.\n", field);
 		unit_count = arch_get_count(field);
-		INFO("unit count:%d.\n", unit_count);
+		TRACE("unit count:%d.\n", unit_count);
 
 		// TODO: can refactor so the switch sets an enum?
 		//  That doesn't really add anything though since we'd need
@@ -370,6 +372,7 @@ static struct architecture arch_init(FILE *fp)
 	for (int i = 0; i < arch.max_neurons; i++)
 	{
 		struct neuron *n = &(arch.neurons[i]);
+
 		n->id = i;
 		n->synapses = NULL;
 		n->axon_in = NULL;
@@ -379,13 +382,25 @@ static struct architecture arch_init(FILE *fp)
 		n->active = 0;
 	}
 
-	// Allocate memory for the synapse blocks
 	for (int i = 0; i < arch.max_mem_blocks; i++)
 	{
 		struct synapse_mem *mem = &(arch.mem_blocks[i]);
 
 		mem->id = i;
 		INFO("Allocating synapse memory for block %d.\n", mem->id);
+	}
+
+	for (int i = 0; i < arch.max_axon_outputs; i++)
+	{
+		struct axon_output *axon_out = &(arch.axon_outputs[i]);
+
+		axon_out->packets_sent = (unsigned int *)
+			malloc(arch.max_axon_inputs * sizeof(unsigned int));
+		if (axon_out->packets_sent == NULL)
+		{
+			INFO("Error: Failed to allocate axon memory.\n");
+			exit(1);
+		}
 	}
 
 	INFO("Allocating memory for %d external inputs.\n",
@@ -424,8 +439,18 @@ void arch_free(struct architecture *arch)
 	{
 		struct neuron *n = &(arch->neurons[i]);
 
+		assert(n != NULL);
 		free(n->synapses);
 		n->synapses = NULL;
+	}
+
+	for (int i = 0; i < arch->max_axon_outputs; i++)
+	{
+		struct axon_output *axon_out = &(arch->axon_outputs[i]);
+
+		assert(axon_out != NULL);
+		free(axon_out->packets_sent);
+		axon_out->packets_sent = NULL;
 	}
 
 	// Free all memory
@@ -460,7 +485,9 @@ static void arch_parse_neuron(struct architecture *arch,
 {
 	struct range field_list[ARCH_MAX_VALUES];
 	struct synapse_mem *mem_block;
-	int ret, list_len, mem_id;
+	struct axon_input *axon_in;
+	struct axon_output *axon_out;
+	int ret, list_len, mem_id, axon_in_id, axon_out_id;
 	char block_type;
 
 	assert(fields && fields[0]);
@@ -470,11 +497,30 @@ static void arch_parse_neuron(struct architecture *arch,
 	ret = sscanf(fields[2], "%u", &mem_id);
 	if (ret < 1)
 	{
-		INFO("Error: Couldn't parse value (%s).\n", fields[2]);
+		INFO("Error: Couldn't mem block (%s).\n", fields[2]);
 		exit(1);
 	}
 	assert(mem_id < arch->max_mem_blocks);
 	mem_block = &(arch->mem_blocks[mem_id]);
+
+	ret = sscanf(fields[3], "%u", &axon_in_id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon in (%s).\n", fields[2]);
+		exit(1);
+	}
+	assert(axon_in_id < arch->max_axon_inputs);
+	axon_in = &(arch->axon_inputs[axon_in_id]);
+
+	ret = sscanf(fields[4], "%u", &axon_out_id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon out (%s).\n", fields[2]);
+		exit(1);
+	}
+	assert(axon_out_id < arch->max_axon_outputs);
+	axon_out = &(arch->axon_outputs[axon_out_id]);
+
 
 	// Copy the neuron a number of times
 	list_len = arch_parse_list(fields[1], &(field_list[0]));
@@ -482,7 +528,7 @@ static void arch_parse_neuron(struct architecture *arch,
 	{
 		struct range *r = &(field_list[i]);
 
-		INFO("min:%u max%u\n", r->min, r->max);
+		TRACE("min:%u max%u\n", r->min, r->max);
 		for (unsigned int id = r->min; id <= r->max; id++)
 		{
 			struct neuron *n;
@@ -491,16 +537,104 @@ static void arch_parse_neuron(struct architecture *arch,
 			n = &(arch->neurons[id]);
 			// Copy any common compartment variables
 			n->mem_block = mem_block;
+			n->axon_in = axon_in;
+			n->axon_out = axon_out;
 
 			TRACE("Neuron parsed n:%d\n", id);
 		}
 	}
 }
 
+static void arch_parse_axon_input(struct architecture *arch,
+					char fields[][ARCH_MAX_FIELD_LEN])
+{
+	struct axon_input *axon_in;
+	int ret, id, router_id;
+	char type;
+
+	assert(fields && fields[0]);
+	type = fields[0][0];
+	assert(type == 'i');
+
+
+	ret = sscanf(fields[1], "%u", &id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon input id (%s).\n", fields[1]);
+		exit(1);
+	}
+	assert(id < arch->max_axon_inputs);
+	axon_in = &(arch->axon_inputs[id]);
+	axon_in->id = id;
+
+	ret = sscanf(fields[2], "%u", &router_id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon router (%s).\n", fields[2]);
+		exit(1);
+	}
+	assert(router_id < arch->max_routers);
+	axon_in->r = &(arch->routers[router_id]);
+
+	ret = sscanf(fields[3], "%u", &axon_in->fan_in);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon input fan in (%s).\n",
+								fields[3]);
+		exit(1);
+	}
+
+	TRACE("Axon input parsed i:%u\n", axon_in->id);
+}
+
+
+// TODO: should the axon output structure really be the same as the axon input
+//  and we just set a flag to determine whether its an input or output port?
+static void arch_parse_axon_output(struct architecture *arch,
+					char fields[][ARCH_MAX_FIELD_LEN])
+{
+	struct axon_output *axon_out;
+	int ret, id, router_id;
+	char type;
+
+	assert(fields && fields[0]);
+	type = fields[0][0];
+	assert(type == 'o');
+
+	ret = sscanf(fields[1], "%u", &id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon output id (%s).\n", fields[1]);
+		exit(1);
+	}
+	assert(id < arch->max_axon_outputs);
+	axon_out = &(arch->axon_outputs[id]);
+	axon_out->id = id;
+
+	ret = sscanf(fields[2], "%u", &router_id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon router (%s).\n", fields[2]);
+		exit(1);
+	}
+	assert(router_id < arch->max_routers);
+	axon_out->r = &(arch->routers[router_id]);
+
+	ret = sscanf(fields[3], "%u", &axon_out->fan_out);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse axon output fan out (%s).\n",
+								fields[3]);
+		exit(1);
+	}
+
+	TRACE("Axon output parsed o:%u\n", axon_out->id);
+}
+
 /*
 static void arch_parse_external_inputs(struct architecture *arch, char *line)
 {
-	
+
 }
 
 void arch_parse_synapse(struct architecture *arch, char *line)

@@ -13,9 +13,10 @@ MAX_COMPARTMENTS = 1024
 MAX_CORES = 128
 NETWORK_FILENAME = "connected_layer.csv"
 TECH_FILENAME = "loihi.tech"
+ARCH_FILENAME = "loihi.list"
 
-def run_sim(network, core_count):
-    fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
+def run_sim(network):
+    fields = ["Neuron ID", "Compartment ID", "Threshold", "Reset",
               "Log Spikes", "Log Voltage", "Synapse Info..."]
     with open(NETWORK_FILENAME, "w") as csv_file:
         writer = csv.writer(csv_file)
@@ -23,8 +24,8 @@ def run_sim(network, core_count):
         writer.writerows(network)
 
     timesteps = 2
-    command = ("./sim", "{0}".format(TECH_FILENAME), "{0}".format(timesteps),
-               NETWORK_FILENAME)
+    command = ("./sim", TECH_FILENAME, ARCH_FILENAME,
+               NETWORK_FILENAME, "{0}".format(timesteps))
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
 
@@ -45,21 +46,16 @@ def fully_connected(layer_neurons, spiking=True):
     weight = 1.0
     reset = 0
     for n in range(0, layer_neurons):
-        core_id = n / MAX_COMPARTMENTS
-
-        neuron = [n, core_id, threshold, reset, 0, 0]
+        neuron = [n, n, threshold, reset, 0, 0]
         for dest in range(layer_neurons, 2*layer_neurons):
             neuron.extend((dest, weight))  # Same weight for all connections
         network.append(neuron)
 
     for n in range(layer_neurons, 2*layer_neurons):
-        core_id = n / MAX_COMPARTMENTS
-        neuron = [n, core_id, threshold, reset, 0, 0]
+        neuron = [n, n, threshold, reset, 0, 0]
         network.append(neuron)
 
-    core_count = core_id + 1
-
-    return network, core_count
+    return network
 
 
 def empty(neurons, max_compartments=MAX_COMPARTMENTS):
@@ -67,7 +63,6 @@ def empty(neurons, max_compartments=MAX_COMPARTMENTS):
     threshold = -1.0  # never spike
     reset = 0.0
 
-    core_id = 0
     compartment = 0
     # Map a number of neurons onto cores, but we may not necessarily use all
     #  compartments of each core
@@ -75,28 +70,22 @@ def empty(neurons, max_compartments=MAX_COMPARTMENTS):
     # Maybe the simulator can take number of cores to simulate as an arg
     #  then we assume all simulated cores are powered
     for n in range(0, neurons):
-        if compartment == max_compartments:
-            core_id += 1
-            compartment = 0
-
-        neuron = [n, core_id, threshold, reset, 0, 0]
+        neuron = [n, n, threshold, reset, 0, 0]
         network.append(neuron)
         compartment += 1
 
-    core_count = core_id + 1
-
-    return network, core_count
+    return network
 
 
 if __name__ == "__main__":
-    core_count = [1, 2, 4, 8, 16, 32, 64, 128]
+    #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):
             n = compartments * cores
-            network, _ = empty(n, compartments)
+            network = empty(n, compartments)
             results = run_sim(network, cores)
 
             times[compartments].append(results["time"])
@@ -130,9 +119,9 @@ if __name__ == "__main__":
     for i in range(1, 31):
         layer_neurons = i*i
 
-        network, core_count = fully_connected(layer_neurons)
+        network = fully_connected(layer_neurons)
         print("Testing network with {0} neurons".format(len(network)))
-        results = run_sim(network, core_count)
+        results = run_sim(network)
 
         neurons.append(len(network))
         spiking_times.append(results["time"])
@@ -157,9 +146,9 @@ if __name__ == "__main__":
     for i in range(1, 31):
         layer_neurons = i*i
 
-        network, core_count = fully_connected(layer_neurons, spiking=False)
+        network = fully_connected(layer_neurons, spiking=False)
         print("Testing network with {0} neurons".format(len(network)))
-        results = run_sim(network, core_count)
+        results = run_sim(network)
 
         neurons.append(len(network))
         nonspiking_times.append(results["time"])
@@ -179,7 +168,7 @@ if __name__ == "__main__":
     #  since this is restricted data!
     loihi_times_spikes = []
     loihi_energy_spikes = []
-    with open("sim_spiking.csv", "r") as spiking_csv:
+    with open("loihi_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
             loihi_times_spikes.append(row["time"])
@@ -187,7 +176,7 @@ if __name__ == "__main__":
 
     loihi_times_no_spikes = []
     loihi_energy_no_spikes = []
-    with open("sim_nonspiking.csv", "r") as nonspiking_csv:
+    with open("loihi_nonspiking.csv", "r") as nonspiking_csv:
         nonspiking_reader = csv.DictReader(nonspiking_csv)
         for row in nonspiking_reader:
             loihi_times_no_spikes.append(row["time"])

@@ -91,8 +91,7 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 
 		for (int j = 0; j < arch->max_axon_inputs; j++)
 		{
-			INFO("max axon inputs:%d", arch->max_axon_inputs);
-			assert(axon_out);
+			assert(axon_out != NULL);
 			axon_out->packets_sent[j] = 0;
 		}
 
@@ -102,6 +101,7 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 		//  Only generate one spike packet per core, that the
 		//  neuron is broadcasting to
 		assert(n->post_connection_count >= 0);
+		//TRACE("n:%d post_connection_count:%d\n", n->id, n->post_connection_count);
 
 		for (int j = 0; j < n->post_connection_count; j++)
 		{
@@ -110,7 +110,7 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 			struct axon_input *axon_in;
 			struct axon_output *axon_out;
 
-			synapse_ptr = n->synapses;
+			synapse_ptr = &(n->synapses[j]);
 			axon_out = n->axon_out;
 			assert(n);
 			assert(synapse_ptr);
@@ -316,13 +316,24 @@ double sim_calculate_time(const struct technology *tech,
 	// TODO: adapt to general arch
 	//  Use the timing tree to calculate, based on parallel, time multiplexed
 	//  and globally synchronized blocks
-	double max_time = 0; // s
+	double max_time, core_time;
 
-	//for (int i = 0; i < tech->max_cores; i++)
-	//{
-	//	struct core *c = &(cores[i]);
-	//	max_time = fmax(max_time, c->time);
-	//}
+	max_time = 0.0; // s
+	core_time = 0.0;
+
+	// TODO: remove this hack, it's just here to make Loihi sims work until
+	//  I have a more general timing structure
+	for (int i = 0; i < arch->max_neurons; i++)
+	{
+		struct neuron *n = &(arch->neurons[i]);
+		if ((i % 1024) == 0)
+		{
+			max_time = fmax(max_time, core_time);
+			core_time = 0.0;
+		}
+		core_time += n->time;
+	}
+	max_time = fmax(max_time, core_time);
 
 	// Add the mesh-wide barrier sync time (assuming worst case of 32 tiles)
 	max_time += tech->time_mesh_barrier;

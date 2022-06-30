@@ -162,6 +162,10 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 		sscanf(neuron_fields[COMPARTMENT_ID], "%d", &compartment_id);
 		// Add neuron to specified neuromorphic core
 		n = &(arch->neurons[compartment_id]);
+		// TODO: make sure we don't allocate the same compartment twice
+		//  it might make sense to have a different variable / rename
+		//  active to indicate that a compartment is taken
+		assert(n->active == 0);
 
 		// Parse related neuron parameters
 		sscanf(neuron_fields[THRESHOLD_VOLTAGE], "%lf",
@@ -184,8 +188,6 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 		// Allocate synaptic memory
 		// TODO: use the memory block to model the space available for
 		//  synaptic memory
-		//assert(n->synapses == NULL);
-		INFO("synapse_count: %d\n", synapse_count);
 		if (synapse_count)
 		{
 			n->synapses = (struct synapse *) malloc(synapse_count *
