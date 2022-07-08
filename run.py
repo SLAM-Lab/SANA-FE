@@ -34,8 +34,8 @@ def run_sim(network):
 
     return results
 
-
-def fully_connected(layer_neurons, spiking=True):
+import random
+def fully_connected(layer_neurons, spiking=True, probability=1.0):
     # Two layers, fully connected
     network = []
     if spiking:  # always spike
@@ -48,7 +48,8 @@ def fully_connected(layer_neurons, spiking=True):
     for n in range(0, layer_neurons):
         neuron = [n, n, threshold, reset, 0, 0]
         for dest in range(layer_neurons, 2*layer_neurons):
-            neuron.extend((dest, weight))  # Same weight for all connections
+            if random.random() < probability:
+                neuron.extend((dest, weight))  # Same weight for all connections
         network.append(neuron)
 
     for n in range(layer_neurons, 2*layer_neurons):
@@ -119,7 +120,7 @@ if __name__ == "__main__":
     for i in range(1, 31):
         layer_neurons = i*i
 
-        network = fully_connected(layer_neurons)
+        network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
         print("Testing network with {0} neurons".format(len(network)))
         results = run_sim(network)
 
