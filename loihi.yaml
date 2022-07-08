@@ -1,0 +1,61 @@
+---
+# We can describe structures in an abstract way, these won't be instantiated.
+#  Only structures under "sim" will be actually created and simulated
+#  The point of this is these structures can be reused inside of the simulation
+templates:
+  subtree:
+    - name: loihi_synapse
+      class: synapse
+      attributes:
+        model: cuba
+        mem_size: 1000000
+        weight_bits: 4
+      timing: parallel
+    - name: loihi_lif
+      class: neuron
+      timing: multiplexed
+      attributes:
+        model: lif
+
+###############################################################################
+
+architecture:
+  subtree:
+    - name: loihi_tile[0..31]
+      timing: parallel
+      local:
+        class: router
+        attributes:
+          connection: mesh
+          dimensions: 2
+      subtree:
+        - name: loihi_core[0..3]
+          timing: parallel
+          local:
+            - loihi_lif[0..1023]
+            - loihi_synapses
+            - name: loihi_in
+              class: axon_in
+              attributes:
+                fan_in: 4096
+                protocol: aer
+            - name: loihi_out
+              class: axon_out
+              attributes:
+                fan_in: 4096
+                protocol: aer
+
+# timing possible values: 
+# clock: the timestep / event takes a fixed time based on clock frequency - how do we define clock speed? Probably a technology parameter
+#   we could still model the timing but in the end we just overwrite it with the clock freq (and raise an error if the sim time took longer)
+# parallel: All instances run in parallel. Each has its own timing.
+# global_sync: similar to parallel, take the max timing of any instances + sync time
+# multiplexed: Each instance must run one after the other. 
+#  -- something more complex might be event drive time simulation, interaction between blocks is modelled. But thats probably another parameter
+
+# keywords:
+# Units:
+# sim, neuron, synapse, axon_in, axon_out, dendrite, router
+#
+# Fixed parameters:
+# timing, instances
