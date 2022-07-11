@@ -165,7 +165,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 		// TODO: make sure we don't allocate the same compartment twice
 		//  it might make sense to have a different variable / rename
 		//  active to indicate that a compartment is taken
-		assert(n->active == 0);
+		assert(n->compartment_used == 0);
 
 		// Parse related neuron parameters
 		sscanf(neuron_fields[THRESHOLD_VOLTAGE], "%lf",
@@ -173,9 +173,11 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 		sscanf(neuron_fields[RESET_VOLTAGE], "%lf", &(n->reset));
 		sscanf(neuron_fields[RECORD_SPIKES], "%d", &(n->log_spikes));
 		sscanf(neuron_fields[RECORD_VOLTAGE], "%d", &(n->log_voltage));
+		sscanf(neuron_fields[FORCE_UPDATE], "%d", &(n->force_update));
 		n->fired = 0;
 		n->potential = n->reset;
-		n->active = 1;
+		n->update_needed = n->force_update;
+		n->compartment_used = 1;
 
 		// Hard coded LIF / CUBA time constants for now
 		// TODO: parameterize based on network description (csv)
@@ -371,6 +373,8 @@ void network_init(const struct technology *tech, struct architecture *arch)
 		n->current_decay = 0.0;
 		n->potential_time_const = 0.0;
 		n->current_time_const = 0.0;
+		n->update_needed = 0;
+		n->compartment_used = 0;
 	}
 
 	for (int i = 0; i < arch->max_routers; i++)

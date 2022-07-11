@@ -46,18 +46,20 @@ void sim_update_state(const struct technology *tech,
 	//#pragma omp parallel for
 	for (int i = 0; i < arch->max_neurons; i++)
 	{
-		//TRACE("Processing %d spikes.\n", c->spike_count);
 		struct neuron *n = &(arch->neurons[i]);
-
-		if (n->active)
+		if (!n->compartment_used)
 		{
-			sim_update_active(tech, n);
+			continue;
+		}
+
+		if (n->update_needed)
+		{
+			sim_update(tech, n);
 		}
 		else
 		{
-#if 0
-			sim_update_inactive(tech, n);
-#endif
+			n->energy += tech->energy_inactive_neuron_update;
+			n->time += tech->time_inactive_neuron_update;
 		}
 	}
 }
@@ -84,11 +86,10 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 		struct neuron *n = &(arch->neurons[i]);
 		struct axon_output *axon_out = n->axon_out;
 
-		if (!n->active || !n->fired)
+		if (!n->compartment_used || !n->fired)
 		{
 			continue;
 		}
-
 
 		assert(axon_out != NULL);
 		for (int j = 0; j < arch->max_axon_inputs; j++)
@@ -129,10 +130,12 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 			post_neuron = synapse_ptr->post_neuron;
 			axon_in = post_neuron->axon_in;
 
+			post_neuron->update_needed = 1;
 			post_neuron->current += synapse_ptr->weight;
 			post_neuron->energy += tech->energy_spike_op;
 			post_neuron->time += tech->time_spike_op;
 
+			post_neuron->spike_count++;
 			total_spike_count++;
 
 			// Mark a packet as sent to the
@@ -207,8 +210,9 @@ int sim_input_spikes(const struct technology *tech, struct architecture *arch)
 			post_neuron->current += synapse_ptr->weight;
 			post_neuron->energy += tech->energy_spike_op;
 			post_neuron->time += tech->time_spike_op;
+			post_neuron->update_needed = 1;
 
-			//post_core->spike_count++;
+			post_neuron->spike_count++;
 			input_spike_count++;
 		}
 
@@ -220,7 +224,7 @@ int sim_input_spikes(const struct technology *tech, struct architecture *arch)
 	return input_spike_count;
 }
 
-void sim_update_active(const struct technology *tech, struct neuron *n)
+void sim_update(const struct technology *tech, struct neuron *n)
 {
 	// The neuron (state update) contains four main components
 	// 1) synapse updates
@@ -232,16 +236,10 @@ void sim_update_active(const struct technology *tech, struct neuron *n)
 	sim_update_lif(tech, n);
 	sim_update_axon(tech, n);
 
-	n->energy += tech->energy_active_neuron_update;
-	n->time += tech->time_active_neuron_update;
-}
-
-void sim_update_inactive(const struct technology *tech,
-						struct neuron *n)
-{
-	// TODO: figure what inactive neuron update even means...
 	n->energy += tech->energy_inactive_neuron_update;
-	n->time += tech->time_inactive_neuron_update;
+			n->time += tech->time_inactive_neuron_update;
+n->energy += tech->energy_active_neuron_update;
+	n->time += tech->time_active_neuron_update;
 }
 
 void sim_update_synapse_cuba(const struct technology *tech, struct neuron *n)
@@ -322,7 +320,10 @@ double sim_calculate_time(const struct technology *tech,
 			max_time = fmax(max_time, core_time);
 			core_time = 0.0;
 		}
-		core_time += n->time;
+		if (n->compartment_used)
+		{
+			core_time += n->time;
+		}
 	}
 	max_time = fmax(max_time, core_time);
 
@@ -340,7 +341,10 @@ double sim_calculate_energy(struct architecture *arch)
 	for (int i = 0; i < arch->max_neurons; i++)
 	{
 		struct neuron *n = &(arch->neurons[i]);
-		total_energy += n->energy;
+		if (n->compartment_used)
+		{
+			total_energy += n->energy;
+		}
 	}
 
 	return total_energy;
@@ -353,9 +357,10 @@ void sim_reset_measurements(struct architecture *arch)
 	{
 		struct neuron *n = &(arch->neurons[i]);
 
-		//n->spike_count = 0;
 		n->energy = 0;
 		n->time = 0;
+		n->update_needed = n->force_update;
+		n->spike_count = 0;
 	}
 }
 

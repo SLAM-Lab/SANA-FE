@@ -17,8 +17,8 @@
 struct neuron
 {
 	struct synapse *synapses;
-	int fired, post_connection_count, id;
-	int log_spikes, log_voltage, active;
+	int compartment_used, fired, post_connection_count, id, spike_count;
+	int log_spikes, log_voltage, update_needed, force_update;
 	double potential, current, bias, threshold, reset;
 	double potential_decay, current_decay, potential_time_const;
 	double current_time_const, time, energy;
@@ -87,8 +87,7 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch);
 int sim_input_spikes(const struct technology *tech, struct architecture *arch);
 
 void sim_update_state(const struct technology *tech, struct architecture *arch);
-void sim_update_active(const struct technology *tech, struct neuron *n);
-void sim_update_inactive(const struct technology *tech, struct neuron *n);
+void sim_update(const struct technology *tech, struct neuron *n);
 void sim_update_synapse_cuba(const struct technology *tech, struct neuron *n);
 void sim_update_dendrite(const struct technology *tech, struct neuron *n);
 void sim_update_lif(const struct technology *tech, struct neuron *n);

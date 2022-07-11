@@ -20,6 +20,7 @@ enum neuron_config_format
 	RESET_VOLTAGE,
 	RECORD_SPIKES, // Record any spikes to a CSV file
 	RECORD_VOLTAGE, // Write the voltage to a CSV file every timestep
+	FORCE_UPDATE,
 	NEURON_FIELDS,
 };
 

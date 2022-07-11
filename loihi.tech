@@ -29,4 +29,4 @@ time_north_south_hop 6.5e-9
 # TODO: replace with a function that calculates based on the number of tiles
 #  used, the range is 113-465 ns (1-32 tiles).  At the moment most of my
 #  experiments are just using a single tile
-time_mesh_barrier 113.0e-9
+time_mesh_barrier 299.0e-9

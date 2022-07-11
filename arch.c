@@ -385,7 +385,8 @@ static struct architecture arch_init(FILE *fp)
 		n->axon_out = NULL;
 
 		n->fired = 0;
-		n->active = 0;
+		n->update_needed = 0;
+		n->compartment_used = 0;
 	}
 
 	for (int i = 0; i < arch.max_mem_blocks; i++)
