@@ -1,50 +1,97 @@
 ---
 # We can describe structures in an abstract way, these won't be instantiated.
-#  Only structures under "sim" will be actually created and simulated
+#  Only structures under "arch" will be actually created and simulated
 #  The point of this is these structures can be reused inside of the simulation
-templates:
-  subtree:
-    - name: loihi_synapse
-      class: synapse
-      attributes:
-        model: cuba
-        mem_size: 1000000
-        weight_bits: 4
-      timing: parallel
-    - name: loihi_lif
-      class: neuron
-      timing: multiplexed
-      attributes:
-        model: lif
+#templates:
+#  subtree:
+#    - name: loihi_synapse
+#      class: synapse
+#      attributes:
+#        model: cuba
+#        weight_bits: 4
+#      timing: parallel
+#    - name: loihi_lif
+#      class: neuron
+#      timing: multiplexed
+#      attributes:
+#        model: lif
 
 ###############################################################################
 
 architecture:
+  name: "loihi_chip"
   subtree:
     - name: loihi_tile[0..31]
-      timing: parallel
       local:
-        class: router
-        attributes:
-          connection: mesh
-          dimensions: 2
+        - name: tile_router 
+          class: router
+          attributes:
+            connection: mesh
+            max_dimensions: # 2D
+              x: 8
+              y: 4 
       subtree:
         - name: loihi_core[0..3]
-          timing: parallel
           local:
-            - loihi_lif[0..1023]
-            - loihi_synapses
-            - name: loihi_in
+            - name: core_compartments[0..1023]
+              # Compartments act analogous to registers in Loihi. They drive
+              #  the simulation, every timestep we update all compartments.
+              #  Updates follow the order:
+              #   synaptic -> dendritic, -> somatic -> axonal
+              #  In a purely analog design we can model a single set of
+              #  functional units per compartment
+              class: compartment
+              attributes:
+                voltage: True
+                current: True
+                type: digital
+            - name: core_synapse_read
+              class: synapse
+              attributes:
+                model: cuba
+            - name: core_lif
+              class: soma
+              attributes:
+                model: leaky_integrate
+                hard_reset: True
+                soft_reset: True
+            - name: core_dendrite
+              class: dendrite
+              attributes:
+                model: leaky_integrate
+                # not sure yet what dendritic ops loihi supports
+            - name: core_sram
+              # The SRAM is used to store synaptic info, neuron state and
+              #  dendrite structures. In the case of convolutional networks
+              #  weights might be shared across compartments, reducing the
+              #  load on SRAM. It makes sense to model memory usage, in the
+              #  simplest case to get data about memory usage and limit the
+              #  networks implemented on the arch
+              class: memory
+              size: 1000000
+            - name: core_in
               class: axon_in
+              # axon_in acts like input ports to the arch or subtree. In future
+              #  we could model the operations done at the axon input e.g.
+              #  mapping input spikes to compartments. Loihi uses a destination
+              #  based protocol, the packet has the destination tile and axon
+              #  The input ports converts an axon to a set of spikes to go to
+              #  synapses on the core. For Loihi we have at most 4096 slots to
+              #  route packets to different synapses.
               attributes:
                 fan_in: 4096
-                protocol: aer
-            - name: loihi_out
+                protocol: dest_axon
+            - name: core_out
               class: axon_out
+              # axon_out acts like output ports. Loihi needs to figure out the
+              #  destination tiles and axons to send spikes to. If transmitting
+              #  to different neurons on a common core, those are grouped into
+              #  one axon. We have 4096 slots on Loihi to send out packets to
+              #  different receiving axons (i.e. 4096 unique cores).
               attributes:
-                fan_in: 4096
-                protocol: aer
-
+                fan_out: 4096
+                protocol: dest_axon
+  
 # timing possible values: 
 # clock: the timestep / event takes a fixed time based on clock frequency - how do we define clock speed? Probably a technology parameter
 #   we could still model the timing but in the end we just overwrite it with the clock freq (and raise an error if the sim time took longer)
