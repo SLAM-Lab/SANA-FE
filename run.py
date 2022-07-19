@@ -50,10 +50,11 @@ def connected_layer(weights, spiking=True):
     for n in range(0, layer_neurons):
         neuron = [n, n, threshold, reset, 0, 0, int(force_update)]
         for dest in range(0, layer_neurons):
+            # Take the ID of the neuron in the 2nd layer
             weight = float(weights[n][dest]) / 255
             if weight != 0:
                 # Zero weights are pruned i.e. removed
-                neuron.extend((dest, weight))  # Same weight for all connections
+                neuron.extend((dest+layer_neurons, weight))
         network.append(neuron)
 
     for n in range(layer_neurons, 2*layer_neurons):
