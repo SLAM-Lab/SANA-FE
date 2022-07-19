@@ -14,7 +14,7 @@ def parse(arch_dict):
     #  A globally defined block can't contain other structures? lets see
 
     if "architecture" not in arch_dict:
-        print("Error: no architecture under sim defined")
+        print("Error: no architecture defined")
     else:
         parse_struct(arch_dict["architecture"], [], 1)
 
@@ -135,6 +135,11 @@ def parse_local(local, parent_ids):
         el["synapses"] = dependencies["synapses"]
         el["axon_inputs"] = dependencies["axon_inputs"]
         el["axon_outputs"] = dependencies["axon_outputs"]
+
+        timer = create_timer()
+        local_ids["timer"] = timer
+        el["timer"] = timer
+
         compartments = parse_compartment(el)
 
     return local_ids
@@ -164,7 +169,8 @@ def parse_compartment(element_dict):
                                           element_dict["dendrites"],
                                           element_dict["somas"],
                                           element_dict["axon_inputs"],
-                                          element_dict["axon_outputs"])
+                                          element_dict["axon_outputs"],
+					  element_dict["timer"])
 
     return [compartment_ids]
 
@@ -220,7 +226,7 @@ the future.
 _compartments = []
 _compartment_count = 0
 def create_compartment(instances, synapses, dendrites, somas, axon_inputs,
-                       axon_outputs):
+                       axon_outputs, timer):
     global _compartment_count
 
     compartment_id = _compartment_count
@@ -231,8 +237,9 @@ def create_compartment(instances, synapses, dendrites, somas, axon_inputs,
     else:
         id_str = str(compartment_id)
 
-    compartment = "c {0} {1} {2} {3}".format(id_str, synapses[0],
-                                             axon_inputs[0], axon_outputs[0])
+    compartment = "c {0} {1} {2} {3} {4}".format(id_str, synapses[0],
+                                             axon_inputs[0], axon_outputs[0],
+					     timer)
     _compartments.append(compartment)
 
     # TODO: return list of ids
@@ -279,6 +286,7 @@ _dendrites = []
 def parse_dendrite(element_dict):
     return create_dendrite()
 
+
 def create_dendrite():
     dendrite_id = len(_dendrites)
     dendrite = "d {0}".format(dendrite_id)
@@ -314,6 +322,15 @@ def create_axon_out(router_id):
     return axon_id
 
 
+_timers = []
+def create_timer():
+    timer_id = len(_timers)
+    timer = "t {0}".format(timer_id)
+    _timers.append(timer)
+
+    return timer_id
+
+
 if __name__ == "__main__":
     arch_list = None
     with open("loihi.yaml", "r") as arch_file:
@@ -322,7 +339,8 @@ if __name__ == "__main__":
 
     #arch_elements = _compartments + _routers
     arch_elements = _compartments + _routers + _memories + _synapses + \
-                    _axon_inputs + _axon_outputs + _somas + _dendrites
+                    _axon_inputs + _axon_outputs + _somas + _dendrites + \
+		    _timers
     #print(arch_elements)
 
     with open("out", "w") as list_file:

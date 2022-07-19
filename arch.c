@@ -259,7 +259,7 @@ static struct architecture arch_init(FILE *fp)
 	arch.max_compartments = 0;
 	arch.max_mem_blocks = 0;
 	arch.max_routers = 0;
-	arch.max_timers = 128; // HACK
+	arch.max_timers = 0;
 	arch.max_axon_inputs = 0;
 	arch.max_axon_outputs = 0;
 	arch.max_external_inputs = 131072; // HACK
@@ -645,8 +645,4 @@ void arch_parse_synapse(struct architecture *arch, char *line)
 
 }
 
-void arch_parse_timer(struct architecture *arch, char *line)
-{
-
-}
 */
