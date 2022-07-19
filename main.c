@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	FILE *probe_spikes_fp, *probe_potential_fp;
 	struct architecture arch;
 	struct technology tech;
-	struct neuron **neuron_ptrs;
+	struct compartment **compartment_ptrs;
 	struct sim_results results;
 	char *filename, *input_buffer;
 	int timesteps, max_input_line;
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 	//max_neurons = max_cores * tech.max_compartments;
 	// Input line must be long enough to encode inputs for all neurons
 	//  simultaneously
-	max_input_line = 32 + (arch.max_neurons*32);
+	max_input_line = 32 + (arch.max_compartments*32);
 
 	filename = argv[NETWORK_FILENAME];
 	// Create the network
@@ -135,20 +135,21 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	INFO("Allocating memory to track %d neurons.\n", arch.max_neurons);
-	neuron_ptrs = (struct neuron **)
-			malloc(arch.max_neurons * sizeof(struct neuron *));
-	if (neuron_ptrs == NULL)
+	INFO("Allocating memory to track %d compartments.\n",
+							arch.max_compartments);
+	compartment_ptrs = (struct compartment **)
+		malloc(arch.max_compartments * sizeof(struct compartment *));
+	if (compartment_ptrs == NULL)
 	{
 		INFO("Error: failed to allocate memory.\n");
 		exit(1);
 	}
 	//INFO("Allocated %ld bytes\n", max_cores * sizeof(struct core));
-	for (int i = 0; i < arch.max_neurons; i++)
+	for (int i = 0; i < arch.max_compartments; i++)
 	{
-		neuron_ptrs[i] = NULL;
+		compartment_ptrs[i] = NULL;
 	}
-	network_read_csv(network_fp, &tech, &arch, neuron_ptrs);
+	network_read_csv(network_fp, &tech, &arch, compartment_ptrs);
 	fclose(network_fp);
 
 	init_results(&results);
@@ -196,13 +197,13 @@ int main(int argc, char *argv[])
 	results_fp = fopen("results.yaml", "w");
 	if (results_fp != NULL)
 	{
-		sim_write_results(results_fp, &results);
+		sim_write_summary(results_fp, &results);
 	}
 	fclose(results_fp);
 
 	// Cleanup
 	arch_free(&arch);
-	free(neuron_ptrs);
+	free(compartment_ptrs);
 
 	// Close any open files
 	fclose(probe_potential_fp);
@@ -272,19 +273,6 @@ void next_inputs(char *buffer, struct core *cores, const int max_cores,
 	}
 }
 */
-
-int sim_input(const double firing_probability)
-{
-	// Simulate a single external input (as one neuron) for a timestep
-	//  Return 1 if the input fires, 0 otherwise
-	double rand_uniform;
-	int input_fired;
-
-	rand_uniform = (double) rand() / RAND_MAX;
-	input_fired = (rand_uniform < firing_probability);
-
-	return input_fired;
-}
 
 void init_results(struct sim_results *results)
 {

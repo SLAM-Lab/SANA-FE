@@ -14,36 +14,38 @@
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-struct neuron
+struct compartment
 {
-	struct synapse *synapses;
-	int compartment_used, fired, post_connection_count, id, spike_count;
+	int id, compartment_used, fired, post_connection_count, spike_count;
 	int log_spikes, log_voltage, update_needed, force_update;
-	double potential, current, bias, threshold, reset;
-	double potential_decay, current_decay, potential_time_const;
-	double current_time_const, time, energy;
+	double *time;
+	double potential, current,  bias, reset, threshold;
+	double potential_decay, potential_time_const;
+	double current_decay, current_time_const;
+	double energy;
 
-	// Pointers to other units associated with the neuron
+	struct synapse *synapses;
 	struct axon_output *axon_out;
 	struct axon_input *axon_in;
-	struct synapse_mem *mem_block;
 };
 
 struct synapse
 {
-	struct neuron *post_neuron, *pre_neuron;
-	float weight;
-	struct synapse_mem *memory;
+	int id;
+	struct compartment *post_neuron, *pre_neuron;
+	double energy, weight;
+	struct mem *memory;
 };
 
-struct synapse_mem
+struct mem
 {
-	int id, memory_size_bytes, weight_bits, max_synapses;
+	int id, memory_size_bytes, weight_bits;
 };
 
 struct axon_output
 {
 	int id, fan_out;
+	double energy;
 	struct router *r;
 	unsigned int *packets_sent;
 };
@@ -57,7 +59,9 @@ struct axon_input
 struct router
 {
 	int x, y, id;
-	int max_dimensions; // For now just support 2 dimensions
+	int max_dimensions, width; // For now just support 2 dimensions
+	double energy;
+	struct router *east, *west, *north, *south;
 };
 
 struct input
@@ -66,17 +70,11 @@ struct input
 	struct synapse *synapses;
 };
 
-struct timer
-{
-	int id;
-	struct timer *parent;
-};
-
 struct sim_results
 {
-	double total_energy, total_sim_time, wall_time;
 	int time_steps;
 	long int total_spikes;
+	double total_energy, total_sim_time, wall_time;
 };
 
 #include "tech.h"
@@ -86,18 +84,18 @@ struct sim_results sim_timestep(const struct technology *tech, struct architectu
 int sim_route_spikes(const struct technology *tech, struct architecture *arch);
 int sim_input_spikes(const struct technology *tech, struct architecture *arch);
 
-void sim_update_state(const struct technology *tech, struct architecture *arch);
-void sim_update(const struct technology *tech, struct neuron *n);
-void sim_update_synapse_cuba(const struct technology *tech, struct neuron *n);
-void sim_update_dendrite(const struct technology *tech, struct neuron *n);
-void sim_update_lif(const struct technology *tech, struct neuron *n);
-void sim_update_axon(const struct technology *tech, struct neuron *n);
+void sim_update(const struct technology *tech, struct architecture *arch);
+void sim_update_compartment(const struct technology *tech, struct compartment *c);
+void sim_update_synapse_cuba(const struct technology *tech, struct compartment *c);
+void sim_update_dendrite(const struct technology *tech, struct compartment *c);
+void sim_update_potential(const struct technology *tech, struct compartment *c);
+void sim_update_axon(const struct technology *tech, struct compartment *c);
 
 void sim_reset_measurements(struct architecture *arch);
 double sim_calculate_energy(struct architecture *arch);
 double sim_calculate_time(const struct technology *tech, struct architecture *arch);
 
-void sim_write_results(FILE *fp, const struct sim_results *results);
+void sim_write_summary(FILE *fp, const struct sim_results *results);
 void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
 void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
 int sim_input(const double firing_probability);

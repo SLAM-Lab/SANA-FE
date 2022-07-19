@@ -25,35 +25,6 @@ static void arch_parse_axon_input(struct architecture *arch, char fields[][ARCH_
 static void arch_parse_axon_output(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
 static void arch_parse_router(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
 
-/*
-enum block_type
-{
-	NEURON = 0,
-	synapse_mem,
-	DENDRITE,
-	AXON_IN,
-	AXON_OUT,
-	ROUTER,
-	TIMER,
-	EXTERNAL_INPUT,
-	N_BLOCKS,
-};
-*/
-
-/*
-const char block_letters[] =
-{
-	'n', // neuron
-	's', // synapse block
-	'd', // dendrite
-	'i', // axon inputs
-	'o', // axon outputs
-	'r', // routers
-	't', // timing
-	'\0',
-};
-*/
-
 struct architecture arch_read_file(FILE *fp)
 {
 	// Read an architecture description and return an initialized structure
@@ -181,7 +152,7 @@ static void arch_read_line(struct architecture *arch, char *line)
 	case '\n':
 		// Line is a comment
 		break;
-	case 'n':
+	case 'c':
 		arch_parse_neuron(arch, fields);
 		break;
 	case 's':
@@ -195,9 +166,6 @@ static void arch_read_line(struct architecture *arch, char *line)
 		break;
 	case 'o':
 		arch_parse_axon_output(arch, fields);
-		break;
-	case 't':
-		//arch_parse_timer(arch, id_list, line);
 		break;
 	case 'e':
 		//arch_parse_external_input(arch, id_list, line);
@@ -281,21 +249,20 @@ static struct architecture arch_init(FILE *fp)
 	char line[ARCH_LINE_LEN];
 	char *field;
 
-	arch.neurons = NULL;
+	arch.compartments = NULL;
 	arch.mem_blocks = NULL;
 	arch.routers = NULL;
-	arch.timers = NULL;
 	arch.axon_inputs = NULL;
 	arch.axon_outputs = NULL;
 	arch.external_inputs = NULL;
 
-	arch.max_neurons = 0;
+	arch.max_compartments = 0;
 	arch.max_mem_blocks = 0;
 	arch.max_routers = 0;
-	arch.max_timers = 0;
+	arch.max_timers = 128; // HACK
 	arch.max_axon_inputs = 0;
 	arch.max_axon_outputs = 0;
-	arch.max_external_inputs = 0;
+	arch.max_external_inputs = 131072; // HACK
 
 	// TODO: refactor - arch_count_units(fp) ?
 	while (fgets(line, ARCH_LINE_LEN, fp))
@@ -318,17 +285,14 @@ static struct architecture arch_init(FILE *fp)
 		case '\n':
 			// Line is a comment
 			continue;
-		case 'n':
-			arch.max_neurons += unit_count;
+		case 'c':
+			arch.max_compartments += unit_count;
 			break;
-		case 's':
+		case 'm':
 			arch.max_mem_blocks += unit_count;
 			break;
 		case 'r':
 			arch.max_routers += unit_count;
-			break;
-		case 't':
-			arch.max_timers += unit_count;
 			break;
 		case 'i':
 			arch.max_axon_inputs += unit_count;
@@ -339,6 +303,9 @@ static struct architecture arch_init(FILE *fp)
 		case 'e':
 			arch.max_external_inputs += unit_count;
 			break;
+		case 't':
+			arch.max_timers += unit_count;
+			break;
 		default:
 			INFO("Warning: unrecognized unit (%c) - skipping.\n",
 								block_type);
@@ -346,52 +313,51 @@ static struct architecture arch_init(FILE *fp)
 		}
 	}
 
-	INFO("Parsed %d neurons.\n", arch.max_neurons);
+	INFO("Parsed %d compartments.\n", arch.max_compartments);
 
 	// Reset file pointer to start of file
 	fseek(fp, 0, SEEK_SET);
 
 	// Based on the number of different units, allocate enough memory to
 	//  simulate this design
-	INFO("Allocating memory for %d neurons.\n", arch.max_neurons);
-	arch.neurons = (struct neuron *)
-		malloc(arch.max_neurons * sizeof(struct neuron));
-	arch.mem_blocks = (struct synapse_mem *)
-		malloc(arch.max_mem_blocks * sizeof(struct synapse_mem));
+	INFO("Allocating memory for %d compartments.\n", arch.max_compartments);
+	arch.compartments = (struct compartment *)
+		malloc(arch.max_compartments * sizeof(struct compartment));
+	arch.mem_blocks = (struct mem *)
+		malloc(arch.max_mem_blocks * sizeof(struct mem));
 	arch.routers = (struct router *)
 		malloc(arch.max_routers * sizeof(struct router));
-	arch.timers = (struct timer *)
-		malloc(arch.max_timers * sizeof(struct timer));
 	arch.axon_inputs = (struct axon_input *)
 		malloc(arch.max_axon_inputs * sizeof(struct axon_input));
 	arch.axon_outputs = (struct axon_output *)
 		malloc(arch.max_axon_outputs * sizeof(struct axon_output));
+	arch.timers = (double *) malloc(arch.max_timers * sizeof(double));
 
-	if (arch.neurons == NULL || arch.mem_blocks == NULL ||
-		arch.routers == NULL || arch.timers == NULL ||
-		arch.axon_inputs == NULL || arch.axon_outputs == NULL)
+	if ((arch.compartments == NULL) || (arch.mem_blocks == NULL) ||
+		(arch.routers == NULL) || (arch.timers == NULL) ||
+		(arch.axon_inputs == NULL) || (arch.axon_outputs == NULL))
 	{
-		INFO("Error: failed to allocate neuron.\n");
+		INFO("Error: Failed to allocate compartment.\n");
 		exit(1);
 	}
 
-	for (int i = 0; i < arch.max_neurons; i++)
+	for (int i = 0; i < arch.max_compartments; i++)
 	{
-		struct neuron *n = &(arch.neurons[i]);
+		struct compartment *c = &(arch.compartments[i]);
 
-		n->id = i;
-		n->synapses = NULL;
-		n->axon_in = NULL;
-		n->axon_out = NULL;
+		c->id = i;
+		c->synapses = NULL;
+		c->axon_in = NULL;
+		c->axon_out = NULL;
 
-		n->fired = 0;
-		n->update_needed = 0;
-		n->compartment_used = 0;
+		c->fired = 0;
+		c->update_needed = 0;
+		c->compartment_used = 0;
 	}
 
 	for (int i = 0; i < arch.max_mem_blocks; i++)
 	{
-		struct synapse_mem *mem = &(arch.mem_blocks[i]);
+		struct mem *mem = &(arch.mem_blocks[i]);
 
 		mem->id = i;
 		INFO("Allocating synapse memory for block %d.\n", mem->id);
@@ -430,6 +396,11 @@ static struct architecture arch_init(FILE *fp)
 		in->send_spike = 0;
 	}
 
+	for (int i = 0; i < arch.max_timers; i++)
+	{
+		arch.timers[i] = 0.0;
+	}
+
 	arch.initialized = 1;
 
 	return arch;
@@ -442,13 +413,13 @@ void arch_free(struct architecture *arch)
 	arch->initialized = 0;
 
 	// Free any neuron data
-	for (int i = 0; i < arch->max_neurons; i++)
+	for (int i = 0; i < arch->max_compartments; i++)
 	{
-		struct neuron *n = &(arch->neurons[i]);
+		struct compartment *c = &(arch->compartments[i]);
 
-		assert(n != NULL);
-		free(n->synapses);
-		n->synapses = NULL;
+		assert(c != NULL);
+		free(c->synapses);
+		c->synapses = NULL;
 	}
 
 	for (int i = 0; i < arch->max_axon_outputs; i++)
@@ -461,24 +432,24 @@ void arch_free(struct architecture *arch)
 	}
 
 	// Free all memory
-	free(arch->neurons);
+	free(arch->compartments);
 	free(arch->mem_blocks);
 	free(arch->routers);
-	free(arch->timers);
 	free(arch->axon_inputs);
 	free(arch->axon_outputs);
 	free(arch->external_inputs);
+	free(arch->timers);
 
 	// Reset all pointers and counters
-	arch->neurons = NULL;
+	arch->compartments = NULL;
 	arch->mem_blocks = NULL;
 	arch->routers = NULL;
-	arch->timers = NULL;
 	arch->axon_inputs = NULL;
 	arch->axon_outputs = NULL;
 	arch->external_inputs = NULL;
+	arch->timers = NULL;
 
-	arch->max_neurons = 0;
+	arch->max_compartments = 0;
 	arch->max_mem_blocks = 0;
 	arch->max_routers = 0;
 	arch->max_timers = 0;
@@ -491,7 +462,7 @@ static void arch_parse_neuron(struct architecture *arch,
 					char fields[][ARCH_MAX_FIELD_LEN])
 {
 	struct range field_list[ARCH_MAX_VALUES];
-	struct synapse_mem *mem_block;
+	//struct mem *mem_block;
 	struct axon_input *axon_in;
 	struct axon_output *axon_out;
 	int ret, list_len, mem_id, axon_in_id, axon_out_id;
@@ -499,7 +470,7 @@ static void arch_parse_neuron(struct architecture *arch,
 
 	assert(fields && fields[0]);
 	block_type = fields[0][0];
-	assert(block_type == 'n');
+	assert(block_type == 'c');
 
 	ret = sscanf(fields[2], "%d", &mem_id);
 	if (ret < 1)
@@ -508,7 +479,6 @@ static void arch_parse_neuron(struct architecture *arch,
 		exit(1);
 	}
 	assert(mem_id < arch->max_mem_blocks);
-	mem_block = &(arch->mem_blocks[mem_id]);
 
 	ret = sscanf(fields[3], "%d", &axon_in_id);
 	if (ret < 1)
@@ -538,14 +508,14 @@ static void arch_parse_neuron(struct architecture *arch,
 		TRACE("min:%u max%u\n", r->min, r->max);
 		for (int id = r->min; id <= r->max; id++)
 		{
-			struct neuron *n;
+			struct compartment *c;
 
-			assert(id <= arch->max_neurons);
-			n = &(arch->neurons[id]);
+			assert(id <= arch->max_compartments);
+			c = &(arch->compartments[id]);
 			// Copy any common compartment variables
-			n->mem_block = mem_block;
-			n->axon_in = axon_in;
-			n->axon_out = axon_out;
+			//c->mem_block = mem_block;
+			c->axon_in = axon_in;
+			c->axon_out = axon_out;
 		}
 		TRACE("Compartment parsed n:%d-%d mem(%d) i(%d) o(%d).\n",
 			r->min, r->max, mem_id, axon_in_id, axon_out_id);
@@ -595,9 +565,6 @@ static void arch_parse_axon_input(struct architecture *arch,
 					axon_in->r->id, axon_in->fan_in);
 }
 
-
-// TODO: should the axon output structure really be the same as the axon input
-//  and we just set a flag to determine whether its an input or output port?
 static void arch_parse_axon_output(struct architecture *arch,
 					char fields[][ARCH_MAX_FIELD_LEN])
 {

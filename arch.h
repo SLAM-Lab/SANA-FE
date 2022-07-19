@@ -3,13 +3,13 @@
 
 struct architecture
 {
-	int max_neurons, max_mem_blocks, max_routers, max_timers;
+	int max_compartments, max_mem_blocks, max_routers, max_timers;
 	int max_axon_inputs, max_axon_outputs, max_external_inputs;
         int initialized;
-	struct neuron *neurons;
-	struct synapse_mem *mem_blocks;
+	double *timers;
+	struct compartment *compartments;
+	struct mem *mem_blocks;
 	struct router *routers;
-	struct timer *timers;
 	struct axon_input *axon_inputs;
 	struct axon_output *axon_outputs;
 	struct input *external_inputs;
