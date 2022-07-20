@@ -360,21 +360,22 @@ double sim_calculate_time(const struct technology *tech,
 
 double sim_calculate_energy(struct architecture *arch)
 {
-	double total_energy, update_energy, spike_gen_energy, network_energy;
-	double synapse_energy;
+	// Returns the total energy across the design, for this timestep
+	double total_energy, compartment_energy, synapse_energy, axon_energy;
+	double router_energy;
 
 	total_energy = 0.0;
-	update_energy = 0.0;
-	network_energy = 0.0;
-	spike_gen_energy = 0.0;
+	compartment_energy = 0.0;
 	synapse_energy = 0.0;
+	axon_energy = 0.0;
+	router_energy = 0.0;
 
 	for (int i = 0; i < arch->max_compartments; i++)
 	{
 		const struct compartment *c = &(arch->compartments[i]);
 		if (c->compartment_used)
 		{
-			update_energy += c->energy;
+			compartment_energy += c->energy;
 			for (int j = 0; j < c->post_connection_count; j++)
 			{
 				const struct synapse *s = &(c->synapses[j]);
@@ -386,16 +387,16 @@ double sim_calculate_energy(struct architecture *arch)
 	for (int i = 0; i < arch->max_axon_outputs; i++)
 	{
 		struct axon_output *out = &(arch->axon_outputs[i]);
-		spike_gen_energy += out->energy;
+		axon_energy += out->energy;
 	}
 
 	for (int i = 0; i < arch->max_routers; i++)
 	{
 		struct router *r = &(arch->routers[i]);
-		network_energy += r->energy;
+		router_energy += r->energy;
 	}
-	total_energy = update_energy + synapse_energy + network_energy +
-							spike_gen_energy;
+	total_energy = compartment_energy + synapse_energy + axon_energy +
+								router_energy;
 
 	return total_energy;
 }
