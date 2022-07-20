@@ -181,6 +181,7 @@ int main(int argc, char *argv[])
 		// TODO: make this parameterised so we can parse different input
 		//  formats
 		//while (fgets(input_buffer, max_input_line, input_fp))
+
 		while (parse_dvs(input_fp, &arch))
 		{
 			run(&tech, &arch, &results, probe_spikes_fp,
@@ -227,9 +228,8 @@ int main(int argc, char *argv[])
 }
 
 void run(struct technology *tech, struct architecture *arch,
-				struct sim_results *results,
-				FILE *probe_spikes_fp, FILE *probe_potential_fp,
-								FILE *perf_fp)
+			struct sim_results *results, FILE *probe_spikes_fp,
+					FILE *probe_potential_fp, FILE *perf_fp)
 {
 	// Run neuromorphic hardware simulation for one timestep
 	//  Measure the CPU time it takes and accumulate the results
@@ -244,15 +244,9 @@ void run(struct technology *tech, struct architecture *arch,
 					probe_potential_fp, perf_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function
-	//results->total_energy += timestep_results.total_energy;
-	//results->total_sim_time += timestep_results.total_sim_time;
-	//results->total_spikes += timestep_results.total_spikes;
-	// TODO: remove hack I've added for one experiment! Just take the latest
-	//  timestep results. Probably its better to write a csv that has a
-	//  result for each timestep. Then any post processing can be done later
-	results->total_energy = timestep_results.total_energy;
-	results->total_sim_time = timestep_results.total_sim_time;
-	results->total_spikes = timestep_results.total_spikes;
+	results->total_energy += timestep_results.total_energy;
+	results->total_sim_time += timestep_results.total_sim_time;
+	results->total_spikes += timestep_results.total_spikes;
 
 	// Calculate elapsed time
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);

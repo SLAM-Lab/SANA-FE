@@ -1,10 +1,7 @@
 #CC=clang-3.8
 CC=gcc
-CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -Ofast -g
-#CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -O0 -g -DDEBUG -no-pie -pg
-#CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -O0 -g
+CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -g
 GIT_COMMIT=$(shell ./git_status.sh)
-#TODO: add "-dirty" if the working dir has local changes
 
 LIBS=-lrt -lm
 DEPS=sim.h network.h tech.h arch.h
@@ -17,7 +14,12 @@ sim: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
 .PHONY: all
+all: CFLAGS += -Ofast
 all: sim
+
+.PHONY: debug
+debug: CFLAGS += -DDEBUG -no-pie -pg -O0
+debug: sim
 
 .PHONY: clean
 clean:
