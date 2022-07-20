@@ -10,7 +10,7 @@
 #include "network.h"
 
 void init_results(struct sim_results *results);
-void run(struct technology *tech, struct architecture *arch, struct sim_results *results, FILE *probe_spikes_fp, FILE *probe_potential_fp);
+void run(struct technology *tech, struct architecture *arch, struct sim_results *results, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
 //void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 int parse_dvs(FILE *fp, struct architecture *arch);
@@ -27,7 +27,7 @@ enum program_args
 int main(int argc, char *argv[])
 {
 	FILE *input_fp, *network_fp, *results_fp, *tech_fp, *arch_fp;
-	FILE *probe_spikes_fp, *probe_potential_fp;
+	FILE *probe_spikes_fp, *probe_potential_fp, *perf_fp;
 	struct architecture arch;
 	struct technology tech;
 	struct compartment **compartment_ptrs;
@@ -126,12 +126,22 @@ int main(int argc, char *argv[])
 	}
 
 	// Open the probe output files for writing, for now hard code filenames
-	//  TODO: add option to command line argument
+	//  TODO: add option for command line argument
 	probe_potential_fp = fopen("probe_potential.csv", "w");
 	probe_spikes_fp = fopen("probe_spikes.csv", "w");
 	if ((probe_potential_fp == NULL) || (probe_spikes_fp == NULL))
 	{
 		INFO("Error: Couldn't open probe output files for writing.\n");
+		exit(1);
+	}
+
+	// TODO: add option for command line argument
+	// TODO: also want the option of enabling and disabling this
+	//  for quick runs we probably don't want it?
+	perf_fp = fopen("perf.csv", "w");
+	if (perf_fp == NULL)
+	{
+		INFO("Error: Couldn't open perf output files for writing.\n");
 		exit(1);
 	}
 
@@ -144,16 +154,19 @@ int main(int argc, char *argv[])
 		INFO("Error: failed to allocate memory.\n");
 		exit(1);
 	}
-	//INFO("Allocated %ld bytes\n", max_cores * sizeof(struct core));
 	for (int i = 0; i < arch.max_compartments; i++)
 	{
 		compartment_ptrs[i] = NULL;
 	}
+
+	INFO("Reading network from file.\n");
 	network_read_csv(network_fp, &tech, &arch, compartment_ptrs);
 	fclose(network_fp);
 
 	init_results(&results);
+	INFO("Creating probe and perf data files.\n");
 	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, &arch);
+	sim_perf_write_header(perf_fp, &arch);
 	if (input_fp != NULL)
 	{
 
@@ -171,7 +184,7 @@ int main(int argc, char *argv[])
 		while (parse_dvs(input_fp, &arch))
 		{
 			run(&tech, &arch, &results, probe_spikes_fp,
-							probe_potential_fp);
+						probe_potential_fp, perf_fp);
 		}
 	}
 	// TODO: another option to generate rate based / poisson spike trains
@@ -183,7 +196,7 @@ int main(int argc, char *argv[])
 		{
 			INFO("*** Time-step %d ***\n", i+1);
 			run(&tech, &arch, &results, probe_spikes_fp,
-							probe_potential_fp);
+						probe_potential_fp, perf_fp);
 		}
 	}
 
@@ -208,13 +221,15 @@ int main(int argc, char *argv[])
 	// Close any open files
 	fclose(probe_potential_fp);
 	fclose(probe_spikes_fp);
+	fclose(perf_fp);
 
 	return 0;
 }
 
 void run(struct technology *tech, struct architecture *arch,
 				struct sim_results *results,
-				FILE *probe_spikes_fp, FILE *probe_potential_fp)
+				FILE *probe_spikes_fp, FILE *probe_potential_fp,
+								FILE *perf_fp)
 {
 	// Run neuromorphic hardware simulation for one timestep
 	//  Measure the CPU time it takes and accumulate the results
@@ -226,7 +241,7 @@ void run(struct technology *tech, struct architecture *arch,
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	timestep_results = sim_timestep(tech, arch, probe_spikes_fp,
-							probe_potential_fp);
+					probe_potential_fp, perf_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function
 	//results->total_energy += timestep_results.total_energy;

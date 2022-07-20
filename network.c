@@ -36,6 +36,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
         int neuron_count, input_count, compartment_id, ret;
 	int neuron_id, dest_id, curr_input, is_input;
 
+	// TODO: better define the max fields
 	const int max_fields = NEURON_FIELDS + (4096 * SYNAPSE_FIELDS);
 	const int max_compartments = arch->max_compartments;
 
@@ -111,7 +112,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 								NEURON_FIELDS);
 			continue;
 		}
-		synapse_count = field_count - NEURON_FIELDS;
+		synapse_count = (field_count - NEURON_FIELDS) / SYNAPSE_FIELDS;
 		assert(synapse_count >= 0);
 
 		for (int i = 0; i < field_count; i++)
@@ -123,9 +124,25 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 		is_input = (neuron_fields[NEURON_ID][0] == 'i');
 		if (is_input)
 		{
+			struct input *input_ptr =
+					&(arch->external_inputs[input_count]);
+
 			TRACE("Creating network input %d.\n", input_count);
+			assert(input_count < arch->max_external_inputs);
+
+			if (synapse_count)
+			{
+				input_ptr->synapses = (struct synapse *)
+					malloc(synapse_count *
+							sizeof(struct synapse));
+				if (input_ptr->synapses == NULL)
+				{
+					INFO("Error: Couldn't allocate"
+								"synapses.\n");
+					exit(1);
+				}
+			}
 			input_count++;
-			assert(input_count <= arch->max_external_inputs);
 			continue;
 		}
 		else // This line is defining a neuron
@@ -189,8 +206,6 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 		c->potential_decay =
 			-(exp(-dt / c->potential_time_const) - 1.0);
 
-		c->time = &(arch->timers[c->id / 1024]); // TODO: hack
-
 		// Allocate synaptic memory
 		// TODO: use the memory block to model the space available for
 		//  synaptic memory
@@ -216,6 +231,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 			c->log_spikes, c->log_voltage);
 		neuron_count++;
 	}
+	INFO("Created %d inputs.\n", input_count);
 	INFO("Created %d neurons.\n", neuron_count);
 
 	curr_input = 0;
@@ -250,12 +266,13 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 				"ignoring line.\n", NEURON_FIELDS);
 			continue;
 		}
-		synapse_count = field_count - NEURON_FIELDS;
+		synapse_count = (field_count - NEURON_FIELDS) / SYNAPSE_FIELDS;
 
 		// Use the first field (the neuron number) to figure if this
 		//  is a valid formatted line or not. Since this is the
 		//  second pass we know this field is valid
 		is_input = (neuron_fields[NEURON_ID][0] == 'i');
+		input_ptr = NULL;
 		if (is_input)
 		{
 			// An input is a virtual connnection - it isn't
@@ -291,22 +308,6 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 			float weight;
 			const int curr_synapse_field = NEURON_FIELDS +
 							(i*SYNAPSE_FIELDS);
-			// The list of synapse input strings is null terminted
-			if (neuron_fields[curr_synapse_field][0] == '\0')
-			{
-				if (is_input)
-				{
-					TRACE("nid:i Added %d synapses.\n",
-					input_ptr->post_connection_count);
-				}
-				else
-				{
-					TRACE("nid:%d Added %d synapses.\n",
-						src->id,
-						src->post_connection_count);
-				}
-				break;
-			}
 
 			// Parse a single synapse from the csv
 			ret = sscanf(neuron_fields[curr_synapse_field +
@@ -339,7 +340,10 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 					input_ptr->post_connection_count]);
 				s->pre_neuron = NULL;
 				s->post_neuron = dest;
+				s->weight = weight;
 				input_ptr->post_connection_count++;
+				TRACE("Created input synapse i->%d (w:%f)\n",
+					s->post_neuron->id, s->weight);
 			}
 			else
 			{
@@ -347,14 +351,27 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 						src->post_connection_count]);
 				s->pre_neuron = src;
 				s->post_neuron = dest;
+				s->weight = weight;
 				src->post_connection_count++;
+				TRACE("Created synapse %d->%d (w:%f)\n",
+					s->pre_neuron->id, s->post_neuron->id,
+					s->weight);
 			}
-			s->weight = weight;
-			TRACE("Created synapse %d->%d (w:%f)\n",
-				s->pre_neuron->id, s->post_neuron->id,
-				s->weight);
+			s->energy = 0.0;
+		}
+		if (is_input)
+		{
+			TRACE("nid:i Added %d synapses.\n",
+			input_ptr->post_connection_count);
+		}
+		else
+		{
+			TRACE("nid:%d Added %d synapses.\n",
+			src->id,
+			src->post_connection_count);
 		}
 	}
+	INFO("Initialized neurons and inputs.\n");
 
 	for (int i = 0; i < max_fields; i++)
 	{
@@ -385,13 +402,6 @@ void network_init(const struct technology *tech, struct architecture *arch)
 		c->reset = 0.0;
 		c->update_needed = 0;
 		c->compartment_used = 0;
-
-		/*
-		c->soma->potential_decay = 0.0;
-		c->synapse_unit->current_decay = 0.0;
-		c->soma->potential_time_const = 0.0;
-		c->synapse_unit->current_time_const = 0.0;
-		*/
 	}
 
 	for (int i = 0; i < arch->max_routers; i++)

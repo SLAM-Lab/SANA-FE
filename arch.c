@@ -306,8 +306,12 @@ static struct architecture arch_init(FILE *fp)
 		case 't':
 			arch.max_timers += unit_count;
 			break;
+		case 'd':
+			break;
+		case 's':
+			break;
 		default:
-			INFO("Warning: unrecognized unit (%c) - skipping.\n",
+			TRACE("Warning: unrecognized unit (%c) - skipping.\n",
 								block_type);
 			break;
 		}
@@ -360,7 +364,7 @@ static struct architecture arch_init(FILE *fp)
 		struct mem *mem = &(arch.mem_blocks[i]);
 
 		mem->id = i;
-		INFO("Allocating synapse memory for block %d.\n", mem->id);
+		TRACE("Allocating synapse memory for block %d.\n", mem->id);
 	}
 
 	for (int i = 0; i < arch.max_axon_outputs; i++)
@@ -431,6 +435,15 @@ void arch_free(struct architecture *arch)
 		axon_out->packets_sent = NULL;
 	}
 
+	for (int i = 0; i < arch->max_external_inputs; i++)
+	{
+		struct input *in = &(arch->external_inputs[i]);
+
+		assert(in != NULL);
+		free(in->synapses);
+		in->synapses = NULL;
+	}
+
 	// Free all memory
 	free(arch->compartments);
 	free(arch->mem_blocks);
@@ -465,7 +478,8 @@ static void arch_parse_neuron(struct architecture *arch,
 	//struct mem *mem_block;
 	struct axon_input *axon_in;
 	struct axon_output *axon_out;
-	int ret, list_len, mem_id, axon_in_id, axon_out_id;
+	double *timer;
+	int ret, list_len, mem_id, axon_in_id, axon_out_id, timer_id;
 	char block_type;
 
 	assert(fields && fields[0]);
@@ -483,7 +497,7 @@ static void arch_parse_neuron(struct architecture *arch,
 	ret = sscanf(fields[3], "%d", &axon_in_id);
 	if (ret < 1)
 	{
-		INFO("Error: Couldn't parse axon in (%s).\n", fields[2]);
+		INFO("Error: Couldn't parse axon in (%s).\n", fields[3]);
 		exit(1);
 	}
 	assert(axon_in_id < arch->max_axon_inputs);
@@ -492,12 +506,20 @@ static void arch_parse_neuron(struct architecture *arch,
 	ret = sscanf(fields[4], "%d", &axon_out_id);
 	if (ret < 1)
 	{
-		INFO("Error: Couldn't parse axon out (%s).\n", fields[2]);
+		INFO("Error: Couldn't parse axon out (%s).\n", fields[4]);
 		exit(1);
 	}
 	assert(axon_out_id < arch->max_axon_outputs);
 	axon_out = &(arch->axon_outputs[axon_out_id]);
 
+	ret = sscanf(fields[5], "%d", &timer_id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse timer (%s).\n", fields[5]);
+		exit(1);
+	}
+	assert(timer_id < arch->max_timers);
+	timer = &(arch->timers[timer_id]);
 
 	// Copy the neuron a number of times
 	list_len = arch_parse_list(fields[1], &(field_list[0]));
@@ -516,6 +538,7 @@ static void arch_parse_neuron(struct architecture *arch,
 			//c->mem_block = mem_block;
 			c->axon_in = axon_in;
 			c->axon_out = axon_out;
+			c->time = timer;
 		}
 		TRACE("Compartment parsed n:%d-%d mem(%d) i(%d) o(%d).\n",
 			r->min, r->max, mem_id, axon_in_id, axon_out_id);

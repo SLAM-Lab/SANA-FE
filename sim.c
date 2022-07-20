@@ -20,7 +20,8 @@
 struct sim_results sim_timestep(const struct technology *tech,
 				struct architecture *arch,
 				FILE *probe_spike_fp,
-				FILE *probe_potential_fp)
+				FILE *probe_potential_fp,
+				FILE *perf_fp)
 {
 	struct sim_results results;
 	long int spikes_sent;
@@ -38,6 +39,10 @@ struct sim_results sim_timestep(const struct technology *tech,
 	INFO("Spikes sent: %ld\n", spikes_sent);
 
 	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, arch);
+	if (perf_fp)
+	{
+		sim_perf_log_timestep(perf_fp, arch);
+	}
 	return results;
 }
 
@@ -55,12 +60,6 @@ void sim_update(const struct technology *tech, struct architecture *arch)
 		if (c->update_needed)
 		{
 			sim_update_compartment(tech, c);
-		}
-		else
-		{
-			double *timer = c->time;
-			c->energy += tech->energy_inactive_neuron_update;
-			(*timer) += tech->time_inactive_neuron_update;
 		}
 	}
 }
@@ -133,8 +132,8 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 
 			post_neuron->update_needed = 1;
 			post_neuron->current += synapse_ptr->weight;
-			post_neuron->energy += tech->energy_spike_op;
 
+			synapse_ptr->energy += tech->energy_spike_op;
 			// TODO: the timing model needs to be refined
 			// Below I tried to account for the synaptic op time in the pre-synaptic
 			//  compartment. This is more accurate for the small
@@ -176,12 +175,17 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 				x_hops = abs(router_pre->x - router_post->x);
 				y_hops = abs(router_pre->y - router_post->y);
 				// E-W hops
-				c->energy += x_hops *
+				// TODO: record the energy of each hop at the
+				//  corresponding router, means we need to
+				//  iterate through all the x and y routers
+				// Maybe it makes sense to have this as two
+				//  options?
+				router_pre->energy += x_hops *
 					tech->energy_east_west_hop;
 				*time += x_hops *
 					tech->time_east_west_hop;
 				// N-S hops
-				c->energy += y_hops *
+				router_pre->energy += y_hops *
 					tech->energy_north_south_hop;
 				*time += y_hops *
 					tech->time_north_south_hop;
@@ -252,16 +256,13 @@ void sim_update_compartment(const struct technology *tech,
 
 	if (c->spike_count)
 	{
-		if (c->bias)
-		{
-			c->energy += tech->energy_active_neuron_update;
-			*(c->time) += tech->time_active_neuron_update;
-		}
-		else
-		{
-			c->energy += tech->energy_inactive_neuron_update;
-			*(c->time) += tech->time_inactive_neuron_update;
-		}
+		c->energy += tech->energy_active_neuron_update;
+		*(c->time) += tech->time_active_neuron_update;
+	}
+	else if (c->force_update)
+	{
+		c->energy += tech->energy_inactive_neuron_update;
+		*(c->time) += tech->time_inactive_neuron_update;
 	}
 }
 
@@ -350,11 +351,28 @@ double sim_calculate_energy(struct architecture *arch)
 
 	for (int i = 0; i < arch->max_compartments; i++)
 	{
-		struct compartment *n = &(arch->compartments[i]);
-		if (n->compartment_used)
+		const struct compartment *c = &(arch->compartments[i]);
+		if (c->compartment_used)
 		{
-			total_energy += n->energy;
+			total_energy += c->energy;
+			for (int j = 0; j < c->post_connection_count; j++)
+			{
+				const struct synapse *s = &(c->synapses[j]);
+				total_energy += s->energy;
+			}
 		}
+	}
+
+	for (int i = 0; i < arch->max_axon_outputs; i++)
+	{
+		struct axon_output *out = &(arch->axon_outputs[i]);
+		total_energy += out->energy;
+	}
+
+	for (int i = 0; i < arch->max_routers; i++)
+	{
+		struct router *r = &(arch->routers[i]);
+		total_energy += r->energy;
 	}
 
 	return total_energy;
@@ -367,9 +385,27 @@ void sim_reset_measurements(struct architecture *arch)
 	{
 		struct compartment *c = &(arch->compartments[i]);
 
-		c->energy = 0;
+		c->energy = 0.0;
 		c->update_needed = c->force_update;
 		c->spike_count = 0;
+
+		for (int j = 0; j < c->post_connection_count; j++)
+		{
+			struct synapse *s = &(c->synapses[j]);
+			s->energy = 0.0;
+		}
+	}
+
+	for (int i = 0; i < arch->max_axon_outputs; i++)
+	{
+		struct axon_output *out = &(arch->axon_outputs[i]);
+		out->energy = 0.0;
+	}
+
+	for (int i = 0; i < arch->max_routers; i++)
+	{
+		struct router *r = &(arch->routers[i]);
+		r->energy = 0.0;
 	}
 
 	// Reset all timers
@@ -379,22 +415,88 @@ void sim_reset_measurements(struct architecture *arch)
 	}
 }
 
-void sim_perf_write_header(FILE *fp)
+void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 {
-	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
+	fprintf(fp, "timestep");
+	for (int i = 0; i < arch->max_compartments; i++)
+	{
+		struct compartment *c = &(arch->compartments[i]);
+		if (c->compartment_used)
+		{
+			fprintf(fp, ",c[%u].update_energy,c[%u].synapse_energy",
+								c->id, c->id);
+		}
+	}
+
+	for (int i = 0; i < arch->max_axon_outputs; i++)
+	{
+		struct axon_output *out = &(arch->axon_outputs[i]);
+		fprintf(fp, ",o[%u].energy", out->id);
+	}
+
+	for (int i = 0; i < arch->max_routers; i++)
+	{
+		struct router *r = &(arch->routers[i]);
+		fprintf(fp, ",r[%u].energy", r->id);
+	}
+
+	for (int i = 0; i < arch->max_timers; i++)
+	{
+		fprintf(fp, ",t[%u].time", i);
+	}
+	fprintf(fp, "\n");
 }
 
-void sim_log_perf(FILE *fp, const struct architecture *arch)
+void sim_perf_log_timestep(FILE *fp, const struct architecture *arch)
 {
 	// Log the energy and time simulated at every compartment, dump it to
 	//  a big csv file. Then we can post process it to pull out the parallel
 	//  time. Time doesn't make sense per compartment, only per parallel
 	//  block. Pull out energy for synapses, routers, axons and compartments
+	fprintf(fp, "timestep");
+	for (int i = 0; i < arch->max_compartments; i++)
+	{
+		double synapse_energy;
+		struct compartment *c = &(arch->compartments[i]);
+
+		// Calculate the total energy at all synapses
+		synapse_energy = 0.0;
+		for (int j = 0; j < c->post_connection_count; j++)
+		{
+			struct synapse *s = &(c->synapses[j]);
+			synapse_energy += s->energy;
+		}
+
+		if (c->compartment_used)
+		{
+			fprintf(fp, ",%lf,%lf", c->energy, synapse_energy);
+		}
+	}
+
+	for (int i = 0; i < arch->max_axon_outputs; i++)
+	{
+		struct axon_output *out = &(arch->axon_outputs[i]);
+		fprintf(fp, ",%lf", out->energy);
+	}
+
+	for (int i = 0; i < arch->max_routers; i++)
+	{
+		struct router *r = &(arch->routers[i]);
+		fprintf(fp, ",%f", r->energy);
+	}
+
+	for (int i = 0; i < arch->max_timers; i++)
+	{
+		fprintf(fp, ",core[%u].time", i);
+	}
+	fprintf(fp, "\n");
+
 }
 
 void sim_write_summary(FILE *fp, const struct sim_results *results)
 {
 	// Write the simulation result to file
+	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
 	fprintf(fp, "energy: %e\n", results->total_energy);
 	fprintf(fp, "time: %e\n", results->total_sim_time);
 	fprintf(fp, "total_spikes: %ld\n", results->total_spikes);

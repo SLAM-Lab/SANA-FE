@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 
 MAX_COMPARTMENTS = 1024
 MAX_CORES = 128
+ARCH_FILENAME = "loihi.list"
 NETWORK_FILENAME = "connected_layer.csv"
 TECH_FILENAME = "loihi.tech"
 
@@ -25,8 +26,7 @@ def run_sim(network, core_count):
         writer.writerows(network)
 
     timesteps = 10
-    command = ("./sim", "{0}".format(TECH_FILENAME), "{0}".format(timesteps),
-               NETWORK_FILENAME)
+    command = ("./sim", "{0}".format(TECH_FILENAME), ARCH_FILENAME, NETWORK_FILENAME, "{0}".format(timesteps),)
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
 
@@ -47,29 +47,29 @@ def fully_connected(layer_neurons, spiking=True, max_connections=100):
         #  I can't seem to have fields that have 0 characters in, they all get
         #  treated as one field
         # neuron = ['i', None, None, None, None, None]
-        neuron = ['i', ' ', ' ', ' ', ' ', ' ', i, 2.0]
+        neuron = ['i', ' ', ' ', ' ', ' ', ' ', ' ', i, 2.0]
         #for dest in range(i*4096, min((i+1)*4096, layer_neurons)):
         #    neuron.extend((i, random.random()))  # Same weight for all connections
         network.append(neuron)
 
     for n in range(0, layer_neurons):
-        core_id = n / MAX_COMPARTMENTS
+        core_id = int(n / MAX_COMPARTMENTS)
 
-        target_core = random.choice(list(range(64,128)))
-        min_neuron = target_core*1024
-        neuron_list = list(range(min_neuron,min_neuron+1024))
-        #neuron_list = list(range(layer_neurons, 2*layer_neurons))
+        #target_core = random.choice(list(range(64,128)))
+        #min_neuron = target_core*1024
+        #neuron_list = list(range(min_neuron,min_neuron+1024))
+        neuron_list = list(range(layer_neurons, 2*layer_neurons))
         dest_neurons = random.sample(neuron_list, max_connections)
         #print(dest_neurons)
 
-        neuron = [n, core_id, 1.0, reset, 0, 0]
+        neuron = [n, n, 1.0, reset, 0, 0, 0]
         for dest in dest_neurons:
             neuron.extend((dest, random.random()))  # Same weight for all connections
         network.append(neuron)
         #print("neuron has {0} fields".format(len(neuron)))
 
         if (n % 10000) == 0:
-            print(n)
+            print("Created {0} neurons".format(n))
 
     if spiking:
         threshold = 3.0
@@ -77,8 +77,7 @@ def fully_connected(layer_neurons, spiking=True, max_connections=100):
         threshold = 2*layer_neurons
 
     for n in range(layer_neurons, 2*layer_neurons):
-        core_id = n / MAX_COMPARTMENTS
-        neuron = [n, core_id, threshold, reset, 0, 0]
+        neuron = [n, n, threshold, reset, 0, 0, 0]
         network.append(neuron)
 
     core_count = core_id + 1
@@ -105,7 +104,7 @@ def empty(neurons, max_compartments=MAX_COMPARTMENTS):
             core_id += 1
             compartment = 0
 
-        neuron = [n, core_id, threshold, reset, 0, 0]
+        neuron = [n, n, threshold, reset, 0, 0, 0]
         network.append(neuron)
         compartment += 1
 
@@ -124,6 +123,7 @@ if __name__ == "__main__":
 
     layer_neurons = 65536
     #layer_neurons = 4096
+    #layer_neurons = 256
 
     network, core_count = fully_connected(layer_neurons, True)
     print("Testing network with {0} neurons and inputs".format(len(network)))

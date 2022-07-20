@@ -79,7 +79,7 @@ struct sim_results
 
 #include "tech.h"
 #include "arch.h"
-struct sim_results sim_timestep(const struct technology *tech, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp);
+struct sim_results sim_timestep(const struct technology *tech, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
 int sim_route_spikes(const struct technology *tech, struct architecture *arch);
 int sim_input_spikes(const struct technology *tech, struct architecture *arch);
@@ -98,5 +98,7 @@ double sim_calculate_time(const struct technology *tech, struct architecture *ar
 void sim_write_summary(FILE *fp, const struct sim_results *results);
 void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
 void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
+void sim_perf_write_header(FILE *perf_fp, const struct architecture *arch);
+void sim_perf_log_timestep(FILE *fp, const struct architecture *arch);
 int sim_input(const double firing_probability);
 #endif

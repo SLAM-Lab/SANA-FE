@@ -1,8 +1,8 @@
 #ifndef NETWORK_HEADER_INCLUDED
 #define NETWORK_HEADER_INCLUDED
 
-#define MAX_CSV_LINE (1024 + (4096*32))
 #define MAX_FIELD_LEN 32
+#define MAX_CSV_LINE (1024 + (4096*MAX_FIELD_LEN))
 
 // This defines the structure of the csv format for specifying neurons in a
 //  network for this simulator.   Each row in the file represents data for a

@@ -46,7 +46,7 @@ def connected_layer(weights, spiking=True):
         threshold = 2*layer_neurons
 
     reset = 0
-    force_update = spiking
+    force_update = True
     for n in range(0, layer_neurons):
         neuron = [n, n, threshold, reset, 0, 0, int(force_update)]
         for dest in range(0, layer_neurons):
@@ -58,7 +58,7 @@ def connected_layer(weights, spiking=True):
         network.append(neuron)
 
     for n in range(layer_neurons, 2*layer_neurons):
-        neuron = [n, n, threshold, reset, 0, 0, 0]
+        neuron = [n, n, threshold, reset, 0, 0, int(force_update)]
         network.append(neuron)
 
     return network
@@ -74,9 +74,8 @@ def fully_connected(layer_neurons, spiking=True, probability=1.0):
 
     weight = 1.0
     reset = 0
-    force_update = spiking
+    force_update = True
     for n in range(0, layer_neurons):
-
         neuron = [n, n, threshold, reset, 0, 0, int(force_update)]
         for dest in range(layer_neurons, 2*layer_neurons):
             if random.random() < probability:
@@ -84,7 +83,7 @@ def fully_connected(layer_neurons, spiking=True, probability=1.0):
         network.append(neuron)
 
     for n in range(layer_neurons, 2*layer_neurons):
-        neuron = [n, n, threshold, reset, 0, 0, 0]
+        neuron = [n, n, threshold, reset, 0, 0, int(force_update)]
         network.append(neuron)
 
     return network
