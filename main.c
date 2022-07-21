@@ -9,8 +9,8 @@
 #include "tech.h"
 #include "network.h"
 
-void init_results(struct sim_results *results);
-void run(struct technology *tech, struct architecture *arch, struct sim_results *results, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
+void init_stats(struct sim_stats *stats);
+void run(struct technology *tech, struct architecture *arch, struct sim_stats *stats, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
 //void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 int parse_dvs(FILE *fp, struct architecture *arch);
@@ -26,19 +26,19 @@ enum program_args
 
 int main(int argc, char *argv[])
 {
-	FILE *input_fp, *network_fp, *results_fp, *tech_fp, *arch_fp;
+	FILE *input_fp, *network_fp, *stats_fp, *tech_fp, *arch_fp;
 	FILE *probe_spikes_fp, *probe_potential_fp, *perf_fp;
 	struct architecture arch;
 	struct technology tech;
 	struct compartment **compartment_ptrs;
-	struct sim_results results;
+	struct sim_stats stats;
 	char *filename, *input_buffer;
 	int timesteps, max_input_line;
 
 	filename = NULL;
 	input_fp = NULL;
 	network_fp = NULL;
-	results_fp = NULL;
+	stats_fp = NULL;
 	input_buffer = NULL;
 	probe_spikes_fp = NULL;
 	probe_potential_fp = NULL;
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 	network_read_csv(network_fp, &tech, &arch, compartment_ptrs);
 	fclose(network_fp);
 
-	init_results(&results);
+	init_stats(&stats);
 	INFO("Creating probe and perf data files.\n");
 	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, &arch);
 	sim_perf_write_header(perf_fp, &arch);
@@ -184,7 +184,7 @@ int main(int argc, char *argv[])
 
 		while (parse_dvs(input_fp, &arch))
 		{
-			run(&tech, &arch, &results, probe_spikes_fp,
+			run(&tech, &arch, &stats, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 		}
 	}
@@ -196,24 +196,22 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < timesteps; i++)
 		{
 			INFO("*** Time-step %d ***\n", i+1);
-			run(&tech, &arch, &results, probe_spikes_fp,
+			run(&tech, &arch, &stats, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 		}
 	}
 
-	INFO("Total simulated time: %es.\n", results.total_sim_time);
-	INFO("Total energy calculated: %eJ.\n", results.total_energy);
-	INFO("Total spikes processed: %ld.\n", results.total_spikes);
-	INFO("Average power consumption: %fW.\n",
-				results.total_energy / results.total_sim_time);
-	INFO("Run finished.\n");
-
-	results_fp = fopen("results.yaml", "w");
-	if (results_fp != NULL)
+	INFO("***** Run Summary *****");
+	sim_write_summary(stdout, &stats);
+	INFO("Average power consumption: %f W.\n",
+				stats.total_energy / stats.total_sim_time);
+	stats_fp = fopen("stats.yaml", "w");
+	if (stats_fp != NULL)
 	{
-		sim_write_summary(results_fp, &results);
+		sim_write_summary(stats_fp, &stats);
 	}
-	fclose(results_fp);
+	fclose(stats_fp);
+	INFO("Run finished.\n");
 
 	// Cleanup
 	arch_free(&arch);
@@ -228,30 +226,31 @@ int main(int argc, char *argv[])
 }
 
 void run(struct technology *tech, struct architecture *arch,
-			struct sim_results *results, FILE *probe_spikes_fp,
+			struct sim_stats *stats, FILE *probe_spikes_fp,
 					FILE *probe_potential_fp, FILE *perf_fp)
 {
 	// Run neuromorphic hardware simulation for one timestep
-	//  Measure the CPU time it takes and accumulate the results
+	//  Measure the CPU time it takes and accumulate the stats
 	struct timespec ts_start, ts_end, ts_elapsed;
-	struct sim_results timestep_results;
+	struct sim_stats timestep_stats;
 
 	// Measure the wall-clock time taken to run the simulation
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-	timestep_results = sim_timestep(tech, arch, probe_spikes_fp,
+	timestep_stats = sim_timestep(tech, arch, probe_spikes_fp,
 					probe_potential_fp, perf_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function
-	results->total_energy += timestep_results.total_energy;
-	results->total_sim_time += timestep_results.total_sim_time;
-	results->total_spikes += timestep_results.total_spikes;
+	stats->total_energy += timestep_stats.total_energy;
+	stats->total_sim_time += timestep_stats.total_sim_time;
+	stats->total_spikes += timestep_stats.total_spikes;
+	stats->total_packets_sent += timestep_stats.total_packets_sent;
 
 	// Calculate elapsed time
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
-	results->wall_time +=
+	stats->wall_time +=
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
 	INFO("Time-step took: %fs.\n",
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
@@ -283,13 +282,14 @@ void next_inputs(char *buffer, struct core *cores, const int max_cores,
 }
 */
 
-void init_results(struct sim_results *results)
+void init_stats(struct sim_stats *stats)
 {
-	results->total_energy = 0.0; // Joules
-	results->total_sim_time = 0.0; // Seconds
-	results->wall_time = 0.0; // Seconds
-	results->time_steps = 0;
-	results->total_spikes = 0;
+	stats->total_energy = 0.0; // Joules
+	stats->total_sim_time = 0.0; // Seconds
+	stats->wall_time = 0.0; // Seconds
+	stats->time_steps = 0;
+	stats->total_spikes = 0;
+	stats->total_packets_sent = 0;
 }
 
 struct timespec calculate_elapsed_time(struct timespec ts_start,

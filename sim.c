@@ -17,13 +17,13 @@
 #include "network.h"
 #include "arch.h"
 
-struct sim_results sim_timestep(const struct technology *tech,
+struct sim_stats sim_timestep(const struct technology *tech,
 				struct architecture *arch,
 				FILE *probe_spike_fp,
 				FILE *probe_potential_fp,
 				FILE *perf_fp)
 {
-	struct sim_results results;
+	struct sim_stats stats;
 	long int spikes_sent;
 
 
@@ -42,16 +42,18 @@ struct sim_results sim_timestep(const struct technology *tech,
 	sim_update(tech, arch);
 
 	// Performance statistics for this timestep
-	results.total_energy = sim_calculate_energy(arch);
-	results.total_sim_time = sim_calculate_time(tech, arch);
-	results.total_spikes = spikes_sent;
+	stats.total_energy = sim_calculate_energy(arch);
+	stats.total_sim_time = sim_calculate_time(tech, arch);
+	stats.total_packets_sent = sim_calculate_packets(arch);
+	stats.total_spikes = spikes_sent;
+
 	INFO("Spikes sent: %ld\n", spikes_sent);
 	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, arch);
 	if (perf_fp)
 	{
 		sim_perf_log_timestep(perf_fp, arch);
 	}
-	return results;
+	return stats;
 }
 
 void sim_update(const struct technology *tech, struct architecture *arch)
@@ -160,6 +162,7 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch)
 			// Mark a packet as sent to the
 			//  core. We will only send one packet per core
 			axon_out->packets_sent[axon_in->id]++;
+			axon_out->total_packets_sent++;
 		}
 
 		// Estimate the energy needed to send spike packets
@@ -337,7 +340,7 @@ void sim_update_axon(const struct technology *tech, struct compartment *c)
 }
 
 double sim_calculate_time(const struct technology *tech,
-						struct architecture *arch)
+						const struct architecture *arch)
 {
 	// Returns the simulation time of the current timestep.
 	//  This is calculated by finding the simulation time of each core,
@@ -358,7 +361,7 @@ double sim_calculate_time(const struct technology *tech,
 	return max_time;
 }
 
-double sim_calculate_energy(struct architecture *arch)
+double sim_calculate_energy(const struct architecture *arch)
 {
 	// Returns the total energy across the design, for this timestep
 	double total_energy, compartment_energy, synapse_energy, axon_energy;
@@ -401,6 +404,19 @@ double sim_calculate_energy(struct architecture *arch)
 	return total_energy;
 }
 
+long int sim_calculate_packets(const struct architecture *arch)
+{
+	long int total_packets = 0;
+
+	for (int i = 0; i < arch->max_axon_outputs; i++)
+	{
+		struct axon_output *out = &(arch->axon_outputs[i]);
+		total_packets += out->total_packets_sent;
+	}
+
+	return total_packets;
+}
+
 void sim_reset_measurements(struct architecture *arch)
 {
 	// Reset energy and spike count measurements to 0
@@ -423,6 +439,7 @@ void sim_reset_measurements(struct architecture *arch)
 	{
 		struct axon_output *out = &(arch->axon_outputs[i]);
 		out->energy = 0.0;
+		out->total_packets_sent = 0;
 	}
 
 	for (int i = 0; i < arch->max_routers; i++)
@@ -515,13 +532,15 @@ void sim_perf_log_timestep(FILE *fp, const struct architecture *arch)
 
 }
 
-void sim_write_summary(FILE *fp, const struct sim_results *results)
+void sim_write_summary(FILE *fp, const struct sim_stats *stats)
 {
 	// Write the simulation result to file
 	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
-	fprintf(fp, "energy: %e\n", results->total_energy);
-	fprintf(fp, "time: %e\n", results->total_sim_time);
-	fprintf(fp, "total_spikes: %ld\n", results->total_spikes);
+	fprintf(fp, "simulated_time: %e\n", stats->total_sim_time);
+	fprintf(fp, "energy: %e\n", stats->total_energy);
+	fprintf(fp, "time: %e\n", stats->total_sim_time);
+	fprintf(fp, "total_spikes: %ld\n", stats->total_spikes);
+	fprintf(fp, "total_packets: %ld\n", stats->total_packets_sent);
 }
 
 void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp,

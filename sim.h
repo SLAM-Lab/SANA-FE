@@ -45,6 +45,7 @@ struct mem
 struct axon_output
 {
 	int id, fan_out;
+	long int total_packets_sent;
 	double energy;
 	struct router *r;
 	unsigned int *packets_sent;
@@ -70,16 +71,16 @@ struct input
 	struct synapse *synapses;
 };
 
-struct sim_results
+struct sim_stats
 {
 	int time_steps;
-	long int total_spikes;
+	long int total_spikes, total_packets_sent;
 	double total_energy, total_sim_time, wall_time;
 };
 
 #include "tech.h"
 #include "arch.h"
-struct sim_results sim_timestep(const struct technology *tech, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
+struct sim_stats sim_timestep(const struct technology *tech, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
 int sim_route_spikes(const struct technology *tech, struct architecture *arch);
 int sim_input_spikes(const struct technology *tech, struct architecture *arch);
@@ -92,10 +93,11 @@ void sim_update_potential(const struct technology *tech, struct compartment *c);
 void sim_update_axon(const struct technology *tech, struct compartment *c);
 
 void sim_reset_measurements(struct architecture *arch);
-double sim_calculate_energy(struct architecture *arch);
-double sim_calculate_time(const struct technology *tech, struct architecture *arch);
+double sim_calculate_energy(const struct architecture *arch);
+double sim_calculate_time(const struct technology *tech, const struct architecture *arch);
+long int sim_calculate_packets(const struct architecture *arch);
 
-void sim_write_summary(FILE *fp, const struct sim_results *results);
+void sim_write_summary(FILE *fp, const struct sim_stats *stats);
 void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
 void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
 void sim_perf_write_header(FILE *perf_fp, const struct architecture *arch);
