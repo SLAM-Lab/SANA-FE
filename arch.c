@@ -42,7 +42,7 @@ struct architecture arch_read_file(FILE *fp)
 
 // TODO: I don't know if this is a wasted effort. We could get away with only
 //  supporting ranges, and the only place ranges are really useful is for
-//  neuron compartments (of which there are many). This is a lot of complicated
+//  neuron neurons (of which there are many). This is a lot of complicated
 //  code and structures for debatable gain. Maybe get rid of this
 static int arch_parse_list(const char *field, struct range *list)
 {
@@ -152,7 +152,7 @@ static void arch_read_line(struct architecture *arch, char *line)
 	case '\n':
 		// Line is a comment
 		break;
-	case 'c':
+	case 'n':
 		arch_parse_neuron(arch, fields);
 		break;
 	case 's':
@@ -249,14 +249,14 @@ static struct architecture arch_init(FILE *fp)
 	char line[ARCH_LINE_LEN];
 	char *field;
 
-	arch.compartments = NULL;
+	arch.neurons = NULL;
 	arch.mem_blocks = NULL;
 	arch.routers = NULL;
 	arch.axon_inputs = NULL;
 	arch.axon_outputs = NULL;
 	arch.external_inputs = NULL;
 
-	arch.max_compartments = 0;
+	arch.max_neurons = 0;
 	arch.max_mem_blocks = 0;
 	arch.max_routers = 0;
 	arch.max_timers = 0;
@@ -285,8 +285,8 @@ static struct architecture arch_init(FILE *fp)
 		case '\n':
 			// Line is a comment
 			continue;
-		case 'c':
-			arch.max_compartments += unit_count;
+		case 'n':
+			arch.max_neurons += unit_count;
 			break;
 		case 'm':
 			arch.max_mem_blocks += unit_count;
@@ -317,16 +317,16 @@ static struct architecture arch_init(FILE *fp)
 		}
 	}
 
-	INFO("Parsed %d compartments.\n", arch.max_compartments);
+	INFO("Parsed %d neurons.\n", arch.max_neurons);
 
 	// Reset file pointer to start of file
 	fseek(fp, 0, SEEK_SET);
 
 	// Based on the number of different units, allocate enough memory to
 	//  simulate this design
-	INFO("Allocating memory for %d compartments.\n", arch.max_compartments);
-	arch.compartments = (struct compartment *)
-		malloc(arch.max_compartments * sizeof(struct compartment));
+	INFO("Allocating memory for %d neurons.\n", arch.max_neurons);
+	arch.neurons = (struct neuron *)
+		malloc(arch.max_neurons * sizeof(struct neuron));
 	arch.mem_blocks = (struct mem *)
 		malloc(arch.max_mem_blocks * sizeof(struct mem));
 	arch.routers = (struct router *)
@@ -337,26 +337,26 @@ static struct architecture arch_init(FILE *fp)
 		malloc(arch.max_axon_outputs * sizeof(struct axon_output));
 	arch.timers = (double *) malloc(arch.max_timers * sizeof(double));
 
-	if ((arch.compartments == NULL) || (arch.mem_blocks == NULL) ||
+	if ((arch.neurons == NULL) || (arch.mem_blocks == NULL) ||
 		(arch.routers == NULL) || (arch.timers == NULL) ||
 		(arch.axon_inputs == NULL) || (arch.axon_outputs == NULL))
 	{
-		INFO("Error: Failed to allocate compartment.\n");
+		INFO("Error: Failed to allocate neuron.\n");
 		exit(1);
 	}
 
-	for (int i = 0; i < arch.max_compartments; i++)
+	for (int i = 0; i < arch.max_neurons; i++)
 	{
-		struct compartment *c = &(arch.compartments[i]);
+		struct neuron *n = &(arch.neurons[i]);
 
-		c->id = i;
-		c->synapses = NULL;
-		c->axon_in = NULL;
-		c->axon_out = NULL;
+		n->id = i;
+		n->synapses = NULL;
+		n->axon_in = NULL;
+		n->axon_out = NULL;
 
-		c->fired = 0;
-		c->update_needed = 0;
-		c->compartment_used = 0;
+		n->fired = 0;
+		n->update_needed = 0;
+		n->neuron_used = 0;
 	}
 
 	for (int i = 0; i < arch.max_mem_blocks; i++)
@@ -417,13 +417,13 @@ void arch_free(struct architecture *arch)
 	arch->initialized = 0;
 
 	// Free any neuron data
-	for (int i = 0; i < arch->max_compartments; i++)
+	for (int i = 0; i < arch->max_neurons; i++)
 	{
-		struct compartment *c = &(arch->compartments[i]);
+		struct neuron *n = &(arch->neurons[i]);
 
-		assert(c != NULL);
-		free(c->synapses);
-		c->synapses = NULL;
+		assert(n != NULL);
+		free(n->synapses);
+		n->synapses = NULL;
 	}
 
 	for (int i = 0; i < arch->max_axon_outputs; i++)
@@ -445,7 +445,7 @@ void arch_free(struct architecture *arch)
 	}
 
 	// Free all memory
-	free(arch->compartments);
+	free(arch->neurons);
 	free(arch->mem_blocks);
 	free(arch->routers);
 	free(arch->axon_inputs);
@@ -454,7 +454,7 @@ void arch_free(struct architecture *arch)
 	free(arch->timers);
 
 	// Reset all pointers and counters
-	arch->compartments = NULL;
+	arch->neurons = NULL;
 	arch->mem_blocks = NULL;
 	arch->routers = NULL;
 	arch->axon_inputs = NULL;
@@ -462,7 +462,7 @@ void arch_free(struct architecture *arch)
 	arch->external_inputs = NULL;
 	arch->timers = NULL;
 
-	arch->max_compartments = 0;
+	arch->max_neurons = 0;
 	arch->max_mem_blocks = 0;
 	arch->max_routers = 0;
 	arch->max_timers = 0;
@@ -484,7 +484,7 @@ static void arch_parse_neuron(struct architecture *arch,
 
 	assert(fields && fields[0]);
 	block_type = fields[0][0];
-	assert(block_type == 'c');
+	assert(block_type == 'n');
 
 	ret = sscanf(fields[2], "%d", &mem_id);
 	if (ret < 1)
@@ -520,6 +520,7 @@ static void arch_parse_neuron(struct architecture *arch,
 	}
 	assert(timer_id < arch->max_timers);
 	timer = &(arch->timers[timer_id]);
+	assert(timer != NULL);
 
 	// Copy the neuron a number of times
 	list_len = arch_parse_list(fields[1], &(field_list[0]));
@@ -530,17 +531,17 @@ static void arch_parse_neuron(struct architecture *arch,
 		TRACE("min:%u max%u\n", r->min, r->max);
 		for (int id = r->min; id <= r->max; id++)
 		{
-			struct compartment *c;
+			struct neuron *n;
 
-			assert(id <= arch->max_compartments);
-			c = &(arch->compartments[id]);
-			// Copy any common compartment variables
-			//c->mem_block = mem_block;
-			c->axon_in = axon_in;
-			c->axon_out = axon_out;
-			c->time = timer;
+			assert(id <= arch->max_neurons);
+			n = &(arch->neurons[id]);
+			// Copy any common neuron variables
+			//n->mem_block = mem_block;
+			n->axon_in = axon_in;
+			n->axon_out = axon_out;
+			n->time = timer;
 		}
-		TRACE("Compartment parsed n:%d-%d mem(%d) i(%d) o(%d).\n",
+		TRACE("neuron parsed n:%d-%d mem(%d) i(%d) o(%d).\n",
 			r->min, r->max, mem_id, axon_in_id, axon_out_id);
 	}
 }
@@ -555,7 +556,6 @@ static void arch_parse_axon_input(struct architecture *arch,
 	assert(fields && fields[0]);
 	type = fields[0][0];
 	assert(type == 'i');
-
 
 	ret = sscanf(fields[1], "%u", &id);
 	if (ret < 1)

@@ -14,9 +14,9 @@
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-struct compartment
+struct neuron
 {
-	int id, compartment_used, fired, post_connection_count, spike_count;
+	int id, neuron_used, fired, post_connection_count, spike_count;
 	int log_spikes, log_voltage, update_needed, force_update;
 	double *time;
 	double potential, current,  bias, reset, threshold;
@@ -32,7 +32,7 @@ struct compartment
 struct synapse
 {
 	int id;
-	struct compartment *post_neuron, *pre_neuron;
+	struct neuron *post_neuron, *pre_neuron;
 	double energy, weight;
 	struct mem *memory;
 };
@@ -86,11 +86,11 @@ int sim_route_spikes(const struct technology *tech, struct architecture *arch);
 int sim_input_spikes(const struct technology *tech, struct architecture *arch);
 
 void sim_update(const struct technology *tech, struct architecture *arch);
-void sim_update_compartment(const struct technology *tech, struct compartment *c);
-void sim_update_synapse_cuba(const struct technology *tech, struct compartment *c);
-void sim_update_dendrite(const struct technology *tech, struct compartment *c);
-void sim_update_potential(const struct technology *tech, struct compartment *c);
-void sim_update_axon(const struct technology *tech, struct compartment *c);
+void sim_update_neuron(const struct technology *tech, struct neuron *c);
+void sim_update_synapse_cuba(const struct technology *tech, struct neuron *c);
+void sim_update_dendrite(const struct technology *tech, struct neuron *c);
+void sim_update_potential(const struct technology *tech, struct neuron *c);
+void sim_update_axon(const struct technology *tech, struct neuron *c);
 
 void sim_reset_measurements(struct architecture *arch);
 double sim_calculate_energy(const struct architecture *arch);

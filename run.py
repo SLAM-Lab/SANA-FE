@@ -4,6 +4,9 @@ Run a few basic experiments, show how we might interface a python
 script with the simulator kernel.
 """
 
+import matplotlib
+matplotlib.use('Agg')
+
 import csv
 import subprocess
 import yaml
@@ -30,7 +33,7 @@ def run_sim(network):
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
 
-    with open("results.yaml", "r") as results_file:
+    with open("stats.yaml", "r") as results_file:
        results = yaml.safe_load(results_file)
 
     return results
@@ -298,4 +301,4 @@ if __name__ == "__main__":
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("connected_spiking_time_loihi_only.png")
 
-    plt.show()
+    #plt.show()

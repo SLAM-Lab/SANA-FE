@@ -1,7 +1,7 @@
 """Parse architecture description YAML file, output machine-readable list"""
 # TODO: It seems obviously better to send a number of instances to the API
 #  rather than just calling the API a number of times with the exact same
-#  element. But does it make sense for every element. Or just compartments?
+#  element. But does it make sense for every element. Or just neurons?
 import yaml
 
 MAX_RECURSION = 32
@@ -90,9 +90,9 @@ def parse_local(local, parent_ids):
         raise Exception("Local vars must be list of elements")
 
     # Now create all the local elements in the simulation or arch description
-    # Create all non-compartment elements first, then pass these as a reference
-    #  to the compartment 
-    elements = {"memory": [], "synapse": [], "compartment": [], "soma": [],
+    # Create all non-neuron elements first, then pass these as a reference
+    #  to the neuron 
+    elements = {"memory": [], "synapse": [], "neuron": [],
                 "dendrite": [], "axon_in": [], "axon_out": [], "router": [],}
     for el in local:
         # Group elements of the same class together   
@@ -102,12 +102,11 @@ def parse_local(local, parent_ids):
         elements[class_name].append(el)
 
     routers = [parse_router(el) for el in elements["router"]]
-    somas = [parse_soma(el) for el in elements["soma"]]
     memories = [parse_memory(el) for el in elements["memory"]]
     dendrites = [parse_dendrite(el) for el in elements["dendrite"]]
     synapses = [parse_synapse(el) for el in elements["synapse"]]
 
-    local_ids = { "routers": routers, "somas": somas, "memories": memories,
+    local_ids = { "routers": routers, "memories": memories,
                   "dendrites": dendrites, "synapses": synapses }
 
     # These elements need to know about other elements that are local or higher
@@ -125,12 +124,11 @@ def parse_local(local, parent_ids):
         local_ids["axon_outputs"].append(parse_axon_out(el))
 
     # Need to combine both parent and local elements and pass these to the
-    #  compartment
+    #  neuron
     dependencies = combine_elements(local_ids, parent_ids)
-    compartments = []
-    for el in elements["compartment"]:
+    neurons = []
+    for el in elements["neuron"]:
         el["synapses"] = dependencies["synapses"]
-        el["somas"] = dependencies["somas"]
         el["dendrites"] = dependencies["dendrites"]
         el["synapses"] = dependencies["synapses"]
         el["axon_inputs"] = dependencies["axon_inputs"]
@@ -140,7 +138,7 @@ def parse_local(local, parent_ids):
         local_ids["timer"] = timer
         el["timer"] = timer
 
-        compartments = parse_compartment(el)
+        neuron = parse_neuron(el)
 
     return local_ids
 
@@ -158,21 +156,18 @@ def get_instances(element_dict):
     return instances
 
 
-def parse_compartment(element_dict):
-    global _compartment_count
+def parse_neuron(element_dict):
+    global _neuron_count
 
     instances = element_dict["instances"]
     attributes = element_dict["attributes"]
 
-
-    compartment_ids = create_compartment(instances, element_dict["synapses"],
+    neuron_ids = create_neuron(instances, element_dict["synapses"],
                                           element_dict["dendrites"],
-                                          element_dict["somas"],
                                           element_dict["axon_inputs"],
                                           element_dict["axon_outputs"],
-					  element_dict["timer"])
-
-    return [compartment_ids]
+                                          element_dict["timer"])
+    return [neuron_ids]
 
 
 def parse_router(element_dict):
@@ -194,13 +189,9 @@ def parse_synapse(element_dict):
 
     print(attributes)
     model = attributes["model"]
-    bits = attributes["bits"]
+    weight_bits = attributes["weight_bits"]
 
-    return create_synapse(model, bits)
-
-
-def parse_soma(element_dict):
-    return create_soma()
+    return create_synapse(model, weight_bits)
 
 
 def parse_axon_out(element_dict):
@@ -223,27 +214,27 @@ def parse_memory(element_dict):
 Functions to add elements. These can be swapped out for python API calls in
 the future.
 """
-_compartments = []
-_compartment_count = 0
-def create_compartment(instances, synapses, dendrites, somas, axon_inputs,
-                       axon_outputs, timer):
-    global _compartment_count
+_neurons = []
+_neuron_count = 0
+def create_neuron(instances, synapses, dendrites, axon_inputs, axon_outputs,
+                                                                        timer):
+    global _neuron_count
 
-    compartment_id = _compartment_count
-    _compartment_count += instances
+    neuron_id = _neuron_count
+    _neuron_count += instances
     if instances > 1:
-        id_str= "{0}..{1}".format(compartment_id,
-                                  (compartment_id+instances) - 1)
+        id_str= "{0}..{1}".format(neuron_id,
+                                  (neuron_id+instances) - 1)
     else:
-        id_str = str(compartment_id)
+        id_str = str(neuron_id)
 
-    compartment = "c {0} {1} {2} {3} {4}".format(id_str, synapses[0],
-                                             axon_inputs[0], axon_outputs[0],
-					     timer)
-    _compartments.append(compartment)
+    neuron = "n {0} {1} {2} {3} {4}".format(id_str, synapses[0],
+                                            axon_inputs[0], axon_outputs[0],
+                                            timer)
+    _neurons.append(neuron)
 
     # TODO: return list of ids
-    return compartment_id
+    return neuron_id
 
 
 _routers = []
@@ -271,15 +262,6 @@ def create_synapse(synapse_model, bits):
     _synapses.append(synapse)
 
     return synapse_id
-
-
-_somas = []
-def create_soma():
-    soma_id = len(_somas)
-    soma = "+ {0}".format(soma_id)
-    _somas.append(soma)
-
-    return soma_id
 
 
 _dendrites = []
@@ -337,10 +319,10 @@ if __name__ == "__main__":
         arch_dict = yaml.safe_load(arch_file)
         parse(arch_dict)
 
-    #arch_elements = _compartments + _routers
-    arch_elements = _compartments + _routers + _memories + _synapses + \
-                    _axon_inputs + _axon_outputs + _somas + _dendrites + \
-		    _timers
+    #arch_elements = _neurons + _routers
+    arch_elements = _neurons + _routers + _memories + _synapses + \
+                    _axon_inputs + _axon_outputs + _dendrites + \
+                    _timers
     #print(arch_elements)
 
     with open("out", "w") as list_file:

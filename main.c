@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	FILE *probe_spikes_fp, *probe_potential_fp, *perf_fp;
 	struct architecture arch;
 	struct technology tech;
-	struct compartment **compartment_ptrs;
+	struct neuron **neuron_ptrs;
 	struct sim_stats stats;
 	char *filename, *input_buffer;
 	int timesteps, max_input_line;
@@ -111,10 +111,10 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	//max_neurons = max_cores * tech.max_compartments;
+	//max_neurons = max_cores * tech.max_neurons;
 	// Input line must be long enough to encode inputs for all neurons
 	//  simultaneously
-	max_input_line = 32 + (arch.max_compartments*32);
+	max_input_line = 32 + (arch.max_neurons*32);
 
 	filename = argv[NETWORK_FILENAME];
 	// Create the network
@@ -145,22 +145,22 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	INFO("Allocating memory to track %d compartments.\n",
-							arch.max_compartments);
-	compartment_ptrs = (struct compartment **)
-		malloc(arch.max_compartments * sizeof(struct compartment *));
-	if (compartment_ptrs == NULL)
+	INFO("Allocating memory to track %d neurons.\n",
+							arch.max_neurons);
+	neuron_ptrs = (struct neuron **)
+		malloc(arch.max_neurons * sizeof(struct neuron *));
+	if (neuron_ptrs == NULL)
 	{
 		INFO("Error: failed to allocate memory.\n");
 		exit(1);
 	}
-	for (int i = 0; i < arch.max_compartments; i++)
+	for (int i = 0; i < arch.max_neurons; i++)
 	{
-		compartment_ptrs[i] = NULL;
+		neuron_ptrs[i] = NULL;
 	}
 
 	INFO("Reading network from file.\n");
-	network_read_csv(network_fp, &tech, &arch, compartment_ptrs);
+	network_read_csv(network_fp, &tech, &arch, neuron_ptrs);
 	fclose(network_fp);
 
 	init_stats(&stats);
@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	INFO("***** Run Summary *****");
+	INFO("***** Run Summary *****\n");
 	sim_write_summary(stdout, &stats);
 	INFO("Average power consumption: %f W.\n",
 				stats.total_energy / stats.total_sim_time);
@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
 
 	// Cleanup
 	arch_free(&arch);
-	free(compartment_ptrs);
+	free(neuron_ptrs);
 
 	// Close any open files
 	fclose(probe_potential_fp);

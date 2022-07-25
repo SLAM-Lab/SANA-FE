@@ -13,28 +13,19 @@ architecture:
       subtree:
         - name: loihi_core[0..3]
           local:
-            - name: core_compartments[0..1023]
-              # Digital compartments act analogous to registers. They drive
-              #  the simulation, every timestep we update all compartments.
-              #  Updates follow the order:
-              #   synaptic -> dendritic, -> somatic -> axonal
-              class: compartment
-              attributes:
-                voltage: True
-                current: True
-                type: digital
-            - name: core_synapse_read
-              class: synapse
-              attributes:
-                model: cuba
-                bits: 4
-            - name: core_lif
-              class: soma
+            - name: core_lif[0..1023]
+              class: neuron
               attributes:
                 model: leaky_integrate
                 hard_reset: True
                 soft_reset: True
-            - name: core_dendrite
+                type: digital
+            - name: core_synapses
+              class: synapse
+              attributes:
+                model: cuba
+                weight_bits: 4
+            - name: core_dendrite[0..1023]
               class: dendrite
               attributes:
                 model: leaky_integrate
@@ -43,21 +34,15 @@ architecture:
               # The SRAM is used to store synaptic info, neuron state and
               #  dendrite structures. In the case of convolutional networks
               #  weights might be shared across compartments, reducing the
-              #  load on SRAM. It makes sense to model memory usage, in the
-              #  simplest case to get data about memory usage and limit the
-              #  networks implemented on the arch
+              #  load on SRAM
               class: memory
               attributes:
                 size: 1000000
             - name: core_in
               class: axon_in
-              # axon_in acts like input ports to the arch or subtree. In future
-              #  we could model the operations done at the axon input e.g.
-              #  mapping input spikes to compartments. Loihi uses a destination
-              #  based protocol, the packet has the destination tile and axon
-              #  The input ports converts an axon to a set of spikes to go to
-              #  synapses on the core. For Loihi we have at most 4096 slots to
-              #  route packets to different synapses.
+              # axon_in acts like input ports to the arch or subtree. 
+              #  For Loihi we have at most 4096 slots to route packets to
+              #  different cores.
               attributes:
                 fan_in: 4096
                 protocol: dest_axon

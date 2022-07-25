@@ -15,7 +15,7 @@
 enum neuron_config_format
 {
 	NEURON_ID = 0,
-	COMPARTMENT_ID, // Which hardware compartment to map to
+	COMPARTMENT_ID, // Which hardware neuron to map to
 	THRESHOLD_VOLTAGE, // Spiking threshold value
 	RESET_VOLTAGE,
 	RECORD_SPIKES, // Record any spikes to a CSV file
@@ -37,7 +37,7 @@ enum synapse_config_format
 #include "sim.h"
 #include "tech.h"
 void network_create_empty(const struct technology *tech, struct architecture *arch);
-void network_read_csv(FILE *fp, const struct technology *tech, struct architecture *arch, struct compartment **compartment_ptrs);
+void network_read_csv(FILE *fp, const struct technology *tech, struct architecture *arch, struct neuron **neuron_ptrs);
 void network_init(const struct technology *tech, struct architecture *arch);
 
 #endif

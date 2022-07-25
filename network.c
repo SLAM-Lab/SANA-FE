@@ -14,7 +14,7 @@
 const double dt = 1.0e-3; // Seconds
 
 void network_read_csv(FILE *fp, const struct technology *tech,
-			struct architecture *arch, struct compartment **compartment_ptrs)
+			struct architecture *arch, struct neuron **neuron_ptrs)
 {
 	// Build arbitrary spiking network from a csv file
 	//
@@ -33,12 +33,12 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 	struct input *input_ptr;
 	struct synapse *s;
 	char *line;
-        int neuron_count, input_count, compartment_id, ret;
-	int neuron_id, dest_id, curr_input, is_input;
+        int neuron_count, input_count, neuron_id, ret;
+	int compartment_id, dest_id, curr_input, is_input;
 
 	// TODO: better define the max fields
 	const int max_fields = NEURON_FIELDS + (4096 * SYNAPSE_FIELDS);
-	const int max_compartments = arch->max_compartments;
+	const int max_neurons = arch->max_neurons;
 
 	// Allocate memory to hold the string fields for each neuron description
 	//  In the file, one line describes one neuron
@@ -74,14 +74,14 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 	//  the neuron and count the number of synapses to allocate.
 	while (fgets(line, MAX_CSV_LINE, fp))
 	{
-		struct compartment *c;
+		struct neuron *c;
 		char *token;
 		int synapse_count, field_count;
 
-		if (neuron_count > max_compartments)
+		if (neuron_count > max_neurons)
 		{
 			INFO("Error: inputting too many neurons, max is %d.\n",
-							max_compartments);
+							max_neurons);
 			exit(1);
 		}
 
@@ -178,8 +178,8 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 
 		sscanf(neuron_fields[COMPARTMENT_ID], "%d", &compartment_id);
 		// Add neuron to specified neuromorphic core
-		c = &(arch->compartments[compartment_id]);
-		assert(c->compartment_used == 0);
+		c = &(arch->neurons[compartment_id]);
+		assert(c->neuron_used == 0);
 
 		// Parse related neuron parameters
 		sscanf(neuron_fields[THRESHOLD_VOLTAGE], "%lf",
@@ -196,7 +196,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 		// TODO: force update is really referring to whether there's
 		//  a bias or not, I figured out
 		c->update_needed = c->force_update;
-		c->compartment_used = 1;
+		c->neuron_used = 1;
 
 		// TODO: Hard coded LIF / CUBA time constants for now
 		c->current_time_const = 1.0e-3;
@@ -223,8 +223,8 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 
 		// Keep track of which CSV line corresponds to which physical
 		//  neuron in the hardware.  This info will be important for
-		//  linking the synapse data to neuron compartments
-		compartment_ptrs[neuron_count] = c;
+		//  linking the synapse data to neuron neurons
+		neuron_ptrs[neuron_count] = c;
 
 		TRACE("Added nid:%d vt:%lf r%lf log_s:%d "
                         "log_v:%d\n", c->id, c->threshold, c->reset,
@@ -239,7 +239,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 	fseek(fp, 0, SEEK_SET);
 	while (fgets(line, MAX_CSV_LINE, fp))
 	{
-		struct compartment *src, *dest;
+		struct neuron *src, *dest;
 		char *token;
 		int field_count, synapse_count;
 
@@ -295,7 +295,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 			}
 			// Now parse all the outgoing synaptic connections for
 			//  this neuron
-			src = compartment_ptrs[neuron_id];
+			src = neuron_ptrs[neuron_id];
 			for (int i = 0; i < field_count; i++)
 			{
 				TRACE("nid:%d Parsed field: %s\n", neuron_id,
@@ -331,7 +331,7 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 			sscanf(neuron_fields[curr_synapse_field +
 								SYNAPSE_WEIGHT],
 								"%f", &weight);
-			dest = compartment_ptrs[dest_id];
+			dest = neuron_ptrs[dest_id];
 			// Create the new synapse and add it to the end out
 			//  the fan-out list core
 			if (is_input)
@@ -384,9 +384,9 @@ void network_read_csv(FILE *fp, const struct technology *tech,
 
 void network_init(const struct technology *tech, struct architecture *arch)
 {
-	for (int i = 0; i < arch->max_compartments; i++)
+	for (int i = 0; i < arch->max_neurons; i++)
 	{
-		struct compartment *c = &(arch->compartments[i]);
+		struct neuron *c = &(arch->neurons[i]);
 
 		c->id = i;
 		c->post_connection_count = 0;
@@ -401,7 +401,7 @@ void network_init(const struct technology *tech, struct architecture *arch)
 		c->threshold = 0.0;
 		c->reset = 0.0;
 		c->update_needed = 0;
-		c->compartment_used = 0;
+		c->neuron_used = 0;
 	}
 
 	for (int i = 0; i < arch->max_routers; i++)
@@ -422,9 +422,9 @@ void network_create_empty(const struct technology *tech,
 {
 	// Initialize an empty network, where cores have no connections between
 	//  neurons
-	for (int i = 0; i < arch->max_compartments; i++)
+	for (int i = 0; i < arch->max_neurons; i++)
 	{
-		struct compartment *c = &(arch->compartments[i]);
+		struct neuron *c = &(arch->neurons[i]);
 
 		c->fired = 0;
 		c->post_connection_count = 0;
