@@ -1,53 +1,68 @@
 ---
+# Energy and time estimates of different events, generated from SPICE
+#  simulations of Loihi.  All numbers were taken from:
+#  "Loihi: A Neuromorphic Manycore Processor with On-Chip Learning" (2018)
+#  M. Davies et al
 architecture:
   name: loihi_chip
-  subtree:
-    - name: loihi_tile[0..31]
-      local:
-        - name: tile_router 
-          class: router
-          attributes:
-            connection: mesh
-            dimensions: 2
-            width: 8
-      subtree:
+  attributes:
+    topology: mesh
+    dimensions: 2
+    width: 8
+    cost:
+      east_west:
+        energy: 3.0e-12
+        time: 4.1e-9
+      north_south:
+        energy: 4.0e-12
+        time: 6.5e-9
+      global_barrier:
+        time: 299.0e-9
+
+  tile:
+    - name: loihi_tile[0..31]  
+      core:
         - name: loihi_core[0..3]
-          local:
-            - name: core_lif[0..1023]
-              class: neuron
+          soma:
+            - name: core_lif
               attributes:
+                type: digital
                 model: leaky_integrate
                 hard_reset: True
                 soft_reset: True
-                type: digital
+                cost:
+                  active:
+                    energy: 81.0e-12
+                    time: 8.4e-9
+                  inactive:
+                    energy: 52.0e-12
+                    time: 5.3e-9
+          synapse:
             - name: core_synapses
-              class: synapse
               attributes:
                 model: cuba
                 weight_bits: 4
-            - name: core_dendrite[0..1023]
-              class: dendrite
-              attributes:
-                model: leaky_integrate
-                # not sure yet what dendritic ops loihi supports
-            - name: core_sram
-              # The SRAM is used to store synaptic info, neuron state and
-              #  dendrite structures. In the case of convolutional networks
-              #  weights might be shared across compartments, reducing the
-              #  load on SRAM
-              class: memory
-              attributes:
-                size: 1000000
+                cost: # Synaptic spike op cost accounted for here
+                  energy: 23.6e-12
+                  time: 3.5e-9
+          dendrite:
+          - name: core_dendrites
+            attributes:
+              model: leaky_integrate
+              cost: # Same as soma (uses same compartment hardware)
+                energy: 81.0e-12 
+                time: 8.4e-9
+                #operations: and, or, multiply
+          axon_in:
             - name: core_in
-              class: axon_in
               # axon_in acts like input ports to the arch or subtree. 
               #  For Loihi we have at most 4096 slots to route packets to
               #  different cores.
               attributes:
                 fan_in: 4096
                 protocol: dest_axon
+          axon_out:
             - name: core_out
-              class: axon_out
               # axon_out acts like output ports. Loihi needs to figure out the
               #  destination tiles and axons to send spikes to. If transmitting
               #  to different neurons on a common core, those are grouped into
@@ -56,38 +71,17 @@ architecture:
               attributes:
                 fan_out: 4096
                 protocol: dest_axon
+                cost:
+                  energy: 1.7e-12
+                  time: 2.1e-9
 
-###############################################################################
-# We can describe structures in an abstract way, these won't be instantiated.
-#  Only structures under "arch" will be actually created and simulated
-#  The point of this is these structures can be reused inside of the simulation
-#templates:
-#  subtree:
-#    - name: loihi_synapse
-#      class: synapse
-#      attributes:
-#        model: cuba
-#        weight_bits: 4
-#      timing: parallel
-#    - name: loihi_lif
-#      class: neuron
-#      timing: multiplexed
-#      attributes:
-#        model: lif
-
-###############################################################################
-
-# timing possible values: 
-# clock: the timestep / event takes a fixed time based on clock frequency - how do we define clock speed? Probably a technology parameter
-#   we could still model the timing but in the end we just overwrite it with the clock freq (and raise an error if the sim time took longer)
-# parallel: All instances run in parallel. Each has its own timing.
-# global_sync: similar to parallel, take the max timing of any instances + sync time
-# multiplexed: Each instance must run one after the other. 
-#  -- something more complex might be event drive time simulation, interaction between blocks is modelled. But thats probably another parameter
-
-# keywords:
-# Units:
-# sim, neuron, synapse, axon_in, axon_out, dendrite, router
-#
-# Fixed parameters:
-# timing, instances
+          ## TODO: support memory blocks in the future e.g.
+          #memory:
+          #  - name: synapse_sram
+          #    # The SRAM is used to store synaptic info, neuron state and
+          #    #  dendrite structures. In the case of convolutional networks
+          #    #  weights might be shared across compartments, reducing the
+          #    #  load on SRAM
+          #    attributes:
+          #      size: 1000000
+          #      mem_type: sram

@@ -6,11 +6,11 @@
 #include <time.h>
 
 #include "sim.h"
-#include "tech.h"
 #include "network.h"
+#include "command.h"
 
 void init_stats(struct sim_stats *stats);
-void run(struct technology *tech, struct architecture *arch, struct sim_stats *stats, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
+void run(struct network *net, struct architecture *arch, struct sim_stats *stats, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
 //void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 int parse_dvs(FILE *fp, struct architecture *arch);
@@ -26,14 +26,13 @@ enum program_args
 
 int main(int argc, char *argv[])
 {
-	FILE *input_fp, *network_fp, *stats_fp, *tech_fp, *arch_fp;
+	FILE *input_fp, *network_fp, *stats_fp, *arch_fp;
 	FILE *probe_spikes_fp, *probe_potential_fp, *perf_fp;
+	struct network net;
 	struct architecture arch;
-	struct technology tech;
-	struct neuron **neuron_ptrs;
 	struct sim_stats stats;
 	char *filename, *input_buffer;
-	int timesteps, max_input_line;
+	int timesteps, max_input_line, max_neurons;
 
 	filename = NULL;
 	input_fp = NULL;
@@ -81,20 +80,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	// Initialize the technology parameters - the chip parameters and key
-	//  metrics
-	tech_init(&tech);
-
 	// Read in program args, sanity check and parse inputs
-	filename = argv[TECHNOLOGY_FILENAME];
-	tech_fp = fopen(filename, "r");
-	if (tech_fp == NULL)
-	{
-		INFO("Error: Technology file failed to open.\n");
-		exit(1);
-	}
-	tech_read_file(&tech, tech_fp);
-
 	filename = argv[ARCH_FILENAME];
 	arch_fp = fopen(filename, "r");
 	if (arch_fp == NULL)
@@ -102,7 +88,7 @@ int main(int argc, char *argv[])
 		INFO("Error: Architecture file failed to open.\n");
 		exit(1);
 	}
-	arch = arch_read_file(arch_fp);
+	command_read_file(arch_fp, &net, &arch);
 
 	sscanf(argv[TIMESTEPS], "%d", &timesteps);
 	if (timesteps <= 0)
@@ -111,10 +97,11 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	//max_neurons = max_cores * tech.max_neurons;
 	// Input line must be long enough to encode inputs for all neurons
 	//  simultaneously
-	max_input_line = 32 + (arch.max_neurons*32);
+	// TODO: remove this hack
+	max_neurons = 128*1024;
+	max_input_line = 32 + (max_neurons*32);
 
 	filename = argv[NETWORK_FILENAME];
 	// Create the network
@@ -145,31 +132,16 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	INFO("Allocating memory to track %d neurons.\n",
-							arch.max_neurons);
-	neuron_ptrs = (struct neuron **)
-		malloc(arch.max_neurons * sizeof(struct neuron *));
-	if (neuron_ptrs == NULL)
-	{
-		INFO("Error: failed to allocate memory.\n");
-		exit(1);
-	}
-	for (int i = 0; i < arch.max_neurons; i++)
-	{
-		neuron_ptrs[i] = NULL;
-	}
-
 	INFO("Reading network from file.\n");
-	network_read_csv(network_fp, &tech, &arch, neuron_ptrs);
+	command_read_file(network_fp, &net, &arch);
 	fclose(network_fp);
 
 	init_stats(&stats);
 	INFO("Creating probe and perf data files.\n");
-	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, &arch);
+	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, &net);
 	sim_perf_write_header(perf_fp, &arch);
 	if (input_fp != NULL)
 	{
-
 		// Allocate a buffer for the inputs
 		input_buffer = (char *) malloc(sizeof(char) * max_input_line);
 		if (input_buffer == NULL)
@@ -184,7 +156,7 @@ int main(int argc, char *argv[])
 
 		while (parse_dvs(input_fp, &arch))
 		{
-			run(&tech, &arch, &stats, probe_spikes_fp,
+			run(&net, &arch, &stats, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 		}
 	}
@@ -196,7 +168,7 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < timesteps; i++)
 		{
 			INFO("*** Time-step %d ***\n", i+1);
-			run(&tech, &arch, &stats, probe_spikes_fp,
+			run(&net, &arch, &stats, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 		}
 	}
@@ -215,7 +187,7 @@ int main(int argc, char *argv[])
 
 	// Cleanup
 	arch_free(&arch);
-	free(neuron_ptrs);
+	free(input_buffer);
 
 	// Close any open files
 	fclose(probe_potential_fp);
@@ -225,8 +197,8 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void run(struct technology *tech, struct architecture *arch,
-			struct sim_stats *stats, FILE *probe_spikes_fp,
+void run(struct network *net, struct architecture *arch,
+		struct sim_stats *stats, FILE *probe_spikes_fp,
 					FILE *probe_potential_fp, FILE *perf_fp)
 {
 	// Run neuromorphic hardware simulation for one timestep
@@ -238,7 +210,7 @@ void run(struct technology *tech, struct architecture *arch,
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-	timestep_stats = sim_timestep(tech, arch, probe_spikes_fp,
+	timestep_stats = sim_timestep(net, arch, probe_spikes_fp,
 					probe_potential_fp, perf_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function

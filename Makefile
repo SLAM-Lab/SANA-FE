@@ -4,8 +4,8 @@ CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -g
 GIT_COMMIT=$(shell ./git_status.sh)
 
 LIBS=-lrt -lm
-DEPS=sim.h network.h tech.h arch.h
-OBJ=main.o sim.o network.o tech.o arch.o
+DEPS=sim.h command.h network.h arch.h
+OBJ=main.o sim.o command.o network.o arch.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"

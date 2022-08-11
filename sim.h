@@ -14,63 +14,6 @@
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-struct neuron
-{
-	int id, neuron_used, fired, post_connection_count, spike_count;
-	int log_spikes, log_voltage, update_needed, force_update;
-	double *time;
-	double potential, current,  bias, reset, threshold;
-	double potential_decay, potential_time_const;
-	double current_decay, current_time_const;
-	double energy;
-
-	struct synapse *synapses;
-	struct axon_output *axon_out;
-	struct axon_input *axon_in;
-};
-
-struct synapse
-{
-	int id;
-	struct neuron *post_neuron, *pre_neuron;
-	double energy, weight;
-	struct mem *memory;
-};
-
-struct mem
-{
-	int id, memory_size_bytes, weight_bits;
-};
-
-struct axon_output
-{
-	int id, fan_out;
-	long int total_packets_sent;
-	double energy;
-	struct router *r;
-	unsigned int *packets_sent;
-};
-
-struct axon_input
-{
-	int id, fan_in;
-	struct router *r;
-};
-
-struct router
-{
-	int x, y, id;
-	int max_dimensions, width; // For now just support 2 dimensions
-	double energy;
-	struct router *east, *west, *north, *south;
-};
-
-struct input
-{
-	int send_spike, post_connection_count;
-	struct synapse *synapses;
-};
-
 struct sim_stats
 {
 	int time_steps;
@@ -78,28 +21,29 @@ struct sim_stats
 	double total_energy, total_sim_time, wall_time;
 };
 
-#include "tech.h"
 #include "arch.h"
-struct sim_stats sim_timestep(const struct technology *tech, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
+#include "network.h"
+#include "stdio.h"
+struct sim_stats sim_timestep(struct network *net, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
-int sim_route_spikes(const struct technology *tech, struct architecture *arch);
-int sim_input_spikes(const struct technology *tech, struct architecture *arch);
+int sim_route_spikes(struct network *net);
+int sim_input_spikes(struct network *net);
 
-void sim_update(const struct technology *tech, struct architecture *arch);
-void sim_update_neuron(const struct technology *tech, struct neuron *c);
-void sim_update_synapse_cuba(const struct technology *tech, struct neuron *c);
-void sim_update_dendrite(const struct technology *tech, struct neuron *c);
-void sim_update_potential(const struct technology *tech, struct neuron *c);
-void sim_update_axon(const struct technology *tech, struct neuron *c);
+void sim_update(struct network *net);
+void sim_update_neuron(struct neuron *n);
+void sim_update_synapse_cuba(struct neuron *n);
+void sim_update_dendrite(struct neuron *n);
+void sim_update_potential(struct neuron *n);
+void sim_update_axon(struct neuron *n);
 
-void sim_reset_measurements(struct architecture *arch);
+void sim_reset_measurements(struct network *net, struct architecture *arch);
 double sim_calculate_energy(const struct architecture *arch);
-double sim_calculate_time(const struct technology *tech, const struct architecture *arch);
+double sim_calculate_time(const struct architecture *arch);
 long int sim_calculate_packets(const struct architecture *arch);
 
 void sim_write_summary(FILE *fp, const struct sim_stats *stats);
-void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
-void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct architecture *arch);
+void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp, const struct network *net);
+void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct network *net);
 void sim_perf_write_header(FILE *perf_fp, const struct architecture *arch);
 void sim_perf_log_timestep(FILE *fp, const struct architecture *arch);
 int sim_input(const double firing_probability);

@@ -1,439 +1,155 @@
 // network.c
 // Utility functions for creating user defined spiking networks
-#include <stdio.h>
-#include <math.h>
+//#include <math.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <string.h>
 
 #include "network.h"
 #include "sim.h"
 
-// Each hardware timestep corresponds to a simulation of the spiking network for
-//  dt seconds. This relates to the LIF time constant.
-const double dt = 1.0e-3; // Seconds
-
-void network_read_csv(FILE *fp, const struct technology *tech,
-			struct architecture *arch, struct neuron **neuron_ptrs)
+int network_create_neuron_group(struct network *net, 
+				const unsigned int neuron_count,
+				const double threshold, const double reset)
 {
-	// Build arbitrary spiking network from a csv file
-	//
-	// SNN is defined in a single csv file, with one row per neuron.
-	//  To build the network, make two passes over the file.
-	//  1) Create all the neurons in the network, map these to hardware
-	//  2) Add the synapses and connect neurons to form a network
-	//  We can't connect the neurons until we have made an initial pass
-	//  to define them all.  This is why a two pass approach was needed.
-	//
-	// The intention is probably to have the csv machine generated.
-	//  There are a number of neuron fields, followed by up to FAN_OUT
-	//  synapses each with a smaller number of fields.
-	//
-	// See network.h to see all the fields and what they mean
-	struct input *input_ptr;
-	struct synapse *s;
-	char *line;
-        int neuron_count, input_count, neuron_id, ret;
-	int compartment_id, dest_id, curr_input, is_input;
+	struct neuron_group *group;
+	int id;
 
-	// TODO: better define the max fields
-	const int max_fields = NEURON_FIELDS + (4096 * SYNAPSE_FIELDS);
-	const int max_neurons = arch->max_neurons;
+	id = net->neuron_group_count;
+	assert(id < NETWORK_MAX_NEURON_GROUPS);
+	net->neuron_group_count++;
 
-	// Allocate memory to hold the string fields for each neuron description
-	//  In the file, one line describes one neuron
-	char **neuron_fields = (char **) malloc(max_fields * sizeof(char *));
-	if (neuron_fields == NULL)
+	group = &(net->groups[id]);
+	group->neurons = (struct neuron *)
+				malloc(sizeof(struct neuron) * neuron_count);
+	if (group->neurons == NULL)
 	{
-		INFO("Error: Failed to allocate memory for network inputs.\n");
+		INFO("Error: Couldn't allocate neuron group %d\n", id);
 		exit(1);
 	}
-	for (int i = 0; i < max_fields; i++)
-	{
-		neuron_fields[i] =
-				(char *) malloc(MAX_FIELD_LEN * sizeof(char));
-		if (neuron_fields[i] == NULL)
-		{
-			INFO("Error: Failed to allocate memory for text.\n");
-			exit(1);
-		}
-	}
+	group->neuron_count = neuron_count;
+	group->default_threshold = threshold;
+	group->default_reset = reset;
 
-	network_init(tech, arch);
-	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
-	if (line == NULL)
+	// Initially the group of neurons is not mapped to anything
+	group->core = NULL;
+	group->axon_in = NULL;
+	group->synapse = NULL;
+	group->dendrite = NULL;
+	group->soma = NULL;
+	group->axon_out = NULL;
+
+	return id;
+}
+
+void network_add_connections(struct neuron *const src,
+				const struct connection connections[],
+				const int connection_count)
+{	
+	// TODO: we need to pass neuron connections all in one go
+	//  so that we can allocate the right amount of space 
+	// So need to get the connections just for this 
+	src->connections = (struct connection *)
+			malloc(sizeof(struct connection) * connection_count);
+	if (src->connections == NULL)
 	{
-		INFO("Error: Couldn't allocate memory for text input.\n");
+		INFO("Error: Couldn't allocate connections for "
+			"neuron (%d.%d).\n", src->group->id, src->id);
 		exit(1);
 	}
 
-	neuron_count = 0;
-	input_count = 0;
-
-	// Step 1 - Create all neurons and map these to the hardware. Initialize
-	//  the neuron and count the number of synapses to allocate.
-	while (fgets(line, MAX_CSV_LINE, fp))
+	// Copy connections across
+	for (int i = 0; i < connection_count; i++)
 	{
-		struct neuron *c;
-		char *token;
-		int synapse_count, field_count;
-
-		if (neuron_count > max_neurons)
-		{
-			INFO("Error: inputting too many neurons, max is %d.\n",
-							max_neurons);
-			exit(1);
-		}
-
-		// Zero initialize all fields, each entry is variable length
-		//  The neuron fields are fixed, but this is follow by a
-		//  variable number of synapses (0-MAX_FANOUT).  The synaptic
-		//  fields are null delimited
-		for (int i = 0; i < max_fields; i++)
-		{
-			neuron_fields[i][0] = '\0';
-		}
-
-		field_count = 0;
-		token = strtok(line, ",");
-		while (token != NULL)
-		{
-			// Only parse the neuron fields, the rest of the fields
-			//  contain the synaptic data which we'll read next pass
-			strncpy(neuron_fields[field_count], token,
-								MAX_FIELD_LEN);
-			token = strtok(NULL, ",");
-			field_count++;
-		}
-		if (field_count < NEURON_FIELDS)
-		{
-			TRACE("nid:%d Number of fields read < %d, "
-				"ignoring line.\n", neuron_count,
-								NEURON_FIELDS);
-			continue;
-		}
-		synapse_count = (field_count - NEURON_FIELDS) / SYNAPSE_FIELDS;
-		assert(synapse_count >= 0);
-
-		for (int i = 0; i < field_count; i++)
-		{
-			TRACE("nid:%d Parsed field: %s\n", neuron_count,
-							neuron_fields[i]);
-		}
-
-		is_input = (neuron_fields[NEURON_ID][0] == 'i');
-		if (is_input)
-		{
-			struct input *input_ptr =
-					&(arch->external_inputs[input_count]);
-
-			TRACE("Creating network input %d.\n", input_count);
-			assert(input_count < arch->max_external_inputs);
-
-			if (synapse_count)
-			{
-				input_ptr->synapses = (struct synapse *)
-					malloc(synapse_count *
-							sizeof(struct synapse));
-				if (input_ptr->synapses == NULL)
-				{
-					INFO("Error: Couldn't allocate"
-								"synapses.\n");
-					exit(1);
-				}
-			}
-			input_count++;
-			continue;
-		}
-		else // This line is defining a neuron
-		{
-			ret = sscanf(neuron_fields[NEURON_ID], "%d",
-								&neuron_id);
-		}
-
-		// Parse the neuron id
-		if (ret <= 0)
-		{
-			// Couldn't parse the neuron id field
-			if (neuron_count == 0)
-			{
-				// Some csv files might have a header on the
-				//  first line(s), skip these
-				TRACE("Header detected, skipping.\n");
-				continue;
-			}
-			else
-			{
-				INFO("Error: couldn't parse %s.\n",
-						neuron_fields[NEURON_ID]);
-				exit(1);
-			}
-		}
-		else if (neuron_id != neuron_count)
-		{
-			INFO("Error: #line (%d) != #neurons (%d).\n",
-					neuron_id, neuron_count);
-			exit(1);
-		}
-
-		sscanf(neuron_fields[COMPARTMENT_ID], "%d", &compartment_id);
-		// Add neuron to specified neuromorphic core
-		c = &(arch->neurons[compartment_id]);
-		assert(c->neuron_used == 0);
-
-		// Parse related neuron parameters
-		sscanf(neuron_fields[THRESHOLD_VOLTAGE], "%lf",
-							&(c->threshold));
-		sscanf(neuron_fields[RESET_VOLTAGE], "%lf", &(c->reset));
-		sscanf(neuron_fields[RECORD_SPIKES], "%d",
-							&(c->log_spikes));
-		sscanf(neuron_fields[RECORD_VOLTAGE], "%d",
-							&(c->log_voltage));
-		sscanf(neuron_fields[FORCE_UPDATE], "%d",
-							&(c->force_update));
-		c->fired = 0;
-		c->potential = c->reset;
-		// TODO: force update is really referring to whether there's
-		//  a bias or not, I figured out
-		c->update_needed = c->force_update;
-		c->neuron_used = 1;
-
-		// TODO: Hard coded LIF / CUBA time constants for now
-		c->current_time_const = 1.0e-3;
-		c->potential_time_const = 2.0e-3;
-		c->current_decay =
-			-(exp(-dt / c->current_time_const) - 1.0);
-		c->potential_decay =
-			-(exp(-dt / c->potential_time_const) - 1.0);
-
-		// Allocate synaptic memory
-		// TODO: use the memory block to model the space available for
-		//  synaptic memory
-		if (synapse_count)
-		{
-			c->synapses = (struct synapse *) malloc(synapse_count *
-							sizeof(struct synapse));
-			if (c->synapses == NULL)
-			{
-				INFO("Error: couldn't allocate synapse mem "
-							"for nid:%u.\n", c->id);
-				exit(1);
-			}
-		}
-
-		// Keep track of which CSV line corresponds to which physical
-		//  neuron in the hardware.  This info will be important for
-		//  linking the synapse data to neuron neurons
-		neuron_ptrs[neuron_count] = c;
-
-		TRACE("Added nid:%d vt:%lf r%lf log_s:%d "
-                        "log_v:%d\n", c->id, c->threshold, c->reset,
-			c->log_spikes, c->log_voltage);
-		neuron_count++;
+		src->connections[i] = connections[i];
 	}
-	INFO("Created %d inputs.\n", input_count);
-	INFO("Created %d neurons.\n", neuron_count);
 
-	curr_input = 0;
-	// Next parse the whole file again, but this time read the synapse data
-	fseek(fp, 0, SEEK_SET);
-	while (fgets(line, MAX_CSV_LINE, fp))
-	{
-		struct neuron *src, *dest;
-		char *token;
-		int field_count, synapse_count;
-
-		for (int i = 0; i < max_fields; i++)
-		{
-			neuron_fields[i][0] = '\0';
-		}
-
-		// Read all csv fields into a buffer
-		field_count = 0;
-		token = strtok(line, ",");
-		while (token != NULL)
-		{
-			// This time read all the fields in the line, but we're
-			//  only interested in the synapse data
-			strncpy(neuron_fields[field_count], token,
-								MAX_FIELD_LEN);
-			token = strtok(NULL, ",");
-			field_count++;
-		}
-		if (field_count < NEURON_FIELDS)
-		{
-			TRACE("Number of fields read < %d, "
-				"ignoring line.\n", NEURON_FIELDS);
-			continue;
-		}
-		synapse_count = (field_count - NEURON_FIELDS) / SYNAPSE_FIELDS;
-
-		// Use the first field (the neuron number) to figure if this
-		//  is a valid formatted line or not. Since this is the
-		//  second pass we know this field is valid
-		is_input = (neuron_fields[NEURON_ID][0] == 'i');
-		input_ptr = NULL;
-		if (is_input)
-		{
-			// An input is a virtual connnection - it isn't
-			//  associated with a neuron on the chip, but is
-			//  connected to other neurons on the chip
-			src = NULL;
-			input_ptr = &(arch->external_inputs[curr_input]);
-			TRACE("Parsing network input: %d.\n", curr_input);
-			curr_input++;
-		}
-		else
-		{
-			ret = sscanf(neuron_fields[NEURON_ID], "%d",
-								&neuron_id);
-			if (ret <= 0)
-			{
-				// Couldn't parse the neuron id field
-				TRACE("Header detected, skipping.\n");
-				continue;
-			}
-			// Now parse all the outgoing synaptic connections for
-			//  this neuron
-			src = neuron_ptrs[neuron_id];
-			for (int i = 0; i < field_count; i++)
-			{
-				TRACE("nid:%d Parsed field: %s\n", neuron_id,
-							neuron_fields[i]);
-			}
-		}
-
-		for (int i = 0; i < synapse_count; i++)
-		{
-			float weight;
-			const int curr_synapse_field = NEURON_FIELDS +
-							(i*SYNAPSE_FIELDS);
-
-			// Parse a single synapse from the csv
-			ret = sscanf(neuron_fields[curr_synapse_field +
-							SYNAPSE_DEST_NID],
-							    "%d", &dest_id);
-			if (ret <= 0)
-			{
-				INFO("Error: Couldn't parse synapse \"%s\".\n",
-					neuron_fields[curr_synapse_field +
-							SYNAPSE_DEST_NID]);
-				exit(1);
-			}
-			else if ((dest_id < 0) || (dest_id >= neuron_count))
-			{
-				INFO("Error: synapse dest neuron (%d) out of "
-					"range [0 <= #neuron < %d].\n", dest_id,
-								neuron_count);
-				exit(1);
-			}
-
-			sscanf(neuron_fields[curr_synapse_field +
-								SYNAPSE_WEIGHT],
-								"%f", &weight);
-			dest = neuron_ptrs[dest_id];
-			// Create the new synapse and add it to the end out
-			//  the fan-out list core
-			if (is_input)
-			{
-				s = &(input_ptr->synapses[
-					input_ptr->post_connection_count]);
-				s->pre_neuron = NULL;
-				s->post_neuron = dest;
-				s->weight = weight;
-				input_ptr->post_connection_count++;
-				TRACE("Created input synapse i->%d (w:%f)\n",
-					s->post_neuron->id, s->weight);
-			}
-			else
-			{
-				s = &(src->synapses[
-						src->post_connection_count]);
-				s->pre_neuron = src;
-				s->post_neuron = dest;
-				s->weight = weight;
-				src->post_connection_count++;
-				TRACE("Created synapse %d->%d (w:%f)\n",
-					s->pre_neuron->id, s->post_neuron->id,
-					s->weight);
-			}
-			s->energy = 0.0;
-		}
-		if (is_input)
-		{
-			TRACE("nid:i Added %d synapses.\n",
-			input_ptr->post_connection_count);
-		}
-		else
-		{
-			TRACE("nid:%d Added %d synapses.\n",
-			src->id,
-			src->post_connection_count);
-		}
-	}
-	INFO("Initialized neurons and inputs.\n");
-
-	for (int i = 0; i < max_fields; i++)
-	{
-		free(neuron_fields[i]);
-	}
-	free(neuron_fields);
-	free(line);
 	return;
 }
 
-void network_init(const struct technology *tech, struct architecture *arch)
+struct neuron *network_id_to_neuron_ptr(struct network *const net,
+					const struct neuron_id id)
 {
-	for (int i = 0; i < arch->max_neurons; i++)
+	struct neuron_group *group;
+	struct neuron *neuron;
+
+	if (id.group < net->neuron_group_count)
 	{
-		struct neuron *c = &(arch->neurons[i]);
-
-		c->id = i;
-		c->post_connection_count = 0;
-		c->log_spikes = 0;
-		c->log_voltage = 0;
-		c->spike_count = 0;
-
-		c->fired = 0;
-		c->potential = 0.0;
-		c->current = 0.0;
-		c->bias = 0.0;
-		c->threshold = 0.0;
-		c->reset = 0.0;
-		c->update_needed = 0;
-		c->neuron_used = 0;
+		INFO("ERROR: Group %d > max %d.\n",
+					id.group, net->neuron_group_count);
+		exit(1);
 	}
 
-	for (int i = 0; i < arch->max_routers; i++)
+	group = &(net->groups[id.group]);
+	if (id.neuron < group->neuron_count)
 	{
-		struct router *r = &(arch->routers[i]);
+		INFO("ERROR: Neuron %d > max %d.\n",
+						id.neuron, group->neuron_count);
+		exit(1);
+	}
+	neuron = &(group->neurons[id.neuron]);
 
-		// TODO:
-		r->east = NULL;
-		r->west = NULL;
-		r->north = NULL;
-		r->south = NULL;
-		r->energy = 0.0;
+	return neuron;
+}
+
+/*
+// Mapping should happen outside of this file, because it's a combination
+//  of both architecture and network
+void network_map_neuron_group(struct network *net, struct architecture *arch,
+				const int group_id, const int core_id, const int axon_in, const int synapse, const int  )
+{
+	assert(id < net->neuron_group_count);
+
+	group = &(net->groups[group_id]);
+	
+	// First find the core
+	for (int i = 0; i < arch->tile_count)
+
+	group->core = arch->tiles
+}
+*/
+
+void network_init(struct network *net)
+{
+	for (int i = 0; i < net->neuron_group_count; i++)
+	{
+		struct neuron_group *group = &(net->groups[i]);
+
+		for (int j = 0; j < group->neuron_count; j++)
+		{
+			struct neuron *n = &(group->neurons[j]);
+
+			n->id = i;
+			n->post_connection_count = 0;
+			n->log_spikes = 0;
+			n->log_voltage = 0;
+			n->spike_count = 0;
+
+			n->fired = 0;
+			n->potential = 0.0;
+			n->current = 0.0;
+			n->bias = 0.0;
+			n->threshold = group->default_threshold;
+			n->reset = group->default_reset;
+			n->update_needed = 0;
+			n->neuron_used = 0;
+		}
 	}
 }
 
-void network_create_empty(const struct technology *tech,
-						struct architecture *arch)
+void network_free(struct network *net)
 {
-	// Initialize an empty network, where cores have no connections between
-	//  neurons
-	for (int i = 0; i < arch->max_neurons; i++)
+	for (int i = 0; i < net->neuron_group_count; i++)
 	{
-		struct neuron *c = &(arch->neurons[i]);
+		struct neuron_group *group = &(net->groups[i]);
 
-		c->fired = 0;
-		c->post_connection_count = 0;
-		c->reset = 0.0;
-		c->potential = c->reset;
-		c->current = 0.0;
-
-		c->threshold = -1.0; // Negative threshold always fires
-		c->bias = 0.0;
+		// First free all the allocated connections in each neuron
+		for (int j = 0; j < group->neuron_count; j++)
+		{
+			free(group->neurons[j].connections);
+		}
+		// Finally free the neurons allocated in the group
+		free(net->groups[i].neurons);
 	}
-}
 
+	return;
+}

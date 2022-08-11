@@ -4,8 +4,6 @@
 #  element. But does it make sense for every element. Or just neurons?
 import yaml
 
-MAX_RECURSION = 32
-
 def parse(arch_dict):
     print(arch_dict)
 
@@ -16,7 +14,7 @@ def parse(arch_dict):
     if "architecture" not in arch_dict:
         print("Error: no architecture defined")
     else:
-        parse_struct(arch_dict["architecture"], [], 1)
+        parse_arch(arch_dict["architecture"])
 
     return
 
@@ -30,117 +28,150 @@ def parse_range(range_str):
     return range_min, range_max
 
 
-def parse_struct(struct_dict, parent_elements, recursion_depth):
-    if recursion_depth > MAX_RECURSION:
-        raise Exception("Error: Exceeded max recursion depth ({0}), "
-                        "stopping!".format(MAX_RECURSION))
+def parse_arch(arch_dict):
+    arch_name = arch_dict["name"]
+    if "[" in arch_name:
+        raise Exception("Error: multiple architectures not supported")
 
-    struct_name = struct_dict["name"]
-    # Work out how many instances of this structure to create
-    if "[" in struct_name:
+    if "attributes" not in arch_dict:
+        raise Exception("Error: NoC not defined for architecture "
+                        "(please add this under attributes)")
+    attributes = arch_dict["attributes"]
+    if "topology" not in attributes:
+        raise Exception("Error: topology not defined for NoC")
+
+    topology = attributes["topology"]
+    if topology == "mesh":
+        dimensions = int(attributes["dimensions"])
+        width = int(attributes["width"])
+    cost = attributes["cost"]
+
+    network_attributes = {"topology": topology, "dimensions": dimensions,
+                          "width": width, "cost": cost}
+
+    if "tile" not in arch_dict:
+        raise Exception("Error: No tiles defined, must be at least one tile")
+
+    tiles = arch_dict["tile"]
+    for tile in tiles:
+        parse_tile(tile, network_attributes)
+
+    return 
+
+
+def parse_tile(tile_dict, network_attributes):
+    tile_name = tile_dict["name"]
+    # Work out how many instances of this tile to create
+    if "[" in tile_name:
         # Can use notation [min..max] to indicate range of elements
-        range_min, range_max = parse_range(struct_name)
+        range_min, range_max = parse_range(tile_name)
     else:
         range_min, range_max = 0, 0
 
-    struct_elements = list()
+    tile_elements = list()
     for instance in range(range_min, range_max+1):
-        struct_name = struct_name.split("[")[0] + "[{0}]".format(instance)
-        print("Parsing struct {0}".format(struct_name))
+        tile_name = tile_name.split("[")[0] + "[{0}]".format(instance)
+        tile_id = create_tile(network_attributes)
+        print("Parsing struct {0}".format(tile_name))
  
         # Add any elements local to this h/w structure. They have access to any
         #  elements in the parent structures
-        if "local" in struct_dict:
-            local_elements = parse_local(struct_dict["local"], parent_elements)
-        else:
-            local_elements = dict()
-        
-        # When looking at the subtree, elements may use information about this
-        #  structure and any parent structures 
-        subtree_elements = list()
-        elements = combine_elements(local_elements, parent_elements)
-        if "subtree" in struct_dict:
-            parse_subtree(struct_dict["subtree"], elements, recursion_depth+1)
+        if "core" not in tile_dict:
+            raise Exception("Error: No cores defined, "
+                            "must be at least one core")
+        cores = tile_dict["core"]
+        for core in cores:
+            parse_core(core, tile_id)
 
     return
 
+def parse_core(core_dict, tile_id):
+    core_name = core_dict["name"]
+    
+    # Work out how many instances of this tile to create
+    if "[" in core_name:
+        # Can use notation [min..max] to indicate range of elements
+        range_min, range_max = parse_range(core_name)
+    else:
+        range_min, range_max = 0, 0
 
-def combine_elements(local, parent):
-    print(local)
-    combined = dict(local)
-    for key in parent:
-        if key not in combined:
-            combined[key] = []
+    elements = ("axon_in", "synapse", "dendrite", "soma", "axon_out")
+    for el in elements:
+        if el not in core_dict:
+            raise Exception("Error: {0} not defined in core {1}".format(
+                el, core_name))
+    
+    for instance in range(range_min, range_max+1):
+        core_name = core_name.split("[")[0] + "[{0}]".format(instance)
+        core_id = create_core(tile_id)
+        print("Parsing struct {0}".format(core_name))
 
-        combined[key].append(parent[key])
-    return combined
+        axon_inputs = [parse_axon_in(el, core_id)
+                       for el in core_dict["axon_in"]]
+        synapse_processors = [parse_synapse(el, core_id) for
+                              el in core_dict["synapse"]]
+        dendrite_processors = [parse_dendrite(el, core_id) for
+                               el in core_dict["dendrite"]]
+        soma_processors = [parse_soma(el, core_id) for
+                           el in core_dict["soma"]]
+        axon_outputs = [parse_axon_out(el, core_id) for
+                        el in core_dict["axon_out"]]
 
 
-def parse_subtree(subtree, parent_elements, recursion_depth):
-    print("Parsing subtree, parent: {0}".format(parent_elements))
-    if not isinstance(subtree, list):
-        raise Exception("Subtree must have list of branches")
+def parse_synapse(element_dict, core_id):
+    # TODO: parse the number of elements to create
+    attributes = element_dict["attributes"]
 
-    for branch in subtree:
-        parse_struct(branch, parent_elements, recursion_depth)
+    print(attributes)
+    model = attributes["model"]
+    weight_bits = attributes["weight_bits"]
+
+    synaptic_op_energy, synaptic_op_time = 0.0, 0.0
+    if "cost" in attributes:
+        costs = attributes["cost"]
+        synaptic_op_energy, synaptic_op_time = costs["energy"], costs["time"]
+
+    return create_synapse(model, weight_bits, synaptic_op_energy,
+                                                            synaptic_op_time)
 
 
-def parse_local(local, parent_ids):
-    if not isinstance(local, list):
-        raise Exception("Local vars must be list of elements")
+def parse_axon_out(element_dict, core_id):
+    # TODO: parse the number of elements to create
+    attributes = element_dict["attributes"]
+    spike_energy, spike_time = 0.0, 0.0
+    if "cost" in attributes:
+        costs = attributes["cost"]
+        spike_energy, spike_time = costs["energy"], costs["time"]
 
-    # Now create all the local elements in the simulation or arch description
-    # Create all non-neuron elements first, then pass these as a reference
-    #  to the neuron 
-    elements = {"memory": [], "synapse": [], "neuron": [],
-                "dendrite": [], "axon_in": [], "axon_out": [], "router": [],}
-    for el in local:
-        # Group elements of the same class together   
-        # TODO: rename to get_instances ? 
-        el["instances"] = get_instances(el)
-        class_name = el["class"]
-        elements[class_name].append(el)
+    return create_axon_out(core_id, spike_energy, spike_time)
 
-    routers = [parse_router(el) for el in elements["router"]]
-    memories = [parse_memory(el) for el in elements["memory"]]
-    dendrites = [parse_dendrite(el) for el in elements["dendrite"]]
-    synapses = [parse_synapse(el) for el in elements["synapse"]]
 
-    local_ids = { "routers": routers, "memories": memories,
-                  "dendrites": dendrites, "synapses": synapses }
+def parse_axon_in(element_dict, core_id):
+    # TODO: parse the number of elements to create
+    return create_axon_in(core_id)
 
-    # These elements need to know about other elements that are local or higher
-    #  in the hierarchy
-    if "routers" in parent_ids:
-        routers = routers + parent_ids["routers"]
-    local_ids["axon_inputs"] = []
-    for el in elements["axon_in"]:
-        el["routers"] = routers
-        local_ids["axon_inputs"].append(parse_axon_in(el))
 
-    local_ids["axon_outputs"] = []
-    for el in elements["axon_out"]:
-        el["routers"] = routers
-        local_ids["axon_outputs"].append(parse_axon_out(el))
+def parse_soma(element_dict, core_id):
+    active_energy, active_time = 0.0, 0.0
+    inactive_energy, inactive_time = 0.0, 0.0
 
-    # Need to combine both parent and local elements and pass these to the
-    #  neuron
-    dependencies = combine_elements(local_ids, parent_ids)
-    neurons = []
-    for el in elements["neuron"]:
-        el["synapses"] = dependencies["synapses"]
-        el["dendrites"] = dependencies["dendrites"]
-        el["synapses"] = dependencies["synapses"]
-        el["axon_inputs"] = dependencies["axon_inputs"]
-        el["axon_outputs"] = dependencies["axon_outputs"]
+    attributes = element_dict["attributes"]
+    if "cost" in attributes:
+        costs = attributes["cost"]
+        active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
+        inactive_energy, inactive_time = costs["active"]["energy"], costs["active"]["time"]
 
-        timer = create_timer()
-        local_ids["timer"] = timer
-        el["timer"] = timer
+    return create_soma(core_id, active_energy, active_time,
+                                            inactive_energy, inactive_time)
 
-        neuron = parse_neuron(el)
 
-    return local_ids
+def parse_dendrite(element_dict, core_id):
+    attributes = element_dict["attributes"]
+    update_energy, update_time = 0.0, 0.0
+    if "cost" in attributes:
+        costs = attributes["cost"]
+        update_energy, update_time = costs["energy"], costs["time"]
+    return create_dendrite(core_id, update_energy, update_time)
 
 
 def get_instances(element_dict):
@@ -155,162 +186,97 @@ def get_instances(element_dict):
     print("Parsing element {0}".format(element_name)) 
     return instances
 
-
-def parse_neuron(element_dict):
-    global _neuron_count
-
-    instances = element_dict["instances"]
-    attributes = element_dict["attributes"]
-
-    neuron_ids = create_neuron(instances, element_dict["synapses"],
-                                          element_dict["dendrites"],
-                                          element_dict["axon_inputs"],
-                                          element_dict["axon_outputs"],
-                                          element_dict["timer"])
-    return [neuron_ids]
-
-
-def parse_router(element_dict):
-    router_ids = []
-
-    assert(element_dict["instances"] == 1)
-
-    attributes = element_dict["attributes"]
-    if "connection" in attributes:
-        connection_type = attributes["connection"]
-        dimensions = int(attributes["dimensions"])
-        width = int(attributes["width"])
-
-    return create_router(dimensions, width, connection_type)
-
-
-def parse_synapse(element_dict):
-    attributes = element_dict["attributes"]
-
-    print(attributes)
-    model = attributes["model"]
-    weight_bits = attributes["weight_bits"]
-
-    return create_synapse(model, weight_bits)
-
-
-def parse_axon_out(element_dict):
-    routers = element_dict["routers"]
-    assert(len(routers) == 1)
-    return create_axon_out(routers[0])
-
-
-def parse_axon_in(element_dict):
-    routers = element_dict["routers"]
-    assert(len(routers) == 1)
-    return create_axon_in(routers[0])
-
-
-def parse_memory(element_dict):
-    attributes = element_dict["attributes"]
-    mem_size = attributes["size"]
-    return create_memory(mem_size)
 """
 Functions to add elements. These can be swapped out for python API calls in
 the future.
 """
-_neurons = []
-_neuron_count = 0
-def create_neuron(instances, synapses, dendrites, axon_inputs, axon_outputs,
-                                                                        timer):
-    global _neuron_count
+_tiles = []
+def create_tile(network_attributes):
+    tile_id = len(_tiles)
 
-    neuron_id = _neuron_count
-    _neuron_count += instances
-    if instances > 1:
-        id_str= "{0}..{1}".format(neuron_id,
-                                  (neuron_id+instances) - 1)
-    else:
-        id_str = str(neuron_id)
+    assert(network_attributes["topology"] == "mesh") # TODO: for now
+    #if network_attributes["topology"] == "mesh":
+    assert(network_attributes["dimensions"] == 2) # TODO: for now
+    x = tile_id % network_attributes["width"]
+    y = int(tile_id / network_attributes["width"])
 
-    neuron = "n {0} {1} {2} {3} {4}".format(id_str, synapses[0],
-                                            axon_inputs[0], axon_outputs[0],
-                                            timer)
-    _neurons.append(neuron)
+    east_west_energy = 0.0
+    east_west_time = 0.0
+    north_south_energy = 0.0
+    north_south_time = 0.0
+    barrier_time = 0.0
+    if "cost" in network_attributes:
+        east_west_energy = network_attributes["cost"]["east_west"]["energy"] 
+        east_west_time = network_attributes["cost"]["east_west"]["time"] 
+        north_south_energy = network_attributes["cost"]["north_south"]["energy"] 
+        north_south_time = network_attributes["cost"]["north_south"]["time"]
+        barrier_time = network_attributes["cost"]["global_barrier"]["time"]
+        # TODO: this will have to be generalized for other topologies
+    costs = "{0} {1} {2} {3} {4}".format(east_west_energy, east_west_time,
+            north_south_energy, north_south_time, barrier_time)
 
-    # TODO: return list of ids
-    return neuron_id
+    tile = "t {0} {1} {2} {3}".format(tile_id, x, y, costs) 
+    _tiles.append(tile)
+    return tile_id
 
 
-_routers = []
-def create_router(dimensions, width, connection_type):
-    router_id = len(_routers)
-
-    if connection_type == "mesh":
-        assert(dimensions == 2)
-        x = router_id % width
-        y = int(router_id / width)
-
-    router = "r {0} {1} {2}".format(router_id, x, y) 
-    _routers.append(router)
-    return router_id
+_cores = []
+def create_core(tile_id):
+    core_id = len(_cores)
+    core = "c {0} {1}".format(core_id, tile_id) 
+    _cores.append(core)
+    return core_id
 
 
 _synapses = []
-def create_synapse(synapse_model, bits):
+def create_synapse(synapse_model, bits, synaptic_op_energy, synaptic_op_time):
     synapse_id = len(_synapses)
 
     models = { "cuba": 0 }
     model_id = models[synapse_model]
 
-    synapse = "s {0} {1} {2}".format(synapse_id, model_id, bits)
+    synapse = "s {0} {1} {2} {3} {4}".format(synapse_id, model_id, bits,
+                                    synaptic_op_energy, synaptic_op_time)
     _synapses.append(synapse)
 
     return synapse_id
 
 
 _dendrites = []
-def parse_dendrite(element_dict):
-    return create_dendrite()
-
-
-def create_dendrite():
+def create_dendrite(core_id, update_energy, update_time):
     dendrite_id = len(_dendrites)
-    dendrite = "d {0}".format(dendrite_id)
+    dendrite = "d {0} {1} {2} {3}".format(dendrite_id, core_id,
+                                                update_energy, update_time)
     _dendrites.append(dendrite)
 
     return dendrite_id
 
-
-_memories = []
-def create_memory(mem_size):
-    memory_id = len(_memories)
-    memory = "m {0} {1}".format(memory_id, mem_size, )
-    _memories.append(memory)
-
-    return memory_id
+_somas = []
+def create_soma(core_id, active_energy, active_time, inactive_energy,
+                                                            inactive_time):
+    soma_id = len(_somas)
+    soma = "+ {0} {1} {2} {3} {4} {5}".format(soma_id, core_id,
+                                                active_energy, active_time,
+                                                inactive_energy, inactive_time)
+    _somas.append(soma)
 
 
 _axon_inputs = []
-def create_axon_in(router_id):
+def create_axon_in(core_id):
     axon_id = len(_axon_inputs)
-    axon = "i {0} {1}".format(axon_id, router_id)
+    axon = "i {0} {1}".format(axon_id, core_id)
     _axon_inputs.append(axon)
 
     return axon_id
 
 
 _axon_outputs = []
-def create_axon_out(router_id):
+def create_axon_out(core_id, spike_energy, spike_time):
     axon_id = len(_axon_outputs)
-    axon = "o {0} {1}".format(axon_id, router_id)
+    axon = "o {0} {1}".format(axon_id, core_id, spike_energy, spike_time)
     _axon_outputs.append(axon)
 
     return axon_id
-
-
-_timers = []
-def create_timer():
-    timer_id = len(_timers)
-    timer = "t {0}".format(timer_id)
-    _timers.append(timer)
-
-    return timer_id
 
 
 if __name__ == "__main__":
@@ -319,11 +285,9 @@ if __name__ == "__main__":
         arch_dict = yaml.safe_load(arch_file)
         parse(arch_dict)
 
-    #arch_elements = _neurons + _routers
-    arch_elements = _neurons + _routers + _memories + _synapses + \
-                    _axon_inputs + _axon_outputs + _dendrites + \
-                    _timers
-    #print(arch_elements)
+    arch_elements = _tiles + _cores + _axon_inputs + _synapses + _dendrites + \
+                                                 _somas + _axon_outputs
+    print(arch_elements)
 
     with open("out", "w") as list_file:
         for line in arch_elements:
