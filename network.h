@@ -90,9 +90,8 @@ struct network
 };
 
 #include "arch.h"
-void network_create_empty(struct architecture *arch);
-//void network_read_csv(FILE *fp, struct network *net, struct architecture *arch);
 void network_init(struct network *net);
+void network_free(struct network *net);
 int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset);
 
 #endif

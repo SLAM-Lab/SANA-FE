@@ -92,23 +92,6 @@ struct neuron *network_id_to_neuron_ptr(struct network *const net,
 	return neuron;
 }
 
-/*
-// Mapping should happen outside of this file, because it's a combination
-//  of both architecture and network
-void network_map_neuron_group(struct network *net, struct architecture *arch,
-				const int group_id, const int core_id, const int axon_in, const int synapse, const int  )
-{
-	assert(id < net->neuron_group_count);
-
-	group = &(net->groups[group_id]);
-	
-	// First find the core
-	for (int i = 0; i < arch->tile_count)
-
-	group->core = arch->tiles
-}
-*/
-
 void network_init(struct network *net)
 {
 	net->neuron_group_count = 0;

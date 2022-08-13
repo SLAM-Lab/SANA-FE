@@ -8,6 +8,10 @@
 #include "arch.h"
 #include "sim.h"
 
+// TODO: is this unnecessary here - it belongs in command.c. The Python glue will have direct
+//  access to these structures, so will be redundant i.e. i can just access the core pointer
+//  directly? The user will iterate through all tiles and cores as internal structs
+//  e.g. core = tile[1], core.add_axon_output(), and so on
 static struct core *arch_get_core(struct architecture *const arch, const int tile_id, const int core_id);
 
 void arch_init(struct architecture *const arch)
@@ -63,19 +67,12 @@ int arch_create_axon_out(struct architecture *const arch,
 	return out->id;
 }
 
-int arch_create_core(struct architecture *const arch,
-						const int tile_id)
+int arch_create_core(struct architecture *const arch, struct tile *const t) 
 {
-	struct tile *t;
 	struct core *c;
 	unsigned int core_id;
 	
-	if (tile_id >= arch->tile_count)
-	{
-		INFO("Error: Invalid tile id: %d.\n", tile_id);
-		exit(1);
-	}
-	t = &(arch->tiles[tile_id]);
+	assert(t != NULL);
 	core_id = t->core_count;
 	t->core_count++;
 
@@ -100,7 +97,7 @@ int arch_create_core(struct architecture *const arch,
 	c->soma_count = 0;
 	c->axon_out_count = 0;
 
-	TRACE("Core created id:%d (tile:%u).\n", c->id, t->id);
+	TRACE("Core created id:%d (tile:%d).\n", c->id, t->id);
 	return c->id;
 }
 
@@ -130,7 +127,7 @@ int arch_create_tile(struct architecture *const arch)
 	t->y = 0;
 	t->core_count = 0;
 
-	TRACE("Tile created id:%u.\n", t->id);
+	TRACE("Tile created id:%d.\n", t->id);
 	return t->id;
 }
 
@@ -140,6 +137,8 @@ static struct core *arch_get_core(struct architecture *const arch,
 	struct tile *t;
 	struct core *c;
 
+	// Make some extra sanity checks on the user input, there's no
+	//  guarantees the ids point to a valid tile or core
 	if (tile_id >= arch->tile_count)
 	{
 		INFO("Error: Accessing invalid tile: %d (max:%d)\n",

@@ -8,9 +8,15 @@
 #define MAX_CSV_LINE (1024 + (4096*MAX_FIELD_LEN))
 #define TOKEN_SEPERATORS " \t"
 
-void command_read_file(FILE *fp, struct network *net, struct architecture *arch);
-void command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch);
-void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch);
+enum 
+{
+	COMMAND_FAIL = -1,
+	COMMAND_OK = 0, // Anything >= 0 means successfully parsed
+};
+
+int command_read_file(FILE *fp, struct network *net, struct architecture *arch);
+int command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch);
+int command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch);
 int command_parse_neuron_group(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_neuron(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_noc(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);

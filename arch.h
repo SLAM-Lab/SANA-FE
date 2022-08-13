@@ -99,7 +99,7 @@ int arch_create_tile(struct architecture *const arch);
 // TODO: is it neater for this to be accessed by a tile ptr, or by an ID?
 //  My internal code can do either. What is best from the Python API though?
 //  Surely the glue can do this transformation
-int arch_create_core(struct architecture *const arch, const int tile_id);
+int arch_create_core(struct architecture *const arch, struct tile *const t);
 int arch_create_axon_out(struct architecture *const arch, const int tile_id, const int core_id);
 
 #endif

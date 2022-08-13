@@ -13,10 +13,10 @@
 // TODO: This doesn't belong in here, it belongs with the snn stuff
 const double dt = 1.0e-3; // Seconds
 
-
-void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
+int command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
 				struct network *net, struct architecture *arch)
 {
+	int ret;
 	char command_type;
 
 	command_type = fields[0][0];
@@ -25,26 +25,26 @@ void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
 							(command_type == '#'))
 	{
 		INFO("Warning: No command, skipping.\n");
-		return;
+		return COMMAND_OK;
 	}
 
 	// Process the command based on the type
 	switch (command_type)
 	{
 	case 'g': // Add neuron group
-		command_parse_neuron_group(net, fields, field_count);
+		ret = command_parse_neuron_group(net, fields, field_count);
 		break;
 	case 'n': // Add neuron
-		command_parse_neuron(net, fields, field_count);
+		ret = command_parse_neuron(net, fields, field_count);
 		break;
 	case '@': // Add network-on-chip (noc)
-		command_parse_noc(arch, fields, field_count);
+		ret = command_parse_noc(arch, fields, field_count);
 		break;
 	case 't':
-		command_parse_tile(arch, fields, field_count);
+		ret = command_parse_tile(arch, fields, field_count);
 		break;
 	case 'c':
-		command_parse_core(arch, fields, field_count);
+		ret = command_parse_core(arch, fields, field_count);
 		break;
 	/*
 	case 's':
@@ -62,18 +62,21 @@ void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
 	case 'e':
 		//arch_parse_external_input(arch, id_list, line);
 		break;
-	*/
 	case '>':
 		// TODO: step simulation
 		break;
+	*/
 	default:
 		TRACE("Warning: unrecognized unit (%c) - skipping.\n",
 							command_type);
+		ret = COMMAND_OK;
 		break;
 	}
+
+	return ret;
 }
 
-void command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch)
+int command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch)
 {
 	char *token;
 	int field_count;
@@ -102,6 +105,7 @@ void command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network
 	}
 
 	// TODO: max_fields is specific to the thing we're decoding
+	// i.e. move this to neuron / SNN specific files
 	/*
 	if (field_count < MAX_FIELDS)
 	{
@@ -115,14 +119,15 @@ void command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network
 	assert(connection_count >= 0);
 	*/
 
-	command_parse_command(fields, field_count, net, arch);
+	return command_parse_command(fields, field_count, net, arch);
 }
 
-void command_read_file(FILE *fp, struct network *net,
+int command_read_file(FILE *fp, struct network *net,
 						struct architecture *arch)
 {
 	char *line;
 	char (*fields)[MAX_FIELD_LEN];
+	int ret;
 
 	assert(net != NULL);
 	assert(arch != NULL);
@@ -130,30 +135,25 @@ void command_read_file(FILE *fp, struct network *net,
 	fields = (char (*)[MAX_FIELD_LEN])
 			malloc(sizeof(char[MAX_FIELD_LEN]) * MAX_FIELDS);
 	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
+	ret = COMMAND_OK;
+
 	if ((line == NULL) || (fields == NULL))
 	{
 		INFO("Error: Couldn't allocate memory for text input.\n");
-		exit(1);
+		ret = COMMAND_FAIL;
 	}
-	// Allocate memory to hold the string fields for each field
-	// TODO: two rounds of malloc are excessive, we can do this with one
-	/*
-	for (int i = 0; i < MAX_FIELDS; i++)
+	else
 	{
-		fields[i] = (char *) malloc(MAX_CSV_LINE * sizeof(char));
-		if (fields[i] == NULL)
+		while (fgets(line, MAX_CSV_LINE, fp) && (ret != COMMAND_FAIL))
 		{
-			INFO("Error: Failed to allocate memory for text.\n");
-			exit(1);
+			ret = command_parse_line(line, fields, net, arch);
 		}
 	}
-	*/
-		
-	while (fgets(line, MAX_CSV_LINE, fp))
-	{
-		// Convert line to fields
-		command_parse_line(line, fields, net, arch);
-	}
+	
+	free(line);
+	free(fields);
+
+	return ret;
 }
 
 int command_parse_tile(struct architecture *const arch,
@@ -201,6 +201,7 @@ int command_parse_noc(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 int command_parse_core(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 							const int field_count)
 {
+	struct tile *t;
 	int tile_id;
 	int ret;
 
@@ -216,7 +217,15 @@ int command_parse_core(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 		INFO("Error: Couldn't parse tile id (%s).\n", fields[1]);
 		exit(1);
 	}
-	return arch_create_core(arch, tile_id);
+
+	if (tile_id >= arch->tile_count)
+	{
+		INFO("Error: Invalid tile id: %d.\n", tile_id);
+		exit(1);
+	}
+	t = &(arch->tiles[tile_id]);
+
+	return arch_create_core(arch, t);
 }
 
 int command_parse_neuron_group(struct network *const net,

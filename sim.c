@@ -418,7 +418,6 @@ double sim_calculate_energy(const struct architecture *arch)
 	double total_energy, soma_energy, synapse_energy, axon_energy;
 	double network_energy;
 
-	total_energy = 0.0;
 	soma_energy = 0.0;
 	synapse_energy = 0.0;
 	axon_energy = 0.0;
@@ -450,7 +449,7 @@ double sim_calculate_energy(const struct architecture *arch)
 		{
 			const struct core *c = &(t->cores[j]);
 
-			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
+			for (int k = 0; k < c->axon_out_count; k++)
 			{
 				const struct axon_output *out =
 							&(c->axon_out[k]);
@@ -553,13 +552,11 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 		{
 			const struct core *c = &(t->cores[j]);
 
-			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
+			for (int k = 0; k < c->axon_out_count; k++)
 			{
 				const struct axon_output *out =
 							&(c->axon_out[i]);
-				out = NULL;
-				fprintf(fp, "%p", (void *) out);
-				//fprintf(fp, "o[%u].energy,", out->id);
+				fprintf(fp, "o[%u].energy,", out->id);
 			}
 		}
 

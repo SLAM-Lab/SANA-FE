@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 	struct architecture arch;
 	struct sim_stats stats;
 	char *filename, *input_buffer;
-	int timesteps, max_input_line, max_neurons;
+	int timesteps, max_input_line, max_neurons, ret;
 
 	filename = NULL;
 	input_fp = NULL;
@@ -41,6 +41,10 @@ int main(int argc, char *argv[])
 	input_buffer = NULL;
 	probe_spikes_fp = NULL;
 	probe_potential_fp = NULL;
+	perf_fp = NULL;
+	// Assume that if we don't get to the point where we write this with
+	//  a valid value, something went wrong and we errored out
+	ret = COMMAND_FAIL;
 
 	INFO("Initializing simulation.\n");
 	if (argc < 1)
@@ -70,7 +74,7 @@ int main(int argc, char *argv[])
 		if (input_fp == NULL)
 		{
 			INFO("Error: Couldn't open inputs %s.\n", filename);
-			exit(1);
+			goto clean_up;
 		}
 	}
 
@@ -78,7 +82,7 @@ int main(int argc, char *argv[])
 	{
 		INFO("Usage: ./sim [-i <input vectors>] <tech file> <arch description>"
 				" <neuron config> <timesteps>\n");
-		exit(1);
+		goto clean_up;
 	}
 
 	arch_init(&arch);
@@ -88,15 +92,20 @@ int main(int argc, char *argv[])
 	if (arch_fp == NULL)
 	{
 		INFO("Error: Architecture file failed to open.\n");
-		exit(1);
+		goto clean_up;
 	}
-	command_read_file(arch_fp, &net, &arch);
+	ret = command_read_file(arch_fp, &net, &arch);
+	fclose(arch_fp);
+	if (ret == COMMAND_FAIL)
+	{
+		goto clean_up;
+	}
 
 	sscanf(argv[TIMESTEPS], "%d", &timesteps);
 	if (timesteps <= 0)
 	{
 		INFO("Time-steps must be > 0 (%d)\n", timesteps);
-		exit(1);
+		goto clean_up;
 	}
 
 	// Open the probe output files for writing, for now hard code filenames
@@ -106,7 +115,7 @@ int main(int argc, char *argv[])
 	if ((probe_potential_fp == NULL) || (probe_spikes_fp == NULL))
 	{
 		INFO("Error: Couldn't open probe output files for writing.\n");
-		exit(1);
+		goto clean_up;
 	}
 
 	// TODO: add option for command line argument
@@ -116,7 +125,7 @@ int main(int argc, char *argv[])
 	if (perf_fp == NULL)
 	{
 		INFO("Error: Couldn't open perf output files for writing.\n");
-		exit(1);
+		goto clean_up;
 	}
 
 	max_neurons = 128*1024;
@@ -128,11 +137,15 @@ int main(int argc, char *argv[])
 	if (network_fp == NULL)
 	{
 		INFO("Neuron data (%s) failed to open.\n", filename);
-		exit(1);
+		goto clean_up;
 	}
 	INFO("Reading network from file.\n");
-	command_read_file(network_fp, &net, &arch);
+	ret = command_read_file(network_fp, &net, &arch);
 	fclose(network_fp);
+	if (ret == COMMAND_FAIL)
+	{
+		goto clean_up;
+	}
 
 	init_stats(&stats);
 	INFO("Creating probe and perf data files.\n");
@@ -180,18 +193,27 @@ int main(int argc, char *argv[])
 	{
 		sim_write_summary(stats_fp, &stats);
 	}
-	fclose(stats_fp);
 	INFO("Run finished.\n");
 
-	// Cleanup
+clean_up:
+	// Free any larger structures here
+	network_free(&net);
+	// Free any locally allocated memory here
 	free(input_buffer);
-
-	// Close any open files
+	// Close any open files here
 	fclose(probe_potential_fp);
 	fclose(probe_spikes_fp);
 	fclose(perf_fp);
+	fclose(stats_fp);
 
-	return 0;
+	if (ret == COMMAND_FAIL)
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 void run(struct network *net, struct architecture *arch,
