@@ -81,11 +81,11 @@ def parse_tile(tile_dict, network_attributes):
                             "must be at least one core")
         cores = tile_dict["core"]
         for core_id, core_dict in enumerate(cores):
-            parse_core(core_dict, core_id, tile_id)
+            parse_core(core_dict, tile_id)
 
     return
 
-def parse_core(core_dict, core_id, tile_id):
+def parse_core(core_dict, tile_id):
     core_name = core_dict["name"]
     
     # Work out how many instances of this tile to create
@@ -106,19 +106,19 @@ def parse_core(core_dict, core_id, tile_id):
         core_id = create_core(tile_id)
         print("Parsing struct {0}".format(core_name))
 
-        axon_inputs = [parse_axon_in(el, core_id)
+        axon_inputs = [parse_axon_in(el, tile_id, core_id)
                        for el in core_dict["axon_in"]]
-        synapse_processors = [parse_synapse(el, core_id) for
+        synapse_processors = [parse_synapse(el, tile_id, core_id) for
                               el in core_dict["synapse"]]
-        dendrite_processors = [parse_dendrite(el, core_id) for
+        dendrite_processors = [parse_dendrite(el, tile_id, core_id) for
                                el in core_dict["dendrite"]]
-        soma_processors = [parse_soma(el, core_id) for
+        soma_processors = [parse_soma(el, tile_id, core_id) for
                            el in core_dict["soma"]]
-        axon_outputs = [parse_axon_out(el, core_id) for
+        axon_outputs = [parse_axon_out(el, tile_id, core_id) for
                         el in core_dict["axon_out"]]
 
 
-def parse_synapse(element_dict, core_id):
+def parse_synapse(element_dict, tile_id, core_id):
     # TODO: parse the number of elements to create
     attributes = element_dict["attributes"]
 
@@ -131,27 +131,25 @@ def parse_synapse(element_dict, core_id):
         costs = attributes["cost"]
         synaptic_op_energy, synaptic_op_time = costs["energy"], costs["time"]
 
-    return create_synapse(model, weight_bits, synaptic_op_energy,
-                                                            synaptic_op_time)
+    return create_synapse(tile_id, core_id, model, weight_bits,
+                          synaptic_op_energy, synaptic_op_time)
 
 
-def parse_axon_out(element_dict, core_id):
-    # TODO: parse the number of elements to create
+def parse_axon_out(element_dict, tile_id, core_id):
     attributes = element_dict["attributes"]
     spike_energy, spike_time = 0.0, 0.0
     if "cost" in attributes:
         costs = attributes["cost"]
         spike_energy, spike_time = costs["energy"], costs["time"]
 
-    return create_axon_out(core_id, spike_energy, spike_time)
+    return create_axon_out(tile_id, core_id, spike_energy, spike_time)
 
 
-def parse_axon_in(element_dict, core_id):
-    # TODO: parse the number of elements to create
-    return create_axon_in(core_id)
+def parse_axon_in(element_dict, tile_id, core_id):
+    return create_axon_in(tile_id, core_id)
 
 
-def parse_soma(element_dict, core_id):
+def parse_soma(element_dict, tile_id, core_id):
     active_energy, active_time = 0.0, 0.0
     inactive_energy, inactive_time = 0.0, 0.0
 
@@ -161,17 +159,17 @@ def parse_soma(element_dict, core_id):
         active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
         inactive_energy, inactive_time = costs["active"]["energy"], costs["active"]["time"]
 
-    return create_soma(core_id, active_energy, active_time,
+    return create_soma(tile_id, core_id, active_energy, active_time,
                                             inactive_energy, inactive_time)
 
 
-def parse_dendrite(element_dict, core_id):
+def parse_dendrite(element_dict, tile_id, core_id):
     attributes = element_dict["attributes"]
     update_energy, update_time = 0.0, 0.0
     if "cost" in attributes:
         costs = attributes["cost"]
         update_energy, update_time = costs["energy"], costs["time"]
-    return create_dendrite(core_id, update_energy, update_time)
+    return create_dendrite(tile_id, core_id, update_energy, update_time)
 
 
 def get_instances(element_dict):
@@ -190,10 +188,19 @@ def get_instances(element_dict):
 Functions to add elements. These can be swapped out for python API calls in
 the future.
 """
-_tiles = []
+_tiles = 0
 _cores_in_tile = []
+_axon_inputs_in_core = [[]]
+_synapses_in_core = [[]]
+_dendrites_in_core = [[]]
+_somas_in_core = [[]]
+_axon_outputs_in_core = [[]]
+_command_list = []
+
 def create_tile(network_attributes):
-    tile_id = len(_tiles)
+    global _tiles
+    tile_id = _tiles
+    _tiles += 1
 
     assert(network_attributes["topology"] == "mesh") # TODO: for now
     #if network_attributes["topology"] == "mesh":
@@ -216,70 +223,84 @@ def create_tile(network_attributes):
     costs = "{0} {1} {2} {3} {4}".format(east_west_energy, east_west_time,
             north_south_energy, north_south_time, barrier_time)
 
-    tile = "t {0} {1} {2} {3}".format(tile_id, x, y, costs) 
-    _tiles.append(tile)
+    tile = "t {0} {1} {2}".format(x, y, costs) 
+    _command_list.append(tile)
     # Track how many cores are in this tile
     _cores_in_tile.append(0)
+    _axon_inputs_in_core.append(list())
+    _synapses_in_core.append(list())
+    _dendrites_in_core.append(list())
+    _somas_in_core.append(list())
+    _axon_outputs_in_core.append(list())
 
     return tile_id
 
 
-_cores = []
 def create_core(tile_id):
     core_id = _cores_in_tile[tile_id]
     core = "c {0}".format(tile_id) 
-    _cores.append(core)
+    _command_list.append(core)
     _cores_in_tile[tile_id] += 1
+
+    _axon_inputs_in_core[tile_id].append(0)
+    _synapses_in_core[tile_id].append(0)
+    _dendrites_in_core[tile_id].append(0)
+    _somas_in_core[tile_id].append(0)
+    _axon_outputs_in_core[tile_id].append(0)
+
     return core_id
 
 
-_synapses = []
-def create_synapse(synapse_model, bits, synaptic_op_energy, synaptic_op_time):
-    synapse_id = len(_synapses)
+def create_synapse(tile_id, core_id, synapse_model, bits, synaptic_op_energy,
+                   synaptic_op_time):
+    synapse_id = _synapses_in_core[tile_id][core_id]
+    _synapses_in_core[tile_id][core_id] += 1
 
     models = { "cuba": 0 }
     model_id = models[synapse_model]
 
-    synapse = "s {0} {1} {2} {3} {4}".format(synapse_id, model_id, bits,
-                                    synaptic_op_energy, synaptic_op_time)
-    _synapses.append(synapse)
+    synapse = "s {0} {1} {2} {3} {4} {5}".format(tile_id, core_id, model_id,
+                                                 bits, synaptic_op_energy,
+                                                 synaptic_op_time)
+    _command_list.append(synapse)
 
     return synapse_id
 
 
-_dendrites = []
-def create_dendrite(core_id, update_energy, update_time):
-    dendrite_id = len(_dendrites)
-    dendrite = "d {0} {1} {2} {3}".format(dendrite_id, core_id,
+def create_dendrite(tile_id, core_id, update_energy, update_time):
+    dendrite_id = _dendrites_in_core[tile_id][core_id]
+    _dendrites_in_core[tile_id][core_id] += 1
+    dendrite = "d {0} {1} {2} {3}".format(tile_id, core_id,
                                                 update_energy, update_time)
-    _dendrites.append(dendrite)
+    _command_list.append(dendrite)
 
     return dendrite_id
 
 _somas = []
-def create_soma(core_id, active_energy, active_time, inactive_energy,
+def create_soma(tile_id, core_id, active_energy, active_time, inactive_energy,
                                                             inactive_time):
-    soma_id = len(_somas)
-    soma = "+ {0} {1} {2} {3} {4} {5}".format(soma_id, core_id,
+    soma_id = _somas_in_core[tile_id][core_id]
+    _somas_in_core[tile_id][core_id] += 1
+    soma = "+ {0} {1} {2} {3} {4} {5}".format(tile_id, core_id,
                                                 active_energy, active_time,
                                                 inactive_energy, inactive_time)
-    _somas.append(soma)
+    _command_list.append(soma)
 
 
-_axon_inputs = []
-def create_axon_in(core_id):
-    axon_id = len(_axon_inputs)
-    axon = "i {0} {1}".format(axon_id, core_id)
-    _axon_inputs.append(axon)
+def create_axon_in(tile_id, core_id):
+    axon_id = _axon_inputs_in_core[tile_id][core_id]
+    axon = "i {0} {1}".format(tile_id, core_id)
+    _axon_inputs_in_core[tile_id][core_id] += 1
+    _command_list.append(axon)
 
     return axon_id
 
 
-_axon_outputs = []
-def create_axon_out(core_id, spike_energy, spike_time):
-    axon_id = len(_axon_outputs)
-    axon = "o {0} {1}".format(axon_id, core_id, spike_energy, spike_time)
-    _axon_outputs.append(axon)
+def create_axon_out(tile_id, core_id, spike_energy, spike_time):
+    axon_id = _axon_outputs_in_core[tile_id][core_id]
+    axon = "o {0} {1} {2} {3}".format(tile_id, core_id, spike_energy, spike_time)
+    _axon_outputs_in_core[tile_id][core_id] += 1
+    _command_list.append(axon)
 
     return axon_id
 
@@ -290,8 +311,7 @@ if __name__ == "__main__":
         arch_dict = yaml.safe_load(arch_file)
         parse(arch_dict)
 
-    arch_elements = _tiles + _cores + _axon_inputs + _synapses + _dendrites + \
-                                                 _somas + _axon_outputs
+    arch_elements = _command_list
     print(arch_elements)
 
     with open("out", "w") as list_file:

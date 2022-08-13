@@ -29,12 +29,8 @@ void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
 	}
 
 	// Process the command based on the type
-	TRACE("Parsing command type: %c\n", command_type);
 	switch (command_type)
 	{
-	case '\n':
-		// Line is a comment
-		break;
 	case 'g': // Add neuron group
 		command_parse_neuron_group(net, fields, field_count);
 		break;
@@ -205,7 +201,7 @@ int command_parse_noc(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 int command_parse_core(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 							const int field_count)
 {
-	unsigned int tile_id;
+	int tile_id;
 	int ret;
 
 	TRACE("Parsing core.\n");
@@ -214,7 +210,7 @@ int command_parse_core(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 		INFO("Error: Invalid <add core> command; not enough fields.\n");
 		exit(1);
 	}
-	ret = sscanf(fields[1], "%u", &tile_id);
+	ret = sscanf(fields[1], "%d", &tile_id);
 	if (ret < 1)
 	{
 		INFO("Error: Couldn't parse tile id (%s).\n", fields[1]);
@@ -228,8 +224,7 @@ int command_parse_neuron_group(struct network *const net,
 							const int field_count)
 {
 	double threshold, reset;
-	unsigned int neuron_count;
-	int ret;
+	int ret, neuron_count;
 
 	if (field_count < 4)
 	{
@@ -237,7 +232,7 @@ int command_parse_neuron_group(struct network *const net,
 							"not enough fields.\n");
 		exit(1);
 	}
-	ret = sscanf(fields[1], "%u", &neuron_count);
+	ret = sscanf(fields[1], "%d", &neuron_count);
 	ret += sscanf(fields[1], "%lf", &threshold);
 	ret += sscanf(fields[1], "%lf", &reset);
 	

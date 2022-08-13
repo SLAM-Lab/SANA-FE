@@ -8,36 +8,63 @@
 #include "arch.h"
 #include "sim.h"
 
-void arch_init(struct architecture *const arch);
-//static void arch_parse_neuron(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
-//static void arch_parse_synapse(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
-//static void arch_parse_axon_input(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
-//static void arch_parse_axon_output(struct architecture *arch, char fields[][ARCH_MAX_FIELD_LEN]);
-
-/*
-struct architecture arch_read_file(FILE *fp)
-{
-	// Read an architecture description and return an initialized structure
-	//  representing the neuromorphic architecture
-	struct architecture arch = arch_init(fp);
-	char line[ARCH_LINE_LEN];
-
-	while (fgets(line, ARCH_LINE_LEN, fp))
-	{
-		arch_read_line(&arch, line);
-	}
-
-	return arch;
-}
-*/
+static struct core *arch_get_core(struct architecture *const arch, const int tile_id, const int core_id);
 
 void arch_init(struct architecture *const arch)
 {
 	arch->tile_count = 0;
 }
 
+int arch_create_axon_in(struct architecture *const arch,
+						const int tile_id,
+						const int core_id)
+{
+	struct core *c;
+	struct axon_input *in;
+	int count;
+
+	c = arch_get_core(arch, tile_id, core_id);
+	count = c->axon_in_count;
+	in = &(c->axon_in[count]);
+
+	in->id = count;
+	in->energy = 0.0;
+	in->time = 0.0;
+	in->packet_size = 0;
+	// We already know a valid tile was given at this point
+	in->t = &(arch->tiles[tile_id]);
+
+	c->axon_in_count++;
+
+	return in->id;
+}
+
+int arch_create_axon_out(struct architecture *const arch,
+						const int tile_id,
+						const int core_id)
+{
+	struct core *c;
+	struct axon_output *out;
+	int count;
+
+	c = arch_get_core(arch, tile_id, core_id);
+	count = c->axon_out_count;
+	out = &(c->axon_out[count]);
+
+	out->id = count;
+	out->total_packets_sent = 0;
+	out->energy = 0.0;
+	out->time = 0.0;
+
+	TRACE("Created axon output %d (c:%d t:%d)\n", out->id, core_id,
+								tile_id);
+	c->axon_out_count++;
+
+	return out->id;
+}
+
 int arch_create_core(struct architecture *const arch,
-						const unsigned int tile_id)
+						const int tile_id)
 {
 	struct tile *t;
 	struct core *c;
@@ -66,8 +93,14 @@ int arch_create_core(struct architecture *const arch,
 	}
 	c->energy = 0.0;
 	c->time = 0.0;
-	TRACE("Core created id:%d (tile:%u).\n", c->id, t->id);
 
+	c->axon_in_count = 0;
+	c->synapse_count = 0;
+	c->dendrite_count = 0;
+	c->soma_count = 0;
+	c->axon_out_count = 0;
+
+	TRACE("Core created id:%d (tile:%u).\n", c->id, t->id);
 	return c->id;
 }
 
@@ -99,6 +132,31 @@ int arch_create_tile(struct architecture *const arch)
 
 	TRACE("Tile created id:%u.\n", t->id);
 	return t->id;
+}
+
+static struct core *arch_get_core(struct architecture *const arch,
+					const int tile_id, const int core_id)
+{
+	struct tile *t;
+	struct core *c;
+
+	if (tile_id >= arch->tile_count)
+	{
+		INFO("Error: Accessing invalid tile: %d (max:%d)\n",
+						tile_id, arch->tile_count);
+		exit(1);
+	}
+	t = &(arch->tiles[tile_id]);
+
+	if (core_id >= t->core_count)
+	{
+		INFO("Error: Accessing invalid core: %d (max:%d)\n",
+						core_id, t->core_count);
+		exit(1);
+	}
+	c = &(t->cores[core_id]);
+
+	return c;
 }
 
 /*

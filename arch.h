@@ -20,6 +20,7 @@ struct axon_input
 {
 	struct tile *t;
 	int id, packet_size;
+	double energy, time;
 };
 
 struct synapse_processor
@@ -62,7 +63,8 @@ struct core
 	struct soma_processor soma[ARCH_MAX_PROCESSORS];
 	struct axon_output axon_out[ARCH_MAX_PROCESSORS];
 	double energy, time;
-	int id;
+	int id, axon_in_count, synapse_count, dendrite_count, soma_count;
+	int axon_out_count;
 };
 
 struct tile
@@ -85,21 +87,19 @@ struct architecture
 	int tile_count, initialized;
 };
 
+/*
 struct range
 {
 	unsigned int min, max;
 };
+*/
 
-//struct architecture arch_read_file(FILE *fp);
 void arch_init(struct architecture *const arch);
-//void arch_free(struct architecture *const arch);
 int arch_create_tile(struct architecture *const arch);
 // TODO: is it neater for this to be accessed by a tile ptr, or by an ID?
 //  My internal code can do either. What is best from the Python API though?
 //  Surely the glue can do this transformation
-int arch_create_core(struct architecture *const arch, const unsigned int tile_id);
-
-//static void arch_read_router(struct architecture *arch, char *line);
-//static void arch_read_timer(struct architecture *arch, char *line);
+int arch_create_core(struct architecture *const arch, const int tile_id);
+int arch_create_axon_out(struct architecture *const arch, const int tile_id, const int core_id);
 
 #endif
