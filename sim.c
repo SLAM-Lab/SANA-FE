@@ -298,7 +298,7 @@ int sim_input_spikes(struct network *net)
 		// Reset the input ready for the next timestep
 		in->send_spike = 0;
 	}
-	TRACE("Processed %d inputs.\n", arch->max_external_inputs);
+	//TRACE("Processed %d inputs.\n", arch->max_external_inputs);
 
 	return input_spike_count;
 }
@@ -443,16 +443,17 @@ double sim_calculate_energy(const struct architecture *arch)
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{
-		struct tile *t = &(arch->tiles[i]);
+		const struct tile *t = &(arch->tiles[i]);
 		network_energy += t->energy;
 
 		for (int j = 0; j < t->core_count; j++)
 		{
-			struct core *c = &(t->cores[j]);
+			const struct core *c = &(t->cores[j]);
 
 			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
 			{
-				struct axon_output *out = &(c->axon_out[k]);
+				const struct axon_output *out =
+							&(c->axon_out[k]);
 				axon_energy += out->energy;
 			}
 		}
@@ -512,7 +513,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		// Reset tile
 		t->energy = 0.0;
 		t->time = 0.0;
-		for (int j = 0; i < t->core_count; j++)
+		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
 			// Reset core
@@ -546,16 +547,19 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{
-		struct tile *t = &(arch->tiles[i]);
+		const struct tile *t = &(arch->tiles[i]);
 
 		for (int j = 0; j < t->core_count; j++)
 		{
-			struct core *c = &(t->cores[j]);
+			const struct core *c = &(t->cores[j]);
 
 			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
 			{
-				struct axon_output *out = &(c->axon_out[i]);
-				fprintf(fp, "o[%u].energy,", out->id);
+				const struct axon_output *out =
+							&(c->axon_out[i]);
+				out = NULL;
+				fprintf(fp, "%p", (void *) out);
+				//fprintf(fp, "o[%u].energy,", out->id);
 			}
 		}
 
@@ -563,7 +567,7 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{
-		struct tile *t = &(arch->tiles[i]);
+		const struct tile *t = &(arch->tiles[i]);
 		fprintf(fp, "t[%u].energy,", t->id);
 	}	
 

@@ -5,6 +5,7 @@
 //  don't have quite as much dynamic allocation going on. If needed this can
 //  fairly easily be removed and replaced with allocating arbitrary numbers of
 //  elements off the heap e.g. in a linked list
+#define ARCH_MAX_TILES 128
 #define ARCH_MAX_CORES 16
 #define ARCH_MAX_LINKS 16
 #define ARCH_MAX_PROCESSORS 4
@@ -61,7 +62,7 @@ struct core
 	struct soma_processor soma[ARCH_MAX_PROCESSORS];
 	struct axon_output axon_out[ARCH_MAX_PROCESSORS];
 	double energy, time;
-	int core_count, id;
+	int id;
 };
 
 struct tile
@@ -79,7 +80,7 @@ struct tile
 
 struct architecture
 {
-	struct tile *tiles;
+	struct tile tiles[ARCH_MAX_TILES];
 	double time_barrier;
 	int tile_count, initialized;
 };
@@ -90,9 +91,13 @@ struct range
 };
 
 //struct architecture arch_read_file(FILE *fp);
-void arch_free(struct architecture *arch);
-int arch_create_tile(void);
-int arch_create_core(void);
+void arch_init(struct architecture *const arch);
+//void arch_free(struct architecture *const arch);
+int arch_create_tile(struct architecture *const arch);
+// TODO: is it neater for this to be accessed by a tile ptr, or by an ID?
+//  My internal code can do either. What is best from the Python API though?
+//  Surely the glue can do this transformation
+int arch_create_core(struct architecture *const arch, const unsigned int tile_id);
 
 //static void arch_read_router(struct architecture *arch, char *line);
 //static void arch_read_timer(struct architecture *arch, char *line);

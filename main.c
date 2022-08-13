@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
 	probe_spikes_fp = NULL;
 	probe_potential_fp = NULL;
 
+	INFO("Initializing simulation.\n");
 	if (argc < 1)
 	{
 		INFO("Error: No program arguments.\n");
@@ -80,6 +81,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	arch_init(&arch);
 	// Read in program args, sanity check and parse inputs
 	filename = argv[ARCH_FILENAME];
 	arch_fp = fopen(filename, "r");
@@ -94,21 +96,6 @@ int main(int argc, char *argv[])
 	if (timesteps <= 0)
 	{
 		INFO("Time-steps must be > 0 (%d)\n", timesteps);
-		exit(1);
-	}
-
-	// Input line must be long enough to encode inputs for all neurons
-	//  simultaneously
-	// TODO: remove this hack
-	max_neurons = 128*1024;
-	max_input_line = 32 + (max_neurons*32);
-
-	filename = argv[NETWORK_FILENAME];
-	// Create the network
-	network_fp = fopen(filename, "r");
-	if (network_fp == NULL)
-	{
-		INFO("Neuron data (%s) failed to open.\n", filename);
 		exit(1);
 	}
 
@@ -132,6 +119,17 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	max_neurons = 128*1024;
+	max_input_line = 32 + (max_neurons*32);
+	network_init(&net);
+	filename = argv[NETWORK_FILENAME];
+	// Create the network
+	network_fp = fopen(filename, "r");
+	if (network_fp == NULL)
+	{
+		INFO("Neuron data (%s) failed to open.\n", filename);
+		exit(1);
+	}
 	INFO("Reading network from file.\n");
 	command_read_file(network_fp, &net, &arch);
 	fclose(network_fp);
@@ -186,7 +184,6 @@ int main(int argc, char *argv[])
 	INFO("Run finished.\n");
 
 	// Cleanup
-	arch_free(&arch);
 	free(input_buffer);
 
 	// Close any open files

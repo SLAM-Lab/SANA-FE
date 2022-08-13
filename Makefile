@@ -1,6 +1,6 @@
 #CC=clang-3.8
 CC=gcc
-CFLAGS=-fopenmp --std=gnu99 -Wall -Werror -g
+CFLAGS=-fopenmp --std=gnu99 -Wall -pedantic -Werror -g
 GIT_COMMIT=$(shell ./git_status.sh)
 
 LIBS=-lrt -lm

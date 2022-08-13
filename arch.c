@@ -33,8 +33,72 @@ struct architecture arch_read_file(FILE *fp)
 
 void arch_init(struct architecture *const arch)
 {
-	arch->tiles = NULL;
 	arch->tile_count = 0;
+}
+
+int arch_create_core(struct architecture *const arch,
+						const unsigned int tile_id)
+{
+	struct tile *t;
+	struct core *c;
+	unsigned int core_id;
+	
+	if (tile_id >= arch->tile_count)
+	{
+		INFO("Error: Invalid tile id: %d.\n", tile_id);
+		exit(1);
+	}
+	t = &(arch->tiles[tile_id]);
+	core_id = t->core_count;
+	t->core_count++;
+
+	c = &(t->cores[core_id]);
+	c->id = core_id;
+
+	for (int i = 0; i < ARCH_MAX_PROCESSORS; i++)
+	{
+		c->axon_in[i].id = i;
+		c->axon_in[i].t = t;
+		c->synapse[i].id = i;
+		c->dendrite[i].id = i;
+		c->soma[i].id = i;
+		c->axon_out[i].id = i;
+	}
+	c->energy = 0.0;
+	c->time = 0.0;
+	TRACE("Core created id:%d (tile:%u).\n", c->id, t->id);
+
+	return c->id;
+}
+
+int arch_create_tile(struct architecture *const arch)
+{
+	struct tile *t;
+	int id;
+	
+	if (arch->tile_count >= ARCH_MAX_TILES)
+	{
+		INFO("Error: Only %d tiles supported.\n", ARCH_MAX_TILES);
+		exit(1);
+	}
+
+	id = arch->tile_count;
+	arch->tile_count++;
+	t = &(arch->tiles[id]);
+
+	t->id = id;
+	t->energy = 0.0;
+	t->time = 0.0;
+	t->energy_east_west_hop = 0.0;
+	t->time_east_west_hop = 0.0;
+	t->energy_north_south_hop = 0.0;
+	t->time_north_south_hop = 0.0;
+	t->x = 0;
+	t->y = 0;
+	t->core_count = 0;
+
+	TRACE("Tile created id:%u.\n", t->id);
+	return t->id;
 }
 
 /*

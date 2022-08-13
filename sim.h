@@ -3,12 +3,12 @@
 
 // DEBUG and TRACE print with source annotations, TRACE is only enabled for
 //  verbose debug printing
-#define INFO(fmt, args...) fprintf(stdout, "[%s:%d:%s()] " fmt, __FILE__, __LINE__, __func__, ##args)
+#define INFO(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
 #ifdef DEBUG
-#define TRACE(fmt, args...) fprintf(stdout, "[%s:%d:%s()] " fmt, __FILE__, __LINE__, __func__, ##args)
+#define TRACE(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
 #else
 //#define NDEBUG 1 // Turn off assert()
-#define TRACE(fmt, args...) do {} while (0)
+#define TRACE(...) do {} while (0)
 #endif
 
 #define RAND_SEED 0xbeef // For srand()

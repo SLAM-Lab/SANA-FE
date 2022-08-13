@@ -14,6 +14,7 @@ int network_create_neuron_group(struct network *net,
 	struct neuron_group *group;
 	int id;
 
+
 	id = net->neuron_group_count;
 	assert(id < NETWORK_MAX_NEURON_GROUPS);
 	net->neuron_group_count++;
@@ -110,6 +111,9 @@ void network_map_neuron_group(struct network *net, struct architecture *arch,
 
 void network_init(struct network *net)
 {
+	net->neuron_group_count = 0;
+	net->external_input_count = 0;
+
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{
 		struct neuron_group *group = &(net->groups[i]);

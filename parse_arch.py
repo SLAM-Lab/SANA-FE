@@ -80,12 +80,12 @@ def parse_tile(tile_dict, network_attributes):
             raise Exception("Error: No cores defined, "
                             "must be at least one core")
         cores = tile_dict["core"]
-        for core in cores:
-            parse_core(core, tile_id)
+        for core_id, core_dict in enumerate(cores):
+            parse_core(core_dict, core_id, tile_id)
 
     return
 
-def parse_core(core_dict, tile_id):
+def parse_core(core_dict, core_id, tile_id):
     core_name = core_dict["name"]
     
     # Work out how many instances of this tile to create
@@ -191,6 +191,7 @@ Functions to add elements. These can be swapped out for python API calls in
 the future.
 """
 _tiles = []
+_cores_in_tile = []
 def create_tile(network_attributes):
     tile_id = len(_tiles)
 
@@ -217,14 +218,18 @@ def create_tile(network_attributes):
 
     tile = "t {0} {1} {2} {3}".format(tile_id, x, y, costs) 
     _tiles.append(tile)
+    # Track how many cores are in this tile
+    _cores_in_tile.append(0)
+
     return tile_id
 
 
 _cores = []
 def create_core(tile_id):
-    core_id = len(_cores)
-    core = "c {0} {1}".format(core_id, tile_id) 
+    core_id = _cores_in_tile[tile_id]
+    core = "c {0}".format(tile_id) 
     _cores.append(core)
+    _cores_in_tile[tile_id] += 1
     return core_id
 
 

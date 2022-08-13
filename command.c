@@ -29,6 +29,7 @@ void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
 	}
 
 	// Process the command based on the type
+	TRACE("Parsing command type: %c\n", command_type);
 	switch (command_type)
 	{
 	case '\n':
@@ -43,14 +44,13 @@ void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
 	case '@': // Add network-on-chip (noc)
 		command_parse_noc(arch, fields, field_count);
 		break;
-	// TODO: fix the rest
-	/*
 	case 't':
-		command_parse_tile(arch, fields);
+		command_parse_tile(arch, fields, field_count);
 		break;
 	case 'c':
-		arch_parse_core(arch, fields);
+		command_parse_core(arch, fields, field_count);
 		break;
+	/*
 	case 's':
 		arch_parse_synapse(arch, fields);
 		break;
@@ -72,7 +72,7 @@ void command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count,
 		break;
 	default:
 		TRACE("Warning: unrecognized unit (%c) - skipping.\n",
-							block_type);
+							command_type);
 		break;
 	}
 }
@@ -82,6 +82,8 @@ void command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network
 	char *token;
 	int field_count;
 
+	assert(net != NULL);
+	assert(arch != NULL);
 	// Zero initialize all fields, each entry is variable length
 	//  The neuron fields are fixed, but this is follow by a
 	//  variable number of connections (0-MAX_FANOUT).  The synaptic
@@ -90,6 +92,7 @@ void command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network
 	{
 		fields[i][0] = '\0';
 	}
+
 
 	field_count = 0;
 	token = strtok(line, TOKEN_SEPERATORS);
@@ -124,6 +127,9 @@ void command_read_file(FILE *fp, struct network *net,
 {
 	char *line;
 	char (*fields)[MAX_FIELD_LEN];
+
+	assert(net != NULL);
+	assert(arch != NULL);
 	
 	fields = (char (*)[MAX_FIELD_LEN])
 			malloc(sizeof(char[MAX_FIELD_LEN]) * MAX_FIELDS);
@@ -154,7 +160,14 @@ void command_read_file(FILE *fp, struct network *net,
 	}
 }
 
-void command_parse_noc(struct architecture *arch, char fields[][MAX_FIELD_LEN],
+int command_parse_tile(struct architecture *const arch,
+			char fields[][MAX_FIELD_LEN], const int field_count)
+{
+	TRACE("Parsing tile.\n");
+	return arch_create_tile(arch);
+}
+
+int command_parse_noc(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 							const int field_count)
 {
 	// Here we can define the links between tiles, all the stuff like whether
@@ -186,26 +199,63 @@ void command_parse_noc(struct architecture *arch, char fields[][MAX_FIELD_LEN],
 	}
 	TRACE("Router parsed r:%u x(%d) y(%d).\n", t->id, t->x, t->y);
 	*/
+	return 0;
 }
 
-void command_parse_tile(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count)
+int command_parse_core(struct architecture *arch, char fields[][MAX_FIELD_LEN],
+							const int field_count)
 {
-	struct tile *t;
-	int id, ret;
+	unsigned int tile_id;
+	int ret;
 
-	ret = sscanf(fields[1], "%u", &id);
-	if (ret < 1)
+	TRACE("Parsing core.\n");
+	if (field_count < 2)
 	{
-		INFO("Error: Couldn't parse axon output id (%s).\n", fields[1]);
+		INFO("Error: Invalid <add core> command; not enough fields.\n");
 		exit(1);
 	}
-	assert(id == arch->tile_count);
-	t = &(arch->tiles[id]);
-	t->id = arch->tile_count;
-	arch->tile_count++;
-	t->core_count = 0;
-	TRACE("Tile created t:%u.\n", t->id);
+	ret = sscanf(fields[1], "%u", &tile_id);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse tile id (%s).\n", fields[1]);
+		exit(1);
+	}
+	return arch_create_core(arch, tile_id);
 }
+
+int command_parse_neuron_group(struct network *const net,
+						char fields[][MAX_FIELD_LEN],
+							const int field_count)
+{
+	double threshold, reset;
+	unsigned int neuron_count;
+	int ret;
+
+	if (field_count < 4)
+	{
+		INFO("Error: Invalid <add neuron group> command; "
+							"not enough fields.\n");
+		exit(1);
+	}
+	ret = sscanf(fields[1], "%u", &neuron_count);
+	ret += sscanf(fields[1], "%lf", &threshold);
+	ret += sscanf(fields[1], "%lf", &reset);
+	
+	if (ret < 3)
+	{
+		INFO("Error: Couldn't parse command\n");
+		exit(1);
+	}
+
+	return network_create_neuron_group(net, neuron_count, threshold, reset);
+}
+
+int command_parse_neuron(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count)
+{
+	return 0;
+}
+
+
 
 /*
 void arch_parse_axon_input(struct architecture *arch,

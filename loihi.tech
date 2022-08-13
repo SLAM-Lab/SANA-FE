@@ -3,14 +3,6 @@
 #  "Loihi: A Neuromorphic Manycore Processor with On-Chip Learning" (2018)
 #  M. Davies et al
 
-# Loihi chip parameters
-#max_cores 128
-#max_cores 2
-#cores_per_tile 4
-#max_compartments 1024
-#fan_out 4096
-#max_inputs 1024
-
 # Energy estimates in Joules
 energy_active_neuron_update 81.0e-12
 energy_inactive_neuron_update 52.0e-12
