@@ -58,12 +58,18 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 		ret = command_parse_axon_output(arch, fields, field_count);
 		break;
 	/*
+	// TODO: we want to define input nodes in the network, then there
+	//  will be another command to set the inputs (either rates for
+	//  rate or poisson inputs, or spikes for event based inputs)
 	case 'e':
-		ret = command_parse_external_input(net, fields);
+		ret = command_parse_extern_input_node(net, fields);
 		break;
+	case '%':
+		ret = command_parse_input_spikes(net, fields);
+		break
 	case '*':
 		// TODO: step simulation
-		ret = command_step_sim(net, arch, fields, field_count);
+		ret = command_parse_step(net, arch, fields, field_count);
 		break;
 	case 'l':  // i.e. L
 		// TODO: load set of commands from a file

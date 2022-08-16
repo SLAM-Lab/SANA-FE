@@ -19,7 +19,6 @@ int parse_dvs(FILE *fp, struct architecture *arch);
 
 enum program_args
 {
-	TECHNOLOGY_FILENAME,
 	ARCH_FILENAME,
 	NETWORK_FILENAME,
 	TIMESTEPS,
@@ -82,7 +81,7 @@ int main(int argc, char *argv[])
 
 	if (argc < PROGRAM_NARGS)
 	{
-		INFO("Usage: ./sim [-i <input vectors>] <tech file> <arch description>"
+		INFO("Usage: ./sim [-i <input vectors>] <arch description>"
 				" <neuron config> <timesteps>\n");
 		goto clean_up;
 	}
