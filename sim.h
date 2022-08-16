@@ -1,15 +1,5 @@
-#ifndef SIM_HEADER_INCLUDED
-#define SIM_HEADER_INCLUDED
-
-// DEBUG and TRACE print with source annotations, TRACE is only enabled for
-//  verbose debug printing
-#define INFO(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-#ifdef DEBUG
-#define TRACE(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-#else
-//#define NDEBUG 1 // Turn off assert()
-#define TRACE(...) do {} while (0)
-#endif
+#ifndef SIM_HEADER_INCLUDED_
+#define SIM_HEADER_INCLUDED_
 
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -37,8 +27,8 @@ void sim_update_potential(struct neuron *n);
 void sim_update_axon(struct neuron *n);
 
 void sim_reset_measurements(struct network *net, struct architecture *arch);
-double sim_calculate_energy(const struct architecture *arch);
-double sim_calculate_time(const struct architecture *arch);
+double sim_calculate_energy(const struct architecture *const arch);
+double sim_calculate_time(const struct architecture *const arch);
 long int sim_calculate_packets(const struct architecture *arch);
 
 void sim_write_summary(FILE *fp, const struct sim_stats *stats);

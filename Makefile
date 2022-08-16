@@ -1,11 +1,11 @@
 #CC=clang-3.8
 CC=gcc
-CFLAGS=-fopenmp --std=gnu99 -Wall -pedantic -Werror -g
+CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g
 GIT_COMMIT=$(shell ./git_status.sh)
 
 LIBS=-lrt -lm
-DEPS=command.h sim.h map.h network.h arch.h
-OBJ=main.o command.o sim.o map.o network.o arch.o
+DEPS=sim.h print.h command.h network.h arch.h
+OBJ=sim.o main.o command.o network.o arch.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"

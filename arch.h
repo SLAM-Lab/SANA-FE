@@ -1,5 +1,5 @@
-#ifndef ARCH_HEADER_INCLUDED
-#define ARCH_HEADER_INCLUDED
+#ifndef ARCH_HEADER_INCLUDED_
+#define ARCH_HEADER_INCLUDED_
 
 // TODO: for now hard define max numbers of hardware blocks. I did this so I
 //  don't have quite as much dynamic allocation going on. If needed this can
@@ -10,11 +10,7 @@
 #define ARCH_MAX_LINKS 16
 #define ARCH_MAX_PROCESSORS 4
 
-#define ARCH_LINE_LEN 512
-#define ARCH_MAX_VALUES 128
-#define ARCH_MAX_VALUE_DIGITS 8
-#define ARCH_MAX_FIELDS 8
-#define ARCH_MAX_FIELD_LEN ((ARCH_MAX_VALUE_DIGITS * 2) + 2) // min..max
+#define ARCH_INVALID_ID -1
 
 struct axon_input
 {
@@ -53,10 +49,9 @@ struct axon_output
 	double energy_spike_within_tile, time_spike_within_tile;
 };
 
-// TODO: separate the spiking network from the architecture stuff i.e. SNN
-//  from hardware
 struct core
 {
+	struct tile *t;
 	struct axon_input axon_in[ARCH_MAX_PROCESSORS]; 
 	struct synapse_processor synapse[ARCH_MAX_PROCESSORS];
 	struct dendrite_processor dendrite[ARCH_MAX_PROCESSORS]; 
@@ -95,11 +90,10 @@ struct range
 */
 
 void arch_init(struct architecture *const arch);
+int arch_create_noc(struct architecture *const arch, const int width, const int height);
 int arch_create_tile(struct architecture *const arch);
-// TODO: is it neater for this to be accessed by a tile ptr, or by an ID?
-//  My internal code can do either. What is best from the Python API though?
-//  Surely the glue can do this transformation
 int arch_create_core(struct architecture *const arch, struct tile *const t);
-int arch_create_axon_out(struct architecture *const arch, const int tile_id, const int core_id);
+int arch_create_axon_in(struct architecture *const arch, struct core *const c);
+int arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
 
 #endif

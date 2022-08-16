@@ -12,6 +12,7 @@
 #include <math.h>
 //#include <omp.h>
 
+#include "print.h"
 #include "sim.h"
 #include "network.h"
 #include "arch.h"
@@ -60,14 +61,17 @@ struct sim_stats sim_timestep(struct network *net,
 void sim_update(struct network *net)
 {
 	//#pragma omp parallel for
+	TRACE("Updating %d group(s).\n", net->neuron_group_count);
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{
 		struct neuron_group *group = &(net->groups[i]);
 
+		TRACE("Updating %d neuron(s) in gid:%d.\n",
+						group->neuron_count, group->id);
 		for (int j = 0; j < group->neuron_count; j++)
 		{
 			struct neuron *n = &(group->neurons[j]);
-			if (!n->neuron_used)
+			if (!n->is_init)
 			{
 				continue;
 			}
@@ -75,6 +79,11 @@ void sim_update(struct network *net)
 			if (n->update_needed)
 			{
 				sim_update_neuron(n);
+			}
+			else
+			{
+				TRACE("Skipping neuron %d.%d\n",
+							n->group->id, n->id);
 			}
 		}
 	}
@@ -104,7 +113,7 @@ int sim_route_spikes(struct network *net)
 		{
 			struct neuron *n = &(group->neurons[j]);
 
-			if (!n->neuron_used || !n->fired)
+			if (!n->is_init || !n->fired)
 			{
 				continue;
 			}
@@ -117,8 +126,8 @@ int sim_route_spikes(struct network *net)
 			
 			// First reset tracking for packets that this neuron
 			//  should sent in the timestep
-			TRACE("n:%d post_connection_count:%d\n", n->id,
-						n->post_connection_count);
+			TRACE("Routing for nid:%d post_connection_count:%d\n",
+					n->id, n->post_connection_count);
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
 				
@@ -130,6 +139,7 @@ int sim_route_spikes(struct network *net)
 				connection_ptr = &(n->connections[k]);
 				assert(connection_ptr != NULL);
 				post_neuron = connection_ptr->post_neuron;
+				assert(post_neuron != NULL);
 				post_group = post_neuron->group;
 				axon_in = post_group->axon_in;
 
@@ -215,6 +225,8 @@ int sim_route_spikes(struct network *net)
 					struct tile *tile_pre = pre_axon->t;
 					struct tile *tile_post = post_axon->t;
 
+					assert(tile_pre != NULL);
+					assert(tile_post != NULL);
 					// Calculate the energy and time for
 					//  sending spike packets
 					int x_hops, y_hops;
@@ -316,6 +328,7 @@ void sim_update_neuron(struct neuron *n)
 	sim_update_potential(n);
 	sim_update_axon(n);
 
+	TRACE("Updating neuron %d.%d.\n", n->group->id, n->id);
 	if (n->spike_count)
 	{
 		group->soma->energy +=
@@ -379,6 +392,7 @@ void sim_update_potential(struct neuron *n)
 		//  calculations
 		out->energy += out->energy_spike_within_tile;
 		out->time += out->time_spike_within_tile;
+		TRACE("out->time=%e\n", out->time);
 		TRACE("nid %d fired.\n", n->id);
 	}
 
@@ -391,18 +405,65 @@ void sim_update_axon(struct neuron *n)
 	return;
 }
 
-double sim_calculate_time(const struct architecture *arch)
+double sim_calculate_time(const struct architecture *const arch)
 {
 	// Returns the simulation time of the current timestep.
 	//  This is calculated by finding the simulation time of each core,
 	//  and simply taking the maximum of this.
-	double max_time;
+	double tile_time, max_time = 0.0;
 
-	max_time = 0.0; // s
 	for (int i = 0; i < arch->tile_count; i++)
 	{
-		//printf("%lf,", arch->timers[i]);
-		max_time = fmax(max_time, arch->tiles[i].time);
+		const struct tile *t = &(arch->tiles[i]);
+		double max_core_time = 0.0;
+		for (int j = 0; j < t->core_count; j++)
+		{
+			const struct core *c = &(t->cores[j]);
+			double unit_time, this_core_time = 0.0;
+			
+			unit_time = 0.0;
+			for (int k = 0; k < c->axon_in_count; k++)
+			{
+				unit_time = fmax(unit_time, c->axon_in[k].time);
+			}
+			this_core_time += unit_time;
+
+			unit_time = 0.0;
+			for (int k = 0; k < c->synapse_count; k++)
+			{
+				unit_time = fmax(unit_time, c->synapse[k].time);
+			}
+			this_core_time += unit_time;
+
+			unit_time = 0.0;
+			for (int k = 0; k < c->dendrite_count; k++)
+			{
+				unit_time =
+					fmax(unit_time, c->dendrite[k].time);	
+			}
+			this_core_time += unit_time;
+
+			unit_time = 0.0;
+			for (int k = 0; k < c->soma_count; k++)
+			{
+				unit_time = fmax(unit_time, c->soma[k].time);
+			}
+			this_core_time += unit_time;
+
+			unit_time = 0.0;
+			for (int k = 0; k < c->axon_out_count; k++)
+			{
+				unit_time =
+					fmax(unit_time, c->axon_out[k].time);
+				INFO("\t%e\n", unit_time);		
+			}
+			this_core_time += unit_time;
+
+			INFO("core time = %e\n", this_core_time);
+			max_core_time = fmax(max_core_time, this_core_time);
+		}
+		tile_time = max_core_time + t->time;
+		max_time = fmax(max_time, tile_time);
 	}
 
 	// Add the mesh-wide barrier sync time (assuming worst case of 32 tiles)
@@ -412,14 +473,15 @@ double sim_calculate_time(const struct architecture *arch)
 	return max_time;
 }
 
-double sim_calculate_energy(const struct architecture *arch)
+double sim_calculate_energy(const struct architecture *const arch)
 {
 	// Returns the total energy across the design, for this timestep
-	double total_energy, soma_energy, synapse_energy, axon_energy;
-	double network_energy;
+	double total_energy, dendrite_energy, soma_energy, synapse_energy;
+	double axon_energy, network_energy;
 
-	soma_energy = 0.0;
 	synapse_energy = 0.0;
+	dendrite_energy = 0.0;
+	soma_energy = 0.0;
 	axon_energy = 0.0;
 	network_energy = 0.0;
 
@@ -458,8 +520,8 @@ double sim_calculate_energy(const struct architecture *arch)
 		}
 	}
 	
-	total_energy = soma_energy + synapse_energy + axon_energy +
-								network_energy;
+	total_energy = synapse_energy + dendrite_energy + soma_energy +
+						axon_energy + network_energy;
 
 	return total_energy;
 }
@@ -555,8 +617,9 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 			for (int k = 0; k < c->axon_out_count; k++)
 			{
 				const struct axon_output *out =
-							&(c->axon_out[i]);
-				fprintf(fp, "o[%u].energy,", out->id);
+							&(c->axon_out[k]);
+				fprintf(fp, "o[%d.%d.%d].energy,",
+							t->id, c->id, out->id);
 			}
 		}
 
@@ -565,7 +628,7 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
-		fprintf(fp, "t[%u].energy,", t->id);
+		fprintf(fp, "t[%d].energy,", t->id);
 	}	
 
 	fprintf(fp, "\n");
@@ -618,7 +681,6 @@ void sim_write_summary(FILE *fp, const struct sim_stats *stats)
 {
 	// Write the simulation result to file
 	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
-	fprintf(fp, "simulated_time: %e\n", stats->total_sim_time);
 	fprintf(fp, "energy: %e\n", stats->total_energy);
 	fprintf(fp, "time: %e\n", stats->total_sim_time);
 	fprintf(fp, "total_spikes: %ld\n", stats->total_spikes);

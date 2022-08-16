@@ -5,8 +5,10 @@
 #include <string.h>
 #include <time.h>
 
+#include "print.h"
 #include "sim.h"
 #include "network.h"
+#include "arch.h"
 #include "command.h"
 
 void init_stats(struct sim_stats *stats);
@@ -201,10 +203,22 @@ clean_up:
 	// Free any locally allocated memory here
 	free(input_buffer);
 	// Close any open files here
-	fclose(probe_potential_fp);
-	fclose(probe_spikes_fp);
-	fclose(perf_fp);
-	fclose(stats_fp);
+	if (probe_potential_fp != NULL)
+	{
+		fclose(probe_potential_fp);
+	}
+	if (probe_spikes_fp != NULL)
+	{
+		fclose(probe_spikes_fp);
+	}
+	if (perf_fp != NULL)
+	{
+		fclose(perf_fp);
+	}
+	if (stats_fp != NULL)
+	{
+		fclose(stats_fp);
+	}
 
 	if (ret == COMMAND_FAIL)
 	{

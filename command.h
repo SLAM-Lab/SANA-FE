@@ -1,5 +1,5 @@
-#ifndef COMMAND_HEADER_INCLUDED
-#define COMMAND_HEADER_INCLUDED
+#ifndef COMMAND_HEADER_INCLUDED_
+#define COMMAND_HEADER_INCLUDED_
 
 // TODO: better define the max fields
 #define MAX_FIELDS (NEURON_FIELDS + (4096*CONNECTION_FIELDS))
@@ -22,5 +22,10 @@ int command_parse_neuron(struct network *const net, char fields[][MAX_FIELD_LEN]
 int command_parse_noc(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_tile(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_core(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
+int command_parse_axon_input(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
+int command_parse_axon_output(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
+
+
+int command_map_hardware(struct network *const net, struct architecture *arch, char fields[][MAX_FIELD_LEN], const int field_count);
 
 #endif

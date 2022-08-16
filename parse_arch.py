@@ -56,6 +56,7 @@ def parse_arch(arch_dict):
     for tile in tiles:
         parse_tile(tile, network_attributes)
 
+    create_noc(8, 4)
     return 
 
 
@@ -303,6 +304,11 @@ def create_axon_out(tile_id, core_id, spike_energy, spike_time):
     _command_list.append(axon)
 
     return axon_id
+
+
+def create_noc(width, height):
+    _command_list.append("@ mesh 2 {0} {1}".format(width, height)) 
+    return width*height
 
 
 if __name__ == "__main__":
