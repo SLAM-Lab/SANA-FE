@@ -82,18 +82,13 @@ struct architecture
 	int tile_count, initialized;
 };
 
-/*
-struct range
-{
-	unsigned int min, max;
-};
-*/
-
 void arch_init(struct architecture *const arch);
 int arch_create_noc(struct architecture *const arch, const int width, const int height);
 int arch_create_tile(struct architecture *const arch);
 int arch_create_core(struct architecture *const arch, struct tile *const t);
 int arch_create_axon_in(struct architecture *const arch, struct core *const c);
+int arch_create_synapse(struct architecture *const arch, struct core *const c, const double energy_spike_op, const double time_spike_op);
+int arch_create_soma(struct architecture *const arch, struct core *const c, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update);
 int arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
 
 #endif

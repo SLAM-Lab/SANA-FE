@@ -23,8 +23,9 @@ int command_parse_noc(struct architecture *const arch, char fields[][MAX_FIELD_L
 int command_parse_tile(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_core(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_axon_input(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
+int command_parse_synapse(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
+int command_parse_soma(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_axon_output(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-
 
 int command_map_hardware(struct network *const net, struct architecture *arch, char fields[][MAX_FIELD_LEN], const int field_count);
 

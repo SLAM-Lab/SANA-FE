@@ -257,12 +257,12 @@ def create_synapse(tile_id, core_id, synapse_model, bits, synaptic_op_energy,
     synapse_id = _synapses_in_core[tile_id][core_id]
     _synapses_in_core[tile_id][core_id] += 1
 
-    models = { "cuba": 0 }
-    model_id = models[synapse_model]
+    # TODO: more features
+    #models = { "cuba": 0 }
+    #model_id = models[synapse_model]
 
-    synapse = "s {0} {1} {2} {3} {4} {5}".format(tile_id, core_id, model_id,
-                                                 bits, synaptic_op_energy,
-                                                 synaptic_op_time)
+    synapse = "s {0} {1} {2} {3}".format(tile_id, core_id, synaptic_op_energy,
+                                         synaptic_op_time)
     _command_list.append(synapse)
 
     return synapse_id

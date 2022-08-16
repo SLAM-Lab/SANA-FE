@@ -193,6 +193,64 @@ int arch_create_axon_in(struct architecture *const arch, struct core *const c)
 	return in->id;
 }
 
+int arch_create_synapse(struct architecture *const arch, struct core *const c,
+					const double energy_spike_op,
+					const double time_spike_op)
+{
+	struct synapse_processor *s;
+	int count = c->synapse_count;
+
+	if (c->synapse_count >= ARCH_MAX_PROCESSORS)
+	{
+		INFO("Error: Max %d synapse processors\n", ARCH_MAX_PROCESSORS);
+		return ARCH_INVALID_ID;
+	}
+
+	s = &(c->synapse[count]);
+	s->energy = 0.0;
+	s->time = 0.0;
+
+	s->energy_spike_op = energy_spike_op;
+	s->time_spike_op = time_spike_op;
+
+	c->synapse_count++;
+	TRACE("Created synapse processor %d (c:%d.%d)\n",
+						s->id, c->t->id, c->id);
+
+	return s->id;
+}
+
+int arch_create_soma(struct architecture *const arch, struct core *const c,
+			double energy_active_neuron_update,
+			double time_active_neuron_update,
+			double energy_inactive_neuron_update,
+			double time_inactive_neuron_update)
+{
+	struct soma_processor *s;
+	int count = c->soma_count;
+
+	if (c->synapse_count >= ARCH_MAX_PROCESSORS)
+	{
+		INFO("Error: Max %d synapse processors\n", ARCH_MAX_PROCESSORS);
+		return ARCH_INVALID_ID;
+	}
+
+	s = &(c->soma[count]);
+	s->energy = 0.0;
+	s->time = 0.0;
+
+	s->energy_active_neuron_update = energy_active_neuron_update;
+	s->time_active_neuron_update = time_active_neuron_update;
+	s->energy_inactive_neuron_update = energy_inactive_neuron_update;
+	s->time_inactive_neuron_update = time_inactive_neuron_update;
+
+	c->soma_count++;
+	TRACE("Created soma processor %d (c:%d.%d)\n",
+						s->id, c->t->id, c->id);
+
+	return s->id;
+}
+
 int arch_create_axon_out(struct architecture *const arch, struct core *const c,
 			const double spike_energy, const double spike_time)
 {

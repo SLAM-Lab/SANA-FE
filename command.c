@@ -33,39 +33,41 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 	case 'n': // Add neuron
 		ret = command_parse_neuron(net, fields, field_count);
 		break;
-	case '@': // Add network-on-chip (noc)
+	case '@': // Add network-on-chip connections (noc)
 		ret = command_parse_noc(arch, fields, field_count);
 		break;
-	case 't':
+	case 't': // Add tile
 		ret = command_parse_tile(arch, fields, field_count);
 		break;
-	case 'c':
+	case 'c': // Add core
 		ret = command_parse_core(arch, fields, field_count);
 		break;
-	case '&': // Map neuron to H/W
+	case '&': // Add mapping of neuron group to H/W
 		ret = command_map_hardware(net, arch, fields, field_count);
 		break;
-	case 'i':
+	case 'i': // Add axon input processor
 		ret = command_parse_axon_input(arch, fields, field_count);
 		break;
-	case 'o':
+	case 's': // Add synapse processor
+		ret = command_parse_synapse(arch, fields, field_count);
+		break;
+	case '+': // Add soma processor
+		ret = command_parse_soma(arch, fields, field_count);
+		break;
+	case 'o': // Add axon output processor
 		ret = command_parse_axon_output(arch, fields, field_count);
 		break;
 	/*
 	case 'e':
-		net_parse_external_input(net, fields);
+		ret = command_parse_external_input(net, fields);
 		break;
-	case 's':
-		arch_parse_synapse(arch, fields);
-		break;
-
-	case '+':
-		arch_parse_soma(arch, fields);
-		break;
-
-
 	case '*':
 		// TODO: step simulation
+		ret = command_step_sim(net, arch, fields, field_count);
+		break;
+	case 'l':  // i.e. L
+		// TODO: load set of commands from a file
+		ret = command_load_commands(net, arch, fields, field_count);
 		break;
 	*/
 	default:
@@ -266,7 +268,7 @@ int command_parse_neuron_group(struct network *const net,
 	}
 	else
 	{
-		INFO("Creating neuron group with %d neurons.\n", neuron_count);
+		TRACE("Creating neuron group with %d neurons.\n", neuron_count);
 		return network_create_neuron_group(net, neuron_count, threshold,
 									reset);
 	}
@@ -301,7 +303,7 @@ int command_parse_neuron(struct network *const net,
 	}
 
 	connection_count = (field_count - NEURON_FIELDS) / CONNECTION_FIELDS;
-	INFO("Parsed neuron gid:%d nid:%d log s:%d log v:%d force:%d "
+	TRACE("Parsed neuron gid:%d nid:%d log s:%d log v:%d force:%d "
 		"connections:%d\n", neuron_group_id, neuron_id, log_spikes,
 				log_voltage, force_update, connection_count);
 
@@ -437,6 +439,56 @@ int command_parse_axon_input(struct architecture *const arch,
 	return arch_create_axon_in(arch, c);
 }
 
+int command_parse_synapse(struct architecture *const arch,
+						char fields[][MAX_FIELD_LEN],
+						const int field_count)
+{
+	struct tile *t;
+	struct core *c;
+	double op_energy, op_time;
+	int tile_id, core_id, ret;
+
+	ret = sscanf(fields[1], "%d", &tile_id);
+	ret += sscanf(fields[2], "%d", &core_id);
+	ret += sscanf(fields[3], "%lf", &op_energy);
+	ret += sscanf(fields[4], "%lf", &op_time);
+	if (ret < 4)
+	{
+		INFO("Error: Couldn't parse synapse processor.\n");
+		return COMMAND_FAIL;
+	}
+	t = &(arch->tiles[tile_id]);
+	c = &(t->cores[core_id]);
+
+	return arch_create_synapse(arch, c, op_energy, op_time);
+}
+
+int command_parse_soma(struct architecture *const arch,
+			char fields[][MAX_FIELD_LEN], const int field_count)
+{
+	struct tile *t;
+	struct core *c;
+	double active_energy, active_time, inactive_energy, inactive_time;
+	int tile_id, core_id, ret;
+
+	ret = sscanf(fields[1], "%d", &tile_id);
+	ret += sscanf(fields[2], "%d", &core_id);
+	ret += sscanf(fields[3], "%lf", &active_energy);
+	ret += sscanf(fields[4], "%lf", &active_time);
+	ret += sscanf(fields[5], "%lf", &inactive_energy);
+	ret += sscanf(fields[6], "%lf", &inactive_time);
+	if (ret < 2)
+	{
+		INFO("Error: Couldn't parse soma processor.\n");
+		return COMMAND_FAIL;
+	}
+	t = &(arch->tiles[tile_id]);
+	c = &(t->cores[core_id]);
+
+	return arch_create_soma(arch, c, active_energy, active_time,
+				inactive_energy, inactive_time);
+}
+
 int command_parse_axon_output(struct architecture *arch,
 						char fields[][MAX_FIELD_LEN],
 						const int field_count)
@@ -458,7 +510,7 @@ int command_parse_axon_output(struct architecture *arch,
 	t = &(arch->tiles[tile_id]);
 	c = &(t->cores[core_id]);
 
-	INFO("Parsed axon output: spike energy:%e time:%e\n",
+	TRACE("Parsed axon output: spike energy:%e time:%e\n",
 						spike_energy, spike_time);
 
 	return arch_create_axon_out(arch, c, spike_energy, spike_time);

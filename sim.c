@@ -455,11 +455,9 @@ double sim_calculate_time(const struct architecture *const arch)
 			{
 				unit_time =
 					fmax(unit_time, c->axon_out[k].time);
-				INFO("\t%e\n", unit_time);		
 			}
 			this_core_time += unit_time;
 
-			INFO("core time = %e\n", this_core_time);
 			max_core_time = fmax(max_core_time, this_core_time);
 		}
 		tile_time = max_core_time + t->time;
@@ -510,6 +508,20 @@ double sim_calculate_energy(const struct architecture *const arch)
 		for (int j = 0; j < t->core_count; j++)
 		{
 			const struct core *c = &(t->cores[j]);
+
+			for (int k = 0; k < c->synapse_count; k++)
+			{
+				const struct synapse_processor *s =
+							&(c->synapse[k]);
+				axon_energy += s->energy;
+			}
+
+			for (int k = 0; k < c->soma_count; k++)
+			{
+				const struct soma_processor *s =
+							&(c->soma[k]);
+				axon_energy += s->energy;
+			}
 
 			for (int k = 0; k < c->axon_out_count; k++)
 			{
