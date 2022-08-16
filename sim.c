@@ -182,21 +182,8 @@ int sim_route_spikes(struct network *net)
 				post_axon = post_group->axon_in;
 				post_group->synapse->energy +=
 					post_group->synapse->energy_spike_op;
-				// TODO: the timing model needs to be refined
-				// Below I tried to account for the synaptic op time in the pre-synaptic
-				//  neuron. This is more accurate for the small
-				//  example I was given. The post-core actually handles
-				//  synaptic updates, so originally I was accounting
-				//  for this in the post-neuron. It was underestimating
-				//  the timing (assuming too much was parallelized).
-				//  The small data I was given implies that the amount
-				//  of parallelized synaptic ops is small.
-				// TODO: this is actually account time in the
-				//  dest processor. Maybe somehow need to account
-				//  for it in the axon sending?
 				post_group->synapse->time +=
 					post_group->synapse->time_spike_op;
-				//*(post_neuron->time) += tech->time_spike_op;
 				
 				// TODO: support AER and other representations
 				//  Loihi sends a destination axon index

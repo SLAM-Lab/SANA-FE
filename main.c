@@ -46,12 +46,14 @@ int main(int argc, char *argv[])
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
 	ret = COMMAND_FAIL;
+	arch_init(&arch);
+	network_init(&net);
 
 	INFO("Initializing simulation.\n");
 	if (argc < 1)
 	{
 		INFO("Error: No program arguments.\n");
-		exit(1);
+		goto clean_up;
 	}
 	// First arg is always program name, skip
 	argc--;
@@ -86,7 +88,6 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
-	arch_init(&arch);
 	// Read in program args, sanity check and parse inputs
 	filename = argv[ARCH_FILENAME];
 	arch_fp = fopen(filename, "r");
@@ -102,10 +103,17 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
-	sscanf(argv[TIMESTEPS], "%d", &timesteps);
-	if (timesteps <= 0)
+	timesteps = 0;
+	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
+	if (ret < 1)
 	{
-		INFO("Time-steps must be > 0 (%d)\n", timesteps);
+		INFO("Error: Time-steps must be integer > 0 (%s).\n",
+							argv[TIMESTEPS]);
+		goto clean_up;
+	}
+	else if (timesteps <= 0)
+	{
+		INFO("Error: Time-steps must be > 0 (%d)\n", timesteps);
 		goto clean_up;
 	}
 
@@ -131,7 +139,6 @@ int main(int argc, char *argv[])
 
 	max_neurons = 128*1024;
 	max_input_line = 32 + (max_neurons*32);
-	network_init(&net);
 	filename = argv[NETWORK_FILENAME];
 	// Create the network
 	network_fp = fopen(filename, "r");
