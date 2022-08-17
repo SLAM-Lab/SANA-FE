@@ -39,6 +39,13 @@ enum connection_config_format
 	CONNECTION_FIELDS,
 };
 
+enum input_types
+{
+	INPUT_EVENT,
+	INPUT_RATE,
+	INPUT_POISSON,
+};
+
 struct neuron_id
 {
 	unsigned int group, neuron;
@@ -48,7 +55,7 @@ struct neuron
 {
 	struct connection *connections;
 	struct neuron_group *group;
-	
+
 	double potential, current,  bias, reset, threshold;
 	double potential_decay, potential_time_const;
 	double current_decay, current_time_const;
@@ -67,8 +74,8 @@ struct connection
 struct input
 {
 	struct connection *connections;
-	double val;
-	int send_spike, post_connection_count;
+	double val; // Either 0,1 (event) or a rate (poisson or rate based)
+	int post_connection_count, type, id;
 };
 
 struct neuron_group
@@ -109,12 +116,14 @@ struct network
 };
 
 #include "arch.h"
-void network_init(struct network *net);
+void network_init(struct network *const net);
 int network_create_neuron(struct neuron *const n, const int log_spikes, const int log_voltages, const int force_update, const int connection_count);
 int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
 int network_map_neuron_group(struct neuron_group *const group, const struct hardware_mapping map);
-void network_free(struct network *net);
-
+int net_create_inputs(struct network *const net, const int input_count, const int input_type);
+int net_create_input_node(struct input *const in, const int connection_count);
+void net_set_input(struct network *const net, const int input_id, const double val);
+void network_free(struct network *const net);
 
 #endif

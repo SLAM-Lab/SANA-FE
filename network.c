@@ -7,7 +7,7 @@
 #include "print.h"
 #include "network.h"
 
-int network_create_neuron_group(struct network *net, 
+int network_create_neuron_group(struct network *net,
 				const unsigned int neuron_count,
 				const double threshold, const double reset)
 {
@@ -74,7 +74,6 @@ int network_create_neuron(struct neuron *const n, const int log_spikes,
 						const int force_update,
 						const int connection_count)
 {
-	
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
 	const double dt = 1.0e-3; // Seconds
@@ -99,11 +98,11 @@ int network_create_neuron(struct neuron *const n, const int log_spikes,
 		-(exp(-dt / n->potential_time_const) - 1.0);
 
 	assert(n->connections == NULL);
-	n->connections = (struct connection *) malloc(sizeof(struct connection) *
-							connection_count);
+	n->connections = (struct connection *)
+			malloc(sizeof(struct connection) * connection_count);
 	if (n->connections == NULL)
 	{
-		INFO("Error: Couldn't allocate synaptic memory.\n");
+		INFO("Error: Couldn't allocate connection memory.\n");
 		return NETWORK_INVALID_NID;
 	}
 
@@ -136,10 +135,64 @@ int network_map_neuron_group(struct neuron_group *const group,
 	return 0;
 }
 
-void network_init(struct network *net)
+int net_create_inputs(struct network *const net, const int input_count,
+							const int input_type)
+{
+	assert(input_count > 0);
+	assert(net->external_inputs == NULL);
+
+	net->external_inputs =
+		(struct input *) malloc(sizeof(struct input) * input_count);
+	if (net->external_inputs == NULL)
+	{
+		INFO("Error: Couldn't allocate memory for network inputs.\n");
+		return -1;
+	}
+	net->external_input_count = input_count;
+
+	for (int i = 0; i < input_count; i++)
+	{
+		struct input *in = &(net->external_inputs[i]);
+
+		in->id = i;
+		in->connections = NULL;
+		in->val = 0.0;
+		in->post_connection_count = 0;
+		in->type = input_type;
+	}
+
+	return 0;
+}
+
+int net_create_input_node(struct input *const in, const int connection_count)
+{
+	assert(in->connections == NULL);
+	in->connections = (struct connection *)
+		malloc(sizeof(struct connection) * connection_count);
+	if (in->connections == NULL)
+	{
+		INFO("Error: Couldn't allocate connection memory.\n");
+		return NETWORK_INVALID_NID;
+	}
+
+	// Zero initialize all connections
+	in->post_connection_count = connection_count;
+	for (int i = 0; i < in->post_connection_count; i++)
+	{
+		struct connection *con = &(in->connections[i]);
+		con->pre_neuron = NULL;
+		con->post_neuron = NULL;
+		con->weight = 0.0;
+	}
+
+	return in->id;
+}
+
+void network_init(struct network *const net)
 {
 	net->neuron_group_count = 0;
 	net->external_input_count = 0;
+	net->external_inputs = NULL;
 
 	for (int i = 0; i < NETWORK_MAX_NEURON_GROUPS; i++)
 	{
@@ -150,7 +203,7 @@ void network_init(struct network *net)
 	}
 }
 
-void network_free(struct network *net)
+void network_free(struct network *const net)
 {
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{
@@ -164,6 +217,13 @@ void network_free(struct network *net)
 		// Finally free the neurons allocated in the group
 		free(net->groups[i].neurons);
 	}
+
+	for (int i = 0; i < net->external_input_count; i++)
+	{
+		struct input *in = &(net->external_inputs[i]);
+		free(in->connections);
+	}
+	free(net->external_inputs);
 
 	return;
 }
@@ -191,4 +251,11 @@ struct neuron *network_id_to_neuron_ptr(struct network *const net,
 	neuron = &(group->neurons[id.neuron]);
 
 	return neuron;
+}
+
+void net_set_input(struct network *const net, const int input_id,
+							const double val)
+{
+	struct input *in = &(net->external_inputs[input_id]);
+	in->val = val;
 }

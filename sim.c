@@ -9,15 +9,15 @@
 #include "network.h"
 #include "arch.h"
 
-struct sim_stats sim_timestep(struct network *net,
-				struct architecture *arch,
+struct sim_stats sim_timestep(struct network *const net,
+				struct architecture *const arch,
+				const int timestep,
 				FILE *probe_spike_fp,
 				FILE *probe_potential_fp,
 				FILE *perf_fp)
 {
 	struct sim_stats stats;
 	long int spikes_sent;
-
 
 	sim_reset_measurements(net, arch);
 #if 1
@@ -26,16 +26,17 @@ struct sim_stats sim_timestep(struct network *net,
 	{
 		// About 1% of neurons spiking
 		//arch->external_inputs[i].send_spike = sim_input(0.01);
-		net->external_inputs[i].send_spike = sim_input(0.01);
+		//net->external_inputs[i].val = 0.01;
 	}
-	INFO("Seeded %d inputs\n", net->external_input_count);
+	//INFO("Seeded %d inputs\n", net->external_input_count);
 #endif
-	spikes_sent = sim_input_spikes(net);
+	spikes_sent = sim_input_spikes(net, timestep);
 	INFO("Input spikes sent: %ld\n", spikes_sent);
 	spikes_sent += sim_route_spikes(net);
 	sim_update(net);
 
-	// Performance statistics for this timestep
+	// Performance statistics for this time step
+	stats.time_steps = 1;
 	stats.total_energy = sim_calculate_energy(arch);
 	stats.total_sim_time = sim_calculate_time(arch);
 	stats.total_packets_sent = sim_calculate_packets(arch);
@@ -100,7 +101,7 @@ int sim_route_spikes(struct network *net)
 		struct neuron_group *group = &(net->groups[i]);
 		struct axon_output *pre_axon = group->axon_out;
 
-		assert(pre_axon != NULL);
+		assert(pre_axon != NULL); // TODO for now require h/w mapping
 		for (int j = 0; j < group->neuron_count; j++)
 		{
 			struct neuron *n = &(group->neurons[j]);
@@ -115,14 +116,13 @@ int sim_route_spikes(struct network *net)
 			//  Only generate one spike packet per core, that the
 			//  neuron is broadcasting to
 			assert(n->post_connection_count >= 0);
-			
+
 			// First reset tracking for packets that this neuron
 			//  should sent in the timestep
 			TRACE("Routing for nid:%d post_connection_count:%d\n",
 					n->id, n->post_connection_count);
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
-				
 				struct neuron *post_neuron;
 				struct neuron_group *post_group;
 				struct connection *connection_ptr;
@@ -176,7 +176,7 @@ int sim_route_spikes(struct network *net)
 					post_group->synapse->energy_spike_op;
 				post_group->synapse->time +=
 					post_group->synapse->time_spike_op;
-				
+
 				// TODO: support AER and other representations
 				//  Loihi sends a destination axon index
 				//  So we need to store this with the neuron
@@ -199,7 +199,8 @@ int sim_route_spikes(struct network *net)
 				// TODO: I think the code below should be a
 				//  function and sim_send_spike can be inlined
 				//  again?
-				if (post_axon->packet_size > 0)
+				if ((pre_axon != NULL) && (post_axon != NULL) &&
+						(post_axon->packet_size > 0))
 				{
 					struct tile *tile_pre = pre_axon->t;
 					struct tile *tile_post = post_axon->t;
@@ -235,27 +236,46 @@ int sim_route_spikes(struct network *net)
 			}
 			n->fired = 0; // Reset the neuron for the next time step
 		}
-		
+
 	}
 	INFO("Neurons fired: %d\n", total_neurons_fired);
 
 	return total_spike_count;
 }
 
-int sim_input_spikes(struct network *net)
+int sim_input_spikes(struct network *net, const int timestep)
 {
 	int input_spike_count = 0;
 
 	// Seed all externally input spikes in the network for this timestep
 	for (int i = 0; i < net->external_input_count; i++)
 	{
+		int send_spike;
 		struct input *in = &(net->external_inputs[i]);
 
-		if ((in == NULL) || (!in->send_spike))
+		if (in == NULL)
 		{
-			continue;
+			break;
 		}
 
+		if (in->type == INPUT_EVENT)
+		{
+			send_spike = (in->val > 0.0);
+		}
+		else if (in->type == INPUT_POISSON)
+		{
+			send_spike = sim_poisson_input(in->val);
+		}
+		else // INPUT_RATE)
+		{
+			send_spike = sim_rate_input(in->val, timestep);
+		}
+
+		if (!send_spike)
+		{
+			INFO("not sending spike\n");
+			continue;
+		}
 		for (int j = 0; j < in->post_connection_count; j++)
 		{
 			// Send a spike to all neurons connected to this input
@@ -269,25 +289,31 @@ int sim_input_spikes(struct network *net)
 			assert(connection_ptr);
 
 			post_neuron = connection_ptr->post_neuron;
-			post_neuron->current += connection_ptr->weight;
-			TRACE("cid:%d Energy before: %lf\n",
+			TRACE("nid:%d Energy before: %lf\n",
 					post_neuron->id, post_neuron->current);
+			post_neuron->current += connection_ptr->weight;
+			TRACE("nid:%d Energy after: %lf\n",
+					post_neuron->id, post_neuron->current);
+
 			post_group = post_neuron->group;
 			post_group->synapse->energy +=
 					post_group->synapse->energy_spike_op;
-			TRACE("cid:%d Energy after: %lf\n",
-					post_neuron->id, post_neuron->current);
 			post_group->synapse->time +=
 				post_group->synapse->time_spike_op;
 
 			post_neuron->update_needed = 1;
-
 			post_neuron->spike_count++;
 			input_spike_count++;
 		}
 
-		// Reset the input ready for the next timestep
-		in->send_spike = 0;
+		// If inputting sets of events, then reset the spike after
+		//  it's processed i.e. inputs are one-shot. For poisson and
+		//  rate inputs, their values stay unchanged until the user
+		//  sets them again (e.g. until the next input is presented)
+		if (in->type == INPUT_EVENT)
+		{
+			in->val = 0;
+		}
 	}
 	//TRACE("Processed %d inputs.\n", arch->max_external_inputs);
 
@@ -399,7 +425,7 @@ double sim_calculate_time(const struct architecture *const arch)
 		{
 			const struct core *c = &(t->cores[j]);
 			double unit_time, this_core_time = 0.0;
-			
+
 			unit_time = 0.0;
 			for (int k = 0; k < c->axon_in_count; k++)
 			{
@@ -418,7 +444,7 @@ double sim_calculate_time(const struct architecture *const arch)
 			for (int k = 0; k < c->dendrite_count; k++)
 			{
 				unit_time =
-					fmax(unit_time, c->dendrite[k].time);	
+					fmax(unit_time, c->dendrite[k].time);
 			}
 			this_core_time += unit_time;
 
@@ -510,7 +536,7 @@ double sim_calculate_energy(const struct architecture *const arch)
 			}
 		}
 	}
-	
+
 	total_energy = synapse_energy + dendrite_energy + soma_energy +
 						axon_energy + network_energy;
 
@@ -620,7 +646,7 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 	{
 		const struct tile *t = &(arch->tiles[i]);
 		fprintf(fp, "t[%d].energy,", t->id);
-	}	
+	}
 
 	fprintf(fp, "\n");
 }
@@ -746,7 +772,6 @@ void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp,
 				potential_probe_count++;
 			}
 		}
-		
 	}
 
 	// Each timestep takes up a line in the respective csv file
@@ -762,7 +787,7 @@ void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp,
 	return;
 }
 
-int sim_input(const double firing_probability)
+int sim_poisson_input(const double firing_probability)
 {
 	// Simulate a single external input (as one neuron) for a timestep
 	//  Return 1 if the input fires, 0 otherwise
@@ -772,5 +797,31 @@ int sim_input(const double firing_probability)
 	rand_uniform = (double) rand() / RAND_MAX;
 	input_fired = (rand_uniform < firing_probability);
 
+	return input_fired;
+}
+
+int sim_rate_input(const double firing_rate, const int timestep)
+{
+	int input_fired;
+
+	INFO("rate input:%lf step:%d\n", firing_rate, timestep);
+	if (firing_rate <= 0.0)
+	{
+		// Avoid divide by zero, this should never fire
+		input_fired = 0;
+	}
+	else if (firing_rate >= 1.0)
+	{
+		input_fired = 1;
+	}
+	else
+	{
+		INFO("firing rate: %lf\n", firing_rate);
+		int timestep_interval = (int) (1.0 / firing_rate);
+		INFO("timestep interval :%d\n", timestep_interval);
+		input_fired = ((timestep % timestep_interval) == 0);
+	}
+
+	INFO("input fired:%d\n", input_fired);
 	return input_fired;
 }

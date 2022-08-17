@@ -1,0 +1,19 @@
+# inputs.net: Connected network with inputs, always spiking
+#
+# Input group - create 3 inputs
+e 3 rate
+# Neuron groups - create 3 neurons with threshold of 1.0
+g 3 1.0 0.0
+# Input nodes - connect all inputs to all neurons with weight 1.0
+> 0 0 0 1.0 0 1 1.0 0 2 1.0
+> 1 0 0 1.0 0 1 1.0 0 2 1.0
+> 2 0 0 1.0 0 1 1.0 0 2 1.0
+# Neurons - no outgoing connections, no probes
+n 0 0 0 0 1
+n 0 1 0 0 1
+n 0 2 0 0 1
+# Map to loihi arch
+# g t c i s d s o
+& 0 0 0 0 0 0 0 0
+# Set default input rates to 1.0 i.e. 100% spiking
+$ 1.0 1.0 1.0

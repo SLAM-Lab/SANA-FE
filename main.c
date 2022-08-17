@@ -88,35 +88,6 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
-	// Read in program args, sanity check and parse inputs
-	filename = argv[ARCH_FILENAME];
-	arch_fp = fopen(filename, "r");
-	if (arch_fp == NULL)
-	{
-		INFO("Error: Architecture file failed to open.\n");
-		goto clean_up;
-	}
-	ret = command_read_file(arch_fp, &net, &arch);
-	fclose(arch_fp);
-	if (ret == COMMAND_FAIL)
-	{
-		goto clean_up;
-	}
-
-	timesteps = 0;
-	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
-	if (ret < 1)
-	{
-		INFO("Error: Time-steps must be integer > 0 (%s).\n",
-							argv[TIMESTEPS]);
-		goto clean_up;
-	}
-	else if (timesteps <= 0)
-	{
-		INFO("Error: Time-steps must be > 0 (%d)\n", timesteps);
-		goto clean_up;
-	}
-
 	// Open the probe output files for writing, for now hard code filenames
 	//  TODO: add option for command line argument
 	probe_potential_fp = fopen("probe_potential.csv", "w");
@@ -137,6 +108,36 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
+	// Read in program args, sanity check and parse inputs
+	filename = argv[ARCH_FILENAME];
+	arch_fp = fopen(filename, "r");
+	if (arch_fp == NULL)
+	{
+		INFO("Error: Architecture file failed to open.\n");
+		goto clean_up;
+	}
+	ret = command_parse_file(arch_fp, &net, &arch, probe_spikes_fp,
+						probe_potential_fp, perf_fp);
+	fclose(arch_fp);
+	if (ret == COMMAND_FAIL)
+	{
+		goto clean_up;
+	}
+
+	timesteps = 0;
+	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
+	if (ret < 1)
+	{
+		INFO("Error: Time-steps must be integer > 0 (%s).\n",
+							argv[TIMESTEPS]);
+		goto clean_up;
+	}
+	else if (timesteps <= 0)
+	{
+		INFO("Error: Time-steps must be > 0 (%d)\n", timesteps);
+		goto clean_up;
+	}
+
 	max_neurons = 128*1024;
 	max_input_line = 32 + (max_neurons*32);
 	filename = argv[NETWORK_FILENAME];
@@ -144,11 +145,12 @@ int main(int argc, char *argv[])
 	network_fp = fopen(filename, "r");
 	if (network_fp == NULL)
 	{
-		INFO("Neuron data (%s) failed to open.\n", filename);
+		INFO("Network data (%s) failed to open.\n", filename);
 		goto clean_up;
 	}
 	INFO("Reading network from file.\n");
-	ret = command_read_file(network_fp, &net, &arch);
+	ret = command_parse_file(network_fp, &net, &arch, probe_spikes_fp,
+						probe_potential_fp, perf_fp);
 	fclose(network_fp);
 	if (ret == COMMAND_FAIL)
 	{
@@ -168,11 +170,9 @@ int main(int argc, char *argv[])
 			INFO("Error: Couldn't allocate memory for inputs.\n");
 			exit(1);
 		}
-		// Parse DVS128 gesture input
 		// TODO: make this parameterised so we can parse different input
 		//  formats
-		//while (fgets(input_buffer, max_input_line, input_fp))
-
+		// Parse DVS128 gesture input
 		while (parse_dvs(input_fp, &arch))
 		{
 			run(&net, &arch, &stats, probe_spikes_fp,
@@ -249,10 +249,12 @@ void run(struct network *net, struct architecture *arch,
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-	timestep_stats = sim_timestep(net, arch, probe_spikes_fp,
-					probe_potential_fp, perf_fp);
+	timestep_stats = sim_timestep(net, arch, stats->time_steps,
+					probe_spikes_fp, probe_potential_fp,
+					perf_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function
+	stats->time_steps += timestep_stats.time_steps;
 	stats->total_energy += timestep_stats.total_energy;
 	stats->total_sim_time += timestep_stats.total_sim_time;
 	stats->total_spikes += timestep_stats.total_spikes;

@@ -8,10 +8,13 @@
 #include "arch.h"
 #include "network.h"
 #include "command.h"
+#include "sim.h"
 
 int command_parse_command(char fields[][MAX_FIELD_LEN],
 				const int field_count, struct network *net,
-				struct architecture *arch)
+				struct architecture *arch,
+				FILE *probe_spikes_fp, FILE *probe_potential_fp,
+				FILE *perf_fp)
 {
 	int ret;
 	char command_type;
@@ -58,25 +61,27 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 	case 'o': // Add axon output processor
 		ret = command_parse_axon_output(arch, fields, field_count);
 		break;
-	/*
-	// TODO: we want to define input nodes in the network, then there
-	//  will be another command to set the inputs (either rates for
-	//  rate or poisson inputs, or spikes for event based inputs)
-	case 'e':
-		ret = command_parse_extern_input_node(net, fields);
+	case 'e': // Add group of external inputs
+		ret = command_parse_extern_input_group(net, fields, field_count);
 		break;
-	case '%':
-		ret = command_parse_input_spikes(net, fields);
-		break
-	case '*':
-		// TODO: step simulation
-		ret = command_parse_step(net, arch, fields, field_count);
+	case '>': // Add single input node
+		ret = command_parse_extern_input_node(net, fields, field_count);
 		break;
-	case 'l':  // i.e. L
-		// TODO: load set of commands from a file
-		ret = command_load_commands(net, arch, fields, field_count);
+	case '$': // Set inputs (either rates or individual spikes)
+		ret = command_parse_input_spikes(net, fields, field_count);
 		break;
-	*/
+	case '*': // Step simulator
+		ret = command_parse_step_sim(net, arch, fields, field_count,
+						probe_spikes_fp,
+						probe_potential_fp, perf_fp);
+		break;
+	case 'l':  // Load commands from file
+		ret = command_parse_load_commands(net, arch, fields,
+							field_count,
+							probe_spikes_fp,
+							probe_potential_fp,
+							perf_fp);
+		break;
 	default:
 		TRACE("Warning: unrecognized unit (%c) - skipping.\n",
 							command_type);
@@ -88,10 +93,12 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 }
 
 int command_parse_line(char *line, char fields[][MAX_FIELD_LEN],
-			struct network *net, struct architecture *arch)
+			struct network *net, struct architecture *arch,
+			FILE *probe_spikes_fp, FILE *probe_potential_fp,
+			FILE *perf_fp)
 {
 	char *token;
-	int field_count;
+	int field_count, last_char_idx;
 
 	assert(net != NULL);
 	assert(arch != NULL);
@@ -104,8 +111,10 @@ int command_parse_line(char *line, char fields[][MAX_FIELD_LEN],
 		fields[i][0] = '\0';
 	}
 
-
 	field_count = 0;
+	last_char_idx = strlen(line)-1;
+	assert(line[last_char_idx] == '\n');
+	line[last_char_idx] = '\0';
 	token = strtok(line, TOKEN_SEPERATORS);
 	while (token != NULL)
 	{
@@ -116,23 +125,14 @@ int command_parse_line(char *line, char fields[][MAX_FIELD_LEN],
 		field_count++;
 	}
 
-	// TODO: max_fields is specific to the thing we're decoding
-	// i.e. move this to neuron / SNN specific files
-	/*
-	if (field_count < MAX_FIELDS)
-	{
-		TRACE("nid:%d Number of fields read < %d, "
-			"ignoring line.\n", neuron_count,
-							NEURON_FIELDS);
-		continue;
-	}
-	*/
-
-	return command_parse_command(fields, field_count, net, arch);
+	return command_parse_command(fields, field_count, net, arch,
+					probe_spikes_fp, probe_potential_fp,
+								perf_fp);
 }
 
-int command_read_file(FILE *fp, struct network *net,
-						struct architecture *arch)
+int command_parse_file(FILE *fp, struct network *net,
+			struct architecture *arch, FILE *probe_spikes_fp,
+			FILE *probe_potential_fp, FILE *perf_fp)
 {
 	char *line;
 	char (*fields)[MAX_FIELD_LEN];
@@ -140,7 +140,7 @@ int command_read_file(FILE *fp, struct network *net,
 
 	assert(net != NULL);
 	assert(arch != NULL);
-	
+
 	fields = (char (*)[MAX_FIELD_LEN])
 			malloc(sizeof(char[MAX_FIELD_LEN]) * MAX_FIELDS);
 	line = (char *) malloc(sizeof(char) * MAX_CSV_LINE);
@@ -155,10 +155,13 @@ int command_read_file(FILE *fp, struct network *net,
 	{
 		while (fgets(line, MAX_CSV_LINE, fp) && (ret != COMMAND_FAIL))
 		{
-			ret = command_parse_line(line, fields, net, arch);
+			ret = command_parse_line(line, fields, net, arch,
+							probe_spikes_fp,
+							probe_potential_fp,
+							perf_fp);
 		}
 	}
-	
+
 	free(line);
 	free(fields);
 
@@ -267,7 +270,7 @@ int command_parse_neuron_group(struct network *const net,
 	ret = sscanf(fields[1], "%d", &neuron_count);
 	ret += sscanf(fields[2], "%lf", &threshold);
 	ret += sscanf(fields[3], "%lf", &reset);
-	
+
 	if (ret < 3)
 	{
 		INFO("Error: Couldn't parse command.\n");
@@ -306,7 +309,7 @@ int command_parse_neuron(struct network *const net,
 	if (ret < (NEURON_FIELDS-1))
 	{
 		INFO("Error: Couldn't parse neuron command.\n");
-		return COMMAND_FAIL;	
+		return COMMAND_FAIL;
 	}
 
 	connection_count = (field_count - NEURON_FIELDS) / CONNECTION_FIELDS;
@@ -336,7 +339,7 @@ int command_parse_neuron(struct network *const net,
 	{
 		return COMMAND_FAIL;
 	}
-	
+
 	TRACE("nid:%d creating %d connections.\n", n->id, connection_count);
 	// Parse each synapse between neurons, those neurons must already exit
 	for (int i = 0; i < connection_count; i++)
@@ -390,7 +393,7 @@ int command_map_hardware(struct network *const net, struct architecture *arch,
 	struct hardware_mapping map;
 	int neuron_group_id, tile_id, core_id, axon_in_id, synapse_id;
 	int dendrite_id, soma_id, axon_out_id, ret;
-	
+
 	TRACE("Parsing mapping.\n");
 	if (field_count < 9)
 	{
@@ -409,7 +412,7 @@ int command_map_hardware(struct network *const net, struct architecture *arch,
 	if (ret < 8)
 	{
 		INFO("Error: Couldn't parse command.\n");
-		return COMMAND_FAIL;	
+		return COMMAND_FAIL;
 	}
 	group = &(net->groups[neuron_group_id]);
 
@@ -521,4 +524,218 @@ int command_parse_axon_output(struct architecture *arch,
 						spike_energy, spike_time);
 
 	return arch_create_axon_out(arch, c, spike_energy, spike_time);
+}
+
+int command_parse_extern_input_group(struct network *const net,
+						char fields[][MAX_FIELD_LEN],
+						const int field_count)
+{
+	int input_type, input_count, ret;
+
+	TRACE("Parsing group of inputs.\n");
+	if (net->external_inputs != NULL)
+	{
+		INFO("Error: Inputs already created.\n");
+		return COMMAND_FAIL;
+	}
+
+	if (field_count < 3)
+	{
+		INFO("Error: Invalid <input group> command; (%d/3) fields.\n",
+								field_count);
+		return COMMAND_FAIL;
+	}
+
+	ret = sscanf(fields[1], "%d", &input_count);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse input count.\n");
+		return COMMAND_FAIL;
+	}
+
+	// Parse the type of inputs to use. For now just allow one type of
+	//  input. If, in future, we wanted to mix and match, I could move this
+	//  stuff to the input node
+	if (strstr("event", fields[2]))
+	{
+		input_type = INPUT_EVENT;
+	}
+	else if (strstr("poisson", fields[2]) == 0)
+	{
+		input_type = INPUT_RATE;
+	}
+	else if (strstr("rate", fields[2]) == 0)
+	{
+		input_type = INPUT_POISSON;
+	}
+	else
+	{
+		INFO("Error: Invalid neuron type (%s).\n", fields[2]);
+		return COMMAND_FAIL;
+	}
+
+ 	return net_create_inputs(net, input_count, input_type);
+}
+
+int command_parse_extern_input_node(struct network *const net,
+						char fields[][MAX_FIELD_LEN],
+						const int field_count)
+{
+	struct input *in;
+	int input_id, connection_count, ret;
+
+	TRACE("Parsing neuron.\n");
+	if (field_count < 2)
+	{
+		INFO("Error: Invalid <input> command; (%d/2) fields.\n",
+							field_count);
+		return COMMAND_FAIL;
+	}
+	ret = sscanf(fields[1], "%d", &input_id);
+	if ((ret < 1) || (input_id < 0) ||
+					(input_id >= net->external_input_count))
+	{
+		INFO("Error: Invalid input ID (%s).\n", fields[1]);
+		return COMMAND_FAIL;
+	}
+	in = &(net->external_inputs[input_id]);
+
+	connection_count = (field_count - 2) / CONNECTION_FIELDS;
+ 	ret = net_create_input_node(in, connection_count);
+	if (ret == COMMAND_FAIL)
+	{
+		return ret;
+	}
+	TRACE("Parsed input iid:%d connections:%d\n",
+					input_id, connection_count);
+	if (connection_count <= 0)
+	{
+		INFO("Error: input with no outgoing connections?");
+		return COMMAND_FAIL;
+	}
+
+	TRACE("iid:%d creating %d connections.\n", in->id, connection_count);
+	// Parse each synapse between neurons, those neurons must already exit
+	for (int i = 0; i < connection_count; i++)
+	{
+		// Parse each connection
+		struct neuron_group *dest_group;
+		struct neuron *src, *dest;
+		struct connection *con;
+		double weight;
+		int dest_gid, dest_nid;
+		const int curr_field = 2 + (i*CONNECTION_FIELDS);
+		assert(curr_field < field_count);
+		con = &(in->connections[i]);
+
+		ret = sscanf(fields[curr_field+CONNECTION_DEST_GID],
+							"%d", &dest_gid);
+		ret += sscanf(fields[curr_field+CONNECTION_DEST_NID],
+							"%d", &dest_nid);
+		TRACE("weight field:%s\n", fields[curr_field+CONNECTION_WEIGHT]);
+		ret += sscanf(fields[curr_field+CONNECTION_WEIGHT],
+							"%lf", &weight);
+		if (ret < 3)
+		{
+			INFO("Error: Couldn't parse synapse.\n");
+			return COMMAND_FAIL;
+		}
+
+		src = NULL; // Is not valid when using an input node to feed
+		dest_group = &(net->groups[dest_gid]);
+		dest = &(dest_group->neurons[dest_nid]);
+
+		con->pre_neuron = src;
+		con->post_neuron = dest;
+		con->weight = weight;
+		TRACE("\tAdded con in[%d]->%d.%d (w:%lf)\n", in->id,
+			con->post_neuron->group->id, con->post_neuron->id,
+			con->weight);
+	}
+
+	return COMMAND_OK;
+}
+
+int command_parse_input_spikes(struct network *const net,
+						char fields[][MAX_FIELD_LEN],
+						const int field_count)
+{
+	double val;
+	int ret, input_count;
+
+	input_count = field_count - 1;
+	if (input_count > net->external_input_count)
+	{
+		INFO("Error: Too many inputs given.\n");
+		return COMMAND_FAIL;
+	}
+
+	for (int i = 0; i < input_count; i++)
+	{
+		struct input *in = &(net->external_inputs[i]);
+		ret = sscanf(fields[i+1], "%lf", &val);
+		if (ret < 1)
+		{
+			INFO("Error: Couldn't parse input value (%s)\n",
+								fields[i+1]);
+			return COMMAND_FAIL;
+		}
+		else if (val < 0.0)
+		{
+			INFO("Warning: id:%d input rate < 0 (%lf)\n",
+							in->id, in->val);
+		}
+		else if (val > 1.0)
+		{
+			INFO("Warning: id:%d input rate > 1 (%lf)\n",
+							in->id, in->val);
+		}
+		net_set_input(net, i, val);
+		TRACE("Parsed input %d=%lf\n", in->id, in->val);
+	}
+
+	return COMMAND_OK;
+}
+
+int command_parse_step_sim(struct network *const net,
+						struct architecture *const arch,
+						char fields[][MAX_FIELD_LEN],
+						const int field_count,
+						FILE *probe_spikes_fp,
+						FILE *probe_potential_fp,
+						FILE *perf_fp)
+{
+	// TODO: should there be a way of getting stats out of this
+	//  the sim_stats is normally accumulated by the simulation
+	//  Probably I need to create a "simulation" struct with all of this
+	//  in, including the file pointers that are copied everywhere
+	// TODO: we need to know which timestep this is for the rate based stuff
+	//  figure this out before I can reenable the function
+	//sim_timestep(net, arch, timestep, probe_spikes_fp, probe_potential_fp,
+	//							perf_fp);
+	// TODO: disabled for now
+	return COMMAND_OK;
+}
+
+int command_parse_load_commands(struct network *const net,
+						struct architecture *const arch,
+						char fields[][MAX_FIELD_LEN],
+						const int field_count,
+						FILE *probe_spikes_fp,
+						FILE *probe_potential_fp,
+						FILE *probe_perf)
+{
+	FILE *fp;
+	int ret;
+
+	fp = fopen(fields[1], "r");
+	if (fp == NULL)
+	{
+		return COMMAND_FAIL;
+	}
+	ret = command_parse_file(fp, net, arch, probe_spikes_fp,
+						probe_potential_fp, probe_perf);
+	fclose(fp);
+
+	return ret;
 }
