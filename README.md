@@ -4,6 +4,7 @@ A framework to help with neuromorphic codesign providing performance (energy,
 time, power) modeling.
 
 # To Build
+
 This project uses a Makefile based build.  To build use:
 `make all`
 
@@ -11,6 +12,7 @@ For debug / profiling builds you can run
 `make debug`
 
 # To Run an Example
+
 `./sim loihi.arch examples/random_network.net 20`
 This simulates 20 time-steps of a small randomly connected network of neurons.
 
@@ -21,6 +23,7 @@ TODO: in future it will just take whatever files you want to give it
 TODO: add `--steps <N timesteps>` and `--output` options
 
 # Input Format
+
 For now the simulator runs a series of commands - all input is formed as
 commands. A command is a single line of input, for now given as a bunch of
 files, in future I'll add an interactive option. Each command does one specific
@@ -47,17 +50,23 @@ Right now all outputs are hard fixed, either csv or yaml files.
 `perf.csv`: Detailed statistics for each timestep, perf breakdown
 
 # Project Code
+
 This project has been written in C and Python.
 
 `main.c`
+
 `sim.c`: Simulator kernel, simulates all models and estimates performance
+
 `network.c`: (Spiking) network related functionality
+
 `arch.c`: Architecture i.e., H/W design related functionality
+
 `command.c`: Implements all commands as set of API function calls
 
 `parse_arch.py`: Parse architecture description YAML file as set of commands
 
 # Commands
+
 See `command.c` in case I didn't update this
 
 TODO: define the syntax for each one
@@ -68,6 +77,7 @@ some binding in another scripting language
 Network related
 * g: Define neuron group
 * n: Define neuron
+
 Hardware related
 * @: Add network on chip interconnect
 * t: Define tile
@@ -77,6 +87,7 @@ Hardware related
 * s: Add synapse processor
 * +: Add soma processor
 * o: Add axon output
+
 TODO - Other
 * external input node
 * Input spikes or spike rates
