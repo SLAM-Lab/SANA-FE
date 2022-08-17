@@ -1,16 +1,8 @@
 // sim.c
-// Neuromorphic simulator kernel
-//
-// Time-step based simulation, based on loop:
-// 1) seed any input spikes
-// 2) route spikes
-// 3) update neurons and check firing
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-//#include <omp.h>
 
 #include "print.h"
 #include "sim.h"

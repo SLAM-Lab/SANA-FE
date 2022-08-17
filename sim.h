@@ -1,3 +1,9 @@
+// sim.h - Neuromorphic simulator kernel
+//
+// Time-step based simulation, based on loop:
+// 1) seed any input spikes
+// 2) route spikes
+// 3) update neurons and check firing
 #ifndef SIM_HEADER_INCLUDED_
 #define SIM_HEADER_INCLUDED_
 

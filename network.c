@@ -1,6 +1,4 @@
 // network.c
-// Utility functions for creating user defined spiking networks
-//#include <math.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>

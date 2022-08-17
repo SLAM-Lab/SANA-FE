@@ -1,3 +1,12 @@
+// command.h - This is the low level interface between the user and the
+//  simulator. It is essentially a text-based way to control the API function
+//  calls that control simulation. Creating spiking neural networks, defining
+//  the hardware architecture, mapping SNNs to arch, defining input spikes and
+//  stepping through the simulation. These could be run from the command line
+//  or from a file, like a primitive script. In this repo, I found it easy
+//  to use a higher level script to generate commands and run the experiments.
+// TODO: In future, the plan is to support some bindings for other languages
+//  e.g. Python
 #ifndef COMMAND_HEADER_INCLUDED_
 #define COMMAND_HEADER_INCLUDED_
 
@@ -8,7 +17,7 @@
 #define MAX_CSV_LINE (1024 + (4096*MAX_FIELD_LEN))
 #define TOKEN_SEPERATORS " \t"
 
-enum 
+enum
 {
 	COMMAND_FAIL = -1,
 	COMMAND_OK = 0, // Anything >= 0 means successfully parsed

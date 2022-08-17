@@ -1,4 +1,4 @@
-// main.c
+// main.c - Command line interface
 // Performance simulation for neuromorphic architectures
 #include <stdio.h>
 #include <stdlib.h>

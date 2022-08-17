@@ -1,17 +1,22 @@
+// network.h - (spiking) neural network functionality. Spiking neural
+//  networks are represented as groups of neurons. A neuron group might have a
+//  bunch of neurons all with the same properties (and common hardware).
+//  Each neuron has its own state and a set of connections to other neurons.
+//  These structures have optional links to hardware for performance simulation.
+//  Here we include different neuron, synapse and dendrite models.
 #ifndef NETWORK_HEADER_INCLUDED_
 #define NETWORK_HEADER_INCLUDED_
 
 #define NETWORK_MAX_NEURON_GROUPS 1024
 #define NETWORK_INVALID_NID -1
 
-// This defines the structure of the csv format for specifying neurons in a
-//  network for this simulator.   Each row in the file represents data for a
-//  unique neuron in hardware.
+// This defines the structure of the format for specifying neurons in a
+//  network for this simulator. Each row in the file represents data for a
+//  unique neuron in the network
 //
 // The format is a number of neuron fields, followed by a variable number of
-//  synapses (each with SYNAPSE_FIELDS entries).  This means each line of the
-//  csv file is variable length depending on the number of synapses for that
-//  neuron.
+//  connections (each with CONNECTION_FIELDS entries).  This means each command
+//  is variable length depending on the number of connections for that neuron.
 enum neuron_config_format
 {
 	NEURON_COMMAND = 0,

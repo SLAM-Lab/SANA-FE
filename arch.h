@@ -1,3 +1,19 @@
+// arch.h: Create a neuromorphic design based on a set of commands
+//  In this simulator an architecture is a represented as a set of different
+//  hardware blocks. The design (chip) is a set of tiles, connected by NoC
+//  interconnect. Within each tile is one or more cores. Each core contains
+//  neuromorphic computation. The neuromorphic pipeline (which seems sufficient
+//  for any design) is a series of elements:
+/*
+axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
+
+(spikes in) (spikes to current) (process input)    (membrane update)(spikes out)
+*/
+// Note importantly that a single processor might handle a bunch of neurons
+//  i.e. it is *not* necessarily a 1-1 mapping. I will provide some different
+//  implementations of each component. It is possible to extend though with
+//  custom elements to do whatever you want
+//  element.
 #ifndef ARCH_HEADER_INCLUDED_
 #define ARCH_HEADER_INCLUDED_
 
@@ -52,9 +68,9 @@ struct axon_output
 struct core
 {
 	struct tile *t;
-	struct axon_input axon_in[ARCH_MAX_PROCESSORS]; 
+	struct axon_input axon_in[ARCH_MAX_PROCESSORS];
 	struct synapse_processor synapse[ARCH_MAX_PROCESSORS];
-	struct dendrite_processor dendrite[ARCH_MAX_PROCESSORS]; 
+	struct dendrite_processor dendrite[ARCH_MAX_PROCESSORS];
 	struct soma_processor soma[ARCH_MAX_PROCESSORS];
 	struct axon_output axon_out[ARCH_MAX_PROCESSORS];
 	double energy, time;

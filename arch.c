@@ -1,6 +1,4 @@
-// arch.c: Create a neuromorphic design based on an architecture description
-//  In this simulator and architecture description is a list of different
-//  blocks.
+// arch.c
 #include <ctype.h>
 #include <stdlib.h>
 #include <assert.h>
