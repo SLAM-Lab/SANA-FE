@@ -11,7 +11,7 @@ For debug / profiling builds you can run
 `make debug`
 
 # To Run an Example
-`./sim loihi.arch loihi.arch examples/random_network.net`
+`./sim loihi.arch examples/random_network.net 20`
 This simulates 20 time-steps of a small randomly connected network of neurons.
 
 General usage:
