@@ -319,7 +319,7 @@ int command_parse_neuron(struct network *const net,
 
 	if (neuron_group_id >= net->neuron_group_count)
 	{
-		INFO("Error: group (%d) > group count (%d)",
+		INFO("Error: Group (%d) >= group count (%d).\n",
 				neuron_group_id, net->neuron_group_count);
 		return COMMAND_FAIL;
 	}
@@ -328,7 +328,7 @@ int command_parse_neuron(struct network *const net,
 
 	if (neuron_id >= group->neuron_count)
 	{
-		INFO("Error: neuron (%d) > neuron count (%d)",
+		INFO("Error: Neuron (%d) >= group neurons (%d).\n",
 					neuron_id, group->neuron_count);
 		return COMMAND_FAIL;
 	}

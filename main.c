@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
 	struct architecture arch;
 	struct sim_stats stats;
 	char *filename, *input_buffer;
+	double average_power;
 	int timesteps, max_input_line, max_neurons, ret;
 
 	filename = NULL;
@@ -194,8 +195,15 @@ int main(int argc, char *argv[])
 
 	INFO("***** Run Summary *****\n");
 	sim_write_summary(stdout, &stats);
-	INFO("Average power consumption: %f W.\n",
-				stats.total_energy / stats.total_sim_time);
+	if (stats.total_sim_time > 0.0)
+	{
+		average_power = stats.total_energy / stats.total_sim_time;
+	}
+	else
+	{
+		average_power = 0.0;
+	}
+	INFO("Average power consumption: %f W.\n", average_power);
 	stats_fp = fopen("stats.yaml", "w");
 	if (stats_fp != NULL)
 	{

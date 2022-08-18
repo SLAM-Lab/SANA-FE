@@ -115,9 +115,9 @@ int network_create_neuron(struct neuron *const n, const int log_spikes,
 		con->weight = 0.0;
 	}
 
-	INFO("Created neuron: nid:%d force:%d thresh:%lf con:%d\n",
-					n->id, n->force_update, n->threshold,
-					n->post_connection_count);
+	INFO("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
+					n->group->id, n->id, n->force_update,
+					n->threshold, n->post_connection_count);
 	n->is_init = 1;
 	return n->id;
 }

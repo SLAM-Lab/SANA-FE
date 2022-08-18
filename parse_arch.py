@@ -19,7 +19,7 @@ def parse(arch_dict):
     return
 
 
-def parse_range(range_str): 
+def parse_range(range_str):
     range_str = range_str.replace("]", "")
     range_str = range_str.split("[")[1]
     range_min = int(range_str.split("..")[0])
@@ -74,7 +74,7 @@ def parse_tile(tile_dict, network_attributes):
         tile_name = tile_name.split("[")[0] + "[{0}]".format(instance)
         tile_id = create_tile(network_attributes)
         print("Parsing struct {0}".format(tile_name))
- 
+
         # Add any elements local to this h/w structure. They have access to any
         #  elements in the parent structures
         if "core" not in tile_dict:
@@ -88,7 +88,7 @@ def parse_tile(tile_dict, network_attributes):
 
 def parse_core(core_dict, tile_id):
     core_name = core_dict["name"]
-    
+
     # Work out how many instances of this tile to create
     if "[" in core_name:
         # Can use notation [min..max] to indicate range of elements
@@ -101,7 +101,7 @@ def parse_core(core_dict, tile_id):
         if el not in core_dict:
             raise Exception("Error: {0} not defined in core {1}".format(
                 el, core_name))
-    
+
     for instance in range(range_min, range_max+1):
         core_name = core_name.split("[")[0] + "[{0}]".format(instance)
         core_id = create_core(tile_id)
@@ -158,7 +158,7 @@ def parse_soma(element_dict, tile_id, core_id):
     if "cost" in attributes:
         costs = attributes["cost"]
         active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
-        inactive_energy, inactive_time = costs["active"]["energy"], costs["active"]["time"]
+        inactive_energy, inactive_time = costs["inactive"]["energy"], costs["inactive"]["time"]
 
     return create_soma(tile_id, core_id, active_energy, active_time,
                                             inactive_energy, inactive_time)
@@ -182,7 +182,7 @@ def get_instances(element_dict):
     else:
         instances = 1
 
-    print("Parsing element {0}".format(element_name)) 
+    print("Parsing element {0}".format(element_name))
     return instances
 
 """
@@ -215,16 +215,16 @@ def create_tile(network_attributes):
     north_south_time = 0.0
     barrier_time = 0.0
     if "cost" in network_attributes:
-        east_west_energy = network_attributes["cost"]["east_west"]["energy"] 
-        east_west_time = network_attributes["cost"]["east_west"]["time"] 
-        north_south_energy = network_attributes["cost"]["north_south"]["energy"] 
+        east_west_energy = network_attributes["cost"]["east_west"]["energy"]
+        east_west_time = network_attributes["cost"]["east_west"]["time"]
+        north_south_energy = network_attributes["cost"]["north_south"]["energy"]
         north_south_time = network_attributes["cost"]["north_south"]["time"]
         barrier_time = network_attributes["cost"]["global_barrier"]["time"]
         # TODO: this will have to be generalized for other topologies
     costs = "{0} {1} {2} {3} {4}".format(east_west_energy, east_west_time,
             north_south_energy, north_south_time, barrier_time)
 
-    tile = "t {0} {1} {2}".format(x, y, costs) 
+    tile = "t {0} {1} {2}".format(x, y, costs)
     _command_list.append(tile)
     # Track how many cores are in this tile
     _cores_in_tile.append(0)
@@ -239,7 +239,7 @@ def create_tile(network_attributes):
 
 def create_core(tile_id):
     core_id = _cores_in_tile[tile_id]
-    core = "c {0}".format(tile_id) 
+    core = "c {0}".format(tile_id)
     _command_list.append(core)
     _cores_in_tile[tile_id] += 1
 
@@ -307,7 +307,7 @@ def create_axon_out(tile_id, core_id, spike_energy, spike_time):
 
 
 def create_noc(width, height):
-    _command_list.append("@ mesh 2 {0} {1}".format(width, height)) 
+    _command_list.append("@ mesh 2 {0} {1}".format(width, height))
     return width*height
 
 
@@ -322,5 +322,5 @@ if __name__ == "__main__":
 
     with open("out", "w") as list_file:
         for line in arch_elements:
-            print(line) 
+            print(line)
             list_file.write(line + '\n')

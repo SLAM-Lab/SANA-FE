@@ -1,3 +1,4 @@
+runs/
 *.swp
 *.o
 *.yaml

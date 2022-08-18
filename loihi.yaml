@@ -20,7 +20,7 @@ architecture:
         time: 299.0e-9
 
   tile:
-    - name: loihi_tile[0..31]  
+    - name: loihi_tile[0..31]
       core:
         - name: loihi_core[0..3]
           soma:
@@ -50,12 +50,12 @@ architecture:
             attributes:
               model: leaky_integrate
               cost: # Same as soma (uses same compartment hardware)
-                energy: 81.0e-12 
+                energy: 81.0e-12
                 time: 8.4e-9
                 #operations: and, or, multiply
           axon_in:
             - name: core_in
-              # axon_in acts like input ports to the arch or subtree. 
+              # axon_in acts like input ports to the arch or subtree.
               #  For Loihi we have at most 4096 slots to route packets to
               #  different cores.
               attributes:
