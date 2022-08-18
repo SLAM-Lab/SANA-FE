@@ -14,17 +14,16 @@ For debug / profiling builds you can run
 # To Run an Example
 
 `./sim loihi.arch examples/random_network.net 20`
-This simulates 20 time-steps of a small randomly connected network of neurons.
+
+This simulates 20 time-steps of a small randomly connected spiking network.
 
 General usage:
-`./sim  <architecture description> <spiking network> <N timesteps>`
 
-TODO: in future it will just take whatever files you want to give it
-TODO: add `--steps <N timesteps>` and `--output` options
+`./sim  <architecture description> <spiking network> <N timesteps>`
 
 # Input Format
 
-For now the simulator runs a series of commands - all input is formed as
+Right now the simulator executes a series of commands, and input is formed as
 commands. A command is a single line of input, for now given as a bunch of
 files, in future I'll add an interactive option. Each command does one specific
 thing e.g. define a neuron in an SNN, or a tile in a chip, or steps the
@@ -38,47 +37,27 @@ then kick off a simulation.
 Note that `parse_arch.py` converts between a YAML description of a neuromorphic
 architecture to a set of architecture commands for the simulator.
 
-TODO: Create requirements for a venv / conda environment
-TODO: Create bindings for other languages e.g. Python
-
-# Output Format
-
-Right now all outputs are hard fixed, either csv or yaml files.
-`probe_spikes.csv`: The spikes for each time-step on probed neurons
-`probe_potential.csv`: The potentials for each time-step on probed neurons
-`stats.yaml`: High level statistics for the simulation e.g. total runtime
-`perf.csv`: Detailed statistics for each timestep, perf breakdown
-
-# Project Code
-
-This project has been written in C and Python.
-
-`main.c`
-
-`sim.c`: Simulator kernel, simulates all models and estimates performance
-
-`network.c`: (Spiking) network related functionality
-
-`arch.c`: Architecture i.e., H/W design related functionality
-
-`command.c`: Implements all commands as set of API function calls
-
-`parse_arch.py`: Parse architecture description YAML file as set of commands
+`run.py` is an example of a complete flow - creating an architecture, network
+and simulating a network for number of timesteps.
 
 # Commands
 
-See `command.c` in case I didn't update this
+See `command.c` in case I didn't update this document.
 
-TODO: define the syntax for each one
-The plan is to make this callable from a binding so the user never has
-to bother with this low level stuff. I.e. commands will become a call to
-some binding in another scripting language
+The plan is to make all of these callable from a binding. Then the user never
+has to bother with this low level stuff. In other words, commands will become an
+equivalent call to some binding from C to another language e.g. Python
 
-Network related
+Right now though my hacky way of doing it is by using a single character
+followed by a variable number of fields.
+
+## (Spiking) network related
 * g: Define neuron group
 * n: Define neuron
+* e: Add group of n inputs to the spiking network
+* \>: Define external input
 
-Hardware related
+## Hardware related
 * @: Add network on chip interconnect
 * t: Define tile
 * c: Define core
@@ -88,11 +67,59 @@ Hardware related
 * +: Add soma processor
 * o: Add axon output
 
-TODO - Other
-* external input node
-* Input spikes or spike rates
-* Step simulator
-* Load commands from a file
+## Other
+* $: input vector, either spikes or spike rates
+* \*: Step simulator
+* l: Load commands from a file
+
+
+# Output Format
+
+Right now all outputs are hard fixed, either csv or yaml files. At some point
+the csv files will be combined into one.
+
+`probe_spikes.csv` The spikes for each time-step on probed neurons
+
+`probe_potential.csv` The potentials for each time-step on probed neurons
+
+`perf.csv` Detailed statistics for each timestep, perf breakdown
+
+`stats.yaml` High level statistics for the simulation e.g. total runtime
+
+# Project Code
+
+This project has been written in C and Python. See header files for more
+description.
+
+`main.c`
+`sim.c`
+`network.c`
+`arch.c`
+`command.c`
+`parse_arch.py`
+`run.py`
+
+This C code has been written to compile under the C99 standard. The style is
+using a mix ideas from the Google guide and Linux style guide. Python code
+is for Python 3.x and should follow PEP8. At some point I'll add linting for
+both.
+
+## Software Testing / Continuous Integration
+
+The code has been run using Valgrind to verify there are no memory leaks.
+After making any changes (especially with memory allocation) make sure no leaks
+are introduced using:
+
+`valgrind ./sim loihi.arch examples/random_network.net 1`
+
+Or something similar. Also clang static code analysis has been used, and should
+ideally stay error free. In a clean build directory run: `scan-build make`. The
+version of clang on my UT machine is ancient so I'll start using codechecker
+(more recent release of the same tool) as soon as it is updated.
+
+At the moment the code has been changing a lot day to day, and is lacking any
+formal unit-tests (hey I'm originally a H/W engineer). Once things are settled
+the plan is to use the Google testing framework.
 
 # Contact
 James Boyle: james.boyle@utexas.edu

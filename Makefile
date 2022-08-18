@@ -6,7 +6,6 @@ GIT_COMMIT=$(shell ./git_status.sh)
 LIBS=-lrt -lm
 DEPS=sim.h print.h command.h network.h arch.h
 OBJ=main.o sim.o command.o network.o arch.o
-OBJDIR=obj
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
