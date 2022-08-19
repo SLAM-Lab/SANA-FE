@@ -17,8 +17,8 @@ import math
 MAX_TILES = 32
 MAX_CORES = 4
 MAX_COMPARTMENTS = 1024
-NETWORK_FILENAME = "runs/connected_layers.net"
-ARCH_FILENAME = "loihi.arch"
+NETWORK_FILENAME = "../runs/connected_layers.net"
+ARCH_FILENAME = "../loihi.arch"
 
 
 class NeuronGroup:
@@ -37,7 +37,7 @@ def run_sim(commands, timesteps):
             field_strs = [str(field) for field in command]
             print(" ".join(field_strs), file=out_file)
 
-    command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
+    command = ("../sim", ARCH_FILENAME, NETWORK_FILENAME,
                "{0}".format(timesteps))
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
@@ -74,7 +74,7 @@ def loihi_map_neuron_to_compartment(loihi_compartments):
 
 def create_layer(layer_neuron_count, groups, loihi_compartments):
     # Create a layer of neurons, which may be one or more groups
-    print("Creating layer with {0} neurons", layer_neuron_count)
+    print("Creating layer with {0} neurons".format(layer_neuron_count))
     print("Compartments free: {0}".format(loihi_compartments))
     prev_core = (None, None)  # (tile id, core id)
     layer_neurons = []
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     """
     # This experiment looks at two fully connected layers, spiking
 
-    with open("sandia_data/weights.pkl", "rb") as weights_file:
+    with open("../sandia_data/weights.pkl", "rb") as weights_file:
         weights = pickle.load(weights_file)
 
     neuron_counts = []
@@ -289,7 +289,7 @@ if __name__ == "__main__":
         spiking_energy.append(results["energy"])
 
     # Write all the simulation data to csv
-    with open("runs/sim_spiking.csv", "w") as spiking_csv:
+    with open("../runs/sim_spiking.csv", "w") as spiking_csv:
         spiking_writer = csv.DictWriter(spiking_csv,
                                         ("neuron_counts", "energy", "time"))
         spiking_writer.writeheader()
@@ -316,7 +316,7 @@ if __name__ == "__main__":
         nonspiking_times.append(results["time"] / timesteps)
         nonspiking_energy.append(results["energy"] / timesteps)
 
-    with open("runs/sim_nonspiking.csv", "w") as nonspiking_csv:
+    with open("../runs/sim_nonspiking.csv", "w") as nonspiking_csv:
         nonspiking_writer = csv.DictWriter(nonspiking_csv,
                                            ("neurons", "energy", "time"))
         nonspiking_writer.writeheader()
@@ -335,7 +335,7 @@ if __name__ == "__main__":
 
     spiking_energy = []
     spiking_times = []
-    with open("runs/sim_spiking.csv", "r") as spiking_csv:
+    with open("../runs/sim_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
             spiking_times.append(float(row["time"]))
@@ -344,13 +344,13 @@ if __name__ == "__main__":
 
     nonspiking_times = []
     nonspiking_energy = []
-    with open("runs/sim_nonspiking.csv", "r") as nonspiking_csv:
+    with open("../runs/sim_nonspiking.csv", "r") as nonspiking_csv:
         nonspiking_reader = csv.DictReader(nonspiking_csv)
         for row in nonspiking_reader:
             nonspiking_times.append(float(row["time"]))
             nonspiking_energy.append(float(row["energy"]))
 
-    with open("sandia_data/loihi_spiking.csv", "r") as spiking_csv:
+    with open("../sandia_data/loihi_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
             loihi_times_spikes.append(float(row["time"]))
@@ -358,7 +358,7 @@ if __name__ == "__main__":
 
     loihi_times_no_spikes = []
     loihi_energy_no_spikes = []
-    with open("sandia_data/loihi_nonspiking.csv", "r") as nonspiking_csv:
+    with open("../sandia_data/loihi_nonspiking.csv", "r") as nonspiking_csv:
         nonspiking_reader = csv.DictReader(nonspiking_csv)
         for row in nonspiking_reader:
             loihi_times_no_spikes.append(float(row["time"]))
@@ -373,7 +373,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured"))
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_time.png")
+    plt.savefig("../runs/connected_spiking_time.png")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, spiking_energy, "-o")
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured"))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_energy.png")
+    plt.savefig("../runs/connected_spiking_energy.png")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, nonspiking_energy, "-o")
@@ -394,7 +394,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated",))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_energy_sim_only.png")
+    plt.savefig("../runs/connected_spiking_energy_sim_only.png")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, nonspiking_times, "-o")
@@ -405,7 +405,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured"))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_not_spiking_time.png")
+    plt.savefig("../runs/connected_not_spiking_time.png")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, nonspiking_energy, "-o")
@@ -416,7 +416,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured"))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_not_spiking_energy.png")
+    plt.savefig("../runs/connected_not_spiking_energy.png")
 
     # Some additional plots to highlight trends
     plt.figure(figsize=(5.5, 5.5))
@@ -425,6 +425,6 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Measured",))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_time_loihi_only.png")
+    plt.savefig("../runs/connected_spiking_time_loihi_only.png")
 
     #plt.show()
