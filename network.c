@@ -63,8 +63,9 @@ int network_create_neuron_group(struct network *net,
 		n->is_init = 0;
 	}
 
-	INFO("Added neuron group gid:%d count:%d\n",
-						group->id, group->neuron_count);
+	INFO("Added neuron group gid:%d count:%d threshold:%lf reset:%lf\n",
+		group->id, group->neuron_count, group->default_threshold,
+		group->default_reset);
 
 	return id;
 }
@@ -86,16 +87,18 @@ int network_create_neuron(struct neuron *const n, const int log_spikes,
 		return NETWORK_INVALID_NID;
 	}
 
+	n->log_spikes = log_spikes;
+	n->log_voltage = log_voltages;
 	n->force_update = force_update;
 	n->update_needed = n->force_update;
 	n->post_connection_count = connection_count;
 	// TODO: Hard coded LIF / CUBA time constants for now
-	n->current_time_const = 1.0e-3;
-	n->potential_time_const = 2.0e-3;
+	n->current_time_const = 10.0e-3;
+	n->potential_time_const = 10.0e-3;
 	n->current_decay =
-		-(exp(-dt / n->current_time_const) - 1.0);
+		exp(-dt / n->current_time_const);
 	n->potential_decay =
-		-(exp(-dt / n->potential_time_const) - 1.0);
+		exp(-dt / n->potential_time_const);
 
 	assert(n->connections == NULL);
 	n->connections = (struct connection *)
@@ -115,7 +118,7 @@ int network_create_neuron(struct neuron *const n, const int log_spikes,
 		con->weight = 0.0;
 	}
 
-	INFO("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
+	TRACE("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
 					n->group->id, n->id, n->force_update,
 					n->threshold, n->post_connection_count);
 	n->is_init = 1;
@@ -166,6 +169,8 @@ int net_create_inputs(struct network *const net, const int input_count,
 
 int net_create_input_node(struct input *const in, const int connection_count)
 {
+	TRACE("Creating input node with %d connections.\n", connection_count);
+
 	assert(in->connections == NULL);
 	in->connections = (struct connection *)
 		malloc(sizeof(struct connection) * connection_count);

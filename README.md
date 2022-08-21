@@ -55,7 +55,7 @@ followed by a variable number of fields.
 * g: Define neuron group
 * n: Define neuron
 * e: Add group of n inputs to the spiking network
-* \>: Define external input
+* \<: Define external input
 
 ## Hardware related
 * @: Add network on chip interconnect

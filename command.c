@@ -64,7 +64,7 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 	case 'e': // Add group of external inputs
 		ret = command_parse_extern_input_group(net, fields, field_count);
 		break;
-	case '>': // Add single input node
+	case '<': // Add single input node
 		ret = command_parse_extern_input_node(net, fields, field_count);
 		break;
 	case '$': // Set inputs (either rates or individual spikes)
@@ -584,7 +584,7 @@ int command_parse_extern_input_node(struct network *const net,
 	struct input *in;
 	int input_id, connection_count, ret;
 
-	TRACE("Parsing neuron.\n");
+	TRACE("Parsing input node.\n");
 	if (field_count < 2)
 	{
 		INFO("Error: Invalid <input> command; (%d/2) fields.\n",
@@ -602,19 +602,20 @@ int command_parse_extern_input_node(struct network *const net,
 
 	connection_count = (field_count - 2) / CONNECTION_FIELDS;
  	ret = net_create_input_node(in, connection_count);
-	if (ret == COMMAND_FAIL)
+	if (ret == NETWORK_INVALID_NID)
 	{
-		return ret;
+		return COMMAND_FAIL;
 	}
 	TRACE("Parsed input iid:%d connections:%d\n",
 					input_id, connection_count);
 	if (connection_count <= 0)
 	{
-		INFO("Error: input with no outgoing connections?");
-		return COMMAND_FAIL;
+		INFO("Warning: input with no outgoing connections.\n");
+		return COMMAND_OK;
 	}
 
-	TRACE("iid:%d creating %d connections.\n", in->id, connection_count);
+	TRACE("iid:%d creating %d connections.\n",
+					in->id, in->post_connection_count);
 	// Parse each synapse between neurons, those neurons must already exit
 	for (int i = 0; i < connection_count; i++)
 	{

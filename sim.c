@@ -25,10 +25,9 @@ struct sim_stats sim_timestep(struct network *const net,
 	for (int i = 0; i < net->external_input_count; i++)
 	{
 		// About 1% of neurons spiking
-		//arch->external_inputs[i].send_spike = sim_input(0.01);
-		//net->external_inputs[i].val = 0.01;
+		net->external_inputs[i].val = 0.005;
 	}
-	//INFO("Seeded %d inputs\n", net->external_input_count);
+	INFO("Seeded %d inputs\n", net->external_input_count);
 #endif
 	spikes_sent = sim_input_spikes(net, timestep);
 	INFO("Input spikes sent: %ld\n", spikes_sent);
@@ -268,12 +267,13 @@ int sim_input_spikes(struct network *net, const int timestep)
 		}
 		else // INPUT_RATE)
 		{
-			send_spike = sim_rate_input(in->val, timestep);
+			//send_spike = sim_rate_input(in->val, timestep);
+			send_spike = sim_poisson_input(in->val);
 		}
 
 		if (!send_spike)
 		{
-			INFO("not sending spike\n");
+			TRACE("not sending spike\n");
 			continue;
 		}
 		for (int j = 0; j < in->post_connection_count; j++)
@@ -305,6 +305,9 @@ int sim_input_spikes(struct network *net, const int timestep)
 			post_neuron->spike_count++;
 			input_spike_count++;
 		}
+		TRACE("Sent spikes to %d connections\n",
+						in->post_connection_count);
+
 
 		// If inputting sets of events, then reset the spike after
 		//  it's processed i.e. inputs are one-shot. For poisson and
@@ -378,6 +381,7 @@ void sim_update_potential(struct neuron *n)
 	//  integate inputs and apply any potential leak
 	TRACE("Updating potential, before:%f\n", n->potential);
 	n->potential *= n->potential_decay;
+
 	// Add the spike potential
 	n->potential += n->current + n->bias;
 	// Clamp min potential
@@ -718,11 +722,12 @@ void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp,
 
 			if (spike_fp && n->log_spikes)
 			{
-				fprintf(spike_fp, "%d,", n->id);
+				fprintf(spike_fp, "%d.%d,", group->id, n->id);
 			}
 			if (potential_fp && n->log_voltage)
 			{
-				fprintf(potential_fp, "%d,", n->id);
+				fprintf(potential_fp, "%d.%d,",
+							group->id, n->id);
 			}
 		}
 	}
@@ -804,7 +809,7 @@ int sim_rate_input(const double firing_rate, const int timestep)
 {
 	int input_fired;
 
-	INFO("rate input:%lf step:%d\n", firing_rate, timestep);
+	TRACE("rate input:%lf step:%d\n", firing_rate, timestep);
 	if (firing_rate <= 0.0)
 	{
 		// Avoid divide by zero, this should never fire
@@ -816,12 +821,12 @@ int sim_rate_input(const double firing_rate, const int timestep)
 	}
 	else
 	{
-		INFO("firing rate: %lf\n", firing_rate);
+		TRACE("firing rate: %lf\n", firing_rate);
 		int timestep_interval = (int) (1.0 / firing_rate);
-		INFO("timestep interval :%d\n", timestep_interval);
+		TRACE("timestep interval :%d\n", timestep_interval);
 		input_fired = ((timestep % timestep_interval) == 0);
 	}
 
-	INFO("input fired:%d\n", input_fired);
+	TRACE("input fired value:%d\n", input_fired);
 	return input_fired;
 }
