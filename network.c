@@ -99,6 +99,8 @@ int network_create_neuron(struct neuron *const n, const int log_spikes,
 		exp(-dt / n->current_time_const);
 	n->potential_decay =
 		exp(-dt / n->potential_time_const);
+	n->current_decay = 1.0;
+	n->potential_decay = 1.0;
 
 	assert(n->connections == NULL);
 	n->connections = (struct connection *)

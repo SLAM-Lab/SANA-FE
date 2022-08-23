@@ -20,7 +20,7 @@ struct sim_stats sim_timestep(struct network *const net,
 	long int spikes_sent;
 
 	sim_reset_measurements(net, arch);
-#if 1
+#if 0
 	// TODO: remove this hack, just to simulate inputs
 	for (int i = 0; i < net->external_input_count; i++)
 	{
@@ -267,8 +267,8 @@ int sim_input_spikes(struct network *net, const int timestep)
 		}
 		else // INPUT_RATE)
 		{
-			//send_spike = sim_rate_input(in->val, timestep);
-			send_spike = sim_poisson_input(in->val);
+			send_spike = sim_rate_input(in->val, timestep);
+			//send_spike = sim_poisson_input(in->val);
 		}
 
 		if (!send_spike)
@@ -385,8 +385,8 @@ void sim_update_potential(struct neuron *n)
 	// Add the spike potential
 	n->potential += n->current + n->bias;
 	// Clamp min potential
-	n->potential = (n->potential < n->reset) ?
-					n->reset : n->potential;
+	//n->potential = (n->potential < n->reset) ?
+	//				n->reset : n->potential;
 
 	TRACE("Updating potential, after:%f\n", n->potential);
 
@@ -522,14 +522,14 @@ double sim_calculate_energy(const struct architecture *const arch)
 			{
 				const struct synapse_processor *s =
 							&(c->synapse[k]);
-				axon_energy += s->energy;
+				synapse_energy += s->energy;
 			}
 
 			for (int k = 0; k < c->soma_count; k++)
 			{
 				const struct soma_processor *s =
 							&(c->soma[k]);
-				axon_energy += s->energy;
+				soma_energy += s->energy;
 			}
 
 			for (int k = 0; k < c->axon_out_count; k++)
@@ -642,6 +642,23 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 				fprintf(fp, "o[%d.%d.%d].energy,",
 							t->id, c->id, out->id);
 			}
+
+			for (int k = 0; k < c->synapse_count; k++)
+			{
+				const struct synapse_processor *s =
+							&(c->synapse[k]);
+
+				fprintf(fp, "s[%d.%d.%d].energy,",
+							t->id, c->id, s->id);
+			}
+
+			for (int k = 0; k < c->soma_count; k++)
+			{
+				const struct soma_processor *s = &(c->soma[k]);
+
+				fprintf(fp, "+[%d.%d.%d].energy,",
+							t->id, c->id, s->id);
+			}
 		}
 
 	}
@@ -661,6 +678,48 @@ void sim_perf_log_timestep(FILE *fp, const struct architecture *arch)
 	//  a big csv file. Then we can post process it to pull out the parallel
 	//  time. Time doesn't make sense per neuron, only per parallel
 	//  block. Pull out energy for synapses, routers, axons and neurons
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		const struct tile *t = &(arch->tiles[i]);
+
+		for (int j = 0; j < t->core_count; j++)
+		{
+			const struct core *c = &(t->cores[j]);
+
+			for (int k = 0; k < c->axon_out_count; k++)
+			{
+				const struct axon_output *out =
+							&(c->axon_out[k]);
+				fprintf(fp, "%e,", out->energy);
+			}
+
+			for (int k = 0; k < c->synapse_count; k++)
+			{
+				const struct synapse_processor *s =
+							&(c->synapse[k]);
+
+				fprintf(fp, "%e,", s->energy);
+			}
+
+			for (int k = 0; k < c->soma_count; k++)
+			{
+				const struct soma_processor *s = &(c->soma[k]);
+
+				fprintf(fp, "%e,",
+						s->energy);
+			}
+		}
+
+	}
+
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		const struct tile *t = &(arch->tiles[i]);
+		fprintf(fp, "%e,", t->energy);
+	}
+
+	fprintf(fp, "\n");
+
 	/*
 	for (int i = 0; i < arch->max_neurons; i++)
 	{

@@ -28,13 +28,13 @@ int arch_create_noc(struct architecture *const arch, const int width,
 			t->x = x;
 			t->y = y;
 
-			north_x = t->x; 
+			north_x = t->x;
 			north_y = t->y - 1;
 			east_x = t->x + 1;
 			east_y = t->y;
 			south_x = t->x;
 			south_y = t->y + 1;
-			west_x = t->x - 1; 
+			west_x = t->x - 1;
 			west_y = t->y;
 
 			link_count = 0;
@@ -59,7 +59,7 @@ int arch_create_noc(struct architecture *const arch, const int width,
 			}
 			if (west_x >= 0)
 			{
-				int lid = (west_y * width) + west_x; 
+				int lid = (west_y * width) + west_x;
 				t->links[link_count] = &(arch->tiles[lid]);
 				link_count++;
 			}
@@ -77,11 +77,13 @@ int arch_create_noc(struct architecture *const arch, const int width,
 	return 0;
 }
 
-int arch_create_tile(struct architecture *const arch)
+int arch_create_tile(struct architecture *const arch,
+			const double energy_east_west_hop,
+			const double energy_north_south_hop)
 {
 	struct tile *t;
 	int id;
-	
+
 	if (arch->tile_count >= ARCH_MAX_TILES)
 	{
 		INFO("Error: Only %d tiles supported.\n", ARCH_MAX_TILES);
@@ -95,9 +97,12 @@ int arch_create_tile(struct architecture *const arch)
 	t->id = id;
 	t->energy = 0.0;
 	t->time = 0.0;
-	t->energy_east_west_hop = 0.0;
+
+	// TODO: generalize this so each link has an associated energy and
+	//  latency, set one level up when defining the noc mesh
+	t->energy_east_west_hop = energy_east_west_hop;
 	t->time_east_west_hop = 0.0;
-	t->energy_north_south_hop = 0.0;
+	t->energy_north_south_hop = energy_north_south_hop;
 	t->time_north_south_hop = 0.0;
 	t->x = 0;
 	t->y = 0;
@@ -119,7 +124,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 {
 	struct core *c;
 	unsigned int core_id;
-	
+
 	assert(t != NULL);
 	core_id = t->core_count;
 	t->core_count++;
@@ -271,7 +276,7 @@ int arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	// Track the tile the axon interfaces with
 	out->t = c->t;
 	c->axon_out_count++;
-	
+
 	TRACE("Created axon output %d (c:%d.%d)\n", out->id, c->t->id, c->id);
 
 	return out->id;

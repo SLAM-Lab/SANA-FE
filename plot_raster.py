@@ -3,20 +3,23 @@ import numpy as np
 import csv
 
 
-plt.figure()
+plt.figure(figsize=(5.0,5.0))
 with open("probe_spikes.csv") as spike_csv:
     spike_data = csv.DictReader(spike_csv)
     timesteps = 0
     neuron_ids = spike_data.fieldnames
     assert(len(neuron_ids) > 0)
     print("Processing {0} neurons".format(len(neuron_ids)))
-    plt.ylim((0, len(neuron_ids)))
+    #plt.ylim((0, len(neuron_ids)))
+    plt.ylim((-1, 11))
 
     for neuron_spikes in spike_data:
         # Spikes for one timestep
         values = list(neuron_spikes.values())
         values = values[0:-1]  # Trim empty field at end of the line
-        s = [int(v) for v in values]
+        #s = [int(v) for v in values[0+3600+5408+7744:]]
+        s = [int(v) for v in values[-12:]]
+
         spike_array = np.asarray(s)
         spikes = np.where(spike_array >= 1)[0]
 
