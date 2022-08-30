@@ -11,7 +11,6 @@
 
 struct sim_stats sim_timestep(struct network *const net,
 				struct architecture *const arch,
-				const int timestep,
 				FILE *probe_spike_fp,
 				FILE *probe_potential_fp,
 				FILE *perf_fp)
@@ -29,7 +28,7 @@ struct sim_stats sim_timestep(struct network *const net,
 	}
 	INFO("Seeded %d inputs\n", net->external_input_count);
 #endif
-	spikes_sent = sim_input_spikes(net, timestep);
+	spikes_sent = sim_input_spikes(net);
 	INFO("Input spikes sent: %ld\n", spikes_sent);
 	spikes_sent += sim_route_spikes(net);
 	sim_update(net);
@@ -242,7 +241,7 @@ int sim_route_spikes(struct network *net)
 	return total_spike_count;
 }
 
-int sim_input_spikes(struct network *net, const int timestep)
+int sim_input_spikes(struct network *net)
 {
 	int input_spike_count = 0;
 
@@ -259,16 +258,15 @@ int sim_input_spikes(struct network *net, const int timestep)
 
 		if (in->type == INPUT_EVENT)
 		{
-			send_spike = (in->val > 0.0);
+			send_spike = (in->spike_val > 0.0);
 		}
 		else if (in->type == INPUT_POISSON)
 		{
-			send_spike = sim_poisson_input(in->val);
+			send_spike = sim_poisson_input(in->rate);
 		}
 		else // INPUT_RATE)
 		{
-			send_spike = sim_rate_input(in->val, timestep);
-			//send_spike = sim_poisson_input(in->val);
+			send_spike = sim_rate_input(in->rate, &(in->spike_val));
 		}
 
 		if (!send_spike)
@@ -315,7 +313,7 @@ int sim_input_spikes(struct network *net, const int timestep)
 		//  sets them again (e.g. until the next input is presented)
 		if (in->type == INPUT_EVENT)
 		{
-			in->val = 0;
+			in->spike_val = 0.0;
 		}
 	}
 	//TRACE("Processed %d inputs.\n", arch->max_external_inputs);
@@ -361,7 +359,7 @@ void sim_update_synapse_cuba(struct neuron *n)
 	//  this would ha ve to be changed if we had a more complicated synapse
 	//  model
 	TRACE("Current before: %lf.\n", n->current);
-	n->current *= n->current_decay;
+	//n->current *= n->current_decay;
 	TRACE("Current after: %lf.\n", n->current);
 
 	return;
@@ -380,10 +378,13 @@ void sim_update_potential(struct neuron *n)
 	// Calculate the change in potential since the last update e.g.
 	//  integate inputs and apply any potential leak
 	TRACE("Updating potential, before:%f\n", n->potential);
-	n->potential *= n->potential_decay;
+	//n->potential *= n->potential_decay;
 
 	// Add the spike potential
 	n->potential += n->current + n->bias;
+
+	// TODO: how should current updates work when there's no decay
+	n->current = 0;
 	// Clamp min potential
 	//n->potential = (n->potential < n->reset) ?
 	//				n->reset : n->potential;
@@ -864,26 +865,23 @@ int sim_poisson_input(const double firing_probability)
 	return input_fired;
 }
 
-int sim_rate_input(const double firing_rate, const int timestep)
+int sim_rate_input(const double firing_rate, double *current)
 {
 	int input_fired;
 
-	TRACE("rate input:%lf step:%d\n", firing_rate, timestep);
-	if (firing_rate <= 0.0)
+	// Note: rate-based input (without randomization) is equivalent to a
+	//  neuron with a fixed bias.
+	TRACE("rate input:%lf\n", firing_rate);
+
+	*current += firing_rate;
+	if (*current >= 1.0)
 	{
-		// Avoid divide by zero, this should never fire
-		input_fired = 0;
-	}
-	else if (firing_rate >= 1.0)
-	{
+		*current = 0.0;
 		input_fired = 1;
 	}
 	else
 	{
-		TRACE("firing rate: %lf\n", firing_rate);
-		int timestep_interval = (int) (1.0 / firing_rate);
-		TRACE("timestep interval :%d\n", timestep_interval);
-		input_fired = ((timestep % timestep_interval) == 0);
+		input_fired = 0;
 	}
 
 	TRACE("input fired value:%d\n", input_fired);

@@ -20,10 +20,10 @@ struct sim_stats
 #include "arch.h"
 #include "network.h"
 #include "stdio.h"
-struct sim_stats sim_timestep(struct network *const net, struct architecture *const arch, const int timestep, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
+struct sim_stats sim_timestep(struct network *const net, struct architecture *const arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
 int sim_route_spikes(struct network *net);
-int sim_input_spikes(struct network *net, const int timestep);
+int sim_input_spikes(struct network *net);
 
 void sim_update(struct network *net);
 void sim_update_neuron(struct neuron *n);
@@ -43,5 +43,5 @@ void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp, const struct net
 void sim_perf_write_header(FILE *perf_fp, const struct architecture *arch);
 void sim_perf_log_timestep(FILE *fp, const struct architecture *arch);
 int sim_poisson_input(const double firing_probability);
-int sim_rate_input(const double firing_rate, const int timestep);
+int sim_rate_input(const double firing_rate, double *spike_val);
 #endif

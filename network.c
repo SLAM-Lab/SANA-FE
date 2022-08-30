@@ -161,7 +161,7 @@ int net_create_inputs(struct network *const net, const int input_count,
 
 		in->id = i;
 		in->connections = NULL;
-		in->val = 0.0;
+		in->spike_val = 0.0;
 		in->post_connection_count = 0;
 		in->type = input_type;
 	}
@@ -261,8 +261,8 @@ struct neuron *network_id_to_neuron_ptr(struct network *const net,
 }
 
 void net_set_input(struct network *const net, const int input_id,
-							const double val)
+							const double rate)
 {
 	struct input *in = &(net->external_inputs[input_id]);
-	in->val = val;
+	in->rate = rate;
 }

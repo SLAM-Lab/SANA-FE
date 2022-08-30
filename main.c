@@ -257,9 +257,8 @@ void run(struct network *net, struct architecture *arch,
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-	timestep_stats = sim_timestep(net, arch, stats->time_steps,
-					probe_spikes_fp, probe_potential_fp,
-					perf_fp);
+	timestep_stats = sim_timestep(net, arch, probe_spikes_fp,
+					probe_potential_fp, perf_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function
 	stats->time_steps += timestep_stats.time_steps;

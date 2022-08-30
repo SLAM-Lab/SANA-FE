@@ -74,7 +74,7 @@ struct connection
 struct input
 {
 	struct connection *connections;
-	double val; // Either 0,1 (event) or a rate (poisson or rate based)
+	double rate, spike_val; // rate only applies to poisson and rate-based
 	int post_connection_count, type, id;
 };
 
@@ -123,7 +123,7 @@ struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct 
 int network_map_neuron_group(struct neuron_group *const group, const struct hardware_mapping map);
 int net_create_inputs(struct network *const net, const int input_count, const int input_type);
 int net_create_input_node(struct input *const in, const int connection_count);
-void net_set_input(struct network *const net, const int input_id, const double val);
+void net_set_input(struct network *const net, const int input_id, const double rate);
 void network_free(struct network *const net);
 
 #endif
