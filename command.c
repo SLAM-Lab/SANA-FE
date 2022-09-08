@@ -220,6 +220,7 @@ int command_parse_tile(struct architecture *const arch,
 			char fields[][MAX_FIELD_LEN], const int field_count)
 {
 	double energy_east_west_hop, energy_north_south_hop;
+	double time_east_west_hop, time_north_south_hop;
 	int ret;
 
 	TRACE("Parsing tile.\n");
@@ -231,7 +232,13 @@ int command_parse_tile(struct architecture *const arch,
 		return COMMAND_FAIL;
 	}
 
-	// TODO: time
+	ret = sscanf(fields[4], "%lf", &time_north_south_hop);
+
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse time (%s).\n", fields[4]);
+		return COMMAND_FAIL;
+	}
 
 	ret = sscanf(fields[5], "%lf", &energy_north_south_hop);
 	if (ret < 1)
@@ -240,10 +247,17 @@ int command_parse_tile(struct architecture *const arch,
 		return COMMAND_FAIL;
 	}
 
-	// TODO: time
+	ret = sscanf(fields[6], "%lf", &time_east_west_hop);
 
-	return arch_create_tile(arch, energy_east_west_hop,
-							energy_north_south_hop);
+	if (ret < 1)
+	{
+		INFO("Error: Couldn't parse energy (%s).\n", fields[6]);
+		return COMMAND_FAIL;
+	}
+
+	return arch_create_tile(arch,
+				energy_east_west_hop, energy_north_south_hop,
+				time_east_west_hop, time_north_south_hop);
 }
 
 int command_parse_core(struct architecture *arch,

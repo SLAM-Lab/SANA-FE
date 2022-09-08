@@ -100,7 +100,7 @@ struct architecture
 
 void arch_init(struct architecture *const arch);
 int arch_create_noc(struct architecture *const arch, const int width, const int height);
-int arch_create_tile(struct architecture *const arch, const double energy_east_west_hop, const double energy_north_south_hop);
+int arch_create_tile(struct architecture *const arch, const double energy_east_west_hop, const double energy_north_south_hop, const double time_east_west_hop, const double time_north_south_hop);
 int arch_create_core(struct architecture *const arch, struct tile *const t);
 int arch_create_axon_in(struct architecture *const arch, struct core *const c);
 int arch_create_synapse(struct architecture *const arch, struct core *const c, const double energy_spike_op, const double time_spike_op);

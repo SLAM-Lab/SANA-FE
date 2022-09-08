@@ -15,6 +15,7 @@ struct sim_stats
 	int time_steps;
 	long int total_spikes, total_packets_sent;
 	double total_energy, total_sim_time, wall_time;
+	double network_time;
 };
 
 #include "arch.h"
@@ -34,7 +35,7 @@ void sim_update_axon(struct neuron *n);
 
 void sim_reset_measurements(struct network *net, struct architecture *arch);
 double sim_calculate_energy(const struct architecture *const arch);
-double sim_calculate_time(const struct architecture *const arch);
+double sim_calculate_time(const struct architecture *const arch, double *network_time);
 long int sim_calculate_packets(const struct architecture *arch);
 
 void sim_write_summary(FILE *fp, const struct sim_stats *stats);

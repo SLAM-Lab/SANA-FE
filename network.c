@@ -44,6 +44,7 @@ int network_create_neuron_group(struct network *net,
 
 		n->fired = 0;
 		n->potential = 0.0;
+		n->charge = 0.0;
 		n->current = 0.0;
 		n->bias = 0.0;
 		n->threshold = group->default_threshold;

@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 
-
 plt.figure(figsize=(5.0,5.0))
 with open("probe_spikes.csv") as spike_csv:
     spike_data = csv.DictReader(spike_csv)

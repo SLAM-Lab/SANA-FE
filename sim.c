@@ -36,7 +36,7 @@ struct sim_stats sim_timestep(struct network *const net,
 	// Performance statistics for this time step
 	stats.time_steps = 1;
 	stats.total_energy = sim_calculate_energy(arch);
-	stats.total_sim_time = sim_calculate_time(arch);
+	stats.total_sim_time = sim_calculate_time(arch, &(stats.network_time));
 	stats.total_packets_sent = sim_calculate_packets(arch);
 	stats.total_spikes = spikes_sent;
 
@@ -161,7 +161,7 @@ int sim_route_spikes(struct network *net)
 
 
 				post_neuron->update_needed = 1;
-				post_neuron->current += connection_ptr->weight;
+				post_neuron->charge += connection_ptr->weight;
 				post_neuron->spike_count++;
 				total_spike_count++;
 
@@ -218,11 +218,15 @@ int sim_route_spikes(struct network *net)
 						tile_pre->energy_east_west_hop;
 					tile_pre->time += x_hops *
 						tile_pre->time_east_west_hop;
+					pre_axon->time += x_hops * tile_pre->time_east_west_hop;
+					//printf("xhops:%d 1 hop:%e total:%e\n", x_hops, tile_pre->time_east_west_hop, x_hops * tile_pre->time_east_west_hop);
+
 					// N-S hops
 					tile_pre->energy += y_hops *
 						tile_pre->energy_north_south_hop;
 					tile_pre->time += y_hops *
 						tile_pre->time_north_south_hop;
+					pre_axon->time += y_hops * tile_pre->time_north_south_hop;
 				}
 				pre_axon->total_packets_sent++;
 				post_axon->packet_size = 0;
@@ -283,7 +287,7 @@ int sim_input_spikes(struct network *net)
 			post_neuron = connection_ptr->post_neuron;
 			TRACE("nid:%d Energy before: %lf\n",
 					post_neuron->id, post_neuron->current);
-			post_neuron->current += connection_ptr->weight;
+			post_neuron->charge += connection_ptr->weight;
 			TRACE("nid:%d Energy after: %lf\n",
 					post_neuron->id, post_neuron->current);
 
@@ -351,7 +355,10 @@ void sim_update_synapse_cuba(struct neuron *n)
 	//  this would ha ve to be changed if we had a more complicated synapse
 	//  model
 	TRACE("Current before: %lf.\n", n->current);
+	// TODO: remove hack
+	n->current = n->charge;
 	//n->current *= n->current_decay;
+	n->charge = 0.0;
 	TRACE("Current after: %lf.\n", n->current);
 
 	return;
@@ -375,8 +382,6 @@ void sim_update_potential(struct neuron *n)
 	// Add the spike potential
 	n->potential += n->current + n->bias;
 
-	// TODO: how should current updates work when there's no decay
-	n->current = 0;
 	// Clamp min potential
 	//n->potential = (n->potential < n->reset) ?
 	//				n->reset : n->potential;
@@ -394,6 +399,7 @@ void sim_update_potential(struct neuron *n)
 		//  calculations
 		assert(out != NULL);
 		out->energy += out->energy_spike_within_tile;
+		printf("%e\n", out->time_spike_within_tile);
 		out->time += out->time_spike_within_tile;
 		TRACE("out->time=%e\n", out->time);
 		TRACE("nid %d fired.\n", n->id);
@@ -408,35 +414,42 @@ void sim_update_axon(struct neuron *n)
 	return;
 }
 
-double sim_calculate_time(const struct architecture *const arch)
+double sim_calculate_time(const struct architecture *const arch, double *network_time)
 {
 	// Returns the simulation time of the current timestep.
 	//  This is calculated by finding the simulation time of each core,
 	//  and simply taking the maximum of this.
-	double tile_time, max_time = 0.0;
+	double max_time = 0.0;
 
+	double max_time_minus_network = 0.0;
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
 		double max_core_time = 0.0;
+		double max_core_time_minus_network = 0.0;
 		for (int j = 0; j < t->core_count; j++)
 		{
 			const struct core *c = &(t->cores[j]);
 			double unit_time, this_core_time = 0.0;
+			double spike_time, neuron_time;
+			double core_time_minus_network;
+
 
 			unit_time = 0.0;
+			spike_time = 0.0;
+			neuron_time = 0.0;
 			for (int k = 0; k < c->axon_in_count; k++)
 			{
 				unit_time = fmax(unit_time, c->axon_in[k].time);
 			}
-			this_core_time += unit_time;
+			spike_time += unit_time;
 
 			unit_time = 0.0;
 			for (int k = 0; k < c->synapse_count; k++)
 			{
 				unit_time = fmax(unit_time, c->synapse[k].time);
 			}
-			this_core_time += unit_time;
+			spike_time += unit_time;
 
 			unit_time = 0.0;
 			for (int k = 0; k < c->dendrite_count; k++)
@@ -444,14 +457,18 @@ double sim_calculate_time(const struct architecture *const arch)
 				unit_time =
 					fmax(unit_time, c->dendrite[k].time);
 			}
-			this_core_time += unit_time;
+			neuron_time += unit_time;
 
 			unit_time = 0.0;
 			for (int k = 0; k < c->soma_count; k++)
 			{
 				unit_time = fmax(unit_time, c->soma[k].time);
 			}
-			this_core_time += unit_time;
+			neuron_time += unit_time;
+
+			core_time_minus_network = fmax(spike_time, neuron_time);
+			max_core_time_minus_network =
+				fmax(max_core_time_minus_network, core_time_minus_network);
 
 			unit_time = 0.0;
 			for (int k = 0; k < c->axon_out_count; k++)
@@ -459,17 +476,23 @@ double sim_calculate_time(const struct architecture *const arch)
 				unit_time =
 					fmax(unit_time, c->axon_out[k].time);
 			}
-			this_core_time += unit_time;
+			neuron_time += unit_time;
 
+			this_core_time = fmax(spike_time, neuron_time);
 			max_core_time = fmax(max_core_time, this_core_time);
 		}
-		tile_time = max_core_time + t->time;
-		max_time = fmax(max_time, tile_time);
+
+		max_time = fmax(max_time, max_core_time);
+		max_time_minus_network = fmax(max_time_minus_network, max_core_time_minus_network);
 	}
 
+	//max_time += max_network_time;
 	// Add the mesh-wide barrier sync time (assuming worst case of 32 tiles)
+	*network_time = max_time - max_time_minus_network;
 	max_time += arch->time_barrier;
 	INFO("Simulated time for step is:%es\n", max_time);
+	INFO("Simulated network time for step is:%es\n", *network_time);
+	INFO("Network time is %lf%% of time\n", (*network_time / max_time) * 100.0);
 
 	return max_time;
 }
@@ -633,6 +656,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 				struct axon_output *out =
 						&(c->axon_out[k]);
 				out->energy = 0.0;
+				out->time = 0.0;
 				out->total_packets_sent = 0;
 			}
 		}
@@ -641,18 +665,6 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 {
-	/*
-	for (int i = 0; i < arch->max_neurons; i++)
-	{
-		struct neuron *n = &(arch->neurons[i]);
-		if (n->neuron_used)
-		{
-			fprintf(fp, "c[%u].update_energy,c[%u].synapse_energy,",
-								n->id, n->id);
-		}
-	}
-	*/
-
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
@@ -667,6 +679,8 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 							&(c->axon_out[k]);
 				fprintf(fp, "o[%d.%d.%d].energy,",
 							t->id, c->id, out->id);
+				fprintf(fp, "o[%d.%d.%d].time,",
+							t->id, c->id, out->id);
 			}
 
 			for (int k = 0; k < c->synapse_count; k++)
@@ -676,6 +690,8 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 
 				fprintf(fp, "s[%d.%d.%d].energy,",
 							t->id, c->id, s->id);
+				fprintf(fp, "s[%d.%d.%d].time,",
+							t->id, c->id, s->id);
 			}
 
 			for (int k = 0; k < c->soma_count; k++)
@@ -684,15 +700,17 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 
 				fprintf(fp, "+[%d.%d.%d].energy,",
 							t->id, c->id, s->id);
+				fprintf(fp, "+[%d.%d.%d].time,",
+							t->id, c->id, s->id);
 			}
 		}
-
 	}
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
 		fprintf(fp, "t[%d].energy,", t->id);
+		fprintf(fp, "t[%d].time,", t->id);
 	}
 
 	fprintf(fp, "\n");
@@ -717,6 +735,7 @@ void sim_perf_log_timestep(FILE *fp, const struct architecture *arch)
 				const struct axon_output *out =
 							&(c->axon_out[k]);
 				fprintf(fp, "%e,", out->energy);
+				fprintf(fp, "%e,", out->time);
 			}
 
 			for (int k = 0; k < c->synapse_count; k++)
@@ -725,23 +744,24 @@ void sim_perf_log_timestep(FILE *fp, const struct architecture *arch)
 							&(c->synapse[k]);
 
 				fprintf(fp, "%e,", s->energy);
+				fprintf(fp, "%e,", s->time);
 			}
 
 			for (int k = 0; k < c->soma_count; k++)
 			{
 				const struct soma_processor *s = &(c->soma[k]);
 
-				fprintf(fp, "%e,",
-						s->energy);
+				fprintf(fp, "%e,", s->energy);
+				fprintf(fp, "%e,", s->time);
 			}
 		}
-
 	}
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
 		fprintf(fp, "%e,", t->energy);
+		fprintf(fp, "%e,", t->time);
 	}
 
 	fprintf(fp, "\n");
@@ -791,6 +811,7 @@ void sim_write_summary(FILE *fp, const struct sim_stats *stats)
 	fprintf(fp, "time: %e\n", stats->total_sim_time);
 	fprintf(fp, "total_spikes: %ld\n", stats->total_spikes);
 	fprintf(fp, "total_packets: %ld\n", stats->total_packets_sent);
+	fprintf(fp, "network_time: %e\n", stats->network_time);
 }
 
 void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp,

@@ -36,13 +36,15 @@ def run_sim():
 def parse_stats(stats):
     print("Parsing statistics")
     total = stats.sum()
+    pd.set_option('display.max_rows', None)
     print(total)
     update_keys, synapse_keys, spike_gen_energy, network_energy = [], [], [], []
     for k in total.keys():
-        if "+[" in k: update_keys.append(k)
-        elif "s[" in k: synapse_keys.append(k)
-        elif "o[" in k: spike_gen_energy.append(k)
-        elif "t[" in k: network_energy.append(k)
+        if "energy" in k:
+            if "+[" in k: update_keys.append(k)
+            elif "s[" in k: synapse_keys.append(k)
+            elif "o[" in k: spike_gen_energy.append(k)
+            elif "t[" in k: network_energy.append(k)
 
     analysis = {}
     analysis["update_energy"] = total[update_keys].sum()
@@ -93,4 +95,12 @@ if __name__ == "__main__":
     plt.xlabel("Operation Type")
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("energy_breakdown.png")
+
+    with open("stats.yaml", "r") as results_file:
+       results = yaml.safe_load(results_file)
+    network_percentage = (results["network_time"] /
+                                        results["time"]) * 100.0
+    print("Percentage of time used for only network: {0}".format(
+          network_percentage))
+
     plt.show()

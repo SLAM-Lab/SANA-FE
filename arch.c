@@ -79,7 +79,9 @@ int arch_create_noc(struct architecture *const arch, const int width,
 
 int arch_create_tile(struct architecture *const arch,
 			const double energy_east_west_hop,
-			const double energy_north_south_hop)
+			const double energy_north_south_hop,
+			const double time_east_west_hop,
+			const double time_north_south_hop)
 {
 	struct tile *t;
 	int id;
@@ -101,9 +103,9 @@ int arch_create_tile(struct architecture *const arch,
 	// TODO: generalize this so each link has an associated energy and
 	//  latency, set one level up when defining the noc mesh
 	t->energy_east_west_hop = energy_east_west_hop;
-	t->time_east_west_hop = 0.0;
+	t->time_east_west_hop = time_east_west_hop;
 	t->energy_north_south_hop = energy_north_south_hop;
-	t->time_north_south_hop = 0.0;
+	t->time_north_south_hop = time_north_south_hop;
 	t->x = 0;
 	t->y = 0;
 	t->core_count = 0;

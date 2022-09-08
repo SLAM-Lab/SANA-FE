@@ -266,11 +266,12 @@ void run(struct network *net, struct architecture *arch,
 	stats->total_sim_time += timestep_stats.total_sim_time;
 	stats->total_spikes += timestep_stats.total_spikes;
 	stats->total_packets_sent += timestep_stats.total_packets_sent;
+	stats->network_time += timestep_stats.network_time;
 
 	// Calculate elapsed time
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
-	stats->wall_time +=
+	stats->wall_time =
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
 	INFO("Time-step took: %fs.\n",
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
