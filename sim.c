@@ -605,6 +605,38 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
 			{
+				struct axon_input *in =
+						&(c->axon_in[k]);
+				in->energy = 0.0;
+				in->time = 0;
+			}
+
+			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
+			{
+				struct synapse_processor *s =
+						&(c->synapse[k]);
+				s->energy = 0.0;
+				s->time = 0.0;
+			}
+
+			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
+			{
+				struct dendrite_processor *d =
+						&(c->dendrite[k]);
+				d->energy = 0.0;
+				d->time = 0.0;
+			}
+
+			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
+			{
+				struct soma_processor *s =
+						&(c->soma[k]);
+				s->energy = 0.0;
+				s->time = 0.0;
+			}
+
+			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
+			{
 				struct axon_output *out =
 						&(c->axon_out[k]);
 				out->energy = 0.0;

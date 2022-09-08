@@ -92,5 +92,5 @@ if __name__ == "__main__":
     plt.ylabel("Energy (J)")
     plt.xlabel("Operation Type")
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("connected_spiking_energy.png")
+    plt.savefig("energy_breakdown.png")
     plt.show()
