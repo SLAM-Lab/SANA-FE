@@ -23,22 +23,25 @@ General usage:
 
 # Input Format
 
-Right now the simulator executes a series of commands, and input is formed as
-commands. A command is a single line of input, for now given as a bunch of
-files, in future I'll add an interactive option. Each command does one specific
-thing e.g. define a neuron in an SNN, or a tile in a chip, or steps the
-simulation by one timestep. The complete list is given below. The order only
-matters that things are defined before they get used. E.g. you define the
-network and architecture before you map the two.
+Right now the simulator executes a series of commands, like a custom program.
+Both configuration and input is a series of commands to the simulator. A command
+is a single line of input, in future I'll add an interactive option.
+
+Each command does one specific thing e.g. define a neuron in an SNN, or a tile
+in a chip, or steps the simulation by one timestep. The complete list is given
+below. The order only matters that things are defined before they get used. E.g.
+you define the network and architecture before you map the two.
 
 Probably what you want to do is create a script to create the input commands and
-then kick off a simulation.
+then kick off a simulation. An entire experiment can be captured in a single
+file or program.
 
 Note that `parse_arch.py` converts between a YAML description of a neuromorphic
 architecture to a set of architecture commands for the simulator.
 
-`run.py` is an example of a complete flow - creating an architecture, network
-and simulating a network for number of timesteps.
+`scripts/connected_layers_experiment.py` is an example of a complete flow -
+creating an architecture, network and simulating a network for number of
+timesteps.
 
 # Commands
 
@@ -113,13 +116,7 @@ are introduced using:
 `valgrind ./sim loihi.arch examples/random_network.net 1`
 
 Or something similar. Also clang static code analysis has been used, and should
-ideally stay error free. In a clean build directory run: `scan-build make`. The
-version of clang on my UT machine is ancient so I'll start using codechecker
-(more recent release of the same tool) as soon as it is updated.
-
-At the moment the code has been changing a lot day to day, and is lacking any
-formal unit-tests (hey I'm originally a H/W engineer). Once things are settled
-the plan is to use the Google testing framework.
+ideally stay error free. In a clean build directory run: `scan-build make`.
 
 # Contact
 James Boyle: james.boyle@utexas.edu

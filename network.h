@@ -46,6 +46,16 @@ enum input_types
 	INPUT_POISSON,
 };
 
+struct hardware_mapping
+{
+	struct core *core;
+	struct synapse_processor *synapse_hw;
+	struct dendrite_processor *dendrite_hw;
+	struct soma_processor *soma_hw;
+	struct axon_output *axon_out;
+	struct axon_input *axon_in;
+};
+
 struct neuron_id
 {
 	unsigned int group, neuron;
@@ -55,6 +65,14 @@ struct neuron
 {
 	struct connection *connections;
 	struct neuron_group *group;
+
+	// Mapped hardware, which is optionally set
+	struct core *core;
+	struct synapse_processor *synapse_hw;
+	struct dendrite_processor *dendrite_hw;
+	struct soma_processor *soma_hw;
+	struct axon_output *axon_out;
+	struct axon_input *axon_in;
 
 	double potential, current,  bias, reset, threshold;
 	double potential_decay, potential_time_const;
@@ -85,27 +103,8 @@ struct neuron_group
 	//  same models. If implemented in hardware, they also must share common
 	//  hardware i.e. the same core and processor blocks in the core
 	struct neuron *neurons;
-
-	// Mapped hardware, which is optionally set
-	struct core *core;
-	struct synapse_processor *synapse;
-	struct dendrite_processor *dendrite;
-	struct soma_processor *soma;
-	struct axon_output *axon_out;
-	struct axon_input *axon_in;
-
 	int id, neuron_count;
 	double default_threshold, default_reset;
-};
-
-struct hardware_mapping
-{
-	struct core *core;
-	struct synapse_processor *synapse;
-	struct dendrite_processor *dendrite;
-	struct soma_processor *soma;
-	struct axon_output *axon_out;
-	struct axon_input *axon_in;
 };
 
 struct network
@@ -120,7 +119,7 @@ void network_init(struct network *const net);
 int network_create_neuron(struct neuron *const n, const int log_spikes, const int log_voltages, const int force_update, const int connection_count);
 int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
-int network_map_neuron_group(struct neuron_group *const group, const struct hardware_mapping map);
+int network_map_neuron(struct neuron *const n, const struct hardware_mapping);
 int net_create_inputs(struct network *const net, const int input_count, const int input_type);
 int net_create_input_node(struct input *const in, const int connection_count);
 void net_set_input(struct network *const net, const int input_id, const double rate);

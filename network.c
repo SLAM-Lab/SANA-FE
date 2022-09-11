@@ -31,14 +31,6 @@ int network_create_neuron_group(struct network *net,
 	group->default_threshold = threshold;
 	group->default_reset = reset;
 
-	// Initially the group of neurons is not mapped to anything
-	group->core = NULL;
-	group->axon_in = NULL;
-	group->synapse = NULL;
-	group->dendrite = NULL;
-	group->soma = NULL;
-	group->axon_out = NULL;
-
 	for (int i = 0; i < group->neuron_count; i++)
 	{
 		struct neuron *n = &(group->neurons[i]);
@@ -60,6 +52,14 @@ int network_create_neuron_group(struct network *net,
 		n->spike_count = 0;
 		n->connections = NULL;
 
+		// Initially the neuron is not mapped to anything
+		n->core = NULL;
+		n->axon_in = NULL;
+		n->synapse_hw = NULL;
+		n->dendrite_hw = NULL;
+		n->soma_hw = NULL;
+		n->axon_out = NULL;
+
 		n->is_init = 0;
 	}
 
@@ -70,10 +70,11 @@ int network_create_neuron_group(struct network *net,
 	return id;
 }
 
-int network_create_neuron(struct neuron *const n, const int log_spikes,
-						const int log_voltages,
-						const int force_update,
-						const int connection_count)
+int network_create_neuron(struct neuron *const n,
+					const int log_spikes,
+					const int log_voltages,
+					const int force_update,
+					const int connection_count)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
@@ -127,17 +128,18 @@ int network_create_neuron(struct neuron *const n, const int log_spikes,
 	return n->id;
 }
 
-int network_map_neuron_group(struct neuron_group *const group,
+int network_map_neuron(struct neuron *const n,
 					const struct hardware_mapping map)
 {
-	group->core = map.core;
-	group->axon_in = map.axon_in;
-	group->synapse = map.synapse;
-	group->dendrite = map.dendrite;
-	group->soma = map.soma;
-	group->axon_out = map.axon_out;
+	// Map the neuron to hardware units
+	n->core = map.core;
+	n->axon_in = map.axon_in;
+	n->synapse_hw = map.synapse_hw;
+	n->dendrite_hw = map.dendrite_hw;
+	n->soma_hw = map.soma_hw;
+	n->axon_out = map.axon_out;
 
-	return 0;
+	return 1;
 }
 
 int net_create_inputs(struct network *const net, const int input_count,

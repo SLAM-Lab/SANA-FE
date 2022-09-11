@@ -29,7 +29,7 @@ int command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, s
 
 // (Spiking) neural network
 int command_parse_neuron_group(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_neuron(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
+int command_parse_neuron(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_extern_input_group(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_extern_input_node(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
 
@@ -42,8 +42,8 @@ int command_parse_synapse(struct architecture *const arch, char fields[][MAX_FIE
 int command_parse_soma(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_axon_output(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 
-// Network to hardware mapping
-int command_map_hardware(struct network *const net, struct architecture *arch, char fields[][MAX_FIELD_LEN], const int field_count);
+// Mapping
+int command_map_hardware(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
 
 // Simulation control
 int command_parse_input_spikes(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);

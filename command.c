@@ -35,7 +35,7 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 		ret = command_parse_neuron_group(net, fields, field_count);
 		break;
 	case 'n': // Add neuron
-		ret = command_parse_neuron(net, fields, field_count);
+		ret = command_parse_neuron(net, arch, fields, field_count);
 		break;
 	case '@': // Add network-on-chip connections (noc)
 		ret = command_parse_noc(arch, fields, field_count);
@@ -46,7 +46,7 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 	case 'c': // Add core
 		ret = command_parse_core(arch, fields, field_count);
 		break;
-	case '&': // Add mapping of neuron group to H/W
+	case '&': // Map neuron to hardware
 		ret = command_map_hardware(net, arch, fields, field_count);
 		break;
 	case 'i': // Add axon input processor
@@ -67,7 +67,7 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 	case '<': // Add single input node
 		ret = command_parse_extern_input_node(net, fields, field_count);
 		break;
-	case '$': // Set inputs (either rates or individual spikes)
+	case '$': // Input vector (either rates or individual spikes)
 		ret = command_parse_input_spikes(net, fields, field_count);
 		break;
 	case '*': // Step simulator
@@ -307,14 +307,14 @@ int command_parse_neuron_group(struct network *const net,
 	}
 }
 
-int command_parse_neuron(struct network *const net,
+int command_parse_neuron(struct network *const net, struct architecture *arch,
 				char fields[][MAX_FIELD_LEN],
 				const int field_count)
 {
 	struct neuron_group *group;
 	struct neuron *n;
-	int neuron_group_id, neuron_id, connection_count, log_spikes;
-	int log_voltage, force_update, ret;
+	int neuron_group_id, neuron_id, connection_count;
+	int log_spikes, log_voltage, force_update, ret;
 
 	TRACE("Parsing neuron.\n");
 	if (field_count < NEURON_FIELDS)
@@ -348,7 +348,6 @@ int command_parse_neuron(struct network *const net,
 	}
 	group = &(net->groups[neuron_group_id]);
 
-
 	if (neuron_id >= group->neuron_count)
 	{
 		INFO("Error: Neuron (%d) >= group neurons (%d).\n",
@@ -356,8 +355,8 @@ int command_parse_neuron(struct network *const net,
 		return COMMAND_FAIL;
 	}
 	n = &(group->neurons[neuron_id]);
-	ret = network_create_neuron(n, log_spikes, log_voltage, force_update,
-							connection_count);
+	ret = network_create_neuron(n, log_spikes, log_voltage,
+				force_update, connection_count);
 	if (ret == NETWORK_INVALID_NID)
 	{
 		return COMMAND_FAIL;
@@ -381,6 +380,8 @@ int command_parse_neuron(struct network *const net,
 							"%d", &dest_gid);
 		ret += sscanf(fields[curr_field+CONNECTION_DEST_NID],
 							"%d", &dest_nid);
+		TRACE("group id:%s\n", fields[curr_field+CONNECTION_DEST_GID]);
+		TRACE("neuron id:%s\n", fields[curr_field+CONNECTION_DEST_NID]);
 		TRACE("weight field:%s\n", fields[curr_field+CONNECTION_WEIGHT]);
 		ret += sscanf(fields[curr_field+CONNECTION_WEIGHT],
 							"%lf", &weight);
@@ -411,44 +412,42 @@ int command_map_hardware(struct network *const net, struct architecture *arch,
 				const int field_count)
 {
 	struct neuron_group *group;
+	struct neuron *n;
 	struct tile *t;
 	struct core *c;
 	struct hardware_mapping map;
-	int neuron_group_id, tile_id, core_id, axon_in_id, synapse_id;
-	int dendrite_id, soma_id, axon_out_id, ret;
+	int neuron_group_id, tile_id, core_id, neuron_id, ret;
 
 	TRACE("Parsing mapping.\n");
-	if (field_count < 9)
+	if (field_count < 5)
 	{
-		INFO("Error: Invalid <map hw> command; (%d/9) fields.\n",
+		INFO("Error: Invalid mapping command; %d fields.\n",
 								field_count);
 		return COMMAND_FAIL;
 	}
 	ret = sscanf(fields[1], "%d", &neuron_group_id);
-	ret += sscanf(fields[2], "%d", &tile_id);
-	ret += sscanf(fields[3], "%d", &core_id);
-	ret += sscanf(fields[4], "%d", &axon_in_id);
-	ret += sscanf(fields[5], "%d", &synapse_id);
-	ret += sscanf(fields[6], "%d", &dendrite_id);
-	ret += sscanf(fields[7], "%d", &soma_id);
-	ret += sscanf(fields[8], "%d", &axon_out_id);
-	if (ret < 8)
+	ret += sscanf(fields[2], "%d", &neuron_id);
+	ret += sscanf(fields[3], "%d", &tile_id);
+	ret += sscanf(fields[4], "%d", &core_id);
+	if (ret < 4)
 	{
 		INFO("Error: Couldn't parse command.\n");
 		return COMMAND_FAIL;
 	}
 	group = &(net->groups[neuron_group_id]);
+	n = &(group->neurons[neuron_id]);
 
 	t = &(arch->tiles[tile_id]);
 	c = &(t->cores[core_id]);
 	map.core = c;
-	map.axon_in = &(c->axon_in[axon_in_id]);
-	map.synapse = &(c->synapse[synapse_id]);
-	map.dendrite = &(c->dendrite[dendrite_id]);
-	map.soma = &(c->soma[soma_id]);
-	map.axon_out = &(c->axon_out[axon_out_id]);
+	// TODO: support mapping to different hardware blocks
+	map.axon_in = &(c->axon_in[0]);
+	map.synapse_hw = &(c->synapse[0]);
+	map.dendrite_hw = &(c->dendrite[0]);
+	map.soma_hw = &(c->soma[0]);
+	map.axon_out = &(c->axon_out[0]);
 
-	return network_map_neuron_group(group, map);
+	return network_map_neuron(n, map);
 }
 
 int command_parse_axon_input(struct architecture *const arch,

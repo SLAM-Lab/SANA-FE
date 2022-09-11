@@ -97,11 +97,9 @@ int sim_route_spikes(struct network *net)
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{
 		struct neuron_group *group = &(net->groups[i]);
-		struct axon_output *pre_axon = group->axon_out;
-
-		assert(pre_axon != NULL); // TODO for now require h/w mapping
 		for (int j = 0; j < group->neuron_count; j++)
 		{
+			struct axon_output *pre_axon;
 			struct neuron *n = &(group->neurons[j]);
 
 			if (!n->is_init || !n->fired)
@@ -109,6 +107,9 @@ int sim_route_spikes(struct network *net)
 				continue;
 			}
 			total_neurons_fired++;
+
+			pre_axon = n->axon_out;
+			assert(pre_axon != NULL); // TODO for now require h/w mapping
 
 			// Generate all the spikes for a spiking neuron
 			//  Only generate one spike packet per core, that the
@@ -122,7 +123,6 @@ int sim_route_spikes(struct network *net)
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
 				struct neuron *post_neuron;
-				struct neuron_group *post_group;
 				struct connection *connection_ptr;
 				struct axon_input *axon_in;
 
@@ -130,8 +130,7 @@ int sim_route_spikes(struct network *net)
 				assert(connection_ptr != NULL);
 				post_neuron = connection_ptr->post_neuron;
 				assert(post_neuron != NULL);
-				post_group = post_neuron->group;
-				axon_in = post_group->axon_in;
+				axon_in = post_neuron->axon_in;
 
 				axon_in->packet_size = 0;
 			}
@@ -142,7 +141,6 @@ int sim_route_spikes(struct network *net)
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
 				struct neuron *post_neuron;
-				struct neuron_group *post_group;
 				struct connection *connection_ptr;
 				struct axon_input *post_axon;
 
@@ -168,12 +166,11 @@ int sim_route_spikes(struct network *net)
 				total_spike_count++;
 
 				// Hardware specific updates
-				post_group = post_neuron->group;
-				post_axon = post_group->axon_in;
-				post_group->synapse->energy +=
-					post_group->synapse->energy_spike_op;
-				post_group->synapse->time +=
-					post_group->synapse->time_spike_op;
+				post_axon = post_neuron->axon_in;
+				post_neuron->synapse_hw->energy +=
+					post_neuron->synapse_hw->energy_spike_op;
+				post_neuron->synapse_hw->time +=
+					post_neuron->synapse_hw->time_spike_op;
 
 				// TODO: support AER and other representations
 				//  Loihi sends a destination axon index
@@ -187,12 +184,10 @@ int sim_route_spikes(struct network *net)
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
 				struct neuron *post_neuron;
-				struct neuron_group *post_group;
 				struct axon_input *post_axon;
 
 				post_neuron = n->connections[k].post_neuron;
-				post_group = post_neuron->group;
-				post_axon = post_group->axon_in;
+				post_axon = post_neuron->axon_in;
 
 				// TODO: I think the code below should be a
 				//  function and sim_send_spike can be inlined
@@ -280,7 +275,6 @@ int sim_input_spikes(struct network *net)
 			//  Normally, we would have a number of input dimensions
 			//  for a given network
 			struct neuron *post_neuron;
-			struct neuron_group *post_group;
 			struct connection *connection_ptr;
 
 			connection_ptr = &(in->connections[j]);
@@ -293,11 +287,10 @@ int sim_input_spikes(struct network *net)
 			TRACE("nid:%d Energy after: %lf\n",
 					post_neuron->id, post_neuron->current);
 
-			post_group = post_neuron->group;
-			post_group->synapse->energy +=
-					post_group->synapse->energy_spike_op;
-			post_group->synapse->time +=
-				post_group->synapse->time_spike_op;
+			post_neuron->synapse_hw->energy +=
+					post_neuron->synapse_hw->energy_spike_op;
+			post_neuron->synapse_hw->time +=
+				post_neuron->synapse_hw->time_spike_op;
 
 			post_neuron->update_needed = 1;
 			post_neuron->spike_count++;
@@ -323,7 +316,6 @@ int sim_input_spikes(struct network *net)
 
 void sim_update_neuron(struct neuron *n)
 {
-	struct neuron_group *const group = n->group;
 	// The neuron (state update) contains four main components
 	// 1) synapse updates
 	// 2) dendrite updates
@@ -337,17 +329,17 @@ void sim_update_neuron(struct neuron *n)
 	TRACE("Updating neuron %d.%d.\n", n->group->id, n->id);
 	if (n->spike_count)
 	{
-		group->soma->energy +=
-			group->soma->energy_active_neuron_update;
-		group->soma->time +=
-			group->soma->time_active_neuron_update;
+		n->soma_hw->energy +=
+			n->soma_hw->energy_active_neuron_update;
+		n->soma_hw->time +=
+			n->soma_hw->time_active_neuron_update;
 	}
 	else if (n->force_update)
 	{
-		group->soma->energy +=
-			group->soma->energy_inactive_neuron_update;
-		group->soma->time +=
-			group->soma->time_inactive_neuron_update;
+		n->soma_hw->energy +=
+			n->soma_hw->energy_inactive_neuron_update;
+		n->soma_hw->time +=
+			n->soma_hw->time_inactive_neuron_update;
 	}
 }
 
@@ -393,13 +385,14 @@ void sim_update_potential(struct neuron *n)
 
 	if (n->potential > n->threshold)
 	{
-		struct axon_output *out = n->group->axon_out;
+		struct axon_output *out = n->axon_out;
 		n->fired = 1;
 		n->potential = n->reset;
 		// Add the "within-tile" spike energy, this is the minimum cost
 		//  of sending a spike
 		// TODO: separate h/w perf stuff from the general network
 		//  calculations
+		assert(out != NULL);
 		out->energy += out->energy_spike_within_tile;
 		out->time += out->time_spike_within_tile;
 		TRACE("out->time=%e\n", out->time);

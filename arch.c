@@ -120,7 +120,7 @@ int arch_create_tile(struct architecture *const arch,
 	return t->id;
 }
 
-int arch_create_core(struct architecture *const arch, struct tile *const t) 
+int arch_create_core(struct architecture *const arch, struct tile *const t)
 {
 	struct core *c;
 	unsigned int core_id;
