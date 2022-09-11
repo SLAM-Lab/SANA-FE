@@ -21,7 +21,9 @@ ARCH_FILENAME = "loihi.arch"
 
 
 class Network:
-    def __init__(self):
+    def __init__(self, external_inputs=0):
+        self.external_inputs = external_inputs
+        self.inputs = []
         self.groups = []
 
     def create_group(self, threshold, reset):
@@ -30,14 +32,24 @@ class Network:
         self.groups.append(group)
         return group
 
+    def create_input(self):
+        input_id = len(self.inputs)
+        input_node = Input(input_id)
+        self.inputs.append(input_node)
+        return input_node
+
     def save(self, filename):
         with open(filename, 'w') as network_file:
+            network_file.write("e {0} rate\n".format(self.external_inputs))
             for group in self.groups:
                 network_file.write(group.to_command())
 
             for group in self.groups:
                 for neuron in group.neurons:
                     network_file.write(neuron.to_command())
+
+            for input_node in self.inputs:
+                network_file.write(input_node.to_command())
 
 
 class NeuronGroup:
@@ -59,6 +71,23 @@ class NeuronGroup:
         #print(self.neurons)
         return neuron
 
+
+class Input:
+    def __init__(self, input_id):
+        self.id = input_id
+        self.connections = []
+
+    def add_connection(self, dest, weight):
+        self.connections.append((dest, weight))
+
+    def to_command(self):
+        command = "< {0}".format(self.id)
+        for connection in self.connections:
+            dest_neuron, weight = connection
+            command += " {0} {1} {2}".format(
+                dest_neuron.group_id, dest_neuron.id, weight)
+        command += '\n'
+        return command
 
 class Neuron:
     def __init__(self, group_id, neuron_id, log_spikes=False, log_voltage=False,
