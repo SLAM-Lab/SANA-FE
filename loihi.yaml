@@ -75,13 +75,3 @@ architecture:
                   energy: 1.7e-12
                   time: 2.1e-9
 
-          ## TODO: support memory blocks in the future e.g.
-          #memory:
-          #  - name: synapse_sram
-          #    # The SRAM is used to store synaptic info, neuron state and
-          #    #  dendrite structures. In the case of convolutional networks
-          #    #  weights might be shared across compartments, reducing the
-          #    #  load on SRAM
-          #    attributes:
-          #      size: 1000000
-          #      mem_type: sram
