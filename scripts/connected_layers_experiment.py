@@ -151,7 +151,7 @@ if __name__ == "__main__":
     spiking_energy = []
 
     #for i in range(1, 4):
-    timesteps = 2
+    timesteps = 1
     for i in range(1, 31):
         layer_neurons = i*i
 

@@ -29,9 +29,9 @@ struct sim_stats sim_timestep(struct network *const net,
 	INFO("Seeded %d inputs\n", net->external_input_count);
 #endif
 	spikes_sent = sim_input_spikes(net);
+	sim_update(net);
 	INFO("Input spikes sent: %ld\n", spikes_sent);
 	spikes_sent += sim_route_spikes(net);
-	sim_update(net);
 
 	// Performance statistics for this time step
 	stats.time_steps = 1;
@@ -70,6 +70,7 @@ void sim_update(struct network *net)
 			if (n->update_needed)
 			{
 				sim_update_neuron(n);
+				n->update_needed = 0;
 			}
 			else
 			{
@@ -176,7 +177,7 @@ int sim_route_spikes(struct network *net)
 					post_neuron->synapse_hw->energy +=
 								55.1e-12;
 					post_neuron->synapse_hw->time +=
-								15.0e-9;
+								7.0e-9;
 				}
 				prev_core_id = post_neuron->core->id;
 				/*
@@ -639,7 +640,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		for (int j = 0; j < group->neuron_count; j++)
 		{
 			struct neuron *n = &(group->neurons[j]);
-			n->update_needed = n->force_update;
+			n->update_needed |= n->force_update;
 			n->spike_count = 0;
 		}
 	}
