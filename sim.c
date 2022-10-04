@@ -35,8 +35,8 @@ struct sim_stats sim_timestep(struct network *const net,
 
 	// Performance statistics for this time step
 	stats.time_steps = 1;
-	stats.total_energy = sim_calculate_energy(arch);
 	stats.total_sim_time = sim_calculate_time(arch, &(stats.network_time));
+	stats.total_energy = sim_calculate_energy(arch, stats.total_sim_time);
 	stats.total_packets_sent = sim_calculate_packets(arch);
 	stats.total_spikes = spikes_sent;
 
@@ -101,6 +101,7 @@ int sim_route_spikes(struct network *net)
 		{
 			struct axon_output *pre_axon;
 			struct neuron *n = &(group->neurons[j]);
+			int prev_core_id;
 
 			if (!n->is_init || !n->fired)
 			{
@@ -138,6 +139,7 @@ int sim_route_spikes(struct network *net)
 			// Next send all spikes to receiving neurons, updating
 			//  their synaptic current and accounting for
 			//  performance costs of those updates
+			prev_core_id = -1;
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
 				struct neuron *post_neuron;
@@ -159,7 +161,6 @@ int sim_route_spikes(struct network *net)
 
 				post_neuron = connection_ptr->post_neuron;
 
-
 				post_neuron->update_needed = 1;
 				post_neuron->charge += connection_ptr->weight;
 				post_neuron->spike_count++;
@@ -167,10 +168,31 @@ int sim_route_spikes(struct network *net)
 
 				// Hardware specific updates
 				post_axon = post_neuron->axon_in;
+
+				// TODO: refactor to function call
+				if ((post_neuron->core->id != prev_core_id)  ||
+								(k % 8) == 0)
+				{
+					post_neuron->synapse_hw->energy +=
+								55.1e-12;
+					post_neuron->synapse_hw->time +=
+								15.0e-9;
+				}
+				prev_core_id = post_neuron->core->id;
+				/*
 				post_neuron->synapse_hw->energy +=
 					post_neuron->synapse_hw->energy_spike_op;
 				post_neuron->synapse_hw->time +=
 					post_neuron->synapse_hw->time_spike_op;
+				*/
+
+				post_neuron->synapse_hw->energy +=
+					post_neuron->synapse_hw->energy_spike_op;
+				if ((k % 4) == 0)
+				{
+					// Four way parallelism
+					post_neuron->synapse_hw->time += 4.0e-9;
+				}
 
 				// TODO: support AER and other representations
 				//  Loihi sends a destination axon index
@@ -203,6 +225,9 @@ int sim_route_spikes(struct network *net)
 					// Calculate the energy and time for
 					//  sending spike packets
 					int x_hops, y_hops;
+
+					pre_axon->energy += 40.8e-12;
+					pre_axon->time += 7.6e-9;
 
 					x_hops =
 						abs(tile_pre->x - tile_post->x);
@@ -331,13 +356,19 @@ void sim_update_neuron(struct neuron *n)
 	sim_update_axon(n);
 
 	TRACE("Updating neuron %d.%d.\n", n->group->id, n->id);
-	if (n->spike_count)
+	if (n->spike_count || n->force_update)
 	{
 		n->soma_hw->energy +=
 			n->soma_hw->energy_active_neuron_update;
 		n->soma_hw->time +=
 			n->soma_hw->time_active_neuron_update;
 	}
+	else
+	{
+		n->soma_hw->energy += 47.5e-12;
+		n->soma_hw->time += 6.1-9;
+	}
+	/*
 	else if (n->force_update)
 	{
 		n->soma_hw->energy +=
@@ -345,6 +376,7 @@ void sim_update_neuron(struct neuron *n)
 		n->soma_hw->time +=
 			n->soma_hw->time_inactive_neuron_update;
 	}
+	*/
 }
 
 void sim_update_synapse_cuba(struct neuron *n)
@@ -393,13 +425,19 @@ void sim_update_potential(struct neuron *n)
 		struct axon_output *out = n->axon_out;
 		n->fired = 1;
 		n->potential = n->reset;
+
+		// The spiking update time is much larger for the neuron than
+		//  the normal update, in addition to the within-tile latency
+		// TODO: add to the soma processor not the axon
+		out->energy += 60.0e-12;
+		out->time += 30.0e-9;
+
 		// Add the "within-tile" spike energy, this is the minimum cost
 		//  of sending a spike
 		// TODO: separate h/w perf stuff from the general network
 		//  calculations
 		assert(out != NULL);
 		out->energy += out->energy_spike_within_tile;
-		printf("%e\n", out->time_spike_within_tile);
 		out->time += out->time_spike_within_tile;
 		TRACE("out->time=%e\n", out->time);
 		TRACE("nid %d fired.\n", n->id);
@@ -497,7 +535,7 @@ double sim_calculate_time(const struct architecture *const arch, double *network
 	return max_time;
 }
 
-double sim_calculate_energy(const struct architecture *const arch)
+double sim_calculate_energy(const struct architecture *const arch, const double time)
 {
 	// Returns the total energy across the design, for this timestep
 	double total_energy, dendrite_energy, soma_energy, synapse_energy;
@@ -560,6 +598,8 @@ double sim_calculate_energy(const struct architecture *const arch)
 
 	total_energy = synapse_energy + dendrite_energy + soma_energy +
 						axon_energy + network_energy;
+	// TODO: formalize leakage amount
+	//total_energy += time * 0.05;
 
 	return total_energy;
 }

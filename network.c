@@ -7,6 +7,8 @@
 #include "print.h"
 #include "network.h"
 
+int total_connection_count = 0;
+
 int network_create_neuron_group(struct network *net,
 				const unsigned int neuron_count,
 				const double threshold, const double reset)
@@ -94,6 +96,7 @@ int network_create_neuron(struct neuron *const n,
 	n->force_update = force_update;
 	n->update_needed = n->force_update;
 	n->post_connection_count = connection_count;
+	total_connection_count += connection_count;
 	// TODO: Hard coded LIF / CUBA time constants for now
 	n->current_time_const = 10.0e-3;
 	n->potential_time_const = 10.0e-3;
@@ -122,7 +125,7 @@ int network_create_neuron(struct neuron *const n,
 		con->weight = 0.0;
 	}
 
-	TRACE("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
+	INFO("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
 					n->group->id, n->id, n->force_update,
 					n->threshold, n->post_connection_count);
 	n->is_init = 1;

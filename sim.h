@@ -34,7 +34,7 @@ void sim_update_potential(struct neuron *n);
 void sim_update_axon(struct neuron *n);
 
 void sim_reset_measurements(struct network *net, struct architecture *arch);
-double sim_calculate_energy(const struct architecture *const arch);
+double sim_calculate_energy(const struct architecture *const arch, const double time);
 double sim_calculate_time(const struct architecture *const arch, double *network_time);
 long int sim_calculate_packets(const struct architecture *arch);
 

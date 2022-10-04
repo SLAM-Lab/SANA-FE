@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 import pickle
 import math
 import sys
-sys.path.insert(0, '/home/usr1/jboyle/neuro/spike-perf')
+sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
 import spikeperf
 
 MAX_TILES = 32
@@ -99,8 +99,8 @@ def connected_layers(weights, spiking=True):
     for src in layer_1.neurons:
         for dest in layer_2.neurons:
             # Take the ID of the neuron in the 2nd layer
-            weight = float(weights[src.id][dest.id]) / 255
-            if weight != 0:
+            weight = float(weights[src.id][dest.id]) / 256
+            if abs(weight) >= (1.0 / 256):
                 # Zero weights are pruned i.e. removed
                 src.add_connection(dest, weight)
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     """
     # This experiment looks at two fully connected layers, spiking
 
-    with open("sandia_data/weights.pkl", "rb") as weights_file:
+    with open("sandia_data/weights_loihi.pkl", "rb") as weights_file:
         weights = pickle.load(weights_file)
 
     neuron_counts = []
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         layer_neurons = i*i
 
         #network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
-        commands = connected_layers(weights[i-1], spiking=True)
+        commands = connected_layers(weights[i-1].transpose(), spiking=True)
         print("Testing network with {0} neurons".format(2*layer_neurons))
         results = run_sim(commands, timesteps)
 
@@ -179,6 +179,7 @@ if __name__ == "__main__":
     nonspiking_times = []
     nonspiking_energy = []
 
+    """
     # The second experiment looks at two fully connected layers, not spiking
     for i in range(1, 31):
         layer_neurons = i*i
@@ -201,7 +202,7 @@ if __name__ == "__main__":
             nonspiking_writer.writerow({"neurons": neuron_count,
                                         "energy": energy_val,
                                         "time": time})
-
+    """
     # **************************************************************************
     # Read Loihi measurement data from csv, this is only available to me locally
     #  since this is restricted data!
@@ -230,7 +231,7 @@ if __name__ == "__main__":
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
             loihi_times_spikes.append(float(row["time"]))
-            loihi_energy_spikes.append(float(row["energy"]))
+            loihi_energy_spikes.append(float(row["dynamic energy"]))
 
     loihi_times_no_spikes = []
     loihi_energy_no_spikes = []

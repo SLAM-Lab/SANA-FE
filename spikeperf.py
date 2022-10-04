@@ -40,7 +40,8 @@ class Network:
 
     def save(self, filename):
         with open(filename, 'w') as network_file:
-            network_file.write("e {0} rate\n".format(self.external_inputs))
+            if self.external_inputs > 0:
+                network_file.write("e {0} rate\n".format(self.external_inputs))
             for group in self.groups:
                 network_file.write(group.to_command())
 
