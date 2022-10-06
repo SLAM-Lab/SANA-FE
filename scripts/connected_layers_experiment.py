@@ -91,6 +91,8 @@ def connected_layers(weights, spiking=True):
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
                                      reset)
+    force_update = False
+    threshold = 2*layer_neuron_count
     layer_2 = spikeperf.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,

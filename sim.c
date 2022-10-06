@@ -102,6 +102,7 @@ int sim_route_spikes(struct network *net)
 		{
 			struct axon_output *pre_axon;
 			struct neuron *n = &(group->neurons[j]);
+			int spikes_per_core = 0;
 			int prev_core_id;
 
 			if (!n->is_init || !n->fired)
@@ -117,6 +118,9 @@ int sim_route_spikes(struct network *net)
 			//  Only generate one spike packet per core, that the
 			//  neuron is broadcasting to
 			assert(n->post_connection_count >= 0);
+
+			// First account for the processing time in this neuron
+			n->core->time += n->time;
 
 			// First reset tracking for packets that this neuron
 			//  should sent in the timestep
@@ -143,6 +147,7 @@ int sim_route_spikes(struct network *net)
 			prev_core_id = -1;
 			for (int k = 0; k < n->post_connection_count; k++)
 			{
+				double spike_processing_time;
 				struct neuron *post_neuron;
 				struct connection *connection_ptr;
 				struct axon_input *post_axon;
@@ -171,29 +176,48 @@ int sim_route_spikes(struct network *net)
 				post_axon = post_neuron->axon_in;
 
 				// TODO: refactor to function call
-				if ((post_neuron->core->id != prev_core_id)  ||
-								(k % 8) == 0)
+				spike_processing_time = 0.0;
+				if (post_neuron->core->id != prev_core_id)
 				{
-					post_neuron->synapse_hw->energy +=
-								55.1e-12;
-					post_neuron->synapse_hw->time +=
-								7.0e-9;
+					INFO("switching to core:%d new time:%e\n", post_neuron->core->id, post_neuron->synapse_hw->time);
+					INFO("core time:%e\n", n->core->time);
+					spikes_per_core = 0;
+					// Sync up the two times between the
+					//  sending core and receiving synapse
+					//  unit
+					// Axon output access time
+					n->core->time += 7.6e-9;
+					if (post_neuron->synapse_hw->time >
+								n->core->time)
+					{
+						n->core->time =
+						post_neuron->synapse_hw->time;
+					}
+					else
+					{
+						post_neuron->synapse_hw->time =
+							n->core->time;
+					}
 				}
 				prev_core_id = post_neuron->core->id;
-				/*
-				post_neuron->synapse_hw->energy +=
-					post_neuron->synapse_hw->energy_spike_op;
-				post_neuron->synapse_hw->time +=
-					post_neuron->synapse_hw->time_spike_op;
-				*/
-
-				post_neuron->synapse_hw->energy +=
-					post_neuron->synapse_hw->energy_spike_op;
-				if ((k % 4) == 0)
+				if ((spikes_per_core % 8) == 0)
 				{
-					// Four way parallelism
-					post_neuron->synapse_hw->time += 4.0e-9;
+					// Read word from memory
+					post_neuron->synapse_hw->energy +=
+								55.1e-12;
+					spike_processing_time += 21.0e-9;
 				}
+				post_neuron->synapse_hw->energy +=
+					post_neuron->synapse_hw->energy_spike_op;
+				if ((spikes_per_core % 4) == 0)
+				{
+					// Four way parallelism in synaptic
+					//  op generation
+					spike_processing_time += 4.0e-9;
+				}
+				spikes_per_core++;
+				post_neuron->synapse_hw->time += spike_processing_time;
+				//INFO("spike processing time:%e\n", spike_processing_time);
 
 				// TODO: support AER and other representations
 				//  Loihi sends a destination axon index
@@ -320,7 +344,7 @@ int sim_input_spikes(struct network *net)
 			post_neuron->synapse_hw->energy +=
 					post_neuron->synapse_hw->energy_spike_op;
 			post_neuron->synapse_hw->time +=
-				post_neuron->synapse_hw->time_spike_op;
+					post_neuron->synapse_hw->time_spike_op;
 
 			post_neuron->update_needed = 1;
 			post_neuron->spike_count++;
@@ -359,6 +383,7 @@ void sim_update_neuron(struct neuron *n)
 	TRACE("Updating neuron %d.%d.\n", n->group->id, n->id);
 	if (n->spike_count || n->force_update)
 	{
+		n->time += n->soma_hw->time_active_neuron_update;
 		n->soma_hw->energy +=
 			n->soma_hw->energy_active_neuron_update;
 		n->soma_hw->time +=
@@ -366,8 +391,11 @@ void sim_update_neuron(struct neuron *n)
 	}
 	else
 	{
+		// inactive neuron update cost
 		n->soma_hw->energy += 47.5e-12;
-		n->soma_hw->time += 6.1-9;
+		n->soma_hw->time += 6.1e-9;
+		n->time += 6.1e-9;
+		//n->core->time += 6.1e-9;
 	}
 	/*
 	else if (n->force_update)
@@ -440,6 +468,7 @@ void sim_update_potential(struct neuron *n)
 		assert(out != NULL);
 		out->energy += out->energy_spike_within_tile;
 		out->time += out->time_spike_within_tile;
+		n->time += out->time_spike_within_tile + 30.0e-9;
 		TRACE("out->time=%e\n", out->time);
 		TRACE("nid %d fired.\n", n->id);
 	}
@@ -481,7 +510,7 @@ double sim_calculate_time(const struct architecture *const arch, double *network
 			{
 				unit_time = fmax(unit_time, c->axon_in[k].time);
 			}
-			spike_time += unit_time;
+			//spike_time += unit_time;
 
 			unit_time = 0.0;
 			for (int k = 0; k < c->synapse_count; k++)
@@ -504,6 +533,7 @@ double sim_calculate_time(const struct architecture *const arch, double *network
 				unit_time = fmax(unit_time, c->soma[k].time);
 			}
 			neuron_time += unit_time;
+			neuron_time = c->time; // TODO: remove hack
 
 			core_time_minus_network = fmax(spike_time, neuron_time);
 			max_core_time_minus_network =
@@ -642,6 +672,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 			struct neuron *n = &(group->neurons[j]);
 			n->update_needed |= n->force_update;
 			n->spike_count = 0;
+			n->time = 0.0;
 		}
 	}
 

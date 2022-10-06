@@ -77,6 +77,7 @@ struct neuron
 	double potential, current, charge, bias, reset, threshold;
 	double potential_decay, potential_time_const;
 	double current_decay, current_time_const;
+    double time;
 	int id, is_init, fired, post_connection_count, spike_count;
 	int log_spikes, log_voltage, update_needed, force_update;
 };
