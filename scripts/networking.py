@@ -1,7 +1,7 @@
-"""First attempt at simulation run script.
+"""Run DVS Gesture and extract some network based statistics
 
-Run a few basic experiments, show how we might interface a python
-script with the simulator kernel.
+This is currently being used to explore dvs gesture rather than networking..
+I should rename
 """
 #import matplotlib
 #matplotlib.use('Agg')
@@ -11,9 +11,10 @@ import subprocess
 import yaml
 from matplotlib import pyplot as plt
 import pandas as pd
+import numpy as np
 
 ARCH_FILENAME = "loihi.arch"
-NETWORK_FILENAME = "examples/dvs_gesture.net"
+NETWORK_FILENAME = "examples/dvs_gesture_mini.net"
 
 def run_sim():
     # Create the network to run
@@ -51,6 +52,7 @@ def parse_stats(stats):
     analysis["synapse_energy"] = total[synapse_keys].sum()
     analysis["spike_gen_energy"] = total[spike_gen_energy].sum()
     analysis["network_energy"] = total[network_energy].sum()
+    analysis["times"] = stats.loc[:, "time"]
 
     return analysis
 
@@ -62,6 +64,7 @@ if __name__ == "__main__":
     spiking_spike_gen_energy = []
     spiking_synapse_energy = []
     spiking_network_energy = []
+    times = []
 
     # Use a pre-generated network for a realistic use case i.e. dvs-gesture
     analysis = run_sim()
@@ -69,6 +72,7 @@ if __name__ == "__main__":
     spiking_spike_gen_energy.append(analysis["spike_gen_energy"])
     spiking_synapse_energy.append(analysis["synapse_energy"])
     spiking_network_energy.append(analysis["network_energy"])
+    times = analysis["times"]
 
     # Write all the simulation data to csv
     #with open("sim_network.csv", "w") as spiking_csv:
@@ -95,6 +99,25 @@ if __name__ == "__main__":
     plt.xlabel("Operation Type")
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("energy_breakdown.png")
+
+    loihi_data = pd.read_csv("runs/loihi_gesture.csv")
+    loihi_times = loihi_data.loc[:, "spiking"] / 1.0e6
+    plt.figure(figsize=(15, 4))
+    plt.plot(np.arange(1, 129), times, marker='x')
+    plt.plot(np.arange(1, 129), loihi_times, marker='x')
+    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+    plt.legend(("Simulated", "Measured on Loihi"))
+    plt.ylabel("Latency (s)")
+    plt.xlabel("Timestep")
+    plt.savefig("dvs_gesture_sim.png")
+
+    voltage_data = pd.read_csv("probe_potential.csv")
+    voltages = voltage_data.loc[:, "0.0"]
+    plt.figure(figsize=(5.5, 5.5))
+    plt.plot(np.arange(1, 129), voltages)
+    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+    plt.savefig("probe_potential.png")
+
 
     with open("stats.yaml", "r") as results_file:
        results = yaml.safe_load(results_file)

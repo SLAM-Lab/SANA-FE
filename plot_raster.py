@@ -18,7 +18,7 @@ with open("probe_spikes.csv") as spike_csv:
         values = values[0:-1]  # Trim empty field at end of the line
         #s = [int(v) for v in values[-900:]]
         #s = [int(v) for v in values[-11:]]
-        s = [int(v) for v in values[:15376]]
+        s = [int(v) for v in values[0:3600]]
 
         spike_array = np.asarray(s)
         spikes = np.where(spike_array >= 1)[0]

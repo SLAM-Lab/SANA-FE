@@ -30,6 +30,7 @@ struct sim_stats sim_timestep(struct network *const net,
 #endif
 	spikes_sent = sim_input_spikes(net);
 	sim_update(net);
+	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, net);
 	INFO("Input spikes sent: %ld\n", spikes_sent);
 	spikes_sent += sim_route_spikes(net);
 
@@ -41,10 +42,9 @@ struct sim_stats sim_timestep(struct network *const net,
 	stats.total_spikes = spikes_sent;
 
 	INFO("Spikes sent: %ld\n", spikes_sent);
-	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, net);
 	if (perf_fp)
 	{
-		sim_perf_log_timestep(perf_fp, arch);
+		sim_perf_log_timestep(perf_fp, arch, &stats);
 	}
 	return stats;
 }
@@ -177,26 +177,42 @@ int sim_route_spikes(struct network *net)
 
 				// TODO: refactor to function call
 				spike_processing_time = 0.0;
+				// If a spike will be sent here, TODO this is
+				//  another temp hack, we need to do more
+				//  time simulation stuff here to make sure
+				//  we correctly parallelize the spikes being
+				//  sent. Here I'm assuming there is some kind
+				//  of backpressure, that stops more and more
+				//  spikes being sent while the previous one
+				//  is being processed
 				if (post_neuron->core->id != prev_core_id)
 				{
-					INFO("switching to core:%d new time:%e\n", post_neuron->core->id, post_neuron->synapse_hw->time);
-					INFO("core time:%e\n", n->core->time);
+					TRACE("nid:%d switching to core:%d synapse time:%e core time:%e\n", n->id, post_neuron->core->id, post_neuron->synapse_hw->time, n->core->time);
 					spikes_per_core = 0;
 					// Sync up the two times between the
 					//  sending core and receiving synapse
 					//  unit
 					// Axon output access time
 					n->core->time += 7.6e-9;
-					if (post_neuron->synapse_hw->time >
-								n->core->time)
+					if (post_neuron->synapse_hw->time > n->core->time)
 					{
-						n->core->time =
-						post_neuron->synapse_hw->time;
+						// Backpressure from rx synapse
+						//  unit
+						n->core->time = post_neuron->synapse_hw->time;
+						TRACE("nid:%d synapse time > core time\n", n->id);
 					}
 					else
 					{
+						// The core time is the limiting
+						//  factor, sync the rx synapse
+						//  time with this.
+						//  TODO: Note this
+						//  is going to break down when
+						//  multiple cores are sending
+						//  to the same synaptic unit!
 						post_neuron->synapse_hw->time =
 							n->core->time;
+						TRACE("nid:%d core time > synapse time\n", n->id);
 					}
 				}
 				prev_core_id = post_neuron->core->id;
@@ -205,7 +221,7 @@ int sim_route_spikes(struct network *net)
 					// Read word from memory
 					post_neuron->synapse_hw->energy +=
 								55.1e-12;
-					spike_processing_time += 21.0e-9;
+					spike_processing_time += 20.5e-9;
 				}
 				post_neuron->synapse_hw->energy +=
 					post_neuron->synapse_hw->energy_spike_op;
@@ -283,7 +299,6 @@ int sim_route_spikes(struct network *net)
 			}
 			n->fired = 0; // Reset the neuron for the next time step
 		}
-
 	}
 	INFO("Neurons fired: %d\n", total_neurons_fired);
 
@@ -737,6 +752,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 {
+	fprintf(fp, "time,");
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
@@ -788,12 +804,14 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 	fprintf(fp, "\n");
 }
 
-void sim_perf_log_timestep(FILE *fp, const struct architecture *arch)
+void sim_perf_log_timestep(FILE *fp, const struct architecture *arch,
+				const struct sim_stats *stats)
 {
 	// Log the energy and time simulated at every neuron, dump it to
 	//  a big csv file. Then we can post process it to pull out the parallel
 	//  time. Time doesn't make sense per neuron, only per parallel
 	//  block. Pull out energy for synapses, routers, axons and neurons
+	fprintf(fp, "%e,", stats->total_sim_time);
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);

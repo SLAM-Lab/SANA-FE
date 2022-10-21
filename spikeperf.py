@@ -146,14 +146,23 @@ def loihi_map_neuron_to_compartment(loihi_compartments):
 
 
 def create_layer(network, layer_neuron_count, loihi_compartments,
-                 log_spikes, log_voltage, force_update, threshold, reset):
+                 log_spikes, log_voltage, force_update, threshold, reset,
+                 mappings=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     print("Compartments free: {0}".format(loihi_compartments))
     layer_group = network.create_group(threshold, reset)
 
-    for _ in range(0, layer_neuron_count):
-        neuron = layer_group.create_neuron(log_spikes, log_voltage, force_update)
-        tile, core = loihi_map_neuron_to_compartment(loihi_compartments)
+    if mappings is not None:
+        assert(len(mappings) == layer_neuron_count)
+
+    for i in range(0, layer_neuron_count):
+        neuron = layer_group.create_neuron(log_spikes, log_voltage,
+                                           force_update)
+
+        if mappings is not None:
+            tile, core = mappings[i]
+        else:
+            tile, core = loihi_map_neuron_to_compartment(loihi_compartments)
         neuron.tile, neuron.core = tile, core
 
     return layer_group

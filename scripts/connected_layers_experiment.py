@@ -52,6 +52,7 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     reset = 0
     log_spikes = False
     log_voltage = False
+    force_update = False
 
     # Create layers
     layer_1 = spikeperf.create_layer(network, layer_neuron_count,
@@ -87,16 +88,39 @@ def connected_layers(weights, spiking=True):
     log_spikes = False
     log_voltage = False
 
+    # layer_mapping = [(0, 0) for _ in range(0, layer_neurons)]
+    neurons_per_core = [0, 0]
+    neurons_per_core[0] = ((layer_neurons + 1) // 2)
+    layer_mapping = [(0, 0) for _ in range(0, ((layer_neurons + 1) // 2))]
+    neurons_per_core[1] = layer_neurons // 2
+    for _ in range(0, (layer_neurons // 2)):
+        layer_mapping.append((0, 1))
+
+    layer_mapping = None
     layer_1 = spikeperf.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
-                                     reset)
+                                     reset, mappings=layer_mapping)
     force_update = False
-    threshold = 2*layer_neuron_count
+
+    #neurons_per_core = {}
+    #neurons_per_core[0] = min((layer_neuron_count //2 ), 1024 - (layer_neuron_count // 2))
+    #neurons_per_core[1] = layer_neuron_count - neurons_per_core[0]
+    #layer_mapping = []
+    #for _ in range(0, neurons_per_core[0]): layer_mapping.append((0, 0))
+    #for _ in range(0, neurons_per_core[1]): layer_mapping.append((0, 1))
+    neurons_per_core = [0, 0]
+    neurons_per_core[0] = ((layer_neurons + 1) // 2)
+    layer_mapping = [(0, 2) for _ in range(0, ((layer_neurons + 1) // 2))]
+    neurons_per_core[1] = layer_neurons // 2
+    for _ in range(0, (layer_neurons // 2)):
+        layer_mapping.append((0, 3))
+    print("neurons per core: {0}".format(neurons_per_core))
+    layer_mapping = None
     layer_2 = spikeperf.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
-                                     reset)
+                                     reset, mappings=layer_mapping)
 
     for src in layer_1.neurons:
         for dest in layer_2.neurons:
@@ -232,7 +256,7 @@ if __name__ == "__main__":
     with open("sandia_data/loihi_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
-            loihi_times_spikes.append(float(row["time"]))
+            loihi_times_spikes.append(float(row["my time"]))
             loihi_energy_spikes.append(float(row["dynamic energy"]))
 
     loihi_times_no_spikes = []
@@ -243,6 +267,7 @@ if __name__ == "__main__":
             loihi_times_no_spikes.append(float(row["time"]))
             loihi_energy_no_spikes.append(float(row["energy"]))
 
+    plt.rcParams.update({'font.size': 14})
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, spiking_times, "-o")
     plt.plot(neuron_counts, loihi_times_spikes, "--x")
