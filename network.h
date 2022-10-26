@@ -77,7 +77,7 @@ struct neuron
 	double potential, current, charge, bias, reset, threshold;
 	double potential_decay, potential_time_const;
 	double current_decay, current_time_const;
-    double time;
+	double latency;
 	int id, is_init, fired, post_connection_count, spike_count;
 	int log_spikes, log_voltage, update_needed, force_update;
 };
@@ -117,6 +117,7 @@ struct network
 
 #include "arch.h"
 void network_init(struct network *const net);
+void network_free(struct network *const net);
 int network_create_neuron(struct neuron *const n, const int log_spikes, const int log_voltages, const int force_update, const int connection_count);
 int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
@@ -124,6 +125,5 @@ int network_map_neuron(struct neuron *const n, const struct hardware_mapping);
 int net_create_inputs(struct network *const net, const int input_count, const int input_type);
 int net_create_input_node(struct input *const in, const int connection_count);
 void net_set_input(struct network *const net, const int input_id, const double rate);
-void network_free(struct network *const net);
 
 #endif

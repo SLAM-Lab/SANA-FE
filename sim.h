@@ -18,12 +18,18 @@ struct sim_stats
 	double network_time;
 };
 
+struct timing
+{
+	struct core *c;
+	int next;
+};
+
 #include "arch.h"
 #include "network.h"
 #include "stdio.h"
 struct sim_stats sim_timestep(struct network *const net, struct architecture *const arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
-int sim_route_spikes(struct network *net);
+int sim_route_spikes(struct architecture *arch, struct network *net);
 int sim_input_spikes(struct network *net);
 
 void sim_update(struct network *net);
@@ -45,4 +51,8 @@ void sim_perf_write_header(FILE *perf_fp, const struct architecture *arch);
 void sim_perf_log_timestep(FILE *fp, const struct architecture *arch, const struct sim_stats *stats);
 int sim_poisson_input(const double firing_probability);
 int sim_rate_input(const double firing_rate, double *spike_val);
+
+struct core *sim_next_timing_update(struct timing *priority);
+void sim_push_timing_update(struct timing *priority);
+
 #endif

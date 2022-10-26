@@ -12,6 +12,22 @@ void arch_init(struct architecture *const arch)
 	arch->time_barrier = 0.0;
 }
 
+void arch_free(struct architecture *const arch)
+{
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		struct tile *t = &(arch->tiles[i]);
+
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
+
+			free(c->neurons);
+			c->neurons = NULL;
+		}
+	}
+}
+
 int arch_create_noc(struct architecture *const arch, const int width,
 							const int height)
 {
@@ -159,6 +175,15 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 		c->axon_out[i].time = 0.0;
 		c->axon_out[i].t = t;
 	}
+
+	c->neuron_count = 0;
+	c->curr_neuron = 0;
+	c->neurons =(struct neuron **) malloc(sizeof(struct neuron *) * 1024);
+	for (int i = 0; i < 1024; i++)
+	{
+		c->neurons[i] = NULL;
+	}
+
 	c->energy = 0.0;
 	c->time = 0.0;
 

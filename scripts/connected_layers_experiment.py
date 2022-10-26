@@ -23,7 +23,6 @@ MAX_COMPARTMENTS = 1024
 NETWORK_FILENAME = "runs/connected_layers.net"
 ARCH_FILENAME = "loihi.arch"
 
-
 def run_sim(network, timesteps):
     network.save(NETWORK_FILENAME)
     run_command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
@@ -73,7 +72,7 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     return network
 
 
-def connected_layers(weights, spiking=True):
+def connected_layers(weights, spiking=True, mapping="luke"):
     network = spikeperf.Network()
     loihi_compartments = spikeperf.loihi_init_compartments()
 
@@ -88,35 +87,54 @@ def connected_layers(weights, spiking=True):
     log_spikes = False
     log_voltage = False
 
-    # layer_mapping = [(0, 0) for _ in range(0, layer_neurons)]
-    neurons_per_core = [0, 0]
-    neurons_per_core[0] = ((layer_neurons + 1) // 2)
-    layer_mapping = [(0, 0) for _ in range(0, ((layer_neurons + 1) // 2))]
-    neurons_per_core[1] = layer_neurons // 2
-    for _ in range(0, (layer_neurons // 2)):
-        layer_mapping.append((0, 1))
+    neurons_per_core = [0, 0, 0, 0]
+    if mapping == "luke" or mapping == "l2_split" or mapping == "fixed":
+        neurons_per_core[0] = layer_neurons
+    elif mapping == "split_2":
+        neurons_per_core[0] = ((layer_neurons + 1) // 2)
+        neurons_per_core[1] = layer_neurons // 2
+    elif mapping == "split_4":
+        neurons_per_core[0] = ((layer_neurons + 1) // 2)
+        neurons_per_core[1] = layer_neurons // 2
 
-    layer_mapping = None
+    layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
+    for _ in range(0, neurons_per_core[1]):
+        layer_mapping.append((0, 1))
+    for _ in range(0, neurons_per_core[2]):
+        layer_mapping.append((0, 2))
+    for _ in range(0, neurons_per_core[3]):
+        layer_mapping.append((0, 3))
+
     layer_1 = spikeperf.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
                                      reset, mappings=layer_mapping)
-    force_update = False
 
-    #neurons_per_core = {}
-    #neurons_per_core[0] = min((layer_neuron_count //2 ), 1024 - (layer_neuron_count // 2))
-    #neurons_per_core[1] = layer_neuron_count - neurons_per_core[0]
-    #layer_mapping = []
-    #for _ in range(0, neurons_per_core[0]): layer_mapping.append((0, 0))
-    #for _ in range(0, neurons_per_core[1]): layer_mapping.append((0, 1))
-    neurons_per_core = [0, 0]
-    neurons_per_core[0] = ((layer_neurons + 1) // 2)
-    layer_mapping = [(0, 2) for _ in range(0, ((layer_neurons + 1) // 2))]
-    neurons_per_core[1] = layer_neurons // 2
-    for _ in range(0, (layer_neurons // 2)):
+    force_update = False
+    neurons_per_core = [0, 0, 0, 0]
+    if mapping == "luke":
+        neurons_per_core[0] = min(layer_neurons, 1024 - layer_neurons)
+        neurons_per_core[1] = layer_neurons - neurons_per_core[0]
+    elif mapping == "fixed":
+        neurons_per_core[1] = layer_neurons
+    elif mapping == "split_2":
+        neurons_per_core[0] = ((layer_neurons + 1) // 2)
+        neurons_per_core[1] = layer_neurons // 2
+    elif mapping == "l2_split":
+        neurons_per_core[1] = ((layer_neurons + 1) // 2)
+        neurons_per_core[2] = layer_neurons // 2
+    elif mapping == "split_4":
+        neurons_per_core[2] = ((layer_neurons + 1) // 2)
+        neurons_per_core[3] = layer_neurons // 2
+
+    layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
+    for _ in range(0, neurons_per_core[1]):
+        layer_mapping.append((0, 1))
+    for _ in range(0, neurons_per_core[2]):
+        layer_mapping.append((0, 2))
+    for _ in range(0, neurons_per_core[3]):
         layer_mapping.append((0, 3))
-    print("neurons per core: {0}".format(neurons_per_core))
-    layer_mapping = None
+
     layer_2 = spikeperf.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
@@ -138,6 +156,7 @@ if __name__ == "__main__":
     #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
+    mapping = "split_4"
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):
@@ -182,7 +201,8 @@ if __name__ == "__main__":
         layer_neurons = i*i
 
         #network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
-        commands = connected_layers(weights[i-1].transpose(), spiking=True)
+        commands = connected_layers(weights[i-1].transpose(), spiking=True,
+                                    mapping=mapping)
         print("Testing network with {0} neurons".format(2*layer_neurons))
         results = run_sim(commands, timesteps)
 
@@ -256,7 +276,7 @@ if __name__ == "__main__":
     with open("sandia_data/loihi_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
-            loihi_times_spikes.append(float(row["my time"]))
+            loihi_times_spikes.append(float(row[mapping]))
             loihi_energy_spikes.append(float(row["dynamic energy"]))
 
     loihi_times_no_spikes = []
@@ -268,7 +288,7 @@ if __name__ == "__main__":
             loihi_energy_no_spikes.append(float(row["energy"]))
 
     plt.rcParams.update({'font.size': 14})
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(6, 6))
     plt.plot(neuron_counts, spiking_times, "-o")
     plt.plot(neuron_counts, loihi_times_spikes, "--x")
     plt.yscale("linear")
@@ -279,7 +299,7 @@ if __name__ == "__main__":
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("runs/connected_spiking_time.png")
 
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(6, 6))
     plt.plot(neuron_counts, spiking_energy, "-o")
     plt.plot(neuron_counts, loihi_energy_spikes, "--x", color="orange")
     plt.yscale("linear")
@@ -290,7 +310,7 @@ if __name__ == "__main__":
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("runs/connected_spiking_energy.png")
 
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(6, 6))
     plt.plot(neuron_counts, nonspiking_energy, "-o")
     plt.yscale("linear")
     plt.xscale("linear")
@@ -300,7 +320,7 @@ if __name__ == "__main__":
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("runs/connected_spiking_energy_sim_only.png")
 
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(6, 6))
     plt.plot(neuron_counts, nonspiking_times, "-o")
     plt.plot(neuron_counts, loihi_times_no_spikes, "--x")
     plt.yscale("linear")
@@ -311,7 +331,7 @@ if __name__ == "__main__":
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("runs/connected_not_spiking_time.png")
 
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(6, 6))
     plt.plot(neuron_counts, nonspiking_energy, "-o")
     plt.plot(neuron_counts, loihi_energy_no_spikes, "--x")
     plt.yscale("linear")
@@ -323,7 +343,7 @@ if __name__ == "__main__":
     plt.savefig("runs/connected_not_spiking_energy.png")
 
     # Some additional plots to highlight trends
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(6, 6))
     plt.plot(neuron_counts, loihi_times_spikes, "--x", color="orange")
     plt.ylabel("Time (s)")
     plt.xlabel("Neurons")

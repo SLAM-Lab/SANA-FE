@@ -214,6 +214,7 @@ int main(int argc, char *argv[])
 clean_up:
 	// Free any larger structures here
 	network_free(&net);
+	arch_free(&arch);
 	// Free any locally allocated memory here
 	free(input_buffer);
 	// Close any open files here

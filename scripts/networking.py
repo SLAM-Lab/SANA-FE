@@ -121,9 +121,9 @@ if __name__ == "__main__":
 
     with open("stats.yaml", "r") as results_file:
        results = yaml.safe_load(results_file)
-    network_percentage = (results["network_time"] /
-                                        results["time"]) * 100.0
-    print("Percentage of time used for only network: {0}".format(
-          network_percentage))
+    #network_percentage = (results["network_time"] /
+    #                                    results["time"]) * 100.0
+    #print("Percentage of time used for only network: {0}".format(
+    #      network_percentage))
 
     plt.show()

@@ -137,6 +137,9 @@ int network_map_neuron(struct neuron *const n,
 {
 	// Map the neuron to hardware units
 	n->core = map.core;
+	map.core->neurons[map.core->neuron_count] = n;
+	map.core->neuron_count++;
+
 	n->axon_in = map.axon_in;
 	n->synapse_hw = map.synapse_hw;
 	n->dendrite_hw = map.dendrite_hw;

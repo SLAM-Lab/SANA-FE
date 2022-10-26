@@ -21,10 +21,11 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 //  don't have quite as much dynamic allocation going on. If needed this can
 //  fairly easily be removed and replaced with allocating arbitrary numbers of
 //  elements off the heap e.g. in a linked list
+#define ARCH_MAX_COMPARTMENTS
 #define ARCH_MAX_TILES 128
 #define ARCH_MAX_CORES 16
-#define ARCH_MAX_LINKS 16
-#define ARCH_MAX_PROCESSORS 4
+#define ARCH_MAX_LINKS 4
+#define ARCH_MAX_PROCESSORS 2
 
 #define ARCH_INVALID_ID -1
 
@@ -38,7 +39,7 @@ struct axon_input
 struct synapse_processor
 {
 	int id;
-	double energy, time;
+	double energy, time, busy_until;
 	double energy_spike_op, time_spike_op;
 };
 
@@ -68,6 +69,8 @@ struct axon_output
 struct core
 {
 	struct tile *t;
+	struct core *next_timing;
+	struct neuron **neurons;
 	struct axon_input axon_in[ARCH_MAX_PROCESSORS];
 	struct synapse_processor synapse[ARCH_MAX_PROCESSORS];
 	struct dendrite_processor dendrite[ARCH_MAX_PROCESSORS];
@@ -76,6 +79,7 @@ struct core
 	double energy, time;
 	int id, axon_in_count, synapse_count, dendrite_count, soma_count;
 	int axon_out_count;
+	int neuron_count, curr_neuron, neurons_left;
 };
 
 struct tile
@@ -99,6 +103,7 @@ struct architecture
 };
 
 void arch_init(struct architecture *const arch);
+void arch_free(struct architecture *const arch);
 int arch_create_noc(struct architecture *const arch, const int width, const int height);
 int arch_create_tile(struct architecture *const arch, const double energy_east_west_hop, const double energy_north_south_hop, const double time_east_west_hop, const double time_north_south_hop);
 int arch_create_core(struct architecture *const arch, struct tile *const t);
