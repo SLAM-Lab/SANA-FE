@@ -23,7 +23,11 @@ void arch_free(struct architecture *const arch)
 			struct core *c = &(t->cores[j]);
 
 			free(c->neurons);
+			free(c->spikes_sent_per_core);
+			free(c->axon_map);
 			c->neurons = NULL;
+			c->spikes_sent_per_core = NULL;
+			c->axon_map = NULL;
 		}
 	}
 }
@@ -178,7 +182,9 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 
 	c->neuron_count = 0;
 	c->curr_neuron = 0;
-	c->neurons =(struct neuron **) malloc(sizeof(struct neuron *) * 1024);
+	c->neurons = (struct neuron **) malloc(sizeof(struct neuron *) * 1024);
+	c->spikes_sent_per_core = (int *) malloc(sizeof(int) * 128);
+	c->axon_map = (struct core **) malloc(sizeof(struct core *) * 128);
 	for (int i = 0; i < 1024; i++)
 	{
 		c->neurons[i] = NULL;

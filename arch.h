@@ -71,6 +71,8 @@ struct core
 	struct tile *t;
 	struct core *next_timing;
 	struct neuron **neurons;
+	struct core **axon_map;
+	int *spikes_sent_per_core;
 	struct axon_input axon_in[ARCH_MAX_PROCESSORS];
 	struct synapse_processor synapse[ARCH_MAX_PROCESSORS];
 	struct dendrite_processor dendrite[ARCH_MAX_PROCESSORS];
@@ -79,7 +81,8 @@ struct core
 	double energy, time;
 	int id, axon_in_count, synapse_count, dendrite_count, soma_count;
 	int axon_out_count;
-	int neuron_count, curr_neuron, neurons_left;
+	int neuron_count, curr_neuron, neurons_left, status;
+	int curr_axon;
 };
 
 struct tile

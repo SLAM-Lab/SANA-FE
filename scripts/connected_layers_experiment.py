@@ -156,7 +156,7 @@ if __name__ == "__main__":
     #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
-    mapping = "split_4"
+    mapping = "split_2"
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):

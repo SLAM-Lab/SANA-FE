@@ -71,6 +71,7 @@ void sim_update(struct network *net)
 			{
 				sim_update_neuron(n);
 				n->update_needed = 0;
+				n->spike_count = 0;
 			}
 			else
 			{
@@ -107,23 +108,23 @@ struct core *sim_update_timing_queue(struct architecture *arch,
 {
 	struct core *next, *tmp;
 
-	assert(top_priority != NULL);
-	next = top_priority->next_timing;
-	if ((next == NULL) || (top_priority->time < next->time))
+	if ((top_priority == NULL) || (top_priority->next_timing == NULL) ||
+			(top_priority->time <= top_priority->next_timing->time))
 	{
 		// Do nothing
 		return top_priority;
 	}
 	else
 	{
-		struct core *curr;
+		struct core *curr = top_priority;
+		next = top_priority->next_timing;
 
 		tmp = top_priority;
 		top_priority = next;
 		// reinsert core into the correct place in the priority list
 		while (next != NULL)
 		{
-			if (next->time > tmp->time)
+			if (tmp->time < next->time)
 			{
 				break;
 			}
@@ -148,7 +149,6 @@ struct core *sim_update_timing_queue(struct architecture *arch,
 int sim_route_spikes(struct architecture *arch, struct network *net)
 {
 	struct core *top_priority;
-	int spikes_sent_per_core[128];
 	const int core_count = 128; // TODO calculate
 	int total_spike_count, total_neurons_fired, cores_left;
 
@@ -209,6 +209,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 		}
 	}
 
+	// Setup timing counters
 	cores_left = core_count;
 	for (int i = 0; i < arch->tile_count; i++)
 	{
@@ -226,147 +227,196 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 		// Get the core with the earliest simulation time
 		struct core *c = top_priority;
 		// Process the next neuron for this core
-		if (c->neurons_left)
+		int nid = c->curr_neuron;
+		struct neuron *n = c->neurons[nid];
+		// Get the current update status
+		if ((c->curr_neuron >= c->neuron_count) || (!n->is_init))
 		{
-			int nid = c->curr_neuron;
-			double max_time_blocked = 0.0;
-			struct neuron *n = c->neurons[nid];
-			//INFO("Looking at neuron nid:%d for core:%d\n", nid, c->id);
+			INFO("\t(cid:%d.%d): Neuron %d not used, get next\n",
+					c->t->id, c->id, c->curr_neuron);
+			c->status = NEURON_FINISHED;
+		}
 
-			for (int i = 0; i < core_count; i++)
-			{
-				spikes_sent_per_core[i] = 0;
-			}
-
+		if (c->status == UPDATE_NEURON)
+		{
 			// Model effect of neuron updates
 			c->time += n->latency;
-			// Figure which packets need to be sent
-			if (n->is_init && n->fired)
+			INFO("(cid:%d.%d) nid:%d.%d update, time:%e\n",
+				c->t->id, c->id, n->group->id, n->id, c->time);
+
+			if (n->fired)
 			{
-				int core_count = 0;
-				for (int i = 0; i < n->post_connection_count; i++)
+				for (int k = 0; k < core_count; k++)
 				{
-					struct connection *conn = &(n->connections[i]);
-					struct neuron *post_neuron = conn->post_neuron;
+					c->spikes_sent_per_core[k] = 0;
+					c->axon_map[k] = NULL;
+				}
+				for (int k = 0; k < n->post_connection_count; k++)
+				{
+					struct connection *conn =
+							&(n->connections[k]);
+					struct neuron *post_neuron =
+								conn->post_neuron;
 					struct core *post_core = post_neuron->core;
-					spikes_sent_per_core[post_core->id]++;
+					// TODO: need a function to figure this out
+					//  or we store an absolute id in the core
+					//  OR we use a 2D array
+					int axon_id = (post_core->t->id * 4) + post_core->id;
+					c->spikes_sent_per_core[axon_id]++;
+					c->axon_map[axon_id] = post_core;
 				}
-
-				// Figure the cost of sending each packet, assuming that
-				//  each packet can be sent in parallel update the
-				//  timing of the receiving synapse.
-				// The new core time is the max of any receiving
-				//  synapses time before sending
-				max_time_blocked = 0.0;
-				for (int i = 0; i < arch->tile_count; i++)
+				INFO("\t(cid:%d.%d) [", c->t->id, c->id);
+				for (int k = 0; k < core_count; k++)
 				{
-					struct tile *t = &(arch->tiles[i]);
-					for (int j = 0; j < t->core_count; j++)
-					{
-						struct core *post_core = &(t->cores[j]);
-
-						if (spikes_sent_per_core[core_count])
-						{
-							double spike_processing_time = 0.0;
-							int memory_accesses, spike_ops;
-
-							// Block the neuron pipeline until the
-							//  last receiving synapse is ready
-							max_time_blocked = fmax(max_time_blocked,
-									post_core->synapse[0].busy_until);
-
-							// Figure out when the rx synapse
-							//  will be busy until. That means
-							//  simulating the network timing,
-							//  and the memory access time.
-							//  We assume that the axon sends
-							//  all spike packets in parallel.
-							//  If that isn't the case we have
-							//  to change this loop, because
-							//  we will have to update timings
-							//  after sending every spike
-							//  packet (so even finer grain
-							//  simulation is needed)
-							struct tile *tile_pre = post_core->t;
-							struct tile *tile_post = post_core->t;
-
-							assert(tile_pre != NULL);
-							assert(tile_post != NULL);
-							// Calculate the energy and time for
-							//  sending spike packets
-							int x_hops, y_hops;
-
-							// Axon access cost (currently assuming
-							//  all axon access are in parallel,
-							//  this might not be valid but
-							//  could be good enough)
-							c->axon_out[0].energy += 40.8e-12;
-							spike_processing_time += 7.6e-9;
-
-							spike_processing_time += c->axon_out[0].time_spike_within_tile;
-							x_hops = abs(tile_pre->x - tile_post->x);
-							y_hops = abs(tile_pre->y - tile_post->y);
-							// E-W hops
-							// TODO: record the energy of each hop at the
-							//  corresponding router, means we need to
-							//  iterate through all the x and y routers
-							// Maybe it makes sense to have this as two
-							//  options?
-							tile_pre->energy += x_hops *
-								tile_pre->energy_east_west_hop;
-							spike_processing_time += x_hops *
-								tile_pre->time_east_west_hop;
-							//printf("xhops:%d 1 hop:%e total:%e\n", x_hops, tile_pre->time_east_west_hop, x_hops * tile_pre->time_east_west_hop);
-
-							// N-S hops
-							tile_pre->energy += y_hops *
-								tile_pre->energy_north_south_hop;
-							spike_processing_time += y_hops *
-								tile_pre->time_north_south_hop;
-
-							// Read word from memory, this is a very
-							//  simplified model
-							INFO("Sending %d spikes from core %d to core %d\n", spikes_sent_per_core[post_core->id], c->id, post_core->id);
-							post_core->synapse[0].energy += spikes_sent_per_core[post_core->id] * 55.1e-12;
-							memory_accesses = (spikes_sent_per_core[post_core->id]+7) / 8;
-							spike_processing_time += memory_accesses * 28.0e-9;
-							post_core->synapse[0].energy += spikes_sent_per_core[post_core->id] * post_core->synapse[0].energy_spike_op;
-							spike_ops = spikes_sent_per_core[post_core->id];
-							spike_processing_time += spike_ops * 4.0e-9;
-
-							//INFO("spike_processing_time:%e core time:%e\n", spike_processing_time, c->time);
-							post_core->synapse[0].busy_until = c->time + spike_processing_time;
-						}
-						core_count++;
-					}
+					printf("%d,",
+						c->spikes_sent_per_core[k]);
 				}
-				c->time = fmax(c->time, max_time_blocked);
-				INFO("c->time %e max_time_blocked:%e\n", c->time, max_time_blocked);
+				printf("]\n");
+
+				c->status = SEND_SPIKES;
+				c->curr_axon = 0;
 			}
-			// Mark this neuron as processed
-			n->fired = 0; // Reset the neuron for the next time step
+			else
+			{
+				INFO("\t(cid:%d.%d) Neuron didn't fire\n",
+							c->t->id, c->id);
+				c->status = NEURON_FINISHED;
+			}
+		}
+		else if (c->status == SEND_SPIKES)
+		{
+			INFO("(cid:%d.%d) send spikes\n", c->t->id, c->id);
+			// Figure the cost of sending each packet, assuming that
+			//  each packet can be sent in parallel update the
+			//  timing of the receiving synapse.
+			// Get next packet to send
+			while ((c->curr_axon < 128) &&
+				c->spikes_sent_per_core[c->curr_axon] == 0)
+			{
+				c->curr_axon++;
+			}
+			if (c->curr_axon >= 128)
+			{
+				// No cores left to send to
+				c->status = NEURON_FINISHED;
+			}
+			else if (c->spikes_sent_per_core[c->curr_axon])
+			{
+				struct core *post_core = c->axon_map[c->curr_axon];
+				double spike_processing_time = 0.0;
+				int memory_accesses, spike_ops;
+
+				INFO("\t(cid:%d.%d) Sending %d spikes to %d.%d\n",
+					c->t->id, c->id,
+					c->spikes_sent_per_core[post_core->id],
+					post_core->t->id, post_core->id);
+
+				if (post_core->synapse[0].busy_until > c->time)
+				{
+					INFO("\t(cid:%d.%d) blocked until %e\n",
+						c->t->id, c->id,
+					post_core->synapse[0].busy_until);
+				}
+				// Block the neuron pipeline until the
+				//  receiving synapse is ready
+				c->time = fmax(c->time,
+					post_core->synapse[0].busy_until);
+
+				// Cost of accessing this axon entry
+				c->time += 7.6e-9;
+				struct tile *tile_pre = post_core->t;
+				struct tile *tile_post = post_core->t;
+
+				assert(tile_pre != NULL);
+				assert(tile_post != NULL);
+				// Calculate the energy and time for
+				//  sending spike packets
+				int x_hops, y_hops;
+
+				// Axon access cost (currently assuming
+				//  all axon access are in parallel,
+				//  this might not be valid but
+				//  could be good enough)
+				c->axon_out[0].energy += 40.8e-12;
+
+				c->time += c->axon_out[0].time_spike_within_tile;
+				//spike_processing_time +=
+				//	c->axon_out[0].time_spike_within_tile;
+				x_hops = abs(tile_pre->x - tile_post->x);
+				y_hops = abs(tile_pre->y - tile_post->y);
+				// E-W hops
+				// TODO: record the energy of each hop at the
+				//  corresponding router, means we need to
+				//  iterate through all the x and y routers
+				// Maybe it makes sense to have this as two
+				//  options?
+				tile_pre->energy += x_hops *
+					tile_pre->energy_east_west_hop;
+				//spike_processing_time += x_hops *
+				//	tile_pre->time_east_west_hop;
+				c->time += x_hops *
+					tile_pre->time_east_west_hop;
+				//printf("xhops:%d 1 hop:%e total:%e\n", x_hops, tile_pre->time_east_west_hop, x_hops * tile_pre->time_east_west_hop);
+
+				// N-S hops
+				tile_pre->energy += y_hops *
+					tile_pre->energy_north_south_hop;
+				//spike_processing_time += y_hops *
+				//	tile_pre->time_north_south_hop;
+				c->time += x_hops *
+					tile_pre->time_east_west_hop;
+
+				// Read word from memory, this is a very
+				//  simplified model
+				memory_accesses =
+				(c->spikes_sent_per_core[c->curr_axon] + 7) / 8;
+				post_core->synapse[0].energy += memory_accesses * 55.1e-12;
+				//spike_processing_time += memory_accesses * 28.0e-9;
+				spike_processing_time += memory_accesses * 23.0e-9;
+				post_core->synapse[0].energy += c->spikes_sent_per_core[c->curr_axon] * post_core->synapse[0].energy_spike_op;
+				//spike_ops = spikes_sent_per_core[post_core->id];
+				spike_ops =
+				(c->spikes_sent_per_core[c->curr_axon] + 3) / 4;
+				spike_processing_time += spike_ops * 4.0e-9;
+				post_core->synapse[0].busy_until =
+						c->time + spike_processing_time;
+					INFO("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
+					c->t->id, c->id,
+					post_core->t->id, post_core->id,
+					post_core->synapse[0].busy_until);
+				c->curr_axon++;
+			}
+		}
+		else if (c->status == NEURON_FINISHED)
+		{
+			INFO("(cid:%d.%d) neuron finished\n",
+				c->t->id, c->id);
+			if (n != NULL)
+			{
+				// Reset the neuron for the next time step
+				n->fired = 0;
+			}
+			// Get the next neuron
 			c->neurons_left--;
 			c->curr_neuron++;
-			assert(c->neurons_left >= 0);
-			assert(c->curr_neuron <= 1024);
+			if (c->neurons_left <= 0)
+			{
+				INFO("\t(cid:%d.%d) finished simulating\n",
+							c->t->id, c->id);
+				// Remove core from queue, core has finished
+				cores_left--;
+				assert(cores_left >= 0);
+				top_priority = top_priority->next_timing;
+			}
+			c->status = UPDATE_NEURON;
 		}
-		if (c->neurons_left <= 0)
+
+		top_priority = sim_update_timing_queue(arch, top_priority);
+		if (top_priority != NULL)
 		{
-			// We have finished processing all neurons in this core
-			//  so move to the next one in the queue
-			// TODO: ignore corner case when core has no neurons or
-			//  only add cores with neurons into the queue in the
-			//  first place
-			cores_left--;
-			assert(cores_left >= 0);
-			top_priority = top_priority->next_timing;
-		}
-		else
-		{
-			// Update the queue with the new timings for this core
-			//  Figure which core to update next
-			top_priority = sim_update_timing_queue(arch,
-								top_priority);
+			INFO("\t(cid:%d.%d) time:%e\n",
+				top_priority->t->id, top_priority->id,
+				top_priority->time);
 		}
 	}
 	INFO("Neurons fired: %d\n", total_neurons_fired);
@@ -470,8 +520,6 @@ void sim_update_neuron(struct neuron *n)
 		n->latency += n->soma_hw->time_active_neuron_update;
 		n->soma_hw->energy +=
 			n->soma_hw->energy_active_neuron_update;
-		n->soma_hw->time +=
-			n->soma_hw->time_active_neuron_update;
 	}
 	else
 	{
@@ -479,17 +527,7 @@ void sim_update_neuron(struct neuron *n)
 		n->soma_hw->energy += 47.5e-12;
 		n->soma_hw->time += 6.1e-9;
 		n->latency += 6.1e-9;
-		//n->core->time += 6.1e-9;
 	}
-	/*
-	else if (n->force_update)
-	{
-		n->soma_hw->energy +=
-			n->soma_hw->energy_inactive_neuron_update;
-		n->soma_hw->time +=
-			n->soma_hw->time_inactive_neuron_update;
-	}
-	*/
 }
 
 void sim_update_synapse_cuba(struct neuron *n)
@@ -697,7 +735,6 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		{
 			struct neuron *n = &(group->neurons[j]);
 			n->update_needed |= n->force_update;
-			n->spike_count = 0;
 			n->latency = 0.0;
 		}
 	}
@@ -716,6 +753,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 			// Reset core
 			c->time = 0.0;
 			c->energy = 0.0;
+			c->status = UPDATE_NEURON;
 
 			for (int k = 0; k < ARCH_MAX_PROCESSORS; k++)
 			{
