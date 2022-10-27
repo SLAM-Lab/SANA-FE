@@ -431,7 +431,6 @@ int sim_input_spikes(struct network *net)
 	// Seed all externally input spikes in the network for this timestep
 	for (int i = 0; i < net->external_input_count; i++)
 	{
-		int send_spike;
 		struct input *in = &(net->external_inputs[i]);
 
 		if (in == NULL)
@@ -441,18 +440,19 @@ int sim_input_spikes(struct network *net)
 
 		if (in->type == INPUT_EVENT)
 		{
-			send_spike = (in->spike_val > 0.0);
+			in->send_spike = (in->spike_val > 0.0);
 		}
 		else if (in->type == INPUT_POISSON)
 		{
-			send_spike = sim_poisson_input(in->rate);
+			in->send_spike = sim_poisson_input(in->rate);
 		}
 		else // INPUT_RATE)
 		{
-			send_spike = sim_rate_input(in->rate, &(in->spike_val));
+			in->send_spike =
+				sim_rate_input(in->rate, &(in->spike_val));
 		}
 
-		if (!send_spike)
+		if (!in->send_spike)
 		{
 			TRACE("not sending spike\n");
 			continue;
@@ -959,6 +959,20 @@ void sim_probe_write_header(FILE *spike_fp, FILE *potential_fp,
 {
 	// Write csv header for probe outputs - record which neurons have been
 	//  probed
+	for (int i = 0; i < net->external_input_count; i++)
+	{
+		const struct input *in = &(net->external_inputs[i]);
+
+		if (spike_fp)
+		{
+			fprintf(spike_fp, "i.%d,", in->id);
+		}
+		if (potential_fp)
+		{
+			fprintf(potential_fp, "i.%d,", in->id);
+		}
+	}
+
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{
 		const struct neuron_group *group = &(net->groups[i]);
@@ -1003,6 +1017,21 @@ void sim_probe_log_timestep(FILE *spike_fp, FILE *potential_fp,
 
 	spike_probe_count = 0;
 	potential_probe_count = 0;
+
+	for (int i = 0; i < net->external_input_count; i++)
+	{
+		const struct input *in = &(net->external_inputs[i]);
+
+		if (spike_fp)
+		{
+			fprintf(spike_fp, "%d,", in->send_spike);
+		}
+
+		if (potential_fp)
+		{
+			fprintf(potential_fp, "%lf,", in->spike_val);
+		}
+	}
 
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{

@@ -94,7 +94,7 @@ struct input
 {
 	struct connection *connections;
 	double rate, spike_val; // rate only applies to poisson and rate-based
-	int post_connection_count, type, id;
+	int post_connection_count, type, id, send_spike;
 };
 
 struct neuron_group
