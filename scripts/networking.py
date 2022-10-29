@@ -126,4 +126,4 @@ if __name__ == "__main__":
     #print("Percentage of time used for only network: {0}".format(
     #      network_percentage))
 
-    plt.show()
+    #plt.show()

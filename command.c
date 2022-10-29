@@ -718,16 +718,16 @@ int command_parse_input_spikes(struct network *const net,
 								fields[i+1]);
 			return COMMAND_FAIL;
 		}
-		else if (val < 0.0)
+		else if (val < 0)
 		{
 			INFO("Warning: id:%d input rate < 0 (%lf)\n",
 							in->id, in->spike_val);
 		}
-		else if (val > 1.0)
-		{
-			INFO("Warning: id:%d input rate > 1 (%lf)\n",
-							in->id, in->spike_val);
-		}
+		//else if (val > 1.0)
+		//{
+		//	INFO("Warning: id:%d input rate > 1 (%lf)\n",
+		//					in->id, in->spike_val);
+		//}
 		net_set_input(net, i, val);
 		INFO("Parsed input %d=%lf\n", in->id, in->spike_val);
 	}

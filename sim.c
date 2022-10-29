@@ -1075,7 +1075,7 @@ int sim_poisson_input(const double firing_probability)
 	int input_fired;
 
 	rand_uniform = (double) rand() / RAND_MAX;
-	input_fired = (rand_uniform < firing_probability);
+	input_fired = rand_uniform < firing_probability;
 
 	return input_fired;
 }
@@ -1087,17 +1087,16 @@ int sim_rate_input(const double firing_rate, double *current)
 	// Note: rate-based input (without randomization) is equivalent to a
 	//  neuron with a fixed bias.
 	TRACE("rate input:%lf\n", firing_rate);
-
-	*current += firing_rate;
-	if (*current >= 1.0)
+	if (*current > 255.0)
 	{
-		*current = 0.0;
+		*current = 0;
 		input_fired = 1;
 	}
 	else
 	{
 		input_fired = 0;
 	}
+	*current += firing_rate;
 
 	TRACE("input fired value:%d\n", input_fired);
 	return input_fired;
