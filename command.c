@@ -685,7 +685,10 @@ int command_parse_extern_input_node(struct network *const net,
 
 		con->pre_neuron = src;
 		con->post_neuron = dest;
-		con->weight = weight;
+
+		// TODO: clean up hacks, quantization effects on Loihi
+		con->weight = (int) (weight * 64*127.0);
+		con->weight = con->weight / (64*127.0);
 		TRACE("\tAdded con in[%d]->%d.%d (w:%lf)\n", in->id,
 			con->post_neuron->group->id, con->post_neuron->id,
 			con->weight);

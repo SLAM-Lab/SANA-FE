@@ -28,9 +28,10 @@ struct sim_stats sim_timestep(struct network *const net,
 	}
 	INFO("Seeded %d inputs\n", net->external_input_count);
 #endif
-	spikes_sent = sim_input_spikes(net);
 	sim_update(net);
 	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, net);
+
+	spikes_sent = sim_input_spikes(net);
 	INFO("Input spikes sent: %ld\n", spikes_sent);
 	spikes_sent += sim_route_spikes(arch, net);
 
@@ -568,7 +569,6 @@ void sim_update_potential(struct neuron *n)
 	// Clamp min potential
 	//n->potential = (n->potential < n->reset) ?
 	//				n->reset : n->potential;
-
 	TRACE("Updating potential, after:%f\n", n->potential);
 
 	if (n->potential > n->threshold)

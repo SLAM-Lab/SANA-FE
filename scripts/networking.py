@@ -16,11 +16,10 @@ import numpy as np
 ARCH_FILENAME = "loihi.arch"
 NETWORK_FILENAME = "examples/dvs_gesture_mini.net"
 
-def run_sim():
+def run_sim(timesteps):
     # Create the network to run
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
               "Log Spikes", "Log Voltage", "Synapse Info..."]
-    timesteps = 128
     command = ("./sim", ARCH_FILENAME,
                NETWORK_FILENAME, "{0}".format(timesteps),)
     print("Command: {0}".format(" ".join(command)))
@@ -65,9 +64,10 @@ if __name__ == "__main__":
     spiking_synapse_energy = []
     spiking_network_energy = []
     times = []
+    timesteps = 127
 
     # Use a pre-generated network for a realistic use case i.e. dvs-gesture
-    analysis = run_sim()
+    analysis = run_sim(timesteps)
     spiking_update_energy.append(analysis["update_energy"])
     spiking_spike_gen_energy.append(analysis["spike_gen_energy"])
     spiking_synapse_energy.append(analysis["synapse_energy"])
@@ -103,8 +103,8 @@ if __name__ == "__main__":
     loihi_data = pd.read_csv("runs/loihi_gesture.csv")
     loihi_times = loihi_data.loc[:, "spiking"] / 1.0e6
     plt.figure(figsize=(15, 4))
-    plt.plot(np.arange(1, 129), times, marker='x')
-    plt.plot(np.arange(1, 129), loihi_times, marker='x')
+    plt.plot(np.arange(1, timesteps+1), times, marker='x')
+    plt.plot(np.arange(1, timesteps+1), loihi_times[0:timesteps], marker='x')
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.legend(("Simulated", "Measured on Loihi"))
     plt.ylabel("Latency (s)")
@@ -112,12 +112,11 @@ if __name__ == "__main__":
     plt.savefig("dvs_gesture_sim.png")
 
     voltage_data = pd.read_csv("probe_potential.csv")
-    voltages = voltage_data.loc[:, "0.0"]
+    voltages = voltage_data.loc[:, "2.0"]
     plt.figure(figsize=(5.5, 5.5))
-    plt.plot(np.arange(1, 129), voltages)
+    plt.plot(np.arange(1, timesteps+1), voltages)
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("probe_potential.png")
-
 
     with open("stats.yaml", "r") as results_file:
        results = yaml.safe_load(results_file)
