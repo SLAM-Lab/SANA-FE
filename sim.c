@@ -1087,6 +1087,7 @@ int sim_rate_input(const double firing_rate, double *current)
 	// Note: rate-based input (without randomization) is equivalent to a
 	//  neuron with a fixed bias.
 	TRACE("rate input:%lf\n", firing_rate);
+	*current += firing_rate;
 	if (*current > 255.0)
 	{
 		*current = 0;
@@ -1096,7 +1097,6 @@ int sim_rate_input(const double firing_rate, double *current)
 	{
 		input_fired = 0;
 	}
-	*current += firing_rate;
 
 	TRACE("input fired value:%d\n", input_fired);
 	return input_fired;

@@ -1,8 +1,8 @@
 """Compress spike train data for a chosen layer, same as snntoolbox format"""
 import csv
 
-#layer = 'i'
-layer = 0
+layer = 'i'
+#layer = 0
 spikes = []
 
 with open("probe_spikes.csv", "r") as csvfile:
@@ -29,7 +29,7 @@ spike_neurons = [spike[1] for spike in spikes]
 
 # Now print in the new format
 with open("spiketrain.csv", "w") as csvfile:
-    writer = csv.writer(csvfile) 
+    writer = csv.writer(csvfile)
     writer.writerow(spike_neurons)
     writer.writerow(spike_times)
 

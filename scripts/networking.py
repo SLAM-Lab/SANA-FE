@@ -112,7 +112,7 @@ if __name__ == "__main__":
     plt.savefig("dvs_gesture_sim.png")
 
     voltage_data = pd.read_csv("probe_potential.csv")
-    voltages = voltage_data.loc[:, "2.0"]
+    voltages = voltage_data.loc[:, "0.0"]
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(np.arange(1, timesteps+1), voltages)
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
