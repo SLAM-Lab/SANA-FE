@@ -105,10 +105,13 @@ class Neuron:
     def add_connection(self, dest, weight):
         self.connections.append((dest, weight))
 
+    def add_bias(self, bias):
+        self.bias = bias
+
     def to_command(self):
-        command = "n {0} {1} {2} {3} {4}".format(
-            self.group_id, self.id, int(self.log_spikes), int(self.log_voltage),
-            int(self.force_update))
+        command = "n {0} {1} {2} {3} {4} {5}".format(
+            self.group_id, self.id, bias,
+            int(self.log_spikes), int(self.log_voltage), int(self.force_update))
 
         for connection in self.connections:
             dest_neuron, weight = connection

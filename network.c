@@ -74,6 +74,7 @@ int network_create_neuron_group(struct network *net,
 }
 
 int network_create_neuron(struct neuron *const n,
+					const double bias,
 					const int log_spikes,
 					const int log_voltages,
 					const int force_update,
@@ -91,6 +92,7 @@ int network_create_neuron(struct neuron *const n,
 		return NETWORK_INVALID_NID;
 	}
 
+	n->bias = bias;
 	n->log_spikes = log_spikes;
 	n->log_voltage = log_voltages;
 	n->force_update = force_update;

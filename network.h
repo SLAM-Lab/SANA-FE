@@ -22,6 +22,7 @@ enum neuron_config_format
 	NEURON_COMMAND = 0,
 	NEURON_GROUP_ID,
 	NEURON_ID,
+	NEURON_BIAS,
 	NEURON_RECORD_SPIKES, // Record any spikes to a CSV file
 	NEURON_RECORD_VOLTAGE, // Write the voltage to a CSV file every timestep
 	NEURON_FORCE_UPDATE,
@@ -118,7 +119,7 @@ struct network
 #include "arch.h"
 void network_init(struct network *const net);
 void network_free(struct network *const net);
-int network_create_neuron(struct neuron *const n, const int log_spikes, const int log_voltages, const int force_update, const int connection_count);
+int network_create_neuron(struct neuron *const n, const double bias, const int log_spikes, const int log_voltages, const int force_update, const int connection_count);
 int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
 int network_map_neuron(struct neuron *const n, const struct hardware_mapping);

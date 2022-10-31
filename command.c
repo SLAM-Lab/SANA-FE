@@ -327,6 +327,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 {
 	struct neuron_group *group;
 	struct neuron *n;
+	double bias;
 	int neuron_group_id, neuron_id, connection_count;
 	int log_spikes, log_voltage, force_update, ret;
 
@@ -339,6 +340,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 	}
 	ret = sscanf(fields[NEURON_GROUP_ID], "%d", &neuron_group_id);
 	ret += sscanf(fields[NEURON_ID], "%d", &neuron_id);
+	ret += sscanf(fields[NEURON_BIAS], "%lf", &bias);
 	ret += sscanf(fields[NEURON_RECORD_SPIKES], "%d", &log_spikes);
 	ret += sscanf(fields[NEURON_RECORD_VOLTAGE], "%d", &log_voltage);
 	ret += sscanf(fields[NEURON_FORCE_UPDATE], "%d", &force_update);
@@ -369,7 +371,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 		return COMMAND_FAIL;
 	}
 	n = &(group->neurons[neuron_id]);
-	ret = network_create_neuron(n, log_spikes, log_voltage,
+	ret = network_create_neuron(n, bias, log_spikes, log_voltage,
 				force_update, connection_count);
 	if (ret == NETWORK_INVALID_NID)
 	{
