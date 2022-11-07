@@ -2,7 +2,7 @@
 import csv
 
 #layer = 'i'
-layer = 0
+layer = 3
 spikes = []
 
 with open("probe_spikes.csv", "r") as csvfile:
@@ -17,7 +17,7 @@ with open("probe_spikes.csv", "r") as csvfile:
             spiked = int(row[n])
             if spiked != 0:
                 neuron_id = n.split('.')[1]
-                spikes.append((timestep, int(neuron_id)))
+                spikes.append((timestep+1, int(neuron_id)))
 
         timestep += 1
 

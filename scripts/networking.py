@@ -14,7 +14,8 @@ import pandas as pd
 import numpy as np
 
 ARCH_FILENAME = "loihi.arch"
-NETWORK_FILENAME = "examples/dvs_gesture_mini.net"
+NETWORK_FILENAME = "examples/dvs_gesture_32x32_test16.net"
+LOIHI_DATA_FILENAME = "runs/loihi_gesture_32x32_16.csv"
 
 def run_sim(timesteps):
     # Create the network to run
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("energy_breakdown.png")
 
-    loihi_data = pd.read_csv("runs/loihi_gesture.csv")
+    loihi_data = pd.read_csv(LOIHI_DATA_FILENAME)
     loihi_times = loihi_data.loc[:, "spiking"] / 1.0e6
     plt.figure(figsize=(15, 4))
     plt.plot(np.arange(1, timesteps+1), times, marker='x')
