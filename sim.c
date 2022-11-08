@@ -90,6 +90,7 @@ struct core *sim_init_timing_priority(struct architecture *arch)
 	// Initialize in reverse order, but assuming all cores start time
 	//  synchronized (time ==), this is arbitrary
 	for (int i = (arch->tile_count-1); i >= 0; i--)
+	//for (int i = 11; i >= 0; i--)
 	{
 		struct tile *t = &(arch->tiles[i]);
 		for (int j = (t->core_count-1); j >= 0; j--)
@@ -99,6 +100,11 @@ struct core *sim_init_timing_priority(struct architecture *arch)
 			c->next_timing = next;
 			next = c;
 		}
+	}
+
+	for (struct core *curr = next; curr != NULL; curr = curr->next_timing)
+	{
+		INFO("curr:%d.%d\n", curr->t->id, curr->id);\
 	}
 
 	return next;
@@ -223,7 +229,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 		}
 	}
 
-	while(cores_left)
+	while(cores_left && (top_priority != NULL))
 	{
 		// Get the core with the earliest simulation time
 		struct core *c = top_priority;
@@ -237,6 +243,13 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 					c->t->id, c->id, c->curr_neuron);
 			c->status = NEURON_FINISHED;
 		}
+		// Hack to ignore time measurements for the input layer
+		/*
+		else if (c->neurons[c->curr_neuron]->group->id == 0) // input layer
+		{
+			c->status = NEURON_FINISHED;
+		}
+		*/
 
 		if (c->status == UPDATE_NEURON)
 		{
@@ -325,7 +338,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 
 				// Cost of accessing this axon entry
 				c->time += 7.6e-9;
-				struct tile *tile_pre = post_core->t;
+				struct tile *tile_pre = c->t;
 				struct tile *tile_post = post_core->t;
 
 				assert(tile_pre != NULL);
@@ -339,6 +352,8 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				//  this might not be valid but
 				//  could be good enough)
 				c->axon_out[0].energy += 40.8e-12;
+
+				//c->time = fmax(c->time, tile_pre->busy_until);
 
 				c->time += c->axon_out[0].time_spike_within_tile;
 				//spike_processing_time +=
@@ -364,8 +379,8 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 					tile_pre->energy_north_south_hop;
 				//spike_processing_time += y_hops *
 				//	tile_pre->time_north_south_hop;
-				c->time += x_hops *
-					tile_pre->time_east_west_hop;
+				c->time += y_hops *
+					tile_pre->time_north_south_hop;
 
 				// Read word from memory, this is a very
 				//  simplified model
@@ -380,7 +395,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				(c->spikes_sent_per_core[c->curr_axon] + 3) / 4;
 				spike_processing_time += spike_ops * 4.0e-9;
 				post_core->synapse[0].busy_until =
-						c->time + spike_processing_time;
+					c->time + spike_processing_time;
 					INFO("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
 					c->t->id, c->id,
 					post_core->t->id, post_core->id,
@@ -747,6 +762,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		// Reset tile
 		t->energy = 0.0;
 		t->time = 0.0;
+		t->busy_until = 0.0;
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);

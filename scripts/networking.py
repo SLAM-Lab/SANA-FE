@@ -14,8 +14,8 @@ import pandas as pd
 import numpy as np
 
 ARCH_FILENAME = "loihi.arch"
-NETWORK_FILENAME = "examples/dvs_gesture_32x32_test16.net"
-LOIHI_DATA_FILENAME = "runs/loihi_gesture_32x32_16.csv"
+NETWORK_FILENAME = "examples/dvs_gesture_32x32_i16.net" # Input 16, 32x32 net
+LOIHI_DATA_FILENAME = "runs/loihi_gesture_32x32_i16.csv"
 
 def run_sim(timesteps):
     # Create the network to run
@@ -104,6 +104,7 @@ if __name__ == "__main__":
     loihi_data = pd.read_csv(LOIHI_DATA_FILENAME)
     loihi_times = loihi_data.loc[:, "spiking"] / 1.0e6
     plt.figure(figsize=(15, 4))
+    print(times)
     plt.plot(np.arange(1, timesteps+1), times, marker='x')
     plt.plot(np.arange(1, timesteps+1), loihi_times[0:timesteps], marker='x')
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
@@ -112,12 +113,14 @@ if __name__ == "__main__":
     plt.xlabel("Timestep")
     plt.savefig("dvs_gesture_sim.png")
 
+    """
     voltage_data = pd.read_csv("probe_potential.csv")
     voltages = voltage_data.loc[:, "0.0"]
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(np.arange(1, timesteps+1), voltages)
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("probe_potential.png")
+    """
 
     with open("stats.yaml", "r") as results_file:
        results = yaml.safe_load(results_file)

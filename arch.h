@@ -94,6 +94,7 @@ struct tile
 	double energy, time;
 	double energy_east_west_hop, time_east_west_hop;
 	double energy_north_south_hop, time_north_south_hop;
+	double busy_until;
 	int id, x, y, core_count;
 	int max_dimensions, width; // For now just support 2 dimensions
 };
