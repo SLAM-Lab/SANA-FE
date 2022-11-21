@@ -1,8 +1,7 @@
 """Compress spike train data for a chosen layer, same as snntoolbox format"""
 import csv
 
-#layer = 'i'
-layer = 3
+layer = '1'
 spikes = []
 
 with open("probe_spikes.csv", "r") as csvfile:

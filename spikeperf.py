@@ -157,6 +157,8 @@ def create_layer(network, layer_neuron_count, loihi_compartments,
     layer_group = network.create_group(threshold, reset)
 
     if mappings is not None:
+        print("mappings: {0} len({1}) layer_neuron_count: {2}".format(
+            mappings, len(mappings), layer_neuron_count))
         assert(len(mappings) == layer_neuron_count)
 
     for i in range(0, layer_neuron_count):

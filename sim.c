@@ -45,7 +45,7 @@ struct sim_stats sim_timestep(struct network *const net,
 	INFO("Spikes sent: %ld\n", spikes_sent);
 	if (perf_fp)
 	{
-		sim_perf_log_timestep(perf_fp, arch, &stats);
+		sim_perf_log_timestep(perf_fp, arch, net, &stats);
 	}
 	return stats;
 }
@@ -157,10 +157,10 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 {
 	struct core *top_priority;
 	const int core_count = 128; // TODO calculate
-	int total_spike_count, total_neurons_fired, cores_left;
+	int total_spike_count, cores_left;
 
 	total_spike_count = 0;
-	total_neurons_fired = 0;
+	net->total_neurons_fired = 0;
 
 	top_priority = sim_init_timing_priority(arch);
 
@@ -194,7 +194,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 			{
 				continue;
 			}
-			total_neurons_fired++;
+			net->total_neurons_fired++;
 			TRACE("Routing for nid:%d post_connection_count:%d\n",
 					n->id, n->post_connection_count);
 			// Send all spikes to receiving neurons, updating
@@ -237,6 +237,8 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 		int nid = c->curr_neuron;
 		struct neuron *n = c->neurons[nid];
 		// Get the current update status
+		INFO("curr_neuron:%d neuron_count:%d\n", c->curr_neuron, c->neuron_count);
+		fflush(stdout);
 		if ((c->curr_neuron >= c->neuron_count) || (!n->is_init))
 		{
 			INFO("\t(cid:%d.%d): Neuron %d not used, get next\n",
@@ -331,15 +333,19 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 						c->t->id, c->id,
 					post_core->synapse[0].busy_until);
 				}
-				// Block the neuron pipeline until the
-				//  receiving synapse is ready
-				c->time = fmax(c->time,
-					post_core->synapse[0].busy_until);
 
+				// Modeling tile as occupied while the network
+				//  is used
 				// Cost of accessing this axon entry
 				c->time += 7.6e-9;
+
+				// Block the neuron pipeline until the
+				//  receiving synapse is ready
 				struct tile *tile_pre = c->t;
 				struct tile *tile_post = post_core->t;
+				c->time = fmax(c->time, tile_pre->busy_until);
+				c->time = fmax(c->time,
+					post_core->synapse[0].busy_until);
 
 				assert(tile_pre != NULL);
 				assert(tile_post != NULL);
@@ -351,11 +357,11 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				//  all axon access are in parallel,
 				//  this might not be valid but
 				//  could be good enough)
+				c->axon_out[0].total_packets_sent++;
 				c->axon_out[0].energy += 40.8e-12;
-
-				//c->time = fmax(c->time, tile_pre->busy_until);
-
 				c->time += c->axon_out[0].time_spike_within_tile;
+				tile_post->busy_until =
+					fmax(tile_post->busy_until, c->time);
 				//spike_processing_time +=
 				//	c->axon_out[0].time_spike_within_tile;
 				x_hops = abs(tile_pre->x - tile_post->x);
@@ -381,6 +387,9 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				//	tile_pre->time_north_south_hop;
 				c->time += y_hops *
 					tile_pre->time_north_south_hop;
+
+				arch->total_hops += x_hops;
+				arch->total_hops += y_hops;
 
 				// Read word from memory, this is a very
 				//  simplified model
@@ -435,7 +444,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				top_priority->time);
 		}
 	}
-	INFO("Neurons fired: %d\n", total_neurons_fired);
+	INFO("Neurons fired: %ld\n", net->total_neurons_fired);
 
 	return total_spike_count;
 }
@@ -742,6 +751,9 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 	// TODO: refactor in network resets vs architecture design resets?
 	// Reset any neuron related measurements or settings for the beginning
 	//  of the timestep
+	arch->total_hops = 0;
+	net->total_neurons_fired = 0;
+	
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{
 		struct neuron_group *group = &(net->groups[i]);
@@ -819,6 +831,9 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 {
 	fprintf(fp, "time,");
+	fprintf(fp, "fired,");
+	fprintf(fp, "packets,");
+	fprintf(fp, "hops,");
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
@@ -871,13 +886,17 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 }
 
 void sim_perf_log_timestep(FILE *fp, const struct architecture *arch,
-				const struct sim_stats *stats)
+				const struct network *net, const struct sim_stats *stats)
 {
 	// Log the energy and time simulated at every neuron, dump it to
 	//  a big csv file. Then we can post process it to pull out the parallel
 	//  time. Time doesn't make sense per neuron, only per parallel
 	//  block. Pull out energy for synapses, routers, axons and neurons
 	fprintf(fp, "%e,", stats->total_sim_time);
+	fprintf(fp, "%ld,", net->total_neurons_fired);
+	fprintf(fp, "%ld,", stats->total_packets_sent);
+	fprintf(fp, "%ld,", arch->total_hops);
+
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);

@@ -90,12 +90,13 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     neurons_per_core = [0, 0, 0, 0]
     if mapping == "luke" or mapping == "l2_split" or mapping == "fixed":
         neurons_per_core[0] = layer_neurons
-    elif mapping == "split_2":
+    elif (mapping == "split_2" or mapping == "l1_split" or mapping == "split_4"
+          or mapping == "split_4_diff_tiles"):
         neurons_per_core[0] = ((layer_neurons + 1) // 2)
         neurons_per_core[1] = layer_neurons // 2
-    elif mapping == "split_4":
-        neurons_per_core[0] = ((layer_neurons + 1) // 2)
-        neurons_per_core[1] = layer_neurons // 2
+    else:
+        print("Error: mapping not supported")
+        exit(1)
 
     layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
     for _ in range(0, neurons_per_core[1]):
@@ -111,7 +112,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
                                      reset, mappings=layer_mapping)
 
     force_update = False
-    neurons_per_core = [0, 0, 0, 0]
+    neurons_per_core = [0, 0, 0, 0, 0]
     if mapping == "luke":
         neurons_per_core[0] = min(layer_neurons, 1024 - layer_neurons)
         neurons_per_core[1] = layer_neurons - neurons_per_core[0]
@@ -126,6 +127,12 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     elif mapping == "split_4":
         neurons_per_core[2] = ((layer_neurons + 1) // 2)
         neurons_per_core[3] = layer_neurons // 2
+    elif mapping == "l1_split":
+        neurons_per_core[2] = layer_neurons
+    elif mapping == "split_4_diff_tiles":
+        neurons_per_core[2] = ((layer_neurons + 1) // 2)
+        neurons_per_core[3] = 0
+        neurons_per_core[4] = layer_neurons // 2
 
     layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
     for _ in range(0, neurons_per_core[1]):
@@ -134,6 +141,8 @@ def connected_layers(weights, spiking=True, mapping="luke"):
         layer_mapping.append((0, 2))
     for _ in range(0, neurons_per_core[3]):
         layer_mapping.append((0, 3))
+    for _ in range(0, neurons_per_core[4]):
+        layer_mapping.append((1, 0))
 
     layer_2 = spikeperf.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
@@ -156,7 +165,8 @@ if __name__ == "__main__":
     #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
-    mapping = "split_2"
+    #mapping = "split_4_diff_tiles"
+    mapping = "luke"
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):
@@ -287,19 +297,21 @@ if __name__ == "__main__":
             loihi_times_no_spikes.append(float(row["time"]))
             loihi_energy_no_spikes.append(float(row["energy"]))
 
-    plt.rcParams.update({'font.size': 14})
-    plt.figure(figsize=(5.5, 5.5))
+    plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
+
+    plt.figure(figsize=(3.0, 3.0))
     plt.plot(neuron_counts, spiking_times, "-o")
     plt.plot(neuron_counts, loihi_times_spikes, "--x")
     plt.yscale("linear")
     plt.xscale("linear")
-    plt.ylabel("Time (s)")
+    plt.ylabel("Time-step Latency (s)")
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured on Loihi"))
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_time.png")
+    plt.tight_layout()
+    plt.savefig("runs/connected_spiking_time.pdf")
 
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(3.0, 3.0))
     plt.plot(neuron_counts, spiking_energy, "-o")
     plt.plot(neuron_counts, loihi_energy_spikes, "--x", color="orange")
     plt.yscale("linear")
@@ -308,7 +320,8 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured on Loihi"))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_energy.png")
+    plt.tight_layout()
+    plt.savefig("runs/connected_spiking_energy.pdf")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, nonspiking_energy, "-o")

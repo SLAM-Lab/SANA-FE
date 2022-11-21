@@ -104,6 +104,8 @@ struct architecture
 	struct tile tiles[ARCH_MAX_TILES];
 	double time_barrier;
 	int tile_count, initialized;
+
+	long int total_hops;
 };
 
 void arch_init(struct architecture *const arch);

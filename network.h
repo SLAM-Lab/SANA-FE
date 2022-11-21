@@ -114,6 +114,7 @@ struct network
 	struct neuron_group groups[NETWORK_MAX_NEURON_GROUPS];
 	struct input *external_inputs;
 	int neuron_group_count, external_input_count;
+	long int total_neurons_fired;
 };
 
 #include "arch.h"
