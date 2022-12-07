@@ -39,6 +39,7 @@ struct sim_stats sim_timestep(struct network *const net, struct architecture *co
 int sim_route_spikes(struct architecture *arch, struct network *net);
 int sim_input_spikes(struct network *net);
 
+void sim_copy_buffers(struct neuron *n);
 void sim_update(struct network *net);
 void sim_update_neuron(struct neuron *n);
 void sim_update_synapse_cuba(struct neuron *n);
@@ -49,6 +50,7 @@ void sim_update_axon(struct neuron *n);
 void sim_reset_measurements(struct network *net, struct architecture *arch);
 double sim_calculate_energy(const struct architecture *const arch, const double time);
 double sim_calculate_time(const struct architecture *const arch, double *network_time);
+double sim_calculate_time_old(const struct architecture *const arch);
 long int sim_calculate_packets(const struct architecture *arch);
 
 void sim_write_summary(FILE *fp, const struct sim_stats *stats);

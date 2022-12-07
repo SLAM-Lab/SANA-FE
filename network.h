@@ -75,8 +75,12 @@ struct neuron
 	struct axon_output *axon_out;
 	struct axon_input *axon_in;
 
-	double potential, current, charge, bias, reset, threshold;
+	double potential, current, d_currents[1], charge, bias, reset, threshold;
 	double potential_decay, potential_time_const;
+
+	double charge_buffer, d_currents_buffer[1], current_buffer;
+	int fired_buffer;
+
 	double current_decay, current_time_const;
 	double latency;
 	int id, is_init, fired, post_connection_count, spike_count;
