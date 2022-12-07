@@ -185,6 +185,8 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 	c->neurons = (struct neuron **) malloc(sizeof(struct neuron *) * 1024);
 	c->spikes_sent_per_core = (int *) malloc(sizeof(int) * 128);
 	c->axon_map = (struct core **) malloc(sizeof(struct core *) * 128);
+	//c->message_processing_time =
+	//			(struct double **) malloc(sizeof(double) * 128);
 	for (int i = 0; i < 1024; i++)
 	{
 		c->neurons[i] = NULL;
@@ -250,6 +252,7 @@ int arch_create_synapse(struct architecture *const arch, struct core *const c,
 	s->time_spike_op = time_spike_op;
 
 	c->synapse_count++;
+	s->buffer_in = 0;
 	TRACE("Created synapse processor %d (c:%d.%d)\n",
 						s->id, c->t->id, c->id);
 
@@ -280,6 +283,8 @@ int arch_create_soma(struct architecture *const arch, struct core *const c,
 	s->energy_inactive_neuron_update = energy_inactive_neuron_update;
 	s->time_inactive_neuron_update = time_inactive_neuron_update;
 
+	s->buffer_in = 1;
+
 	c->soma_count++;
 	TRACE("Created soma processor %d (c:%d.%d)\n",
 						s->id, c->t->id, c->id);
@@ -305,10 +310,11 @@ int arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	out->time = 0.0;
 	out->energy_spike_within_tile = spike_energy;
 	out->time_spike_within_tile = spike_time;
+	out->buffer_in = 0;
 
 	// Track the tile the axon interfaces with
 	out->t = c->t;
-	c->axon_out_count++;
+	//out->axon_out_count++;
 
 	TRACE("Created axon output %d (c:%d.%d)\n", out->id, c->t->id, c->id);
 

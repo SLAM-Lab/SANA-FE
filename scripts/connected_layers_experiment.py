@@ -166,7 +166,8 @@ if __name__ == "__main__":
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     #mapping = "split_4_diff_tiles"
-    mapping = "luke"
+    mapping = "split_2"
+    #mapping = "fixed"
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):
@@ -205,9 +206,9 @@ if __name__ == "__main__":
     spiking_times = []
     spiking_energy = []
 
-    #for i in range(1, 4):
     timesteps = 1
-    for i in range(1, 31):
+    for i in range(1, 30):
+    #for i in range(1, 4):
         layer_neurons = i*i
 
         #network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
@@ -299,7 +300,7 @@ if __name__ == "__main__":
 
     plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
 
-    plt.figure(figsize=(3.0, 3.0))
+    plt.figure(figsize=(2.5, 2.5))
     plt.plot(neuron_counts, spiking_times, "-o")
     plt.plot(neuron_counts, loihi_times_spikes, "--x")
     plt.yscale("linear")
@@ -310,8 +311,9 @@ if __name__ == "__main__":
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.tight_layout()
     plt.savefig("runs/connected_spiking_time.pdf")
+    plt.savefig("runs/connected_spiking_time.png")
 
-    plt.figure(figsize=(3.0, 3.0))
+    plt.figure(figsize=(2.5, 2.5))
     plt.plot(neuron_counts, spiking_energy, "-o")
     plt.plot(neuron_counts, loihi_energy_spikes, "--x", color="orange")
     plt.yscale("linear")
@@ -322,9 +324,10 @@ if __name__ == "__main__":
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.tight_layout()
     plt.savefig("runs/connected_spiking_energy.pdf")
+    plt.savefig("runs/connected_spiking_energy.png")
 
     plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neuron_counts, nonspiking_energy, "-o")
+    plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
     plt.yscale("linear")
     plt.xscale("linear")
     plt.ylabel("Energy (J)")
@@ -334,8 +337,8 @@ if __name__ == "__main__":
     plt.savefig("runs/connected_spiking_energy_sim_only.png")
 
     plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neuron_counts, nonspiking_times, "-o")
-    plt.plot(neuron_counts, loihi_times_no_spikes, "--x")
+    plt.plot(neuron_counts, nonspiking_times[0:-1], "-o")
+    plt.plot(neuron_counts, loihi_times_no_spikes[0:-1], "--x")
     plt.yscale("linear")
     plt.xscale("linear")
     plt.ylabel("Time (s)")
@@ -345,8 +348,8 @@ if __name__ == "__main__":
     plt.savefig("runs/connected_not_spiking_time.png")
 
     plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neuron_counts, nonspiking_energy, "-o")
-    plt.plot(neuron_counts, loihi_energy_no_spikes, "--x")
+    plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
+    plt.plot(neuron_counts, loihi_energy_no_spikes[0:-1], "--x")
     plt.yscale("linear")
     plt.xscale("linear")
     plt.ylabel("Energy (J)")
@@ -355,6 +358,7 @@ if __name__ == "__main__":
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("runs/connected_not_spiking_energy.png")
 
+    """
     # Some additional plots to highlight trends
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, loihi_times_spikes, "--x", color="orange")
@@ -363,5 +367,5 @@ if __name__ == "__main__":
     plt.legend(("Measured on Loihi",))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("runs/connected_spiking_time_loihi_only.png")
-
+    """
     #plt.show()

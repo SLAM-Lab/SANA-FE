@@ -12,6 +12,7 @@ import yaml
 from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
+import os
 
 ARCH_FILENAME = "loihi.arch"
 NETWORK_FILENAME = "examples/dvs_gesture_32x32_i16.net" # Input 16, 32x32 net
@@ -22,17 +23,13 @@ def run_sim(timesteps):
     # Create the network to run
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
               "Log Spikes", "Log Voltage", "Synapse Info..."]
+    #timesteps = 100000
     command = ("./sim", ARCH_FILENAME,
                NETWORK_FILENAME, "{0}".format(timesteps),)
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
 
-    # Parse the detailed perf statistics
-    print("Reading performance data")
-    stats = pd.read_csv("perf.csv")
-    analysis = parse_stats(stats)
-
-    return analysis
+    return
 
 
 def parse_stats(stats):
@@ -116,7 +113,13 @@ if __name__ == "__main__":
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
 
     # Use a pre-generated network for a realistic use case i.e. dvs-gesture
-    analysis = run_sim(timesteps)
+    run_sim(timesteps)
+    # Parse the detailed perf statistics
+    print("Reading performance data")
+    stats = pd.read_csv("perf.csv")
+    analysis = parse_stats(stats)
+
+
     spiking_update_energy.append(analysis["update_energy"])
     spiking_spike_gen_energy.append(analysis["spike_gen_energy"])
     spiking_synapse_energy.append(analysis["synapse_energy"])
@@ -188,7 +191,7 @@ if __name__ == "__main__":
     plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
     loihi_data = pd.read_csv(LOIHI_TIME_DATA_FILENAME)
     loihi_times = loihi_data.loc[:, "spiking"] / 1.0e6
-    plt.figure(figsize=(7.0, 3.0))
+    plt.figure(figsize=(5.0, 2.5))
     plt.plot(np.arange(1, timesteps+1), times, "-o")
     plt.plot(np.arange(1, timesteps+1), loihi_times[0:timesteps], "--x")
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
@@ -200,7 +203,7 @@ if __name__ == "__main__":
     plt.savefig("dvs_gesture_sim_time.pdf")
 
     # Plot the correlation between simulated and measured time-step latency
-    plt.figure(figsize=(3.0, 3.0))
+    plt.figure(figsize=(2.5, 2.5))
     plt.plot(times, loihi_times[0:timesteps], "x")
     plt.plot(np.linspace(min(times), max(times)), np.linspace(min(times), max(times)), "k--")
     plt.xticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
@@ -211,6 +214,7 @@ if __name__ == "__main__":
     plt.xlabel("Simulated Latency (s)")
     plt.tight_layout()
     plt.savefig("dvs_gesture_sim_correlation.pdf")
+    plt.savefig("dvs_gesture_sim_correlation.png")
 
     # Calculate total error
     relative_error = abs(loihi_times[0:timesteps] - times) / loihi_times[0:timesteps]
@@ -223,7 +227,7 @@ if __name__ == "__main__":
     loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_FILENAME)
     loihi_energies = loihi_data.loc[:, "spiking"] / 1.0e6
     print(loihi_energies)
-    plt.figure(figsize=(15, 4))
+    plt.figure(figsize=(15, 2.5))
     plt.plot(np.arange(1, timesteps+1), energies, marker='x')
     plt.plot(np.arange(1, timesteps+1), loihi_energies[0:timesteps], marker='x')
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
@@ -232,17 +236,35 @@ if __name__ == "__main__":
     plt.xlabel("Timestep")
     plt.savefig("dvs_gesture_sim_energy.png")
 
+    # Plot the potential probes from simulation
+    layers = ("inputs", "0Conv2D_15x15x16", "1Conv2D_13x13x32",
+             "2Conv2D_11x11x64", "3Conv2D_9x9x11", "5Dense_11")
+    layer_sizes = (1024, 3600, 5408, 7744, 891, 11)
+    thresholds = (255, 293, 486, 510, 1729, 473)
     voltage_data = pd.read_csv("probe_potential.csv")
-    probes = []
-    #for i in range(0, 32):
-    for i in range(33,35):
-        probes.append("1.{0}".format(i))
-    voltages = voltage_data.loc[:, probes]
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(np.arange(1, timesteps+1), voltages)
-    plt.legend(probes)
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("probe_potential.png")
+
+    plt.rcParams.update({'font.size': 12, 'lines.markersize': 5})
+    plot_neurons = {"inputs": [], "0Conv2D_15x15x16": [50, 67], "1Conv2D_13x13x32": [], "2Conv2D_11x11x64": [], "3Conv2D_9x9x11": [], "5Dense_11":[]}
+    for layer_id, layer in enumerate(layers):
+        layer_path = "runs/potentials/{0}".format(layer)
+        if not os.path.exists(layer_path):
+            os.makedirs(layer_path)
+
+        for neuron_id in plot_neurons[layer]:
+            voltages = voltage_data.loc[:, "{0}.{1}".format(
+                layer_id, neuron_id)]
+            plt.figure(figsize=(5.5, 5.5))
+            plt.plot(np.arange(1, timesteps+1), voltages*64, "-x")
+            plt.plot(np.arange(1, timesteps+1),
+                     np.ones(timesteps) * thresholds[layer_id] * 64)
+            #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+            plt.ylabel("Membrane Potential")
+            plt.xlabel("Time-step")
+            #plt.ylim((-0.2, 1.0))
+            plt.tight_layout()
+            plt.savefig("{0}/probe_voltage_{1}.png".format(layer_path,
+                                                           neuron_id))
+            plt.close()
 
     with open("stats.yaml", "r") as results_file:
        results = yaml.safe_load(results_file)

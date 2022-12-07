@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
 		//  no inputs
 		for (int i = 0; i < timesteps; i++)
 		{
-			INFO("*** Time-step %d ***\n", i+1);
+			//INFO("*** Time-step %d ***\n", i+1);
 			run(&net, &arch, &stats, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 		}
@@ -274,8 +274,8 @@ void run(struct network *net, struct architecture *arch,
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 	stats->wall_time =
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
-	INFO("Time-step took: %fs.\n",
-		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
+	//INFO("Time-step took: %fs.\n",
+	//	(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
 }
 
 /*

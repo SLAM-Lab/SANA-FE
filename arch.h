@@ -32,26 +32,26 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 struct axon_input
 {
 	struct tile *t;
-	int id, packet_size;
+	int id, packet_size, buffer_in;
 	double energy, time;
 };
 
 struct synapse_processor
 {
-	int id;
+	int id, buffer_in;
 	double energy, time, busy_until;
 	double energy_spike_op, time_spike_op;
 };
 
 struct dendrite_processor
 {
-	int id;
+	int id, buffer_in;
 	double energy, time;
 };
 
 struct soma_processor
 {
-	int id;
+	int id, buffer_in;
 	double energy, time;
 	double energy_active_neuron_update, time_active_neuron_update;
 	double energy_inactive_neuron_update, time_inactive_neuron_update;
@@ -60,7 +60,7 @@ struct soma_processor
 struct axon_output
 {
 	struct tile *t;
-	int id;
+	int id, buffer_in;
 	long int total_packets_sent;
 	double energy, time;
 	double energy_spike_within_tile, time_spike_within_tile;
@@ -72,6 +72,7 @@ struct core
 	struct core *next_timing;
 	struct neuron **neurons;
 	struct core **axon_map;
+	double **message_processing_time;
 	int *spikes_sent_per_core;
 	struct axon_input axon_in[ARCH_MAX_PROCESSORS];
 	struct synapse_processor synapse[ARCH_MAX_PROCESSORS];

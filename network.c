@@ -46,14 +46,19 @@ int network_create_neuron_group(struct network *net,
 
 		n->fired = 0;
 		n->potential = 0.0;
-		n->charge = 0.0;
 		n->current = 0.0;
+		n->charge = 0.0;
 		n->bias = 0.0;
 		n->threshold = group->default_threshold;
 		n->reset = group->default_reset;
 		n->update_needed = 0;
 		n->spike_count = 0;
 		n->connections = NULL;
+
+		n->charge_buffer = 0.0;
+		n->d_currents_buffer[0] = 0.0;
+		n->current_buffer = 0.0;
+		n->fired_buffer = 0;
 
 		// Initially the neuron is not mapped to anything
 		n->core = NULL;
