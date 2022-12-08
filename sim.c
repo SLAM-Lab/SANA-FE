@@ -370,6 +370,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 		// Get the core with the earliest simulation time
 		struct core *c = top_priority;
 		// Process the next neuron for this core
+		int spike_ops;
 		int nid = c->curr_neuron;
 		struct neuron *n = c->neurons[nid];
 		// Get the current update status
@@ -463,14 +464,14 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 			{
 				struct core *post_core = c->axon_map[c->curr_axon];
 				double spike_processing_time = 0.0;
-				int memory_accesses, spike_ops;
+				int memory_accesses;
 
 				TRACE("\t(cid:%d.%d) Sending %d spikes to %d.%d\n",
 					c->t->id, c->id,
 					c->spikes_sent_per_core[post_core->id],
 					post_core->t->id, post_core->id);
 
-				if (post_core->synapse[0].time > c->time)
+				if (post_core->synapse[0].busy_until > c->time)
 				{
 					TRACE("\t(cid:%d.%d) blocked until %e\n",
 						c->t->id, c->id,
@@ -489,7 +490,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				struct tile *tile_post = post_core->t;
 				//c->time = fmax(c->time, tile_post->busy_until);
 				c->time = fmax(c->time,
-					post_core->synapse[0].time);
+					post_core->synapse[0].busy_until);
 
 				assert(tile_pre != NULL);
 				assert(tile_post != NULL);
@@ -548,19 +549,21 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				post_core->synapse[0].energy += memory_accesses * 55.1e-12;
 				//spike_processing_time += memory_accesses * 28.0e-9;
 				spike_processing_time += memory_accesses * 23.0e-9;
+				post_core->synapse[0].time += memory_accesses * 23.0e-9;
 				post_core->synapse[0].energy += c->spikes_sent_per_core[c->curr_axon] * post_core->synapse[0].energy_spike_op;
 				//spike_ops = spikes_sent_per_core[post_core->id];
 				spike_ops =
 					(c->spikes_sent_per_core[c->curr_axon]
 								+ 3) / 4;
+				spike_processing_time += spike_ops * 4.0e-9;
 				post_core->synapse[0].time += spike_ops * 4.0e-9;
 
-				post_core->synapse[0].time =
+				post_core->synapse[0].busy_until =
 					c->time + spike_processing_time;
 					TRACE("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
 					c->t->id, c->id,
 					post_core->t->id, post_core->id,
-					post_core->synapse[0].time);
+					post_core->synapse[0].busy_until);
 				c->curr_axon++;
 			}
 		}
