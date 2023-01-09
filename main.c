@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
 		//  no inputs
 		for (int i = 0; i < timesteps; i++)
 		{
-			//INFO("*** Time-step %d ***\n", i+1);
+			INFO("*** Time-step %d ***\n", i+1);
 			run(&net, &arch, &stats, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 		}

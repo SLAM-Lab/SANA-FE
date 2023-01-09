@@ -6,7 +6,6 @@
 //  for any design) is a series of elements:
 /*
 axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
-
 (spikes in) (spikes to current) (process input)    (membrane update)(spikes out)
 */
 // Note importantly that a single processor might handle a bunch of neurons
@@ -25,9 +24,18 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 #define ARCH_MAX_TILES 128
 #define ARCH_MAX_CORES 16
 #define ARCH_MAX_LINKS 4
-#define ARCH_MAX_PROCESSORS 2
 
 #define ARCH_INVALID_ID -1
+
+enum buffer_positions
+{
+	BUFFER_AXON_IN = 0,	// Buffer incoming packets
+	BUFFER_SYNAPSE,		// Buffer synaptic addresses
+	BUFFER_DENDRITE,	// Buffer synaptic current
+	BUFFER_SOMA,		// Buffer dendritic current
+	BUFFER_AXON_OUT,	// Buffer axon addresses i.e. spikes out
+	BUFFER_POSITIONS,
+};
 
 enum neuron_models
 {
@@ -38,28 +46,30 @@ enum neuron_models
 struct axon_input
 {
 	struct tile *t;
-	int id, packet_size, buffer_in, packets_buffer, spikes_buffer;
+	int packet_size, buffer_in, packets_buffer, spikes_buffer;
 	long int packets_in;
 	double energy, time;
 };
 
 struct synapse_processor
 {
-	int id, buffer_in, spikes_buffer;
+	int buffer_in, spikes_buffer;
+	int weights_per_word, word_bits, weight_bits;
 	long int total_spikes, memory_reads;
 	double energy, time, busy_until;
-	double energy_spike_op, time_spike_op;
+	double energy_spike_op, energy_memory_access;
+	double time_spike_op, time_memory_access;
 };
 
 struct dendrite_processor
 {
-	int id, buffer_in;
+	int buffer_in;
 	double energy, time;
 };
 
 struct soma_processor
 {
-	int id, buffer_in, model;
+	int buffer_in, model;
 	long int updates, spikes_sent;
 	double energy, time;
 	double energy_active_neuron_update, time_active_neuron_update;
@@ -70,10 +80,10 @@ struct soma_processor
 struct axon_output
 {
 	struct tile *t;
-	int id, buffer_in;
+	int buffer_in;
 	long int packets_out;
 	double energy, time;
-	double energy_spike_within_tile, time_spike_within_tile;
+	double energy_access, time_access;
 };
 
 struct core
@@ -84,14 +94,13 @@ struct core
 	struct core **axon_map;
 	double **message_processing_time;
 	int *spikes_sent_per_core;
-	struct axon_input axon_in[ARCH_MAX_PROCESSORS];
-	struct synapse_processor synapse[ARCH_MAX_PROCESSORS];
-	struct dendrite_processor dendrite[ARCH_MAX_PROCESSORS];
-	struct soma_processor soma[ARCH_MAX_PROCESSORS];
-	struct axon_output axon_out[ARCH_MAX_PROCESSORS];
+	struct axon_input axon_in;
+	struct synapse_processor synapse;
+	struct dendrite_processor dendrite;
+	struct soma_processor soma;
+	struct axon_output axon_out;
 	double energy, time;
-	int id, axon_in_count, synapse_count, dendrite_count, soma_count;
-	int axon_out_count;
+	int id, buffer_pos;
 	int neuron_count, curr_neuron, neurons_left, status;
 	int curr_axon;
 };
@@ -105,6 +114,7 @@ struct tile
 	double energy, time;
 	double energy_east_west_hop, time_east_west_hop;
 	double energy_north_south_hop, time_north_south_hop;
+	double energy_spike_within_tile, time_spike_within_tile;
 	double busy_until;
 	int id, x, y, core_count;
 	int max_dimensions, width; // For now just support 2 dimensions
@@ -124,9 +134,9 @@ void arch_free(struct architecture *const arch);
 int arch_create_noc(struct architecture *const arch, const int width, const int height);
 int arch_create_tile(struct architecture *const arch, const double energy_east_west_hop, const double energy_north_south_hop, const double time_east_west_hop, const double time_north_south_hop);
 int arch_create_core(struct architecture *const arch, struct tile *const t);
-int arch_create_axon_in(struct architecture *const arch, struct core *const c);
-int arch_create_synapse(struct architecture *const arch, struct core *const c, const double energy_spike_op, const double time_spike_op);
-int arch_create_soma(struct architecture *const arch, struct core *const c, int model, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update, double energy_spiking, double time_spiking);
-int arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
+void arch_create_axon_in(struct architecture *const arch, struct core *const c);
+void arch_create_synapse(struct architecture *const arch, struct core *const c, const int weight_bits, const int word_bits, const double energy_spike_op, const double time_spike_op, const double energy_memory_access, const double time_memory_access);
+void arch_create_soma(struct architecture *const arch, struct core *const c, int model, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update, double energy_spiking, double time_spiking);
+void arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
 
 #endif

@@ -166,7 +166,7 @@ if __name__ == "__main__":
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     #mapping = "split_4_diff_tiles"
-    mapping = "split_2"
+    mapping = "luke"
     #mapping = "fixed"
     """
     for cores in core_count:

@@ -457,11 +457,11 @@ int command_map_hardware(struct network *const net, struct architecture *arch,
 	c = &(t->cores[core_id]);
 	map.core = c;
 	// TODO: support mapping to different hardware blocks
-	map.axon_in = &(c->axon_in[0]);
-	map.synapse_hw = &(c->synapse[0]);
-	map.dendrite_hw = &(c->dendrite[0]);
-	map.soma_hw = &(c->soma[0]);
-	map.axon_out = &(c->axon_out[0]);
+	map.axon_in = &(c->axon_in);
+	map.synapse_hw = &(c->synapse);
+	map.dendrite_hw = &(c->dendrite);
+	map.soma_hw = &(c->soma);
+	map.axon_out = &(c->axon_out);
 
 	return network_map_neuron(n, map);
 }
@@ -484,7 +484,8 @@ int command_parse_axon_input(struct architecture *const arch,
 	t = &(arch->tiles[tile_id]);
 	c = &(t->cores[core_id]);
 
-	return arch_create_axon_in(arch, c);
+	arch_create_axon_in(arch, c);
+	return COMMAND_OK;
 }
 
 int command_parse_synapse(struct architecture *const arch,
@@ -493,14 +494,18 @@ int command_parse_synapse(struct architecture *const arch,
 {
 	struct tile *t;
 	struct core *c;
-	double op_energy, op_time;
-	int tile_id, core_id, ret;
+	double spike_energy, spike_time, memory_energy, memory_time;
+	int tile_id, core_id, weight_bits, word_bits, ret;
 
 	ret = sscanf(fields[1], "%d", &tile_id);
 	ret += sscanf(fields[2], "%d", &core_id);
-	ret += sscanf(fields[3], "%lf", &op_energy);
-	ret += sscanf(fields[4], "%lf", &op_time);
-	if (ret < 4)
+	ret += sscanf(fields[3], "%d", &weight_bits);
+	ret += sscanf(fields[4], "%d", &word_bits);
+	ret += sscanf(fields[5], "%lf", &spike_energy);
+	ret += sscanf(fields[6], "%lf", &spike_time);
+	ret += sscanf(fields[7], "%lf", &memory_energy);
+	ret += sscanf(fields[8], "%lf", &memory_time);
+	if (ret < 8)
 	{
 		INFO("Error: Couldn't parse synapse processor.\n");
 		return COMMAND_FAIL;
@@ -508,7 +513,9 @@ int command_parse_synapse(struct architecture *const arch,
 	t = &(arch->tiles[tile_id]);
 	c = &(t->cores[core_id]);
 
-	return arch_create_synapse(arch, c, op_energy, op_time);
+	arch_create_synapse(arch, c, weight_bits, word_bits,
+			spike_energy, spike_time, memory_energy, memory_time);
+	return COMMAND_OK;
 }
 
 int command_parse_soma(struct architecture *const arch,
@@ -542,9 +549,10 @@ int command_parse_soma(struct architecture *const arch,
 	t = &(arch->tiles[tile_id]);
 	c = &(t->cores[core_id]);
 
-	return arch_create_soma(arch, c, model, active_energy, active_time,
+	arch_create_soma(arch, c, model, active_energy, active_time,
 				inactive_energy, inactive_time,
 				spiking_energy, spiking_time);
+	return COMMAND_OK;
 }
 
 int command_parse_axon_output(struct architecture *arch,
@@ -571,7 +579,8 @@ int command_parse_axon_output(struct architecture *arch,
 	TRACE("Parsed axon output: spike energy:%e time:%e\n",
 						spike_energy, spike_time);
 
-	return arch_create_axon_out(arch, c, spike_energy, spike_time);
+	arch_create_axon_out(arch, c, spike_energy, spike_time);
+	return COMMAND_OK;
 }
 
 int command_parse_extern_input_group(struct network *const net,

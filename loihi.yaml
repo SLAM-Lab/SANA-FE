@@ -21,8 +21,15 @@ architecture:
 
   tile:
     - name: loihi_tile[0..31]
+      attributes:
+        blocking: True
+        cost:
+          energy: 1.7e-12
+          time: 2.1e-9
       core:
         - name: loihi_core[0..3]
+          attributes:
+            blocking: True
           axon_in:
             - name: core_in
               # axon_in acts like input ports to the arch or subtree.
@@ -39,12 +46,12 @@ architecture:
                 hard_reset: True
                 soft_reset: True
                 cost:
-                  active:
-                    energy: 81.0e-12
-                    time: 8.4e-9
                   inactive:
                     energy: 47.5e-12
                     time: 6.1e-9
+                  active:
+                    energy: 81.0e-12
+                    time: 9.6e-9
                   spiking:
                     energy: 60.0e-12
                     time: 30.0e-9
@@ -52,18 +59,19 @@ architecture:
             - name: core_synapses
               attributes:
                 model: cuba
-                weight_bits: 4
-                cost: # Synaptic spike op cost accounted for here
-                  energy: 23.6e-12
-                  time: 3.5e-9
+                weight_bits: 8
+                word_bits: 64
+                cost:
+                  spike:
+                    energy: 23.6e-12
+                    time: 4.0e-9
+                  memory:
+                    energy: 55.1e-12
+                    time: 23.0e-9
           dendrite:
           - name: core_dendrites
             attributes:
-              model: leaky_integrate
-              cost: # Same as soma (uses same compartment hardware)
-                energy: 81.0e-12
-                time: 8.4e-9
-                #operations: and, or, multiply
+
           axon_out:
             - name: core_out
               # axon_out acts like output ports. Loihi needs to figure out the
@@ -75,6 +83,5 @@ architecture:
                 fan_out: 4096
                 protocol: dest_axon
                 cost:
-                  energy: 1.7e-12
-                  time: 2.1e-9
-
+                  energy: 40.8e-12
+                  time: 7.6e-9

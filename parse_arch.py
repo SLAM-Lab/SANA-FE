@@ -117,26 +117,29 @@ def parse_core(core_dict, tile_id):
 
 
 def parse_synapse(element_dict, tile_id, core_id):
-    # TODO: parse the number of elements to create
     attributes = element_dict["attributes"]
 
     print(attributes)
     model = attributes["model"]
     weight_bits = attributes["weight_bits"]
+    word_bits = attributes["word_bits"]
 
     synaptic_op_energy, synaptic_op_time = 0.0, 0.0
     if "cost" in attributes:
         costs = attributes["cost"]
-        synaptic_op_energy, synaptic_op_time = costs["energy"], costs["time"]
+        synaptic_op_energy, synaptic_op_time = costs["spike"]["energy"], costs["spike"]["time"]
+        memory_access_energy = costs["memory"]["energy"]
+        memory_access_time = costs["memory"]["time"]
 
-    return create_synapse(tile_id, core_id, model, weight_bits,
-                          synaptic_op_energy, synaptic_op_time)
+    return create_synapse(tile_id, core_id, model, weight_bits, word_bits,
+                          synaptic_op_energy, synaptic_op_time,
+                          memory_access_energy, memory_access_time)
 
 
 def parse_axon_out(element_dict, tile_id, core_id):
     attributes = element_dict["attributes"]
     spike_energy, spike_time = 0.0, 0.0
-    if "cost" in attributes:
+    if attributes is not None and "cost" in attributes:
         costs = attributes["cost"]
         spike_energy, spike_time = costs["energy"], costs["time"]
 
@@ -152,7 +155,7 @@ def parse_soma(element_dict, tile_id, core_id):
     inactive_energy, inactive_time = 0.0, 0.0
 
     attributes = element_dict["attributes"]
-    if "cost" in attributes:
+    if attributes is not None and "cost" in attributes:
         costs = attributes["cost"]
         model = attributes["model"]
         active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
@@ -167,7 +170,7 @@ def parse_soma(element_dict, tile_id, core_id):
 def parse_dendrite(element_dict, tile_id, core_id):
     attributes = element_dict["attributes"]
     update_energy, update_time = 0.0, 0.0
-    if "cost" in attributes:
+    if attributes is not None and "cost" in attributes:
         costs = attributes["cost"]
         update_energy, update_time = costs["energy"], costs["time"]
     return create_dendrite(tile_id, core_id, update_energy, update_time)
@@ -252,17 +255,19 @@ def create_core(tile_id):
     return core_id
 
 
-def create_synapse(tile_id, core_id, synapse_model, bits, synaptic_op_energy,
-                   synaptic_op_time):
+def create_synapse(tile_id, core_id, synapse_model, weight_bits, word_bits,
+                   synaptic_op_energy, synaptic_op_time, memory_access_energy,
+                   memory_access_time):
     synapse_id = _synapses_in_core[tile_id][core_id]
     _synapses_in_core[tile_id][core_id] += 1
 
-    # TODO: more features
-    #models = { "cuba": 0 }
-    #model_id = models[synapse_model]
-
-    synapse = "s {0} {1} {2} {3}".format(tile_id, core_id, synaptic_op_energy,
-                                         synaptic_op_time)
+    synapse = "s {0} {1} {2} {3} {4} {5} {6} {7}".format(tile_id, core_id,
+                                         weight_bits,
+                                         word_bits,
+                                         synaptic_op_energy,
+                                         synaptic_op_time,
+                                         memory_access_energy,
+                                         memory_access_time)
     _command_list.append(synapse)
 
     return synapse_id
@@ -282,9 +287,6 @@ def create_soma(tile_id, core_id, model, active_energy, active_time,
                 inactive_energy, inactive_time, spiking_energy, spiking_time):
     soma_id = _somas_in_core[tile_id][core_id]
     _somas_in_core[tile_id][core_id] += 1
-    #soma = "+ {0} {1} {2} {3} {4} {5} {6} {7} {8}".format(tile_id, core_id,
-    #        model, active_energy, active_time, inactive_energy, inactive_time,
-    #        spiking_energy, spiking_time)
 
     soma = f"+ {tile_id} {core_id} {model} {active_energy} {active_time} {inactive_energy} {inactive_time} {spiking_energy} {spiking_time}"
     _command_list.append(soma)

@@ -155,30 +155,22 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 	c->id = core_id;
 	c->t = t;
 
-	for (int i = 0; i < ARCH_MAX_PROCESSORS; i++)
-	{
-		c->axon_in[i].id = i;
-		c->axon_in[i].energy = 0.0;
-		c->axon_in[i].time = 0.0;
-		c->axon_in[i].t = t;
+	c->axon_in.energy = 0.0;
+	c->axon_in.time = 0.0;
+	c->axon_in.t = t;
 
-		c->synapse[i].id = i;
-		c->synapse[i].energy = 0.0;
-		c->synapse[i].time = 0.0;
+	c->synapse.energy = 0.0;
+	c->synapse.time = 0.0;
 
-		c->dendrite[i].id = i;
-		c->dendrite[i].energy = 0.0;
-		c->dendrite[i].time = 0.0;
+	c->dendrite.energy = 0.0;
+	c->dendrite.time = 0.0;
 
-		c->soma[i].id = i;
-		c->soma[i].energy = 0.0;
-		c->soma[i].time = 0.0;
+	c->soma.energy = 0.0;
+	c->soma.time = 0.0;
 
-		c->axon_out[i].id = i;
-		c->axon_out[i].energy = 0.0;
-		c->axon_out[i].time = 0.0;
-		c->axon_out[i].t = t;
-	}
+	c->axon_out.energy = 0.0;
+	c->axon_out.time = 0.0;
+	c->axon_out.t = t;
 
 	c->neuron_count = 0;
 	c->curr_neuron = 0;
@@ -195,71 +187,60 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 	c->energy = 0.0;
 	c->time = 0.0;
 
-	c->axon_in_count = 0;
-	c->synapse_count = 0;
-	c->dendrite_count = 0;
-	c->soma_count = 0;
-	c->axon_out_count = 0;
-
 	TRACE("Core created id:%d (tile:%d).\n", c->id, t->id);
 	return c->id;
 }
 
-int arch_create_axon_in(struct architecture *const arch, struct core *const c)
+void arch_create_axon_in(struct architecture *const arch, struct core *const c)
 {
 	struct axon_input *in;
-	int count = c->axon_in_count;
 
-	if (c->axon_in_count >= ARCH_MAX_PROCESSORS)
-	{
-		INFO("Error: Max %d axon inputs\n", ARCH_MAX_PROCESSORS);
-		return ARCH_INVALID_ID;
-	}
-
-	in = &(c->axon_in[count]);
+	in = &(c->axon_in);
 	in->energy = 0.0;
 	in->time = 0.0;
 	in->packet_size = 0;
 	// We already know a valid tile was given at this point
 	in->t = c->t;
 
-	c->axon_in_count++;
-
 	TRACE("Created axon input %d (c:%d.%d)\n",
 						in->id, c->t->id, c->id);
 
-	return in->id;
+	return;
 }
 
-int arch_create_synapse(struct architecture *const arch, struct core *const c,
-					const double energy_spike_op,
-					const double time_spike_op)
+void arch_create_synapse(struct architecture *const arch, struct core *const c,
+						const int weight_bits,
+						const int word_bits,
+						const double energy_spike_op,
+						const double time_spike_op,
+						const double energy_memory_read,
+						const double time_memory_read)
 {
 	struct synapse_processor *s;
-	int count = c->synapse_count;
 
-	if (c->synapse_count >= ARCH_MAX_PROCESSORS)
-	{
-		INFO("Error: Max %d synapse processors\n", ARCH_MAX_PROCESSORS);
-		return ARCH_INVALID_ID;
-	}
-
-	s = &(c->synapse[count]);
+	s = &(c->synapse);
 	s->energy = 0.0;
 	s->time = 0.0;
 
 	s->energy_spike_op = energy_spike_op;
 	s->time_spike_op = time_spike_op;
 
-	c->synapse_count++;
+	// The word size is the number of bits accessed with each memory read.
+	//  The weight size is the number of bits for a single synaptic weight.
+	//  A single memory read might return multiple weights
+	s->weight_bits = weight_bits;
+	s->word_bits = word_bits;
+	// Round up to the nearest word
+	s->weights_per_word = (word_bits + (weight_bits - 1)) / weight_bits;
+
 	s->buffer_in = 0;
 	TRACE("Created synapse processor %d (c:%d.%d)\n",
 						s->id, c->t->id, c->id);
 
-	return s->id;
+	return;
 }
 
-int arch_create_soma(struct architecture *const arch, struct core *const c,
+void arch_create_soma(struct architecture *const arch, struct core *const c,
 			int model,
 			double energy_active_neuron_update,
 			double time_active_neuron_update,
@@ -269,15 +250,8 @@ int arch_create_soma(struct architecture *const arch, struct core *const c,
 			double time_spiking)
 {
 	struct soma_processor *s;
-	int count = c->soma_count;
 
-	if (c->synapse_count >= ARCH_MAX_PROCESSORS)
-	{
-		INFO("Error: Max %d synapse processors\n", ARCH_MAX_PROCESSORS);
-		return ARCH_INVALID_ID;
-	}
-
-	s = &(c->soma[count]);
+	s = &(c->soma);
 	s->energy = 0.0;
 	s->time = 0.0;
 
@@ -291,31 +265,23 @@ int arch_create_soma(struct architecture *const arch, struct core *const c,
 
 	s->buffer_in = 1;
 
-	c->soma_count++;
 	TRACE("Created soma processor %d (c:%d.%d)\n",
 						s->id, c->t->id, c->id);
 
-	return s->id;
+	return;
 }
 
-int arch_create_axon_out(struct architecture *const arch, struct core *const c,
-			const double spike_energy, const double spike_time)
+void arch_create_axon_out(struct architecture *const arch, struct core *const c,
+			const double access_energy, const double access_time)
 {
 	struct axon_output *out;
-	int count = c->axon_out_count;
 
-	if (count >= ARCH_MAX_PROCESSORS)
-	{
-		INFO("Error: Max %d axon outputs\n", ARCH_MAX_PROCESSORS);
-		return ARCH_INVALID_ID;
-	}
-
-	out = &(c->axon_out[count]);
+	out = &(c->axon_out);
 	out->packets_out = 0;
 	out->energy = 0.0;
 	out->time = 0.0;
-	out->energy_spike_within_tile = spike_energy;
-	out->time_spike_within_tile = spike_time;
+	out->energy_access = access_energy;
+	out->time_access = access_time;
 	out->buffer_in = 0;
 
 	// Track the tile the axon interfaces with
@@ -323,34 +289,5 @@ int arch_create_axon_out(struct architecture *const arch, struct core *const c,
 
 	TRACE("Created axon output %d (c:%d.%d)\n", out->id, c->t->id, c->id);
 
-	return out->id;
+	return;
 }
-
-/*
-static struct core *arch_get_core(struct architecture *const arch,
-					const int tile_id, const int core_id)
-{
-	struct tile *t;
-	struct core *c;
-
-	// Make some extra sanity checks on the user input, there's no
-	//  guarantees the ids point to a valid tile or core
-	if (tile_id >= arch->tile_count)
-	{
-		INFO("Error: Accessing invalid tile: %d (max:%d)\n",
-						tile_id, arch->tile_count);
-		exit(1);
-	}
-	t = &(arch->tiles[tile_id]);
-
-	if (core_id >= t->core_count)
-	{
-		INFO("Error: Accessing invalid core: %d (max:%d)\n",
-						core_id, t->core_count);
-		exit(1);
-	}
-	c = &(t->cores[core_id]);
-
-	return c;
-}
-*/
