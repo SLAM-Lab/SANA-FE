@@ -1,7 +1,4 @@
 """Parse architecture description YAML file, output machine-readable list"""
-# TODO: It seems obviously better to send a number of instances to the API
-#  rather than just calling the API a number of times with the exact same
-#  element. But does it make sense for every element. Or just neurons?
 import yaml
 
 def parse(arch_dict):
@@ -57,7 +54,7 @@ def parse_arch(arch_dict):
         parse_tile(tile, network_attributes)
 
     create_noc(8, 4)
-    return 
+    return
 
 
 def parse_tile(tile_dict, network_attributes):
@@ -159,9 +156,11 @@ def parse_soma(element_dict, tile_id, core_id):
         costs = attributes["cost"]
         active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
         inactive_energy, inactive_time = costs["inactive"]["energy"], costs["inactive"]["time"]
+        spiking_energy, spiking_time = costs["spiking"]["energy"], costs["spiking"]["time"]
 
     return create_soma(tile_id, core_id, active_energy, active_time,
-                                            inactive_energy, inactive_time)
+                        inactive_energy, inactive_time, spiking_energy,
+                        spiking_time)
 
 
 def parse_dendrite(element_dict, tile_id, core_id):
@@ -279,12 +278,12 @@ def create_dendrite(tile_id, core_id, update_energy, update_time):
 
 _somas = []
 def create_soma(tile_id, core_id, active_energy, active_time, inactive_energy,
-                                                            inactive_time):
+                    inactive_time, spiking_energy, spiking_time):
     soma_id = _somas_in_core[tile_id][core_id]
     _somas_in_core[tile_id][core_id] += 1
-    soma = "+ {0} {1} {2} {3} {4} {5}".format(tile_id, core_id,
-                                                active_energy, active_time,
-                                                inactive_energy, inactive_time)
+    soma = "+ {0} {1} {2} {3} {4} {5} {6} {7}".format(tile_id, core_id,
+            active_energy, active_time, inactive_energy, inactive_time,
+            spiking_energy, spiking_time)
     _command_list.append(soma)
 
 

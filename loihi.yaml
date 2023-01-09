@@ -38,8 +38,8 @@ architecture:
                     energy: 47.5e-12
                     time: 6.1e-9
                   spiking:
-                    energy: ?
-                    time: ?
+                    energy: 60.0e-12
+                    time: 30.0e-9
           synapse:
             - name: core_synapses
               attributes:
