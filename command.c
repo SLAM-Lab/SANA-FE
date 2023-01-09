@@ -343,7 +343,6 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 	ret += sscanf(fields[NEURON_BIAS], "%lf", &bias);
 	ret += sscanf(fields[NEURON_RECORD_SPIKES], "%d", &log_spikes);
 	ret += sscanf(fields[NEURON_RECORD_VOLTAGE], "%d", &log_voltage);
-	log_voltage = 1; // TODO: fix hack, just regenerate the network..
 	ret += sscanf(fields[NEURON_FORCE_UPDATE], "%d", &force_update);
 
 	if (ret < (NEURON_FIELDS-1))
@@ -518,6 +517,7 @@ int command_parse_soma(struct architecture *const arch,
 	struct tile *t;
 	struct core *c;
 	double active_energy, active_time, inactive_energy, inactive_time;
+	double spiking_energy, spiking_time;
 	int tile_id, core_id, ret;
 
 	ret = sscanf(fields[1], "%d", &tile_id);
@@ -526,7 +526,9 @@ int command_parse_soma(struct architecture *const arch,
 	ret += sscanf(fields[4], "%lf", &active_time);
 	ret += sscanf(fields[5], "%lf", &inactive_energy);
 	ret += sscanf(fields[6], "%lf", &inactive_time);
-	if (ret < 2)
+	ret += sscanf(fields[7], "%lf", &spiking_energy);
+	ret += sscanf(fields[8], "%lf", &spiking_time);
+	if (ret < 8)
 	{
 		INFO("Error: Couldn't parse soma processor.\n");
 		return COMMAND_FAIL;
@@ -535,7 +537,8 @@ int command_parse_soma(struct architecture *const arch,
 	c = &(t->cores[core_id]);
 
 	return arch_create_soma(arch, c, active_energy, active_time,
-				inactive_energy, inactive_time);
+				inactive_energy, inactive_time,
+				spiking_energy, spiking_time);
 }
 
 int command_parse_axon_output(struct architecture *arch,

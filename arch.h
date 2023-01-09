@@ -32,13 +32,13 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 struct axon_input
 {
 	struct tile *t;
-	int id, packet_size, buffer_in;
+	int id, packet_size, buffer_in, packets_buffer, spikes_buffer;
 	double energy, time;
 };
 
 struct synapse_processor
 {
-	int id, buffer_in;
+	int id, buffer_in, spikes_buffer, total_spikes;
 	double energy, time, busy_until;
 	double energy_spike_op, time_spike_op;
 };
@@ -55,6 +55,7 @@ struct soma_processor
 	double energy, time;
 	double energy_active_neuron_update, time_active_neuron_update;
 	double energy_inactive_neuron_update, time_inactive_neuron_update;
+	double energy_spiking, time_spiking;
 };
 
 struct axon_output
@@ -116,7 +117,7 @@ int arch_create_tile(struct architecture *const arch, const double energy_east_w
 int arch_create_core(struct architecture *const arch, struct tile *const t);
 int arch_create_axon_in(struct architecture *const arch, struct core *const c);
 int arch_create_synapse(struct architecture *const arch, struct core *const c, const double energy_spike_op, const double time_spike_op);
-int arch_create_soma(struct architecture *const arch, struct core *const c, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update);
+int arch_create_soma(struct architecture *const arch, struct core *const c, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update, double energy_spiking, double time_spiking);
 int arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
 
 #endif

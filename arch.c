@@ -263,7 +263,9 @@ int arch_create_soma(struct architecture *const arch, struct core *const c,
 			double energy_active_neuron_update,
 			double time_active_neuron_update,
 			double energy_inactive_neuron_update,
-			double time_inactive_neuron_update)
+			double time_inactive_neuron_update,
+			double energy_spiking,
+			double time_spiking)
 {
 	struct soma_processor *s;
 	int count = c->soma_count;
@@ -282,6 +284,8 @@ int arch_create_soma(struct architecture *const arch, struct core *const c,
 	s->time_active_neuron_update = time_active_neuron_update;
 	s->energy_inactive_neuron_update = energy_inactive_neuron_update;
 	s->time_inactive_neuron_update = time_inactive_neuron_update;
+	s->energy_spiking = energy_spiking;
+	s->time_spiking = time_spiking;
 
 	s->buffer_in = 1;
 

@@ -42,7 +42,7 @@ int sim_input_spikes(struct network *net);
 
 void sim_copy_buffers(struct neuron *n);
 void sim_update(struct network *net);
-void sim_pipeline_send(struct network *net, struct neuron *n);
+void sim_process_neuron(struct network *net, struct neuron *n);
 double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr);
 void sim_update_synapse(struct neuron *n);
 void sim_update_dendrite(struct neuron *n);

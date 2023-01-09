@@ -82,7 +82,7 @@ struct neuron
 	int fired_buffer;
 
 	double current_decay, current_time_const;
-	double latency;
+	double processing_time;
 	int id, is_init, fired, post_connection_count, spike_count;
 	int log_spikes, log_voltage, update_needed, force_update;
 };

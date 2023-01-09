@@ -47,20 +47,21 @@ def parse_stats(stats):
 
     analysis = {}
     analysis["update_energy"] = total[update_keys].sum()
-    analysis["synapse_energy"] = total[synapse_keys].sum()
+    #analysis["synapse_energy"] = total[synapse_keys].sum()
     analysis["spike_gen_energy"] = total[spike_gen_energy].sum()
     analysis["network_energy"] = total[network_energy].sum()
     # Sum across all keys for each timestep
-    analysis["total_energies"] = (stats.loc[:, update_keys].sum(axis=1) +
-        stats.loc[:, synapse_keys].sum(axis=1) +
-        stats.loc[:, spike_gen_energy].sum(axis=1) +
-        stats.loc[:, network_energy].sum(axis=1))
-    print(analysis["total_energies"])
+    #analysis["total_energies"] = (stats.loc[:, update_keys].sum(axis=1) +
+    #    stats.loc[:, synapse_keys].sum(axis=1) +
+    #    stats.loc[:, spike_gen_energy].sum(axis=1) +
+    #    stats.loc[:, network_energy].sum(axis=1))
+    #print(analysis["total_energies"])
 
     analysis["times"] = stats.loc[:, "time"]
     analysis["hops"] = stats.loc[:, "hops"]
     analysis["fired"] = stats.loc[:, "fired"]
     analysis["packets"] = stats.loc[:, "packets"]
+    analysis["total_energies"] = stats.loc[:, "total_energy"]
 
     return analysis
 
@@ -120,10 +121,10 @@ if __name__ == "__main__":
     analysis = parse_stats(stats)
 
 
-    spiking_update_energy.append(analysis["update_energy"])
-    spiking_spike_gen_energy.append(analysis["spike_gen_energy"])
-    spiking_synapse_energy.append(analysis["synapse_energy"])
-    spiking_network_energy.append(analysis["network_energy"])
+    #spiking_update_energy.append(analysis["update_energy"])
+    #spiking_spike_gen_energy.append(analysis["spike_gen_energy"])
+    #spiking_synapse_energy.append(analysis["synapse_energy"])
+    #spiking_network_energy.append(analysis["network_energy"])
     times = analysis["times"]
     energies = analysis["total_energies"]
 
@@ -220,21 +221,36 @@ if __name__ == "__main__":
     relative_error = abs(loihi_times[0:timesteps] - times) / loihi_times[0:timesteps]
     print(relative_error)
     mean_error = sum(relative_error) / len(relative_error)
-    print("Mean error: {0} ({1} %)".format(mean_error, mean_error * 100))
+    print("Time Absolute Mean error: {0} ({1} %)".format(mean_error, mean_error * 100))
+
+    total_error =  (sum(loihi_times[0:timesteps]) - sum(times)) / sum(loihi_times[0:timesteps])
+    print("Time Total error: {0} ({1} %)".format(total_error, total_error * 100))
+
 
     # TODO: I'm simulating dynamic energy, but the measurements are for static
     #  energy consumption, which pretty much just mirror the time simulation...
     loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_FILENAME)
     loihi_energies = loihi_data.loc[:, "spiking"] / 1.0e6
     print(loihi_energies)
-    plt.figure(figsize=(15, 2.5))
-    plt.plot(np.arange(1, timesteps+1), energies, marker='x')
-    plt.plot(np.arange(1, timesteps+1), loihi_energies[0:timesteps], marker='x')
+    plt.figure(figsize=(5.0, 2.5))
+    plt.plot(np.arange(1, timesteps+1), energies, '-o')
+    plt.plot(np.arange(1, timesteps+1), loihi_energies[0:timesteps], '--x')
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.legend(("Simulated", "Measured on Loihi"))
     plt.ylabel("Energy (J)")
     plt.xlabel("Timestep")
     plt.savefig("dvs_gesture_sim_energy.png")
+
+
+    relative_error = abs(loihi_energies[0:timesteps] - energies) / loihi_energies[0:timesteps]
+    print(relative_error)
+    mean_error = sum(relative_error) / len(relative_error)
+    print("Energy Absolute Mean error: {0} ({1} %)".format(mean_error, mean_error * 100))
+
+    total_error =  (sum(loihi_energies[0:timesteps]) - sum(energies)) / sum(loihi_energies[0:timesteps])
+    print("Energy Total error: {0} ({1} %)".format(total_error, total_error * 100))
+
+
 
     # Plot the potential probes from simulation
     layers = ("inputs", "0Conv2D_15x15x16", "1Conv2D_13x13x32",
