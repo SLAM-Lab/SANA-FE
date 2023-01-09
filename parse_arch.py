@@ -154,11 +154,12 @@ def parse_soma(element_dict, tile_id, core_id):
     attributes = element_dict["attributes"]
     if "cost" in attributes:
         costs = attributes["cost"]
+        model = attributes["model"]
         active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
         inactive_energy, inactive_time = costs["inactive"]["energy"], costs["inactive"]["time"]
         spiking_energy, spiking_time = costs["spiking"]["energy"], costs["spiking"]["time"]
 
-    return create_soma(tile_id, core_id, active_energy, active_time,
+    return create_soma(tile_id, core_id, model, active_energy, active_time,
                         inactive_energy, inactive_time, spiking_energy,
                         spiking_time)
 
@@ -277,13 +278,15 @@ def create_dendrite(tile_id, core_id, update_energy, update_time):
     return dendrite_id
 
 _somas = []
-def create_soma(tile_id, core_id, active_energy, active_time, inactive_energy,
-                    inactive_time, spiking_energy, spiking_time):
+def create_soma(tile_id, core_id, model, active_energy, active_time,
+                inactive_energy, inactive_time, spiking_energy, spiking_time):
     soma_id = _somas_in_core[tile_id][core_id]
     _somas_in_core[tile_id][core_id] += 1
-    soma = "+ {0} {1} {2} {3} {4} {5} {6} {7}".format(tile_id, core_id,
-            active_energy, active_time, inactive_energy, inactive_time,
-            spiking_energy, spiking_time)
+    #soma = "+ {0} {1} {2} {3} {4} {5} {6} {7} {8}".format(tile_id, core_id,
+    #        model, active_energy, active_time, inactive_energy, inactive_time,
+    #        spiking_energy, spiking_time)
+
+    soma = f"+ {tile_id} {core_id} {model} {active_energy} {active_time} {inactive_energy} {inactive_time} {spiking_energy} {spiking_time}"
     _command_list.append(soma)
 
 

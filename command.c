@@ -518,16 +518,22 @@ int command_parse_soma(struct architecture *const arch,
 	struct core *c;
 	double active_energy, active_time, inactive_energy, inactive_time;
 	double spiking_energy, spiking_time;
-	int tile_id, core_id, ret;
+	int tile_id, core_id, model, ret;
 
 	ret = sscanf(fields[1], "%d", &tile_id);
 	ret += sscanf(fields[2], "%d", &core_id);
-	ret += sscanf(fields[3], "%lf", &active_energy);
-	ret += sscanf(fields[4], "%lf", &active_time);
-	ret += sscanf(fields[5], "%lf", &inactive_energy);
-	ret += sscanf(fields[6], "%lf", &inactive_time);
-	ret += sscanf(fields[7], "%lf", &spiking_energy);
-	ret += sscanf(fields[8], "%lf", &spiking_time);
+
+	if (strcmp(fields[3], "integrate_fire") == 0)
+	{
+		model = NEURON_IF;
+	}
+
+	ret += sscanf(fields[4], "%lf", &active_energy);
+	ret += sscanf(fields[5], "%lf", &active_time);
+	ret += sscanf(fields[6], "%lf", &inactive_energy);
+	ret += sscanf(fields[7], "%lf", &inactive_time);
+	ret += sscanf(fields[8], "%lf", &spiking_energy);
+	ret += sscanf(fields[9], "%lf", &spiking_time);
 	if (ret < 8)
 	{
 		INFO("Error: Couldn't parse soma processor.\n");
@@ -536,7 +542,7 @@ int command_parse_soma(struct architecture *const arch,
 	t = &(arch->tiles[tile_id]);
 	c = &(t->cores[core_id]);
 
-	return arch_create_soma(arch, c, active_energy, active_time,
+	return arch_create_soma(arch, c, model, active_energy, active_time,
 				inactive_energy, inactive_time,
 				spiking_energy, spiking_time);
 }

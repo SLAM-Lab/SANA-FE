@@ -23,6 +23,14 @@ architecture:
     - name: loihi_tile[0..31]
       core:
         - name: loihi_core[0..3]
+          axon_in:
+            - name: core_in
+              # axon_in acts like input ports to the arch or subtree.
+              #  For Loihi we have at most 4096 slots to route packets to
+              #  different cores.
+              attributes:
+                fan_in: 4096
+                protocol: dest_axon
           soma:
             - name: core_lif
               attributes:
@@ -56,14 +64,6 @@ architecture:
                 energy: 81.0e-12
                 time: 8.4e-9
                 #operations: and, or, multiply
-          axon_in:
-            - name: core_in
-              # axon_in acts like input ports to the arch or subtree.
-              #  For Loihi we have at most 4096 slots to route packets to
-              #  different cores.
-              attributes:
-                fan_in: 4096
-                protocol: dest_axon
           axon_out:
             - name: core_out
               # axon_out acts like output ports. Loihi needs to figure out the

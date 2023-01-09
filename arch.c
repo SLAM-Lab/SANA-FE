@@ -260,6 +260,7 @@ int arch_create_synapse(struct architecture *const arch, struct core *const c,
 }
 
 int arch_create_soma(struct architecture *const arch, struct core *const c,
+			int model,
 			double energy_active_neuron_update,
 			double time_active_neuron_update,
 			double energy_inactive_neuron_update,
@@ -280,6 +281,7 @@ int arch_create_soma(struct architecture *const arch, struct core *const c,
 	s->energy = 0.0;
 	s->time = 0.0;
 
+	s->model = model;
 	s->energy_active_neuron_update = energy_active_neuron_update;
 	s->time_active_neuron_update = time_active_neuron_update;
 	s->energy_inactive_neuron_update = energy_inactive_neuron_update;
@@ -309,7 +311,7 @@ int arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	}
 
 	out = &(c->axon_out[count]);
-	out->total_packets_sent = 0;
+	out->packets_out = 0;
 	out->energy = 0.0;
 	out->time = 0.0;
 	out->energy_spike_within_tile = spike_energy;
@@ -318,7 +320,6 @@ int arch_create_axon_out(struct architecture *const arch, struct core *const c,
 
 	// Track the tile the axon interfaces with
 	out->t = c->t;
-	//out->axon_out_count++;
 
 	TRACE("Created axon output %d (c:%d.%d)\n", out->id, c->t->id, c->id);
 

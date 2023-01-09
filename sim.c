@@ -17,27 +17,29 @@ void sim_copy_buffers(struct neuron *n)
 	{
 		// Copy over all the synapses addresses to access
 		n->charge = n->charge_buffer;
+		n->charge_buffer = 0.0;
 	}
-	if (n->core->dendrite->buffer_in)
+	else if (n->core->dendrite->buffer_in)
 	{
 		// Copy all synapse addresses
 		n->d_currents[0] = n->d_currents_buffer[0];
 	}
-	if (n->core->soma->buffer_in)
+	else if (n->core->soma->buffer_in)
 	{
 		n->current = n->current_buffer;
+		n->current_buffer = 0.0;
 	}
-	if (n->core->axon_out->buffer_in)
+	else if (n->core->axon_out->buffer_in)
 	{
 		// Copy packets
 		n->fired = n->fired_buffer;
+		n->fired_buffer = 0;
 	}
+
 	//n->current *= n->current_decay;
+
+	// Reset buffers
 	n->d_currents_buffer[0] = 0.0;
-	n->current_buffer = 0.0;
-	n->charge_buffer = 0.0;
-	n->fired_buffer = 0;
-	TRACE("Current after: %lf.\n", n->current);
 }
 
 struct sim_stats sim_timestep(struct network *const net,
@@ -277,81 +279,6 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 
 	top_priority = sim_init_timing_priority(arch);
 
-	// now we go through all neurons to see which ones spiked
-	//  for all neurons that spike, we send a spike to the corresponding axon output
-	//  do we care about the axon output, surely only care about sending packets to other axon_inputs
-	//   but we will store the packet tracking struct inside the axon output struct
-	//  that axon_output sends to all relevant axon_inputs (we look up the dest neuron which must store a link to that)
-	//  the axon_output and input must store the relevant router if it applies i.e. the next link in the chain
-
-	// Functional vs hardware modelling. Should we separate the two. I
-	//  thought it would be nice to be able to simulate the network
-	//  without hardware. That means
-	//  for all neurons:
-	//      if neuron has fired:
-	//          send spike to their connections (update charge for all receiving neurons)
-	//          mark neuron as not fired? (although we could just reset in reset measurements)
-	// The timing model instead iterates through hardware
-
-	// First functionally simulate the effect of spikes on the neuron
-	//  Update the charge at the receiving neurons, based on the synaptic
-	//  weight
-	/*
-	for (int i = 0; i < net->neuron_group_count; i++)
-	{
-		struct neuron_group *group = &(net->groups[i]);
-		for (int j = 0; j < group->neuron_count; j++)
-		{
-			struct neuron *n = &(group->neurons[j]);
-
-			if (!n->is_init || !n->fired)
-			{
-				continue;
-			}
-			net->total_neurons_fired++;
-			TRACE("Routing for nid:%d post_connection_count:%d\n",
-					n->id, n->post_connection_count);
-			// Send all spikes to receiving neurons, updating
-			//  their synaptic current
-			for (int k = 0; k < n->post_connection_count; k++)
-			{
-				struct neuron *post_neuron;
-				struct connection *connection_ptr;
-
-				connection_ptr = &(n->connections[k]);
-				assert(connection_ptr->pre_neuron->id == n->id);
-
-				post_neuron = connection_ptr->post_neuron;
-				post_neuron->update_needed = 1;
-				if (post_neuron->core->dendrite->buffer_in)
-				{
-					post_neuron->charge_buffer +=
-						connection_ptr->weight;
-				}
-				else
-				{
-					post_neuron->charge +=
-							connection_ptr->weight;
-				}
-
-				// Copy the charge to the soma current
-				if (post_neuron->soma_hw->buffer_in)
-				{
-					post_neuron->current_buffer =
-							post_neuron->charge;
-				}
-				else
-				{
-					post_neuron->current =
-							post_neuron->charge;
-				}
-
-				post_neuron->spike_count++;
-				total_spike_count++;
-			}
-		}
-	}
-	*/
 	// Setup timing counters
 	cores_left = core_count;
 	for (int i = 0; i < arch->tile_count; i++)
@@ -502,7 +429,7 @@ int sim_route_spikes(struct architecture *arch, struct network *net)
 				//  all axon access are in parallel,
 				//  this might not be valid but
 				//  could be good enough)
-				c->axon_out[0].total_packets_sent++;
+				c->axon_out[0].packets_out++;
 				c->axon_out[0].energy += 40.8e-12;
 				c->time += c->axon_out[0].time_spike_within_tile;
 				c->axon_out[0].time +=
@@ -782,62 +709,64 @@ void sim_update_dendrite(struct neuron *n)
 
 void sim_update_soma(struct neuron *n)
 {
+	struct soma_processor *soma = n->soma_hw;
+
 	// Calculate the change in potential since the last update e.g.
 	//  integate inputs and apply any potential leak
 	TRACE("Updating potential, before:%f\n", n->potential);
-	//n->potential *= n->potential_decay;
 
-	// Add the spike potential
-	n->potential += n->current + n->bias;
-	n->current = 0.0;
-	n->charge = 0.0;
-
-	// Clamp min potential
-	//n->potential = (n->potential < n->reset) ?
-	//				n->reset : n->potential;
-	TRACE("Updating potential, after:%f\n", n->potential);
-
-	if ((n->force_update && n->potential > n->threshold) ||
-		(!n->force_update && n->potential >= n->threshold))
+	if ((soma->model == NEURON_IF) || (soma->model == NEURON_LIF))
 	{
-		struct axon_output *out = n->axon_out;
-		if (out->buffer_in)
+		if (soma->model == NEURON_LIF)
 		{
-			n->fired_buffer = 1;
+			n->potential *= n->potential_decay;
+		}
+
+		// Add the spike potential
+		n->potential += n->current + n->bias;
+		n->current = 0.0;
+		n->charge = 0.0;
+
+	#if 0
+		// Clamp min potential
+		n->potential = (n->potential < n->reset) ?
+						n->reset : n->potential;
+	#endif
+		TRACE("Updating potential, after:%f\n", n->potential);
+
+		if ((n->force_update && (n->potential > n->threshold)) ||
+			(!n->force_update && n->potential >= n->threshold))
+		{
+			struct axon_output *out = n->axon_out;
+			if (out->buffer_in)
+			{
+				n->fired_buffer = 1;
+			}
+			else
+			{
+				n->fired = 1;
+			}
+
+			n->potential = n->reset;
+			n->processing_time += soma->time_spiking;
+
+			soma->energy += soma->energy_spiking;
+			soma->time += soma->time_spiking;
+			assert(out != NULL);
+			out->energy += out->energy_spike_within_tile;
+			TRACE("nid %d fired.\n", n->id);
 		}
 		else
 		{
-			n->fired = 1;
-		}
-
-		n->potential = n->reset;
-
-		// The spiking update time is much larger for the neuron than
-		//  the normal update, in addition to the within-tile latency
-		// TODO: add to the soma processor not the axon
-		//out->energy += 60.0e-12;
-		out->energy += n->soma_hw->energy_spiking;
-		//n->processing_time += 30.0e-9;
-		//n->soma_hw->time += 30.0e-9;
-		n->processing_time += n->soma_hw->time_spiking;
-		n->soma_hw->time += n->soma_hw->time_spiking;
-		// TODO: separate h/w perf stuff from the general network
-		//  calculations
-		assert(out != NULL);
-		out->energy += out->energy_spike_within_tile;
-		TRACE("out->time=%e\n", out->time);
-		TRACE("nid %d fired.\n", n->id);
-	}
-	else
-	{
-		struct axon_output *out = n->axon_out;
-		if (out->buffer_in)
-		{
-			n->fired_buffer = 0;
-		}
-		else
-		{
-			n->fired = 0;
+			struct axon_output *out = n->axon_out;
+			if (out->buffer_in)
+			{
+				n->fired_buffer = 0;
+			}
+			else
+			{
+				n->fired = 0;
+			}
 		}
 	}
 
@@ -1031,7 +960,7 @@ long int sim_calculate_packets(const struct architecture *arch)
 			{
 				const struct axon_output *out =
 							&(c->axon_out[k]);
-				total_packets += out->total_packets_sent;
+				total_packets += out->packets_out;
 			}
 		}
 	}
@@ -1115,7 +1044,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 						&(c->axon_out[k]);
 				out->energy = 0.0;
 				out->time = 0.0;
-				out->total_packets_sent = 0;
+				out->packets_out = 0;
 			}
 		}
 	}
