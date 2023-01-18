@@ -14,7 +14,7 @@ architecture:
         energy: 3.0e-12
         time: 4.1e-9
       north_south:
-        energy: 4.0e-12
+        energy: 4.2e-12
         time: 6.5e-9
       global_barrier:
         time: 299.0e-9
@@ -50,10 +50,10 @@ architecture:
                     energy: 47.5e-12
                     time: 6.1e-9
                   active:
-                    energy: 81.0e-12
+                    energy: 69.8e-12
                     time: 9.6e-9
                   spiking:
-                    energy: 60.0e-12
+                    energy: 68.7e-12
                     time: 30.0e-9
           synapse:
             - name: core_synapses
@@ -63,7 +63,7 @@ architecture:
                 word_bits: 64
                 cost:
                   spike:
-                    energy: 23.6e-12
+                    energy: 21.1e-12
                     time: 4.0e-9
                   memory:
                     energy: 55.1e-12

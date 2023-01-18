@@ -56,7 +56,7 @@ struct synapse_processor
 	int buffer_in, spikes_buffer;
 	int weights_per_word, word_bits, weight_bits;
 	long int total_spikes, memory_reads;
-	double energy, time, busy_until;
+	double energy, time;
 	double energy_spike_op, energy_memory_access;
 	double time_spike_op, time_memory_access;
 };
@@ -92,15 +92,14 @@ struct core
 	struct core *next_timing;
 	struct neuron **neurons;
 	struct core **axon_map;
-	double **message_processing_time;
 	int *spikes_sent_per_core;
 	struct axon_input axon_in;
 	struct synapse_processor synapse;
 	struct dendrite_processor dendrite;
 	struct soma_processor soma;
 	struct axon_output axon_out;
-	double energy, time;
-	int id, buffer_pos;
+	double energy, time, blocked_until;
+	int id, buffer_pos, is_blocking;
 	int neuron_count, curr_neuron, neurons_left, status;
 	int curr_axon;
 };
@@ -115,8 +114,8 @@ struct tile
 	double energy_east_west_hop, time_east_west_hop;
 	double energy_north_south_hop, time_north_south_hop;
 	double energy_spike_within_tile, time_spike_within_tile;
-	double busy_until;
-	int id, x, y, core_count;
+	double blocked_until;
+	int id, x, y, core_count, is_blocking;
 	int max_dimensions, width; // For now just support 2 dimensions
 };
 

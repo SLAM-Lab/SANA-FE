@@ -15,7 +15,7 @@ import pickle
 import math
 import sys
 sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
-import spikeperf
+import utils
 
 MAX_TILES = 32
 MAX_CORES = 4
@@ -40,8 +40,8 @@ import random
 def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
     # Two layers, fully connected
-    network = spikeperf.Network()
-    loihi_compartments = spikeperf.loihi_init_compartments()
+    network = utils.Network()
+    loihi_compartments = utils.loihi_init_compartments()
 
     if spiking:  # always spike
         threshold = -1.0
@@ -54,11 +54,11 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     force_update = False
 
     # Create layers
-    layer_1 = spikeperf.create_layer(network, layer_neuron_count,
+    layer_1 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments,
                                      log_spikes, log_voltage, force_update,
                                      threshold, reset)
-    layer_2 = spikeperf.create_layer(network, layer_neuron_count, loihi_compartments,
+    layer_2 = utils.create_layer(network, layer_neuron_count, loihi_compartments,
                                      log_spikes, log_voltage, force_update,
                                      threshold, reset)
 
@@ -73,8 +73,8 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
 
 
 def connected_layers(weights, spiking=True, mapping="luke"):
-    network = spikeperf.Network()
-    loihi_compartments = spikeperf.loihi_init_compartments()
+    network = utils.Network()
+    loihi_compartments = utils.loihi_init_compartments()
 
     layer_neuron_count = len(weights)
     if spiking:  # always spike
@@ -106,7 +106,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     for _ in range(0, neurons_per_core[3]):
         layer_mapping.append((0, 3))
 
-    layer_1 = spikeperf.create_layer(network, layer_neuron_count,
+    layer_1 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
                                      reset, mappings=layer_mapping)
@@ -144,7 +144,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     for _ in range(0, neurons_per_core[4]):
         layer_mapping.append((1, 0))
 
-    layer_2 = spikeperf.create_layer(network, layer_neuron_count,
+    layer_2 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
                                      reset, mappings=layer_mapping)
@@ -166,8 +166,10 @@ if __name__ == "__main__":
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     #mapping = "split_4_diff_tiles"
-    mapping = "luke"
+    #mapping = "luke"
+    #mapping = "split_2"
     #mapping = "fixed"
+    mapping = "split_4"
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):

@@ -119,6 +119,7 @@ int arch_create_tile(struct architecture *const arch,
 	t->id = id;
 	t->energy = 0.0;
 	t->time = 0.0;
+	t->is_blocking = 0;
 
 	// TODO: generalize this so each link has an associated energy and
 	//  latency, set one level up when defining the noc mesh
@@ -154,6 +155,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 	c = &(t->cores[core_id]);
 	c->id = core_id;
 	c->t = t;
+	c->is_blocking = 1;
 
 	c->axon_in.energy = 0.0;
 	c->axon_in.time = 0.0;
@@ -177,8 +179,6 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 	c->neurons = (struct neuron **) malloc(sizeof(struct neuron *) * 1024);
 	c->spikes_sent_per_core = (int *) malloc(sizeof(int) * 128);
 	c->axon_map = (struct core **) malloc(sizeof(struct core *) * 128);
-	//c->message_processing_time =
-	//			(struct double **) malloc(sizeof(double) * 128);
 	for (int i = 0; i < 1024; i++)
 	{
 		c->neurons[i] = NULL;
@@ -186,6 +186,8 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 
 	c->energy = 0.0;
 	c->time = 0.0;
+
+	c->buffer_pos = BUFFER_SOMA;
 
 	TRACE("Core created id:%d (tile:%d).\n", c->id, t->id);
 	return c->id;
@@ -233,7 +235,6 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 	// Round up to the nearest word
 	s->weights_per_word = (word_bits + (weight_bits - 1)) / weight_bits;
 
-	s->buffer_in = 0;
 	TRACE("Created synapse processor %d (c:%d.%d)\n",
 						s->id, c->t->id, c->id);
 
@@ -263,8 +264,6 @@ void arch_create_soma(struct architecture *const arch, struct core *const c,
 	s->energy_spiking = energy_spiking;
 	s->time_spiking = time_spiking;
 
-	s->buffer_in = 1;
-
 	TRACE("Created soma processor %d (c:%d.%d)\n",
 						s->id, c->t->id, c->id);
 
@@ -282,7 +281,6 @@ void arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	out->time = 0.0;
 	out->energy_access = access_energy;
 	out->time_access = access_time;
-	out->buffer_in = 0;
 
 	// Track the tile the axon interfaces with
 	out->t = c->t;
