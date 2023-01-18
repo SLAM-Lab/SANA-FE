@@ -4,6 +4,7 @@
 //  Each neuron has its own state and a set of connections to other neurons.
 //  These structures have optional links to hardware for performance simulation.
 //  Here we include different neuron, synapse and dendrite models.
+// Copyright (C) 2023 - The University of Texas at Austin
 #ifndef NETWORK_HEADER_INCLUDED_
 #define NETWORK_HEADER_INCLUDED_
 

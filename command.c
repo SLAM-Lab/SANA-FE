@@ -1,4 +1,5 @@
 // command.c
+// Copyright (C) 2023 - The University of Texas at Austin
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

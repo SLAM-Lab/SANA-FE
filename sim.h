@@ -37,7 +37,6 @@ enum status
 struct sim_stats sim_timestep(struct network *const net, struct architecture *const arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
 int sim_send_messages(struct architecture *arch, struct network *net);
-//int sim_route_spikes(struct architecture *arch, struct network *net);
 int sim_input_spikes(struct network *net);
 
 void sim_process_neuron(struct network *net, struct neuron *n);
@@ -66,6 +65,5 @@ void sim_start_next_timestep(struct neuron *n);
 struct core *sim_init_timing_priority(struct architecture *arch);
 struct core *sim_update_timing_queue(struct architecture *arch,
 						struct core *top_priority);
-//void sim_push_timing_update(struct timing *priority);
 
 #endif

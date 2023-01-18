@@ -1,4 +1,5 @@
 // main.c - Command line interface
+// Copyright (C) 2023 - The University of Texas at Austin
 // Performance simulation for neuromorphic architectures
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,7 +35,7 @@ int main(int argc, char *argv[])
 	struct sim_stats stats;
 	char *filename, *input_buffer;
 	double average_power;
-	int timesteps, max_input_line, max_neurons, ret;
+	int timesteps, ret;
 
 	filename = NULL;
 	input_fp = NULL;
@@ -85,7 +86,7 @@ int main(int argc, char *argv[])
 	if (argc < PROGRAM_NARGS)
 	{
 		INFO("Usage: ./sim [-i <input vectors>] <arch description>"
-				" <neuron config> <timesteps>\n");
+				" <network config> <timesteps>\n");
 		goto clean_up;
 	}
 
@@ -139,8 +140,6 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
-	max_neurons = 128*1024;
-	max_input_line = 32 + (max_neurons*32);
 	filename = argv[NETWORK_FILENAME];
 	// Create the network
 	network_fp = fopen(filename, "r");
@@ -162,35 +161,14 @@ int main(int argc, char *argv[])
 	INFO("Creating probe and perf data files.\n");
 	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, &net);
 	sim_perf_write_header(perf_fp, &arch);
-	if (input_fp != NULL)
+
+	// Single step simulation, based on initial network state and
+	//  no inputs
+	for (int i = 0; i < timesteps; i++)
 	{
-		// Allocate a buffer for the inputs
-		input_buffer = (char *) malloc(sizeof(char) * max_input_line);
-		if (input_buffer == NULL)
-		{
-			INFO("Error: Couldn't allocate memory for inputs.\n");
-			exit(1);
-		}
-		// TODO: make this parameterised so we can parse different input
-		//  formats
-		// Parse DVS128 gesture input
-		while (parse_dvs(input_fp, &arch))
-		{
-			run(&net, &arch, &stats, probe_spikes_fp,
-						probe_potential_fp, perf_fp);
-		}
-	}
-	// TODO: another option to generate rate based / poisson spike trains
-	else
-	{
-		// Single step simulation, based on initial network state and
-		//  no inputs
-		for (int i = 0; i < timesteps; i++)
-		{
-			INFO("*** Time-step %d ***\n", i+1);
-			run(&net, &arch, &stats, probe_spikes_fp,
-						probe_potential_fp, perf_fp);
-		}
+		INFO("*** Time-step %d ***\n", i+1);
+		run(&net, &arch, &stats, probe_spikes_fp,
+					probe_potential_fp, perf_fp);
 	}
 
 	INFO("***** Run Summary *****\n");
@@ -274,35 +252,9 @@ void run(struct network *net, struct architecture *arch,
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 	stats->wall_time +=
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
-	//INFO("Time-step took: %fs.\n",
-	//	(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
+	INFO("Time-step took: %fs.\n",
+		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
 }
-
-/*
-void next_inputs(char *buffer, struct core *cores, const int max_cores,
-						struct neuron **neuron_ptrs)
-{
-	char *token;
-	int neuron_count;
-
-	neuron_count = 0;
-	token = strtok(buffer, ",");
-	while (token != NULL)
-	{
-		// This time read all the fields in the line, we're
-		//  interested in the synapse data
-		int ret = sscanf(token, "%lf", &firing_rate);
-		if (ret <= 0)
-		{
-			INFO("Error: invalid input format (%s)", buffer);
-			exit(1);
-		}
-
-		token = strtok(NULL, ",");
-		neuron_count++;
-	}
-}
-*/
 
 void init_stats(struct sim_stats *stats)
 {
@@ -329,10 +281,4 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	}
 
 	return ts_elapsed;
-}
-
-int parse_dvs(FILE *fp, struct architecture *arch)
-{
-	// TODO
-	return 0;
 }

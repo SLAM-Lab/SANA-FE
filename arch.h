@@ -1,4 +1,5 @@
 // arch.h: Create a neuromorphic design based on a set of commands
+// Copyright (C) 2023 - The University of Texas at Austin
 //  In this simulator an architecture is a represented as a set of different
 //  hardware blocks. The design (chip) is a set of tiles, connected by NoC
 //  interconnect. Within each tile is one or more cores. Each core contains
@@ -21,8 +22,8 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 //  fairly easily be removed and replaced with allocating arbitrary numbers of
 //  elements off the heap e.g. in a linked list
 #define ARCH_MAX_COMPARTMENTS
-#define ARCH_MAX_TILES 128
-#define ARCH_MAX_CORES 16
+#define ARCH_MAX_TILES 32
+#define ARCH_MAX_CORES 4
 #define ARCH_MAX_LINKS 4
 
 #define ARCH_INVALID_ID -1
@@ -34,6 +35,7 @@ enum buffer_positions
 	BUFFER_DENDRITE,	// Buffer synaptic current
 	BUFFER_SOMA,		// Buffer dendritic current
 	BUFFER_AXON_OUT,	// Buffer axon addresses i.e. spikes out
+	BUFFER_NETWORK,		// Buffer messages to the network
 	BUFFER_POSITIONS,
 };
 
@@ -46,14 +48,14 @@ enum neuron_models
 struct axon_input
 {
 	struct tile *t;
-	int packet_size, buffer_in, packets_buffer, spikes_buffer;
+	int packet_size, packets_buffer, spikes_buffer;
 	long int packets_in;
 	double energy, time;
 };
 
 struct synapse_processor
 {
-	int buffer_in, spikes_buffer;
+	int spikes_buffer;
 	int weights_per_word, word_bits, weight_bits;
 	long int total_spikes, memory_reads;
 	double energy, time;
@@ -63,13 +65,12 @@ struct synapse_processor
 
 struct dendrite_processor
 {
-	int buffer_in;
 	double energy, time;
 };
 
 struct soma_processor
 {
-	int buffer_in, model;
+	int model;
 	long int updates, spikes_sent;
 	double energy, time;
 	double energy_active_neuron_update, time_active_neuron_update;
@@ -80,7 +81,6 @@ struct soma_processor
 struct axon_output
 {
 	struct tile *t;
-	int buffer_in;
 	long int packets_out;
 	double energy, time;
 	double energy_access, time_access;

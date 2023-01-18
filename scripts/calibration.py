@@ -1,7 +1,8 @@
-"""First attempt at simulation run script.
+"""Calibrating SANA-FE against real-world hardware
 
-Run a few basic experiments, show how we might interface a python
-script with the simulator kernel.
+Use several partitions of a small benchmark to calibrate
+the simulator.
+Copyright (C) 2023 - The University of Texas at Austin
 """
 
 import matplotlib

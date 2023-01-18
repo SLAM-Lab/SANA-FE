@@ -1,8 +1,5 @@
-// TODO: all numbers in the yaml file
-// TODO: the busy until needs to go into the core and tile
-// TODO: update the scheduling function to match pseudocode, using event object
-
 // sim.c
+// Copyright (C) 2023 - The University of Texas at Austin
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -73,31 +70,27 @@ void sim_process_neuron(struct network *net, struct neuron *n)
 	// Depending on the first buffered stage, start processing from the
 	//  first buffered value. Then compute for the rest of the pipeline
 	//  regardless of the rest.
-	int first_buffered = -1;
 	if (!n->is_init)
 	{
 		return;
 	}
 
-	if (n->core->synapse.buffer_in)
+	struct core *c = n->core;
+	if (c->buffer_pos <= BUFFER_SYNAPSE)
 	{
-		first_buffered = 0;
 		sim_update_synapse(n);
 	}
-	if (first_buffered >= 0 || n->core->dendrite.buffer_in)
+	if (c->buffer_pos <= BUFFER_DENDRITE)
 	{
-		first_buffered = 1;
 		sim_update_dendrite(n);
 	}
-	if (first_buffered >= 0 || n->core->soma.buffer_in)
+	if (c->buffer_pos <= BUFFER_SOMA)
 	{
-		first_buffered = 2;
 		sim_update_soma(n);
 		// route spikes so go to axon_in, synapse
 	}
-	if (first_buffered >= 0 || n->core->axon_out.buffer_in)
+	if (c->buffer_pos <= BUFFER_SOMA)
 	{
-		first_buffered = 3;
 		sim_update_axon(n);
 		// route spikes, axon_in, synapse
 	}
@@ -160,7 +153,8 @@ double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr)
 {
 	// We receive a spike and process up to the time-step buffer
 
-	if (n->core->axon_in.buffer_in)
+	struct core *c = n->core;
+	if (c->buffer_pos == BUFFER_AXON_IN)
 	{
 		// TODO
 		return n->core->axon_in.time;
@@ -170,7 +164,7 @@ double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr)
 		// TODO
 	}
 
-	if (n->core->dendrite.buffer_in)
+	if (c->buffer_pos == BUFFER_DENDRITE)
 	{
 		n->charge_buffer += connection_ptr->weight;
 		return n->core->dendrite.time;
@@ -183,7 +177,7 @@ double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr)
 	}
 
 	// Copy the charge to the soma current
-	if (n->soma_hw->buffer_in)
+	if (c->buffer_pos == BUFFER_SOMA)
 	{
 		n->current_buffer = n->charge;
 		return n->soma_hw->time;
@@ -229,8 +223,6 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 		int nid = c->curr_neuron;
 		struct neuron *n = c->neurons[nid];
 		// Get the current update status
-		TRACE("curr_neuron:%d neuron_count:%d\n", c->curr_neuron, c->neuron_count);
-		fflush(stdout);
 		if ((c->curr_neuron >= c->neuron_count) || (!n->is_init))
 		{
 			TRACE("\t(cid:%d.%d): Neuron %d not used, get next\n",
@@ -371,10 +363,10 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 				spike_processing_time += spike_ops *
 					post_core->synapse.time_spike_op;
 
-				if (post_core->synapse.buffer_in)
+				if (post_core->buffer_pos == BUFFER_SYNAPSE)
 				{
-					post_core->synapse.buffer_in +=
-						spike_ops;
+					//post_core->synapse.buffer_in +=
+					//	spike_ops;
 				}
 				else
 				{
@@ -548,7 +540,7 @@ int sim_input_spikes(struct network *net)
 			post_neuron = connection_ptr->post_neuron;
 			TRACE("nid:%d Energy before: %lf\n",
 					post_neuron->id, post_neuron->current);
-			if (post_neuron->core->soma.buffer_in)
+			if (post_neuron->core->buffer_pos == BUFFER_SOMA)
 			{
 				post_neuron->current_buffer += connection_ptr->weight;
 			}
@@ -636,8 +628,7 @@ void sim_update_soma(struct neuron *n)
 		if ((n->force_update && (n->potential > n->threshold)) ||
 			(!n->force_update && n->potential >= n->threshold))
 		{
-			struct axon_output *out = n->axon_out;
-			if (out->buffer_in)
+			if (n->core->buffer_pos == BUFFER_AXON_OUT)
 			{
 				n->fired_buffer = 1;
 			}
@@ -655,8 +646,7 @@ void sim_update_soma(struct neuron *n)
 		}
 		else
 		{
-			struct axon_output *out = n->axon_out;
-			if (out->buffer_in)
+			if (n->core->buffer_pos == BUFFER_AXON_OUT)
 			{
 				n->fired_buffer = 0;
 			}

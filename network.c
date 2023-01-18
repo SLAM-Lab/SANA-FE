@@ -1,4 +1,5 @@
 // network.c
+// Copyright (C) 2023 - The University of Texas at Austin
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
