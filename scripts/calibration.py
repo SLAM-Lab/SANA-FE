@@ -1,8 +1,13 @@
-"""Calibrating SANA-FE against real-world hardware
+"""
+Copyright (c) 2023 - The University of Texas at Austin
+This work was produced under contract #2317831 to National Technology and
+Engineering Solutions of Sandia, LLC which is under contract
+No. DE-NA0003525 with the U.S. Department of Energy.
+
+Calibrating SANA-FE against real-world hardware
 
 Use several partitions of a small benchmark to calibrate
 the simulator.
-Copyright (C) 2023 - The University of Texas at Austin
 """
 
 import matplotlib
@@ -167,10 +172,9 @@ if __name__ == "__main__":
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     #mapping = "split_4_diff_tiles"
-    #mapping = "luke"
-    #mapping = "split_2"
     #mapping = "fixed"
-    mapping = "split_4"
+    #mapping = "luke"
+    mapping = "split_2"
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):

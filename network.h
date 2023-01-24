@@ -1,10 +1,13 @@
+// Copyright (c) 2023 - The University of Texas at Austin
+//  This work was produced under contract #2317831 to National Technology and
+//  Engineering Solutions of Sandia, LLC which is under contract
+//  No. DE-NA0003525 with the U.S. Department of Energy.
 // network.h - (spiking) neural network functionality. Spiking neural
 //  networks are represented as groups of neurons. A neuron group might have a
 //  bunch of neurons all with the same properties (and common hardware).
 //  Each neuron has its own state and a set of connections to other neurons.
-//  These structures have optional links to hardware for performance simulation.
+//  These structures have links to hardware for performance simulation.
 //  Here we include different neuron, synapse and dendrite models.
-// Copyright (C) 2023 - The University of Texas at Austin
 #ifndef NETWORK_HEADER_INCLUDED_
 #define NETWORK_HEADER_INCLUDED_
 

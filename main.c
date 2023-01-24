@@ -1,5 +1,8 @@
+// Copyright (c) 2023 - The University of Texas at Austin
+//  This work was produced under contract #2317831 to National Technology and
+//  Engineering Solutions of Sandia, LLC which is under contract
+//  No. DE-NA0003525 with the U.S. Department of Energy.
 // main.c - Command line interface
-// Copyright (C) 2023 - The University of Texas at Austin
 // Performance simulation for neuromorphic architectures
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +17,6 @@
 
 void init_stats(struct sim_stats *stats);
 void run(struct network *net, struct architecture *arch, struct sim_stats *stats, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
-//void next_inputs(char *buffer, struct core *cores, const int max_cores, struct neuron **neuron_ptrs);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 int parse_dvs(FILE *fp, struct architecture *arch);
 

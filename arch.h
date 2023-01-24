@@ -1,14 +1,19 @@
+// Copyright (c) 2023 - The University of Texas at Austin
+//  This work was produced under contract #2317831 to National Technology and
+//  Engineering Solutions of Sandia, LLC which is under contract
+//  No. DE-NA0003525 with the U.S. Department of Energy.
 // arch.h: Create a neuromorphic design based on a set of commands
-// Copyright (C) 2023 - The University of Texas at Austin
 //  In this simulator an architecture is a represented as a set of different
 //  hardware blocks. The design (chip) is a set of tiles, connected by NoC
 //  interconnect. Within each tile is one or more cores. Each core contains
 //  neuromorphic computation. The neuromorphic pipeline (which seems sufficient
 //  for any design) is a series of elements:
+
 /*
 axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 (spikes in) (spikes to current) (process input)    (membrane update)(spikes out)
 */
+
 // Note importantly that a single processor might handle a bunch of neurons
 //  i.e. it is *not* necessarily a 1-1 mapping. I will provide some different
 //  implementations of each component. It is possible to extend though with

@@ -1,5 +1,8 @@
-// sim.c
-// Copyright (C) 2023 - The University of Texas at Austin
+// Copyright (c) 2023 - The University of Texas at Austin
+//  This work was produced under contract #2317831 to National Technology and
+//  Engineering Solutions of Sandia, LLC which is under contract
+//  No. DE-NA0003525 with the U.S. Department of Energy.
+//  sim.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -291,6 +294,7 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 			else if (c->spikes_sent_per_core[c->curr_axon])
 			{
 				struct core *post_core = c->axon_map[c->curr_axon];
+				double network_latency = 0.0;
 				double spike_processing_time = 0.0;
 				int memory_accesses;
 
@@ -327,13 +331,13 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 				//  options?
 				tile_pre->energy += x_hops *
 					tile_pre->energy_east_west_hop;
-				c->time += x_hops *
+				network_latency += x_hops *
 					tile_pre->time_east_west_hop;
 
 				// N-S hops
 				tile_pre->energy += y_hops *
 					tile_pre->energy_north_south_hop;
-				c->time += y_hops *
+				network_latency += y_hops *
 					tile_pre->time_north_south_hop;
 
 				if (post_core->is_blocking)
@@ -348,7 +352,9 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 				}
 				arch->total_hops += x_hops;
 				arch->total_hops += y_hops;
+				tile_post->blocked_until = c->time + network_latency;
 
+				c->time += network_latency;
 				// Read word from memory, this is a very
 				//  simplified model
 				spike_ops = c->spikes_sent_per_core[c->curr_axon];
@@ -365,8 +371,7 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 
 				if (post_core->buffer_pos == BUFFER_SYNAPSE)
 				{
-					//post_core->synapse.buffer_in +=
-					//	spike_ops;
+
 				}
 				else
 				{
@@ -376,10 +381,17 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 						memory_accesses;
 				}
 
-				post_core->blocked_until =
-					c->time + spike_processing_time;
-				tile_post->blocked_until =
-					c->time + spike_processing_time;
+				if (post_core->is_blocking)
+				{
+					post_core->blocked_until =
+						c->time + spike_processing_time;
+				}
+				else
+				{
+					post_core->blocked_until +=
+						spike_processing_time;
+				}
+
 				TRACE("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
 					c->t->id, c->id,
 					post_core->t->id, post_core->id,
@@ -683,7 +695,7 @@ double sim_calculate_time(const struct architecture *const arch,
 			const struct core *c = &(t->cores[j]);
 			double this_core_time = 0.0;
 			this_core_time =
-					fmax(c->time, c->synapse.time);
+					fmax(c->time, c->blocked_until);
 			max_core_time = fmax(max_core_time, this_core_time);
 		}
 
@@ -693,41 +705,6 @@ double sim_calculate_time(const struct architecture *const arch,
 	// Add the mesh-wide barrier sync time (assuming worst case of 32 tiles)
 	max_time += arch->time_barrier;
 	//INFO("Simulated time for step is:%es\n", max_time);
-
-	return max_time;
-}
-
-double sim_calculate_time_old(const struct architecture *const arch)
-{
-	// Returns the simulation time of the current timestep.
-	//  This is calculated by finding the simulation time of each core,
-	//  and simply taking the maximum of this.
-	double tile_time, max_time = 0.0;
-
-	for (int i = 0; i < arch->tile_count; i++)
-	{
-		const struct tile *t = &(arch->tiles[i]);
-		double max_core_time = 0.0;
-		for (int j = 0; j < t->core_count; j++)
-		{
-			const struct core *c = &(t->cores[j]);
-			double this_core_time = 0.0;
-
-			this_core_time += c->axon_in.time;
-			this_core_time += c->synapse.time;
-			this_core_time += c->dendrite.time;
-			this_core_time += c->soma.time;
-			this_core_time += c->axon_out.time;
-
-			max_core_time = fmax(max_core_time, this_core_time);
-		}
-		tile_time = max_core_time + t->time;
-		max_time = fmax(max_time, tile_time);
-	}
-
-	// Add the mesh-wide barrier sync time (assuming worst case of 32 tiles)
-	max_time += arch->time_barrier;
-	INFO("Simulated time for step is:%es\n", max_time);
 
 	return max_time;
 }

@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - The University of Texas at Austin
+//  This work was produced under contract #2317831 to National Technology and
+//  Engineering Solutions of Sandia, LLC which is under contract
+//  No. DE-NA0003525 with the U.S. Department of Energy.
 // command.h - This is the low level interface between the user and the
 //  simulator. It is essentially a text-based way to control the API function
 //  calls that control simulation. Creating spiking neural networks, defining
