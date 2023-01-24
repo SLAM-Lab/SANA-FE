@@ -16,7 +16,7 @@
 #include "command.h"
 
 void init_stats(struct sim_stats *stats);
-void run(struct network *net, struct architecture *arch, struct sim_stats *stats, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
+void run(struct network *net, struct architecture *arch, struct sim_stats *stats, const int timestep, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 int parse_dvs(FILE *fp, struct architecture *arch);
 
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < timesteps; i++)
 	{
 		INFO("*** Time-step %d ***\n", i+1);
-		run(&net, &arch, &stats, probe_spikes_fp,
+		run(&net, &arch, &stats, i, probe_spikes_fp,
 					probe_potential_fp, perf_fp);
 	}
 
@@ -225,9 +225,9 @@ clean_up:
 	}
 }
 
-void run(struct network *net, struct architecture *arch,
-		struct sim_stats *stats, FILE *probe_spikes_fp,
-					FILE *probe_potential_fp, FILE *perf_fp)
+void run(struct network *net, struct architecture *arch,struct sim_stats *stats,
+	const int timestep, FILE *probe_spikes_fp, FILE *probe_potential_fp,
+								FILE *perf_fp)
 {
 	// Run neuromorphic hardware simulation for one timestep
 	//  Measure the CPU time it takes and accumulate the stats
@@ -238,7 +238,7 @@ void run(struct network *net, struct architecture *arch,
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-	timestep_stats = sim_timestep(net, arch, probe_spikes_fp,
+	timestep_stats = sim_timestep(net, arch, timestep, probe_spikes_fp,
 					probe_potential_fp, perf_fp);
 	// Accumulate totals for the entire simulation
 	// TODO: make a function

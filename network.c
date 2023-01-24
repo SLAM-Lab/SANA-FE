@@ -127,6 +127,8 @@ int network_create_neuron(struct neuron *const n,
 		return NETWORK_INVALID_NID;
 	}
 
+	n->soma_last_updated = 0;
+
 	// Zero initialize all connections
 	for (int i = 0; i < n->post_connection_count; i++)
 	{

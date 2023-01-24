@@ -38,17 +38,20 @@ enum status
 #include "arch.h"
 #include "network.h"
 #include "stdio.h"
-struct sim_stats sim_timestep(struct network *const net, struct architecture *const arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
+struct sim_stats sim_timestep(struct network *const net, struct architecture *const arch, const int timestep, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
-int sim_send_messages(struct architecture *arch, struct network *net);
+int sim_send_messages(struct architecture *arch, struct network *net, const int timestep);
 int sim_input_spikes(struct network *net);
 
-void sim_process_neuron(struct network *net, struct neuron *n);
-double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr);
+void sim_process_neuron(struct network *net, struct neuron *n, const int timestep);
+double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr, const int timestep);
 void sim_update_synapse(struct neuron *n);
 void sim_update_dendrite(struct neuron *n);
-void sim_update_soma(struct neuron *n);
+double sim_update_soma(struct neuron *n, const double current_in, const int timestep);
 void sim_update_axon(struct neuron *n);
+
+void sim_neuron_send_spike(struct neuron *n);
+
 
 void sim_reset_measurements(struct network *net, struct architecture *arch);
 double sim_calculate_energy(const struct architecture *const arch, const double time);

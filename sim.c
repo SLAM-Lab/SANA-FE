@@ -15,6 +15,7 @@
 
 struct sim_stats sim_timestep(struct network *const net,
 				struct architecture *const arch,
+				const int timestep,
 				FILE *probe_spike_fp,
 				FILE *probe_potential_fp,
 				FILE *perf_fp)
@@ -37,7 +38,8 @@ struct sim_stats sim_timestep(struct network *const net,
 			for (int k = 0; k < c->neuron_count; k++)
 			{
 				sim_start_next_timestep(c->neurons[k]);
-				sim_process_neuron(net, c->neurons[k]);
+				sim_process_neuron(net, c->neurons[k],
+								timestep);
 			}
 		}
 	}
@@ -45,7 +47,7 @@ struct sim_stats sim_timestep(struct network *const net,
 
 	// Send all spike messages
 	spikes_sent = sim_input_spikes(net);
-	spikes_sent += sim_send_messages(arch, net);
+	spikes_sent += sim_send_messages(arch, net, timestep);
 
 	// Performance statistics for this time step
 	stats.time_steps = 1;
@@ -62,7 +64,8 @@ struct sim_stats sim_timestep(struct network *const net,
 	return stats;
 }
 
-void sim_process_neuron(struct network *net, struct neuron *n)
+void sim_process_neuron(struct network *net, struct neuron *n,
+							const int timestep)
 {
 	// The neuron (state update) contains four main components
 	// 1) synapse updates
@@ -79,45 +82,22 @@ void sim_process_neuron(struct network *net, struct neuron *n)
 	}
 
 	struct core *c = n->core;
-	if (c->buffer_pos <= BUFFER_SYNAPSE)
+	if (c->buffer_pos == BUFFER_SYNAPSE)
 	{
 		sim_update_synapse(n);
 	}
-	if (c->buffer_pos <= BUFFER_DENDRITE)
+	else if (c->buffer_pos == BUFFER_DENDRITE)
 	{
 		sim_update_dendrite(n);
 	}
-	if (c->buffer_pos <= BUFFER_SOMA)
+	else if (c->buffer_pos == BUFFER_SOMA)
 	{
-		sim_update_soma(n);
-		// route spikes so go to axon_in, synapse
+		double current_in = n->current_buffer;
+		n->current_buffer = 0.0;
+		n->processing_time = sim_update_soma(n, current_in, timestep);
 	}
-	if (c->buffer_pos <= BUFFER_SOMA)
-	{
-		sim_update_axon(n);
-		// route spikes, axon_in, synapse
-	}
-
 	TRACE("Updating neuron %d.%d.\n", n->group->id, n->id);
-	if (n->spike_count || n->force_update)
-	{
-		n->processing_time += n->soma_hw->time_active_neuron_update;
-		n->soma_hw->energy +=
-			n->soma_hw->energy_active_neuron_update;
-	}
-	else
-	{
-		// inactive neuron update cost
-		n->soma_hw->energy += n->soma_hw->energy_inactive_neuron_update;
-		n->soma_hw->time += n->soma_hw->time_inactive_neuron_update;
-		n->processing_time += n->soma_hw->time_inactive_neuron_update;
-	}
 
-	if (n->fired)
-	{
-		// In update axon?
-		net->total_neurons_fired++;
-	}
 	n->update_needed = 0;
 	n->spike_count = 0;
 }
@@ -137,11 +117,6 @@ void sim_start_next_timestep(struct neuron *n)
 		n->d_currents[0] = n->d_currents_buffer[0];
 		n->d_currents_buffer[0] = 0.0;
 	}
-	else if (c->buffer_pos == BUFFER_SOMA)
-	{
-		n->current = n->current_buffer;
-		n->current_buffer = 0.0;
-	}
 	else if (c->buffer_pos == BUFFER_AXON_OUT)
 	{
 		// Copy packets
@@ -152,7 +127,8 @@ void sim_start_next_timestep(struct neuron *n)
 	//n->current *= n->current_decay;
 }
 
-double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr)
+double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr,
+							const int timestep)
 {
 	// We receive a spike and process up to the time-step buffer
 
@@ -188,14 +164,12 @@ double sim_pipeline_receive(struct neuron *n, struct connection *connection_ptr)
 	else
 	{
 		assert(0);
-		n->current = n->charge;
-		sim_update_soma(n);
+		return sim_update_soma(n, n->charge, timestep);
 	}
-
-	return n->axon_out->time;
 }
 
-int sim_send_messages(struct architecture *arch, struct network *net)
+int sim_send_messages(struct architecture *arch, struct network *net,
+							const int timestep)
 {
 	struct core *top_priority;
 	const int core_count = 128; // TODO calculate
@@ -262,7 +236,8 @@ int sim_send_messages(struct architecture *arch, struct network *net)
 					c->spikes_sent_per_core[axon_id]++;
 					total_spike_count++;
 					c->axon_map[axon_id] = post_core;
-					sim_pipeline_receive(post_neuron, conn);
+					sim_pipeline_receive(post_neuron, conn,
+								timestep);
 				}
 				c->status = SEND_SPIKES;
 				c->curr_axon = 0;
@@ -610,9 +585,11 @@ void sim_update_dendrite(struct neuron *n)
 	return;
 }
 
-void sim_update_soma(struct neuron *n)
+double sim_update_soma(struct neuron *n, const double current_in,
+							const int timestep)
 {
 	struct soma_processor *soma = n->soma_hw;
+	double latency = 0.0;
 
 	// Calculate the change in potential since the last update e.g.
 	//  integate inputs and apply any potential leak
@@ -622,11 +599,15 @@ void sim_update_soma(struct neuron *n)
 	{
 		if (soma->model == NEURON_LIF)
 		{
-			n->potential *= n->potential_decay;
+			while (n->soma_last_updated <= timestep)
+			{
+				n->potential *= n->potential_decay;
+				n->soma_last_updated++;
+			}
 		}
 
 		// Add the spike potential
-		n->potential += n->current + n->bias;
+		n->potential += current_in + n->bias;
 		n->current = 0.0;
 		n->charge = 0.0;
 
@@ -640,42 +621,43 @@ void sim_update_soma(struct neuron *n)
 		if ((n->force_update && (n->potential > n->threshold)) ||
 			(!n->force_update && n->potential >= n->threshold))
 		{
-			if (n->core->buffer_pos == BUFFER_AXON_OUT)
-			{
-				n->fired_buffer = 1;
-			}
-			else
-			{
-				n->fired = 1;
-			}
-
 			n->potential = n->reset;
-			n->processing_time += soma->time_spiking;
-
-			soma->energy += soma->energy_spiking;
-			soma->time += soma->time_spiking;
+			sim_neuron_send_spike(n);
 			TRACE("nid %d fired.\n", n->id);
-		}
-		else
-		{
-			if (n->core->buffer_pos == BUFFER_AXON_OUT)
-			{
-				n->fired_buffer = 0;
-			}
-			else
-			{
-				n->fired = 0;
-			}
+
+			latency += soma->time_spiking;
+			soma->energy += soma->energy_spiking;
+			soma->spikes_sent++;
 		}
 	}
 
-	return;
+	if (n->spike_count || n->force_update)
+	{
+		latency += n->soma_hw->time_active_neuron_update;
+		soma->updates++;
+		n->soma_hw->energy +=
+			n->soma_hw->energy_active_neuron_update;
+	}
+	else
+	{
+		// inactive neuron update cost
+		n->soma_hw->energy += n->soma_hw->energy_inactive_neuron_update;
+		latency += n->soma_hw->time_inactive_neuron_update;
+	}
+
+	return latency;
 }
 
-void sim_update_axon(struct neuron *n)
+void sim_neuron_send_spike(struct neuron *n)
 {
-	// TODO
-	return;
+	if (n->core->buffer_pos == BUFFER_AXON_OUT)
+	{
+		n->fired_buffer = 1;
+	}
+	else
+	{
+		n->fired = 1;
+	}
 }
 
 double sim_calculate_time(const struct architecture *const arch,

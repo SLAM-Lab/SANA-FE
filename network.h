@@ -79,6 +79,9 @@ struct neuron
 	struct axon_output *axon_out;
 	struct axon_input *axon_in;
 
+	// Track the timestep each hardware unit was last updated
+	int soma_last_updated;
+
 	double potential, current, d_currents[1], charge, bias, reset, threshold;
 	double potential_decay, potential_time_const;
 
