@@ -1,7 +1,12 @@
-Simulating Performance of Neuromorphic Architectures
+Copyright (c) 2023 - The University of Texas at Austin
+This work was produced under contract #2317831 to National Technology and
+Engineering Solutions of Sandia, LLC which is under contract
+No. DE-NA0003525 with the U.S. Department of Energy.
 
-A framework to help with neuromorphic codesign, modeling performance (energy,
-time, power).
+Simulating Advanced Neuromorphic Architectures for Fast Exploration (SANA-FE)
+
+A framework to model energy and performance of neuromorphic designs, to aid with
+neuromorphic codesign.
 
 # To Build
 
@@ -59,18 +64,16 @@ It is assumed that tiles and cores are all parallel processing elements.
 
 Neuromorphic cores are assumed to share some common design principles.
 Here we define the pipeline used for all cores in this simulator.
-A pipeline here is a series of niche processors, which can each handle a part of
-the computation of one or more neurons.
-Those processors could be digital logic, analog circuits or a novel device.
-Where multiple processors are defined for the same stage, we assume
-these computations can be done in parallel.
+A pipeline here is a series of niche processing units, which can each handle
+part of the computation of one or more neurons.
+Those units could be digital logic, analog circuits or a novel device.
 
 Input axons receive spike packets from the network.
-The synaptic processor looks up connectivity for incoming spikes and updates
+The synaptic unit looks up connectivity for incoming spikes and updates
 the relevant synaptic currents.
-The dendritic processor combines currents based on a tree structure and a set
+The dendritic unit combines currents based on a tree structure and a set
 of operations.
-The soma processor updates membrane potentials based on dendritic currents
+The soma unit updates membrane potentials based on the dendritic current
 If the firing criteria is met, it generates a spike for that neuron.
 The output axons send spikes from the soma out to the network.
 
@@ -95,10 +98,8 @@ a list of parameters.
 * +: Add soma processor
 * o: Add axon output
 
-## SImulator control
+## Simulator control
 * $: input vector, either spikes or spike rates
-* \*: Step simulator
-* l: Load commands from a file
 
 # Output Format
 
@@ -125,9 +126,9 @@ description.
 `command.c`
 `parse_arch.py`
 `run.py`
-`spikeperf.py`
+`utils.py`
 
-This C code has been written based on the C99 standard.
+C code has been written based on the C99 standard.
 
 # Contact
 James Boyle: james.boyle@utexas.edu
