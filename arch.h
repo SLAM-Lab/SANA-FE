@@ -27,7 +27,7 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 //  fairly easily be removed and replaced with allocating arbitrary numbers of
 //  elements off the heap e.g. in a linked list
 #define ARCH_MAX_COMPARTMENTS
-#define ARCH_MAX_TILES 32
+#define ARCH_MAX_TILES 3200
 #define ARCH_MAX_CORES 4
 #define ARCH_MAX_LINKS 4
 

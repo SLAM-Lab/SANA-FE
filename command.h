@@ -16,9 +16,9 @@
 
 // TODO: better define the max fields
 #define MAX_FIELDS (NEURON_FIELDS + (4096*CONNECTION_FIELDS))
-#define MAX_NEURONS (128*1024)
-#define MAX_FIELD_LEN 32
-#define MAX_CSV_LINE (1024 + (4096*MAX_FIELD_LEN))
+#define MAX_NEURONS (12800*1024)
+#define MAX_FIELD_LEN 64
+#define MAX_CSV_LINE (10240 + (4096*MAX_FIELD_LEN))
 #define TOKEN_SEPERATORS " \t"
 
 enum

@@ -151,6 +151,7 @@ int network_map_neuron(struct neuron *const n,
 	// Map the neuron to hardware units
 	assert(map.core != NULL);
 	assert(map.core->neurons != NULL);
+	assert(n->core == NULL);
 	n->core = map.core;
 	INFO("mapping core %d to neuron:%d\n",
 		map.core->id, map.core->neuron_count);

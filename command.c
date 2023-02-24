@@ -407,12 +407,21 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 							"%lf", &weight);
 		if (ret < 3)
 		{
+			INFO("group id:%s\n",
+				fields[curr_field+CONNECTION_DEST_GID]);
+			INFO("neuron id:%s\n",
+				fields[curr_field+CONNECTION_DEST_NID]);
+			INFO("weight field:%s\n",
+				fields[curr_field+CONNECTION_WEIGHT]);
+
 			INFO("Error: Couldn't parse synapse.\n");
 			return COMMAND_FAIL;
 		}
 
 		src = n;
+		assert(dest_gid < net->neuron_group_count);
 		dest_group = &(net->groups[dest_gid]);
+		assert(dest_nid < dest_group->neuron_count);
 		dest = &(dest_group->neurons[dest_nid]);
 
 		con->pre_neuron = src;

@@ -5,9 +5,6 @@ Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
 
 Run DVS Gesture and extract some network based statistics
-
-This is currently being used to explore dvs gesture rather than networking..
-I should rename
 """
 #import matplotlib
 #matplotlib.use('Agg')
@@ -19,6 +16,9 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 import os
+
+#ARCH_FILENAME = "loihi_big.arch"
+#NETWORK_FILENAME = "examples/dvs_gesture_big.net"
 
 ARCH_FILENAME = "loihi.arch"
 NETWORK_FILENAME = "examples/dvs_gesture_32x32_i16.net" # Input 16, 32x32 net
@@ -148,7 +148,8 @@ if __name__ == "__main__":
     #                                 "spike_gen_energy": spike_gen_energy,
     #                                 "synapse_energy": synapse_energy,
     #                                 "network_energy": network_energy})
-
+ 
+    plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
     plt.figure(figsize=(5.5, 5.5))
     plt.bar(1, spiking_update_energy)
     plt.bar(2, spiking_spike_gen_energy, color="orange")
@@ -164,7 +165,7 @@ if __name__ == "__main__":
     # Plot the latency
     loihi_data = pd.read_csv(LOIHI_TIME_DATA_FILENAME)
     loihi_times = loihi_data.loc[:, "spiking"] / 1.0e6
-    plt.figure(figsize=(15, 16))
+    plt.figure(figsize=(7, 8))
     plt.subplot(311)
     plt.plot(np.arange(1, timesteps+1), times, marker='x')
     plt.plot(np.arange(1, timesteps+1), loihi_times[0:timesteps], marker='x')
@@ -179,6 +180,7 @@ if __name__ == "__main__":
     plt.plot(np.arange(1, timesteps+1), analysis["hops"], marker='x')
     plt.legend(("Packets Sent", "Total Hops"))
     plt.xlabel("Timestep")
+
 
     plt.subplot(313)
     plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
@@ -195,7 +197,7 @@ if __name__ == "__main__":
     plt.savefig("dvs_gesture_sim_time.png")
 
     # Plot the latency
-    plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
+
     loihi_data = pd.read_csv(LOIHI_TIME_DATA_FILENAME)
     loihi_times = loihi_data.loc[:, "spiking"] / 1.0e6
     plt.figure(figsize=(5.0, 2.5))

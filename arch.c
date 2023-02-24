@@ -181,8 +181,10 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 	c->neuron_count = 0;
 	c->curr_neuron = 0;
 	c->neurons = (struct neuron **) malloc(sizeof(struct neuron *) * 1024);
-	c->spikes_sent_per_core = (int *) malloc(sizeof(int) * 128);
-	c->axon_map = (struct core **) malloc(sizeof(struct core *) * 128);
+	c->spikes_sent_per_core = (int *) malloc(sizeof(int) *
+					ARCH_MAX_TILES * ARCH_MAX_CORES);
+	c->axon_map = (struct core **) malloc(sizeof(struct core *) *
+					ARCH_MAX_TILES * ARCH_MAX_CORES);
 	for (int i = 0; i < 1024; i++)
 	{
 		c->neurons[i] = NULL;

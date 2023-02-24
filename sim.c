@@ -37,9 +37,12 @@ struct sim_stats sim_timestep(struct network *const net,
 			struct core *c = &(t->cores[j]);
 			for (int k = 0; k < c->neuron_count; k++)
 			{
-				sim_start_next_timestep(c->neurons[k]);
-				sim_process_neuron(net, c->neurons[k],
+				if (c->neurons[k] != NULL)
+				{
+					sim_start_next_timestep(c->neurons[k]);
+					sim_process_neuron(net, c->neurons[k],
 								timestep);
+				}
 			}
 		}
 	}
@@ -104,6 +107,10 @@ void sim_process_neuron(struct network *net, struct neuron *n,
 
 void sim_start_next_timestep(struct neuron *n)
 {
+	if (n == NULL)
+	{
+		return;
+	}
 	struct core *c = n->core;
 	if (c->buffer_pos == BUFFER_SYNAPSE)
 	{
@@ -172,7 +179,7 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 							const int timestep)
 {
 	struct core *top_priority;
-	const int core_count = 128; // TODO calculate
+	const int core_count = ARCH_MAX_CORES * ARCH_MAX_TILES; // TODO calculate
 	int total_spike_count, cores_left;
 
 	total_spike_count = 0;
@@ -200,7 +207,8 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 		int nid = c->curr_neuron;
 		struct neuron *n = c->neurons[nid];
 		// Get the current update status
-		if ((c->curr_neuron >= c->neuron_count) || (!n->is_init))
+		if ((c->curr_neuron >= c->neuron_count) ||
+						(n == NULL) || (!n->is_init))
 		{
 			TRACE("\t(cid:%d.%d): Neuron %d not used, get next\n",
 					c->t->id, c->id, c->curr_neuron);
@@ -217,6 +225,7 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 
 			if (n->fired)
 			{
+				net->total_neurons_fired++;
 				for (int k = 0; k < core_count; k++)
 				{
 					c->spikes_sent_per_core[k] = 0;
@@ -229,6 +238,9 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 					struct neuron *post_neuron =
 								conn->post_neuron;
 					struct core *post_core = post_neuron->core;
+					assert(post_neuron != NULL);
+					assert(post_core != NULL);
+
 					// TODO: need a function to figure this out
 					//  or we store an absolute id in the core
 					//  OR we use a 2D array
@@ -256,12 +268,12 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 			//  each packet can be sent in parallel update the
 			//  timing of the receiving synapse.
 			// Get next packet to send
-			while ((c->curr_axon < 128) &&
+			while ((c->curr_axon < core_count) &&
 				c->spikes_sent_per_core[c->curr_axon] == 0)
 			{
 				c->curr_axon++;
 			}
-			if (c->curr_axon >= 128)
+			if (c->curr_axon >= core_count)
 			{
 				// No cores left to send to
 				c->status = NEURON_FINISHED;
@@ -295,6 +307,8 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 				c->axon_out.packets_out++;
 				c->time += c->axon_out.time_access;
 
+				c->axon_out.energy +=
+					c->axon_out.energy_access;
 				c->axon_out.energy +=
 					c->t->energy_spike_within_tile;
 				c->time += c->t->time_spike_within_tile;
@@ -895,6 +909,7 @@ void sim_write_summary(FILE *fp, const struct sim_stats *stats)
 	fprintf(fp, "total_spikes: %ld\n", stats->total_spikes);
 	fprintf(fp, "total_packets: %ld\n", stats->total_packets_sent);
 	fprintf(fp, "wall_time: %lf\n", stats->wall_time);
+	fprintf(fp, "time_steps: %d\n", stats->time_steps);
 	//fprintf(fp, "network_time: %e\n", stats->network_time);
 }
 

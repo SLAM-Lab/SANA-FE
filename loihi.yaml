@@ -63,7 +63,8 @@ architecture:
                 word_bits: 64
                 cost:
                   spike:
-                    energy: 21.1e-12
+                    #energy: 21.1e-12
+                    energy: 30.0e-12
                     time: 4.0e-9
                   memory:
                     energy: 55.1e-12
