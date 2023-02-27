@@ -118,6 +118,14 @@ int network_create_neuron(struct neuron *const n,
 	n->current_decay = 1.0;
 	n->potential_decay = 1.0;
 
+	n->reverse_reset = 0.0;
+	n->reverse_threshold = 0.0;
+	n->random_range_mask = 0;
+
+	n->reset_mode = NEURON_RESET_HARD;
+	n->reverse_reset_mode = NEURON_NO_RESET;
+
+	n->soma_last_updated = 0;
 	assert(n->connections == NULL);
 	n->connections = (struct connection *)
 			malloc(sizeof(struct connection) * connection_count);
@@ -126,8 +134,6 @@ int network_create_neuron(struct neuron *const n,
 		INFO("Error: Couldn't allocate connection memory.\n");
 		return NETWORK_INVALID_NID;
 	}
-
-	n->soma_last_updated = 0;
 
 	// Zero initialize all connections
 	for (int i = 0; i < n->post_connection_count; i++)

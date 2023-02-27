@@ -51,6 +51,15 @@ enum input_types
 	INPUT_POISSON,
 };
 
+enum neuron_reset_modes
+{
+	NEURON_NO_RESET,
+	NEURON_RESET_SOFT,
+	NEURON_RESET_HARD,
+	NEURON_RESET_SATURATE,
+	NEURON_RESET_MODE_COUNT,
+};
+
 struct hardware_mapping
 {
 	struct core *core;
@@ -80,9 +89,10 @@ struct neuron
 	struct axon_input *axon_in;
 
 	// Track the timestep each hardware unit was last updated
-	int soma_last_updated;
+	unsigned int random_range_mask;
 
-	double potential, current, d_currents[1], charge, bias, reset, threshold;
+	double potential, current, d_currents[1], charge, bias;
+	double reset, reverse_reset, threshold, reverse_threshold;
 	double potential_decay, potential_time_const;
 
 	double charge_buffer, d_currents_buffer[1], current_buffer;
@@ -92,6 +102,7 @@ struct neuron
 	double processing_time;
 	int id, is_init, fired, post_connection_count, spike_count;
 	int log_spikes, log_voltage, update_needed, force_update;
+	int soma_last_updated;
 };
 
 struct connection

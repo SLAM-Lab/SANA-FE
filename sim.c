@@ -32,6 +32,7 @@ struct sim_stats sim_timestep(struct network *const net,
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
+
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
@@ -599,8 +600,34 @@ void sim_update_dendrite(struct neuron *n)
 	return;
 }
 
+double sim_update_soma_lif(struct neuron *n, const double current_in, const int timestep);
+double sim_update_soma_truenorth(struct neuron *n, const double current_in, const int timestep);
+
+
 double sim_update_soma(struct neuron *n, const double current_in,
 							const int timestep)
+{
+	struct soma_processor *soma = n->soma_hw;
+
+	if ((soma->model == NEURON_LIF) || (soma->model == NEURON_IF))
+	{
+		return sim_update_soma_lif(n, current_in, timestep);
+	}
+	else if (soma->model == NEURON_TRUENORTH)
+	{
+		return sim_update_soma_truenorth(n, current_in, timestep);
+	}
+	else
+	{
+		INFO("Neuron model not recognised: %d", soma->model);
+		assert(0);
+		return 0.0;
+	}
+}
+
+double sim_update_soma_lif(struct neuron *n, const double current_in,
+							const int timestep)
+
 {
 	struct soma_processor *soma = n->soma_hw;
 	double latency = 0.0;
@@ -609,40 +636,37 @@ double sim_update_soma(struct neuron *n, const double current_in,
 	//  integate inputs and apply any potential leak
 	TRACE("Updating potential, before:%f\n", n->potential);
 
-	if ((soma->model == NEURON_IF) || (soma->model == NEURON_LIF))
+	if (soma->model == NEURON_LIF)
 	{
-		if (soma->model == NEURON_LIF)
+		while (n->soma_last_updated <= timestep)
 		{
-			while (n->soma_last_updated <= timestep)
-			{
-				n->potential *= n->potential_decay;
-				n->soma_last_updated++;
-			}
+			n->potential *= n->potential_decay;
+			n->soma_last_updated++;
 		}
+	}
 
-		// Add the spike potential
-		n->potential += current_in + n->bias;
-		n->current = 0.0;
-		n->charge = 0.0;
+	// Add the spike potential
+	n->potential += current_in + n->bias;
+	n->current = 0.0;
+	n->charge = 0.0;
 
-	#if 0
-		// Clamp min potential
-		n->potential = (n->potential < n->reset) ?
-						n->reset : n->potential;
-	#endif
-		TRACE("Updating potential, after:%f\n", n->potential);
+#if 0
+	// Clamp min potential
+	n->potential = (n->potential < n->reset) ?
+					n->reset : n->potential;
+#endif
+	TRACE("Updating potential, after:%f\n", n->potential);
 
-		if ((n->force_update && (n->potential > n->threshold)) ||
-			(!n->force_update && n->potential >= n->threshold))
-		{
-			n->potential = n->reset;
-			sim_neuron_send_spike(n);
-			TRACE("nid %d fired.\n", n->id);
+	if ((n->force_update && (n->potential > n->threshold)) ||
+		(!n->force_update && n->potential >= n->threshold))
+	{
+		n->potential = n->reset;
+		sim_neuron_send_spike(n);
+		TRACE("nid %d fired.\n", n->id);
 
-			latency += soma->time_spiking;
-			soma->energy += soma->energy_spiking;
-			soma->spikes_sent++;
-		}
+		latency += soma->time_spiking;
+		soma->energy += soma->energy_spiking;
+		soma->spikes_sent++;
 	}
 
 	if (n->spike_count || n->force_update)
@@ -662,8 +686,77 @@ double sim_update_soma(struct neuron *n, const double current_in,
 	return latency;
 }
 
-void sim_neuron_send_spike(struct neuron *n)
+double sim_update_soma_truenorth(struct neuron *n, const double current_in,
+							const int timestep)
 {
+	struct soma_processor *soma = n->soma_hw;
+	double v, latency = 0.0;
+	int randomize_threshold;
+
+	// Apply leak
+	while (n->soma_last_updated <= timestep)
+	{
+		// Linear leak
+		if (soma->leak_towards_zero && (n->potential < 0.0))
+		{
+			n->potential += n->potential_decay;
+		}
+		else
+		{
+			n->potential -= n->potential_decay;
+		}
+		n->soma_last_updated++;
+	}
+
+	// Add the synaptic currents, processed by the dendrite
+	n->potential += current_in + n->bias;
+	n->current = 0.0;
+	n->charge = 0.0;
+
+	// Apply thresholding and reset
+	v = n->potential;
+	randomize_threshold = (n->random_range_mask != 0);
+	if (randomize_threshold)
+	{
+		unsigned int r = rand() & n->random_range_mask;
+		v += (double) r;
+	}
+
+	if (v > n->threshold)
+	{
+		if (soma->reset_mode == NEURON_RESET_HARD)
+		{
+			n->potential = n->reset;
+		}
+		else if (soma->reset_mode == NEURON_RESET_SOFT)
+		{
+			n->potential -= n->threshold;
+		}
+		latency += sim_neuron_send_spike(n);
+	}
+	else if (v < n->reverse_threshold)
+	{
+		if (soma->reverse_reset_mode == NEURON_RESET_HARD)
+		{
+			n->potential = n->reverse_reset;
+		}
+		else if (soma->reverse_reset_mode == NEURON_RESET_SATURATE)
+		{
+			n->potential = n->reverse_threshold;
+		}
+	}
+
+	return latency;
+}
+
+double sim_neuron_send_spike(struct neuron *n)
+{
+	struct soma_processor *soma = n->soma_hw;
+	double latency = soma->time_spiking;
+
+	soma->energy += soma->energy_spiking;
+	soma->spikes_sent++;
+
 	if (n->core->buffer_pos == BUFFER_AXON_OUT)
 	{
 		n->fired_buffer = 1;
@@ -672,6 +765,8 @@ void sim_neuron_send_spike(struct neuron *n)
 	{
 		n->fired = 1;
 	}
+
+	return latency;
 }
 
 double sim_calculate_time(const struct architecture *const arch,

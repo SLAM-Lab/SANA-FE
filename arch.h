@@ -48,6 +48,7 @@ enum neuron_models
 {
 	NEURON_IF,
 	NEURON_LIF,
+	NEURON_TRUENORTH,
 };
 
 struct axon_input
@@ -75,7 +76,7 @@ struct dendrite_processor
 
 struct soma_processor
 {
-	int model;
+	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
 	long int updates, spikes_sent;
 	double energy, time;
 	double energy_active_neuron_update, time_active_neuron_update;
