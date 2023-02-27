@@ -64,10 +64,14 @@ class NeuronGroup:
         self.neurons = []
         self.threshold = threshold
         self.reset = reset
+        # TODO: remove defaults
+        self.reverse_reset = 0.0
+        self.reverse_threshold = 0.0
 
     def to_command(self):
-        return "g {0} {1} {2}\n".format(len(self.neurons), self.threshold,
-                                        self.reset)
+        return "g {0} {1} {2} {3} {4}\n".format(len(self.neurons),
+            self.threshold, self.reset,
+            self.reverse_threshold, self.reverse_reset)
 
     def create_neuron(self, log_spikes, log_voltage, force_update):
         neuron_id = len(self.neurons)

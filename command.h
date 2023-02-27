@@ -31,6 +31,9 @@ int command_parse_file(FILE *fp, struct network *net, struct architecture *arch,
 int command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 int command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
+// Misc parsing
+int command_parse_reset_mode(const char *str);
+
 // (Spiking) neural network
 int command_parse_neuron_group(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
 int command_parse_neuron(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);

@@ -32,7 +32,6 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 #define ARCH_MAX_LINKS 4
 
 #define ARCH_INVALID_ID -1
-
 enum buffer_positions
 {
 	BUFFER_AXON_IN = 0,	// Buffer incoming packets
@@ -49,6 +48,15 @@ enum neuron_models
 	NEURON_IF,
 	NEURON_LIF,
 	NEURON_TRUENORTH,
+};
+
+enum neuron_reset_modes
+{
+	NEURON_NO_RESET,
+	NEURON_RESET_SOFT,
+	NEURON_RESET_HARD,
+	NEURON_RESET_SATURATE,
+	NEURON_RESET_MODE_COUNT,
 };
 
 struct axon_input
@@ -141,7 +149,7 @@ int arch_create_tile(struct architecture *const arch, const double energy_east_w
 int arch_create_core(struct architecture *const arch, struct tile *const t);
 void arch_create_axon_in(struct architecture *const arch, struct core *const c);
 void arch_create_synapse(struct architecture *const arch, struct core *const c, const int weight_bits, const int word_bits, const double energy_spike_op, const double time_spike_op, const double energy_memory_access, const double time_memory_access);
-void arch_create_soma(struct architecture *const arch, struct core *const c, int model, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update, double energy_spiking, double time_spiking);
+void arch_create_soma(struct architecture *const arch, struct core *const c, int model, int reset_mode, int reverse_reset_mode, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update, double energy_spiking, double time_spiking);
 void arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
 
 #endif

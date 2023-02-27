@@ -158,20 +158,26 @@ def parse_axon_in(element_dict, tile_id, core_id):
 
 
 def parse_soma(element_dict, tile_id, core_id):
+    reset_mode = "hard"
+    reverse_reset_mode = "none"
     active_energy, active_time = 0.0, 0.0
     inactive_energy, inactive_time = 0.0, 0.0
 
     attributes = element_dict["attributes"]
+    model = attributes["model"]
+    if attributes is not None and "reset" in attributes:
+        reset_mode = attributes["reset"]
+    if attributes is not None and "reverse_reset" in attributes:
+        reverse_reset_mode = attributes["reverse_reset"]
     if attributes is not None and "cost" in attributes:
         costs = attributes["cost"]
-        model = attributes["model"]
         active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
         inactive_energy, inactive_time = costs["inactive"]["energy"], costs["inactive"]["time"]
         spiking_energy, spiking_time = costs["spiking"]["energy"], costs["spiking"]["time"]
 
-    return create_soma(tile_id, core_id, model, active_energy, active_time,
-                        inactive_energy, inactive_time, spiking_energy,
-                        spiking_time)
+    return create_soma(tile_id, core_id, model, reset_mode, reverse_reset_mode,
+                        active_energy, active_time, inactive_energy,
+                        inactive_time, spiking_energy, spiking_time)
 
 
 def parse_dendrite(element_dict, tile_id, core_id):
@@ -290,12 +296,13 @@ def create_dendrite(tile_id, core_id, update_energy, update_time):
     return dendrite_id
 
 _somas = []
-def create_soma(tile_id, core_id, model, active_energy, active_time,
-                inactive_energy, inactive_time, spiking_energy, spiking_time):
+def create_soma(tile_id, core_id, model, reset_mode, reverse_reset_mode,
+                active_energy, active_time, inactive_energy, inactive_time,
+                spiking_energy, spiking_time):
     soma_id = _somas_in_core[tile_id][core_id]
     _somas_in_core[tile_id][core_id] += 1
 
-    soma = f"+ {tile_id} {core_id} {model} {active_energy} {active_time} {inactive_energy} {inactive_time} {spiking_energy} {spiking_time}"
+    soma = f"+ {tile_id} {core_id} {model} {reset_mode} {reverse_reset_mode} {active_energy} {active_time} {inactive_energy} {inactive_time} {spiking_energy} {spiking_time}"
     _command_list.append(soma)
 
 

@@ -295,14 +295,42 @@ int command_parse_core(struct architecture *arch,
 	return arch_create_core(arch, t);
 }
 
+int command_parse_reset_mode(const char *str)
+{
+	int reset_mode = -1;
+
+	if (strcmp(str, "none"))
+	{
+		reset_mode = NEURON_NO_RESET;
+	}
+	else if (strcmp(str, "soft"))
+	{
+		reset_mode = NEURON_RESET_SOFT;
+	}
+	else if (strcmp(str, "hard"))
+	{
+		reset_mode = NEURON_RESET_HARD;
+	}
+	else if (strcmp(str, "saturate"))
+	{
+		reset_mode = NEURON_RESET_SATURATE;
+	}
+	else
+	{
+		INFO("Error: reset mode not recognized.");
+	}
+
+	return reset_mode;
+}
+
 int command_parse_neuron_group(struct network *const net,
 				char fields[][MAX_FIELD_LEN],
 				const int field_count)
 {
-	double threshold, reset;
+	double threshold, reset, reverse_threshold, reverse_reset;
 	int ret, neuron_count;
 
-	if (field_count < 3)
+	if (field_count < 5)
 	{
 		INFO("Error: Invalid <add neuron group> command; "
 							"not enough fields.\n");
@@ -311,8 +339,10 @@ int command_parse_neuron_group(struct network *const net,
 	ret = sscanf(fields[1], "%d", &neuron_count);
 	ret += sscanf(fields[2], "%lf", &threshold);
 	ret += sscanf(fields[3], "%lf", &reset);
+	ret += sscanf(fields[4], "%lf", &reverse_threshold);
+	ret += sscanf(fields[5], "%lf", &reverse_reset);
 
-	if (ret < 3)
+	if (ret < 5)
 	{
 		INFO("Error: Couldn't parse command.\n");
 		return COMMAND_FAIL;
@@ -321,7 +351,8 @@ int command_parse_neuron_group(struct network *const net,
 	{
 		TRACE("Creating neuron group with %d neurons.\n", neuron_count);
 		return network_create_neuron_group(net, neuron_count, threshold,
-									reset);
+							reset, reverse_reset,
+							reverse_threshold);
 	}
 }
 
@@ -355,11 +386,6 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 		return COMMAND_FAIL;
 	}
 
-	connection_count = (field_count - NEURON_FIELDS) / CONNECTION_FIELDS;
-	TRACE("Parsed neuron gid:%d nid:%d log s:%d log v:%d force:%d "
-		"connections:%d\n", neuron_group_id, neuron_id, log_spikes,
-				log_voltage, force_update, connection_count);
-
 	if (neuron_group_id >= net->neuron_group_count)
 	{
 		INFO("Error: Group (%d) >= group count (%d).\n",
@@ -367,6 +393,13 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 		return COMMAND_FAIL;
 	}
 	group = &(net->groups[neuron_group_id]);
+
+	connection_count = (field_count - NEURON_FIELDS) / CONNECTION_FIELDS;
+	TRACE("Parsed neuron gid:%d nid:%d log s:%d log v:%d force:%d "
+		"connections:%d\n", neuron_group_id, neuron_id, log_spikes,
+				log_voltage, force_update, connection_count);
+
+
 
 	if (neuron_id >= group->neuron_count)
 	{
@@ -538,7 +571,7 @@ int command_parse_soma(struct architecture *const arch,
 	struct core *c;
 	double active_energy, active_time, inactive_energy, inactive_time;
 	double spiking_energy, spiking_time;
-	int tile_id, core_id, model, ret;
+	int tile_id, core_id, model, reset_mode, reverse_reset_mode, ret;
 
 	ret = sscanf(fields[1], "%d", &tile_id);
 	ret += sscanf(fields[2], "%d", &core_id);
@@ -547,13 +580,28 @@ int command_parse_soma(struct architecture *const arch,
 	{
 		model = NEURON_IF;
 	}
+	else if (strcmp(fields[3], "leaky_integrate_fire") == 0)
+	{
+		model = NEURON_LIF;
+	}
+	else if (strcmp(fields[3], "truenorth") == 0)
+	{
+		model = NEURON_TRUENORTH;
+	}
+	else
+	{
+		// TODO: make invalid, must specify neuron model
+		model = NEURON_IF;
+	}
+	reset_mode = command_parse_reset_mode(fields[4]);
+	reverse_reset_mode = command_parse_reset_mode(fields[5]);
 
-	ret += sscanf(fields[4], "%lf", &active_energy);
-	ret += sscanf(fields[5], "%lf", &active_time);
-	ret += sscanf(fields[6], "%lf", &inactive_energy);
-	ret += sscanf(fields[7], "%lf", &inactive_time);
-	ret += sscanf(fields[8], "%lf", &spiking_energy);
-	ret += sscanf(fields[9], "%lf", &spiking_time);
+	ret += sscanf(fields[6], "%lf", &active_energy);
+	ret += sscanf(fields[7], "%lf", &active_time);
+	ret += sscanf(fields[8], "%lf", &inactive_energy);
+	ret += sscanf(fields[9], "%lf", &inactive_time);
+	ret += sscanf(fields[10], "%lf", &spiking_energy);
+	ret += sscanf(fields[11], "%lf", &spiking_time);
 	if (ret < 8)
 	{
 		INFO("Error: Couldn't parse soma processor.\n");
@@ -562,7 +610,8 @@ int command_parse_soma(struct architecture *const arch,
 	t = &(arch->tiles[tile_id]);
 	c = &(t->cores[core_id]);
 
-	arch_create_soma(arch, c, model, active_energy, active_time,
+	arch_create_soma(arch, c, model, reset_mode, reverse_reset_mode,
+				active_energy, active_time,
 				inactive_energy, inactive_time,
 				spiking_energy, spiking_time);
 	return COMMAND_OK;

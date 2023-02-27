@@ -15,7 +15,10 @@ int total_connection_count = 0;
 
 int network_create_neuron_group(struct network *net,
 				const unsigned int neuron_count,
-				const double threshold, const double reset)
+				const double threshold,
+				const double reset,
+				const double reverse_threshold,
+				const double reverse_reset)
 {
 	struct neuron_group *group;
 	int id;
@@ -54,7 +57,9 @@ int network_create_neuron_group(struct network *net,
 		n->charge = 0.0;
 		n->bias = 0.0;
 		n->threshold = group->default_threshold;
+		n->reverse_threshold = group->default_threshold;
 		n->reset = group->default_reset;
+		n->reverse_reset = group->default_reset;
 		n->update_needed = 0;
 		n->spike_count = 0;
 		n->connections = NULL;
@@ -117,13 +122,7 @@ int network_create_neuron(struct neuron *const n,
 		exp(-dt / n->potential_time_const);
 	n->current_decay = 1.0;
 	n->potential_decay = 1.0;
-
-	n->reverse_reset = 0.0;
-	n->reverse_threshold = 0.0;
 	n->random_range_mask = 0;
-
-	n->reset_mode = NEURON_RESET_HARD;
-	n->reverse_reset_mode = NEURON_NO_RESET;
 
 	n->soma_last_updated = 0;
 	assert(n->connections == NULL);

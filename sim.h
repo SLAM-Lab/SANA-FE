@@ -50,8 +50,7 @@ void sim_update_dendrite(struct neuron *n);
 double sim_update_soma(struct neuron *n, const double current_in, const int timestep);
 void sim_update_axon(struct neuron *n);
 
-void sim_neuron_send_spike(struct neuron *n);
-
+double sim_neuron_send_spike(struct neuron *n);
 
 void sim_reset_measurements(struct network *net, struct architecture *arch);
 double sim_calculate_energy(const struct architecture *const arch, const double time);
