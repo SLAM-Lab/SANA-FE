@@ -28,7 +28,7 @@ def run_sim(network_filename, timesteps, plot_filename):
     run_command = ("./sim", ARCH_FILENAME, network_filename,
                "{0}".format(timesteps))
     print("Running command: {0}".format(" ".join(run_command)))
-    #subprocess.call(run_command)
+    subprocess.call(run_command)
 
     potential_data = pd.read_csv("probe_potential.csv")
     spike_data = pd.read_csv("probe_spikes.csv")
@@ -36,19 +36,18 @@ def run_sim(network_filename, timesteps, plot_filename):
     potentials = potential_data.loc[:, "1.0"]
     # TODO: remove this kind of hacky change! We make the smallest possible
     #  value 0 I guess?
-    norm_potentials = potentials + 15.0
+    #norm_potentials = potentials + 15.0
+    norm_potentials = potentials
     spike_idx = spike_data.loc[:, "1.0"].to_numpy().nonzero()[0]
-    spike_vals = 20.0 * np.ones(spike_idx.shape)
-
-    print(spike_idx)
-    print(spike_vals)
+    #spike_vals = 20.0 * np.ones(spike_idx.shape)
+    spike_vals = np.ones(spike_idx.shape)
 
     plt.figure()
     plt.plot(norm_potentials)
     plt.scatter(spike_idx, spike_vals, marker='^', color='red')
     plt.xlabel("Simulation Ticks")
     plt.ylabel("Normalized Membrane Potential")
-    plt.ylim((0, 22))
+    #plt.ylim((0, 22))
     plt.tight_layout()
     # Need to save
     plt.savefig(plot_filename)
@@ -58,8 +57,8 @@ def run_sim(network_filename, timesteps, plot_filename):
 
 
 def run():
-    run_sim("examples/truenorth_phasic.net", 1000, "runs/phasic.png")
-    #run_sim("examples/truenorth_bursting.net", 1000, "runs/bursting.png")
+    #run_sim("examples/truenorth_phasic.net", 1000, "runs/phasic.png")
+    run_sim("examples/truenorth_bursting.net", 1000, "runs/bursting.png")
 
 
 if __name__ == "__main__":

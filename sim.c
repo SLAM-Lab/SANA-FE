@@ -98,7 +98,11 @@ void sim_process_neuron(struct network *net, struct neuron *n,
 	{
 		double current_in = n->current_buffer;
 		n->current_buffer = 0.0;
-		n->processing_time = sim_update_soma(n, current_in, timestep);
+		if (n->update_needed)
+		{
+			n->processing_time = sim_update_soma(n, current_in,
+								timestep);
+		}
 	}
 	TRACE("Updating neuron %d.%d.\n", n->group->id, n->id);
 
@@ -237,17 +241,20 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 					struct connection *conn =
 							&(n->connections[k]);
 					struct neuron *post_neuron =
-								conn->post_neuron;
-					struct core *post_core = post_neuron->core;
+							conn->post_neuron;
+					struct core *post_core =
+							post_neuron->core;
 					assert(post_neuron != NULL);
 					assert(post_core != NULL);
 
 					// TODO: need a function to figure this out
 					//  or we store an absolute id in the core
 					//  OR we use a 2D array
-					int axon_id = (post_core->t->id * 4) + post_core->id;
+					int axon_id = (post_core->t->id * 4) +
+								post_core->id;
 					c->spikes_sent_per_core[axon_id]++;
 					total_spike_count++;
+					post_neuron->update_needed = 1;
 					c->axon_map[axon_id] = post_core;
 					sim_pipeline_receive(post_neuron, conn,
 								timestep);

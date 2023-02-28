@@ -148,7 +148,6 @@ if __name__ == "__main__":
     #                                 "spike_gen_energy": spike_gen_energy,
     #                                 "synapse_energy": synapse_energy,
     #                                 "network_energy": network_energy})
- 
     plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
     plt.figure(figsize=(5.5, 5.5))
     plt.bar(1, spiking_update_energy)
@@ -160,7 +159,6 @@ if __name__ == "__main__":
     plt.xlabel("Operation Type")
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.savefig("energy_breakdown.png")
-
 
     # Plot the latency
     loihi_data = pd.read_csv(LOIHI_TIME_DATA_FILENAME)
