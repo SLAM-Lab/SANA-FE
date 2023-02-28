@@ -18,9 +18,6 @@ import math
 
 from matplotlib import pyplot as plt
 
-MAX_TILES = 32
-MAX_CORES = 4
-MAX_COMPARTMENTS = 1024
 NETWORK_FILENAME = "runs/connected_layers.net"
 ARCH_FILENAME = "loihi.arch"
 
@@ -30,10 +27,13 @@ class Network:
         self.external_inputs = external_inputs
         self.inputs = []
         self.groups = []
+        self._max_tiles = None
+        self._max_cores = None
+        self._max_compartments = None
 
-    def create_group(self, threshold, reset):
+    def create_group(self, threshold, reset, leak):
         group_id = len(self.groups)
-        group = NeuronGroup(group_id, threshold, reset)
+        group = NeuronGroup(group_id, threshold, reset, leak)
         self.groups.append(group)
         return group
 
@@ -59,7 +59,7 @@ class Network:
 
 
 class NeuronGroup:
-    def __init__(self, group_id, threshold, reset):
+    def __init__(self, group_id, threshold, reset, leak):
         self.id = group_id
         self.neurons = []
         self.threshold = threshold
@@ -67,11 +67,13 @@ class NeuronGroup:
         # TODO: remove defaults
         self.reverse_reset = 0.0
         self.reverse_threshold = 0.0
+        self.leak = leak
 
     def to_command(self):
-        return "g {0} {1} {2} {3} {4}\n".format(len(self.neurons),
-            self.threshold, self.reset,
-            self.reverse_threshold, self.reverse_reset)
+        neuron_count = len(self.neurons)
+        return (f"g {neuron_count} {self.threshold} {self.reset} "
+                f"{self.reverse_threshold} {self.reverse_reset} {self.leak} "
+                f"hard none\n")
 
     def create_neuron(self, log_spikes, log_voltage, force_update):
         neuron_id = len(self.neurons)
@@ -119,9 +121,12 @@ class Neuron:
         self.bias = bias
 
     def to_command(self):
-        command = "n {0} {1} {2} {3} {4} {5}".format(
-            self.group_id, self.id, self.bias,
-            int(self.log_spikes), int(self.log_voltage), int(self.force_update))
+        log_spikes = int(self.log_spikes)
+        log_voltage = int(self.log_voltage)
+        force_update = int(self.force_update)
+        self.leak = 1.0
+        command = (f"n {self.group_id} {self.id} {self.bias} {log_spikes} "
+                   f"{log_voltage} {force_update}")
 
         for connection in self.connections:
             dest_neuron, weight = connection
@@ -134,50 +139,50 @@ class Neuron:
         return command
 
 
-# TODO: generalize this to map networks to any hardware. Probably using the
-#  same architecture description
-def loihi_init_compartments():
+def init_compartments(max_tiles, max_cores, max_compartments):
     compartments = []
-    for tile in range(0, MAX_TILES):
+    for tile in range(0, max_tiles):
         c = []
-        for core in range(0, MAX_CORES):
-            c.append(MAX_COMPARTMENTS)
+        for core in range(0, max_cores):
+            c.append(max_compartments)
         compartments.append(c)
 
     return compartments
 
 
-def loihi_map_neuron_to_compartment(loihi_compartments):
-    for tile in range(0, MAX_TILES):
-        for core in range(0, MAX_CORES):
-            if loihi_compartments[tile][core] > 0:
-                loihi_compartments[tile][core] -= 1
+def map_neuron_to_compartment(compartments):
+    for tile, cores in enumerate(compartments):
+        for core, _ in enumerate(cores):
+            if compartments[tile][core] > 0:
+                compartments[tile][core] -= 1
                 return tile, core
 
     # No free compartments left
     return None, None
 
 
-def create_layer(network, layer_neuron_count, loihi_compartments,
+def create_layer(network, layer_neuron_count, compartments,
                  log_spikes, log_voltage, force_update, threshold, reset,
-                 mappings=None):
+                 leak, mappings=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
-    print("Compartments free: {0}".format(loihi_compartments))
-    layer_group = network.create_group(threshold, reset)
+    #print("Compartments free: {0}".format(compartments))
+    layer_group = network.create_group(threshold, reset, leak)
 
     if mappings is not None:
-        print("mappings: {0} len({1}) layer_neuron_count: {2}".format(
-            mappings, len(mappings), layer_neuron_count))
+        #print("mappings: {0} len({1}) layer_neuron_count: {2}".format(
+        #    mappings, len(mappings), layer_neuron_count))
         assert(len(mappings) == layer_neuron_count)
 
     for i in range(0, layer_neuron_count):
+        if (i % 10000) == 0:
+            print(f"Creating neuron {i}")
         neuron = layer_group.create_neuron(log_spikes, log_voltage,
                                            force_update)
 
         if mappings is not None:
             tile, core = mappings[i]
         else:
-            tile, core = loihi_map_neuron_to_compartment(loihi_compartments)
+            tile, core = map_neuron_to_compartment(compartments)
         neuron.tile, neuron.core = tile, core
 
     return layer_group

@@ -94,7 +94,7 @@ int network_create_neuron_group(struct network *net,
 		n->is_init = 0;
 	}
 
-	INFO("Added neuron group gid:%d count:%d "
+	INFO("Created neuron group gid:%d count:%d "
 		"threshold:%lf neg threshold:%lf "
 		"pos reset:%lf reset mode:%d "
 		"neg reset:%lf neg reset mode:%d\n",
@@ -160,7 +160,7 @@ int network_create_neuron(struct neuron *const n,
 		con->weight = 0.0;
 	}
 
-	INFO("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
+	TRACE("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
 					n->group->id, n->id, n->force_update,
 					n->threshold, n->post_connection_count);
 	n->is_init = 1;
@@ -175,8 +175,7 @@ int network_map_neuron(struct neuron *const n,
 	assert(map.core->neurons != NULL);
 	assert(n->core == NULL);
 	n->core = map.core;
-	INFO("mapping core %d to neuron:%d\n",
-		map.core->id, map.core->neuron_count);
+	TRACE("mapping neuron %d to core %d\n", n->id, map.core->id);
 	map.core->neurons[map.core->neuron_count] = n;
 	map.core->neuron_count++;
 

@@ -740,13 +740,13 @@ double sim_update_soma_truenorth(struct neuron *n, const double current_in,
 		v += (double) r;
 	}
 
-	INFO("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n",
-		v, n->threshold, n->group->reset_mode, n->reverse_threshold,
-		n->group->reverse_reset_mode);
+	//INFO("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n",
+	//	v, n->threshold, n->group->reset_mode, n->reverse_threshold,
+	//	n->group->reverse_reset_mode);
 	if (v >= n->threshold)
 	{
 		int reset_mode = n->group->reset_mode;
-		INFO("pos reset:%d\n", reset_mode);
+		//INFO("pos reset:%d\n", reset_mode);
 		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reset;
@@ -764,7 +764,7 @@ double sim_update_soma_truenorth(struct neuron *n, const double current_in,
 	else if (v <= n->reverse_threshold)
 	{
 		int reset_mode = n->group->reverse_reset_mode;
-		INFO("neg reset:%d\n", reset_mode);
+		//INFO("neg reset:%d\n", reset_mode);
 		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reverse_reset;
@@ -779,7 +779,7 @@ double sim_update_soma_truenorth(struct neuron *n, const double current_in,
 		}
 		// No spike is generated
 	}
-	INFO("potential:%lf threshold %lf\n", n->potential, n->threshold);
+	//INFO("potential:%lf threshold %lf\n", n->potential, n->threshold);
 
 	return latency;
 }

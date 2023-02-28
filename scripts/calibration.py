@@ -47,7 +47,7 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
     # Two layers, fully connected
     network = utils.Network()
-    loihi_compartments = utils.loihi_init_compartments()
+    loihi_compartments = utils.init_compartments(32, 4, 1024)
 
     if spiking:  # always spike
         threshold = -1.0
@@ -80,7 +80,7 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
 
 def connected_layers(weights, spiking=True, mapping="luke"):
     network = utils.Network()
-    loihi_compartments = utils.loihi_init_compartments()
+    loihi_compartments = utils.init_compartments(32, 4, 1024)
 
     layer_neuron_count = len(weights)
     if spiking:  # always spike
@@ -92,6 +92,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     force_update = True
     log_spikes = False
     log_voltage = False
+    leak = 1.0
 
     neurons_per_core = [0, 0, 0, 0]
     if mapping == "luke" or mapping == "l2_split" or mapping == "fixed":
@@ -115,7 +116,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     layer_1 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
-                                     reset, mappings=layer_mapping)
+                                     reset, leak, mappings=layer_mapping)
 
     force_update = False
     neurons_per_core = [0, 0, 0, 0, 0]
@@ -153,7 +154,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     layer_2 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_voltage, force_update, threshold,
-                                     reset, mappings=layer_mapping)
+                                     reset, leak, mappings=layer_mapping)
 
     for src in layer_1.neurons:
         for dest in layer_2.neurons:
@@ -163,7 +164,6 @@ def connected_layers(weights, spiking=True, mapping="luke"):
                 # Zero weights are pruned i.e. removed
                 src.add_connection(dest, weight)
 
-    print(network)
     return network
 
 
@@ -220,7 +220,7 @@ if __name__ == "__main__":
         layer_neurons = i*i
 
         #network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
-        commands = connected_layers(weights[i-1].transpose(), spiking=True,
+        commands = connected_layers(weights[i-1].transpose(), spiking=True, 
                                     mapping=mapping)
         print("Testing network with {0} neurons".format(2*layer_neurons))
         results = run_sim(commands, timesteps)

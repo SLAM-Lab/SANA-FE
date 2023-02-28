@@ -1,6 +1,7 @@
 #CC=clang-3.8
 CC=gcc
-CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -pg
+#CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -pg
+CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g
 RELFLAGS=-Ofast
 DEBUGFLAGS=-DDEBUG -no-pie -pg -O0
 GIT_COMMIT=$(shell ./git_status.sh)
