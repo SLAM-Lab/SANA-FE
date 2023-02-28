@@ -9,6 +9,7 @@ architecture:
     topology: mesh
     dimensions: 2
     width: 8
+    height: 4
     cost:
       east_west:
         energy: 3.0e-12

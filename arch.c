@@ -248,7 +248,7 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 }
 
 void arch_create_soma(struct architecture *const arch, struct core *const c,
-			int model, int reset_mode, int reverse_reset_mode,
+			int model,
 			double energy_active_neuron_update,
 			double time_active_neuron_update,
 			double energy_inactive_neuron_update,
@@ -263,14 +263,14 @@ void arch_create_soma(struct architecture *const arch, struct core *const c,
 	s->time = 0.0;
 
 	s->model = model;
-	s->reset_mode = reset_mode;
-	s->reverse_reset_mode = reverse_reset_mode;
 	s->energy_active_neuron_update = energy_active_neuron_update;
 	s->time_active_neuron_update = time_active_neuron_update;
 	s->energy_inactive_neuron_update = energy_inactive_neuron_update;
 	s->time_inactive_neuron_update = time_inactive_neuron_update;
 	s->energy_spiking = energy_spiking;
 	s->time_spiking = time_spiking;
+	// TODO: figure this parameter for setting the leak
+	s->leak_towards_zero = 1;
 
 	TRACE("Created soma processor %d (c:%d.%d)\n",
 						s->id, c->t->id, c->id);

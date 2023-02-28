@@ -697,13 +697,24 @@ double sim_update_soma_truenorth(struct neuron *n, const double current_in,
 	while (n->soma_last_updated <= timestep)
 	{
 		// Linear leak
-		if (soma->leak_towards_zero && (n->potential < 0.0))
+		if (soma->leak_towards_zero)
 		{
-			n->potential += n->potential_decay;
+			// TODO: what happens if we're above zero but by less
+			//  than the leak amount (for convergent), will we
+			//  oscillate between the two? Does it matter
+			if (n->potential > 0.0)
+			{
+				n->potential -= n->potential_decay;
+			}
+			else if (n->potential < 0.0)
+			{
+				n->potential += n->potential_decay;
+			}
+			// else equals zero, so no leak is applied
 		}
 		else
 		{
-			n->potential -= n->potential_decay;
+			n->potential += n->potential_decay;
 		}
 		n->soma_last_updated++;
 	}
@@ -722,29 +733,46 @@ double sim_update_soma_truenorth(struct neuron *n, const double current_in,
 		v += (double) r;
 	}
 
-	if (v > n->threshold)
+	INFO("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n",
+		v, n->threshold, n->group->reset_mode, n->reverse_threshold,
+		n->group->reverse_reset_mode);
+	if (v >= n->threshold)
 	{
-		if (soma->reset_mode == NEURON_RESET_HARD)
+		int reset_mode = n->group->reset_mode;
+		INFO("pos reset:%d\n", reset_mode);
+		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reset;
 		}
-		else if (soma->reset_mode == NEURON_RESET_SOFT)
+		else if (reset_mode == NEURON_RESET_SOFT)
 		{
 			n->potential -= n->threshold;
 		}
+		else if (reset_mode == NEURON_RESET_SATURATE)
+		{
+			n->potential = n->threshold;
+		}
 		latency += sim_neuron_send_spike(n);
 	}
-	else if (v < n->reverse_threshold)
+	else if (v <= n->reverse_threshold)
 	{
-		if (soma->reverse_reset_mode == NEURON_RESET_HARD)
+		int reset_mode = n->group->reverse_reset_mode;
+		INFO("neg reset:%d\n", reset_mode);
+		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reverse_reset;
 		}
-		else if (soma->reverse_reset_mode == NEURON_RESET_SATURATE)
+		else if (reset_mode == NEURON_RESET_SOFT)
+		{
+			n->potential += n->reverse_threshold;
+		}
+		else if (reset_mode == NEURON_RESET_SATURATE)
 		{
 			n->potential = n->reverse_threshold;
 		}
+		// No spike is generated
 	}
+	INFO("potential:%lf threshold %lf\n", n->potential, n->threshold);
 
 	return latency;
 }

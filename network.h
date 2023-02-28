@@ -119,7 +119,7 @@ struct neuron_group
 	//  same models. If implemented in hardware, they also must share common
 	//  hardware i.e. the same core and processor blocks in the core
 	struct neuron *neurons;
-	int id, neuron_count;
+	int id, neuron_count, reset_mode, reverse_reset_mode;
 	double default_threshold, default_reset;
 	double default_reverse_threshold, default_reverse_reset;
 };
@@ -136,7 +136,7 @@ struct network
 void network_init(struct network *const net);
 void network_free(struct network *const net);
 int network_create_neuron(struct neuron *const n, const double bias, const int log_spikes, const int log_voltages, const int force_update, const int connection_count);
-int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset, const double reverse_threshold, const double reverse_reset);
+int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset, const double reverse_threshold, const double reverse_reset, const double leak, const int reset_mode, const int reverse_reset_mode);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
 int network_map_neuron(struct neuron *const n, const struct hardware_mapping);
 int net_create_inputs(struct network *const net, const int input_count, const int input_type);

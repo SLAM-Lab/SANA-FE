@@ -7,6 +7,7 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 Parse architecture description YAML file, output machine-readable list
 """
 import yaml
+import sys
 
 def parse(arch_dict):
     print(arch_dict)
@@ -48,6 +49,7 @@ def parse_arch(arch_dict):
     if topology == "mesh":
         dimensions = int(attributes["dimensions"])
         width = int(attributes["width"])
+        height = int(attributes["height"])
     cost = attributes["cost"]
 
     network_attributes = {"topology": topology, "dimensions": dimensions,
@@ -60,7 +62,7 @@ def parse_arch(arch_dict):
     for tile in tiles:
         parse_tile(tile, network_attributes)
 
-    create_noc(8, 4)
+    create_noc(width, height)
     return
 
 
@@ -158,24 +160,18 @@ def parse_axon_in(element_dict, tile_id, core_id):
 
 
 def parse_soma(element_dict, tile_id, core_id):
-    reset_mode = "hard"
-    reverse_reset_mode = "none"
     active_energy, active_time = 0.0, 0.0
     inactive_energy, inactive_time = 0.0, 0.0
 
     attributes = element_dict["attributes"]
     model = attributes["model"]
-    if attributes is not None and "reset" in attributes:
-        reset_mode = attributes["reset"]
-    if attributes is not None and "reverse_reset" in attributes:
-        reverse_reset_mode = attributes["reverse_reset"]
     if attributes is not None and "cost" in attributes:
         costs = attributes["cost"]
         active_energy, active_time = costs["active"]["energy"], costs["active"]["time"]
         inactive_energy, inactive_time = costs["inactive"]["energy"], costs["inactive"]["time"]
         spiking_energy, spiking_time = costs["spiking"]["energy"], costs["spiking"]["time"]
 
-    return create_soma(tile_id, core_id, model, reset_mode, reverse_reset_mode,
+    return create_soma(tile_id, core_id, model,
                         active_energy, active_time, inactive_energy,
                         inactive_time, spiking_energy, spiking_time)
 
@@ -296,13 +292,13 @@ def create_dendrite(tile_id, core_id, update_energy, update_time):
     return dendrite_id
 
 _somas = []
-def create_soma(tile_id, core_id, model, reset_mode, reverse_reset_mode,
+def create_soma(tile_id, core_id, model,
                 active_energy, active_time, inactive_energy, inactive_time,
                 spiking_energy, spiking_time):
     soma_id = _somas_in_core[tile_id][core_id]
     _somas_in_core[tile_id][core_id] += 1
 
-    soma = f"+ {tile_id} {core_id} {model} {reset_mode} {reverse_reset_mode} {active_energy} {active_time} {inactive_energy} {inactive_time} {spiking_energy} {spiking_time}"
+    soma = f"+ {tile_id} {core_id} {model} {active_energy} {active_time} {inactive_energy} {inactive_time} {spiking_energy} {spiking_time}"
     _command_list.append(soma)
 
 
@@ -330,15 +326,22 @@ def create_noc(width, height):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: parse_arch.py <arch file> <output file>")
+        exit()
+
+    input_filename = sys.argv[1]
+    output_filename = sys.argv[2]
+
     arch_list = None
-    with open("loihi.yaml", "r") as arch_file:
+    with open(input_filename, "r") as arch_file:
         arch_dict = yaml.safe_load(arch_file)
         parse(arch_dict)
 
     arch_elements = _command_list
     print(arch_elements)
 
-    with open("out", "w") as list_file:
+    with open(output_filename, "w") as list_file:
         for line in arch_elements:
             print(line)
             list_file.write(line + '\n')

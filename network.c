@@ -18,7 +18,10 @@ int network_create_neuron_group(struct network *net,
 				const double threshold,
 				const double reset,
 				const double reverse_threshold,
-				const double reverse_reset)
+				const double reverse_reset,
+				const double leak,
+				const int reset_mode,
+				const int reverse_reset_mode)
 {
 	struct neuron_group *group;
 	int id;
@@ -39,6 +42,11 @@ int network_create_neuron_group(struct network *net,
 	group->neuron_count = neuron_count;
 	group->default_threshold = threshold;
 	group->default_reset = reset;
+	group->reset_mode = reset_mode;
+
+	group->default_reverse_threshold = reverse_threshold;
+	group->default_reverse_reset = reverse_reset;
+	group->reverse_reset_mode = reverse_reset_mode;
 
 	for (int i = 0; i < group->neuron_count; i++)
 	{
@@ -51,15 +59,21 @@ int network_create_neuron_group(struct network *net,
 		n->log_voltage = 0;
 		n->force_update = 0;
 
+		n->reset = group->default_reset;
+		n->reverse_reset = group->default_reset;
+		n->threshold = group->default_threshold;
+		n->reverse_threshold = group->default_reverse_threshold;
+
 		n->fired = 0;
 		n->potential = 0.0;
 		n->current = 0.0;
 		n->charge = 0.0;
 		n->bias = 0.0;
-		n->threshold = group->default_threshold;
-		n->reverse_threshold = group->default_threshold;
-		n->reset = group->default_reset;
-		n->reverse_reset = group->default_reset;
+
+		//n->potential_decay =
+		//	exp(-dt / n->potential_time_const);
+		n->potential_decay = leak;
+
 		n->update_needed = 0;
 		n->spike_count = 0;
 		n->connections = NULL;
@@ -80,9 +94,14 @@ int network_create_neuron_group(struct network *net,
 		n->is_init = 0;
 	}
 
-	INFO("Added neuron group gid:%d count:%d threshold:%lf reset:%lf\n",
-		group->id, group->neuron_count, group->default_threshold,
-		group->default_reset);
+	INFO("Added neuron group gid:%d count:%d "
+		"threshold:%lf neg threshold:%lf "
+		"pos reset:%lf reset mode:%d "
+		"neg reset:%lf neg reset mode:%d\n",
+		group->id, group->neuron_count,
+		group->default_threshold, group->default_reverse_threshold,
+		group->default_reset, group->reset_mode,
+		group->default_reverse_reset, group->reverse_reset_mode);
 
 	return id;
 }
@@ -118,10 +137,8 @@ int network_create_neuron(struct neuron *const n,
 	n->potential_time_const = 10.0e-3;
 	n->current_decay =
 		exp(-dt / n->current_time_const);
-	n->potential_decay =
-		exp(-dt / n->potential_time_const);
+
 	n->current_decay = 1.0;
-	n->potential_decay = 1.0;
 	n->random_range_mask = 0;
 
 	n->soma_last_updated = 0;
