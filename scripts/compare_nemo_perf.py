@@ -1,53 +1,72 @@
+"""
+Copyright (c) 2023 - The University of Texas at Austin
+This work was produced under contract #2317831 to National Technology and
+Engineering Solutions of Sandia, LLC which is under contract
+No. DE-NA0003525 with the U.S. Department of Energy.
+"""
+# TODO: I seem to be getting an issue where NeMo is freezing after a number of
+#  timestep / ticks
+
+# External libraries, plotting
 import matplotlib
 matplotlib.use('Agg')
-
-import subprocess
 from matplotlib import pyplot as plt
-import random
 
+# Other external libraries
+import numpy as np
+import pandas as pd
+
+# Python built-in libraries
+import subprocess
+import random
+import time
+import csv
+
+# SANA-FE libraries
 import sys
 sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
 import utils
 
+# Use a dumb seed to get consistent results
 random.seed(1)
 
+# Global experiment parameters
 TRUENORTH_COMPARTMENTS = 256
 TRUENORTH_AXONS = TRUENORTH_COMPARTMENTS
-#TRUENORTH_TILES = 4096
-TRUENORTH_TILES = 32
 SPIKE_INTRA_CORE_PROB = 0.8
 NETWORK_FILENAME = "runs/nemo_randomized.net"
 ARCH_FILENAME = "truenorth.arch"
+TIMESTEPS = 10  # i.e., ticks, where each tick is 1 ms of wall-time on the chip
+NEMO_BIN_PATH = "/home/usr1/jboyle/neuro/NeMo/bin/NeMo"
+CSV_RESULTS_FILENAME = "runs/compare_sanafe_nemo.csv"
 
 # Create a random truenorth network, 80% connected to neuron within same
 # core, 20% connected to neurons outside
-def create_nemo_network():
+def create_nemo_network(cores):
     network = utils.Network()
-    compartments = utils.init_compartments(TRUENORTH_TILES, 1,
+    compartments = utils.init_compartments(cores, 1,
                                            TRUENORTH_COMPARTMENTS)
     print("Creating neuron population")
-    
+
     mappings = []
-    for i in range(0, TRUENORTH_TILES):
+    for i in range(0, cores):
         m = (i, 0)
         mappings.extend((m,) * TRUENORTH_COMPARTMENTS)
-    print(len(mappings))
     # Create neurons to fill every TrueNorth compartment, with a negative
     #  threshold and forced updates i.e., spikes every timestep
-    population = utils.create_layer(network,
-                                    TRUENORTH_TILES*TRUENORTH_COMPARTMENTS,
+    population = utils.create_layer(network, cores*TRUENORTH_COMPARTMENTS,
                                     compartments, 0, 0, 1, 0.0, -1.0, 0.0,
                                     mappings=mappings)
 
 
     print("Generating randomized network connections")
     weight = 1.0
-    for c in range(0, TRUENORTH_TILES):
+    for c in range(0, cores):
         if (c % 32) == 0:
             print(f"Generating synaptic connections for core {c}")
         for n in range(0, TRUENORTH_AXONS):
             if random.random() < SPIKE_INTRA_CORE_PROB:
-                possible_cores = list(range(0, TRUENORTH_TILES))
+                possible_cores = list(range(0, cores))
                 del(possible_cores[c])
                 dest_core = random.choice(possible_cores)
             else:  # 20% chance of picking the same core
@@ -60,25 +79,76 @@ def create_nemo_network():
     network.save(NETWORK_FILENAME)
 
 
-# Run the simulation on SANA-FE
-def run_sim_sanafe(timesteps):
+# Run the simulation on SANA-FE, generating the network and immediately using it
+#  Return the total runtime measured by Python, including setup and processing
+#  time.
+def run_sim_sanafe(cores, timesteps):
+    create_nemo_network(cores)
     run_command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
                    "{0}".format(timesteps))
-    print("Command: {0}".format(" ".join(run_command)))
+    print("sana-fe command: {0}".format(" ".join(run_command)))
+    start = time.time()
     subprocess.call(run_command)
+    end = time.time()
+    run_time = end - start
+    print(f"sanafe runtime for {cores} cores was {run_time} s")
+
+    return run_time
+
+
+# Run the same simulation on NeMo, for a given number of cores and timesteps
+#  Return the runtime measured by Python.
+# TODO: should we add changes to measure the runtime of simulation and ignore
+#  setup time? Is this even possible
+def run_sim_nemo(cores, timesteps):
+    run_command = ("mpirun", NEMO_BIN_PATH,
+                   f"--cores={cores}", f"--end={timesteps}",  "--sync=3")
+    print("NeMo command: {0}".format(" ".join(run_command)))
+    start = time.time()
+    subprocess.call(run_command)
+    end = time.time()
+    run_time = end - start
+    print(f"nemo runtime for {cores} cores was {run_time} s")
+
+    return run_time
+
+
+def plot_results():
+    df = pd.read_csv(CSV_RESULTS_FILENAME, index_col="cores")
+    plt.figure()
+    df.plot.bar(rot=0)
+    plt.xlabel("TrueNorth Core Count")
+    plt.ylabel("Run-time (s)")
+    plt.tight_layout()
+    plt.savefig("runs/compare_sanafe_nemo.png")
 
     return
 
 
-def run_sim_nemo(timesteps):
-    pass
-
-
-# 3) plot runtime results against runtime results for NeMo, varying the core
-#    count
-
-
 if __name__ == "__main__":
-    create_nemo_network()
-    run_sim_sanafe(100)
+    run_experiments = True
+    plot = True
+    if run_experiments:
+        #core_counts = (4,8,16)
+        core_counts = (32, 64, 128, 256, 512, 1024)
+        print(f"Running experiments with following core counts: {core_counts}")
 
+        experimental_runs = len(core_counts)
+        sanafe_runtimes = np.zeros(experimental_runs)
+        nemo_runtimes = np.zeros(experimental_runs)
+
+        for i, cores in enumerate(core_counts):
+            print(f"Running simulation of {cores} cores")
+            sanafe_runtimes[i] = run_sim_sanafe(cores, TIMESTEPS)
+            nemo_runtimes[i] = run_sim_nemo(cores, TIMESTEPS)
+
+        with open(CSV_RESULTS_FILENAME, "w") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(("cores", "SANA-FE", "NeMo"))
+            for i, cores in enumerate(core_counts):
+                writer.writerow((cores, sanafe_runtimes[i], nemo_runtimes[i]))
+
+        print("Saved results to file")
+
+    if plot:
+        plot_results()

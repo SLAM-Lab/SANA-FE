@@ -298,7 +298,9 @@ def create_soma(tile_id, core_id, model,
     soma_id = _somas_in_core[tile_id][core_id]
     _somas_in_core[tile_id][core_id] += 1
 
-    soma = f"+ {tile_id} {core_id} {model} {active_energy} {active_time} {inactive_energy} {inactive_time} {spiking_energy} {spiking_time}"
+    soma = (f"+ {tile_id} {core_id} {model} {active_energy} {active_time} "
+            f"{inactive_energy} {inactive_time} {spiking_energy} "
+            f"{spiking_time}")
     _command_list.append(soma)
 
 
