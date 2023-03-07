@@ -39,8 +39,8 @@ def run_sim(network_filename, timesteps, plot_filename):
     #norm_potentials = potentials + 15.0
     norm_potentials = potentials
     spike_idx = spike_data.loc[:, "1.0"].to_numpy().nonzero()[0]
-    #spike_vals = 20.0 * np.ones(spike_idx.shape)
-    spike_vals = np.ones(spike_idx.shape)
+    spike_vals = 20.0 * np.ones(spike_idx.shape)
+    #spike_vals = np.ones(spike_idx.shape)
 
     plt.figure()
     plt.plot(norm_potentials)
@@ -57,9 +57,8 @@ def run_sim(network_filename, timesteps, plot_filename):
 
 
 def run():
-    #run_sim("examples/truenorth_phasic.net", 1000, "runs/phasic.png")
+    run_sim("examples/truenorth_phasic.net", 1000, "runs/phasic.png")
     run_sim("examples/truenorth_bursting.net", 1000, "runs/bursting.png")
-
 
 if __name__ == "__main__":
     run()

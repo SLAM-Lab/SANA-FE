@@ -3,9 +3,9 @@ g 1       200     0    0   0        0 hard none
 g 1       2     -15  -10 -15       -2 hard saturate
 
 # g n b s v f connections
-n 0 0 1 0 0 1 1 0 20
+n 0 0 1 0 0 1 1 0 4
 #
-n 1 0 0 1 1 1
+n 1 0 0 1 1 0
 
 & 0 0 0 0
 & 1 0 0 0

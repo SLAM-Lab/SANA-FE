@@ -38,7 +38,8 @@ NETWORK_FILENAME = "runs/nemo_randomized.net"
 ARCH_FILENAME = "truenorth.arch"
 TIMESTEPS = 10  # i.e., ticks, where each tick is 1 ms of wall-time on the chip
 NEMO_BIN_PATH = "/home/usr1/jboyle/neuro/NeMo/bin/NeMo"
-CSV_RESULTS_FILENAME = "runs/compare_sanafe_nemo.csv"
+#CSV_RESULTS_FILENAME = "runs/compare_sanafe_nemo.csv"
+CSV_RESULTS_FILENAME = "/dev/null"
 
 # Create a random truenorth network, 80% connected to neuron within same
 # core, 20% connected to neurons outside
@@ -100,15 +101,27 @@ def run_sim_sanafe(cores, timesteps):
 #  Return the runtime measured by Python.
 # TODO: should we add changes to measure the runtime of simulation and ignore
 #  setup time? Is this even possible
-def run_sim_nemo(cores, timesteps):
-    run_command = ("mpirun", NEMO_BIN_PATH,
-                   f"--cores={cores}", f"--end={timesteps}",  "--sync=3")
+def run_sim_nemo(cores, timesteps, debug=True):
+    run_command = ["mpirun", NEMO_BIN_PATH,
+                   f"--cores={cores}", f"--end={timesteps}",  "--sync=3",
+                   "--rand"]
+    if debug:
+        run_command.append("--svouts")
     print("NeMo command: {0}".format(" ".join(run_command)))
     start = time.time()
     subprocess.call(run_command)
     end = time.time()
     run_time = end - start
     print(f"nemo runtime for {cores} cores was {run_time} s")
+
+    if debug:
+        # See how many spikes were sent, i.e., how many line entries are in the
+        #  firing logs (1 spike per line). We just want to check we generate
+        #  roughly the same number of spikes as sana-fe
+        num_spikes = 0
+        for i in range(0, 4):
+            num_spikes += sum(1 for line in open(f"fire_record_rank_{i}.csv"))
+        print(f"NeMo {num_spikes} total spikes")
 
     return run_time
 
@@ -127,9 +140,8 @@ def plot_results():
 
 if __name__ == "__main__":
     run_experiments = True
-    plot = True
+    plot = False
     if run_experiments:
-        #core_counts = (4,8,16)
         core_counts = (32, 64, 128, 256, 512, 1024)
         print(f"Running experiments with following core counts: {core_counts}")
 

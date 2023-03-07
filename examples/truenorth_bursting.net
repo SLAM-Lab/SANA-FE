@@ -6,9 +6,9 @@ g 1       6       0    0   0        0 hard saturate
 # g n b s v f connections
 n 0 0 1 0 0 1 1 0 1 2 0 1
 # neuron 0 in paper
-n 1 0 0 1 1 0
+n 1 0 0 1 1 1
 # neuron 1 in paper
-n 2 0 0 0 0 0 1 0 -100
+n 2 0 0 0 0 1 1 0 -100
 
 & 0 0 0 0
 & 1 0 0 0
