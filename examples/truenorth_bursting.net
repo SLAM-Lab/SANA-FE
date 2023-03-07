@@ -1,12 +1,12 @@
 # neurons vth reset -vth  -reset leak reset modes
 g 1       300     0    0   0        0 hard none
-g 1       18      1   20   1       -1 hard saturate
+g 1       18      1    0   1       -1 hard saturate
 g 1       6       0    0   0        0 hard saturate
 
 # g n b s v f connections
-n 0 0 1 0 0 1 1 0 1 2 0 1
+n 0 0 1 0 0 1 1 0 1 2 0 0
 # neuron 0 in paper
-n 1 0 0 1 1 1
+n 1 0 0 1 1 1 2 0 1
 # neuron 1 in paper
 n 2 0 0 0 0 1 1 0 -100
 
