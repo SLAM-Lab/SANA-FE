@@ -220,7 +220,7 @@ if __name__ == "__main__":
         layer_neurons = i*i
 
         #network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
-        commands = connected_layers(weights[i-1].transpose(), spiking=True, 
+        commands = connected_layers(weights[i-1].transpose(), spiking=True,
                                     mapping=mapping)
         print("Testing network with {0} neurons".format(2*layer_neurons))
         results = run_sim(commands, timesteps)

@@ -38,8 +38,7 @@ NETWORK_FILENAME = "runs/nemo_randomized.net"
 ARCH_FILENAME = "truenorth.arch"
 TIMESTEPS = 10  # i.e., ticks, where each tick is 1 ms of wall-time on the chip
 NEMO_BIN_PATH = "/home/usr1/jboyle/neuro/NeMo/bin/NeMo"
-#CSV_RESULTS_FILENAME = "runs/compare_sanafe_nemo.csv"
-CSV_RESULTS_FILENAME = "/dev/null"
+CSV_RESULTS_FILENAME = "runs/compare_sanafe_nemo.csv"
 
 # Create a random truenorth network, 80% connected to neuron within same
 # core, 20% connected to neurons outside

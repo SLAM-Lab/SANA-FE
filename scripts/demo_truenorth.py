@@ -34,19 +34,14 @@ def run_sim(network_filename, timesteps, plot_filename):
     spike_data = pd.read_csv("probe_spikes.csv")
 
     potentials = potential_data.loc[:, "1.0"]
-    # TODO: remove this kind of hacky change! We make the smallest possible
-    #  value 0 I guess?
-    #norm_potentials = potentials + 15.0
-    norm_potentials = potentials
     spike_idx = spike_data.loc[:, "1.0"].to_numpy().nonzero()[0]
-    spike_vals = 20.0 * np.ones(spike_idx.shape)
-    #spike_vals = np.ones(spike_idx.shape)
+    spike_vals = np.max(potentials) * np.ones(spike_idx.shape)
 
     plt.figure()
-    plt.plot(norm_potentials)
+    plt.plot(potentials)
     plt.scatter(spike_idx, spike_vals, marker='^', color='red')
     plt.xlabel("Simulation Ticks")
-    plt.ylabel("Normalized Membrane Potential")
+    plt.ylabel("Membrane Potential")
     #plt.ylim((0, 22))
     plt.tight_layout()
     # Need to save
