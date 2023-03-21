@@ -430,7 +430,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 		int dest_gid, dest_nid;
 		const int curr_field = NEURON_FIELDS + (i*CONNECTION_FIELDS);
 		assert(curr_field < field_count);
-		con = &(n->connections[i]);
+		con = &(n->connections_out[i]);
 
 		ret = sscanf(fields[curr_field+CONNECTION_DEST_GID],
 							"%d", &dest_gid);
@@ -512,7 +512,7 @@ int command_map_hardware(struct network *const net, struct architecture *arch,
 	map.soma_hw = &(c->soma);
 	map.axon_out = &(c->axon_out);
 
-	return network_map_neuron(n, map);
+	return arch_map_neuron(n, map);
 }
 
 int command_parse_axon_input(struct architecture *const arch,

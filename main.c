@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	FILE *input_fp, *network_fp, *stats_fp, *arch_fp;
 	FILE *probe_spikes_fp, *probe_potential_fp, *perf_fp;
 	struct network net;
-	struct architecture arch;
+	struct architecture *arch;
 	struct sim_stats stats;
 	char *filename, *input_buffer;
 	double average_power;
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
 	ret = COMMAND_FAIL;
-	arch_init(&arch);
+	arch = arch_init();
 	network_init(&net);
 
 	INFO("Initializing simulation.\n");
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 		INFO("Error: Architecture file failed to open.\n");
 		goto clean_up;
 	}
-	ret = command_parse_file(arch_fp, &net, &arch, probe_spikes_fp,
+	ret = command_parse_file(arch_fp, &net, arch, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 	fclose(arch_fp);
 	if (ret == COMMAND_FAIL)
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 	INFO("Reading network from file.\n");
-	ret = command_parse_file(network_fp, &net, &arch, probe_spikes_fp,
+	ret = command_parse_file(network_fp, &net, arch, probe_spikes_fp,
 						probe_potential_fp, perf_fp);
 	fclose(network_fp);
 	if (ret == COMMAND_FAIL)
@@ -159,17 +159,18 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
+	arch_create_axon_maps(arch);
 	init_stats(&stats);
 	INFO("Creating probe and perf data files.\n");
 	sim_probe_write_header(probe_spikes_fp, probe_potential_fp, &net);
-	sim_perf_write_header(perf_fp, &arch);
+	sim_perf_write_header(perf_fp, arch);
 
 	// Single step simulation, based on initial network state and
 	//  no inputs
 	for (int i = 0; i < timesteps; i++)
 	{
 		INFO("*** Time-step %d ***\n", i+1);
-		run(&net, &arch, &stats, i, probe_spikes_fp,
+		run(&net, arch, &stats, i, probe_spikes_fp,
 					probe_potential_fp, perf_fp);
 	}
 
@@ -194,7 +195,7 @@ int main(int argc, char *argv[])
 clean_up:
 	// Free any larger structures here
 	network_free(&net);
-	arch_free(&arch);
+	arch_free(arch);
 	// Free any locally allocated memory here
 	free(input_buffer);
 	// Close any open files here

@@ -55,10 +55,12 @@ struct sim_stats sim_timestep(struct network *const net,
 
 	// Performance statistics for this time step
 	stats.time_steps = 1;
+	stats.network_time = 0.0;
 	stats.total_sim_time = sim_calculate_time(arch, &(stats.network_time));
 	stats.total_energy = sim_calculate_energy(arch, stats.total_sim_time);
 	stats.total_packets_sent = sim_calculate_packets(arch);
 	stats.total_spikes = spikes_sent;
+	stats.wall_time = 0;
 
 	INFO("Spikes sent: %ld\n", spikes_sent);
 	if (perf_fp)
@@ -231,34 +233,26 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 			if (n->fired)
 			{
 				net->total_neurons_fired++;
-				for (int k = 0; k < core_count; k++)
-				{
-					c->spikes_sent_per_core[k] = 0;
-					c->axon_map[k] = NULL;
-				}
-				for (int k = 0; k < n->post_connection_count; k++)
+				for (int k = 0; k < n->connection_out_count; k++)
 				{
 					struct connection *conn =
-							&(n->connections[k]);
+						&(n->connections_out[k]);
 					struct neuron *post_neuron =
 							conn->post_neuron;
-					struct core *post_core =
-							post_neuron->core;
 					assert(post_neuron != NULL);
-					assert(post_core != NULL);
-
-					// TODO: need a function to figure this out
-					//  or we store an absolute id in the core
-					//  OR we use a 2D array
-					int axon_id = (post_core->t->id * 4) +
-								post_core->id;
-					c->spikes_sent_per_core[axon_id]++;
 					total_spike_count++;
 					post_neuron->update_needed = 1;
-					c->axon_map[axon_id] = post_core;
 					sim_pipeline_receive(post_neuron, conn,
 								timestep);
 				}
+
+				// Record a spike message at all the connected
+				//  cores (axons)
+				for (int k = 0; k < n->maps_out_count; k++)
+				{
+					n->maps_out[k]->spike_received = 1;
+				}
+
 				c->status = SEND_SPIKES;
 				c->curr_axon = 0;
 			}
@@ -271,27 +265,36 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 		}
 		else if (c->status == SEND_SPIKES)
 		{
-			TRACE("(cid:%d.%d) send spikes\n", c->t->id, c->id);
-			// Figure the cost of sending each packet, assuming that
-			//  each packet can be sent in parallel update the
-			//  timing of the receiving synapse.
-			// Get next packet to send
-			while ((c->curr_axon < core_count) &&
-				c->spikes_sent_per_core[c->curr_axon] == 0)
-			{
-				c->curr_axon++;
-			}
-			if (c->curr_axon >= core_count)
+			//INFO("(cid:%d.%d) send spikes, curr_axon:%d\n",
+			//			c->t->id, c->id, c->curr_axon);
+			if (c->curr_axon >= n->maps_out_count)
 			{
 				// No cores left to send to
+				TRACE("sent all spikes, finished\n");
 				c->status = NEURON_FINISHED;
 			}
-			else if (c->spikes_sent_per_core[c->curr_axon])
+			else
 			{
-				struct core *post_core = c->axon_map[c->curr_axon];
+				TRACE("current neuron:%d nid:%d.%d curr axon:%d n->maps_out_count:%d\n",
+					 c->curr_neuron, n->core->id, n->id, c->curr_axon, n->maps_out_count);
+
+				struct axon_map *post_axon = NULL;
+				struct neuron *post_neuron = NULL;
+				struct core *post_core = NULL;
 				double network_latency = 0.0;
 				double spike_processing_time = 0.0;
 				int memory_accesses;
+
+				if (n->maps_out_count)
+				{
+					assert(n->maps_out != NULL);
+					assert(n->maps_out[0] != NULL);
+					post_axon = n->maps_out[c->curr_axon];
+					assert(post_axon != NULL);
+					assert(post_axon->connections != NULL);
+					post_neuron = post_axon->connections[0]->post_neuron;
+					post_core = post_neuron->core;
+				}
 
 				TRACE("\t(cid:%d.%d) Sending %d spikes to %d.%d\n",
 					c->t->id, c->id,
@@ -354,12 +357,14 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 				c->time += network_latency;
 				// Read word from memory, this is a very
 				//  simplified model
-				spike_ops = c->spikes_sent_per_core[c->curr_axon];
+				spike_ops = post_axon->connection_count;
 				memory_accesses =
 					(spike_ops + (c->synapse.weights_per_word - 1)) /
 					(c->synapse.weights_per_word);
-				post_core->synapse.energy += memory_accesses * c->synapse.energy_memory_access;
-				spike_processing_time += memory_accesses * c->synapse.time_memory_access;
+				post_core->synapse.energy += memory_accesses *
+						c->synapse.energy_memory_access;
+				spike_processing_time += memory_accesses *
+						c->synapse.time_memory_access;
 
 				post_core->synapse.energy += spike_ops *
 					post_core->synapse.energy_spike_op;
@@ -392,25 +397,30 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 				TRACE("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
 					c->t->id, c->id,
 					post_core->t->id, post_core->id,
-					post_core->synapse.busy_until);
+					post_core->blocked_until);
 				c->curr_axon++;
 			}
 		}
 		else if (c->status == NEURON_FINISHED)
 		{
-			TRACE("(cid:%d.%d) neuron finished\n",
-				c->t->id, c->id);
+			TRACE("(cid:%d.%d) neuron finished, %d neurons left\n",
+				c->t->id, c->id, c->neurons_left);
 			if (n != NULL)
 			{
-				// Reset the neuron for the next time step
+				// Reset the neuron and axons for the next time
+				//  step
 				n->fired = 0;
+				for (int k = 0; k < n->maps_out_count; k++)
+				{
+					n->maps_out[k]->spike_received = 0;
+				}
 			}
 			// Get the next neuron
 			c->neurons_left--;
 			c->curr_neuron++;
 			if (c->neurons_left <= 0)
 			{
-				TRACE("\t(cid:%d.%d) finished simulating\n",
+				INFO("\t(cid:%d.%d) finished simulating\n",
 							c->t->id, c->id);
 				// Remove core from queue, core has finished
 				cores_left--;
@@ -418,6 +428,11 @@ int sim_send_messages(struct architecture *arch, struct network *net,
 				top_priority = top_priority->next_timing;
 			}
 			c->status = UPDATE_NEURON;
+		}
+		else
+		{
+			INFO("Error: State not recognized.");
+			exit(1);
 		}
 
 		top_priority = sim_update_timing_queue(arch, top_priority);
@@ -571,7 +586,6 @@ int sim_input_spikes(struct network *net)
 		}
 		TRACE("Sent spikes to %d connections\n",
 						in->post_connection_count);
-
 
 		// If inputting sets of events, then reset the spike after
 		//  it's processed i.e. inputs are one-shot. For poisson and

@@ -9,11 +9,94 @@
 
 #include "print.h"
 #include "arch.h"
+#include "network.h"
 
-void arch_init(struct architecture *const arch)
+struct architecture *arch_init(void)
 {
+	struct architecture *arch;
+
+	arch = (struct architecture *) malloc(sizeof(struct architecture));
+	if (arch == NULL)
+	{
+		INFO("Error: Architecture couldn't be created.\n");
+		exit(1);
+	}
+
 	arch->tile_count = 0;
 	arch->time_barrier = 0.0;
+	arch->initialized = 0;
+	arch->total_hops = 0;
+
+	for (int i = 0; i < ARCH_MAX_TILES; i++)
+	{
+		struct tile *t = &(arch->tiles[i]);
+
+		t->energy = 0.0;
+		t->time = 0.0;
+		t->energy_east_west_hop = 0.0;
+		t->time_east_west_hop = 0.0;
+		t->energy_north_south_hop = 0.0;
+		t->time_north_south_hop = 0.0;
+		t->energy_spike_within_tile = 0.0;
+		t->time_spike_within_tile = 0.0;
+		t->blocked_until = 0.0;
+		t->id = -1;
+		t->x = -1;
+		t->y = -1;
+		t->core_count = 0;
+		t->is_blocking = 0;
+		t->max_dimensions = 0;
+		t->width = 0;
+
+		for (int j = 0; j < ARCH_MAX_CORES; j++)
+		{
+			struct core *c = &(t->cores[j]);
+			c->t = NULL;
+			c->next_timing = NULL;
+			c->energy = 0.0;
+			c->time = 0.0;
+			c->blocked_until = 0.0;
+			c->id = -1;
+			c->buffer_pos = 0;
+			c->is_blocking = 0;
+			c->neuron_count = 0;
+			c->curr_neuron = 0;
+			c->neurons_left = 0;
+			c->status = 0;
+			c->curr_axon = 0;
+
+			c->axon_in.energy = 0.0;
+			c->axon_in.time = 0.0;
+			c->axon_in.packets_in = 0;
+			c->axon_in.packet_size = 0;
+			c->axon_in.packets_buffer = 0;
+			c->axon_in.spikes_buffer = 0;
+			c->axon_in.map_count = 0;
+
+			c->synapse.spikes_buffer = 0;
+			c->synapse.weights_per_word = 0;
+			c->synapse.word_bits = 0;
+			c->synapse.weight_bits = 0;
+			c->synapse.total_spikes = 0;
+			c->synapse.memory_reads = 0;
+			c->synapse.energy = 0.0;
+			c->synapse.time = 0.0;
+			c->synapse.energy_spike_op = 0.0;
+			c->synapse.time_spike_op = 0.0;
+			c->synapse.energy_memory_access = 0.0;
+			c->synapse.time_memory_access = 0.0;
+
+			c->dendrite.energy = 0.0;
+			c->dendrite.time = 0.0;
+
+			c->soma.energy = 0.0;
+			c->soma.time = 0.0;
+			c->axon_out.energy = 0.0;
+			c->axon_out.time = 0.0;
+		}
+	}
+
+	return arch;
 }
 
 void arch_free(struct architecture *const arch)
@@ -27,13 +110,17 @@ void arch_free(struct architecture *const arch)
 			struct core *c = &(t->cores[j]);
 
 			free(c->neurons);
-			free(c->spikes_sent_per_core);
-			free(c->axon_map);
 			c->neurons = NULL;
-			c->spikes_sent_per_core = NULL;
-			c->axon_map = NULL;
+
+			for (int k = 0; k < c->axon_in.map_count; k++)
+			{
+				struct axon_map *a = &(c->axon_in.map[k]);
+				free(a->connections);
+				a->connections = NULL;
+			}
 		}
 	}
+	free(arch);
 }
 
 int arch_create_noc(struct architecture *const arch, const int width,
@@ -125,8 +212,6 @@ int arch_create_tile(struct architecture *const arch,
 	t->time = 0.0;
 	t->is_blocking = 0;
 
-	// TODO: generalize this so each link has an associated energy and
-	//  latency, set one level up when defining the noc mesh
 	t->energy_east_west_hop = energy_east_west_hop;
 	t->time_east_west_hop = time_east_west_hop;
 	t->energy_north_south_hop = energy_north_south_hop;
@@ -180,11 +265,8 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 
 	c->neuron_count = 0;
 	c->curr_neuron = 0;
-	c->neurons = (struct neuron **) malloc(sizeof(struct neuron *) * 1024);
-	c->spikes_sent_per_core = (int *) malloc(sizeof(int) *
-					ARCH_MAX_TILES * ARCH_MAX_CORES);
-	c->axon_map = (struct core **) malloc(sizeof(struct core *) *
-					ARCH_MAX_TILES * ARCH_MAX_CORES);
+	c->neurons = (struct neuron **) malloc(sizeof(struct neuron *) *
+							ARCH_MAX_COMPARTMENTS);
 	for (int i = 0; i < 1024; i++)
 	{
 		c->neurons[i] = NULL;
@@ -207,6 +289,7 @@ void arch_create_axon_in(struct architecture *const arch, struct core *const c)
 	in->energy = 0.0;
 	in->time = 0.0;
 	in->packet_size = 0;
+	in->map_count = 0;
 	// We already know a valid tile was given at this point
 	in->t = c->t;
 
@@ -232,6 +315,12 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 
 	s->energy_spike_op = energy_spike_op;
 	s->time_spike_op = time_spike_op;
+
+	//s->energy_memory_access = energy_memory_read;
+	//s->time_memory_access = time_memory_read;
+	// TODO: enable these again
+	s->energy_memory_access = 0.0;
+	s->time_memory_access = 0.0;
 
 	// The word size is the number of bits accessed with each memory read.
 	//  The weight size is the number of bits for a single synaptic weight.
@@ -289,6 +378,7 @@ void arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	out->time = 0.0;
 	out->energy_access = access_energy;
 	out->time_access = access_time;
+	out->map_count = 0;
 
 	// Track the tile the axon interfaces with
 	out->t = c->t;
@@ -296,4 +386,274 @@ void arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	TRACE("Created axon output %d (c:%d.%d)\n", out->id, c->t->id, c->id);
 
 	return;
+}
+
+int arch_map_neuron(struct neuron *const n, const struct hardware_mapping map)
+{
+	// Map the neuron to hardware units
+	assert(map.core != NULL);
+	assert(map.core->neurons != NULL);
+	assert(n->core == NULL);
+	n->core = map.core;
+	TRACE("mapping neuron %d to core %d\n", n->id, map.core->id);
+	map.core->neurons[map.core->neuron_count] = n;
+	map.core->neuron_count++;
+
+	n->axon_in = map.axon_in;
+	n->synapse_hw = map.synapse_hw;
+	n->dendrite_hw = map.dendrite_hw;
+	n->soma_hw = map.soma_hw;
+	n->axon_out = map.axon_out;
+
+	return 1;
+}
+
+void arch_create_axon_maps(struct architecture *const arch)
+{
+	INFO("Creating axon map.\n");
+	// Initialize the axon structures
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		struct tile *t = &(arch->tiles[i]);
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
+			for (int i = 0; i < ARCH_MAX_AXON_MAP; i++)
+			{
+				c->axon_in.map[i].connection_count = 0;
+				c->axon_in.map[i].spike_received = 0;
+				c->axon_out.map_ptr[i] = NULL;
+			}
+		}
+	}
+
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		struct tile *t = &(arch->tiles[i]);
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
+			for (int k = 0; k < c->neuron_count; k++)
+			{
+				struct neuron *pre_neuron = c->neurons[k];
+				// Track the connections
+				int connection_count[ARCH_MAX_TILES*ARCH_MAX_CORES];
+				struct core *cores[ARCH_MAX_TILES*ARCH_MAX_CORES];
+
+				for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES; x++)
+				{
+					connection_count[x] = 0;
+					cores[x] = NULL;
+				}
+
+				//INFO("Creating axons for neuron %d\n", k);
+				// Count how many connections go to each core
+				//  from this neuron. This will be used to
+				//  allocate the axon maps and the connections
+				//  in each map
+				for (int conn = 0;
+					conn < pre_neuron->connection_out_count;
+					conn++)
+				{
+					//INFO("Looking at connection id: %d\n",
+					//				conn);
+					struct connection *curr =
+						&(pre_neuron->connections_out[conn]);
+					struct core *dest_core =
+							curr->post_neuron->core;
+					// TODO: HACK want a unique core identifier beyond the
+					//  number within the tile. Need to index the correct
+					//  core number here
+					int core_number = (dest_core->t->id * 4) + dest_core->id;
+					connection_count[core_number]++;
+					cores[core_number] = dest_core;
+					//INFO("Connected to dest core: %d\n",
+					//			core_number);
+				}
+
+				int axon_count = 0;
+				for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES; x++)
+				{
+					// Now for each connected core, create
+					//  a new axon map at the destination
+					//  core. Then link this axon to output
+					//  of the source core. Finally update
+					//  the presynaptic neuron and
+					//  postsynaptic neuron to account for
+					//  this
+					if (connection_count[x] > 0)
+					{
+						// Create the axon map, and add
+						//  it to the map at the dest
+						//  core.
+						//struct neuron *post_neuron = curr->post_neuron;
+						struct core *dest_core = cores[x];
+						struct axon_input *axon_in = &(dest_core->axon_in);
+						int map_count = axon_in->map_count++;
+						INFO("axon in map count:%d for core:%d.%d, adding %d connections\n",
+							map_count, dest_core->id, dest_core->t->id, connection_count[x] );
+						struct axon_map *a = &(axon_in->map[map_count]);
+
+						//INFO("Adding connection to core.\n");
+						// Allocate the entry and its connections
+						//INFO("Axon has %d connections; allocating %lu bytes\n",
+						//	connection_count[x], connection_count[x] * sizeof(struct connection));
+						a->connections = malloc(connection_count[x] * sizeof(struct connection));
+						if (a->connections == NULL)
+						{
+							INFO("Error: Couldn't allocate axon memory.\n");
+							exit(1);
+						}
+
+						// Now create the link to this map in the
+						//  pre-synaptic core
+						map_count = c->axon_out.map_count++;
+						c->axon_out.map_ptr[map_count] = a;
+						if (pre_neuron->maps_out == NULL)
+						{
+							//INFO("Setting neuron nid:%d axon out.\n", pre_neuron->id);
+							pre_neuron->maps_out =
+								&(c->axon_out.map_ptr[map_count]);
+							assert(pre_neuron->maps_out != NULL);
+							assert(pre_neuron->maps_out[0] != NULL);
+						}
+						pre_neuron->maps_out_count++;
+						INFO("nid:%d.%d cid:%d.%d added one output axon, axon out map_count:%d, neuron out map count:%d.\n",
+							pre_neuron->group->id, pre_neuron->id, c->t->id, c->id, c->axon_out.map_count, pre_neuron->maps_out_count);
+						axon_count++;
+					}
+				}
+				//INFO("nid:%d axon count: %d\n", pre_neuron->id, axon_count);
+				assert(axon_count < ARCH_MAX_AXON_MAP);
+
+				for (int conn = 0; conn < pre_neuron->connection_out_count; conn++)
+				{
+					// For each connection, add the connection to the axon.
+					//  Also track the axon in the post synaptic neuron
+					struct connection *curr =
+						&(pre_neuron->connections_out[conn]);
+					struct core *p = curr->post_neuron->core;
+					//INFO("adding connection:%d\n", conn);
+					// just add to the current axon
+					int map_count = p->axon_in.map_count;
+					if (map_count <= 0 || map_count > ARCH_MAX_AXON_MAP)
+					{
+						INFO("map_count:%d\n", map_count);
+					}
+					assert(map_count > 0);
+					assert(map_count <= ARCH_MAX_AXON_MAP);
+					//INFO("adding to connection to axon:%d\n",
+					//			map_count - 1);
+					// Access the most recently created axon
+					//  for the core
+					struct axon_map *a =
+						&(p->axon_in.map[map_count-1]);
+					a->connections[a->connection_count++] =
+									curr;
+
+					// Update the post synaptic neuron to
+					//  track
+					if (curr->post_neuron->maps_in == NULL)
+					{
+						// Point to the first mapping
+						curr->post_neuron->maps_in = a;
+					}
+					// We might add a bunch of connections
+					//  from another core coming into this
+					//  one, then we need to update and
+					//  track
+					curr->post_neuron->maps_in_count++;
+				}
+			}
+		}
+	}
+
+	TRACE("Created all axons\n");
+
+
+	INFO("** Mapping summary **\n");
+	int in_count, out_count, core_count, core_used;
+	in_count = out_count = core_count = 0;
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		// For debug only, print the axon maps
+		struct tile *t = &(arch->tiles[i]);
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
+
+			core_used = 0;
+			for (int k = 0; k < c->neuron_count; k++)
+			{
+				//struct neuron *n = c->neurons[k];
+				//TRACE("\tnid:%d.%d ", n->group->id, n->id);
+				//TRACE("i:%d o:%d\n",
+				//	n->maps_in_count, n->maps_out_count);
+				core_used = 1;
+			}
+
+			if (core_used)
+			{
+				INFO("cid:%d.%d n:%d i:%d o:%d\n", t->id, c->id,
+					c->neuron_count, c->axon_in.map_count,
+					c->axon_out.map_count);
+				in_count += c->axon_in.map_count;
+				out_count += c->axon_out.map_count;
+				core_count++;
+			}
+		}
+	}
+	INFO("Total cores: %d\n", core_count);
+	INFO("Average in map count: %lf\n", (double) in_count / core_count);
+	INFO("Average out map count: %lf\n", (double) out_count / core_count);
+
+	/*
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		// For debug only, print the axon maps
+		struct tile *t = &(arch->tiles[i]);
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
+			for (int a = 0; a < c->axon_in.map_count; a++)
+			{
+				struct axon_map *map = &(c->axon_in.map[a]);
+				TRACE("map[%d] = {%d}\n", a,
+							map->connection_count);
+				for (int conn = 0; conn < map->connection_count;
+									conn++)
+				{
+					struct connection *c =
+						map->connections[conn];
+					TRACE("\t%d -> %d\n", c->pre_neuron->id,
+							c->post_neuron->id);
+				}
+			}
+		}
+	}
+	*/
+
+	/*
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		// For debug only, print the axon maps
+		struct tile *t = &(arch->tiles[i]);
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
+			for (int k = 0; k < c->neuron_count; k++)
+			{
+				struct neuron *n = c->neurons[k];
+				TRACE("nid:%d.%d\n", n->core->id, n->id);
+				TRACE("Map out count:%d\n", n->maps_out_count);
+				TRACE("Maps in count:%d\n", n->maps_in_count);
+				if (n->maps_out_count)
+				{
+					assert(n->maps_out != NULL);
+					assert(n->maps_out[0] != NULL);
+				}
+			}
+		}
+	}
+	*/
 }

@@ -22,12 +22,14 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 #ifndef ARCH_HEADER_INCLUDED_
 #define ARCH_HEADER_INCLUDED_
 
-// TODO: for now hard define max numbers of hardware blocks. I did this so I
-//  don't have quite as much dynamic allocation going on. If needed this can
-//  fairly easily be removed and replaced with allocating arbitrary numbers of
-//  elements off the heap e.g. in a linked list
-#define ARCH_MAX_COMPARTMENTS
-#define ARCH_MAX_TILES 4096
+#include <stdint.h>
+#include "network.h"
+
+// Hard define maximum defined h/w sizes
+#define ARCH_MAX_COMPARTMENTS 1024
+//#define ARCH_MAX_AXON_MAP 4096
+#define ARCH_MAX_AXON_MAP 16384
+#define ARCH_MAX_TILES 32
 #define ARCH_MAX_CORES 4
 #define ARCH_MAX_LINKS 4
 
@@ -59,12 +61,37 @@ enum neuron_reset_modes
 	NEURON_RESET_MODE_COUNT,
 };
 
+struct hardware_mapping
+{
+	struct core *core;
+	struct synapse_processor *synapse_hw;
+	struct dendrite_processor *dendrite_hw;
+	struct soma_processor *soma_hw;
+	struct axon_output *axon_out;
+	struct axon_input *axon_in;
+};
+
+// duplicate the synaptic information. we will have to figure this out after
+//  then network has been totally mapped to the hardware. if we add any neurons
+//  after the fact we would need to ensure all the incoming connections are
+//  mapped to a core. when we receive a message, we set a flag to mark that
+//  axon as active
+struct axon_map
+{
+	// List of all neuron connections to send spike to
+	uint8_t spike_received;
+	int connection_count;
+	struct connection **connections;
+	struct neuron *pre_neuron;
+};
+
 struct axon_input
 {
 	struct tile *t;
-	int packet_size, packets_buffer, spikes_buffer;
+	struct axon_map map[ARCH_MAX_AXON_MAP];
 	long int packets_in;
 	double energy, time;
+	int packet_size, packets_buffer, spikes_buffer, map_count;
 };
 
 struct synapse_processor
@@ -94,10 +121,23 @@ struct soma_processor
 
 struct axon_output
 {
+	// The axon output points to a number of axons, stored at the
+	//  post-synaptic core. A neuron can point to a number of these
+	struct axon_map *map_ptr[ARCH_MAX_AXON_MAP];
 	struct tile *t;
+	int map_count;
+
 	long int packets_out;
 	double energy, time;
 	double energy_access, time_access;
+};
+
+struct message
+{
+	struct neuron *n;
+	struct axon_map *dest;
+
+	double generation_latency, receive_latency, network_latency;
 };
 
 struct core
@@ -105,13 +145,13 @@ struct core
 	struct tile *t;
 	struct core *next_timing;
 	struct neuron **neurons;
-	struct core **axon_map;
-	int *spikes_sent_per_core;
+
 	struct axon_input axon_in;
 	struct synapse_processor synapse;
 	struct dendrite_processor dendrite;
 	struct soma_processor soma;
 	struct axon_output axon_out;
+
 	double energy, time, blocked_until;
 	int id, buffer_pos, is_blocking;
 	int neuron_count, curr_neuron, neurons_left, status;
@@ -142,7 +182,7 @@ struct architecture
 	long int total_hops;
 };
 
-void arch_init(struct architecture *const arch);
+struct architecture *arch_init(void);
 void arch_free(struct architecture *const arch);
 int arch_create_noc(struct architecture *const arch, const int width, const int height);
 int arch_create_tile(struct architecture *const arch, const double energy_east_west_hop, const double energy_north_south_hop, const double time_east_west_hop, const double time_north_south_hop);
@@ -151,5 +191,8 @@ void arch_create_axon_in(struct architecture *const arch, struct core *const c);
 void arch_create_synapse(struct architecture *const arch, struct core *const c, const int weight_bits, const int word_bits, const double energy_spike_op, const double time_spike_op, const double energy_memory_access, const double time_memory_access);
 void arch_create_soma(struct architecture *const arch, struct core *const c, int model, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update, double energy_spiking, double time_spiking);
 void arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
+int arch_map_neuron(struct neuron *const n, const struct hardware_mapping);
+void arch_create_axon_maps(struct architecture *const arch);
+void arch_create_core_axon_map(struct core *const core);
 
 #endif

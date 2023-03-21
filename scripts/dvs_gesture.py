@@ -25,7 +25,7 @@ ARCH_FILENAME = "loihi.arch"
 NETWORK_FILENAME = "examples/dvs_gesture_32x32.net" # Input 16, 32x32 net
 #LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_i16_time.csv"
 LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_time.csv"
-LOIHI_ENERGY_DATA_FILENAME = "runs/loihi_gesture_32x32_i16_energy.csv"
+LOIHI_ENERGY_DATA_FILENAME = "runs/loihi_gesture_32x32_energy.csv"
 
 def run_sim(timesteps):
     # Create the network to run
@@ -110,8 +110,8 @@ def parse_loihi_spiketrains(total_timesteps):
 
 if __name__ == "__main__":
     run_experiment = True
-    plot_experiment = False
-    experiment = "energy"
+    plot_experiment = True
+    experiment = "time"
 
     neurons = []
     spiking_times = []
@@ -126,7 +126,8 @@ if __name__ == "__main__":
         timesteps = 128
     else:
         timesteps = 3000
-    frames = 100
+    #frames = 100
+    frames = 1
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiment:
@@ -147,7 +148,8 @@ if __name__ == "__main__":
             mapping_data = mappings_file.read()
 
         print("Reading input file")
-        for inputs in range(0, frames):
+        #for inputs in range(0, frames):
+        for inputs in range(16, 17):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
             input_filename = f"examples/loihi_gesture_32x32/inputs{inputs}.net"
@@ -214,7 +216,7 @@ if __name__ == "__main__":
         plt.legend(("Simulated", "Measured on Loihi"))
         plt.ylabel("Latency (s)")
         plt.xlabel("Timestep")
-        """
+
         # Also plot underneath the different activity on the chip for both my
         #  simulator and Loihi
         plt.subplot(312)
@@ -236,7 +238,7 @@ if __name__ == "__main__":
         print("diff = {}".format(
             analysis["fired"] - np.array(fired_count[0:timesteps])))
         plt.savefig("dvs_gesture_sim_time.png")
-        """
+
         # Plot the latency
         times = np.loadtxt("runs/sim_gesture_32x32_time.csv", delimiter=",")
         loihi_data = pd.read_csv(LOIHI_TIME_DATA_FILENAME)
@@ -249,8 +251,8 @@ if __name__ == "__main__":
         loihi_times = np.delete(loihi_times,
                         list(range(timesteps-1, timesteps*frames, timesteps)))
         plt.figure(figsize=(5.0, 2.5))
-        plt.plot(np.arange(1, timesteps+1), times[0:timesteps], "-o")
-        plt.plot(np.arange(1, timesteps+1), loihi_times[0:timesteps], "--x")
+        plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
+        plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1)*frames], marker='x')
         plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
         plt.legend(("Simulated", "Measured on Loihi"))
         plt.ylabel("Time-step Latency (s)")
@@ -274,7 +276,7 @@ if __name__ == "__main__":
         plt.savefig("dvs_gesture_sim_correlation.png")
 
         # Calculate total error
-        relative_error = np.abs(loihi_times[0:frames*timesteps] - times[0:frames*timesteps]) / loihi_times[0:frames*timesteps]
+        relative_error = np.abs(loihi_times[0:frames*(timesteps-1)] - times[0:frames*(timesteps-1)]) / loihi_times[0:frames*(timesteps-1)]
         print(relative_error)
         mean_error = np.sum(relative_error) / len(relative_error)
         print("Time Absolute Mean error: {0} ({1} %)".format(mean_error, mean_error * 100))
@@ -284,17 +286,18 @@ if __name__ == "__main__":
 
         # TODO: I'm simulating dynamic energy, but the measurements are for static
         #  energy consumption, which pretty much just mirror the time simulation...
-        loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_FILENAME)
-        loihi_energies = loihi_data.loc[:, "spiking"] / 1.0e6
-        print(loihi_energies)
-        plt.figure(figsize=(5.0, 2.5))
-        plt.plot(np.arange(1, timesteps+1), energies[0:timesteps], '-o')
-        plt.plot(np.arange(1, timesteps+1), loihi_energies[0:timesteps], '--x')
-        plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-        plt.legend(("Simulated", "Measured on Loihi"))
-        plt.ylabel("Energy (J)")
-        plt.xlabel("Timestep")
-        plt.savefig("dvs_gesture_sim_energy.png")
+
+        #loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_FILENAME)
+        #loihi_energies = loihi_data.loc[:, "spiking"] / 1.0e6
+        #print(loihi_energies)
+        #plt.figure(figsize=(5.0, 2.5))
+        #plt.plot(np.arange(1, timesteps+1), energies[0:timesteps], '-o')
+        #plt.plot(np.arange(1, timesteps+1), loihi_energies[0:timesteps], '--x')
+        #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+        #plt.legend(("Simulated", "Measured on Loihi"))
+        #plt.ylabel("Energy (J)")
+        #plt.xlabel("Timestep")
+        #plt.savefig("dvs_gesture_sim_energy.png")
 
 
         """

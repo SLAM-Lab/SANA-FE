@@ -54,7 +54,7 @@ int network_create_neuron_group(struct network *net,
 
 		n->id = i;
 		n->group = group;
-		n->post_connection_count = 0;
+		n->connection_out_count = 0;
 		n->log_spikes = 0;
 		n->log_voltage = 0;
 		n->force_update = 0;
@@ -76,7 +76,7 @@ int network_create_neuron_group(struct network *net,
 
 		n->update_needed = 0;
 		n->spike_count = 0;
-		n->connections = NULL;
+		n->connections_out = NULL;
 
 		n->charge_buffer = 0.0;
 		n->d_currents_buffer[0] = 0.0;
@@ -90,6 +90,11 @@ int network_create_neuron_group(struct network *net,
 		n->dendrite_hw = NULL;
 		n->soma_hw = NULL;
 		n->axon_out = NULL;
+
+		n->maps_in = NULL;
+		n->maps_out = NULL;
+		n->maps_in_count = 0;
+		n->maps_out_count = 0;
 
 		n->is_init = 0;
 	}
@@ -130,7 +135,7 @@ int network_create_neuron(struct neuron *const n,
 	n->log_voltage = log_voltages;
 	n->force_update = force_update;
 	n->update_needed = n->force_update;
-	n->post_connection_count = connection_count;
+	n->connection_out_count = connection_count;
 	total_connection_count += connection_count;
 	// TODO: Hard coded LIF / CUBA time constants for now
 	n->current_time_const = 10.0e-3;
@@ -142,19 +147,19 @@ int network_create_neuron(struct neuron *const n,
 	n->random_range_mask = 0;
 
 	n->soma_last_updated = 0;
-	assert(n->connections == NULL);
-	n->connections = (struct connection *)
+	assert(n->connections_out == NULL);
+	n->connections_out = (struct connection *)
 			malloc(sizeof(struct connection) * connection_count);
-	if (n->connections == NULL)
+	if (n->connections_out == NULL)
 	{
 		INFO("Error: Couldn't allocate connection memory.\n");
 		return NETWORK_INVALID_NID;
 	}
 
 	// Zero initialize all connections
-	for (int i = 0; i < n->post_connection_count; i++)
+	for (int i = 0; i < n->connection_out_count; i++)
 	{
-		struct connection *con = &(n->connections[i]);
+		struct connection *con = &(n->connections_out[i]);
 		con->pre_neuron = NULL;
 		con->post_neuron = NULL;
 		con->weight = 0.0;
@@ -165,27 +170,6 @@ int network_create_neuron(struct neuron *const n,
 					n->threshold, n->post_connection_count);
 	n->is_init = 1;
 	return n->id;
-}
-
-int network_map_neuron(struct neuron *const n,
-					const struct hardware_mapping map)
-{
-	// Map the neuron to hardware units
-	assert(map.core != NULL);
-	assert(map.core->neurons != NULL);
-	assert(n->core == NULL);
-	n->core = map.core;
-	TRACE("mapping neuron %d to core %d\n", n->id, map.core->id);
-	map.core->neurons[map.core->neuron_count] = n;
-	map.core->neuron_count++;
-
-	n->axon_in = map.axon_in;
-	n->synapse_hw = map.synapse_hw;
-	n->dendrite_hw = map.dendrite_hw;
-	n->soma_hw = map.soma_hw;
-	n->axon_out = map.axon_out;
-
-	return 1;
 }
 
 int net_create_inputs(struct network *const net, const int input_count,
@@ -267,7 +251,7 @@ void network_free(struct network *const net)
 		// First free all the allocated connections in each neuron
 		for (int j = 0; j < group->neuron_count; j++)
 		{
-			free(group->neurons[j].connections);
+			free(group->neurons[j].connections_out);
 		}
 		// Finally free the neurons allocated in the group
 		free(net->groups[i].neurons);
