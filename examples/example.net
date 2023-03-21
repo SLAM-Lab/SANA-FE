@@ -1,0 +1,21 @@
+## Fully connected network, everything spikes on each timestep
+#
+## First define the neuron group
+#       neurons thresh  reset -thresh -reset leak reset modes
+g       6       -1.0    0.0      -1.0      0    0  hard none
+## Then define neurons in the group
+#       gid     nid	bias    log s   log v   force   syn 0         syn 1        syn 2 w2,	...
+n       0       0   0       1       0       1       0 3 1.0       0 4 1.0        0 5 1.0
+n       0       1   0       0       1       1       0 3 1.0       0 4 1.0        0 5 1.0
+n       0       2   0       1       0       1       0 3 1.0       0 4 1.0        0 5 1.0
+n       0       3   0       0       1       1
+n       0       4   0       1       0       1
+n       0       5   0       0       0       1
+## Finally map to an architecture that was already defined
+#       gid     nid     tile    core    in      syn     dend    soma    out
+&       0       0       0       0       0       0       0       0       0
+&       0       1       0       0       0       0       0       0       0
+&       0       2       0       0       0       0       0       0       0
+&       0       3       0       0       0       0       0       0       0
+&       0       4       0       0       0       0       0       0       0
+&       0       5       0       0       0       0       0       0       0

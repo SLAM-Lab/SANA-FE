@@ -653,7 +653,10 @@ double sim_update_soma_lif(struct neuron *n, const double current_in,
 	}
 
 	// Add the spike potential
+	double random_voltage = (double) rand() / RAND_MAX;
 	n->potential += current_in + n->bias;
+	// TODO: this is a hack in progress, formalize the randomized voltage
+	n->potential += (random_voltage*3.0);
 	n->current = 0.0;
 	n->charge = 0.0;
 
