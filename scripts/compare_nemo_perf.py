@@ -127,19 +127,18 @@ def run_sim_nemo(cores, timesteps, debug=True):
 
 def plot_results():
     df = pd.read_csv(CSV_RESULTS_FILENAME, index_col="cores")
-    plt.figure()
-    df.plot.bar(rot=0)
+    plt.rcParams.update({'font.size': 14, 'lines.markersize': 1})
+    df.plot.bar(rot=0, figsize=(4.0, 4.0))
     plt.xlabel("TrueNorth Core Count")
     plt.ylabel("Run-time (s)")
     plt.tight_layout()
     plt.savefig("runs/compare_sanafe_nemo.png")
-
     return
 
 
 if __name__ == "__main__":
-    run_experiments = True
-    plot = False
+    run_experiments = False
+    plot = True
     if run_experiments:
         core_counts = (32, 64, 128, 256, 512, 1024)
         print(f"Running experiments with following core counts: {core_counts}")

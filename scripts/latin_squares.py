@@ -28,7 +28,7 @@ ARCH_FILENAME = "loihi.arch"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
-N = 3
+N = 20
 TIMESTEPS = 100
 
 def calculate_graph_index(row, col, digit):
@@ -63,7 +63,8 @@ for i in range(0, N):
 # TODO: take into account known positions. This should basically remove some
 #  neuron connections since we know that *has* to be the answer. That neuron
 #  should fire with a bias and not be inhibited. We can immediately prune away
-#  any options that would conflict
+#  any options that would conflict. This neuron can spike on every timestep as
+#  well.
 
 # Connect such that every digit in one position inhibits all other digits in
 #  that position
@@ -137,11 +138,11 @@ with open("probe_spikes.csv") as spikes:
 print(spike_counts)
 chosen_digits = np.argmax(spike_counts, axis=2)
 
-# Verify the solution is in fact correct
+# Verify the solution is correct
 
 # Plot a grid and fill in the numbers based on the largest number of
 #  spikes collected after a fixed point
-plt.figure()
+plt.figure(figsize=(1, 1))
 fig, ax = plt.subplots(1, 1)
 ax.axis('tight')
 ax.axis('off')
