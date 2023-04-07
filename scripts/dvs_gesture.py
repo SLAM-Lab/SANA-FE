@@ -27,6 +27,9 @@ NETWORK_FILENAME = "examples/dvs_gesture_32x32.net" # Input 16, 32x32 net
 LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "runs/loihi_gesture_32x32_energy.csv"
 
+SIM_TIME_DATA_FILENAME = "runs/sim_gesture_32x32_time.csv"
+SIM_ENERGY_DATA_FILENAME = "runs/sim_gesture_32x32_energy.csv"
+
 def run_sim(timesteps):
     # Create the network to run
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
@@ -68,6 +71,7 @@ def parse_stats(stats):
     analysis["times"] = stats.loc[:, "time"]
     analysis["hops"] = stats.loc[:, "hops"]
     analysis["fired"] = stats.loc[:, "fired"]
+    print(f"fired: {analysis['fired']}")
     analysis["packets"] = stats.loc[:, "packets"]
     analysis["total_energy"] = sum(stats.loc[:, "total_energy"])
 
@@ -175,9 +179,9 @@ if __name__ == "__main__":
             energies = np.append(energies, analysis["total_energy"])
 
         if experiment == "time":
-            np.savetxt("runs/sim_gesture_32x32_time.csv", times, delimiter=",")
+            np.savetxt(SIM_TIME_DATA_FILENAME, times, delimiter=",")
         else:  # energy
-            with open("runs/sim_gesture_32x32_energy.csv", "wb") as f:
+            with open(SIM_ENERGY_DATA_FILENAME, "wb") as f:
                 np.savetxt(f, energies, delimiter=",")
     print(energies)
 

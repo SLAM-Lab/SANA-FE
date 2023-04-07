@@ -143,15 +143,22 @@ def plot_results():
     plt.close()
 
     plt.figure(figsize=(4.0, 4.0))
-    for messages_per_neuron in (1, 4, 16):
-        runtimes = np.array(df.loc[(df["spikes_per_message"] == 4) & (df["neurons_per_core"] == 1024) & (df["messages_per_neuron"] == messages_per_neuron), "runtime"])
-        neurons = np.array(df.loc[(df["spikes_per_message"] == 4) & (df["neurons_per_core"] == 1024) & (df["messages_per_neuron"] == messages_per_neuron), "cores"] * 1024)
-        print(runtimes)
-        print(neurons)
-        print(runtimes / neurons)
-        time_per_neuron = runtimes / neurons
+    #for messages_per_neuron in (1, 4, 16):
+    #runtimes = np.array(df.loc[(df["spikes_per_message"] == 4) & (df["neurons_per_core"] == 1024) & (df["messages_per_neuron"] == messages_per_neuron), "runtime"])
+    #neurons = np.array(df.loc[(df["spikes_per_message"] == 4) & (df["neurons_per_core"] == 1024) & (df["messages_per_neuron"] == messages_per_neuron), "cores"] * 1024)
+    
+    print("printing")
+    runtimes = np.array(df.loc[((df["spikes_per_message"] == 1) &
+    (df["neurons_per_core"] * df["messages_per_neuron"] * df["cores"] == 8192)), "runtime"])
+    neurons = np.array(df.loc[((df["spikes_per_message"] == 1) &
+    (df["neurons_per_core"] * df["messages_per_neuron"] * df["cores"] == 8192)), "cores"] * 1024)
+    print(runtimes)
+    print(neurons)
+    print(runtimes / neurons)
+    time_per_neuron = runtimes / neurons
+    print("end print")
 
-        plt.plot(neurons, time_per_neuron, "o-")
+    plt.plot(neurons, time_per_neuron, "o")
 
     legend_str = [f"{4*s} spikes / neuron" for s in (1, 4, 16)]
     plt.legend(legend_str)

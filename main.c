@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
 	}
 
 	INFO("***** Run Summary *****\n");
-	sim_write_summary(stdout, &stats);
+	sim_write_summary(stdout, arch, &stats);
 	if (stats.total_sim_time > 0.0)
 	{
 		average_power = stats.total_energy / stats.total_sim_time;
@@ -188,7 +188,7 @@ int main(int argc, char *argv[])
 	stats_fp = fopen("stats.yaml", "w");
 	if (stats_fp != NULL)
 	{
-		sim_write_summary(stats_fp, &stats);
+		sim_write_summary(stats_fp, arch, &stats);
 	}
 	INFO("Run finished.\n");
 

@@ -26,6 +26,7 @@ struct architecture *arch_init(void)
 	arch->time_barrier = 0.0;
 	arch->initialized = 0;
 	arch->total_hops = 0;
+	arch->total_packets = 0;
 
 	for (int i = 0; i < ARCH_MAX_TILES; i++)
 	{
@@ -316,11 +317,8 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 	s->energy_spike_op = energy_spike_op;
 	s->time_spike_op = time_spike_op;
 
-	//s->energy_memory_access = energy_memory_read;
-	//s->time_memory_access = time_memory_read;
-	// TODO: enable these again
-	s->energy_memory_access = 0.0;
-	s->time_memory_access = 0.0;
+	s->energy_memory_access = energy_memory_read;
+	s->time_memory_access = time_memory_read;
 
 	// The word size is the number of bits accessed with each memory read.
 	//  The weight size is the number of bits for a single synaptic weight.
@@ -421,12 +419,14 @@ void arch_create_axon_maps(struct architecture *const arch)
 			for (int i = 0; i < ARCH_MAX_AXON_MAP; i++)
 			{
 				c->axon_in.map[i].connection_count = 0;
-				c->axon_in.map[i].spike_received = 0;
+				c->axon_in.map[i].spikes_received = 0;
 				c->axon_out.map_ptr[i] = NULL;
 			}
 		}
 	}
 
+	// TODO: think of a meaningful way of refactoring this monolithic
+	//  block
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -490,7 +490,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 						struct core *dest_core = cores[x];
 						struct axon_input *axon_in = &(dest_core->axon_in);
 						int map_count = axon_in->map_count++;
-						INFO("axon in map count:%d for core:%d.%d, adding %d connections\n",
+						TRACE("axon in map count:%d for core:%d.%d, adding %d connections\n",
 							map_count, dest_core->id, dest_core->t->id, connection_count[x] );
 						struct axon_map *a = &(axon_in->map[map_count]);
 
@@ -518,7 +518,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 							assert(pre_neuron->maps_out[0] != NULL);
 						}
 						pre_neuron->maps_out_count++;
-						INFO("nid:%d.%d cid:%d.%d added one output axon, axon out map_count:%d, neuron out map count:%d.\n",
+						TRACE("nid:%d.%d cid:%d.%d added one output axon, axon out map_count:%d, neuron out map count:%d.\n",
 							pre_neuron->group->id, pre_neuron->id, c->t->id, c->id, c->axon_out.map_count, pre_neuron->maps_out_count);
 						axon_count++;
 					}
@@ -538,7 +538,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 					int map_count = p->axon_in.map_count;
 					if (map_count <= 0 || map_count > ARCH_MAX_AXON_MAP)
 					{
-						INFO("map_count:%d\n", map_count);
+						TRACE("map_count:%d\n", map_count);
 					}
 					assert(map_count > 0);
 					assert(map_count <= ARCH_MAX_AXON_MAP);
@@ -550,6 +550,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 						&(p->axon_in.map[map_count-1]);
 					a->connections[a->connection_count++] =
 									curr;
+					a->pre_neuron = pre_neuron;
 
 					// Update the post synaptic neuron to
 					//  track
@@ -571,6 +572,8 @@ void arch_create_axon_maps(struct architecture *const arch)
 	TRACE("Created all axons\n");
 
 
+	// Print summary about axons created
+	// TODO: refactor?
 	INFO("** Mapping summary **\n");
 	int in_count, out_count, core_count, core_used;
 	in_count = out_count = core_count = 0;

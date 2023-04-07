@@ -84,7 +84,8 @@ struct neuron
 	int fired_buffer;
 
 	double current_decay, current_time_const;
-	double processing_time;
+	// TODO: this should move into a message struct
+	double processing_latency, network_latency, receive_latency;
 
 	int id, is_init, fired, connection_out_count, spike_count;
 	int log_spikes, log_voltage, update_needed, force_update;

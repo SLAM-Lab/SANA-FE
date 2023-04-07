@@ -71,16 +71,11 @@ struct hardware_mapping
 	struct axon_input *axon_in;
 };
 
-// duplicate the synaptic information. we will have to figure this out after
-//  then network has been totally mapped to the hardware. if we add any neurons
-//  after the fact we would need to ensure all the incoming connections are
-//  mapped to a core. when we receive a message, we set a flag to mark that
-//  axon as active
 struct axon_map
 {
 	// List of all neuron connections to send spike to
-	uint8_t spike_received;
-	int connection_count;
+	int connection_count, spikes_received;
+	double network_latency, receive_latency;
 	struct connection **connections;
 	struct neuron *pre_neuron;
 };
@@ -132,14 +127,6 @@ struct axon_output
 	double energy_access, time_access;
 };
 
-struct message
-{
-	struct neuron *n;
-	struct axon_map *dest;
-
-	double generation_latency, receive_latency, network_latency;
-};
-
 struct core
 {
 	struct tile *t;
@@ -179,7 +166,7 @@ struct architecture
 	double time_barrier;
 	int tile_count, initialized;
 
-	long int total_hops;
+	long int total_hops, total_packets;
 };
 
 struct architecture *arch_init(void);
