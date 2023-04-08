@@ -41,7 +41,7 @@ enum status
 struct sim_stats sim_timestep(struct network *const net, struct architecture *const arch, const int timestep, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
 
 void sim_send_messages(struct network *net, struct architecture *arch, const int timestep);
-int sim_receive_messages(struct network *net, struct architecture *arch, const int timestep);
+void sim_receive_messages(struct network *net, struct architecture *arch, const int timestep);
 int sim_input_spikes(struct network *net);
 int sim_schedule_messages(struct network *net, struct architecture *arch, const int timestep);
 

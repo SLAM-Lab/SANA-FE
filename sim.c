@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <omp.h>
 
 #include "print.h"
 #include "sim.h"
@@ -21,7 +22,6 @@ struct sim_stats sim_timestep(struct network *const net,
 				FILE *perf_fp)
 {
 	struct sim_stats stats;
-	long int spikes_sent;
 
 	// Start the next time-step
 	sim_reset_measurements(net, arch);
@@ -31,8 +31,8 @@ struct sim_stats sim_timestep(struct network *const net,
 
 	sim_send_messages(net, arch, timestep);
 	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, net);
-	spikes_sent = sim_input_spikes(net);
-	spikes_sent += sim_receive_messages(net, arch, timestep);
+	sim_input_spikes(net);
+	sim_receive_messages(net, arch, timestep);
 	sim_schedule_messages(net, arch, timestep);
 
 	// Performance statistics for this time step
@@ -40,10 +40,10 @@ struct sim_stats sim_timestep(struct network *const net,
 	stats.network_time = 0.0;
 	stats.total_sim_time = sim_calculate_time(arch, &(stats.network_time));
 	stats.total_energy = sim_calculate_energy(arch, stats.total_sim_time);
-	stats.total_spikes = spikes_sent;
+	stats.total_spikes = 0;
 	stats.wall_time = 0;
 
-	INFO("Spikes sent: %ld\n", spikes_sent);
+	//INFO("Spikes sent: %ld\n", spikes_sent);
 	if (perf_fp)
 	{
 		sim_perf_log_timestep(perf_fp, arch, net, &stats);
@@ -54,6 +54,7 @@ struct sim_stats sim_timestep(struct network *const net,
 void sim_send_messages(struct network *net, struct architecture *arch,
 							const int timestep)
 {
+	#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -72,11 +73,10 @@ void sim_send_messages(struct network *net, struct architecture *arch,
 	}
 }
 
-int sim_receive_messages(struct network *net, struct architecture *arch,
+void sim_receive_messages(struct network *net, struct architecture *arch,
 							const int timestep)
 {
-	int total_spikes_received = 0;
-
+	#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -108,7 +108,6 @@ int sim_receive_messages(struct network *net, struct architecture *arch,
 			}
 		}
 	}
-	return total_spikes_received;
 }
 
 double sim_estimate_network_costs(struct architecture *arch, struct tile *src,
@@ -145,9 +144,8 @@ int sim_schedule_messages(struct network *net, struct architecture *arch,
 {
 	struct core *top_priority;
 	const int core_count = ARCH_MAX_CORES * ARCH_MAX_TILES; // TODO calculate
-	int total_spike_count, cores_left;
+	int cores_left;
 
-	total_spike_count = 0;
 	top_priority = sim_init_timing_priority(arch);
 
 	// Setup timing counters
@@ -320,7 +318,7 @@ int sim_schedule_messages(struct network *net, struct architecture *arch,
 	}
 	TRACE("Neurons fired: %ld\n", net->total_neurons_fired);
 
-	return total_spike_count;
+	return 0;
 }
 
 // TODO: could go into reset_measurements..
