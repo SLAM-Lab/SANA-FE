@@ -28,6 +28,8 @@ struct sim_stats sim_timestep(struct network *const net,
 
 	TRACE("Updating %d group(s).\n", net->neuron_group_count);
 	net->total_neurons_fired = 0;
+	net->total_synapse_reads = 0;
+	net->total_neuron_updates = 0;
 
 	sim_send_messages(net, arch, timestep);
 	sim_probe_log_timestep(probe_spike_fp, probe_potential_fp, net);
@@ -97,6 +99,8 @@ void sim_receive_messages(struct network *net, struct architecture *arch,
 					assert(pre_core != NULL);
 					struct tile *pre_tile = pre_core->t;
 					assert(pre_tile != NULL);
+					net->total_synapse_reads +=
+							a->connection_count;
 					a->network_latency =
 						sim_estimate_network_costs(arch,
 								pre_tile, t);
@@ -386,6 +390,7 @@ void sim_process_neuron(struct network *net, struct neuron *n,
 		n->current_buffer = 0.0;
 		if (n->update_needed)
 		{
+			net->total_neuron_updates++;
 			n->processing_latency = sim_update_soma(n, current_in,
 								timestep);
 		}
@@ -591,9 +596,9 @@ double sim_update_synapse(struct axon_map *axon, const int timestep)
 	spike_ops = axon->connection_count;
 	memory_accesses = (spike_ops + (post_core->synapse.weights_per_word-1))/
 					(post_core->synapse.weights_per_word);
-	post_core->synapse.energy += memory_accesses *
-					post_core->synapse.energy_memory_access;
-	latency += memory_accesses * post_core->synapse.time_memory_access;
+	//post_core->synapse.energy += memory_accesses *
+	//				post_core->synapse.energy_memory_access;
+	//latency += memory_accesses * post_core->synapse.time_memory_access;
 
 	post_core->synapse.energy += spike_ops *
 		post_core->synapse.energy_spike_op;
@@ -702,7 +707,6 @@ double sim_update_soma_lif(struct neuron *n, const double current_in,
 		TRACE("nid %d fired.\n", n->id);
 
 		latency += soma->time_spiking;
-		//soma->energy += soma->energy_spiking;
 		soma->spikes_sent++;
 	}
 
@@ -905,6 +909,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 	arch->total_hops = 0;
 	arch->total_packets = 0;
 	net->total_neurons_fired = 0;
+	net->total_neuron_updates = 0;
 
 	for (int i = 0; i < net->neuron_group_count; i++)
 	{
@@ -963,6 +968,8 @@ void sim_perf_write_header(FILE *fp, const struct architecture *arch)
 	fprintf(fp, "hops,");
 	fprintf(fp, "total_energy,");
 	fprintf(fp, "wall_time,");
+	fprintf(fp, "total_synapse_reads,");
+	fprintf(fp, "total_neuron_updates,");
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
@@ -1009,8 +1016,10 @@ void sim_perf_log_timestep(FILE *fp, const struct architecture *arch,
 	fprintf(fp, "%ld,", net->total_neurons_fired);
 	fprintf(fp, "%ld,", arch->total_packets);
 	fprintf(fp, "%ld,", arch->total_hops);
-	fprintf(fp, "%lf,", stats->total_energy);
+	fprintf(fp, "%e,", stats->total_energy);
 	fprintf(fp, "%lf,", stats->wall_time);
+	fprintf(fp, "%ld,", net->total_synapse_reads);
+	fprintf(fp, "%ld,", net->total_neuron_updates);
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{

@@ -245,7 +245,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t)
 	c = &(t->cores[core_id]);
 	c->id = core_id;
 	c->t = t;
-	c->is_blocking = 1;
+	c->is_blocking = 0;
 
 	c->axon_in.energy = 0.0;
 	c->axon_in.time = 0.0;

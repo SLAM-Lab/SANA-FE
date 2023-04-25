@@ -173,8 +173,8 @@ if __name__ == "__main__":
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     #mapping = "split_4_diff_tiles"
 
-    #mapping = "fixed"
-    mapping = "luke"
+    mapping = "fixed"
+    #mapping = "luke"
     #mapping = "split_2"
     """
     for cores in core_count:
@@ -306,18 +306,29 @@ if __name__ == "__main__":
             loihi_times_no_spikes.append(float(row["time"]))
             loihi_energy_no_spikes.append(float(row["energy"]))
 
-    plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
+    plt.rcParams.update({'font.size': 9, 'lines.markersize': 3})
+
+
+    import numpy as np
+    loihi = np.array(loihi_times_spikes)
+    sim = np.array(spiking_times) * 1.0e3
+    error = np.abs(loihi - sim) / loihi
+    print("errors: {0}".format(error * 100))
+    print("mean time error: {0}".format(np.mean(error[6:]) * 100))
+
+    spiking_times = np.array(spiking_times) * 1.0e3
+    loihi_times_spikes = np.array(loihi_times_spikes) * 1.0e3
 
     plt.figure(figsize=(2.5, 2.5))
-    plt.plot(neuron_counts, spiking_times, "-o")
-    plt.plot(neuron_counts, loihi_times_spikes, "--x")
+    plt.plot(neuron_counts[6:], spiking_times[6:], "-o")
+    plt.plot(neuron_counts[6:], loihi_times_spikes[6:], "--x")
     plt.yscale("linear")
     plt.xscale("linear")
-    plt.ylabel("Time-step Latency (s)")
+    plt.ylabel("Time-step Latency (ms)")
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured on Loihi"))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.tight_layout()
+    #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+    plt.tight_layout(pad=0)
     plt.savefig("runs/connected_spiking_time.pdf")
     plt.savefig("runs/connected_spiking_time.png")
 

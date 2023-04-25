@@ -23,8 +23,8 @@ import os
 ARCH_FILENAME = "loihi.arch"
 #NETWORK_FILENAME = "examples/dvs_gesture_32x32_i16.net" # Input 16, 32x32 net
 NETWORK_FILENAME = "examples/dvs_gesture_32x32.net" # Input 16, 32x32 net
-#LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_i16_time.csv"
-LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_time.csv"
+LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_i16_time.csv"
+#LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "runs/loihi_gesture_32x32_energy.csv"
 
 SIM_TIME_DATA_FILENAME = "runs/sim_gesture_32x32_time.csv"
