@@ -169,7 +169,10 @@ int main(int argc, char *argv[])
 	//  no inputs
 	for (int i = 0; i < timesteps; i++)
 	{
-		INFO("*** Time-step %d ***\n", i+1);
+		if (i % 100 == 0)
+		{
+			INFO("*** Time-step %d ***\n", i+1);
+		}
 		run(&net, arch, &stats, i, probe_spikes_fp,
 					probe_potential_fp, perf_fp);
 	}

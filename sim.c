@@ -179,23 +179,45 @@ int sim_schedule_messages(struct network *net, struct architecture *arch,
 
 		if (c->status == UPDATE_NEURON)
 		{
-			// Model effect of stage prior to sending message
-			//  This should just be the last stage latency
-			c->time += n->processing_latency;
-			TRACE("(cid:%d.%d) nid:%d.%d update, time:%e\n",
-				c->t->id, c->id, n->group->id, n->id, c->time);
+			while (c->status == UPDATE_NEURON)
+			{
+				// Model effect of stage prior to sending message
+				//  This should just be the last stage latency
+				c->time += n->processing_latency;
+				TRACE("(cid:%d.%d) nid:%d.%d update, time:%e\n",
+					c->t->id, c->id, n->group->id, n->id, c->time);
 
-			if (n->fired)
-			{
-				net->total_neurons_fired++;
-				c->status = SEND_SPIKES;
-				c->curr_axon = 0;
-			}
-			else
-			{
-				TRACE("\t(cid:%d.%d) Neuron didn't fire\n",
-							c->t->id, c->id);
-				c->status = NEURON_FINISHED;
+				if (n->fired)
+				{
+					net->total_neurons_fired++;
+					c->status = SEND_SPIKES;
+					c->curr_axon = 0;
+				}
+				else
+				{
+					TRACE("\t(cid:%d.%d) Neuron didn't fire\n",
+								c->t->id, c->id);
+					// Get the next neuron to process
+					TRACE("(cid:%d.%d) neuron finished, %d neurons left\n",
+					c->t->id, c->id, c->neurons_left);
+					//  Get the next spiking neuron
+					c->neurons_left--;
+					c->curr_neuron++;
+					if (c->neurons_left <= 0)
+					{
+						// Simulation of this core has finished
+						c->status = NEURON_FINISHED;
+					}
+					else
+					{
+						// Get the next neuron in the core
+						//  immediately, don't simulate another
+						//  event
+						c->status = UPDATE_NEURON;
+						nid = c->curr_neuron;
+						n = c->neurons[nid];
+					}
+				}
 			}
 		}
 		else if (c->status == SEND_SPIKES)
