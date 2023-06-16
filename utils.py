@@ -75,9 +75,9 @@ class NeuronGroup:
                 f"{self.reverse_threshold} {self.reverse_reset} {self.leak} "
                 f"hard none\n")
 
-    def create_neuron(self, log_spikes, log_voltage, force_update):
+    def create_neuron(self, log_spikes, log_potential, force_update):
         neuron_id = len(self.neurons)
-        neuron = Neuron(self.id, neuron_id, log_spikes, log_voltage,
+        neuron = Neuron(self.id, neuron_id, log_spikes, log_potential,
                         force_update)
         self.neurons.append(neuron)
         #print(self.neurons)
@@ -102,12 +102,12 @@ class Input:
         return command
 
 class Neuron:
-    def __init__(self, group_id, neuron_id, log_spikes=False, log_voltage=False,
+    def __init__(self, group_id, neuron_id, log_spikes=False, log_potential=False,
                force_update=False):
         self.group_id = group_id
         self.id = neuron_id
         self.log_spikes = log_spikes
-        self.log_voltage = log_voltage
+        self.log_potential = log_potential
         self.force_update = force_update
         self.connections = []
         self.tile = None
@@ -122,11 +122,11 @@ class Neuron:
 
     def to_command(self):
         log_spikes = int(self.log_spikes)
-        log_voltage = int(self.log_voltage)
+        log_potential = int(self.log_potential)
         force_update = int(self.force_update)
         self.leak = 1.0
         command = (f"n {self.group_id} {self.id} {self.bias} {log_spikes} "
-                   f"{log_voltage} {force_update}")
+                   f"{log_potential} {force_update}")
 
         for connection in self.connections:
             dest_neuron, weight = connection
@@ -162,7 +162,7 @@ def map_neuron_to_compartment(compartments):
 
 
 def create_layer(network, layer_neuron_count, compartments,
-                 log_spikes, log_voltage, force_update, threshold, reset,
+                 log_spikes, log_potential, force_update, threshold, reset,
                  leak, mappings=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     #print("Compartments free: {0}".format(compartments))
@@ -176,7 +176,7 @@ def create_layer(network, layer_neuron_count, compartments,
     for i in range(0, layer_neuron_count):
         if (i % 10000) == 0:
             print(f"Creating neuron {i}")
-        neuron = layer_group.create_neuron(log_spikes, log_voltage,
+        neuron = layer_group.create_neuron(log_spikes, log_potential,
                                            force_update)
 
         if mappings is not None:

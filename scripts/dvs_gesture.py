@@ -17,26 +17,33 @@ import pandas as pd
 import numpy as np
 import os
 
-#ARCH_FILENAME = "loihi_big.arch"
-#NETWORK_FILENAME = "examples/dvs_gesture_big.net"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 
 ARCH_FILENAME = "loihi.arch"
-#NETWORK_FILENAME = "examples/dvs_gesture_32x32_i16.net" # Input 16, 32x32 net
-NETWORK_FILENAME = "examples/dvs_gesture_32x32.net" # Input 16, 32x32 net
-#LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_i16_time.csv"
-LOIHI_TIME_DATA_FILENAME = "runs/loihi_gesture_32x32_time.csv"
-LOIHI_ENERGY_DATA_FILENAME = "runs/loihi_gesture_32x32_energy.csv"
+NETWORK_FILENAME = "dvs_gesture_32x32.net"
+LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
+LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
+SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
+SIM_ENERGY_DATA_FILENAME = "sim_gesture_32x32_energy.csv"
 
-SIM_TIME_DATA_FILENAME = "runs/sim_gesture_32x32_time.csv"
-SIM_ENERGY_DATA_FILENAME = "runs/sim_gesture_32x32_energy.csv"
+NETWORK_DIR = os.path.join(PROJECT_DIR, "snn", "dvs", "loihi_gesture_32x32")
+DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
+
+ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
+GENERATED_NETWORK_PATH = os.path.join(DVS_RUN_DIR, NETWORK_FILENAME)
+LOIHI_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_TIME_DATA_FILENAME)
+LOIHI_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_ENERGY_DATA_FILENAME)
+SIM_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_TIME_DATA_FILENAME)
+SIM_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_ENERGY_DATA_FILENAME)
+
 
 def run_sim(timesteps):
     # Create the network to run
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
               "Log Spikes", "Log Voltage", "Synapse Info..."]
-    #timesteps = 100000
-    command = ("./sim", ARCH_FILENAME,
-               NETWORK_FILENAME, "{0}".format(timesteps),)
+    command = (os.path.join(PROJECT_DIR, "sim"), "-p", ARCH_PATH,
+               GENERATED_NETWORK_PATH, f"{timesteps}")
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)
 
@@ -47,31 +54,10 @@ def parse_stats(stats):
     print("Parsing statistics")
     total = stats.sum()
     pd.set_option('display.max_rows', None)
-    print(total)
-    update_keys, synapse_keys, spike_gen_energy, network_energy = [], [], [], []
-    for k in total.keys():
-        if "energy" in k:
-            if "+[" in k: update_keys.append(k)
-            elif "s[" in k: synapse_keys.append(k)
-            elif "o[" in k: spike_gen_energy.append(k)
-            elif "t[" in k: network_energy.append(k)
-
     analysis = {}
-    analysis["update_energy"] = total[update_keys].sum()
-    #analysis["synapse_energy"] = total[synapse_keys].sum()
-    analysis["spike_gen_energy"] = total[spike_gen_energy].sum()
-    analysis["network_energy"] = total[network_energy].sum()
-    # Sum across all keys for each timestep
-    #analysis["total_energies"] = (stats.loc[:, update_keys].sum(axis=1) +
-    #    stats.loc[:, synapse_keys].sum(axis=1) +
-    #    stats.loc[:, spike_gen_energy].sum(axis=1) +
-    #    stats.loc[:, network_energy].sum(axis=1))
-    #print(analysis["total_energies"])
-
     analysis["times"] = stats.loc[:, "time"]
     analysis["hops"] = stats.loc[:, "hops"]
     analysis["fired"] = stats.loc[:, "fired"]
-    print(f"fired: {analysis['fired']}")
     analysis["packets"] = stats.loc[:, "packets"]
     analysis["total_energy"] = sum(stats.loc[:, "total_energy"])
 
@@ -90,7 +76,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
     for i in range(0, len(files)):
         f = files[i]
-        path = "runs/spiketrains/" + f
+        path = os.path.join(DVS_RUN_DIR, "spiketrains", f)
 
         with open(path, "r") as spiketrain:
             reader = csv.reader(spiketrain)
@@ -124,11 +110,9 @@ if __name__ == "__main__":
     spiking_spike_gen_energy = []
     spiking_synapse_energy = []
     spiking_network_energy = []
-    #times = []
     times = np.array(())
     energies = np.array(())
     timesteps = 10000
-    #timesteps = 128
     frames = 100
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
@@ -136,50 +120,56 @@ if __name__ == "__main__":
         neurons = ""
         groups = ""
 
-        neuron_groups_filename = "examples/loihi_gesture_32x32/neuron_groups.net"
+
+        neuron_groups_filename = os.path.join(NETWORK_DIR, "neuron_groups.net")
         with open(neuron_groups_filename, "r") as group_file:
             group_data = group_file.read()
 
-        snn_filename = "examples/loihi_gesture_32x32/dvs_gesture.net"
+        snn_filename = os.path.join(NETWORK_DIR, "dvs_gesture.net")
         with open(snn_filename, "r") as snn_file:
             snn_data = snn_file.read()
 
         print("Reading mapping file")
-        mappings_filename = "examples/loihi_gesture_32x32/mappings.net"
+        mappings_filename = os.path.join(NETWORK_DIR, "mappings.net")
         with open(mappings_filename, "r") as mappings_file:
             mapping_data = mappings_file.read()
 
         print("Reading input file")
+
+        # Clear the data files
+        open(SIM_ENERGY_DATA_PATH, "w")
+        open(SIM_TIME_DATA_PATH, "w")
+
         for inputs in range(0, frames):
         #for inputs in range(90, 91):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
-            input_filename = f"examples/loihi_gesture_32x32/inputs{inputs}.net"
+            input_filename = os.path.join(NETWORK_DIR, f"inputs{inputs}.net")
             with open(input_filename, "r") as input_file:
                 input_data = input_file.read()
 
-            data = group_data + "\n" + input_data + "\n" + snn_data + "\n" + mapping_data
-            with open(NETWORK_FILENAME, "w") as network_file:
+            data = (group_data + "\n" + input_data + "\n" + snn_data + "\n" +
+                    mapping_data)
+            with open(GENERATED_NETWORK_PATH, "w") as network_file:
                 network_file.write(data)
 
-            # Use a pre-generated network for a realistic use case i.e. dvs-gesture
+            # Use a pre-generated network for a realistic use case i.e.
+            #  dvs-gesture
             run_sim(timesteps)
             # Parse the detailed perf statistics
             print("Reading performance data")
-            stats = pd.read_csv("perf.csv")
+            stats = pd.read_csv(os.path.join(PROJECT_DIR, "perf.csv"))
             analysis = parse_stats(stats)
-
-            #spiking_update_energy.append(analysis["update_energy"])
-            #spiking_spike_gen_energy.append(analysis["spike_gen_energy"])
-            #spiking_synapse_energy.append(analysis["synapse_energy"])
-            #spiking_network_energy.append(analysis["network_energy"])
             times = np.append(times, analysis["times"])
             energies = np.append(energies, analysis["total_energy"] / timesteps)
 
-        if experiment == "time":
-            np.savetxt(SIM_TIME_DATA_FILENAME, times, delimiter=",")
-        else:  # energy
-            np.savetxt(SIM_ENERGY_DATA_FILENAME, energies, delimiter=",")
+            if experiment == "time":
+                with open(SIM_TIME_DATA_PATH, "a") as time_file:
+                    np.savetxt(SIM_TIME_DATA_PATH, times, delimiter=",")
+            else:  # energy
+                with open(SIM_ENERGY_DATA_PATH, "a") as energy_file:
+                    np.savetxt(SIM_ENERGY_DATA_PATH, energies,
+                               delimiter=",")
 
     if plot_experiment:
         """
@@ -197,9 +187,9 @@ if __name__ == "__main__":
         # Plot the latency
         if experiment == "time":
             plt.rcParams.update({'font.size': 8, 'lines.markersize': 1})
-            times = np.loadtxt("runs/sim_gesture_32x32_time.csv", delimiter=",")
+            times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
             #times = (times * 0.65) + 0.5e-5
-            loihi_data = pd.read_csv(LOIHI_TIME_DATA_FILENAME)
+            loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
             #loihi_times = np.array(loihi_data.loc[:, "spiking"] / 1.0e6)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
 
@@ -251,12 +241,12 @@ if __name__ == "__main__":
 
             print("diff = {}".format(
                 analysis["fired"] - np.array(fired_count[0:timesteps])))
-            plt.savefig("dvs_gesture_sim_time.png")
+            plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
             """
 
             # Plot the latency
-            times = np.loadtxt("runs/sim_gesture_32x32_time.csv", delimiter=",")
-            loihi_data = pd.read_csv(LOIHI_TIME_DATA_FILENAME)
+            times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
+            loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
             # There is a weird effect, that the first sample of all inputs > 1 is
             #  a 0 value. Just ignore the entries for both arrays (so we have
@@ -279,15 +269,13 @@ if __name__ == "__main__":
             plt.xlabel("Time-step")
             plt.legend(("Simulated", "Measured on Loihi"))
             plt.tight_layout()
-            plt.savefig("dvs_gesture_sim_time.pdf")
-            plt.savefig("dvs_gesture_sim_time.png")
+            plt.savefig("runs/dvs/dvs_gesture_sim_time.pdf")
+            plt.savefig("runs/dvs/dvs_gesture_sim_time.png")
 
             # Plot the correlation between simulated and measured time-step latency
             plt.figure(figsize=(2.5, 2.5))
             #plt.plot(times[0:frames*(timesteps-1)], loihi_times[0:frames*(timesteps-1)], "x")
 
-            print(total_times)
-            print(loihi_total_times)
             #exit()
             plt.plot(total_times[0:frames], loihi_total_times[0:frames], "x")
             plt.plot(np.linspace(min(total_times), max(total_times)), np.linspace(min(total_times), max(total_times)), "k--")
@@ -300,11 +288,8 @@ if __name__ == "__main__":
             #plt.xlim((0, 4e-3))
             #plt.ylim((0, 4e-3))
             plt.tight_layout()
-            plt.savefig("dvs_gesture_sim_correlation.pdf")
-            plt.savefig("dvs_gesture_sim_correlation.png")
-
-            for t in total_times:
-                print(t)
+            plt.savefig("runs/dvs/dvs_gesture_sim_correlation.pdf")
+            plt.savefig("runs/dvs/dvs_gesture_sim_correlation.png")
 
             # Calculate total error
             # TODO: recalculate
@@ -318,9 +303,9 @@ if __name__ == "__main__":
 
         if experiment == "energy":
             plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
-            loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_FILENAME, delimiter=",")
+            loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
             loihi_energies = np.array(loihi_data) / 1.0e9
-            energies = np.loadtxt(SIM_ENERGY_DATA_FILENAME)
+            energies = np.loadtxt(SIM_ENERGY_DATA_PATH)
             plt.figure(figsize=(2.5, 2.5))
             plt.plot(energies[0:frames], loihi_energies[0:frames], 'x')
             #plt.plot(energies[0:frames] + 0.45e-6, loihi_energies[0:frames], 'x')
@@ -332,13 +317,7 @@ if __name__ == "__main__":
             plt.ylabel("Measured Energy (J)")
             plt.xlabel("Simulated Energy (J)")
             plt.tight_layout()
-            plt.savefig("dvs_gesture_sim_energy.png")
-            print("sim")
-            for e in energies:
-                print(e)
-            print("loihi")
-            for e in loihi_energies:
-                print(float(e))
+            plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
 
         """
         relative_error = abs(loihi_energies[0:frames*timesteps] - energies) / loihi_energies[0:frames*timesteps]
@@ -362,7 +341,7 @@ if __name__ == "__main__":
         plt.rcParams.update({'font.size': 12, 'lines.markersize': 5})
         plot_neurons = {"inputs": [], "0Conv2D_15x15x16": [50, 67], "1Conv2D_13x13x32": [], "2Conv2D_11x11x64": [], "3Conv2D_9x9x11": [], "5Dense_11":[]}
         for layer_id, layer in enumerate(layers):
-            layer_path = "runs/potentials/{0}".format(layer)
+            layer_path = "runs/dvs/potentials/{0}".format(layer)
             if not os.path.exists(layer_path):
                 os.makedirs(layer_path)
 

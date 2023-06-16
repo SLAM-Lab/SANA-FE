@@ -27,9 +27,9 @@ enum
 	COMMAND_OK = 0, // Anything >= 0 means successfully parsed
 };
 
-int command_parse_file(FILE *fp, struct network *net, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
-int command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
-int command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
+int command_parse_file(FILE *fp, struct network *net, struct architecture *arch, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
+int command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
+int command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
 
 // Misc parsing
 int command_parse_reset_mode(const char *str);
@@ -54,7 +54,7 @@ int command_map_hardware(struct network *const net, struct architecture *const a
 
 // Simulation control
 int command_parse_input_spikes(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_step_sim(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count, FILE *probe_spikes_fp, FILE *probe_potential_fp, FILE *perf_fp);
-int command_parse_load_commands(struct network *net, struct architecture *arch, char fields[][MAX_FIELD_LEN], const int field_count, FILE *probe_spike_fp, FILE *probe_potential_fp, FILE *perf_fp);
+int command_parse_step_sim(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count, FILE *probe_spikes_fp, FILE *potential_trace_fp, FILE *perf_fp);
+int command_parse_load_commands(struct network *net, struct architecture *arch, char fields[][MAX_FIELD_LEN], const int field_count, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
 
 #endif

@@ -76,29 +76,22 @@ struct neuron
 	// Track the timestep each hardware unit was last updated
 	unsigned int random_range_mask;
 
-	double potential, current, d_currents[1], charge, bias;
+	double potential, current, charge, bias;
 	double reset, reverse_reset, threshold, reverse_threshold;
-	double potential_decay, potential_time_const;
-
-	double charge_buffer, d_currents_buffer[1], current_buffer;
-	int fired_buffer;
-
-	double current_decay, current_time_const;
-	// TODO: this should move into a message struct
-	double processing_latency, network_latency, receive_latency;
+	double potential_decay, potential_time_const, dendritic_current_decay;
+	double processing_latency;
 
 	int id, is_init, fired, connection_out_count, spike_count;
-	int log_spikes, log_voltage, update_needed, force_update;
-	int soma_last_updated;
+	int log_spikes, log_potential, update_needed, force_update;
+	int soma_last_updated, dendrite_last_updated;
 	int maps_in_count, maps_out_count;
 };
 
 struct connection
 {
 	struct neuron *post_neuron, *pre_neuron;
-	double weight;
-	// TODO: delay, and any other synapse/connection properties
-	int id;
+	double weight, current, synaptic_current_decay;
+	int id, delay;
 };
 
 struct input
@@ -125,13 +118,12 @@ struct network
 	struct neuron_group groups[NETWORK_MAX_NEURON_GROUPS];
 	struct input *external_inputs;
 	int neuron_group_count, external_input_count;
-	long int total_neurons_fired;
 };
 
 #include "arch.h"
 void network_init(struct network *const net);
 void network_free(struct network *const net);
-int network_create_neuron(struct neuron *const n, const double bias, const int log_spikes, const int log_voltages, const int force_update, const int connection_count);
+int network_create_neuron(struct neuron *const n, const double bias, const int log_spikes, const int log_potentials, const int force_update, const int connection_count);
 int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset, const double reverse_threshold, const double reverse_reset, const double leak, const int reset_mode, const int reverse_reset_mode);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
 int net_create_inputs(struct network *const net, const int input_count, const int input_type);

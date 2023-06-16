@@ -1,0 +1,84 @@
+---
+architecture:
+  name: truenorth_chip
+  attributes:
+    topology: mesh
+    dimensions: 2
+    width: 64
+    height: 64
+    cost:
+      east_west:
+        energy: 0.0e-12
+        time: 0.0e-9
+      north_south:
+        energy: 0.0e-12
+        time: 0.0e-9
+      global_barrier:
+        time: 0.0e-9
+
+  tile:
+    - name: truenorth_tile[0..4095]
+      attributes:
+        blocking: False
+        cost:
+          energy: 0.0e-12
+          time: 0.0e-9
+      core:
+        - name: truenorth_core
+          attributes:
+            blocking: False
+          axon_in:
+            - name: core_in
+              # axon_in acts like input ports to the arch or subtree.
+              #  For Loihi we have at most 4096 slots to route packets to
+              #  different cores.
+              attributes:
+                fan_in: 256
+                protocol: dest_axon
+          soma:
+            - name: core_truenorth
+              attributes:
+                type: digital
+                model: truenorth
+                reset: hard
+                reverse_reset: saturate
+                cost:
+                  inactive:
+                    energy: 0.0e-12
+                    time: 0.0e-9
+                  active:
+                    energy: 0.0e-12
+                    time: 0.0e-9
+                  spiking:
+                    energy: 0.0e-12
+                    time: 0.0e-9
+          synapse:
+            - name: core_synapses
+              attributes:
+                model: cuba
+                weight_bits: 8
+                word_bits: 64
+                cost:
+                  spike:
+                    energy: 0.0e-12
+                    time: 0.0e-9
+                  memory:
+                    energy: 0.0e-12
+                    time: 0.0e-9
+          dendrite:
+          - name: core_dendrites
+            attributes:
+
+          axon_out:
+            - name: core_out
+              # axon_out acts like output ports. Loihi needs to figure out the
+              #  destination tiles and axons to send spikes to. If transmitting
+              #  to different neurons on a common core, those are grouped into
+              #  one axon. We have 4096 slots on Loihi to send out packets to
+              #  different receiving axons (i.e. 4096 unique cores).
+              attributes:
+                fan_out: 1
+                protocol: dest_axon
+                cost:
+                  energy: 0.0e-12
+                  time: 0.0e-9

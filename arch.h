@@ -75,6 +75,7 @@ struct axon_map
 {
 	// List of all neuron connections to send spike to
 	int connection_count, spikes_received;
+	long int last_updated;
 	double network_latency, receive_latency;
 	struct connection **connections;
 	struct neuron *pre_neuron;
@@ -165,8 +166,6 @@ struct architecture
 	struct tile tiles[ARCH_MAX_TILES];
 	double time_barrier;
 	int tile_count, initialized;
-
-	long int total_hops, total_packets;
 };
 
 struct architecture *arch_init(void);

@@ -17,7 +17,7 @@
 int command_parse_command(char fields[][MAX_FIELD_LEN],
 				const int field_count, struct network *net,
 				struct architecture *arch,
-				FILE *probe_spikes_fp, FILE *probe_potential_fp,
+				FILE *probe_spikes_fp, FILE *potential_trace_fp,
 				FILE *perf_fp)
 {
 	int ret;
@@ -77,13 +77,13 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 	case '*': // Step simulator
 		ret = command_parse_step_sim(net, arch, fields, field_count,
 						probe_spikes_fp,
-						probe_potential_fp, perf_fp);
+						potential_trace_fp, perf_fp);
 		break;
 	case 'l':  // Load commands from file
 		ret = command_parse_load_commands(net, arch, fields,
 							field_count,
 							probe_spikes_fp,
-							probe_potential_fp,
+							potential_trace_fp,
 							perf_fp);
 		break;
 	default:
@@ -98,7 +98,7 @@ int command_parse_command(char fields[][MAX_FIELD_LEN],
 
 int command_parse_line(char *line, char fields[][MAX_FIELD_LEN],
 			struct network *net, struct architecture *arch,
-			FILE *probe_spikes_fp, FILE *probe_potential_fp,
+			FILE *probe_spikes_fp, FILE *potential_trace_fp,
 			FILE *perf_fp)
 {
 	char *token;
@@ -130,13 +130,13 @@ int command_parse_line(char *line, char fields[][MAX_FIELD_LEN],
 	}
 
 	return command_parse_command(fields, field_count, net, arch,
-					probe_spikes_fp, probe_potential_fp,
+					probe_spikes_fp, potential_trace_fp,
 								perf_fp);
 }
 
 int command_parse_file(FILE *fp, struct network *net,
 			struct architecture *arch, FILE *probe_spikes_fp,
-			FILE *probe_potential_fp, FILE *perf_fp)
+			FILE *potential_trace_fp, FILE *perf_fp)
 {
 	char *line;
 	char (*fields)[MAX_FIELD_LEN];
@@ -161,7 +161,7 @@ int command_parse_file(FILE *fp, struct network *net,
 		{
 			ret = command_parse_line(line, fields, net, arch,
 							probe_spikes_fp,
-							probe_potential_fp,
+							potential_trace_fp,
 							perf_fp);
 		}
 	}
@@ -367,7 +367,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 	struct neuron *n;
 	double bias;
 	int neuron_group_id, neuron_id, connection_count;
-	int log_spikes, log_voltage, force_update, ret;
+	int log_spikes, log_potential, force_update, ret;
 
 	TRACE("Parsing neuron.\n");
 	if (field_count < NEURON_FIELDS)
@@ -380,7 +380,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 	ret += sscanf(fields[NEURON_ID], "%d", &neuron_id);
 	ret += sscanf(fields[NEURON_BIAS], "%lf", &bias);
 	ret += sscanf(fields[NEURON_RECORD_SPIKES], "%d", &log_spikes);
-	ret += sscanf(fields[NEURON_RECORD_VOLTAGE], "%d", &log_voltage);
+	ret += sscanf(fields[NEURON_RECORD_VOLTAGE], "%d", &log_potential);
 	ret += sscanf(fields[NEURON_FORCE_UPDATE], "%d", &force_update);
 
 	if (ret < (NEURON_FIELDS-1))
@@ -400,7 +400,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 	connection_count = (field_count - NEURON_FIELDS) / CONNECTION_FIELDS;
 	TRACE("Parsed neuron gid:%d nid:%d log s:%d log v:%d force:%d "
 		"connections:%d\n", neuron_group_id, neuron_id, log_spikes,
-				log_voltage, force_update, connection_count);
+				log_potential, force_update, connection_count);
 
 
 
@@ -411,7 +411,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 		return COMMAND_FAIL;
 	}
 	n = &(group->neurons[neuron_id]);
-	ret = network_create_neuron(n, bias, log_spikes, log_voltage,
+	ret = network_create_neuron(n, bias, log_spikes, log_potential,
 				force_update, connection_count);
 	if (ret == NETWORK_INVALID_NID)
 	{
@@ -827,7 +827,7 @@ int command_parse_step_sim(struct network *const net,
 						char fields[][MAX_FIELD_LEN],
 						const int field_count,
 						FILE *probe_spikes_fp,
-						FILE *probe_potential_fp,
+						FILE *potential_trace_fp,
 						FILE *perf_fp)
 {
 	// TODO: should there be a way of getting stats out of this
@@ -836,7 +836,7 @@ int command_parse_step_sim(struct network *const net,
 	//  in, including the file pointers that are copied everywhere
 	// TODO: we need to know which timestep this is for the rate based stuff
 	//  figure this out before I can reenable the function
-	//sim_timestep(net, arch, timestep, probe_spikes_fp, probe_potential_fp,
+	//sim_timestep(net, arch, timestep, probe_spikes_fp, potential_trace_fp,
 	//							perf_fp);
 	// TODO: disabled for now
 	return COMMAND_OK;
@@ -847,7 +847,7 @@ int command_parse_load_commands(struct network *const net,
 						char fields[][MAX_FIELD_LEN],
 						const int field_count,
 						FILE *probe_spikes_fp,
-						FILE *probe_potential_fp,
+						FILE *potential_trace_fp,
 						FILE *probe_perf)
 {
 	FILE *fp;
@@ -859,7 +859,7 @@ int command_parse_load_commands(struct network *const net,
 		return COMMAND_FAIL;
 	}
 	ret = command_parse_file(fp, net, arch, probe_spikes_fp,
-						probe_potential_fp, probe_perf);
+						potential_trace_fp, probe_perf);
 	fclose(fp);
 
 	return ret;

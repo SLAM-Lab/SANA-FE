@@ -146,7 +146,7 @@ def plot_results():
     #for messages_per_neuron in (1, 4, 16):
     #runtimes = np.array(df.loc[(df["spikes_per_message"] == 4) & (df["neurons_per_core"] == 1024) & (df["messages_per_neuron"] == messages_per_neuron), "runtime"])
     #neurons = np.array(df.loc[(df["spikes_per_message"] == 4) & (df["neurons_per_core"] == 1024) & (df["messages_per_neuron"] == messages_per_neuron), "cores"] * 1024)
-    
+
     print("printing")
     runtimes = np.array(df.loc[((df["spikes_per_message"] == 1) &
     (df["neurons_per_core"] * df["messages_per_neuron"] * df["cores"] == 8192)), "runtime"])

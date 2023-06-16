@@ -56,7 +56,7 @@ int network_create_neuron_group(struct network *net,
 		n->group = group;
 		n->connection_out_count = 0;
 		n->log_spikes = 0;
-		n->log_voltage = 0;
+		n->log_potential = 0;
 		n->force_update = 0;
 
 		n->reset = group->default_reset;
@@ -70,18 +70,13 @@ int network_create_neuron_group(struct network *net,
 		n->charge = 0.0;
 		n->bias = 0.0;
 
-		//n->potential_decay =
-		//	exp(-dt / n->potential_time_const);
 		n->potential_decay = leak;
+		// By default, dendrite current resets every timestep
+		n->dendritic_current_decay = 0.0;
 
 		n->update_needed = 0;
 		n->spike_count = 0;
 		n->connections_out = NULL;
-
-		n->charge_buffer = 0.0;
-		n->d_currents_buffer[0] = 0.0;
-		n->current_buffer = 0.0;
-		n->fired_buffer = 0;
 
 		// Initially the neuron is not mapped to anything
 		n->core = NULL;
@@ -114,13 +109,12 @@ int network_create_neuron_group(struct network *net,
 int network_create_neuron(struct neuron *const n,
 					const double bias,
 					const int log_spikes,
-					const int log_voltages,
+					const int log_potentials,
 					const int force_update,
 					const int connection_count)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
-	const double dt = 1.0e-3; // Seconds
 	assert(connection_count >= 0);
 	assert(n != NULL);
 
@@ -130,23 +124,18 @@ int network_create_neuron(struct neuron *const n,
 		return NETWORK_INVALID_NID;
 	}
 
+	n->potential = 0.0;
 	n->bias = bias;
 	n->log_spikes = log_spikes;
-	n->log_voltage = log_voltages;
+	n->log_potential = log_potentials;
 	n->force_update = force_update;
 	n->update_needed = n->force_update;
 	n->connection_out_count = connection_count;
 	total_connection_count += connection_count;
-	// TODO: Hard coded LIF / CUBA time constants for now
-	n->current_time_const = 10.0e-3;
-	n->potential_time_const = 10.0e-3;
-	n->current_decay =
-		exp(-dt / n->current_time_const);
-
-	n->current_decay = 1.0;
 	n->random_range_mask = 0;
 
 	n->soma_last_updated = 0;
+	n->dendrite_last_updated = 0;
 	assert(n->connections_out == NULL);
 	n->connections_out = (struct connection *)
 			malloc(sizeof(struct connection) * connection_count);
@@ -160,14 +149,18 @@ int network_create_neuron(struct neuron *const n,
 	for (int i = 0; i < n->connection_out_count; i++)
 	{
 		struct connection *con = &(n->connections_out[i]);
+		con->id = i;
+		con->current = 0.0;
 		con->pre_neuron = NULL;
 		con->post_neuron = NULL;
 		con->weight = 0.0;
+		con->delay = 0.0;
+		con->synaptic_current_decay = 0.0;
 	}
 
-	TRACE("Created neuron: gid:%d nid:%d force:%d thresh:%lf con:%d\n",
+	TRACE("Created neuron: gid:%d nid:%d force:%d thresh:%lf\n",
 					n->group->id, n->id, n->force_update,
-					n->threshold, n->post_connection_count);
+					n->threshold);
 	n->is_init = 1;
 	return n->id;
 }
@@ -222,6 +215,9 @@ int net_create_input_node(struct input *const in, const int connection_count)
 		con->pre_neuron = NULL;
 		con->post_neuron = NULL;
 		con->weight = 0.0;
+		con->current = 0.0;
+		con->synaptic_current_decay = 0.0;
+		con->delay = 0.0;
 	}
 
 	return in->id;

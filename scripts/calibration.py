@@ -56,16 +56,16 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
 
     reset = 0
     log_spikes = False
-    log_voltage = False
+    log_potential = False
     force_update = False
 
     # Create layers
     layer_1 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments,
-                                     log_spikes, log_voltage, force_update,
+                                     log_spikes, log_potential, force_update,
                                      threshold, reset)
     layer_2 = utils.create_layer(network, layer_neuron_count, loihi_compartments,
-                                     log_spikes, log_voltage, force_update,
+                                     log_spikes, log_potential, force_update,
                                      threshold, reset)
 
     # Create connections
@@ -91,7 +91,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     reset = 0
     force_update = True
     log_spikes = False
-    log_voltage = False
+    log_potential = False
     leak = 1.0
 
     neurons_per_core = [0, 0, 0, 0]
@@ -115,7 +115,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
 
     layer_1 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
-                                     log_voltage, force_update, threshold,
+                                     log_potential, force_update, threshold,
                                      reset, leak, mappings=layer_mapping)
 
     force_update = False
@@ -153,7 +153,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
 
     layer_2 = utils.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
-                                     log_voltage, force_update, threshold,
+                                     log_potential, force_update, threshold,
                                      reset, leak, mappings=layer_mapping)
 
     for src in layer_1.neurons:

@@ -25,8 +25,6 @@ struct architecture *arch_init(void)
 	arch->tile_count = 0;
 	arch->time_barrier = 0.0;
 	arch->initialized = 0;
-	arch->total_hops = 0;
-	arch->total_packets = 0;
 
 	for (int i = 0; i < ARCH_MAX_TILES; i++)
 	{
@@ -294,8 +292,7 @@ void arch_create_axon_in(struct architecture *const arch, struct core *const c)
 	// We already know a valid tile was given at this point
 	in->t = c->t;
 
-	TRACE("Created axon input %d (c:%d.%d)\n",
-						in->id, c->t->id, c->id);
+	TRACE("Created axon input (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
@@ -328,8 +325,7 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 	// Round up to the nearest word
 	s->weights_per_word = (word_bits + (weight_bits - 1)) / weight_bits;
 
-	TRACE("Created synapse processor %d (c:%d.%d)\n",
-						s->id, c->t->id, c->id);
+	TRACE("Created synapse processor (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
@@ -359,8 +355,7 @@ void arch_create_soma(struct architecture *const arch, struct core *const c,
 	// TODO: figure this parameter for setting the leak
 	s->leak_towards_zero = 1;
 
-	TRACE("Created soma processor %d (c:%d.%d)\n",
-						s->id, c->t->id, c->id);
+	TRACE("Created soma processor (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
@@ -381,7 +376,7 @@ void arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	// Track the tile the axon interfaces with
 	out->t = c->t;
 
-	TRACE("Created axon output %d (c:%d.%d)\n", out->id, c->t->id, c->id);
+	TRACE("Created axon output (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
@@ -420,7 +415,10 @@ void arch_create_axon_maps(struct architecture *const arch)
 			{
 				c->axon_in.map[i].connection_count = 0;
 				c->axon_in.map[i].spikes_received = 0;
+				c->axon_in.map[i].receive_latency = 0.0;
 				c->axon_out.map_ptr[i] = NULL;
+				c->axon_in.map[i].last_updated = 0;
+				c->axon_in.map[i].pre_neuron = NULL;
 			}
 		}
 	}

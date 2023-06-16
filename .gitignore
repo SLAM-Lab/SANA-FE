@@ -1,9 +1,12 @@
 runs/
+debug/
+release/
+etc/
 *.swp
-*.o
 *.yaml
 *.png
 *.csv
 .vscode
 gmon.out
 sim
+__pycache__

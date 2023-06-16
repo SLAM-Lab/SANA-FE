@@ -38,7 +38,7 @@ network = utils.Network()
 compartments = utils.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                         1024)
 log_spikes = 1
-log_voltage = 1
+log_potential = 1
 force_update = 1
 threshold = 1.0
 reset = 0.0
@@ -55,7 +55,7 @@ for i in range(0, N):
     row = []
     for j in range(0, N):
         row.append(utils.create_layer(network, N, compartments,
-                          log_spikes, log_voltage, force_update,
+                          log_spikes, log_potential, force_update,
                           threshold, reset, leak))
     square.append(row)
 

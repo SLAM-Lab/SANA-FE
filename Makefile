@@ -4,7 +4,7 @@ CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -fopenmp
 #CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -pg -fopenmp
 RELFLAGS=-Ofast
 DEBUGFLAGS=-DDEBUG -no-pie -pg -O0
-GIT_COMMIT=$(shell ./git_status.sh)
+GIT_COMMIT=$(shell ./scripts/git_status.sh)
 
 LIBS=-lrt -lm
 DEPS=sim.h print.h command.h network.h arch.h
@@ -47,4 +47,4 @@ clean:
 	rm -f $(DEBUGOBJ)
 
 prep:
-	@mkdir -p $(RELDIR) $(DEBUGDIR)
+	@mkdir -p $(RELDIR) $(DEBUGDIR) runs
