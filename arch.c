@@ -61,7 +61,6 @@ struct architecture *arch_init(void)
 			c->neuron_count = 0;
 			c->curr_neuron = 0;
 			c->neurons_left = 0;
-			c->status = 0;
 			c->curr_axon = 0;
 
 			c->axon_in.energy = 0.0;

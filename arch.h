@@ -142,7 +142,7 @@ struct core
 
 	double energy, time, blocked_until;
 	int id, buffer_pos, is_blocking;
-	int neuron_count, curr_neuron, neurons_left, status;
+	int neuron_count, curr_neuron, neurons_left, messages_left;
 	int curr_axon;
 };
 

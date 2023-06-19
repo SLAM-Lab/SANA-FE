@@ -35,13 +35,6 @@ struct timing
 	int next;
 };
 
-enum status
-{
-	UPDATE_NEURON,
-	SEND_SPIKES,
-	NEURON_FINISHED,
-};
-
 #include "arch.h"
 #include "network.h"
 #include "stdio.h"
