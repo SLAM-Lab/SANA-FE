@@ -23,6 +23,8 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 #define ARCH_HEADER_INCLUDED_
 
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include "network.h"
 
 // Hard define maximum defined h/w sizes
@@ -32,6 +34,10 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 #define ARCH_MAX_TILES 32
 #define ARCH_MAX_CORES 4
 #define ARCH_MAX_LINKS 4
+#define ARCH_MAX_DESCRIPTION_LINE 256
+#define ARCH_MAX_FIELD_LEN 64
+#define ARCH_MAX_BLOCK_COUNT 4096
+#define ARCH_MAX_ATTRIBUTES 256
 
 #define ARCH_INVALID_ID -1
 enum buffer_positions
@@ -59,6 +65,19 @@ enum neuron_reset_modes
 	NEURON_RESET_HARD,
 	NEURON_RESET_SATURATE,
 	NEURON_RESET_MODE_COUNT,
+};
+
+enum arch_description_blocks
+{
+	ARCH_DESCRIPTION_TOP = -1,
+	ARCH_DESCRIPTION_ARCH,
+	ARCH_DESCRIPTION_TILE,
+	ARCH_DESCRIPTION_CORE,
+	ARCH_DESCRIPTION_AXON_IN,
+	ARCH_DESCRIPTION_SYNAPSE,
+	ARCH_DESCRIPTION_DENDRITE,
+	ARCH_DESCRIPTION_SOMA,
+	ARCH_DESCRIPTION_AXON_OUT,
 };
 
 struct hardware_mapping
@@ -94,6 +113,7 @@ struct axon_map
 
 struct axon_input
 {
+	char name[ARCH_MAX_FIELD_LEN];
 	struct tile *t;
 	struct axon_map map[ARCH_MAX_AXON_MAP];
 	long int packets_in;
@@ -103,6 +123,7 @@ struct axon_input
 
 struct synapse_processor
 {
+	char name[ARCH_MAX_FIELD_LEN];
 	int spikes_buffer;
 	int weights_per_word, word_bits, weight_bits;
 	long int total_spikes, memory_reads;
@@ -113,11 +134,13 @@ struct synapse_processor
 
 struct dendrite_processor
 {
+	char name[ARCH_MAX_FIELD_LEN];
 	double energy, time;
 };
 
 struct soma_processor
 {
+	char name[ARCH_MAX_FIELD_LEN];
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
 	long int updates, spikes_sent;
 	double energy, time;
@@ -133,6 +156,7 @@ struct axon_output
 	struct axon_map *map_ptr[ARCH_MAX_AXON_MAP];
 	struct tile *t;
 	int map_count;
+	char name[ARCH_MAX_FIELD_LEN];
 
 	long int packets_out;
 	double energy, time;
@@ -151,6 +175,7 @@ struct core
 	struct soma_processor soma;
 	struct axon_output axon_out;
 
+	char name[ARCH_MAX_FIELD_LEN];
 	double energy, time, blocked_until;
 	int id, buffer_pos, is_blocking;
 	int neuron_count, curr_neuron, neurons_left, messages_left;
@@ -163,6 +188,7 @@ struct tile
 	// TODO: maybe can associate energy and latency with each link, that
 	//  will be the most general way to implement this!
 	struct tile *links[ARCH_MAX_LINKS];
+	char name[ARCH_MAX_FIELD_LEN];
 	double energy, time;
 	double energy_east_west_hop, time_east_west_hop;
 	double energy_north_south_hop, time_north_south_hop;
@@ -175,8 +201,9 @@ struct tile
 struct architecture
 {
 	struct tile tiles[ARCH_MAX_TILES];
+	char name[ARCH_MAX_FIELD_LEN];
 	double time_barrier;
-	int tile_count, initialized;
+	int noc_dimensions, noc_width, noc_height, tile_count, initialized;
 };
 
 struct architecture *arch_init(void);
@@ -191,5 +218,37 @@ void arch_create_axon_out(struct architecture *const arch, struct core *const c,
 int arch_map_neuron(struct neuron *const n, const struct hardware_mapping);
 void arch_create_axon_maps(struct architecture *const arch);
 void arch_create_core_axon_map(struct core *const core);
+
+// ***************************
+// Parsing routines
+struct description_block *arch_parse_block(FILE *fp, const int block_type, struct description_block *const parent, struct description_block *const sibling);
+
+int arch_parse_field_int(char *str);
+void arch_parse_field(char *str, char *field);
+int arch_parse_name(char *field, char *name);
+int arch_is_field(const char *fieldname, char *str);
+int arch_is_list(char *str);
+
+int arch_parse_file(FILE *fp, struct description_block *arch_description);
+struct description_block *arch_parse_block(FILE *fp, const int block_type, struct description_block *const parent, struct description_block *const sibling);
+struct description_block *arch_parse_list(FILE *fp, const int list_type, struct description_block *const parent);
+int arch_get_description_line(FILE *fp, char *line);
+int arch_parse_attributes(FILE *fp, struct description_block *block);
+void arch_print_description(struct description_block *arch_description, const int level);
+int arch_build_arch(struct description_block *arch_description);
+
+
+struct attributes
+{
+	char key[ARCH_MAX_FIELD_LEN], value_str[ARCH_MAX_FIELD_LEN];
+};
+
+struct description_block
+{
+	char name[ARCH_MAX_FIELD_LEN];
+	struct attributes attributes[ARCH_MAX_ATTRIBUTES];
+	struct description_block *child, *parent, *next_sibling;
+	int type, instances, indent, attribute_count;
+};
 
 #endif

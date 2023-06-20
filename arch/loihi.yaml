@@ -1,4 +1,3 @@
----
 # Energy and time estimates of different events, generated from SPICE
 #  simulations of Loihi.  All numbers were taken from:
 #  "Loihi: A Neuromorphic Manycore Processor with On-Chip Learning" (2018)
@@ -10,23 +9,18 @@ architecture:
     dimensions: 2
     width: 8
     height: 4
-    cost:
-      east_west:
-        energy: 3.0e-12
-        time: 4.1e-9
-      north_south:
-        energy: 4.2e-12
-        time: 6.5e-9
-      global_barrier:
-        time: 299.0e-9
+    energy_east_west: 3.0e-12
+    latency_east_west: 4.1e-9
+    energy_north_south: 4.2e-12
+    latency_north_south: 6.5e-9
+    latency_global_barrier: 299.0e-9
 
   tile:
     - name: loihi_tile[0..31]
       attributes:
         blocking: True
-        cost:
-          energy: 1.7e-12
-          time: 2.1e-9
+        energy_broadcast: 1.7e-12
+        latency_broadcast: 2.1e-9
       core:
         - name: loihi_core[0..3]
           attributes:
@@ -46,31 +40,22 @@ architecture:
                 model: leaky_integrate
                 hard_reset: True
                 soft_reset: True
-                cost:
-                  inactive:
-                    energy: 47.5e-12
-                    time: 6.1e-9
-                  active:
-                    energy: 69.8e-12
-                    time: 9.6e-9
-                  spiking:
-                    energy: 68.7e-12
-                    time: 30.0e-9
+                energy_inactive: 47.5e-12
+                latency_inactive: 6.1e-9
+                energy_active: 69.8e-12
+                latency_active: 9.6e-9
+                energy_spiking: 68.7e-12
+                latency_spiking: 30.0e-9
           synapse:
             - name: core_synapses
               attributes:
                 model: cuba
                 weight_bits: 8
                 word_bits: 64
-                cost:
-                  spike:
-                    #energy: 21.1e-12
-                    energy: 30.0e-12
-                    time: 4.0e-9
-                  memory:
-                    energy: 55.1e-12
-                    #time: 23.0e-9
-                    time: 0.0
+                energy_spike: 30.0e-12
+                latency_spike: 4.0e-9
+                energy_memory: 55.1e-12
+                latency_memory: 0.0
           dendrite:
           - name: core_dendrites
             attributes:
@@ -85,6 +70,5 @@ architecture:
               attributes:
                 fan_out: 4096
                 protocol: dest_axon
-                cost:
-                  energy: 40.8e-12
-                  time: 7.6e-9
+                energy: 40.8e-12
+                latency: 7.6e-9

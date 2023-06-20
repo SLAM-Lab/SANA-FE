@@ -2,7 +2,8 @@
 CC=gcc
 CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -fopenmp
 #CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -pg -fopenmp
-RELFLAGS=-Ofast
+#RELFLAGS=-Ofast
+RELFLATS=-O0
 DEBUGFLAGS=-DDEBUG -no-pie -pg -O0
 GIT_COMMIT=$(shell ./scripts/git_status.sh)
 

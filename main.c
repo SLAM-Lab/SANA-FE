@@ -161,8 +161,11 @@ int main(int argc, char *argv[])
 		INFO("Error: Architecture file %s failed to open.\n", filename);
 		goto clean_up;
 	}
-	ret = command_parse_file(arch_fp, &net, arch, sim.spike_trace_fp,
-					sim.potential_trace_fp, sim.perf_fp);
+	//ret = command_parse_file(arch_fp, &net, arch, sim.spike_trace_fp,
+	//				sim.potential_trace_fp, sim.perf_fp);
+	struct description_block block;
+	arch_parse_file(arch_fp, &block); // TODO: WIP - finish this
+	arch_print_description(&block, 0);
 	fclose(arch_fp);
 	if (ret == COMMAND_FAIL)
 	{

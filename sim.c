@@ -65,6 +65,7 @@ void sim_init_sim(struct simulation *sim)
 	sim->potential_trace_fp = NULL;
 	sim->spike_trace_fp = NULL;
 	sim->perf_fp = NULL;
+	sim->message_trace_fp = NULL;
 }
 
 void sim_init_timestep(struct timestep *const ts)
@@ -1224,7 +1225,6 @@ void sim_trace_record_message(const struct simulation *const sim,
 
 	return;
 }
-
 
 int sim_poisson_input(const double firing_probability)
 {
