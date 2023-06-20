@@ -16,15 +16,16 @@
 
 struct simulation
 {
-	int log_perf, log_spikes, log_potential;
-	long int timesteps, total_spikes, total_packets_sent;
+	int log_perf, log_spikes, log_potential, log_messages;
+	long int timesteps, total_spikes, total_messages_sent;
 	double total_energy, total_sim_time, wall_time;
-	FILE *spike_trace_fp, *potential_trace_fp, *perf_fp, *stats_fp;
+	FILE *spike_trace_fp, *potential_trace_fp, *message_trace_fp, *perf_fp;
+	FILE *stats_fp;
 };
 
 struct timestep
 {
-	long int timestep, spike_count, packets_sent, total_hops;
+	long int timestep, spike_count, messages_sent, total_hops;
 	long int total_neurons_fired, spikes;
 	double energy, sim_time;
 };
@@ -46,7 +47,7 @@ void sim_init_timestep(struct timestep *const ts);
 void sim_send_messages(struct simulation *const sim, struct timestep *const ts, struct network *net, struct architecture *arch);
 void sim_receive_messages(struct timestep *const ts, struct network *net, struct architecture *arch);
 int sim_input_spikes(struct network *net);
-int sim_schedule_messages(struct timestep *const ts, struct network *net, struct architecture *arch);
+int sim_schedule_messages(const struct simulation *const sim, struct timestep *const ts, struct network *net, struct architecture *arch);
 
 void sim_process_neuron(struct timestep *const ts, struct network *net, struct neuron *n);
 double sim_pipeline_receive(struct timestep *const ts, struct core *c, struct axon_map *axon);
@@ -69,8 +70,10 @@ long int sim_calculate_packets(const struct architecture *arch);
 void sim_write_summary(FILE *fp, const struct architecture *arch, const struct simulation *stats);
 void sim_spike_trace_write_header(const struct simulation *const sim);
 void sim_potential_trace_write_header(const struct simulation *const sim, const struct network *net);
-void sim_spike_trace_record_spikes(const struct simulation *const sim, const struct network *net);
-void sim_potential_trace_record_potentials(const struct simulation *const sim, const struct network *net);
+void sim_message_trace_write_header(const struct simulation *const sim);
+void sim_trace_record_spikes(const struct simulation *const sim, const struct network *net);
+void sim_trace_record_potentials(const struct simulation *const sim, const struct network *net);
+void sim_trace_record_message(const struct simulation *const sim, const struct message *const m);
 void sim_perf_write_header(FILE *perf_fp);
 void sim_perf_log_timestep(const struct timestep *const ts, FILE *fp);
 int sim_poisson_input(const double firing_probability);

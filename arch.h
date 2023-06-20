@@ -71,6 +71,17 @@ struct hardware_mapping
 	struct axon_input *axon_in;
 };
 
+struct message
+{
+	struct tile *src_tile, *dest_tile;
+	struct core *src_core, *dest_core;
+	struct axon_map *dest_axon;
+	struct neuron *src_neuron;
+	double generation_latency, network_latency, receive_latency;
+	double blocked_latency;
+	int spikes, hops;
+};
+
 struct axon_map
 {
 	// List of all neuron connections to send spike to

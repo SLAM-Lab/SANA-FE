@@ -42,7 +42,7 @@ def run_sim(timesteps):
     # Create the network to run
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
               "Log Spikes", "Log potential", "Synapse Info..."]
-    command = (os.path.join(PROJECT_DIR, "sim"), "-p", ARCH_PATH,
+    command = (os.path.join(PROJECT_DIR, "sim"), "-p", "-m", ARCH_PATH,
                GENERATED_NETWORK_PATH, f"{timesteps}")
     print("Command: {0}".format(" ".join(command)))
     subprocess.call(command)

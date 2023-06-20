@@ -79,6 +79,9 @@ int main(int argc, char *argv[])
 			case 'v':
 				sim.log_potential = 1;
 				break;
+			case 'm':
+				sim.log_messages = 1;
+				break;
 			default:
 				INFO("Error: Flag %c not recognized.\n",
 								argv[0][1]);
@@ -112,40 +115,40 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
-	// Open the probe output files for writing, for now hard code filenames
-	//  TODO: add option for command line argument
 	if (sim.log_potential)
 	{
 		sim.potential_trace_fp = fopen("potential.trace", "w");
 		if (sim.potential_trace_fp == NULL)
 		{
-			INFO("Error: Couldn't open probe output files "
-							"for writing.\n");
+			INFO("Error: Couldn't open trace file for writing.\n");
 			goto clean_up;
 		}
 	}
-
 	if (sim.log_spikes)
 	{
 		sim.spike_trace_fp = fopen("spikes.trace", "w");
 		if (sim.spike_trace_fp == NULL)
 		{
-			INFO("Error: Couldn't open probe output files "
-							"for writing.\n");
+			INFO("Error: Couldn't open trace file for writing.\n");
 			goto clean_up;
 		}
 	}
+	if (sim.log_messages)
+	{
+		sim.message_trace_fp = fopen("messages.trace", "w");
+		if (sim.message_trace_fp == NULL)
+		{
+			INFO("Error: Couldn't open trace file for writing.\n");
+			goto clean_up;
+		}
 
-	// TODO: add option for command line argument
-	// TODO: also want the option of enabling and disabling this
-	//  for quick runs we probably don't want it?
+	}
 	if (sim.log_perf)
 	{
 		sim.perf_fp = fopen("perf.csv", "w");
 		if (sim.perf_fp == NULL)
 		{
-			INFO("Error: Couldn't open perf output files "
-							"for writing.\n");
+			INFO("Error: Couldn't open perf file for writing.\n");
 			goto clean_up;
 		}
 	}
@@ -207,6 +210,10 @@ int main(int argc, char *argv[])
 	{
 		sim_potential_trace_write_header(&sim, &net);
 	}
+	if (sim.message_trace_fp != NULL)
+	{
+		sim_message_trace_write_header(&sim);
+	}
 	if (sim.perf_fp != NULL)
 	{
 		sim_perf_write_header(sim.perf_fp);
@@ -254,6 +261,10 @@ clean_up:
 	if (sim.spike_trace_fp != NULL)
 	{
 		fclose(sim.spike_trace_fp);
+	}
+	if (sim.message_trace_fp != NULL)
+	{
+		fclose(sim.message_trace_fp);
 	}
 	if (sim.perf_fp != NULL)
 	{
