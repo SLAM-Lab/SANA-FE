@@ -16,19 +16,22 @@ import subprocess
 from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
+import os
 import networkx as nx
 
 # SANA-FE libraries
 import sys
-sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+sys.path.insert(0, os.path.join(PROJECT_DIR))
 import utils
 
-NETWORK_FILENAME = "runs/latin_square.net"
-ARCH_FILENAME = "loihi.arch"
+NETWORK_FILENAME = "runs/latin/latin_square.net"
+ARCH_FILENAME = "arch/loihi.arch"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
-N = 20
+N = 4
 TIMESTEPS = 100
 
 def calculate_graph_index(row, col, digit):
@@ -106,34 +109,39 @@ for row in range(0, N):
                     connections += 1
 
 print(f"Latin square network has {connections} connections")
-network.save(NETWORK_FILENAME)
+network_path = os.path.join(PROJECT_DIR, NETWORK_FILENAME)
+network.save(network_path)
 
 if N < 4:
     pos = nx.nx_agraph.graphviz_layout(G)
     nx.draw_networkx(G, pos)
-    plt.savefig("runs/latin_net.png")
+    plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_net.png"))
 
 # Now execute the network using SANA-FE and extract the spike timings
-run_command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
-                "{0}".format(TIMESTEPS))
+arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
+run_command = ("./sim", "-s", "-v", arch_path, network_path, f"{TIMESTEPS}")
 print("sana-fe command: {0}".format(" ".join(run_command)))
 subprocess.call(run_command)
 
 # Use spiking data to create the grid solution produced by the Loihi run
 #with open
-with open("probe_spikes.csv") as spikes:
+with open(os.path.join(PROJECT_DIR, "spikes.trace")) as spikes:
     reader = csv.reader(spikes)
     header = next(reader)
 
     spike_counts = np.zeros((N, N, N))
-    for timestep in reader:
-        # Count all the spikes for every timestep
-        pos = 0
-        for row in range(0, N):
-            for col in range(0, N):
-                for digit in range(0, N):
-                    spike_counts[row][col][digit] += int(timestep[pos])
-                    pos += 1
+    for spike in reader:
+        gid_str, nid_str = spike[0].split(".")
+        gid, nid = int(gid_str), int(nid_str)
+        timestep = int(spike[1])
+
+        digit = nid
+        col = gid % N
+        row = gid // N
+        assert(digit < N)
+        assert(col < N)
+        assert(r < N)
+        spike_counts[row][col][digit] += 1
 
 print(spike_counts)
 chosen_digits = np.argmax(spike_counts, axis=2)
@@ -150,9 +158,9 @@ ax.table(cellText=chosen_digits, colWidths=[0.1] * N*N, cellLoc="center",
          loc="center")
 ax.set_aspect("equal")
 plt.tight_layout()
-plt.savefig("runs/latin_square.png")
+plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_square.png"))
 
-df = pd.read_csv("probe_potential.csv")
+df = pd.read_csv("potential.trace")
 plt.figure()
 df.plot()
-plt.savefig("runs/latin_voltages.png")
+plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_potentials.png"))

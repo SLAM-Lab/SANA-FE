@@ -30,7 +30,7 @@ enum neuron_config_format
 	NEURON_ID,
 	NEURON_BIAS,
 	NEURON_RECORD_SPIKES, // Record any spikes to a CSV file
-	NEURON_RECORD_VOLTAGE, // Write the voltage to a CSV file every timestep
+	NEURON_RECORD_potential, // Write the potential to a CSV file every timestep
 	NEURON_FORCE_UPDATE,
 	NEURON_FIELDS,
 };

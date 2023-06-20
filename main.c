@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
 	argv++;
 
 	// Parse optional args
-	if (argc > 2)
+	while (argc > 2)
 	{
 		if (argv[0][0] == '-')
 		{
@@ -86,6 +86,10 @@ int main(int argc, char *argv[])
 			}
 			argc--;
 			argv++;
+		}
+		else
+		{
+			break;
 		}
 	}
 
@@ -151,7 +155,7 @@ int main(int argc, char *argv[])
 	arch_fp = fopen(filename, "r");
 	if (arch_fp == NULL)
 	{
-		INFO("Error: Architecture file failed to open.\n");
+		INFO("Error: Architecture file %s failed to open.\n", filename);
 		goto clean_up;
 	}
 	ret = command_parse_file(arch_fp, &net, arch, sim.spike_trace_fp,
@@ -195,11 +199,15 @@ int main(int argc, char *argv[])
 
 	arch_create_axon_maps(arch);
 	INFO("Creating probe and perf data files.\n");
-	if (sim.spike_trace_fp && sim.potential_trace_fp)
+	if (sim.spike_trace_fp != NULL)
 	{
-		sim_probe_write_header(&sim, &net);
+		sim_spike_trace_write_header(&sim);
 	}
-	if (sim.perf_fp)
+	if (sim.potential_trace_fp != NULL)
+	{
+		sim_potential_trace_write_header(&sim, &net);
+	}
+	if (sim.perf_fp != NULL)
 	{
 		sim_perf_write_header(sim.perf_fp);
 	}
@@ -208,6 +216,7 @@ int main(int argc, char *argv[])
 	{
 		if ((i+1) % 100 == 0)
 		{
+			// Print heart-beat every hundred timesteps
 			INFO("*** Time-step %d ***\n", i+1);
 		}
 		run(&sim, &net, arch);

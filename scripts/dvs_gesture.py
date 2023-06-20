@@ -41,7 +41,7 @@ SIM_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_ENERGY_DATA_FILENAME)
 def run_sim(timesteps):
     # Create the network to run
     fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
-              "Log Spikes", "Log Voltage", "Synapse Info..."]
+              "Log Spikes", "Log potential", "Synapse Info..."]
     command = (os.path.join(PROJECT_DIR, "sim"), "-p", ARCH_PATH,
                GENERATED_NETWORK_PATH, f"{timesteps}")
     print("Command: {0}".format(" ".join(command)))
@@ -113,7 +113,8 @@ if __name__ == "__main__":
     times = np.array(())
     energies = np.array(())
     #timesteps = 100000
-    frames = 100
+    #frames = 100
+    frames = 8
     timesteps = 128
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
@@ -337,7 +338,7 @@ if __name__ == "__main__":
                 "2Conv2D_11x11x64", "3Conv2D_9x9x11", "5Dense_11")
         layer_sizes = (1024, 3600, 5408, 7744, 891, 11)
         thresholds = (255, 293, 486, 510, 1729, 473)
-        voltage_data = pd.read_csv("probe_potential.csv")
+        potential_data = pd.read_csv("probe_potential.csv")
 
         plt.rcParams.update({'font.size': 12, 'lines.markersize': 5})
         plot_neurons = {"inputs": [], "0Conv2D_15x15x16": [50, 67], "1Conv2D_13x13x32": [], "2Conv2D_11x11x64": [], "3Conv2D_9x9x11": [], "5Dense_11":[]}
@@ -347,10 +348,10 @@ if __name__ == "__main__":
                 os.makedirs(layer_path)
 
             for neuron_id in plot_neurons[layer]:
-                voltages = voltage_data.loc[:, "{0}.{1}".format(
+                potentials = potential_data.loc[:, "{0}.{1}".format(
                     layer_id, neuron_id)]
                 plt.figure(figsize=(5.5, 5.5))
-                plt.plot(np.arange(1, timesteps+1), voltages*64, "-x")
+                plt.plot(np.arange(1, timesteps+1), potentials*64, "-x")
                 plt.plot(np.arange(1, timesteps+1),
                         np.ones(timesteps) * thresholds[layer_id] * 64)
                 #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
@@ -358,7 +359,7 @@ if __name__ == "__main__":
                 plt.xlabel("Time-step")
                 #plt.ylim((-0.2, 1.0))
                 plt.tight_layout()
-                plt.savefig("{0}/probe_voltage_{1}.png".format(layer_path,
+                plt.savefig("{0}/probe_potential_{1}.png".format(layer_path,
                                                             neuron_id))
                 plt.close()
 

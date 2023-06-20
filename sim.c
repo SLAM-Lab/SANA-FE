@@ -25,8 +25,7 @@ struct timestep sim_timestep(struct simulation *const sim,
 	sim_reset_measurements(net, arch);
 
 	ts.timestep = sim->timesteps;
-	sim_send_messages(&ts, net, arch);
-	sim_probe_log_timestep(sim, net);
+	sim_send_messages(sim, &ts, net, arch);
 	sim_input_spikes(net);
 	sim_receive_messages(&ts, net, arch);
 	sim_schedule_messages(&ts, net, arch);
@@ -80,8 +79,8 @@ void sim_init_timestep(struct timestep *const ts)
 	ts->sim_time = 0.0;
 }
 
-void sim_send_messages(struct timestep *const ts, struct network *net,
-						struct architecture *arch)
+void sim_send_messages(struct simulation *const sim, struct timestep *const ts,
+			struct network *net, struct architecture *arch)
 {
 	#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
@@ -98,6 +97,14 @@ void sim_send_messages(struct timestep *const ts, struct network *net,
 				sim_process_neuron(ts, net, n);
 			}
 		}
+	}
+	if (sim->log_spikes)
+	{
+		sim_spike_trace_record_spikes(sim, net);
+	}
+	if (sim->log_potential)
+	{
+		sim_potential_trace_record_potentials(sim, net);
 	}
 }
 
@@ -721,12 +728,12 @@ double sim_update_soma_lif(struct timestep *const ts, struct neuron *n,
 
 	// Add the spike potential
 #if 0
-	double random_voltage = (double) rand() / RAND_MAX;
-	n->potential += (random_voltage*3.0);
+	double random_potential = (double) rand() / RAND_MAX;
+	n->potential += (random_potential*3.0);
 #endif
 	n->potential += current_in + n->bias;
 
-	// TODO: this is a hack in progress, formalize the randomized voltage
+	// TODO: this is a hack in progress, formalize the randomized potential
 #if 0
 	// Clamp min potential
 	n->potential = (n->potential < n->reset) ?
@@ -1020,7 +1027,15 @@ void sim_write_summary(FILE *fp, const struct architecture *arch,
 	fprintf(fp, "timesteps: %ld\n", sim->timesteps);
 }
 
-void sim_probe_write_header(const struct simulation *sim,
+void sim_spike_trace_write_header(const struct simulation *const sim)
+{
+	assert(sim->spike_trace_fp != NULL);
+	fprintf(sim->spike_trace_fp, "gid.nid,timestep\n");
+
+	return;
+}
+
+void sim_potential_trace_write_header(const struct simulation *const sim,
 						const struct network *net)
 {
 	// Write csv header for probe outputs - record which neurons have been
@@ -1029,10 +1044,6 @@ void sim_probe_write_header(const struct simulation *sim,
 	{
 		const struct input *in = &(net->external_inputs[i]);
 
-		if (sim->spike_trace_fp && sim->log_spikes)
-		{
-			fprintf(sim->spike_trace_fp, "i.%d,", in->id);
-		}
 		if (sim->potential_trace_fp && sim->log_potential)
 		{
 			fprintf(sim->potential_trace_fp, "i.%d,", in->id);
@@ -1045,13 +1056,6 @@ void sim_probe_write_header(const struct simulation *sim,
 		for (int j = 0; j < group->neuron_count; j++)
 		{
 			const struct neuron *n = &(group->neurons[j]);
-
-			if (sim->spike_trace_fp && sim->log_spikes &&
-								n->log_spikes)
-			{
-				fprintf(sim->spike_trace_fp, "%d.%d,",
-							group->id, n->id);
-			}
 			if (sim->potential_trace_fp && sim->log_potential &&
 							n->log_potential)
 			{
@@ -1061,10 +1065,6 @@ void sim_probe_write_header(const struct simulation *sim,
 		}
 	}
 
-	if (sim->spike_trace_fp)
-	{
-		fputc('\n', sim->spike_trace_fp);
-	}
 	if (sim->potential_trace_fp)
 	{
 		fputc('\n', sim->potential_trace_fp);
@@ -1073,32 +1073,20 @@ void sim_probe_write_header(const struct simulation *sim,
 	return;
 }
 
-void sim_probe_log_timestep(const struct simulation *sim,
+void sim_spike_trace_record_spikes(const struct simulation *const sim,
 						const struct network *net)
 {
-	// Each line of this csv file is the output of each probed neuron
-	//  Currently we only probe the voltage / potential and the spikes
-	//  (e.g. for a spike raster plot).
-	//
-	// In the future, we might want to generalise this to probe any of the
-	//  variable parameters
-	int spike_probe_count, potential_probe_count;
-
-	spike_probe_count = 0;
-	potential_probe_count = 0;
+	// A trace of all spikes that are generated
+	int spike_probe_count = 0;
+	assert(sim->spike_trace_fp != NULL);
 
 	for (int i = 0; i < net->external_input_count; i++)
 	{
 		const struct input *in = &(net->external_inputs[i]);
-
-		if (sim->spike_trace_fp)
+		if (in->send_spike)
 		{
-			fprintf(sim->spike_trace_fp, "%d,", in->send_spike);
-		}
-
-		if (sim->potential_trace_fp)
-		{
-			fprintf(sim->potential_trace_fp, "%lf,", in->spike_val);
+			fprintf(sim->spike_trace_fp, "i.%d,%d,", in->id,
+								in->send_spike);
 		}
 	}
 
@@ -1109,14 +1097,41 @@ void sim_probe_log_timestep(const struct simulation *sim,
 		for (int j = 0; j < group->neuron_count; j++)
 		{
 			const struct neuron *n = &(group->neurons[j]);
-
-			if (sim->spike_trace_fp && sim->log_spikes && n->log_spikes)
+			if (n->log_spikes && n->fired)
 			{
-				fprintf(sim->spike_trace_fp, "%d,", n->fired);
+				fprintf(sim->spike_trace_fp, "%d.%d,%ld\n",
+					n->group->id, n->id, sim->timesteps);
 				spike_probe_count++;
 			}
-			if (sim->potential_trace_fp && sim->log_potential &&
-							n->log_potential)
+		}
+	}
+
+	return;
+}
+
+void sim_potential_trace_record_potentials(const struct simulation *const sim,
+						const struct network *net)
+{
+	// Each line of this csv file is the potential of all probed neurons for
+	//  one time-step
+	int potential_probe_count = 0;
+
+	for (int i = 0; i < net->external_input_count; i++)
+	{
+		const struct input *in = &(net->external_inputs[i]);
+		if (sim->potential_trace_fp)
+		{
+			fprintf(sim->potential_trace_fp, "%lf,", in->spike_val);
+		}
+	}
+
+	for (int i = 0; i < net->neuron_group_count; i++)
+	{
+		const struct neuron_group *group = &(net->groups[i]);
+		for (int j = 0; j < group->neuron_count; j++)
+		{
+			const struct neuron *n = &(group->neurons[j]);
+			if (sim->potential_trace_fp && n->log_potential)
 			{
 				fprintf(sim->potential_trace_fp,
 							"%lf,", n->potential);
@@ -1126,10 +1141,6 @@ void sim_probe_log_timestep(const struct simulation *sim,
 	}
 
 	// Each timestep takes up a line in the respective csv file
-	if (sim->spike_trace_fp && (spike_probe_count > 0))
-	{
-		fputc('\n', sim->spike_trace_fp);
-	}
 	if (sim->potential_trace_fp && (potential_probe_count > 0))
 	{
 		fputc('\n', sim->potential_trace_fp);

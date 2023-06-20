@@ -43,7 +43,7 @@ struct timestep sim_timestep(struct simulation *const sim, struct network *const
 void sim_init_sim(struct simulation *sim);
 void sim_init_timestep(struct timestep *const ts);
 
-void sim_send_messages(struct timestep *const ts, struct network *net, struct architecture *arch);
+void sim_send_messages(struct simulation *const sim, struct timestep *const ts, struct network *net, struct architecture *arch);
 void sim_receive_messages(struct timestep *const ts, struct network *net, struct architecture *arch);
 int sim_input_spikes(struct network *net);
 int sim_schedule_messages(struct timestep *const ts, struct network *net, struct architecture *arch);
@@ -67,8 +67,10 @@ double sim_calculate_time_old(const struct architecture *const arch);
 long int sim_calculate_packets(const struct architecture *arch);
 
 void sim_write_summary(FILE *fp, const struct architecture *arch, const struct simulation *stats);
-void sim_probe_write_header(const struct simulation *sim, const struct network *net);
-void sim_probe_log_timestep(const struct simulation *sim, const struct network *net);
+void sim_spike_trace_write_header(const struct simulation *const sim);
+void sim_potential_trace_write_header(const struct simulation *const sim, const struct network *net);
+void sim_spike_trace_record_spikes(const struct simulation *const sim, const struct network *net);
+void sim_potential_trace_record_potentials(const struct simulation *const sim, const struct network *net);
 void sim_perf_write_header(FILE *perf_fp);
 void sim_perf_log_timestep(const struct timestep *const ts, FILE *fp);
 int sim_poisson_input(const double firing_probability);

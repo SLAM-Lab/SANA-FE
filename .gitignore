@@ -5,7 +5,8 @@ etc/
 *.swp
 *.yaml
 *.png
-*.csv
+*.trace
+perf.csv
 .vscode
 gmon.out
 sim

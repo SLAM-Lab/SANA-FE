@@ -380,7 +380,7 @@ int command_parse_neuron(struct network *const net, struct architecture *arch,
 	ret += sscanf(fields[NEURON_ID], "%d", &neuron_id);
 	ret += sscanf(fields[NEURON_BIAS], "%lf", &bias);
 	ret += sscanf(fields[NEURON_RECORD_SPIKES], "%d", &log_spikes);
-	ret += sscanf(fields[NEURON_RECORD_VOLTAGE], "%d", &log_potential);
+	ret += sscanf(fields[NEURON_RECORD_potential], "%d", &log_potential);
 	ret += sscanf(fields[NEURON_FORCE_UPDATE], "%d", &force_update);
 
 	if (ret < (NEURON_FIELDS-1))
