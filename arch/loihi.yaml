@@ -9,18 +9,19 @@ architecture:
     dimensions: 2
     width: 8
     height: 4
-    energy_east_west: 3.0e-12
-    latency_east_west: 4.1e-9
-    energy_north_south: 4.2e-12
-    latency_north_south: 6.5e-9
     latency_global_barrier: 299.0e-9
 
   tile:
     - name: loihi_tile[0..31]
       attributes:
         blocking: True
-        energy_broadcast: 1.7e-12
-        latency_broadcast: 2.1e-9
+        energy_spike_within_tile: 1.7e-12
+        latency_spike_within_tile: 2.1e-9
+        energy_east_west: 3.0e-12
+        latency_east_west: 4.1e-9
+        energy_north_south: 4.2e-12
+        latency_north_south: 6.5e-9
+
       core:
         - name: loihi_core[0..3]
           attributes:
@@ -37,7 +38,7 @@ architecture:
             - name: core_lif
               attributes:
                 type: digital
-                model: leaky_integrate
+                model: leaky_integrate_fire
                 hard_reset: True
                 soft_reset: True
                 energy_inactive: 47.5e-12

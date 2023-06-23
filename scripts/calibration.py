@@ -9,45 +9,34 @@ Calibrating SANA-FE against real-world hardware
 Use several partitions of a small benchmark to calibrate
 the simulator.
 """
-
 import matplotlib
 matplotlib.use('Agg')
 
 import csv
-import subprocess
-import yaml
 from matplotlib import pyplot as plt
 import pickle
-import math
 import sys
-sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
-import utils
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+
+sys.path.insert(0, PROJECT_DIR)
+import sim
 
 MAX_TILES = 32
 MAX_CORES = 4
 MAX_COMPARTMENTS = 1024
-NETWORK_FILENAME = "runs/connected_layers.net"
-ARCH_FILENAME = "loihi.arch"
-
-def run_sim(network, timesteps):
-    network.save(NETWORK_FILENAME)
-    run_command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
-               "{0}".format(timesteps))
-    print("Command: {0}".format(" ".join(run_command)))
-    subprocess.call(run_command)
-
-    with open("stats.yaml", "r") as results_file:
-       results = yaml.safe_load(results_file)
-
-    return results
+NETWORK_FILENAME = "runs/calibration/connected_layers.net"
+ARCH_FILENAME = "arch/loihi.yaml"
 
 
 import random
 def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
     # Two layers, fully connected
-    network = utils.Network()
-    loihi_compartments = utils.init_compartments(32, 4, 1024)
+    network = sim.Network()
+    loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     if spiking:  # always spike
         threshold = -1.0
@@ -60,11 +49,11 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     force_update = False
 
     # Create layers
-    layer_1 = utils.create_layer(network, layer_neuron_count,
+    layer_1 = sim.create_layer(network, layer_neuron_count,
                                      loihi_compartments,
                                      log_spikes, log_potential, force_update,
                                      threshold, reset)
-    layer_2 = utils.create_layer(network, layer_neuron_count, loihi_compartments,
+    layer_2 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
                                      log_spikes, log_potential, force_update,
                                      threshold, reset)
 
@@ -79,8 +68,8 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
 
 
 def connected_layers(weights, spiking=True, mapping="luke"):
-    network = utils.Network()
-    loihi_compartments = utils.init_compartments(32, 4, 1024)
+    network = sim.Network()
+    loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     layer_neuron_count = len(weights)
     if spiking:  # always spike
@@ -113,7 +102,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     for _ in range(0, neurons_per_core[3]):
         layer_mapping.append((0, 3))
 
-    layer_1 = utils.create_layer(network, layer_neuron_count,
+    layer_1 = sim.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_potential, force_update, threshold,
                                      reset, leak, mappings=layer_mapping)
@@ -151,7 +140,7 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     for _ in range(0, neurons_per_core[4]):
         layer_mapping.append((1, 0))
 
-    layer_2 = utils.create_layer(network, layer_neuron_count,
+    layer_2 = sim.create_layer(network, layer_neuron_count,
                                      loihi_compartments, log_spikes,
                                      log_potential, force_update, threshold,
                                      reset, leak, mappings=layer_mapping)
@@ -173,8 +162,8 @@ if __name__ == "__main__":
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
     #mapping = "split_4_diff_tiles"
 
-    #mapping = "fixed"
-    mapping = "luke"
+    mapping = "fixed"
+    #mapping = "luke"
     #mapping = "split_2"
     """
     for cores in core_count:
@@ -207,7 +196,7 @@ if __name__ == "__main__":
     """
     # This experiment looks at two fully connected layers, spiking
 
-    with open("sandia_data/weights_loihi.pkl", "rb") as weights_file:
+    with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
         weights = pickle.load(weights_file)
 
     neuron_counts = []
@@ -220,17 +209,18 @@ if __name__ == "__main__":
         layer_neurons = i*i
 
         #network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
-        commands = connected_layers(weights[i-1].transpose(), spiking=True,
+        snn = connected_layers(weights[i-1].transpose(), spiking=True,
                                     mapping=mapping)
         print("Testing network with {0} neurons".format(2*layer_neurons))
-        results = run_sim(commands, timesteps)
+        snn.save(NETWORK_FILENAME)
+        results = sim.run(ARCH_FILENAME, NETWORK_FILENAME, timesteps)
 
         neuron_counts.append(layer_neurons*2)
         spiking_times.append(results["time"])
         spiking_energy.append(results["energy"])
 
     # Write all the simulation data to csv
-    with open("runs/sim_spiking.csv", "w") as spiking_csv:
+    with open("runs/calibration/sim_spiking.csv", "w") as spiking_csv:
         spiking_writer = csv.DictWriter(spiking_csv,
                                         ("neuron_counts", "energy", "time"))
         spiking_writer.writeheader()
@@ -277,7 +267,7 @@ if __name__ == "__main__":
 
     spiking_energy = []
     spiking_times = []
-    with open("runs/sim_spiking.csv", "r") as spiking_csv:
+    with open("runs/calibration/sim_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
             spiking_times.append(float(row["time"]))
@@ -286,13 +276,13 @@ if __name__ == "__main__":
 
     nonspiking_times = []
     nonspiking_energy = []
-    with open("runs/sim_nonspiking.csv", "r") as nonspiking_csv:
+    with open("runs/calibration/sim_nonspiking.csv", "r") as nonspiking_csv:
         nonspiking_reader = csv.DictReader(nonspiking_csv)
         for row in nonspiking_reader:
             nonspiking_times.append(float(row["time"]))
             nonspiking_energy.append(float(row["energy"]))
 
-    with open("sandia_data/loihi_spiking.csv", "r") as spiking_csv:
+    with open("runs/sandia_data/loihi_spiking.csv", "r") as spiking_csv:
         spiking_reader = csv.DictReader(spiking_csv)
         for row in spiking_reader:
             loihi_times_spikes.append(float(row[mapping]))
@@ -300,7 +290,7 @@ if __name__ == "__main__":
 
     loihi_times_no_spikes = []
     loihi_energy_no_spikes = []
-    with open("sandia_data/loihi_nonspiking.csv", "r") as nonspiking_csv:
+    with open("runs/sandia_data/loihi_nonspiking.csv", "r") as nonspiking_csv:
         nonspiking_reader = csv.DictReader(nonspiking_csv)
         for row in nonspiking_reader:
             loihi_times_no_spikes.append(float(row["time"]))
@@ -318,8 +308,8 @@ if __name__ == "__main__":
     plt.legend(("Simulated", "Measured on Loihi"))
     plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.tight_layout()
-    plt.savefig("runs/connected_spiking_time.pdf")
-    plt.savefig("runs/connected_spiking_time.png")
+    plt.savefig("runs/calibration/connected_spiking_time.pdf")
+    plt.savefig("runs/calibration/connected_spiking_time.png")
 
     plt.figure(figsize=(2.5, 2.5))
     plt.plot(neuron_counts, spiking_energy, "-o")
@@ -331,8 +321,8 @@ if __name__ == "__main__":
     plt.legend(("Simulated", "Measured on Loihi"))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
     plt.tight_layout()
-    plt.savefig("runs/connected_spiking_energy.pdf")
-    plt.savefig("runs/connected_spiking_energy.png")
+    plt.savefig("runs/calibration/connected_spiking_energy.pdf")
+    plt.savefig("runs/calibration/connected_spiking_energy.png")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
@@ -342,7 +332,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated",))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_energy_sim_only.png")
+    plt.savefig("runs/calibration/connected_spiking_energy_sim_only.png")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, nonspiking_times[0:-1], "-o")
@@ -353,7 +343,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured on Loihi"))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_not_spiking_time.png")
+    plt.savefig("runs/calibration/connected_not_spiking_time.png")
 
     plt.figure(figsize=(5.5, 5.5))
     plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
@@ -364,7 +354,7 @@ if __name__ == "__main__":
     plt.xlabel("Neurons")
     plt.legend(("Simulated", "Measured on Loihi"))
     #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_not_spiking_energy.png")
+    plt.savefig("runs/calibration/connected_not_spiking_energy.png")
 
     """
     # Some additional plots to highlight trends

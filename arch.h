@@ -10,15 +10,10 @@
 //  for any design) is a series of elements:
 
 /*
-axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
-(spikes in) (spikes to current) (process input)    (membrane update)(spikes out)
+axon input -> synapse --------> dendrite ------> soma -------> axon output
+(spikes in) (spikes to current)(process input)(membrane update)(spikes out)
 */
 
-// Note importantly that a single processor might handle a bunch of neurons
-//  i.e. it is *not* necessarily a 1-1 mapping. I will provide some different
-//  implementations of each component. It is possible to extend though with
-//  custom elements to do whatever you want
-//  element.
 #ifndef ARCH_HEADER_INCLUDED_
 #define ARCH_HEADER_INCLUDED_
 
@@ -26,17 +21,23 @@ axon inputs->synapse processor->dendrite processor->soma processor->axon outputs
 #include <stdio.h>
 #include <string.h>
 #include "network.h"
+#include "description.h"
 
 // Hard define maximum defined h/w sizes
 #define ARCH_MAX_COMPARTMENTS 1024
-//#define ARCH_MAX_AXON_MAP 4096
+// TODO: the axon map label is a bit confusing. Its the possible mappings of
+//  incoming connections to each core. In the hardware, there are 4096 axon maps
+//  but these could be reused multiple times. Maybe we need to have an axon map
+//  and the map can have a list based on the neurons that can send out or in
+//  via it. Each unique usage of the map can generate send and receive latency
+// Maybe need to rename the axon_map structure. axon_access maybe? and this
+//  should be allocated dynamically to avoid using too much memory?
+//
 #define ARCH_MAX_AXON_MAP 16384
-#define ARCH_MAX_TILES 32
+#define ARCH_MAX_TILES 4096
 #define ARCH_MAX_CORES 4
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
-#define ARCH_MAX_FIELD_LEN 64
-#define ARCH_MAX_BLOCK_COUNT 4096
 #define ARCH_MAX_ATTRIBUTES 256
 
 #define ARCH_INVALID_ID -1
@@ -53,7 +54,6 @@ enum buffer_positions
 
 enum neuron_models
 {
-	NEURON_IF,
 	NEURON_LIF,
 	NEURON_TRUENORTH,
 };
@@ -80,16 +80,6 @@ enum arch_description_blocks
 	ARCH_DESCRIPTION_AXON_OUT,
 };
 
-struct hardware_mapping
-{
-	struct core *core;
-	struct synapse_processor *synapse_hw;
-	struct dendrite_processor *dendrite_hw;
-	struct soma_processor *soma_hw;
-	struct axon_output *axon_out;
-	struct axon_input *axon_in;
-};
-
 struct message
 {
 	struct tile *src_tile, *dest_tile;
@@ -113,7 +103,7 @@ struct axon_map
 
 struct axon_input
 {
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 	struct tile *t;
 	struct axon_map map[ARCH_MAX_AXON_MAP];
 	long int packets_in;
@@ -123,7 +113,7 @@ struct axon_input
 
 struct synapse_processor
 {
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 	int spikes_buffer;
 	int weights_per_word, word_bits, weight_bits;
 	long int total_spikes, memory_reads;
@@ -134,13 +124,13 @@ struct synapse_processor
 
 struct dendrite_processor
 {
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 	double energy, time;
 };
 
 struct soma_processor
 {
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
 	long int updates, spikes_sent;
 	double energy, time;
@@ -156,7 +146,7 @@ struct axon_output
 	struct axon_map *map_ptr[ARCH_MAX_AXON_MAP];
 	struct tile *t;
 	int map_count;
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 
 	long int packets_out;
 	double energy, time;
@@ -175,7 +165,7 @@ struct core
 	struct soma_processor soma;
 	struct axon_output axon_out;
 
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 	double energy, time, blocked_until;
 	int id, buffer_pos, is_blocking;
 	int neuron_count, curr_neuron, neurons_left, messages_left;
@@ -188,7 +178,7 @@ struct tile
 	// TODO: maybe can associate energy and latency with each link, that
 	//  will be the most general way to implement this!
 	struct tile *links[ARCH_MAX_LINKS];
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 	double energy, time;
 	double energy_east_west_hop, time_east_west_hop;
 	double energy_north_south_hop, time_north_south_hop;
@@ -201,54 +191,26 @@ struct tile
 struct architecture
 {
 	struct tile tiles[ARCH_MAX_TILES];
-	char name[ARCH_MAX_FIELD_LEN];
+	char name[MAX_FIELD_LEN];
 	double time_barrier;
-	int noc_dimensions, noc_width, noc_height, tile_count, initialized;
+	int noc_dimensions, noc_width, noc_height, tile_count, topology;
+	int is_init;
 };
+
+#include "description.h"
 
 struct architecture *arch_init(void);
 void arch_free(struct architecture *const arch);
-int arch_create_noc(struct architecture *const arch, const int width, const int height);
-int arch_create_tile(struct architecture *const arch, const double energy_east_west_hop, const double energy_north_south_hop, const double time_east_west_hop, const double time_north_south_hop);
-int arch_create_core(struct architecture *const arch, struct tile *const t);
-void arch_create_axon_in(struct architecture *const arch, struct core *const c);
-void arch_create_synapse(struct architecture *const arch, struct core *const c, const int weight_bits, const int word_bits, const double energy_spike_op, const double time_spike_op, const double energy_memory_access, const double time_memory_access);
-void arch_create_soma(struct architecture *const arch, struct core *const c, int model, double energy_active_neuron_update, double time_active_neuron_update, double energy_inactive_neuron_update, double time_inactive_neuron_update, double energy_spiking, double time_spiking);
-void arch_create_axon_out(struct architecture *const arch, struct core *const c, const double spike_energy, const double spike_time);
-int arch_map_neuron(struct neuron *const n, const struct hardware_mapping);
+int arch_create_noc(struct architecture *const arch, struct attributes *attr, const int attribute_count);
+int arch_create_tile(struct architecture *const arch, struct attributes *attr, const int attribute_count);
+int arch_create_core(struct architecture *const arch, struct tile *const t, struct attributes *attr, const int attribute_count);
+void arch_create_axon_in(struct architecture *const arch, struct core *const c, struct attributes *attr, const int attribute_count);
+void arch_create_synapse(struct architecture *const arch, struct core *const c, const struct attributes *const attr, const int attribute_count);
+void arch_create_soma(struct architecture *const arch, struct core *const c, struct attributes *attr, const int attribute_count);
+void arch_create_axon_out(struct architecture *const arch, struct core *const c, struct attributes *attr, const int attribute_count);
 void arch_create_axon_maps(struct architecture *const arch);
 void arch_create_core_axon_map(struct core *const core);
 
-// ***************************
-// Parsing routines
-struct description_block *arch_parse_block(FILE *fp, const int block_type, struct description_block *const parent, struct description_block *const sibling);
-
-int arch_parse_field_int(char *str);
-void arch_parse_field(char *str, char *field);
-int arch_parse_name(char *field, char *name);
-int arch_is_field(const char *fieldname, char *str);
-int arch_is_list(char *str);
-
-int arch_parse_file(FILE *fp, struct description_block *arch_description);
-struct description_block *arch_parse_block(FILE *fp, const int block_type, struct description_block *const parent, struct description_block *const sibling);
-struct description_block *arch_parse_list(FILE *fp, const int list_type, struct description_block *const parent);
-int arch_get_description_line(FILE *fp, char *line);
-int arch_parse_attributes(FILE *fp, struct description_block *block);
-void arch_print_description(struct description_block *arch_description, const int level);
-int arch_build_arch(struct description_block *arch_description);
-
-
-struct attributes
-{
-	char key[ARCH_MAX_FIELD_LEN], value_str[ARCH_MAX_FIELD_LEN];
-};
-
-struct description_block
-{
-	char name[ARCH_MAX_FIELD_LEN];
-	struct attributes attributes[ARCH_MAX_ATTRIBUTES];
-	struct description_block *child, *parent, *next_sibling;
-	int type, instances, indent, attribute_count;
-};
+int arch_parse_neuron_model(char *model_str);
 
 #endif

@@ -24,7 +24,7 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
-import utils
+import sim
 
 NETWORK_FILENAME = "runs/latin/latin_square.net"
 ARCH_FILENAME = "arch/loihi.arch"
@@ -37,8 +37,8 @@ TIMESTEPS = 100
 def calculate_graph_index(row, col, digit):
     return ((row*N + col)*N) + digit
 
-network = utils.Network()
-compartments = utils.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
+network = sim.Network()
+compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                         1024)
 log_spikes = 1
 log_potential = 1
@@ -57,9 +57,9 @@ square = []
 for i in range(0, N):
     row = []
     for j in range(0, N):
-        row.append(utils.create_layer(network, N, compartments,
-                          log_spikes, log_potential, force_update,
-                          threshold, reset, leak))
+        row.append(sim.create_layer(network, N, compartments,
+                                    log_spikes, log_potential, force_update,
+                                    threshold, reset, leak))
     square.append(row)
 
 
@@ -119,9 +119,8 @@ if N < 4:
 
 # Now execute the network using SANA-FE and extract the spike timings
 arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
-run_command = ("./sim", "-s", "-v", arch_path, network_path, f"{TIMESTEPS}")
-print("sana-fe command: {0}".format(" ".join(run_command)))
-subprocess.call(run_command)
+sim.run(arch_path, network_path, TIMESTEPS,
+        spike_trace=True, potential_trace=True)
 
 # Use spiking data to create the grid solution produced by the Loihi run
 #with open

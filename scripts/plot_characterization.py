@@ -2,8 +2,6 @@ import matplotlib
 matplotlib.use('Agg')
 
 import csv
-import subprocess
-import yaml
 from matplotlib import pyplot as plt
 
 neurons = []

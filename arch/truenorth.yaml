@@ -6,23 +6,11 @@ architecture:
     dimensions: 2
     width: 64
     height: 64
-    cost:
-      east_west:
-        energy: 0.0e-12
-        time: 0.0e-9
-      north_south:
-        energy: 0.0e-12
-        time: 0.0e-9
-      global_barrier:
-        time: 0.0e-9
 
   tile:
     - name: truenorth_tile[0..4095]
       attributes:
         blocking: False
-        cost:
-          energy: 0.0e-12
-          time: 0.0e-9
       core:
         - name: truenorth_core
           attributes:
@@ -42,29 +30,12 @@ architecture:
                 model: truenorth
                 reset: hard
                 reverse_reset: saturate
-                cost:
-                  inactive:
-                    energy: 0.0e-12
-                    time: 0.0e-9
-                  active:
-                    energy: 0.0e-12
-                    time: 0.0e-9
-                  spiking:
-                    energy: 0.0e-12
-                    time: 0.0e-9
           synapse:
             - name: core_synapses
               attributes:
                 model: cuba
                 weight_bits: 8
                 word_bits: 64
-                cost:
-                  spike:
-                    energy: 0.0e-12
-                    time: 0.0e-9
-                  memory:
-                    energy: 0.0e-12
-                    time: 0.0e-9
           dendrite:
           - name: core_dendrites
             attributes:
@@ -79,6 +50,4 @@ architecture:
               attributes:
                 fan_out: 1
                 protocol: dest_axon
-                cost:
-                  energy: 0.0e-12
-                  time: 0.0e-9
+

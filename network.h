@@ -13,27 +13,9 @@
 
 #define NETWORK_MAX_NEURON_GROUPS 1024
 #define NETWORK_INVALID_NID -1
+#define MAX_FIELDs 128
 
 #include <stdint.h>
-
-// This defines the structure of the format for specifying neurons in a
-//  network for this simulator. Each row in the file represents data for a
-//  unique neuron in the network
-//
-// The format is a number of neuron fields, followed by a variable number of
-//  connections (each with CONNECTION_FIELDS entries).  This means each command
-//  is variable length depending on the number of connections for that neuron.
-enum neuron_config_format
-{
-	NEURON_COMMAND = 0,
-	NEURON_GROUP_ID,
-	NEURON_ID,
-	NEURON_BIAS,
-	NEURON_RECORD_SPIKES, // Record any spikes to a CSV file
-	NEURON_RECORD_potential, // Write the potential to a CSV file every timestep
-	NEURON_FORCE_UPDATE,
-	NEURON_FIELDS,
-};
 
 enum connection_config_format
 {
@@ -78,11 +60,11 @@ struct neuron
 
 	double potential, current, charge, bias;
 	double reset, reverse_reset, threshold, reverse_threshold;
-	double potential_decay, potential_time_const, dendritic_current_decay;
-	double processing_latency;
+	double leak_decay, leak_bias, potential_time_const;
+	double dendritic_current_decay, processing_latency;
 
-	int id, is_init, fired, connection_out_count, spike_count;
-	int log_spikes, log_potential, update_needed, force_update;
+	int id, is_init, fired, connection_out_count, max_connections_out;
+	int log_spikes, log_potential, update_needed, force_update, spike_count;
 	int soma_last_updated, dendrite_last_updated;
 	int maps_in_count, maps_out_count;
 };
@@ -109,8 +91,11 @@ struct neuron_group
 	//  hardware i.e. the same core and processor blocks in the core
 	struct neuron *neurons;
 	int id, neuron_count, reset_mode, reverse_reset_mode;
+	int default_log_potential, default_log_spikes;
+	int default_max_connections_out, default_force_update;
 	double default_threshold, default_reset;
 	double default_reverse_threshold, default_reverse_reset;
+	double default_leak_decay, default_leak_bias;
 };
 
 struct network
@@ -120,14 +105,21 @@ struct network
 	int neuron_group_count, external_input_count;
 };
 
-#include "arch.h"
+struct architecture;
+struct attributes;
+struct core;
+
+
 void network_init(struct network *const net);
 void network_free(struct network *const net);
-int network_create_neuron(struct neuron *const n, const double bias, const int log_spikes, const int log_potentials, const int force_update, const int connection_count);
-int network_create_neuron_group(struct network *net,  const unsigned int neuron_count, const double threshold, const double reset, const double reverse_threshold, const double reverse_reset, const double leak, const int reset_mode, const int reverse_reset_mode);
+int network_create_neuron(struct neuron *const n, struct attributes *attr, const int attribute_count);
+int network_create_neuron_group(struct network *net, const int neuron_count, struct attributes *attr, const int attribute_count);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
-int net_create_inputs(struct network *const net, const int input_count, const int input_type);
-int net_create_input_node(struct input *const in, const int connection_count);
-void net_set_input(struct network *const net, const int input_id, const double rate);
+int network_create_inputs(struct network *const net, const int input_count, const int input_type);
+int network_create_input_node(struct input *const in, const int connection_count);
+void network_set_input(struct network *const net, const int input_id, const double rate);
+int network_parse_reset_mode(const char *str);
+int network_connect_neurons(struct connection *const con, struct neuron *const src, struct neuron *const dest, struct attributes *attr, const int attribute_count);
+int network_map_hardware(struct neuron *const n, struct core *c);
 
 #endif

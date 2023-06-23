@@ -16,30 +16,43 @@ import matplotlib
 matplotlib.use('Agg')
 
 import sys
-import subprocess
 import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
-sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
-import utils
+import os
 
-ARCH_FILENAME = "truenorth.arch"
-def run_sim(network_filename, timesteps, plot_filename):
-    run_command = ("./sim", ARCH_FILENAME, network_filename,
-               "{0}".format(timesteps))
-    print("Running command: {0}".format(" ".join(run_command)))
-    subprocess.call(run_command)
+import sys
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+sys.path.insert(0, os.path.join(PROJECT_DIR))
+import sim
 
-    potential_data = pd.read_csv("probe_potential.csv")
-    spike_data = pd.read_csv("probe_spikes.csv")
+ARCH_PATH = os.path.join(PROJECT_DIR, "arch", "truenorth.yaml")
 
-    potentials = potential_data.loc[:, "1.0"]
-    spike_idx = spike_data.loc[:, "1.0"].to_numpy().nonzero()[0]
-    spike_vals = np.max(potentials) * np.ones(spike_idx.shape)
+
+def run_sim(network_path, timesteps, plot_filename):
+    print(ARCH_PATH)
+    sim.run(ARCH_PATH, network_path, timesteps, potential_trace=True,
+            spike_trace=True)
+
+    potential_data = pd.read_csv("potential.trace")
+    spike_data = pd.read_csv("spikes.trace")
+
+    offset=200
+    potentials = potential_data.loc[offset:timesteps, "1.0"]
+
+    spikes_in = spike_data.loc[spike_data["gid.nid"] == 0.0]
+    spikes_out = spike_data.loc[spike_data["gid.nid"] == 1.0]
 
     plt.figure()
-    plt.plot(potentials)
-    plt.scatter(spike_idx, spike_vals, marker='^', color='red')
+    plt.plot(np.arange(0, timesteps-offset), potentials)
+    spike_idx = spikes_out.loc[:, "timestep"]
+    height = max(potentials) + 2
+    spike_vals = height * np.ones(spike_idx.shape)
+    plt.scatter(spike_idx-offset, spike_vals, marker='^', color='red')
+    spike_idx = spikes_in.loc[:, "timestep"]
+    spike_vals = min(potentials) * np.ones(spike_idx.shape)
+    plt.scatter(spike_idx-offset, spike_vals, marker='^', color='black')
     plt.xlabel("Simulation Ticks")
     plt.ylabel("Membrane Potential")
     #plt.ylim((0, 22))
@@ -51,9 +64,9 @@ def run_sim(network_filename, timesteps, plot_filename):
     return (potential_data, spike_data)
 
 
-def run():
-    run_sim("examples/truenorth_phasic.net", 1000, "runs/phasic.png")
-    run_sim("examples/truenorth_bursting.net", 1000, "runs/bursting.png")
+def run_experiment():
+    run_sim("snn/nemo/truenorth_phasic.net", 1200, "runs/nemo/phasic.png")
+    run_sim("snn/nemo/truenorth_bursting.net", 1200, "runs/nemo/bursting.png")
 
 if __name__ == "__main__":
-    run()
+    run_experiment()

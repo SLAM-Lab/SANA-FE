@@ -112,7 +112,7 @@ combine all data into perf.csv
 
 `perf.csv` Detailed statistics for each timestep and each hardware unit
 
-`stats.yaml` High level statistics for the simulation e.g. runtime
+`run_summary.yaml` High level statistics for the simulation e.g. runtime
 
 # Project Code
 

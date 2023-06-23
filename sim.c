@@ -61,6 +61,7 @@ void sim_init_sim(struct simulation *sim)
 	sim->log_perf = 0;
 	sim->log_potential = 0;
 	sim->log_spikes = 0;
+	sim->log_messages = 0;
 
 	sim->potential_trace_fp = NULL;
 	sim->spike_trace_fp = NULL;
@@ -731,7 +732,7 @@ double sim_update_soma(struct timestep *const ts, struct neuron *n,
 	}
 
 	TRACE("nid:%d updating, current_in:%lf\n", n->id, current_in);
-	if ((soma->model == NEURON_LIF) || (soma->model == NEURON_IF))
+	if (soma->model == NEURON_LIF)
 	{
 		latency += sim_update_soma_lif(ts, n, current_in);
 	}
@@ -763,7 +764,7 @@ double sim_update_soma_lif(struct timestep *const ts, struct neuron *n,
 	{
 		while (n->soma_last_updated <= ts->timestep)
 		{
-			n->potential *= n->potential_decay;
+			n->potential *= n->leak_decay;
 			n->soma_last_updated++;
 		}
 	}
@@ -820,17 +821,17 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 			//  oscillate between the two? Does it matter
 			if (n->potential > 0.0)
 			{
-				n->potential -= n->potential_decay;
+				n->potential -= n->leak_bias;
 			}
 			else if (n->potential < 0.0)
 			{
-				n->potential += n->potential_decay;
+				n->potential += n->leak_bias;
 			}
 			// else equals zero, so no leak is applied
 		}
 		else
 		{
-			n->potential += n->potential_decay;
+			n->potential += n->leak_decay;
 		}
 		n->soma_last_updated++;
 	}
@@ -888,7 +889,7 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 		}
 		// No spike is generated
 	}
-	//INFO("potential:%lf threshold %lf\n", n->potential, n->threshold);
+	TRACE("potential:%lf threshold %lf\n", n->potential, n->threshold);
 
 	return latency;
 }

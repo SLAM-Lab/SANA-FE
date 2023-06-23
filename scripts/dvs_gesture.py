@@ -4,23 +4,26 @@ This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
 
-Run DVS Gesture and extract some network based statistics
+Run DVS Gesture and extract some performance statistics
 """
 #import matplotlib
 #matplotlib.use('Agg')
 
 import csv
-import subprocess
 import yaml
 from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 import os
+import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 
-ARCH_FILENAME = "loihi.arch"
+sys.path.insert(0, PROJECT_DIR)
+import sim
+
+ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net"
 LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
@@ -36,18 +39,6 @@ LOIHI_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_TIME_DATA_FILENAME)
 LOIHI_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_ENERGY_DATA_FILENAME)
 SIM_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_TIME_DATA_FILENAME)
 SIM_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_ENERGY_DATA_FILENAME)
-
-
-def run_sim(timesteps):
-    # Create the network to run
-    fields = ["Neuron ID", "Core ID", "Threshold", "Reset",
-              "Log Spikes", "Log potential", "Synapse Info..."]
-    command = (os.path.join(PROJECT_DIR, "sim"), "-p", "-m", ARCH_PATH,
-               GENERATED_NETWORK_PATH, f"{timesteps}")
-    print("Command: {0}".format(" ".join(command)))
-    subprocess.call(command)
-
-    return
 
 
 def parse_stats(stats):
@@ -113,15 +104,13 @@ if __name__ == "__main__":
     times = np.array(())
     energies = np.array(())
     #timesteps = 100000
-    #frames = 100
-    frames = 8
+    frames = 2
     timesteps = 128
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiment:
         neurons = ""
         groups = ""
-
 
         neuron_groups_filename = os.path.join(NETWORK_DIR, "neuron_groups.net")
         with open(neuron_groups_filename, "r") as group_file:
@@ -157,7 +146,7 @@ if __name__ == "__main__":
 
             # Use a pre-generated network for a realistic use case i.e.
             #  dvs-gesture
-            run_sim(timesteps)
+            sim.run(ARCH_PATH, GENERATED_NETWORK_PATH, timesteps)
             # Parse the detailed perf statistics
             print("Reading performance data")
             stats = pd.read_csv(os.path.join(PROJECT_DIR, "perf.csv"))
@@ -363,7 +352,7 @@ if __name__ == "__main__":
                                                             neuron_id))
                 plt.close()
 
-        with open("stats.yaml", "r") as results_file:
+        with open("run_summary.yaml", "r") as results_file:
             results = yaml.safe_load(results_file)
         #network_percentage = (results["network_time"] /
         #                                    results["time"]) * 100.0

@@ -14,47 +14,11 @@
 #ifndef COMMAND_HEADER_INCLUDED_
 #define COMMAND_HEADER_INCLUDED_
 
-// TODO: better define the max fields
-#define MAX_FIELDS (NEURON_FIELDS + (4096*CONNECTION_FIELDS))
-#define MAX_NEURONS (12800*1024)
-#define MAX_FIELD_LEN 64
-#define MAX_CSV_LINE (10240 + (4096*MAX_FIELD_LEN))
-#define TOKEN_SEPERATORS " \t"
+struct simulation;
+struct architecture;
+struct network;
 
-enum
-{
-	COMMAND_FAIL = -1,
-	COMMAND_OK = 0, // Anything >= 0 means successfully parsed
-};
-
-int command_parse_file(FILE *fp, struct network *net, struct architecture *arch, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
-int command_parse_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
-int command_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
-
-// Misc parsing
-int command_parse_reset_mode(const char *str);
-
-// (Spiking) neural network
-int command_parse_neuron_group(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_neuron(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_extern_input_group(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_extern_input_node(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
-
-// Neuromorphic hardware
-int command_parse_noc(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_tile(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_core(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_axon_input(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_synapse(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_soma(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_axon_output(struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-
-// Mapping
-int command_map_hardware(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count);
-
-// Simulation control
 int command_parse_input_spikes(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_step_sim(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count, FILE *probe_spikes_fp, FILE *potential_trace_fp, FILE *perf_fp);
-int command_parse_load_commands(struct network *net, struct architecture *arch, char fields[][MAX_FIELD_LEN], const int field_count, FILE *spike_trace_fp, FILE *potential_trace_fp, FILE *perf_fp);
+int command_parse_step_sim(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count, struct simulation *sim);
 
 #endif

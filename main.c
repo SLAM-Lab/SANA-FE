@@ -13,6 +13,7 @@
 #include "sim.h"
 #include "network.h"
 #include "arch.h"
+#include "description.h"
 #include "command.h"
 
 void run(struct simulation *sim, struct network *net, struct architecture *arch);
@@ -28,7 +29,7 @@ enum program_args
 
 int main(int argc, char *argv[])
 {
-	FILE *input_fp, *network_fp, *stats_fp, *arch_fp;
+	FILE *input_fp, *network_fp, *arch_fp;
 	struct simulation sim;
 	struct network net;
 	struct architecture *arch;
@@ -38,12 +39,10 @@ int main(int argc, char *argv[])
 
 	filename = NULL;
 	input_fp = NULL;
-	network_fp = NULL;
-	stats_fp = NULL;
 	input_buffer = NULL;
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
-	ret = COMMAND_FAIL;
+	ret = RET_FAIL;
 	arch = arch_init();
 	network_init(&net);
 	sim_init_sim(&sim);
@@ -161,13 +160,10 @@ int main(int argc, char *argv[])
 		INFO("Error: Architecture file %s failed to open.\n", filename);
 		goto clean_up;
 	}
-	//ret = command_parse_file(arch_fp, &net, arch, sim.spike_trace_fp,
-	//				sim.potential_trace_fp, sim.perf_fp);
-	struct description_block block;
-	arch_parse_file(arch_fp, &block); // TODO: WIP - finish this
-	arch_print_description(&block, 0);
+	ret = description_parse_file(arch_fp, NULL, arch);
+	//arch_print_description(&description, 0);
 	fclose(arch_fp);
-	if (ret == COMMAND_FAIL)
+	if (ret == RET_FAIL)
 	{
 		goto clean_up;
 	}
@@ -195,10 +191,9 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 	INFO("Reading network from file.\n");
-	ret = command_parse_file(network_fp, &net, arch, sim.spike_trace_fp,
-					sim.potential_trace_fp, sim.perf_fp);
+	ret = description_parse_file(network_fp, &net, arch);
 	fclose(network_fp);
-	if (ret == COMMAND_FAIL)
+	if (ret == RET_FAIL)
 	{
 		goto clean_up;
 	}
@@ -243,7 +238,7 @@ int main(int argc, char *argv[])
 		average_power = 0.0;
 	}
 	INFO("Average power consumption: %f W.\n", average_power);
-	sim.stats_fp = fopen("stats.yaml", "w");
+	sim.stats_fp = fopen("run_summary.yaml", "w");
 	if (sim.stats_fp != NULL)
 	{
 		sim_write_summary(sim.stats_fp, arch, &sim);
@@ -273,12 +268,12 @@ clean_up:
 	{
 		fclose(sim.perf_fp);
 	}
-	if (stats_fp != NULL)
+	if (sim.stats_fp != NULL)
 	{
-		fclose(stats_fp);
+		fclose(sim.stats_fp);
 	}
 
-	if (ret == COMMAND_FAIL)
+	if (ret == RET_FAIL)
 	{
 		return 1;
 	}

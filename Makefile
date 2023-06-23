@@ -8,8 +8,8 @@ DEBUGFLAGS=-DDEBUG -no-pie -pg -O0
 GIT_COMMIT=$(shell ./scripts/git_status.sh)
 
 LIBS=-lrt -lm
-DEPS=sim.h print.h command.h network.h arch.h
-OBJ=main.o sim.o command.o network.o arch.o
+DEPS=sim.h print.h command.h network.h arch.h description.h
+OBJ=main.o sim.o command.o network.o arch.o description.o
 DEBUGDIR=debug
 RELDIR=release
 

@@ -1,15 +1,20 @@
-# neurons vth reset -vth  -reset leak reset modes
-g 1       300     0    0   0        0 hard none
-g 1       18      1    0   1       -1 hard saturate
-g 1       6       0    0   0        0 hard saturate
+# neuron groups
+g 1 threshold=300  reset=0    reverse_threshold=0   reverse_reset=0   leak_bias=0  reset_mode=hard  reverse_reset_mode=none
+g 1 threshold=18   reset=1    reverse_threshold=0   reverse_reset=1   leak_bias=-1 reset_mode=hard  reverse_reset_mode=saturate
+g 1 threshold=6    reset=0    reverse_threshold=0   reverse_reset=0   leak_bias=0  reset_mode=hard  reverse_reset_mode=saturate
 
-# g n b s v f connections
-n 0 0 1 0 0 1 1 0 1 2 0 0
+n 0.0 bias=1.0 log_spikes=1 force_update=1
+e 0.0->1.0 w=1.0
+e 0.0->2.0 w=0
+
 # neuron 0 in paper
-n 1 0 0 1 1 1 2 0 1
-# neuron 1 in paper
-n 2 0 0 0 0 1 1 0 -100
+n 1.0 bias=0.0 log_spikes=1 log_v=1 force_update=1
+e 1.0->2.0 w=1.0
 
-& 0 0 0 0
-& 1 0 0 0
-& 2 0 0 0
+# neuron 1 in paper
+n 2.0 bias=0.0 force_update=1
+e 2.0->1.0 w=-100.0
+
+& 0.0@0.0
+& 1.0@0.0
+& 2.0@0.0

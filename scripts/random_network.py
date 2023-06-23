@@ -88,7 +88,7 @@ def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_me
     print("sana-fe command: {0}".format(" ".join(run_command)))
     subprocess.call(run_command)
 
-    with open("stats.yaml", "r") as summary_file:
+    with open("run_summary.yaml", "r") as summary_file:
         summary = yaml.safe_load(summary_file)
 
     return summary
