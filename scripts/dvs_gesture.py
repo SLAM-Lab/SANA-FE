@@ -103,9 +103,8 @@ if __name__ == "__main__":
     spiking_network_energy = []
     times = np.array(())
     energies = np.array(())
-    #timesteps = 100000
-    frames = 2
-    timesteps = 128
+    timesteps = 100000
+    frames = 100
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiment:

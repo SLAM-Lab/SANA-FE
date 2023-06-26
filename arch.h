@@ -34,7 +34,7 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 //  should be allocated dynamically to avoid using too much memory?
 //
 #define ARCH_MAX_AXON_MAP 16384
-#define ARCH_MAX_TILES 4096
+#define ARCH_MAX_TILES 128
 #define ARCH_MAX_CORES 4
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
