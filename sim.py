@@ -409,7 +409,7 @@ def create_noc(noc_dict):
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
         run_dir=os.path.join(project_dir, "runs"),
-        spike_trace=False, potential_trace=True, perf_trace=True,
+        perf_trace=True, spike_trace=False, potential_trace=False,
         message_trace=False):
     parse_file(arch_path, os.path.join(run_dir, "arch"))
     # Parse inputs and run simulation
