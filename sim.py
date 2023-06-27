@@ -25,10 +25,11 @@ class Network:
         self._max_compartments = None
 
     def create_group(self, threshold, reset, leak, log_spikes=False,
-                     log_potential=False, force_update=False):
+                     log_potential=False, force_update=False,
+                     connections_out=None):
         group_id = len(self.groups)
         group = NeuronGroup(group_id, threshold, reset, leak, log_spikes,
-                            log_potential, force_update)
+                            log_potential, force_update, connections_out)
         self.groups.append(group)
         return group
 
@@ -55,7 +56,7 @@ class Network:
 
 class NeuronGroup:
     def __init__(self, group_id, threshold, reset, leak, log_spikes=None,
-                 log_potential=None, force_update=None):
+                 log_potential=None, force_update=None, connections_out=None):
         # TODO: support all features here
         self.id = group_id
         self.neurons = []
@@ -66,7 +67,7 @@ class NeuronGroup:
         self.reverse_reset_mode = None
         self.reverse_threshold = None
         self.leak_decay = leak
-        self.max_connections = 1024
+        self.connections_out = connections_out
         self.log_spikes = log_spikes
         self.log_potential = log_potential
         self.force_update = force_update
@@ -95,6 +96,8 @@ class NeuronGroup:
             group_str += f" log_v={int(self.log_potential)}"
         if self.force_update is not None:
             group_str += f" force_update={int(self.force_update)}"
+        if self.connections_out is not None:
+            group_str += f" connections_out={self.connections_out}"
 
         group_str += "\n"
         return group_str
@@ -156,7 +159,7 @@ class Neuron:
             neuron_str += f" log_v={int(self.log_potential)}"
         if self.force_update is not None:
             neuron_str += f" force_update={int(self.force_update)}"
-        if len(self.connections) > self.group.max_connections:
+        if len(self.connections) > self.group.connections_out:
            neuron_str += f" connections_out={len(self.connections)}"
         neuron_str += "\n"
 
@@ -164,7 +167,11 @@ class Neuron:
             dest_neuron, weight = connection
             neuron_str += f"e {self.group.id}.{self.id}->"
             neuron_str += f"{dest_neuron.group.id}.{dest_neuron.id}"
-            neuron_str += f" w={weight:.5e}\n"
+            if isinstance(weight, float):
+                neuron_str += f" w={weight:.5e}"
+            else:
+                neuron_str += f" w={weight}"
+            neuron_str += "\n"
 
         if map_neuron:
             neuron_str += "& {0}.{1}@{2}.{3}\n".format(self.group.id, self.id,
@@ -196,11 +203,12 @@ def map_neuron_to_compartment(compartments):
 
 def create_layer(network, layer_neuron_count, compartments,
                  log_spikes, log_potential, force_update, threshold, reset,
-                 leak, mappings=None):
+                 leak, mappings=None, connections_out=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     #print("Compartments free: {0}".format(compartments))
     layer_group = network.create_group(threshold, reset, leak, log_spikes,
-                                       log_potential, force_update)
+                                       log_potential, force_update,
+                                       connections_out=connections_out)
 
     if mappings is not None:
         #print("mappings: {0} len({1}) layer_neuron_count: {2}".format(

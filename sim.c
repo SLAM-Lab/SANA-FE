@@ -40,7 +40,7 @@ struct timestep sim_timestep(struct simulation *const sim,
 	sim->total_spikes += ts.spikes;
 	sim->total_messages_sent += ts.messages_sent;
 
-	TRACE("Spikes sent: %ld\n", spikes_sent);
+	TRACE("Spikes sent: %ld\n", sim->total_spikes);
 	if (sim->perf_fp)
 	{
 		sim_perf_log_timestep(&ts, sim->perf_fp);
@@ -252,7 +252,8 @@ int sim_schedule_messages(const struct simulation *const sim,
 					TRACE("(cid:%d.%d) nid:%d.%d fired, "
 						"time:%e\n",
 						c->t->id, c->id,
-						n->group->id, n->id, c->time);
+						m.src_neuron->group->id,
+						m.src_neuron->id, c->time);
 					ts->total_neurons_fired++;
 					c->messages_left =
 						m.src_neuron->maps_out_count;

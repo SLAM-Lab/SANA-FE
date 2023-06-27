@@ -187,7 +187,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		break;
 	default:
 		TRACE("Warning: unrecognized unit (%c) - skipping.\n",
-							command_type);
+							entry_type);
 		ret = RET_OK;
 		break;
 	}
@@ -318,8 +318,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			return RET_FAIL;
 		}
 		group = &(net->groups[neuron_group_id]);
-		TRACE("Parsed neuron gid:%d nid:%d log s:%d log v:%d force:%d "
-			"connections:%d\n", neuron_group_id, neuron_id);
+		TRACE("Parsed neuron gid:%d nid:%d\n",
+						neuron_group_id, neuron_id);
 	}
 	if (neuron_id > -1)
 	{

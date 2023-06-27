@@ -162,6 +162,7 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 			sscanf(a->value_str, "%d", &arch->noc_height);
 		}
 	}
+	assert((arch->noc_height * arch->noc_width) <= ARCH_MAX_TILES);
 
 	for (int y = 0; y < arch->noc_height; y++)
 	{
@@ -221,7 +222,8 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 	}
 
 	arch->is_init = 1;
-	TRACE("NoC created, mesh, width:%d height:%d.\n", width, height);
+	TRACE("NoC created, mesh, width:%d height:%d.\n",
+		arch->noc_width, arch->noc_height);
 	return 0;
 }
 
@@ -626,7 +628,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 					// TODO: HACK want a unique core identifier beyond the
 					//  number within the tile. Need to index the correct
 					//  core number here
-					int core_number = (dest_core->t->id * 4) + dest_core->id;
+					int core_number = (dest_core->t->id * ARCH_MAX_CORES) + dest_core->id;
 					connection_count[core_number]++;
 					cores[core_number] = dest_core;
 					TRACE("Connected to dest core: %d\n",

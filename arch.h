@@ -34,8 +34,16 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 //  should be allocated dynamically to avoid using too much memory?
 //
 #define ARCH_MAX_AXON_MAP 16384
-#define ARCH_MAX_TILES 128
-#define ARCH_MAX_CORES 4
+// TODO: better dynamically define or allocate these numbers, so that we can
+//  support a range of architectures seamlessly. At the moment, a large amount
+//  of memory is needed if we want to support lots of large cores
+// TrueNorth
+#define ARCH_MAX_TILES 4096
+#define ARCH_MAX_CORES 1
+// Loihi
+//#define ARCH_MAX_TILES 1280
+//#define ARCH_MAX_CORES 4
+
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
 #define ARCH_MAX_ATTRIBUTES 256

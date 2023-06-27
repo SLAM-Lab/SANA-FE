@@ -35,7 +35,7 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 
 	group->neuron_count = neuron_count;
 
-	group->default_max_connections_out = 1024;
+	group->default_max_connections_out = 0;
 	group->default_log_potential = 0; // Disabled by default
 	group->default_threshold = 1.0;
 	group->default_reverse_threshold = -1.0;
@@ -265,6 +265,8 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	n->soma_last_updated = 0;
 	n->dendrite_last_updated = 0;
 	assert(n->connections_out == NULL);
+	TRACE("Allocating memory (%d b) for connections\n",
+		sizeof(struct connection) * n->max_connections_out);
 	n->connections_out = (struct connection *)
 		malloc(sizeof(struct connection) * n->max_connections_out);
 	if (n->connections_out == NULL)
@@ -471,7 +473,7 @@ int network_map_hardware(struct neuron *n, struct core *c)
 	assert(c->neurons != NULL);
 	assert(n->core == NULL);
 	n->core = c;
-	TRACE("mapping neuron %d to core %d\n", n->id, map.core->id);
+	TRACE("mapping neuron %d to core %d\n", n->id, c->id);
 	c->neurons[c->neuron_count] = n;
 	c->neuron_count++;
 

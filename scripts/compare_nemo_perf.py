@@ -21,11 +21,15 @@ import subprocess
 import random
 import time
 import csv
+import sys
+import os
 
 # SANA-FE libraries
-import sys
-sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
-import utils
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+
+sys.path.insert(0, PROJECT_DIR)
+import sim
 
 # Use a dumb seed to get consistent results
 random.seed(1)
@@ -34,17 +38,19 @@ random.seed(1)
 TRUENORTH_COMPARTMENTS = 256
 TRUENORTH_AXONS = TRUENORTH_COMPARTMENTS
 SPIKE_INTRA_CORE_PROB = 0.8
-NETWORK_FILENAME = "runs/nemo_randomized.net"
-ARCH_FILENAME = "truenorth.arch"
+NETWORK_FILENAME = os.path.join(PROJECT_DIR, "runs", "nemo",
+                                "nemo_randomized.net")
+ARCH_FILENAME = os.path.join(PROJECT_DIR, "arch", "truenorth.yaml")
 TIMESTEPS = 10  # i.e., ticks, where each tick is 1 ms of wall-time on the chip
 NEMO_BIN_PATH = "/home/usr1/jboyle/neuro/NeMo/bin/NeMo"
-CSV_RESULTS_FILENAME = "runs/compare_sanafe_nemo.csv"
+CSV_RESULTS_FILENAME = os.path.join(PROJECT_DIR, "runs",
+                                    "compare_sanafe_nemo.csv")
 
 # Create a random truenorth network, 80% connected to neuron within same
 # core, 20% connected to neurons outside
 def create_nemo_network(cores):
-    network = utils.Network()
-    compartments = utils.init_compartments(cores, 1,
+    network = sim.Network()
+    compartments = sim.init_compartments(cores, 1,
                                            TRUENORTH_COMPARTMENTS)
     print("Creating neuron population")
 
@@ -54,13 +60,12 @@ def create_nemo_network(cores):
         mappings.extend((m,) * TRUENORTH_COMPARTMENTS)
     # Create neurons to fill every TrueNorth compartment, with a negative
     #  threshold and forced updates i.e., spikes every timestep
-    population = utils.create_layer(network, cores*TRUENORTH_COMPARTMENTS,
+    population = sim.create_layer(network, cores*TRUENORTH_COMPARTMENTS,
                                     compartments, 0, 0, 1, 0.0, -1.0, 0.0,
-                                    mappings=mappings)
-
+                                    mappings=mappings, connections_out=1)
 
     print("Generating randomized network connections")
-    weight = 1.0
+    weight = 1
     for c in range(0, cores):
         if (c % 32) == 0:
             print(f"Generating synaptic connections for core {c}")
@@ -84,15 +89,11 @@ def create_nemo_network(cores):
 #  time.
 def run_sim_sanafe(cores, timesteps):
     create_nemo_network(cores)
-    run_command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
-                   "{0}".format(timesteps))
-    print("sana-fe command: {0}".format(" ".join(run_command)))
     start = time.time()
-    subprocess.call(run_command)
+    sim.run(ARCH_FILENAME, NETWORK_FILENAME, timesteps)
     end = time.time()
     run_time = end - start
     print(f"sanafe runtime for {cores} cores was {run_time} s")
-
     return run_time
 
 
@@ -132,13 +133,13 @@ def plot_results():
     plt.xlabel("TrueNorth Core Count")
     plt.ylabel("Run-time (s)")
     plt.tight_layout()
-    plt.savefig("runs/compare_sanafe_nemo.png")
+    plt.savefig(os.path.join(PROJECT_DIR, "runs", "compare_sanafe_nemo.png"))
     return
 
 
 if __name__ == "__main__":
-    run_experiments = False
-    plot = True
+    run_experiments = True
+    plot = False
     if run_experiments:
         core_counts = (32, 64, 128, 256, 512, 1024)
         print(f"Running experiments with following core counts: {core_counts}")
@@ -150,13 +151,14 @@ if __name__ == "__main__":
         for i, cores in enumerate(core_counts):
             print(f"Running simulation of {cores} cores")
             sanafe_runtimes[i] = run_sim_sanafe(cores, TIMESTEPS)
-            nemo_runtimes[i] = run_sim_nemo(cores, TIMESTEPS)
+            #nemo_runtimes[i] = run_sim_nemo(cores, TIMESTEPS)
 
-        with open(CSV_RESULTS_FILENAME, "w") as csv_file:
-            writer = csv.writer(csv_file)
-            writer.writerow(("cores", "SANA-FE", "NeMo"))
-            for i, cores in enumerate(core_counts):
-                writer.writerow((cores, sanafe_runtimes[i], nemo_runtimes[i]))
+        print(sanafe_runtimes)
+        #with open(CSV_RESULTS_FILENAME, "w") as csv_file:
+        #    writer = csv.writer(csv_file)
+        #    writer.writerow(("cores", "SANA-FE", "NeMo"))
+        #    for i, cores in enumerate(core_counts):
+        #        writer.writerow((cores, sanafe_runtimes[i], nemo_runtimes[i]))
 
         print("Saved results to file")
 
