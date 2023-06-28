@@ -267,12 +267,15 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	assert(n->connections_out == NULL);
 	TRACE("Allocating memory (%d b) for connections\n",
 		sizeof(struct connection) * n->max_connections_out);
-	n->connections_out = (struct connection *)
-		malloc(sizeof(struct connection) * n->max_connections_out);
-	if (n->connections_out == NULL)
+	if (n->max_connections_out > 0)
 	{
-		INFO("Error: Couldn't allocate connection memory.\n");
-		return NETWORK_INVALID_NID;
+		n->connections_out = (struct connection *)
+		malloc(sizeof(struct connection) * n->max_connections_out);
+		if (n->connections_out == NULL)
+		{
+			INFO("Error: Couldn't allocate connection memory.\n");
+			return NETWORK_INVALID_NID;
+		}
 	}
 
 	// Zero initialize all connections

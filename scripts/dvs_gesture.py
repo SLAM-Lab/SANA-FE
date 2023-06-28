@@ -90,7 +90,7 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiment = True
+    run_experiment = False
     plot_experiment = True
     experiment = "time"
     #experiment = "energy"
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     spiking_network_energy = []
     times = np.array(())
     energies = np.array(())
-    timesteps = 100000
+    timesteps = 128
     frames = 100
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         """
         # Plot the latency
         if experiment == "time":
-            plt.rcParams.update({'font.size': 8, 'lines.markersize': 1})
+            plt.rcParams.update({'font.size': 8, 'lines.markersize': 4})
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
             #times = (times * 0.65) + 0.5e-5
             loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
@@ -246,38 +246,39 @@ if __name__ == "__main__":
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps-1, timesteps*frames, timesteps)))
             loihi_times = loihi_times[0:timesteps-1,:]
-            plt.figure(figsize=(5.0, 2.5))
+            plt.figure(figsize=(7.5, 2.0))
 
             # TODO: flatten all timesteps again?
             #plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
             #plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
-            plt.plot(np.arange(1, timesteps), times[1:(timesteps)], marker='x')
-            plt.plot(np.arange(1, timesteps), loihi_times[0:(timesteps-1), 0], marker='x')
-            plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-            plt.legend(("Simulated", "Measured on Loihi"))
-            plt.ylabel("Time-step Latency (s)")
+            plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
+            plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--x")
+
+            plt.legend(("Measured", "Simulated"))
+            plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")
-            plt.legend(("Simulated", "Measured on Loihi"))
-            plt.tight_layout()
+            plt.legend(("Measured on Loihi", "Simulated"))
+            plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_time.pdf")
             plt.savefig("runs/dvs/dvs_gesture_sim_time.png")
 
             # Plot the correlation between simulated and measured time-step latency
-            plt.figure(figsize=(2.5, 2.5))
+            plt.figure(figsize=(1.8, 1.8))
+            plt.minorticks_on()
+            plt.gca().set_box_aspect(1)
             #plt.plot(times[0:frames*(timesteps-1)], loihi_times[0:frames*(timesteps-1)], "x")
 
-            #exit()
-            plt.plot(total_times[0:frames], loihi_total_times[0:frames], "x")
-            plt.plot(np.linspace(min(total_times), max(total_times)), np.linspace(min(total_times), max(total_times)), "k--")
+            plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
+            plt.plot(total_times[0:frames]*1.0e3, loihi_total_times[0:frames]*1.0e3, "x")
+            plt.plot(np.linspace(min(total_times), max(total_times)) * 1.0e3,
+                     np.linspace(min(total_times), max(total_times)) * 1.0e3, "k--")
             #plt.xticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
             #plt.yticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
-            plt.ticklabel_format(style="sci", axis="x", scilimits=(0,0))
-            plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
             plt.ylabel("Measured Latency (s)")
             plt.xlabel("Simulated Latency (s)")
             #plt.xlim((0, 4e-3))
             #plt.ylim((0, 4e-3))
-            plt.tight_layout()
+            plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_correlation.pdf")
             plt.savefig("runs/dvs/dvs_gesture_sim_correlation.png")
 
@@ -291,24 +292,24 @@ if __name__ == "__main__":
             #total_error =  (np.sum(loihi_times[0:timesteps*frames]) - np.sum(times[0:timesteps*frames])) / np.sum(loihi_times[0:timesteps*frames])
             #print("Time Total error: {0} ({1} %)".format(total_error, total_error * 100))
 
-        if experiment == "energy":
-            plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
-            loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
-            loihi_energies = np.array(loihi_data) / 1.0e9
-            energies = np.loadtxt(SIM_ENERGY_DATA_PATH)
-            plt.figure(figsize=(2.5, 2.5))
-            plt.plot(energies[0:frames], loihi_energies[0:frames], 'x')
-            #plt.plot(energies[0:frames] + 0.45e-6, loihi_energies[0:frames], 'x')
-            plt.plot(np.linspace(min(loihi_energies), max(loihi_energies)), np.linspace(min(loihi_energies), max(loihi_energies)), "k--")
-            plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-            plt.xlim((2e-6, 5e-6))
-            plt.ylim((2e-6, 5e-6))
-            #plt.legend(("Simulated", "Measured on Loihi"))
-            plt.ylabel("Measured Energy (J)")
-            plt.xlabel("Simulated Energy (J)")
-            plt.tight_layout()
-            plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
-
+        #if experiment == "energy":
+        plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
+        loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
+        loihi_energies = np.array(loihi_data) / 1.0e9
+        energies = np.loadtxt(SIM_ENERGY_DATA_PATH)
+        plt.figure(figsize=(2.5, 2.5))
+        plt.plot(energies[0:frames], loihi_energies[0:frames], 'x')
+        #plt.plot(energies[0:frames] + 0.45e-6, loihi_energies[0:frames], 'x')
+        plt.plot(np.linspace(min(loihi_energies), max(loihi_energies)), np.linspace(min(loihi_energies), max(loihi_energies)), "k--")
+        plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+        plt.xlim((2e-6, 5e-6))
+        plt.ylim((2e-6, 5e-6))
+        #plt.legend(("Simulated", "Measured on Loihi"))
+        plt.ylabel("Measured Energy (J)")
+        plt.xlabel("Simulated Energy (J)")
+        plt.tight_layout()
+        plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
+        plt.savefig("runs/dvs/dvs_gesture_sim_energy.pdf")
         """
         relative_error = abs(loihi_energies[0:frames*timesteps] - energies) / loihi_energies[0:frames*timesteps]
         print(relative_error)

@@ -38,11 +38,11 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
 // TrueNorth
-#define ARCH_MAX_TILES 4096
-#define ARCH_MAX_CORES 1
+//#define ARCH_MAX_TILES 4096
+//#define ARCH_MAX_CORES 1
 // Loihi
-//#define ARCH_MAX_TILES 1280
-//#define ARCH_MAX_CORES 4
+#define ARCH_MAX_TILES 128
+#define ARCH_MAX_CORES 4
 
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256

@@ -17,6 +17,9 @@ from matplotlib import pyplot as plt
 import pickle
 import sys
 import os
+import numpy as np
+import pandas as pd
+import yaml
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
@@ -85,11 +88,11 @@ def connected_layers(weights, spiking=True, mapping="luke"):
 
     neurons_per_core = [0, 0, 0, 0]
     if mapping == "luke" or mapping == "l2_split" or mapping == "fixed":
-        neurons_per_core[0] = layer_neurons
+        neurons_per_core[0] = layer_neuron_count
     elif (mapping == "split_2" or mapping == "l1_split" or mapping == "split_4"
           or mapping == "split_4_diff_tiles"):
-        neurons_per_core[0] = ((layer_neurons + 1) // 2)
-        neurons_per_core[1] = layer_neurons // 2
+        neurons_per_core[0] = ((layer_neuron_count + 1) // 2)
+        neurons_per_core[1] = layer_neuron_count // 2
     else:
         print("Error: mapping not supported")
         exit(1)
@@ -110,25 +113,25 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     force_update = False
     neurons_per_core = [0, 0, 0, 0, 0]
     if mapping == "luke":
-        neurons_per_core[0] = min(layer_neurons, 1024 - layer_neurons)
-        neurons_per_core[1] = layer_neurons - neurons_per_core[0]
+        neurons_per_core[0] = min(layer_neuron_count, 1024 - layer_neuron_count)
+        neurons_per_core[1] = layer_neuron_count - neurons_per_core[0]
     elif mapping == "fixed":
-        neurons_per_core[1] = layer_neurons
+        neurons_per_core[1] = layer_neuron_count
     elif mapping == "split_2":
-        neurons_per_core[0] = ((layer_neurons + 1) // 2)
-        neurons_per_core[1] = layer_neurons // 2
+        neurons_per_core[0] = ((layer_neuron_count + 1) // 2)
+        neurons_per_core[1] = layer_neuron_count // 2
     elif mapping == "l2_split":
-        neurons_per_core[1] = ((layer_neurons + 1) // 2)
-        neurons_per_core[2] = layer_neurons // 2
+        neurons_per_core[1] = ((layer_neuron_count + 1) // 2)
+        neurons_per_core[2] = layer_neuron_count // 2
     elif mapping == "split_4":
-        neurons_per_core[2] = ((layer_neurons + 1) // 2)
-        neurons_per_core[3] = layer_neurons // 2
+        neurons_per_core[2] = ((layer_neuron_count + 1) // 2)
+        neurons_per_core[3] = layer_neuron_count // 2
     elif mapping == "l1_split":
-        neurons_per_core[2] = layer_neurons
+        neurons_per_core[2] = layer_neuron_count
     elif mapping == "split_4_diff_tiles":
-        neurons_per_core[2] = ((layer_neurons + 1) // 2)
+        neurons_per_core[2] = ((layer_neuron_count + 1) // 2)
         neurons_per_core[3] = 0
-        neurons_per_core[4] = layer_neurons // 2
+        neurons_per_core[4] = layer_neuron_count // 2
 
     layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
     for _ in range(0, neurons_per_core[1]):
@@ -156,15 +159,63 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     return network
 
 
+def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
+                           max_size=30):
+    with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
+        weights = pickle.load(weights_file)
+
+    # Setup the correct blocking and save to a temporary arch file
+    with open(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"), "r") as arch_file:
+        loihi_arch = yaml.safe_load(arch_file)
+
+    tiles = loihi_arch["architecture"]["tile"]
+    for t in tiles:
+        t["attributes"]["blocking"] = tiles_blocking
+        cores = t["core"]
+        for c in cores:
+            c["attributes"]["blocking"] = cores_blocking
+
+    generated_arch_filename = os.path.join(PROJECT_DIR, "runs", "calibration",
+                                 "calibrated_loihi.arch")
+    with open(generated_arch_filename, "w") as arch_file:
+        yaml.safe_dump(loihi_arch, arch_file)
+
+    timesteps = 1
+    for i in range(1, max_size):
+        # Sweep across range of network sizes
+        layer_neurons = i*i
+        snn = connected_layers(weights[i-1].transpose(), spiking=True,
+                                    mapping=mapping)
+        snn.save(NETWORK_FILENAME)
+
+        print("Testing network with {0} neurons".format(2*layer_neurons))
+        results = sim.run(generated_arch_filename, NETWORK_FILENAME,
+                            timesteps)
+
+        with open(os.path.join(PROJECT_DIR, "runs", "calibration", "sim_spiking.csv"),
+                  "a") as spiking_csv:
+            spiking_writer = csv.DictWriter(spiking_csv,
+                                            ("neuron_counts", "energy", "time",
+                                             "mapping", "cores_blocking",
+                                             "tiles_blocking"))
+            spiking_writer.writerow({"neuron_counts": layer_neurons*2,
+                                      "time": results["time"],
+                                      "energy": results["energy"],
+                                      "mapping": mapping,
+                                      "cores_blocking": cores_blocking,
+                                      "tiles_blocking": tiles_blocking})
+
+    return
+
+
+mappings = ("fixed", "luke", "split_2")
 if __name__ == "__main__":
+    run_experiments = False
+    plot_experiments = True
+
     #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
-    #mapping = "split_4_diff_tiles"
-
-    mapping = "fixed"
-    #mapping = "luke"
-    #mapping = "split_2"
     """
     for cores in core_count:
         for compartments in range(0, MAX_COMPARTMENTS+1, 256):
@@ -196,43 +247,26 @@ if __name__ == "__main__":
     """
     # This experiment looks at two fully connected layers, spiking
 
-    with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
-        weights = pickle.load(weights_file)
+    if run_experiments:
+        with open(f"runs/calibration/sim_spiking.csv", "w") as spiking_csv:
+            spiking_writer = csv.DictWriter(spiking_csv,
+                                       ("neuron_counts", "energy", "time",
+                                        "mapping", "cores_blocking",
+                                        "tiles_blocking"))
+            spiking_writer.writeheader()
+        for mapping in mappings:
+            run_spiking_experiment(mapping, cores_blocking=False,
+                                   tiles_blocking=False, max_size=30)
+            run_spiking_experiment(mapping, cores_blocking=True,
+                                   tiles_blocking=False, max_size=30)
+            run_spiking_experiment(mapping, cores_blocking=True,
+                                   tiles_blocking=True, max_size=30)
+        with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
+            weights = pickle.load(weights_file)
 
-    neuron_counts = []
-    spiking_times = []
-    spiking_energy = []
-
-    timesteps = 1
-    for i in range(1, 30):
-    #for i in range(1, 4):
-        layer_neurons = i*i
-
-        #network = fully_connected(layer_neurons, spiking=True, probability=connection_probabilities[i-1])
-        snn = connected_layers(weights[i-1].transpose(), spiking=True,
-                                    mapping=mapping)
-        print("Testing network with {0} neurons".format(2*layer_neurons))
-        snn.save(NETWORK_FILENAME)
-        results = sim.run(ARCH_FILENAME, NETWORK_FILENAME, timesteps)
-
-        neuron_counts.append(layer_neurons*2)
-        spiking_times.append(results["time"])
-        spiking_energy.append(results["energy"])
-
-    # Write all the simulation data to csv
-    with open("runs/calibration/sim_spiking.csv", "w") as spiking_csv:
-        spiking_writer = csv.DictWriter(spiking_csv,
-                                        ("neuron_counts", "energy", "time"))
-        spiking_writer.writeheader()
-        for count, time, energy_val in zip(neuron_counts, spiking_times,
-                                                  spiking_energy):
-            spiking_writer.writerow({"neuron_counts": count,
-                                     "energy": energy_val,
-                                     "time": time})
-
-    neuron_counts = []
-    nonspiking_times = []
-    nonspiking_energy = []
+        neuron_counts = []
+        spiking_times = []
+        spiking_energy = []
 
     """
     # The second experiment looks at two fully connected layers, not spiking
@@ -261,109 +295,138 @@ if __name__ == "__main__":
     # **************************************************************************
     # Read Loihi measurement data from csv, this is only available to me locally
     #  since this is restricted data!
-    neuron_counts = []
-    loihi_times_spikes = []
-    loihi_energy_spikes = []
+    if plot_experiments:
+        loihi_times_spikes = {"fixed": [], "luke": [], "split_2": []}
+        loihi_energy_spikes = []
 
-    spiking_energy = []
-    spiking_times = []
-    with open("runs/calibration/sim_spiking.csv", "r") as spiking_csv:
-        spiking_reader = csv.DictReader(spiking_csv)
-        for row in spiking_reader:
-            spiking_times.append(float(row["time"]))
-            spiking_energy.append(float(row["energy"]))
-            neuron_counts.append(int(row["neuron_counts"]))
+        spiking_energy = []
+        with open("runs/calibration/sim_spiking.csv", "r") as spiking_csv:
+            df = pd.read_csv(spiking_csv)
 
-    nonspiking_times = []
-    nonspiking_energy = []
-    with open("runs/calibration/sim_nonspiking.csv", "r") as nonspiking_csv:
-        nonspiking_reader = csv.DictReader(nonspiking_csv)
-        for row in nonspiking_reader:
-            nonspiking_times.append(float(row["time"]))
-            nonspiking_energy.append(float(row["energy"]))
+        with open("runs/sandia_data/loihi_spiking.csv", "r") as spiking_csv:
+            spiking_reader = csv.DictReader(spiking_csv)
+            for row in spiking_reader:
+                for mapping in mappings:
+                    loihi_times_spikes[mapping].append(float(row[mapping]))
+                loihi_energy_spikes.append(float(row["dynamic energy"]))
+        """
+        nonspiking_times = []
+        nonspiking_energy = []
+        with open("runs/calibration/sim_nonspiking.csv", "r") as nonspiking_csv:
+            nonspiking_reader = csv.DictReader(nonspiking_csv)
+            for row in nonspiking_reader:
+                nonspiking_times.append(float(row["time"]))
+                nonspiking_energy.append(float(row["energy"]))
+        loihi_times_no_spikes = []
+        loihi_energy_no_spikes = []
+        with open("runs/sandia_data/loihi_nonspiking.csv", "r") as nonspiking_csv:
+            nonspiking_reader = csv.DictReader(nonspiking_csv)
+            for row in nonspiking_reader:
+                loihi_times_no_spikes.append(float(row["time"]))
+                loihi_energy_no_spikes.append(float(row["energy"]))
+        """
 
-    with open("runs/sandia_data/loihi_spiking.csv", "r") as spiking_csv:
-        spiking_reader = csv.DictReader(spiking_csv)
-        for row in spiking_reader:
-            loihi_times_spikes.append(float(row[mapping]))
-            loihi_energy_spikes.append(float(row["dynamic energy"]))
+        plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
+        # First plot results for the simple fixed mapping, where one layer is on
+        #  one core and the second layer is on another
+        spiking_frame = df.loc[(df["mapping"] == "fixed") &
+                               (df["cores_blocking"] == False) &
+                               (df["tiles_blocking"] == False)]
+        spiking_times = np.array(spiking_frame["time"])
+        spiking_energy = np.array(spiking_frame["energy"])
+        neuron_counts = np.array(spiking_frame["neuron_counts"])
 
-    loihi_times_no_spikes = []
-    loihi_energy_no_spikes = []
-    with open("runs/sandia_data/loihi_nonspiking.csv", "r") as nonspiking_csv:
-        nonspiking_reader = csv.DictReader(nonspiking_csv)
-        for row in nonspiking_reader:
-            loihi_times_no_spikes.append(float(row["time"]))
-            loihi_energy_no_spikes.append(float(row["energy"]))
+        plt.figure(figsize=(1.8, 1.8))
+        plt.plot(neuron_counts, np.array(loihi_times_spikes["fixed"]) * 1.0e3, "-")
+        plt.plot(neuron_counts, spiking_times * 1.0e3, "x")
+        plt.gca().set_box_aspect(1)
+        plt.yscale("linear")
+        plt.xscale("linear")
+        plt.ylabel("Time-step Latency (ms)")
+        plt.xlabel("Neurons")
+        plt.minorticks_on()
+        plt.legend(("Measured", "Simulated"))
+        plt.tight_layout(pad=0.3)
+        plt.savefig("runs/calibration/interception_time_partition_1.pdf")
+        plt.savefig("runs/calibration/interception_time_partition_1.png")
 
-    plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
+        plt.figure(figsize=(1.8, 1.8))
+        plt.plot(neuron_counts, np.array(loihi_energy_spikes) * 1.0e6, "-")
+        plt.plot(neuron_counts, np.array(spiking_energy) * 1.0e6, "x")
+        plt.gca().set_box_aspect(1)
+        plt.yscale("linear")
+        plt.xscale("linear")
+        plt.ylabel("Energy ($\mu$J)")
+        plt.xlabel("Neurons")
+        plt.minorticks_on()
+        plt.legend(("Measured", "Simulated"))
+        plt.tight_layout(pad=0.3)
+        plt.savefig("runs/calibration/interception_energy.pdf")
+        plt.savefig("runs/calibration/interception_energy.png")
 
-    plt.figure(figsize=(2.5, 2.5))
-    plt.plot(neuron_counts, spiking_times, "-o")
-    plt.plot(neuron_counts, loihi_times_spikes, "--x")
-    plt.yscale("linear")
-    plt.xscale("linear")
-    plt.ylabel("Time-step Latency (s)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated", "Measured on Loihi"))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.tight_layout()
-    plt.savefig("runs/calibration/connected_spiking_time.pdf")
-    plt.savefig("runs/calibration/connected_spiking_time.png")
+        plt.rcParams.update({'font.size': 9, 'lines.markersize': 3})
+        ## Plot the effect of cores blocking
+        spiking_frame = df.loc[(df["mapping"] == "luke") &
+                               (df["tiles_blocking"] == False)]
+        cores_nonblocking = spiking_frame.loc[spiking_frame["cores_blocking"] == False]
+        cores_blocking = spiking_frame.loc[spiking_frame["cores_blocking"] == True]
 
-    plt.figure(figsize=(2.5, 2.5))
-    plt.plot(neuron_counts, spiking_energy, "-o")
-    plt.plot(neuron_counts, loihi_energy_spikes, "--x", color="orange")
-    plt.yscale("linear")
-    plt.xscale("linear")
-    plt.ylabel("Energy (J)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated", "Measured on Loihi"))
-    #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.tight_layout()
-    plt.savefig("runs/calibration/connected_spiking_energy.pdf")
-    plt.savefig("runs/calibration/connected_spiking_energy.png")
+        plt.figure(figsize=(2.4, 2.4))
+        plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
+        plt.plot(neuron_counts, np.array(cores_nonblocking["time"] * 1.0e3), "x")
+        plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "o")
+        plt.gca().set_box_aspect(1)
+        plt.yscale("linear")
+        plt.xscale("linear")
+        plt.ylabel("Time-step Latency (ms)")
+        plt.xlabel("Neurons")
+        plt.minorticks_on()
+        plt.legend(("Measured", "Uncalibrated", "Calibrated"))
+        plt.tight_layout(pad=0.3)
+        plt.savefig("runs/calibration/interception_time_partition_2.pdf")
+        plt.savefig("runs/calibration/interception_time_partition_2.png")
 
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
-    plt.yscale("linear")
-    plt.xscale("linear")
-    plt.ylabel("Energy (J)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated",))
-    #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/calibration/connected_spiking_energy_sim_only.png")
+        # Plot the effect of network tiles blocking
+        spiking_frame = df.loc[(df["mapping"] == "split_2") &
+                               (df["cores_blocking"] == True)]
+        tiles_nonblocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == False]
+        tiles_blocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == True]
 
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neuron_counts, nonspiking_times[0:-1], "-o")
-    plt.plot(neuron_counts, loihi_times_no_spikes[0:-1], "--x")
-    plt.yscale("linear")
-    plt.xscale("linear")
-    plt.ylabel("Time (s)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated", "Measured on Loihi"))
-    #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/calibration/connected_not_spiking_time.png")
+        plt.figure(figsize=(2.4, 2.4))
+        plt.plot(neuron_counts, np.array(loihi_times_spikes["split_2"]) * 1.0e3, "-")
+        plt.plot(neuron_counts, np.array(tiles_nonblocking["time"]) * 1.0e3, "x")
+        plt.plot(neuron_counts, np.array(tiles_blocking["time"]) * 1.0e3, "o")
+        plt.gca().set_box_aspect(1)
+        plt.yscale("linear")
+        plt.xscale("linear")
+        plt.ylabel("Time-step Latency (ms)")
+        plt.xlabel("Neurons")
+        plt.minorticks_on()
+        plt.legend(("Measured", "Uncalibrated", "Calibrated"))
+        plt.tight_layout(pad=0.3)
+        plt.savefig("runs/calibration/interception_time_partition_3.pdf")
+        plt.savefig("runs/calibration/interception_time_partition_3.png")
+        """
+        plt.figure(figsize=(5.5, 5.5))
+        plt.plot(neuron_counts, nonspiking_times[0:-1], "-o")
+        plt.plot(neuron_counts, loihi_times_no_spikes[0:-1], "--x")
+        plt.yscale("linear")
+        plt.xscale("linear")
+        plt.ylabel("Time (s)")
+        plt.xlabel("Neurons")
+        plt.legend(("Simulated", "Measured on Loihi"))
+        #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+        plt.savefig("runs/calibration/connected_not_spiking_time.png")
 
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
-    plt.plot(neuron_counts, loihi_energy_no_spikes[0:-1], "--x")
-    plt.yscale("linear")
-    plt.xscale("linear")
-    plt.ylabel("Energy (J)")
-    plt.xlabel("Neurons")
-    plt.legend(("Simulated", "Measured on Loihi"))
-    #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/calibration/connected_not_spiking_energy.png")
-
-    """
-    # Some additional plots to highlight trends
-    plt.figure(figsize=(5.5, 5.5))
-    plt.plot(neuron_counts, loihi_times_spikes, "--x", color="orange")
-    plt.ylabel("Time (s)")
-    plt.xlabel("Neurons")
-    plt.legend(("Measured on Loihi",))
-    #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("runs/connected_spiking_time_loihi_only.png")
-    """
-    #plt.show()
+        plt.figure(figsize=(5.5, 5.5))
+        plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
+        plt.plot(neuron_counts, loihi_energy_no_spikes[0:-1], "--x")
+        plt.yscale("linear")
+        plt.xscale("linear")
+        plt.ylabel("Energy (J)")
+        plt.xlabel("Neurons")
+        plt.legend(("Simulated", "Measured on Loihi"))
+        #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+        plt.savefig("runs/calibration/connected_not_spiking_energy.png")
+        """
+        #plt.show()

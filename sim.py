@@ -159,7 +159,8 @@ class Neuron:
             neuron_str += f" log_v={int(self.log_potential)}"
         if self.force_update is not None:
             neuron_str += f" force_update={int(self.force_update)}"
-        if len(self.connections) > self.group.connections_out:
+        if (self.group.connections_out is None or (self.connections and
+            (len(self.connections) > self.group.connections_out))):
            neuron_str += f" connections_out={len(self.connections)}"
         neuron_str += "\n"
 
@@ -419,7 +420,9 @@ def run(arch_path, network_path, timesteps,
         run_dir=os.path.join(project_dir, "runs"),
         perf_trace=True, spike_trace=False, potential_trace=False,
         message_trace=False):
-    parse_file(arch_path, os.path.join(run_dir, "arch"))
+    parsed_filename = os.path.join(run_dir,
+                                   os.path.basename(arch_path) + ".parsed")
+    parse_file(arch_path, parsed_filename)
     # Parse inputs and run simulation
     args = []
     if spike_trace:
@@ -430,7 +433,7 @@ def run(arch_path, network_path, timesteps,
         args.append("-p")
     if message_trace:
         args.append("-m")
-    command = [os.path.join(project_dir, "sim"),] + args + [os.path.join(run_dir, "arch"),
+    command = [os.path.join(project_dir, "sim"),] + args + [parsed_filename,
                network_path, f"{timesteps}"]
 
     print("Command: {0}".format(" ".join(command)))
