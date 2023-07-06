@@ -16,13 +16,14 @@ ARCH_FILENAME = "loihi.arch"
 ### SNN utility functions ###
 
 class Network:
-    def __init__(self, external_inputs=0):
+    def __init__(self, external_inputs=0, save_mappings=False):
         self.external_inputs = external_inputs
         self.inputs = []
         self.groups = []
         self._max_tiles = None
         self._max_cores = None
         self._max_compartments = None
+        self._save_mappings = save_mappings
 
     def create_group(self, threshold, reset, leak, log_spikes=False,
                      log_potential=False, force_update=False,
@@ -39,15 +40,18 @@ class Network:
         self.inputs.append(input_node)
         return input_node
 
-    def save(self, filename):
+    def save(self, filename, group_idx=None):
+        if group_idx is None:
+            group_idx = slice(0, len(self.groups))
         with open(filename, 'w') as network_file:
             if self.external_inputs > 0:
                 network_file.write("x {0} rate\n".format(self.external_inputs))
-            for group in self.groups:
+            for group in self.groups[group_idx]:
                 network_file.write(str(group))
 
-            for group in self.groups:
+            for group in self.groups[group_idx]:
                 for neuron in group.neurons:
+                    neuron._save_mappings = False
                     network_file.write(str(neuron))
 
             for input_node in self.inputs:
@@ -168,13 +172,13 @@ class Neuron:
             dest_neuron, weight = connection
             neuron_str += f"e {self.group.id}.{self.id}->"
             neuron_str += f"{dest_neuron.group.id}.{dest_neuron.id}"
-            if isinstance(weight, float):
+        if isinstance(weight, float):
                 neuron_str += f" w={weight:.5e}"
             else:
                 neuron_str += f" w={weight}"
             neuron_str += "\n"
 
-        if map_neuron:
+        if self._save_mappings:
             neuron_str += "& {0}.{1}@{2}.{3}\n".format(self.group.id, self.id,
                                                     self.tile, self.core)
         return neuron_str
