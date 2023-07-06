@@ -18,18 +18,21 @@ import subprocess
 import random
 import csv
 import yaml
+import sys
+import os
 
 # SANA-FE libraries
-import sys
-sys.path.insert(0, '/home/usr1/jboyle/neuro/sana-fe')
-import utils
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+sys.path.insert(0, PROJECT_DIR)
+import sim
 
 # Use a dumb seed to get consistent results
 random.seed(1)
 
 # Global experiment parameters
-NETWORK_FILENAME = "runs/random.net"
-ARCH_FILENAME = "loihi.arch"
+NETWORK_FILENAME = "runs/random/random.net"
+ARCH_FILENAME = "arch/loihi.arch"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
@@ -38,8 +41,8 @@ TIMESTEPS = 1
 
 def create_random_network(cores, neurons_per_core, messages_per_neuron,
                           spikes_per_message):
-    network = utils.Network()
-    compartments = utils.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
+    network = sim.Network()
+    compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                            neurons_per_core)
 
     neurons = cores * neurons_per_core
@@ -49,9 +52,9 @@ def create_random_network(cores, neurons_per_core, messages_per_neuron,
         mappings.extend((m,) * neurons_per_core)
 
     print("Creating neuron population")
-    population = utils.create_layer(network, neurons,
-                                    compartments, 0, 0, 1, 0.0, 0.0, 0.0,
-                                    mappings=mappings)
+    population = sim.create_layer(network, neurons,
+                                  compartments, 0, 0, 1, 0.0, 0.0, 0.0,
+                                  mappings=mappings)
 
     print("Generating randomized network connections")
     weight = 1.0
@@ -95,7 +98,7 @@ def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_me
 
 
 def plot_results():
-    df = pd.read_csv("runs/sanafe_perf.csv")
+    df = pd.read_csv("runs/random/sanafe_perf.csv")
     plt.rcParams.update({'font.size': 14, 'lines.markersize': 5})
 
     plt.figure(figsize=(4.0, 4.0))
@@ -110,7 +113,7 @@ def plot_results():
     plt.xlabel("Spike Messages")
     plt.ylabel("Run-time (s)")
     plt.tight_layout()
-    plt.savefig("runs/sanafe_perf_1.png")
+    plt.savefig("runs/random/sanafe_perf_1.png")
     plt.close()
 
     plt.figure(figsize=(4.0, 4.0))
@@ -125,7 +128,7 @@ def plot_results():
     plt.xlabel("Spike Messages")
     plt.ylabel("Run-time (s)")
     plt.tight_layout()
-    plt.savefig("runs/sanafe_perf_2.png")
+    plt.savefig("runs/random/sanafe_perf_2.png")
     plt.close()
 
     plt.figure(figsize=(4.0, 4.0))
@@ -139,7 +142,7 @@ def plot_results():
     plt.xlabel("Loihi Core Count")
     plt.ylabel("Run-time (s)")
     plt.tight_layout()
-    plt.savefig("runs/sanafe_perf_3.png")
+    plt.savefig("runs/random/sanafe_perf_3.png")
     plt.close()
 
     plt.figure(figsize=(4.0, 4.0))
@@ -190,7 +193,7 @@ def plot_results():
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot = True
     if run_experiments:
         cores = (1, 2, 4, 8, 16, 32, 64, 128)
@@ -201,20 +204,22 @@ if __name__ == "__main__":
         # Part one is we try different numbers of cores and different numbers
         #  of messages per core
         data_points = []
-        with open("runs/sanafe_perf.csv", "w") as csv_file:
+        with open("runs/random/sanafe_perf.csv", "w") as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(("cores", "neurons_per_core", "messages_per_neuron",
                              "spikes_per_message", "messages", "spikes",
                              "runtime"))
-            for c in cores:
-                for n in neurons_per_core:
-                    for m in messages_per_neuron:
-                        if m <= c:
-                            for s in spikes_per_message:
-                                results = run_sim(TIMESTEPS, c, n, m, s)
-                                row = (c, n, m, s, results["total_packets"],
-                                    results["total_spikes"],
-                                    results["wall_time"])
+        for c in cores:
+            for n in neurons_per_core:
+                for m in messages_per_neuron:
+                    if m <= c:
+                        for s in spikes_per_message:
+                            results = run_sim(TIMESTEPS, c, n, m, s)
+                            row = (c, n, m, s, results["total_packets"],
+                                results["total_spikes"],
+                                results["wall_time"])
+                            with open("runs/random/sanafe_perf.csv", "a") as csv_file:
+                                writer = csv.writer(csv_file)
                                 writer.writerow(row)
         print("Saved results to file")
 
