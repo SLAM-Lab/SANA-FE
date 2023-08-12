@@ -14,7 +14,7 @@ architecture:
   tile:
     - name: loihi_tile[0..31]
       attributes:
-        blocking: True
+        blocking: False
         energy_spike_within_tile: 1.7e-12
         latency_spike_within_tile: 2.1e-9
         energy_east_west: 3.0e-12
@@ -26,6 +26,10 @@ architecture:
         - name: loihi_core[0..3]
           attributes:
             blocking: True
+            # The noise sequence for Loihi is probably proprietary, so I need
+            #  to figure out how these experiments are uploaded to git. For
+            #  now this file just won't exist
+            noise: etc/loihi_random_seq.csv
           axon_in:
             - name: core_in
               # axon_in acts like input ports to the arch or subtree.
@@ -53,7 +57,7 @@ architecture:
                 model: cuba
                 weight_bits: 8
                 word_bits: 64
-                energy_spike: 30.0e-12
+                energy_spike: 21.1e-12
                 latency_spike: 4.0e-9
                 energy_memory: 55.1e-12
                 latency_memory: 0.0

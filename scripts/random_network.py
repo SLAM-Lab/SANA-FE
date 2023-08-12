@@ -32,12 +32,12 @@ random.seed(1)
 
 # Global experiment parameters
 NETWORK_FILENAME = "runs/random/random.net"
-ARCH_FILENAME = "arch/loihi.arch"
+ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
 TIMESTEPS = 1
-#TIMESTEPS = 4
+TIMESTEPS = 100
 
 def create_random_network(cores, neurons_per_core, messages_per_neuron,
                           spikes_per_message):
@@ -108,7 +108,8 @@ def plot_results():
                  "o-")
 
     legend_str = [f"{c} cores" for c in df["cores"].unique()]
-    plt.legend(legend_str, reverse=True)
+    #plt.legend(legend_str, reverse=True)
+    plt.legend(legend_str)
     plt.ticklabel_format(style="sci", axis="x", scilimits=(0,0))
     plt.xlabel("Spike Messages")
     plt.ylabel("Run-time (s)")
@@ -196,6 +197,7 @@ if __name__ == "__main__":
     run_experiments = True
     plot = True
     if run_experiments:
+        """
         cores = (1, 2, 4, 8, 16, 32, 64, 128)
         messages_per_neuron = (1, 2, 4, 8, 16, 32, 64, 128)
         spikes_per_message = (1, 4, 8)
@@ -222,6 +224,26 @@ if __name__ == "__main__":
                                 writer = csv.writer(csv_file)
                                 writer.writerow(row)
         print("Saved results to file")
+        """
+        with open("runs/random/random_network_8.csv", "r") as csv_file:
+            reader = csv.DictReader(csv_file)
+            fieldnames = reader.fieldnames
+            with open("runs/random/random_network_8_no_blocking.csv", "w") as out_file:
+                writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+                writer.writeheader()
+
+            for line in reader:
+                results = sim.run(ARCH_FILENAME, line["network"], TIMESTEPS,
+                                  perf_trace=True)
+                print(results)
+                line["loihi_energy"] = float(line["loihi_energy"])
+                line["loihi_latency"] = float(line["loihi_latency"])
+                line["sim_energy"] = results["energy"] / TIMESTEPS
+                line["sim_latency"] = results["time"] / TIMESTEPS
+                print(line)
+                with open("runs/random/random_network_8_no_blocking.csv", "a") as out_file:
+                    writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+                    writer.writerow(line)
 
     if plot:
         plot_results()

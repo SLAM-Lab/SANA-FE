@@ -90,10 +90,10 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiment = False
+    run_experiment = True
     plot_experiment = True
-    experiment = "time"
-    #experiment = "energy"
+    #experiment = "time"
+    experiment = "energy"
 
     neurons = []
     spiking_times = []
@@ -127,11 +127,12 @@ if __name__ == "__main__":
         print("Reading input file")
 
         # Clear the data files
-        open(SIM_ENERGY_DATA_PATH, "w")
-        open(SIM_TIME_DATA_PATH, "w")
+        if experiment == "energy":
+            open(SIM_ENERGY_DATA_PATH, "w")
+        elif experiment == "time":
+            open(SIM_TIME_DATA_PATH, "w")
 
         for inputs in range(0, frames):
-        #for inputs in range(90, 91):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
             input_filename = os.path.join(NETWORK_DIR, f"inputs{inputs}.net")
@@ -198,9 +199,6 @@ if __name__ == "__main__":
                 #loihi_total_times[i] = np.sum(loihi_times[i*(timesteps-1):(i+1)*(timesteps-1)])
                 loihi_total_times[i] = np.sum(loihi_times[0:timesteps, i])
 
-            # HACK: remove these experiments
-            #total_times = total_times * 0.45 + 1.1e-3
-
             """
             plt.figure(figsize=(7, 8))
             plt.subplot(311)
@@ -246,18 +244,21 @@ if __name__ == "__main__":
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps-1, timesteps*frames, timesteps)))
             loihi_times = loihi_times[0:timesteps-1,:]
-            plt.figure(figsize=(7.5, 2.0))
+            plt.figure(figsize=(5.0, 2.0))
+            #plt.figure(figsize=(7.5, 2.0))
 
             # TODO: flatten all timesteps again?
-            #plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
-            #plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
-            plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
-            plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--x")
+            ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
+            ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
+            #plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
+            #plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--x")
+            #plt.legend(("Measured", "Simulated"))
 
-            plt.legend(("Measured", "Simulated"))
+            plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "-o")
+            plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "--x")
+            plt.legend(("Simulated", "Measured on Loihi"))
             plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")
-            plt.legend(("Measured on Loihi", "Simulated"))
             plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_time.pdf")
             plt.savefig("runs/dvs/dvs_gesture_sim_time.png")
@@ -292,35 +293,59 @@ if __name__ == "__main__":
             #total_error =  (np.sum(loihi_times[0:timesteps*frames]) - np.sum(times[0:timesteps*frames])) / np.sum(loihi_times[0:timesteps*frames])
             #print("Time Total error: {0} ({1} %)".format(total_error, total_error * 100))
 
-        #if experiment == "energy":
-        plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
-        loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
-        loihi_energies = np.array(loihi_data) / 1.0e9
-        energies = np.loadtxt(SIM_ENERGY_DATA_PATH)
-        plt.figure(figsize=(2.5, 2.5))
-        plt.plot(energies[0:frames], loihi_energies[0:frames], 'x')
-        #plt.plot(energies[0:frames] + 0.45e-6, loihi_energies[0:frames], 'x')
-        plt.plot(np.linspace(min(loihi_energies), max(loihi_energies)), np.linspace(min(loihi_energies), max(loihi_energies)), "k--")
-        plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-        plt.xlim((2e-6, 5e-6))
-        plt.ylim((2e-6, 5e-6))
-        #plt.legend(("Simulated", "Measured on Loihi"))
-        plt.ylabel("Measured Energy (J)")
-        plt.xlabel("Simulated Energy (J)")
-        plt.tight_layout()
-        plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
-        plt.savefig("runs/dvs/dvs_gesture_sim_energy.pdf")
-        """
-        relative_error = abs(loihi_energies[0:frames*timesteps] - energies) / loihi_energies[0:frames*timesteps]
-        print(relative_error)
-        mean_error = sum(relative_error) / len(relative_error)
-        print("Energy Absolute Mean error: {0} ({1} %)".format(mean_error, mean_error * 100))
+        if experiment == "energy":
+            plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
+            loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
+            loihi_energies = np.array(loihi_data).flatten() * 1.0e6
+            energies = np.loadtxt(SIM_ENERGY_DATA_PATH) * 1.0e6
+            plt.figure(figsize=(2.4, 2.4))
+            plt.plot(energies[0:frames], loihi_energies[0:frames], 'x')
+            plt.plot(np.linspace(min(loihi_energies), max(loihi_energies)), np.linspace(min(loihi_energies), max(loihi_energies)), "k--")
+            plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
+            plt.xlim((1, 4))
+            plt.ylim((1, 4))
+            plt.ylabel("Measured Energy ($\mu$J)")
+            plt.xlabel("Simulated Energy ($\mu$J)")
+            plt.tight_layout()
+            plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
+            plt.savefig("runs/dvs/dvs_gesture_sim_energy.pdf")
 
-        total_error =  (sum(loihi_energies[0:timesteps]) - sum(energies)) / sum(loihi_energies[0:timesteps])
-        print("Energy Total error: {0} ({1} %)".format(total_error, total_error * 100))
+            relative_error = abs(loihi_energies[0:frames] - energies[0:frames]) / loihi_energies[0:frames]
+            mean_error = sum(relative_error) / len(relative_error)
+            print(relative_error)
+            print(f"Energy Absolute Mean error: {mean_error} ({mean_error*100.0} %)")
+
+            total_error = (sum(loihi_energies[0:frames]) - sum(energies[0:frames])) / sum(loihi_energies[0:frames])
+            print(f"Energy Total error: {total_error} ({total_error*100.0} %)")
+
+            plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
+            # Figure out how many neurons fired in the Loihi data
+            fired_count = [len(loihi_spiketrains[i]) for
+                        i in range(0, len(loihi_spiketrains))]
+            plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
+            plt.ylabel("Neurons Fired")
+            plt.xlabel("Timestep")
+            plt.legend(("Simulated", "Measured on Loihi"))
+
+            print("diff = {}".format(
+                analysis["fired"] - np.array(fired_count[0:timesteps])))
+            plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
+
+        """
+        plt.figure()
+        plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
+        # Figure out how many neurons fired in the Loihi data
+        fired_count = [len(loihi_spiketrains[i]) for
+                    i in range(0, len(loihi_spiketrains))]
+        plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
+        plt.ylabel("Neurons Fired")
+        plt.xlabel("Timestep")
+        plt.legend(("Simulated", "Measured on Loihi"))
+        print("diff = {}".format(
+            analysis["fired"] - np.array(fired_count[0:timesteps])))
+        plt.savefig("runs/dvs/dvs_gesture_spikes_i16.png")
         """
         exit()
-
         # These experiments not used for now
         # Plot the potential probes from simulation
         layers = ("inputs", "0Conv2D_15x15x16", "1Conv2D_13x13x32",

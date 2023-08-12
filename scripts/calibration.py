@@ -33,7 +33,6 @@ MAX_COMPARTMENTS = 1024
 NETWORK_FILENAME = "runs/calibration/connected_layers.net"
 ARCH_FILENAME = "arch/loihi.yaml"
 
-
 import random
 def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
@@ -375,6 +374,12 @@ if __name__ == "__main__":
         plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(cores_nonblocking["time"] * 1.0e3), "x")
         plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "o")
+
+        #plt.figure(figsize=(2.5, 2.5))
+        #plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "-o")
+        #plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-x")
+        #plt.legend(("Simulated", "Measured on Loihi"))
+
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")

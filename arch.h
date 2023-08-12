@@ -88,6 +88,13 @@ enum arch_description_blocks
 	ARCH_DESCRIPTION_AXON_OUT,
 };
 
+enum noise_type
+{
+	NOISE_NONE = -1,
+	NOISE_FILE_STREAM,
+	// TODO: implement different random noise generators
+};
+
 struct message
 {
 	struct tile *src_tile, *dest_tile;
@@ -102,7 +109,7 @@ struct message
 struct axon_map
 {
 	// List of all neuron connections to send spike to
-	int connection_count, spikes_received;
+	int connection_count, spikes_received, active_synapses;
 	long int last_updated;
 	double network_latency, receive_latency;
 	struct connection **connections;
@@ -173,11 +180,13 @@ struct core
 	struct soma_processor soma;
 	struct axon_output axon_out;
 
+	FILE *noise_stream;
+
 	char name[MAX_FIELD_LEN];
 	double energy, time, blocked_until;
 	int id, buffer_pos, is_blocking;
 	int neuron_count, curr_neuron, neurons_left, messages_left;
-	int curr_axon;
+	int curr_axon, noise_type;
 };
 
 struct tile

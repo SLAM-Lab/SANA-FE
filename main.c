@@ -217,6 +217,7 @@ int main(int argc, char *argv[])
 		sim_perf_write_header(sim.perf_fp);
 	}
 	// Step simulation
+	INFO("Running simulation.\n");
 	for (int i = 0; i < timesteps; i++)
 	{
 		if ((i+1) % 100 == 0)
