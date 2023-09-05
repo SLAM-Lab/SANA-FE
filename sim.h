@@ -13,11 +13,13 @@
 
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define MAX_NOISE_FILE_ENTRY 128
 
 struct simulation
 {
 	int log_perf, log_spikes, log_potential, log_messages;
 	long int timesteps, total_spikes, total_messages_sent;
+	long int total_neurons_fired;
 	double total_energy, total_sim_time, wall_time;
 	FILE *spike_trace_fp, *potential_trace_fp, *message_trace_fp, *perf_fp;
 	FILE *stats_fp;
@@ -52,7 +54,7 @@ int sim_schedule_messages(const struct simulation *const sim, struct timestep *c
 void sim_process_neuron(struct timestep *const ts, struct network *net, struct neuron *n);
 double sim_pipeline_receive(struct timestep *const ts, struct core *c, struct axon_map *axon);
 double sim_neuron_send_spike(struct neuron *n);
-double sim_update_synapse(struct timestep *const ts, struct axon_map *axon);
+double sim_update_synapse(struct timestep *const ts, struct axon_map *axon, const int synaptic_lookup);
 double sim_update_dendrite(struct timestep *const ts, struct neuron *n, const double charge);
 double sim_update_soma(struct timestep *const ts, struct neuron *n, const double current_in);
 double sim_update_axon(struct neuron *n);

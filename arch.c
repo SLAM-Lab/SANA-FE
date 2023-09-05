@@ -329,6 +329,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 
 	/*** Set attributes ***/
 	c->is_blocking = 0;
+	c->noise_type = NOISE_NONE;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
@@ -337,6 +338,17 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 		{
 			c->is_blocking = (strncmp(a->value_str, "True",
 						MAX_FIELD_LEN) == 0);
+		}
+		if (strncmp("noise", a->key, MAX_FIELD_LEN) == 0)
+		{
+			c->noise_type = NOISE_FILE_STREAM;
+			c->noise_stream = fopen(a->value_str, "r");
+			INFO("Opening noise str: %s\n", a->value_str);
+			if (c->noise_stream == NULL)
+			{
+				INFO("Error: Failed to open noise stream/\n");
+				exit(1);
+			}
 		}
 	}
 
@@ -454,8 +466,7 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 	}
 
 	// Round up to the nearest word
-	s->weights_per_word = (s->word_bits + (s->weight_bits - 1)) /
-								s->weight_bits;
+	s->weights_per_word = s->word_bits / s->weight_bits;
 	assert(s->weights_per_word > 0);
 
 	TRACE("Synapse processor created (c:%d.%d)\n", c->t->id, c->id);
@@ -580,6 +591,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 			for (int i = 0; i < ARCH_MAX_AXON_MAP; i++)
 			{
 				c->axon_in.map[i].connection_count = 0;
+				c->axon_in.map[i].active_synapses = 0;
 				c->axon_in.map[i].spikes_received = 0;
 				c->axon_in.map[i].receive_latency = 0.0;
 				c->axon_out.map_ptr[i] = NULL;
@@ -600,6 +612,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 			for (int k = 0; k < c->neuron_count; k++)
 			{
 				struct neuron *pre_neuron = c->neurons[k];
+				assert(pre_neuron->core != NULL);
 				// Track the connections
 				int connection_count[ARCH_MAX_TILES*ARCH_MAX_CORES];
 				struct core *cores[ARCH_MAX_TILES*ARCH_MAX_CORES];

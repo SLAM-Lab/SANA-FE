@@ -39,6 +39,7 @@ struct timestep sim_timestep(struct simulation *const sim,
 	sim->total_energy += ts.energy;
 	sim->total_spikes += ts.spikes;
 	sim->total_messages_sent += ts.messages_sent;
+	sim->total_neurons_fired += ts.total_neurons_fired;
 
 	TRACE("Spikes sent: %ld\n", sim->total_spikes);
 	if (sim->perf_fp)
@@ -382,8 +383,8 @@ int sim_schedule_messages(const struct simulation *const sim,
 				top_priority->t->id, top_priority->id,
 				top_priority->time);
 		}
-		TRACE("Neurons fired: %ld\n", ts->total_neurons_fired);
 	}
+	TRACE("Neurons fired: %ld\n", ts->total_neurons_fired);
 
 	return 0;
 }
@@ -397,26 +398,23 @@ void sim_process_neuron(struct timestep *const ts, struct network *net,
 	}
 
 	struct core *c = n->core;
+	n->processing_latency = 0.0;
+
+	// TODO: I think there's a flaw here. We update synapses for the core,
+	//  not for the neuron. Then each neuron does have a single dendritic
+	//  tree. So it's just this, maybe we make it "process neurons"
 	if (c->buffer_pos == BUFFER_SYNAPSE)
 	{
-		// Go through all axons connected as inputs to this neuron,
-		//  and trigger updates for any that are spiking
-		n->processing_latency = 0.0;
 		for (int i = 0; i < n->maps_in_count; i++)
 		{
 			struct axon_map *a = &(n->maps_in[i]);
-			if (a->pre_neuron->fired)
-			{
-				n->processing_latency +=
-						sim_update_synapse(ts, a);
-			}
+			n->processing_latency += sim_update_synapse(ts, a, 1);
 		}
 	}
 	else if (c->buffer_pos == BUFFER_DENDRITE)
 	{
 		// Go through all synapses connected to this neuron and update
 		//  all synaptic currents into the dendrite
-		n->processing_latency = 0.0;
 		for (int i = 0; i < n->maps_in_count; i++)
 		{
 			struct axon_map *a = &(n->maps_in[i]);
@@ -455,7 +453,9 @@ double sim_pipeline_receive(struct timestep *const ts, struct core *c,
 	TRACE("Receiving messages for cid:%d\n", c->id);
 	if (c->buffer_pos >= BUFFER_SYNAPSE)
 	{
-		message_processing_latency = sim_update_synapse(ts, axon);
+		int synaptic_lookup = 1;
+		message_processing_latency = sim_update_synapse(ts, axon,
+							synaptic_lookup);
 	}
 
 	return message_processing_latency;
@@ -595,7 +595,7 @@ int sim_input_spikes(struct network *net)
 					post_neuron->id, post_neuron->current);
 
 			post_neuron->synapse_hw->energy +=
-					post_neuron->synapse_hw->energy_spike_op;
+				post_neuron->synapse_hw->energy_spike_op;
 			post_neuron->synapse_hw->time +=
 					post_neuron->synapse_hw->time_spike_op;
 
@@ -619,10 +619,14 @@ int sim_input_spikes(struct network *net)
 	return input_spike_count;
 }
 
-double sim_update_synapse(struct timestep *const ts, struct axon_map *axon)
+double sim_update_synapse(struct timestep *const ts, struct axon_map *axon,
+						const int synaptic_lookup)
 {
+	// Update all synapses to different neurons in one core. If a synaptic
+	//  lookup, read and accumulate the synaptic weights. Otherwise, just
+	//  update filtered current and any other connection properties
 	struct core *post_core;
-	double latency;
+	double latency, min_synaptic_resolution;
 	int spike_ops, memory_accesses;
 
 	latency = 0.0;
@@ -630,51 +634,87 @@ double sim_update_synapse(struct timestep *const ts, struct axon_map *axon)
 	spike_ops = axon->connection_count;
 
 	TRACE("Updating synapses for (cid:%d)\n", axon->pre_neuron->id);
-	// Simple memory access model where we consider the number of words
-	//  accessed and the cost per access
-	memory_accesses = (spike_ops + (post_core->synapse.weights_per_word-1))/
-					(post_core->synapse.weights_per_word);
-	post_core->synapse.energy += memory_accesses *
-					post_core->synapse.energy_memory_access;
-	latency += memory_accesses * post_core->synapse.time_memory_access;
-
-	post_core->synapse.energy += spike_ops *
-		post_core->synapse.energy_spike_op;
-	latency += spike_ops * post_core->synapse.time_spike_op;
-	post_core->synapse.total_spikes += spike_ops;
-	ts->spikes += spike_ops;
-	post_core->synapse.memory_reads += memory_accesses;
-
 	while (axon->last_updated <= ts->timestep)
 	{
 		TRACE("Updating synaptic current (last updated:%ld, ts:%ld)\n",
 			axon->last_updated, ts->timestep);
-		for (int i = 0; i < axon->connection_count; i++)
+		if (axon->active_synapses > 0)
 		{
-			struct connection *con = axon->connections[i];
-			con->current *= con->synaptic_current_decay;
-			TRACE("(nid:%d->nid:%d) con->current:%lf\n",
-				con->pre_neuron->id, con->post_neuron->id,
-				con->current);
+			for (int i = 0; i < axon->connection_count; i++)
+			{
+				struct neuron *post_neuron;
+				struct connection *con = axon->connections[i];
+
+				post_neuron = con->post_neuron;
+				con->current *= con->synaptic_current_decay;
+
+				// "Turn off" synapses that have basically no
+				//  synaptic current left to decay (based on
+				//  the weight resolution)
+				min_synaptic_resolution =
+					1.0 / post_core->synapse.weight_bits;
+				if (fabs(con->current) <
+						min_synaptic_resolution)
+				{
+					con->current = 0.0;
+					axon->active_synapses--;
+				}
+
+				TRACE("(nid:%d->nid:%d) con->current:%lf\n",
+					con->pre_neuron->id,
+					con->post_neuron->id,
+					con->current);
+				if (post_core->buffer_pos != BUFFER_DENDRITE)
+				{
+					latency += sim_update_dendrite(ts,
+						post_neuron, con->current);
+				}
+			}
 		}
 		axon->last_updated++;
 	}
-	for (int i = 0; i < axon->connection_count; i++)
+
+	if (synaptic_lookup)
 	{
-		struct neuron *post_neuron;
-		struct connection *con = axon->connections[i];
+		axon->active_synapses = axon->connection_count;
+		// Simple memory access model where we consider the number of
+		//  words accessed and the cost per access
+		memory_accesses =
+			(spike_ops + (post_core->synapse.weights_per_word-1)) /
+					(post_core->synapse.weights_per_word);
+		TRACE("weights_per_word:%d memory_acceses:%d\n",
+			post_core->synapse.weights_per_word, memory_accesses);
+		post_core->synapse.energy += memory_accesses *
+					post_core->synapse.energy_memory_access;
+		latency += memory_accesses *
+					post_core->synapse.time_memory_access;
 
-		con->current += con->weight;
-		post_neuron = con->post_neuron;
-		post_neuron->update_needed = 1;
-		post_neuron->spike_count++;
-		TRACE("Sending spike to nid:%d, current:%lf\n",
-			post_neuron->id, con->current);
+		post_core->synapse.energy += spike_ops *
+					post_core->synapse.energy_spike_op;
+		//latency += spike_ops * post_core->synapse.time_spike_op;
+		latency += ((spike_ops+3) / 4) *
+					(post_core->synapse.time_spike_op * 4);
+		post_core->synapse.total_spikes += spike_ops;
+		ts->spikes += spike_ops;
+		post_core->synapse.memory_reads += memory_accesses;
 
-		if (post_core->buffer_pos != BUFFER_DENDRITE)
+		for (int i = 0; i < axon->connection_count; i++)
 		{
-			latency += sim_update_dendrite(ts, post_neuron,
+			struct neuron *post_neuron;
+			struct connection *con = axon->connections[i];
+
+			con->current += con->weight;
+			post_neuron = con->post_neuron;
+			post_neuron->update_needed = 1;
+			post_neuron->spike_count++;
+			TRACE("Sending spike to nid:%d, current:%lf\n",
+					post_neuron->id, con->current);
+
+			if (post_core->buffer_pos != BUFFER_DENDRITE)
+			{
+				latency += sim_update_dendrite(ts, post_neuron,
 								con->current);
+			}
 		}
 	}
 
@@ -692,17 +732,17 @@ double sim_update_dendrite(struct timestep *const ts, struct neuron *n,
 	dendritic_current = 0.0;
 	while (n->dendrite_last_updated <= ts->timestep)
 	{
-		// TODO: add more complex model with multiple taps
 		TRACE("Updating dendritic current (last_updated:%d, ts:%ld)\n",
 			n->dendrite_last_updated, ts->timestep);
 		n->charge *= n->dendritic_current_decay;
 		n->dendrite_last_updated++;
-		TRACE("nid:%d charge:%lf\n", n->id, n->charge);
 		dendritic_current = n->charge;
+		TRACE("nid:%d charge:%lf\n", n->id, n->charge);
 	}
 
 	// Update dendritic tap currents
 	// TODO: implement multi-tap models
+	TRACE("charge:%lf\n", charge);
 	dendritic_current += charge;
 	n->charge += charge;
 
@@ -750,12 +790,54 @@ double sim_update_soma(struct timestep *const ts, struct neuron *n,
 	return latency;
 }
 
+double sim_generate_noise(struct core *c)
+{
+	int noise_val = 0;
+	int ret;
+
+	if (c->noise_type == NOISE_FILE_STREAM)
+	{
+		// With a noise stream, we have a file containing a series of
+		//  random values. This is useful if we want to exactly
+		//  replicate h/w without knowing how the stream is generated.
+		//  We can record the random sequence and replicate it here
+		char noise_str[MAX_NOISE_FILE_ENTRY];
+		// If we get to the end of the stream, by default reset it.
+		//  However, it is unlikely the stream will be correct at this
+		//  point
+		if (feof(c->noise_stream))
+		{
+			INFO("Warning: At the end of the noise stream. "
+			     "Random values are unlikely to be correct.\n");
+			fseek(c->noise_stream, 0, SEEK_SET);
+		}
+		fgets(noise_str, MAX_NOISE_FILE_ENTRY, c->noise_stream);
+		ret = sscanf(noise_str, "%d", &noise_val);
+		TRACE("noise val:%d\n", noise_val);
+		if (ret < 1)
+		{
+			INFO("Error: invalid noise stream entry.\n");
+		}
+	}
+
+	// Get the number of noise bits required TODO: generalize
+	int sign_bit = noise_val & 0x100;
+	noise_val &= 0x7f;  // TODO: hack, fixed for 8 bits
+	if (sign_bit)
+	{
+		// Sign extend
+		noise_val |= ~(0x7f);
+	}
+
+	return (double) noise_val;
+}
+
 double sim_update_soma_lif(struct timestep *const ts, struct neuron *n,
 							const double current_in)
 
 {
 	struct soma_processor *soma = n->soma_hw;
-	double latency = 0.0;
+	double random_potential, latency = 0.0;
 
 	// Calculate the change in potential since the last update e.g.
 	//  integate inputs and apply any potential leak
@@ -770,35 +852,60 @@ double sim_update_soma_lif(struct timestep *const ts, struct neuron *n,
 		}
 	}
 
-	// Add the spike potential
-#if 0
-	double random_potential = (double) rand() / RAND_MAX;
-	n->potential += (random_potential*3.0);
-#endif
-	n->potential += current_in + n->bias;
+	// Add randomized noise to potential if enabled
+	if (n->core->noise_type == NOISE_FILE_STREAM)
+	{
+		random_potential = sim_generate_noise(n->core);
+		n->potential += random_potential;
+	}
 
-	// TODO: this is a hack in progress, formalize the randomized potential
-#if 0
-	// Clamp min potential
-	n->potential = (n->potential < n->reset) ?
-					n->reset : n->potential;
-#endif
+	// Add the synaptic / dendrite current to the potential
+	//printf("n->bias:%lf n->potential before:%lf current_in:%lf\n", n->bias, n->potential, current_in);
+	n->potential += current_in + n->bias;
+	n->charge = 0.0;
+	//printf("n->bias:%lf n->potential after:%lf\n", n->bias, n->potential);
+
 	TRACE("Updating potential, after:%f\n", n->potential);
 
+	// Check against threshold potential (for spiking)
 	if ((n->force_update && (n->potential > n->threshold)) ||
 		(!n->force_update && n->potential >= n->threshold))
 	{
-		n->potential = n->reset;
+		if (n->group->reset_mode == NEURON_RESET_HARD)
+		{
+			n->potential = n->reset;
+		}
+		else if (n->group->reset_mode == NEURON_RESET_SOFT)
+		{
+			n->potential -= n->threshold;
+		}
 		latency += sim_neuron_send_spike(n);
 		soma->spikes_sent++;
 	}
 
-	if (n->spike_count || n->force_update)
+	// Check against reverse threshold
+	if (n->potential < n->reverse_threshold)
+	{
+		if (n->group->reverse_reset_mode == NEURON_RESET_SOFT)
+		{
+			n->potential -= n->reverse_threshold;
+		}
+		else if (n->group->reverse_reset_mode == NEURON_RESET_HARD)
+		{
+			n->potential = n->reverse_reset;
+		}
+		else if (n->group->reverse_reset_mode == NEURON_RESET_SATURATE)
+		{
+			n->potential = n->reverse_threshold;
+		}
+	}
+
+	// Update soma
+	if (n->spike_count || (n->force_update && (fabs(n->bias) > 0.0)))
 	{
 		latency += n->soma_hw->time_active_neuron_update;
 		soma->updates++;
-		n->soma_hw->energy +=
-			n->soma_hw->energy_active_neuron_update;
+		n->soma_hw->energy += n->soma_hw->energy_active_neuron_update;
 	}
 
 	return latency;
@@ -857,7 +964,6 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 	if (v >= n->threshold)
 	{
 		int reset_mode = n->group->reset_mode;
-		//INFO("pos reset:%d\n", reset_mode);
 		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reset;
@@ -875,7 +981,6 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 	else if (v <= n->reverse_threshold)
 	{
 		int reset_mode = n->group->reverse_reset_mode;
-		//INFO("neg reset:%d\n", reset_mode);
 		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reverse_reset;
@@ -898,8 +1003,9 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 double sim_neuron_send_spike(struct neuron *n)
 {
 	struct soma_processor *soma = n->soma_hw;
-	double latency = soma->time_spiking;
+	double latency = 0.0;
 
+	latency += soma->time_spiking;
 	soma->energy += soma->energy_spiking;
 	if (n->core->buffer_pos != BUFFER_AXON_OUT)
 	{
@@ -984,7 +1090,10 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		for (int j = 0; j < group->neuron_count; j++)
 		{
 			struct neuron *n = &(group->neurons[j]);
-			n->update_needed |= n->force_update;
+			// Neurons can be manually forced to update, for example
+			//  if they have a constant input bias
+			n->update_needed |=
+				(n->force_update && (n->bias != 0.0));
 			n->processing_latency = 0.0;
 			n->fired = 0;
 
@@ -1067,6 +1176,7 @@ void sim_write_summary(FILE *fp, const struct architecture *arch,
 	fprintf(fp, "time: %e\n", sim->total_sim_time);
 	fprintf(fp, "total_spikes: %ld\n", sim->total_spikes);
 	fprintf(fp, "total_packets: %ld\n", sim->total_messages_sent);
+	fprintf(fp, "total_neurons_fired: %ld\n", sim->total_neurons_fired);
 	fprintf(fp, "wall_time: %lf\n", sim->wall_time);
 	fprintf(fp, "timesteps: %ld\n", sim->timesteps);
 }

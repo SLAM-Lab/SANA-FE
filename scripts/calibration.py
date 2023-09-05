@@ -33,7 +33,6 @@ MAX_COMPARTMENTS = 1024
 NETWORK_FILENAME = "runs/calibration/connected_layers.net"
 ARCH_FILENAME = "arch/loihi.yaml"
 
-
 import random
 def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
@@ -149,6 +148,8 @@ def connected_layers(weights, spiking=True, mapping="luke"):
                                      reset, leak, mappings=layer_mapping)
 
     for src in layer_1.neurons:
+        # Add bias to force neuron to fire
+        src.add_bias(1.0)
         for dest in layer_2.neurons:
             # Take the ID of the neuron in the 2nd layer
             weight = float(weights[src.id][dest.id]) / 256
@@ -210,7 +211,7 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
 
 mappings = ("fixed", "luke", "split_2")
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
 
     #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
@@ -375,6 +376,12 @@ if __name__ == "__main__":
         plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(cores_nonblocking["time"] * 1.0e3), "x")
         plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "o")
+
+        #plt.figure(figsize=(2.5, 2.5))
+        #plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "-o")
+        #plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-x")
+        #plt.legend(("Simulated", "Measured on Loihi"))
+
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")

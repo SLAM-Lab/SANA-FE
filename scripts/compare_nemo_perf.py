@@ -43,7 +43,7 @@ NETWORK_FILENAME = os.path.join(PROJECT_DIR, "runs", "nemo",
 ARCH_FILENAME = os.path.join(PROJECT_DIR, "arch", "truenorth.yaml")
 TIMESTEPS = 10  # i.e., ticks, where each tick is 1 ms of wall-time on the chip
 NEMO_BIN_PATH = "/home/usr1/jboyle/neuro/NeMo/bin/NeMo"
-CSV_RESULTS_FILENAME = os.path.join(PROJECT_DIR, "runs",
+CSV_RESULTS_FILENAME = os.path.join(PROJECT_DIR, "runs", "nemo",
                                     "compare_sanafe_nemo.csv")
 
 # Create a random truenorth network, 80% connected to neuron within same
@@ -129,17 +129,19 @@ def run_sim_nemo(cores, timesteps, debug=True):
 def plot_results():
     df = pd.read_csv(CSV_RESULTS_FILENAME, index_col="cores")
     plt.rcParams.update({'font.size': 14, 'lines.markersize': 1})
-    df.plot.bar(rot=0, figsize=(4.0, 4.0))
+    #df.plot.bar(rot=0, figsize=(4.0, 4.0))
+    df.plot.bar(rot=0, figsize=(8.0, 4.0))
     plt.xlabel("TrueNorth Core Count")
     plt.ylabel("Run-time (s)")
     plt.tight_layout()
-    plt.savefig(os.path.join(PROJECT_DIR, "runs", "compare_sanafe_nemo.png"))
+    plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.png"))
+    plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.pdf"))
     return
 
 
 if __name__ == "__main__":
-    run_experiments = True
-    plot = False
+    run_experiments = False
+    plot = True
     if run_experiments:
         core_counts = (32, 64, 128, 256, 512, 1024)
         print(f"Running experiments with following core counts: {core_counts}")
