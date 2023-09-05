@@ -51,7 +51,7 @@ class Network:
 
             for group in self.groups[group_idx]:
                 for neuron in group.neurons:
-                    neuron._save_mappings = False
+                    neuron._save_mappings = self._save_mappings
                     network_file.write(str(neuron))
 
             for input_node in self.inputs:

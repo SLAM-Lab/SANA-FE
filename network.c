@@ -469,6 +469,29 @@ void network_set_input(struct network *const net, const int input_id,
 	in->rate = rate;
 }
 
+void network_check_mapped(struct network *const net)
+{
+	// Check that all network neurons are mapped to a physical core
+	//  If a neuron is not, print an error message and stop the simulation
+	for (int i = 0; i < net->neuron_group_count; i++)
+	{
+		struct neuron_group *group = &(net->groups[i]);
+
+		for (int j = 0; j < group->neuron_count; j++)
+		{
+			struct neuron *n = &(group->neurons[j]);
+
+			if (n->core == NULL)
+			{
+				INFO("Error: Neuron %d.%d not mapped to H/W.\n",
+					group->id, n->id);
+				exit(1);
+			}
+		}
+	}
+}
+
+
 int network_map_hardware(struct neuron *n, struct core *c)
 {
 	// Map the neuron to hardware units

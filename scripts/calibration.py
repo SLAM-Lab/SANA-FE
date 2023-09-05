@@ -37,7 +37,7 @@ import random
 def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
     # Two layers, fully connected
-    network = sim.Network()
+    network = sim.Network(save_mappings=True)
     loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     if spiking:  # always spike
@@ -70,7 +70,7 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
 
 
 def connected_layers(weights, spiking=True, mapping="luke"):
-    network = sim.Network()
+    network = sim.Network(save_mappings=True)
     loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     layer_neuron_count = len(weights)
@@ -346,10 +346,11 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"))
+        plt.xticks(np.arange(0, neuron_counts[-1]+1, 500))
+        plt.legend(("Measured", "Simulated"), fontsize=7)
         plt.tight_layout(pad=0.3)
-        plt.savefig("runs/calibration/interception_time_partition_1.pdf")
-        plt.savefig("runs/calibration/interception_time_partition_1.png")
+        plt.savefig("runs/calibration/calibration_time_partition_1.pdf")
+        plt.savefig("runs/calibration/calibration_time_partition_1.png")
 
         plt.figure(figsize=(1.8, 1.8))
         plt.plot(neuron_counts, np.array(loihi_energy_spikes) * 1.0e6, "-")
@@ -360,10 +361,11 @@ if __name__ == "__main__":
         plt.ylabel("Energy ($\mu$J)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"))
+        plt.xticks(np.arange(0, neuron_counts[-1]+1, 500))
+        plt.legend(("Measured", "Simulated"), fontsize=7)
         plt.tight_layout(pad=0.3)
-        plt.savefig("runs/calibration/interception_energy.pdf")
-        plt.savefig("runs/calibration/interception_energy.png")
+        plt.savefig("runs/calibration/calibration_energy.pdf")
+        plt.savefig("runs/calibration/calibration_energy.png")
 
         plt.rcParams.update({'font.size': 9, 'lines.markersize': 3})
         ## Plot the effect of cores blocking
@@ -388,10 +390,10 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Uncalibrated", "Calibrated"))
+        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=8)
         plt.tight_layout(pad=0.3)
-        plt.savefig("runs/calibration/interception_time_partition_2.pdf")
-        plt.savefig("runs/calibration/interception_time_partition_2.png")
+        plt.savefig("runs/calibration/calibration_time_partition_2.pdf")
+        plt.savefig("runs/calibration/calibration_time_partition_2.png")
 
         # Plot the effect of network tiles blocking
         spiking_frame = df.loc[(df["mapping"] == "split_2") &
@@ -409,10 +411,10 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Uncalibrated", "Calibrated"))
+        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=8)
         plt.tight_layout(pad=0.3)
-        plt.savefig("runs/calibration/interception_time_partition_3.pdf")
-        plt.savefig("runs/calibration/interception_time_partition_3.png")
+        plt.savefig("runs/calibration/calibration_time_partition_3.pdf")
+        plt.savefig("runs/calibration/calibration_time_partition_3.png")
         """
         plt.figure(figsize=(5.5, 5.5))
         plt.plot(neuron_counts, nonspiking_times[0:-1], "-o")

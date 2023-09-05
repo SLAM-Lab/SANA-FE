@@ -197,6 +197,7 @@ int main(int argc, char *argv[])
 	{
 		goto clean_up;
 	}
+	network_check_mapped(&net);
 
 	arch_create_axon_maps(arch);
 	INFO("Creating probe and perf data files.\n");

@@ -40,7 +40,7 @@ TIMESTEPS = 100
 
 def create_random_network(cores, neurons_per_core, messages_per_neuron,
                           spikes_per_message):
-    network = sim.Network()
+    network = sim.Network(save_mappings=True)
     compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                            neurons_per_core)
 

@@ -37,7 +37,7 @@ def calculate_graph_index(row, col, digit):
     return ((row*N + col)*N) + digit
 
 def latin_square():
-    network = sim.Network()
+    network = sim.Network(save_mappings=True)
     compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                             1024)
     log_spikes = 1

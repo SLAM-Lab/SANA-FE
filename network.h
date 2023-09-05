@@ -121,5 +121,6 @@ void network_set_input(struct network *const net, const int input_id, const doub
 int network_parse_reset_mode(const char *str);
 int network_connect_neurons(struct connection *const con, struct neuron *const src, struct neuron *const dest, struct attributes *attr, const int attribute_count);
 int network_map_hardware(struct neuron *const n, struct core *c);
+void network_check_mapped(struct network *const net);
 
 #endif
