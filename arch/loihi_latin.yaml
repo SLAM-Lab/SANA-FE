@@ -62,7 +62,6 @@ architecture:
             - name: core_synapses
               attributes:
                 model: cuba
-                #weight_bits: 8
                 # 8 weight bits + 1 sign bit + 10 compartment address bits
                 weight_bits: 19
                 word_bits: 64
@@ -73,7 +72,6 @@ architecture:
           dendrite:
           - name: core_dendrites
             attributes:
-
           axon_out:
             - name: core_out
               # axon_out acts like output ports. Loihi needs to figure out the

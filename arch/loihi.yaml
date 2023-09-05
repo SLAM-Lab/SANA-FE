@@ -50,9 +50,8 @@ architecture:
             - name: core_synapses
               attributes:
                 model: cuba
-                weight_bits: 8
-                # 8 weight bits + 1 sign bit + 10 compartment address bits
-                #weight_bits: 19
+                # 8 weight bits, 1 sign bit and delay+tag bits
+                weight_bits: 16
                 word_bits: 64
                 energy_spike: 21.1e-12
                 latency_spike: 4.0e-9

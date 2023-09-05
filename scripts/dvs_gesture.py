@@ -23,7 +23,7 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, PROJECT_DIR)
 import sim
 
-ARCH_FILENAME = "loihi.yaml"
+ARCH_FILENAME = "loihi_dvs.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net"
 LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
@@ -90,10 +90,10 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiment = True
+    run_experiment = False
     plot_experiment = True
-    #experiment = "time"
-    experiment = "energy"
+    experiment = "time"
+    #experiment = "energy"
 
     neurons = []
     spiking_times = []
@@ -244,19 +244,14 @@ if __name__ == "__main__":
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps-1, timesteps*frames, timesteps)))
             loihi_times = loihi_times[0:timesteps-1,:]
-            plt.figure(figsize=(5.0, 2.0))
-            #plt.figure(figsize=(7.5, 2.0))
+            plt.figure(figsize=(7.0, 2.0))
 
             # TODO: flatten all timesteps again?
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
-            #plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
-            #plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--x")
-            #plt.legend(("Measured", "Simulated"))
-
-            plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "-o")
-            plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "--x")
-            plt.legend(("Simulated", "Measured on Loihi"))
+            plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
+            plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--x")
+            plt.legend(("Measured on Loihi", "Simulated"))
             plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")
             plt.tight_layout(pad=0.3)
@@ -293,6 +288,7 @@ if __name__ == "__main__":
             #total_error =  (np.sum(loihi_times[0:timesteps*frames]) - np.sum(times[0:timesteps*frames])) / np.sum(loihi_times[0:timesteps*frames])
             #print("Time Total error: {0} ({1} %)".format(total_error, total_error * 100))
 
+            """
             plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
             # Figure out how many neurons fired in the Loihi data
             fired_count = [len(loihi_spiketrains[i]) for
@@ -305,6 +301,7 @@ if __name__ == "__main__":
             print("diff = {}".format(
                 analysis["fired"] - np.array(fired_count[0:timesteps])))
             plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
+            """
 
         if experiment == "energy":
             plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
