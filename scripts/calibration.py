@@ -148,6 +148,8 @@ def connected_layers(weights, spiking=True, mapping="luke"):
                                      reset, leak, mappings=layer_mapping)
 
     for src in layer_1.neurons:
+        # Add bias to force neuron to fire
+        src.add_bias(1.0)
         for dest in layer_2.neurons:
             # Take the ID of the neuron in the 2nd layer
             weight = float(weights[src.id][dest.id]) / 256
@@ -209,7 +211,7 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
 
 mappings = ("fixed", "luke", "split_2")
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
 
     #core_count = [1, 2, 4, 8, 16, 32, 64, 128]

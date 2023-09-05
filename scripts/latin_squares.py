@@ -26,10 +26,11 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 import sim
 
-ARCH_FILENAME = "arch/loihi.yaml"
+ARCH_FILENAME = "arch/loihi_latin.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
+#TIMESTEPS = 1000
 TIMESTEPS = 10240
 
 def calculate_graph_index(row, col, digit):
@@ -165,8 +166,11 @@ def plot_results():
 def run_experiment(network_filename):
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     network_path = os.path.join(PROJECT_DIR, network_filename)
+    #results = sim.run(arch_path, network_path, TIMESTEPS,
+    #                  spike_trace=True, potential_trace=True)
     results = sim.run(arch_path, network_path, TIMESTEPS,
-                      spike_trace=True, potential_trace=True)
+                      spike_trace=False, potential_trace=False)
+
     return results
 
 

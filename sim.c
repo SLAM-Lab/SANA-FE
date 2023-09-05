@@ -679,9 +679,11 @@ double sim_update_synapse(struct timestep *const ts, struct axon_map *axon,
 		axon->active_synapses = axon->connection_count;
 		// Simple memory access model where we consider the number of
 		//  words accessed and the cost per access
-		memory_accesses = (spike_ops +
-			(post_core->synapse.weights_per_word-1)) /
-			(post_core->synapse.weights_per_word);
+		memory_accesses =
+			(spike_ops + (post_core->synapse.weights_per_word-1)) /
+					(post_core->synapse.weights_per_word);
+		TRACE("weights_per_word:%d memory_acceses:%d\n",
+			post_core->synapse.weights_per_word, memory_accesses);
 		post_core->synapse.energy += memory_accesses *
 					post_core->synapse.energy_memory_access;
 		latency += memory_accesses *
@@ -899,7 +901,7 @@ double sim_update_soma_lif(struct timestep *const ts, struct neuron *n,
 	}
 
 	// Update soma
-	if (n->spike_count || n->force_update)
+	if (n->spike_count || (n->force_update && (fabs(n->bias) > 0.0)))
 	{
 		latency += n->soma_hw->time_active_neuron_update;
 		soma->updates++;
@@ -962,7 +964,6 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 	if (v >= n->threshold)
 	{
 		int reset_mode = n->group->reset_mode;
-		//INFO("pos reset:%d\n", reset_mode);
 		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reset;
@@ -980,7 +981,6 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 	else if (v <= n->reverse_threshold)
 	{
 		int reset_mode = n->group->reverse_reset_mode;
-		//INFO("neg reset:%d\n", reset_mode);
 		if (reset_mode == NEURON_RESET_HARD)
 		{
 			n->potential = n->reverse_reset;
@@ -1003,8 +1003,9 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 double sim_neuron_send_spike(struct neuron *n)
 {
 	struct soma_processor *soma = n->soma_hw;
-	double latency = soma->time_spiking;
+	double latency = 0.0;
 
+	latency += soma->time_spiking;
 	soma->energy += soma->energy_spiking;
 	if (n->core->buffer_pos != BUFFER_AXON_OUT)
 	{
@@ -1089,7 +1090,10 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		for (int j = 0; j < group->neuron_count; j++)
 		{
 			struct neuron *n = &(group->neurons[j]);
-			n->update_needed |= n->force_update;
+			// Neurons can be manually forced to update, for example
+			//  if they have a constant input bias
+			n->update_needed |=
+				(n->force_update && (n->bias != 0.0));
 			n->processing_latency = 0.0;
 			n->fired = 0;
 

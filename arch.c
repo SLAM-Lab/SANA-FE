@@ -466,8 +466,7 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 	}
 
 	// Round up to the nearest word
-	s->weights_per_word = (s->word_bits + (s->weight_bits - 1)) /
-								s->weight_bits;
+	s->weights_per_word = s->word_bits / s->weight_bits;
 	assert(s->weights_per_word > 0);
 
 	TRACE("Synapse processor created (c:%d.%d)\n", c->t->id, c->id);

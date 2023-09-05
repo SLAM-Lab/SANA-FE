@@ -261,7 +261,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		}
 	}
 
-	n->update_needed = n->force_update;
+	n->update_needed = (n->force_update && (n->bias != 0.0));
 	n->soma_last_updated = 0;
 	n->dendrite_last_updated = 0;
 	assert(n->connections_out == NULL);

@@ -293,6 +293,19 @@ if __name__ == "__main__":
             #total_error =  (np.sum(loihi_times[0:timesteps*frames]) - np.sum(times[0:timesteps*frames])) / np.sum(loihi_times[0:timesteps*frames])
             #print("Time Total error: {0} ({1} %)".format(total_error, total_error * 100))
 
+            plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
+            # Figure out how many neurons fired in the Loihi data
+            fired_count = [len(loihi_spiketrains[i]) for
+                        i in range(0, len(loihi_spiketrains))]
+            plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
+            plt.ylabel("Neurons Fired")
+            plt.xlabel("Timestep")
+            plt.legend(("Simulated", "Measured on Loihi"))
+
+            print("diff = {}".format(
+                analysis["fired"] - np.array(fired_count[0:timesteps])))
+            plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
+
         if experiment == "energy":
             plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
             loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
@@ -317,20 +330,6 @@ if __name__ == "__main__":
 
             total_error = (sum(loihi_energies[0:frames]) - sum(energies[0:frames])) / sum(loihi_energies[0:frames])
             print(f"Energy Total error: {total_error} ({total_error*100.0} %)")
-
-            plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
-            # Figure out how many neurons fired in the Loihi data
-            fired_count = [len(loihi_spiketrains[i]) for
-                        i in range(0, len(loihi_spiketrains))]
-            plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
-            plt.ylabel("Neurons Fired")
-            plt.xlabel("Timestep")
-            plt.legend(("Simulated", "Measured on Loihi"))
-
-            print("diff = {}".format(
-                analysis["fired"] - np.array(fired_count[0:timesteps])))
-            plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
-
         """
         plt.figure()
         plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
