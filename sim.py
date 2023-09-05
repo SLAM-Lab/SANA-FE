@@ -172,7 +172,7 @@ class Neuron:
             dest_neuron, weight = connection
             neuron_str += f"e {self.group.id}.{self.id}->"
             neuron_str += f"{dest_neuron.group.id}.{dest_neuron.id}"
-        if isinstance(weight, float):
+            if isinstance(weight, float):
                 neuron_str += f" w={weight:.5e}"
             else:
                 neuron_str += f" w={weight}"
