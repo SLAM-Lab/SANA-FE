@@ -128,12 +128,12 @@ def run_sim_nemo(cores, timesteps, debug=True):
 
 def plot_results():
     df = pd.read_csv(CSV_RESULTS_FILENAME, index_col="cores")
-    plt.rcParams.update({'font.size': 14, 'lines.markersize': 1})
-    #df.plot.bar(rot=0, figsize=(4.0, 4.0))
-    df.plot.bar(rot=0, figsize=(8.0, 4.0))
+    plt.rcParams.update({'font.size': 8, 'lines.markersize': 1})
+    df.plot.bar(rot=0, figsize=(3.5, 1.6), color=("#ff7f0e", "#1f77b4"))
     plt.xlabel("TrueNorth Core Count")
     plt.ylabel("Run-time (s)")
-    plt.tight_layout()
+    plt.minorticks_on()
+    plt.tight_layout(pad=0.3)
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.png"))
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.pdf"))
     return
