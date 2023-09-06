@@ -40,7 +40,6 @@ LOIHI_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_ENERGY_DATA_FILENAME)
 SIM_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_TIME_DATA_FILENAME)
 SIM_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_ENERGY_DATA_FILENAME)
 
-
 def parse_stats(stats):
     print("Parsing statistics")
     total = stats.sum()
@@ -92,8 +91,8 @@ def parse_loihi_spiketrains(total_timesteps):
 if __name__ == "__main__":
     run_experiment = False
     plot_experiment = True
-    experiment = "time"
-    #experiment = "energy"
+    #experiment = "time"
+    experiment = "energy"
 
     neurons = []
     spiking_times = []
@@ -308,7 +307,10 @@ if __name__ == "__main__":
             loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
             loihi_energies = np.array(loihi_data).flatten() * 1.0e6
             energies = np.loadtxt(SIM_ENERGY_DATA_PATH) * 1.0e6
-            plt.figure(figsize=(2.4, 2.4))
+            plt.figure(figsize=(1.8, 1.8))
+            plt.minorticks_on()
+            plt.gca().set_box_aspect(1)
+
             plt.plot(energies[0:frames], loihi_energies[0:frames], 'x')
             plt.plot(np.linspace(min(loihi_energies), max(loihi_energies)), np.linspace(min(loihi_energies), max(loihi_energies)), "k--")
             plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
@@ -316,7 +318,7 @@ if __name__ == "__main__":
             plt.ylim((1, 4))
             plt.ylabel("Measured Energy ($\mu$J)")
             plt.xlabel("Simulated Energy ($\mu$J)")
-            plt.tight_layout()
+            plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
             plt.savefig("runs/dvs/dvs_gesture_sim_energy.pdf")
 
