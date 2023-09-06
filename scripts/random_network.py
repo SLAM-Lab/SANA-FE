@@ -79,9 +79,6 @@ def create_random_network(cores, neurons_per_core, messages_per_neuron,
     network.save(NETWORK_FILENAME)
 
 
-# Run the simulation on SANA-FE, generating the network and immediately using it
-#  Return the total runtime measured by Python, including setup and processing
-#  time.
 def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_message):
     create_random_network(cores, neurons_per_core, messages_per_core,
                           spikes_per_message)
@@ -96,6 +93,130 @@ def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_me
     return summary
 
 
+if __name__ == "__main__":
+    run_experiments = False
+    plot_experiments = True
+    if run_experiments:
+        with open("runs/random/loihi_random.csv", "r") as csv_file:
+            reader = csv.DictReader(csv_file)
+            fieldnames = reader.fieldnames
+            fieldnames.append("sim_energy")
+            fieldnames.append("sim_latency")
+            fieldnames.append("total_spikes")
+            with open("runs/random/sim_random.csv", "w") as out_file:
+                writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+                writer.writeheader()
+
+            for line in reader:
+                results = sim.run(ARCH_FILENAME, line["network"], TIMESTEPS,
+                                  perf_trace=True)
+                print(results)
+                df = pd.read_csv("perf.csv")
+                line["total_spikes"] = df.loc[2, "fired"]
+                #line["loihi_energy"] = float(line["loihi_energy"])
+                #line["loihi_latency"] = float(line["loihi_latency"])
+                line["sim_energy"] = results["energy"] / TIMESTEPS
+                line["sim_latency"] = results["time"] / TIMESTEPS
+                print(line)
+                with open("runs/random/sim_random.csv", "a") as out_file:
+                    writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+                    writer.writerow(line)
+
+    if plot_experiments:
+        sim_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random",
+                                         "sim_random.csv"))
+        loihi_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random",
+                                           "loihi_random.csv"))
+        df = pd.merge(sim_df, loihi_df)
+        # The smallest measurements hit the limits of Loihi's time measuring
+        #  precision. Filter out these rows
+        df = df[df["loihi_latency"] > 3.0e-6]
+        sim_energy = df["sim_energy"].values
+        loihi_energy = df["loihi_energy"].values
+        sim_latency = df["sim_latency"].values
+        loihi_latency = df["loihi_latency"].values
+
+        plt.rcParams.update({"font.size": 8, "lines.markersize": 2})
+        # Plot the simulated vs measured energy 
+        plt.figure(figsize=(2.6, 2.6))
+        plt.minorticks_on()
+        plt.gca().set_box_aspect(1)
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.plot(sim_energy, loihi_energy, "x")
+        plt.plot(np.linspace(min(sim_energy), max(sim_energy)),
+                 np.linspace(min(sim_energy), max(sim_energy)),
+                 "k--", alpha=0.5)
+        
+        plt.minorticks_on()
+        plt.xlabel("Simulated Energy (J)")
+        plt.ylabel("Measured Energy (J)") 
+        plt.xticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
+        plt.yticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
+        plt.tight_layout(pad=0.3)
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
+                                 "random_energy.pdf"))
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
+                                 "random_energy.png"))
+
+        # Plot the simulated vs measured latency
+        plt.figure(figsize=(2.6, 2.6))
+        plt.minorticks_on()
+        plt.gca().set_box_aspect(1)
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.plot(sim_latency, loihi_latency, "x")
+        plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
+                 np.linspace(min(sim_latency), max(sim_latency)), "k--")
+        plt.xlabel("Simulated Latency (s)")
+        plt.ylabel("Measured Latency (s)")
+        plt.xticks((1.0e-6, 1.0e-5, 1.0e-4))
+        plt.yticks((1.0e-6, 1.0e-5, 1.0e-4)) 
+        plt.tight_layout(pad=0.3)
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
+                                 "random_latency.pdf"))
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
+                                 "random_latency.png"))
+
+
+
+# The old code for plotting the simulator performance, need to think about
+#  what is needed or how to show this
+"""
+# Run the simulation on SANA-FE, generating the network and immediately using it
+#  Return the total runtime measured by Python, including setup and processing
+#  time.
+
+        cores = (1, 2, 4, 8, 16, 32, 64, 128)
+        messages_per_neuron = (1, 2, 4, 8, 16, 32, 64, 128)
+        spikes_per_message = (1, 4, 8)
+        neurons_per_core = (8, 16, 32, 64, 128, 256, 512, 1024)
+
+        # Part one is we try different numbers of cores and different numbers
+        #  of messages per core
+        data_points = []
+        with open("runs/random/sanafe_perf.csv", "w") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(("cores", "neurons_per_core", "messages_per_neuron",
+                             "spikes_per_message", "messages", "spikes",
+                             "runtime"))
+        for c in cores:
+            for n in neurons_per_core:
+                for m in messages_per_neuron:
+                    if m <= c:
+                        for s in spikes_per_message:
+                            results = run_sim(TIMESTEPS, c, n, m, s)
+                            row = (c, n, m, s, results["total_packets"],
+                                results["total_spikes"],
+                                results["wall_time"])
+                            with open("runs/random/sanafe_perf.csv", "a") as csv_file:
+                                writer = csv.writer(csv_file)
+                                writer.writerow(row)
+        print("Saved results to file")
+"""
+
+
+"""
 def plot_results():
     df = pd.read_csv("runs/random/sanafe_perf.csv")
     plt.rcParams.update({'font.size': 14, 'lines.markersize': 5})
@@ -191,63 +312,4 @@ def plot_results():
 
     return
 
-
-if __name__ == "__main__":
-    run_experiments = True
-    plot = True
-    if run_experiments:
-        """
-        cores = (1, 2, 4, 8, 16, 32, 64, 128)
-        messages_per_neuron = (1, 2, 4, 8, 16, 32, 64, 128)
-        spikes_per_message = (1, 4, 8)
-        neurons_per_core = (8, 16, 32, 64, 128, 256, 512, 1024)
-
-        # Part one is we try different numbers of cores and different numbers
-        #  of messages per core
-        data_points = []
-        with open("runs/random/sanafe_perf.csv", "w") as csv_file:
-            writer = csv.writer(csv_file)
-            writer.writerow(("cores", "neurons_per_core", "messages_per_neuron",
-                             "spikes_per_message", "messages", "spikes",
-                             "runtime"))
-        for c in cores:
-            for n in neurons_per_core:
-                for m in messages_per_neuron:
-                    if m <= c:
-                        for s in spikes_per_message:
-                            results = run_sim(TIMESTEPS, c, n, m, s)
-                            row = (c, n, m, s, results["total_packets"],
-                                results["total_spikes"],
-                                results["wall_time"])
-                            with open("runs/random/sanafe_perf.csv", "a") as csv_file:
-                                writer = csv.writer(csv_file)
-                                writer.writerow(row)
-        print("Saved results to file")
-        """
-        with open("runs/random/loihi_random.csv", "r") as csv_file:
-            reader = csv.DictReader(csv_file)
-            fieldnames = reader.fieldnames
-            fieldnames.append("sim_energy")
-            fieldnames.append("sim_latency")
-            fieldnames.append("total_spikes")
-            with open("runs/random/sim_random.csv", "w") as out_file:
-                writer = csv.DictWriter(out_file, fieldnames=fieldnames)
-                writer.writeheader()
-
-            for line in reader:
-                results = sim.run(ARCH_FILENAME, line["network"], TIMESTEPS,
-                                  perf_trace=True)
-                print(results)
-                df = pd.read_csv("perf.csv")
-                line["total_spikes"] = df.loc[2, "fired"]
-                #line["loihi_energy"] = float(line["loihi_energy"])
-                #line["loihi_latency"] = float(line["loihi_latency"])
-                line["sim_energy"] = results["energy"] / TIMESTEPS
-                line["sim_latency"] = results["time"] / TIMESTEPS
-                print(line)
-                with open("runs/random/sim_random.csv", "a") as out_file:
-                    writer = csv.DictWriter(out_file, fieldnames=fieldnames)
-                    writer.writerow(line)
-
-    if plot:
-        plot_results()
+"""

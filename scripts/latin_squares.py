@@ -30,7 +30,6 @@ ARCH_FILENAME = "arch/loihi_latin.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
-#TIMESTEPS = 1000
 TIMESTEPS = 10240
 
 def calculate_graph_index(row, col, digit):
@@ -166,8 +165,6 @@ def plot_results():
 def run_experiment(network_filename):
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     network_path = os.path.join(PROJECT_DIR, network_filename)
-    #results = sim.run(arch_path, network_path, TIMESTEPS,
-    #                  spike_trace=True, potential_trace=True)
     results = sim.run(arch_path, network_path, TIMESTEPS,
                       spike_trace=False, potential_trace=False)
 
@@ -175,18 +172,76 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"), "w")
-    with open(os.path.join(PROJECT_DIR, "runs/latin/loihi_latin.csv")) as latin_squares_file:
-        reader = csv.DictReader(latin_squares_file)
+    run_experiment = False
+    plot_experiment = True
 
-        for line in reader:
-            results = run_experiment(line["network"])
-            print(results)
+    if run_experiment:
+        open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"), "w")
+        with (open(os.path.join(PROJECT_DIR, "runs/latin/loihi_latin.csv")) as
+              latin_squares_file):
+            reader = csv.DictReader(latin_squares_file)
 
-            time = results["time"] / TIMESTEPS
-            energy = results["energy"] / TIMESTEPS
+            for line in reader:
+                results = run_experiment(line["network"])
+                print(results)
+                time = results["time"] / TIMESTEPS
+                energy = results["energy"] / TIMESTEPS
+                row = (line["N"], line["network"], energy, time)
+                with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
+                          "a") as csv_file:
+                    writer = csv.writer(csv_file)
+                    writer.writerow(row)
+    if plot_experiment:
+        sim_df = pd.read_csv(os.path.join(PROJECT_DIR,
+                                          "runs", "latin", "sim_latin.csv"))
+        print(sim_df)
+        loihi_df = pd.read_csv(os.path.join(PROJECT_DIR,
+                                            "runs", "latin", "loihi_latin.csv"))
+        print(loihi_df)
+        df = pd.merge(sim_df, loihi_df)
+        sim_energy = df["sim_energy"].values * 1.0e6
+        loihi_energy = df["loihi_energy"].values * 1.0e6
+        sim_latency = df["sim_latency"].values * 1.0e6
+        loihi_latency = df["loihi_latency"].values * 1.0e6
 
-            row = (line["N"], line["network"], energy, time)
-            with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"), "a") as csv_file:
-                writer = csv.writer(csv_file)
-                writer.writerow(row)
+        # Plot the simulated vs measured energy
+        plt.rcParams.update({"font.size": 8, "lines.markersize": 5})
+        plt.figure(figsize=(1.7, 1.7))
+        plt.minorticks_on()
+        plt.gca().set_box_aspect(1)
+
+        plt.plot(sim_energy, loihi_energy, "x")
+        plt.plot(np.linspace(min(sim_energy), max(sim_energy)),
+                 np.linspace(min(sim_energy), max(sim_energy)), "k--")
+        plt.xlabel("Simulated Energy ($\mu$J)")
+        plt.ylabel("Measured Energy ($\mu$J)")
+        plt.xticks(np.arange(0, 1.1, 0.4))
+        plt.yticks(np.arange(0, 1.1, 0.4))
+        plt.tight_layout(pad=0.3)
+
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "latin",
+                                 "latin_energy.pdf"))
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "latin",
+                                 "latin_energy.png"))
+
+        # Plot the simulated vs measured latency
+        plt.figure(figsize=(1.7, 1.7))
+        plt.minorticks_on()
+        plt.gca().set_box_aspect(1)
+
+        plt.plot(sim_latency, loihi_latency, "x")
+        plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
+                 np.linspace(min(sim_latency), max(sim_latency)), "k--")
+        plt.xlabel("Simulated Latency ($\mu$s)")
+        plt.ylabel("Measured Latency ($\mu$s)")
+        plt.xticks(np.arange(0, 41, 20))
+        plt.yticks(np.arange(0, 41, 20))
+        plt.tight_layout()
+
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "latin",
+                                 "latin_latency.pdf"))
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "latin",
+                                 "latin_latency.png"))
+
+
+

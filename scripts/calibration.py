@@ -211,7 +211,7 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
 
 mappings = ("fixed", "luke", "split_2")
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
 
     #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
@@ -327,7 +327,7 @@ if __name__ == "__main__":
                 loihi_energy_no_spikes.append(float(row["energy"]))
         """
 
-        plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
+        plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
         # First plot results for the simple fixed mapping, where one layer is on
         #  one core and the second layer is on another
         spiking_frame = df.loc[(df["mapping"] == "fixed") &
@@ -337,8 +337,9 @@ if __name__ == "__main__":
         spiking_energy = np.array(spiking_frame["energy"])
         neuron_counts = np.array(spiking_frame["neuron_counts"])
 
-        plt.figure(figsize=(1.8, 1.8))
-        plt.plot(neuron_counts, np.array(loihi_times_spikes["fixed"]) * 1.0e3, "-")
+        plt.figure(figsize=(1.7, 1.7))
+        plt.plot(neuron_counts,
+                 np.array(loihi_times_spikes["fixed"]) * 1.0e3, "-")
         plt.plot(neuron_counts, spiking_times * 1.0e3, "x")
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
@@ -352,7 +353,7 @@ if __name__ == "__main__":
         plt.savefig("runs/calibration/calibration_time_partition_1.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_1.png")
 
-        plt.figure(figsize=(1.8, 1.8))
+        plt.figure(figsize=(1.7, 1.7))
         plt.plot(neuron_counts, np.array(loihi_energy_spikes) * 1.0e6, "-")
         plt.plot(neuron_counts, np.array(spiking_energy) * 1.0e6, "x")
         plt.gca().set_box_aspect(1)
@@ -367,14 +368,14 @@ if __name__ == "__main__":
         plt.savefig("runs/calibration/calibration_energy.pdf")
         plt.savefig("runs/calibration/calibration_energy.png")
 
-        plt.rcParams.update({'font.size': 9, 'lines.markersize': 3})
+        plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
         ## Plot the effect of cores blocking
         spiking_frame = df.loc[(df["mapping"] == "luke") &
                                (df["tiles_blocking"] == False)]
         cores_nonblocking = spiking_frame.loc[spiking_frame["cores_blocking"] == False]
         cores_blocking = spiking_frame.loc[spiking_frame["cores_blocking"] == True]
 
-        plt.figure(figsize=(2.4, 2.4))
+        plt.figure(figsize=(2.0, 2.0))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(cores_nonblocking["time"] * 1.0e3), "x")
         plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "o")
@@ -390,7 +391,7 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=8)
+        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_2.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_2.png")
@@ -401,7 +402,7 @@ if __name__ == "__main__":
         tiles_nonblocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == False]
         tiles_blocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == True]
 
-        plt.figure(figsize=(2.4, 2.4))
+        plt.figure(figsize=(2.0, 2.0))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["split_2"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(tiles_nonblocking["time"]) * 1.0e3, "x")
         plt.plot(neuron_counts, np.array(tiles_blocking["time"]) * 1.0e3, "o")
@@ -411,7 +412,7 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=8)
+        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_3.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_3.png")
