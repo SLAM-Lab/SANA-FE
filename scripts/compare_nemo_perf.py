@@ -42,7 +42,7 @@ NETWORK_FILENAME = os.path.join(PROJECT_DIR, "runs", "nemo",
                                 "nemo_randomized.net")
 ARCH_FILENAME = os.path.join(PROJECT_DIR, "arch", "truenorth.yaml")
 TIMESTEPS = 10  # i.e., ticks, where each tick is 1 ms of wall-time on the chip
-NEMO_BIN_PATH = "/home/usr1/jboyle/neuro/NeMo/bin/NeMo"
+NEMO_BIN_PATH = "/home/usr1/jboyle/neuro/nemo/NeMo/bin/NeMo"
 CSV_RESULTS_FILENAME = os.path.join(PROJECT_DIR, "runs", "nemo",
                                     "compare_sanafe_nemo.csv")
 
