@@ -57,6 +57,7 @@ void sim_init_sim(struct simulation *sim)
 	sim->timesteps = 0;
 	sim->total_spikes = 0;
 	sim->total_messages_sent = 0;
+	sim->total_neurons_fired = 0;
 
 	// All logging disabled by default
 	sim->log_perf = 0;

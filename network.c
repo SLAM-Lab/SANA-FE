@@ -205,6 +205,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	/*** Set attributes ***/
 	n->bias = 0.0;
 	n->random_range_mask = 0;
+	n->force_update = 0;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
