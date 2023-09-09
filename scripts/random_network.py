@@ -52,8 +52,9 @@ def create_random_network(cores, neurons_per_core, messages_per_neuron,
 
     print("Creating neuron population")
     population = sim.create_layer(network, neurons,
-                                  compartments, 0, 0, 1, 0.0, 0.0, 0.0,
-                                  mappings=mappings)
+                                  compartments, log_spikes=0, log_potential=0,
+                                  force_update=0, threshold=0.0, reset=0.0,
+                                  leak=0.0, mappings=mappings)
 
     print("Generating randomized network connections")
     weight = 1.0
@@ -179,9 +180,9 @@ if __name__ == "__main__":
                                  "random_latency.png"))
 
 
-
-# The old code for plotting the simulator performance, need to think about
-#  what is needed or how to show this
+# The old code for another experiment, where we measure simulator performance
+#  across a range of SNNs. Currently just ignore all of this - I didn't figure
+#  how to get meaningful plots
 """
 # Run the simulation on SANA-FE, generating the network and immediately using it
 #  Return the total runtime measured by Python, including setup and processing

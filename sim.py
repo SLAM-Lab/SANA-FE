@@ -152,7 +152,6 @@ class Neuron:
         self.bias = bias
 
     def __str__(self, map_neuron=True):
-        self.leak = 1.0
         neuron_str = f"n {self.group.id}.{self.id}"
         if self.bias is not None:
             neuron_str += f" bias={self.bias}"
@@ -207,17 +206,15 @@ def map_neuron_to_compartment(compartments):
 
 
 def create_layer(network, layer_neuron_count, compartments,
-                 log_spikes, log_potential, force_update, threshold, reset,
-                 leak, mappings=None, connections_out=None):
+                 log_spikes=False, log_potential=False, force_update=False,
+                 threshold=1.0, reset=0.0, leak=1.0, mappings=None,
+                 connections_out=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
-    #print("Compartments free: {0}".format(compartments))
     layer_group = network.create_group(threshold, reset, leak, log_spikes,
                                        log_potential, force_update,
                                        connections_out=connections_out)
 
     if mappings is not None:
-        #print("mappings: {0} len({1}) layer_neuron_count: {2}".format(
-        #    mappings, len(mappings), layer_neuron_count))
         assert(len(mappings) == layer_neuron_count)
 
     for i in range(0, layer_neuron_count):
@@ -452,6 +449,7 @@ def run(arch_path, network_path, timesteps,
 
 
 if __name__ == "__main__":
+    # Run SANA-FE from the command-line
     import argparse
 
     parser = argparse.ArgumentParser(prog="python sim.py",
@@ -459,9 +457,12 @@ if __name__ == "__main__":
     parser.add_argument("architecture", help="Architecture description (YAML) file path", type=str)
     parser.add_argument("snn", help="Spiking Neural Network description file path", type=str)
     parser.add_argument("timesteps", help="Number of timesteps to simulate", type=int)
+    parser.add_argument("-s", "--spikes", help="Trace spikes", action="store_true")
+    parser.add_argument("-v", "--voltages", help="Trace membrane voltages", action="store_true")
 
     args = parser.parse_args()
     print(args)
 
-    run(args.architecture, args.snn, args.timesteps)
+    run(args.architecture, args.snn, args.timesteps,
+        log_spikes=args.spikes, log_potentials=args.voltages)
     print("sim finished")

@@ -89,8 +89,8 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiment = False
-    plot_experiment = True
+    run_experiments = True
+    plot_experiments = True
     experiment = "time"
     #experiment = "energy"
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     frames = 100
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
-    if run_experiment:
+    if run_experiments:
         neurons = ""
         groups = ""
 
@@ -161,7 +161,7 @@ if __name__ == "__main__":
                     np.savetxt(SIM_ENERGY_DATA_PATH, energies,
                                delimiter=",")
 
-    if plot_experiment:
+    if plot_experiments:
         """
         plt.figure(figsize=(5.5, 5.5))
         plt.bar(1, spiking_update_energy)

@@ -6,8 +6,6 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 
 Run Latin Square solver benchmark (CSP solver)
 """
-# TODO: First try to get the application working roughly, as proof of concept.
-#  Next I will create an equivalent model for Loihi and compare the two.
 import matplotlib
 matplotlib.use('Agg')
 
@@ -39,34 +37,24 @@ def latin_square():
     network = sim.Network(save_mappings=True)
     compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                             1024)
-    log_spikes = 1
-    log_potential = 1
-    force_update = 1
-    threshold = 1.0
-    reset = 0.0
-    leak = 0.0
-
     print(f"Creating WTA networks for {N} digits")
-
     G = nx.DiGraph()
     G.add_nodes_from(range(0, N**3))
-    # For every position in the square, create a WTA layer representing all possible
-    #  digit choices
+
+    # For every position in the square, create a WTA layer representing all
+    #  possible digit choices
     square = []
     for i in range(0, N):
         row = []
         for j in range(0, N):
             row.append(sim.create_layer(network, N, compartments,
-                                        log_spikes, log_potential, force_update,
-                                        threshold, reset, leak))
+                                        log_spikes=1,
+                                        log_potential=1,
+                                        force_update=0,
+                                        threshold=1.0 * (2**6),
+                                        reset=0.0,
+                                        leak=1.0))
         square.append(row)
-
-
-    # TODO: take into account known positions. This should basically remove some
-    #  neuron connections since we know that *has* to be the answer. That neuron
-    #  should fire with a bias and not be inhibited. We can immediately prune away
-    #  any options that would conflict. This neuron can spike on every timestep as
-    #  well.
 
     # Connect such that every digit in one position inhibits all other digits in
     #  that position
@@ -89,7 +77,8 @@ def latin_square():
 
                 for r in range(0, N):
                     if r != row:
-                        # Add inhibiting connection for this digit at all other rows
+                        # Add inhibiting connection for this digit at all other
+                        #  rows
                         dest = square[r][col]
                         post_neuron = dest.neurons[digit]
                         pre_neuron.add_connection(post_neuron, -1)
@@ -176,28 +165,34 @@ if __name__ == "__main__":
     plot_experiment = True
 
     if run_experiment:
-        open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"), "w")
-        with (open(os.path.join(PROJECT_DIR, "runs/latin/loihi_latin.csv")) as
-              latin_squares_file):
-            reader = csv.DictReader(latin_squares_file)
+        if (os.path.isfile(os.path.join(PROJECT_DIR, "runs", "latin",
+                           "loihi_latin.csv"))):
+            open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
+                 "w")
+            with (open(os.path.join(PROJECT_DIR, "runs", "latin",
+                                    "loihi_latin.csv")) as latin_squares_file):
+                reader = csv.DictReader(latin_squares_file)
 
-            for line in reader:
-                results = run_experiment(line["network"])
-                print(results)
-                time = results["time"] / TIMESTEPS
-                energy = results["energy"] / TIMESTEPS
-                row = (line["N"], line["network"], energy, time)
-                with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
-                          "a") as csv_file:
-                    writer = csv.writer(csv_file)
-                    writer.writerow(row)
+                for line in reader:
+                    # Each line of loihi_latin.csv is another experiment,
+                    #  containing the network to run and the results measured
+                    #  on Loihi
+                    results = run_experiment(line["network"])
+                    time = results["time"] / TIMESTEPS
+                    energy = results["energy"] / TIMESTEPS
+                    row = (line["N"], line["network"], energy, time)
+                    with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
+                              "a") as csv_file:
+                        writer = csv.writer(csv_file)
+                        writer.writerow(row)
+        else:
+            
+            
     if plot_experiment:
         sim_df = pd.read_csv(os.path.join(PROJECT_DIR,
                                           "runs", "latin", "sim_latin.csv"))
-        print(sim_df)
         loihi_df = pd.read_csv(os.path.join(PROJECT_DIR,
                                             "runs", "latin", "loihi_latin.csv"))
-        print(loihi_df)
         df = pd.merge(sim_df, loihi_df)
         sim_energy = df["sim_energy"].values * 1.0e6
         loihi_energy = df["loihi_energy"].values * 1.0e6

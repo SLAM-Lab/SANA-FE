@@ -51,13 +51,14 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     force_update = False
 
     # Create layers
-    layer_1 = sim.create_layer(network, layer_neuron_count,
-                                     loihi_compartments,
-                                     log_spikes, log_potential, force_update,
-                                     threshold, reset)
+    layer_1 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
+                               log_spikes=False, log_potential=False,
+                               force_update=False, threshold=threshold,
+                               reset=reset)
     layer_2 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
-                                     log_spikes, log_potential, force_update,
-                                     threshold, reset)
+                               log_spikes=False, log_potential=False,
+                               force_update=False, threshold=threshold,
+                               reset=reset)
 
     # Create connections
     weight = 1.0
@@ -79,12 +80,6 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     else:  # never spike
         threshold = 2*layer_neuron_count
 
-    reset = 0
-    force_update = True
-    log_spikes = False
-    log_potential = False
-    leak = 1.0
-
     neurons_per_core = [0, 0, 0, 0]
     if mapping == "luke" or mapping == "l2_split" or mapping == "fixed":
         neurons_per_core[0] = layer_neuron_count
@@ -104,12 +99,11 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     for _ in range(0, neurons_per_core[3]):
         layer_mapping.append((0, 3))
 
-    layer_1 = sim.create_layer(network, layer_neuron_count,
-                                     loihi_compartments, log_spikes,
-                                     log_potential, force_update, threshold,
-                                     reset, leak, mappings=layer_mapping)
+    layer_1 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
+                               log_spikes=False, log_potential=False,
+                               force_update=False, threshold=threshold,
+                               reset=0.0, leak=1.0, mappings=layer_mapping)
 
-    force_update = False
     neurons_per_core = [0, 0, 0, 0, 0]
     if mapping == "luke":
         neurons_per_core[0] = min(layer_neuron_count, 1024 - layer_neuron_count)
@@ -143,9 +137,10 @@ def connected_layers(weights, spiking=True, mapping="luke"):
         layer_mapping.append((1, 0))
 
     layer_2 = sim.create_layer(network, layer_neuron_count,
-                                     loihi_compartments, log_spikes,
-                                     log_potential, force_update, threshold,
-                                     reset, leak, mappings=layer_mapping)
+                               loihi_compartments, log_spikes=False,
+                               log_potential=False, force_update=False,
+                               threshold=threshold, reset=0.0, leak=1.0,
+                               mappings=layer_mapping)
 
     for src in layer_1.neurons:
         # Add bias to force neuron to fire
@@ -211,43 +206,13 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
 
 mappings = ("fixed", "luke", "split_2")
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
 
-    #core_count = [1, 2, 4, 8, 16, 32, 64, 128]
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
-    """
-    for cores in core_count:
-        for compartments in range(0, MAX_COMPARTMENTS+1, 256):
-            n = compartments * cores
-            network = empty(n, compartments)
-            results = run_sim(network, cores)
-
-            times[compartments].append(results["time"])
-            energy[compartments].append(results["energy"])
-
-    plt.rcParams.update({'font.size': 14})
-    plt.figure(figsize=(5.5, 5.5))
-    for compartments in range(0, MAX_COMPARTMENTS+1, 256):
-        plt.plot(core_count, times[compartments], "-o")
-    plt.ylabel("Time (s)")
-    plt.xlabel("Cores Used")
-    plt.legend(("0", "256", "512", "768", "1024"))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("empty_times.png")
-
-    plt.figure(figsize=(5.5, 5.5))
-    for compartments in range(0, MAX_COMPARTMENTS+1, 256):
-        plt.plot(core_count, energy[compartments], "-o")
-    plt.ylabel("Energy (J)")
-    plt.xlabel("Cores Used")
-    plt.legend(("0", "256", "512", "768", "1024"))
-    plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-    plt.savefig("empty_energy.png")
-    """
+    
     # This experiment looks at two fully connected layers, spiking
-
     if run_experiments:
         with open(f"runs/calibration/sim_spiking.csv", "w") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
@@ -269,30 +234,6 @@ if __name__ == "__main__":
         spiking_times = []
         spiking_energy = []
 
-    """
-    # The second experiment looks at two fully connected layers, not spiking
-    for i in range(1, 31):
-        layer_neurons = i*i
-
-        commands = fully_connected(layer_neurons, spiking=False,
-                                   force_update=True)
-        print("Testing network with {0} neurons".format(layer_neurons*2))
-        results = run_sim(commands, timesteps)
-
-        neuron_counts.append(layer_neurons*2)
-        nonspiking_times.append(results["time"] / timesteps)
-        nonspiking_energy.append(results["energy"] / timesteps)
-
-    with open("runs/sim_nonspiking.csv", "w") as nonspiking_csv:
-        nonspiking_writer = csv.DictWriter(nonspiking_csv,
-                                           ("neurons", "energy", "time"))
-        nonspiking_writer.writeheader()
-        for neuron_count, time, energy_val in zip(neuron_counts, nonspiking_times,
-                                                  nonspiking_energy):
-            nonspiking_writer.writerow({"neurons": neuron_count,
-                                        "energy": energy_val,
-                                        "time": time})
-    """
     # **************************************************************************
     # Read Loihi measurement data from csv, this is only available to me locally
     #  since this is restricted data!
@@ -310,23 +251,7 @@ if __name__ == "__main__":
                 for mapping in mappings:
                     loihi_times_spikes[mapping].append(float(row[mapping]))
                 loihi_energy_spikes.append(float(row["dynamic energy"]))
-        """
-        nonspiking_times = []
-        nonspiking_energy = []
-        with open("runs/calibration/sim_nonspiking.csv", "r") as nonspiking_csv:
-            nonspiking_reader = csv.DictReader(nonspiking_csv)
-            for row in nonspiking_reader:
-                nonspiking_times.append(float(row["time"]))
-                nonspiking_energy.append(float(row["energy"]))
-        loihi_times_no_spikes = []
-        loihi_energy_no_spikes = []
-        with open("runs/sandia_data/loihi_nonspiking.csv", "r") as nonspiking_csv:
-            nonspiking_reader = csv.DictReader(nonspiking_csv)
-            for row in nonspiking_reader:
-                loihi_times_no_spikes.append(float(row["time"]))
-                loihi_energy_no_spikes.append(float(row["energy"]))
-        """
-
+        
         plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
         # First plot results for the simple fixed mapping, where one layer is on
         #  one core and the second layer is on another
@@ -416,27 +341,4 @@ if __name__ == "__main__":
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_3.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_3.png")
-        """
-        plt.figure(figsize=(5.5, 5.5))
-        plt.plot(neuron_counts, nonspiking_times[0:-1], "-o")
-        plt.plot(neuron_counts, loihi_times_no_spikes[0:-1], "--x")
-        plt.yscale("linear")
-        plt.xscale("linear")
-        plt.ylabel("Time (s)")
-        plt.xlabel("Neurons")
-        plt.legend(("Simulated", "Measured on Loihi"))
-        #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-        plt.savefig("runs/calibration/connected_not_spiking_time.png")
 
-        plt.figure(figsize=(5.5, 5.5))
-        plt.plot(neuron_counts, nonspiking_energy[0:-1], "-o")
-        plt.plot(neuron_counts, loihi_energy_no_spikes[0:-1], "--x")
-        plt.yscale("linear")
-        plt.xscale("linear")
-        plt.ylabel("Energy (J)")
-        plt.xlabel("Neurons")
-        plt.legend(("Simulated", "Measured on Loihi"))
-        #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-        plt.savefig("runs/calibration/connected_not_spiking_energy.png")
-        """
-        #plt.show()

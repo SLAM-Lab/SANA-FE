@@ -69,6 +69,7 @@ void sim_init_sim(struct simulation *sim)
 	sim->spike_trace_fp = NULL;
 	sim->perf_fp = NULL;
 	sim->message_trace_fp = NULL;
+	sim->stats_fp = NULL;
 }
 
 void sim_init_timestep(struct timestep *const ts)
@@ -869,8 +870,8 @@ double sim_update_soma_lif(struct timestep *const ts, struct neuron *n,
 	TRACE("Updating potential, after:%f\n", n->potential);
 
 	// Check against threshold potential (for spiking)
-	if ((n->force_update && (n->potential > n->threshold)) ||
-		(!n->force_update && n->potential >= n->threshold))
+	if (((n->bias != 0.0) && (n->potential > n->threshold)) ||
+		((n->bias == 0.0) && (n->potential >= n->threshold)))
 	{
 		if (n->group->reset_mode == NEURON_RESET_HARD)
 		{
@@ -901,8 +902,9 @@ double sim_update_soma_lif(struct timestep *const ts, struct neuron *n,
 		}
 	}
 
-	// Update soma
-	if (n->spike_count || (n->force_update && (fabs(n->bias) > 0.0)))
+	// Update soma, if there are any received spikes, there is a non-zero
+	//  bias or we force the neuron to update every time-step
+	if (n->spike_count || (fabs(n->bias) > 0.0) || n->force_update)
 	{
 		latency += n->soma_hw->time_active_neuron_update;
 		soma->updates++;
@@ -1093,8 +1095,8 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 			struct neuron *n = &(group->neurons[j]);
 			// Neurons can be manually forced to update, for example
 			//  if they have a constant input bias
-			n->update_needed |=
-				(n->force_update && (n->bias != 0.0));
+			n->update_needed |= (n->force_update ||
+							(n->bias != 0.0));
 			n->processing_latency = 0.0;
 			n->fired = 0;
 

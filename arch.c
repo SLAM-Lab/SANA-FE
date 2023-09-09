@@ -108,12 +108,10 @@ void arch_free(struct architecture *const arch)
 	{
 		struct tile *t = &(arch->tiles[i]);
 
-		INFO("i:%d tid:%d\n", i, t->id);
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
 
-			printf("tid:%d cid:%d->neurons\n", t->id, c->id);
 			free(c->neurons);
 			c->neurons = NULL;
 
@@ -243,7 +241,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 
 	id = arch->tile_count;
 	arch->tile_count++;
-	assert(arch->tile_count < ARCH_MAX_TILES);
+	assert(arch->tile_count <= ARCH_MAX_TILES);
 	t = &(arch->tiles[id]);
 
 	t->id = id;
@@ -324,7 +322,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 	assert(t != NULL);
 	core_id = t->core_count;
 	t->core_count++;
-	assert(t->core_count < ARCH_MAX_CORES);
+	assert(t->core_count <= ARCH_MAX_CORES);
 
 	c = &(t->cores[core_id]);
 	c->id = core_id;
@@ -440,9 +438,10 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 		}
 		if (strncmp("word_bits", curr->key, MAX_FIELD_LEN) == 0)
 		{
-			// The word size is the number of bits accessed with each memory read.
-			//  The weight size is the number of bits for a single synaptic weight.
-			//  A single memory read might return multiple weights
+			// The word size is the number of bits accessed with
+			//  each memory read. The weight size is the number of
+			//  bits for a single synaptic weight. A single memory
+			//  read might return multiple weights
 			sscanf(curr->value_str, "%d", &s->word_bits);
 		}
 		else if (strncmp("energy_memory", curr->key,

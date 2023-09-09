@@ -37,12 +37,14 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 
 	group->default_max_connections_out = 0;
 	group->default_log_potential = 0; // Disabled by default
+	group->default_log_spikes = 0;
 	group->default_threshold = 1.0;
 	group->default_reverse_threshold = -1.0;
 	group->default_reset = 0.0;
 	group->default_reverse_reset = 0.0;
 	group->reset_mode = NEURON_RESET_HARD;
 	group->reverse_reset_mode = NEURON_NO_RESET; // Disabled by default
+	group->default_force_update = 0;
 	// Default is no leak (potential decay), i.e., the potential for the
 	//  next timestep is 100% of the previous timestep's
 	group->default_leak_decay = 1.0;
@@ -205,7 +207,6 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	/*** Set attributes ***/
 	n->bias = 0.0;
 	n->random_range_mask = 0;
-	n->force_update = 0;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
@@ -262,9 +263,13 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		}
 	}
 
-	n->update_needed = (n->force_update && (n->bias != 0.0));
+	// Set the initial update state, no spikes can arrive before the first
+	//  time-step but we can force the neuron to update, or bias it
+	n->update_needed = (n->force_update || (fabs(n->bias) > 0.0));
+
 	n->soma_last_updated = 0;
 	n->dendrite_last_updated = 0;
+
 	assert(n->connections_out == NULL);
 	TRACE("Allocating memory (%d b) for connections\n",
 		sizeof(struct connection) * n->max_connections_out);
