@@ -299,7 +299,7 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 	sim->wall_time += (double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
-	TRACE("Time-step took: %fs.\n",
+	TRACE1("Time-step took: %fs.\n",
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
 }
 

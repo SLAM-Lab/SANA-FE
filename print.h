@@ -8,12 +8,18 @@
 #include "stdio.h"
 
 // DEBUG and TRACE print with source annotations, TRACE is only enabled for
-//  verbose debug printing
+//  verbose debug printing.
+// TODO: fully support different levels of trace verbosity (thinking of making
+//  3 levels, with 3 being most verbose)
 #define INFO(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
 #ifdef DEBUG
-#define TRACE(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
+#define TRACE1(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
+#define TRACE2(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
+#define TRACE2(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
 #else
-#define TRACE(...) do {} while (0)
+#define TRACE1(...) do {} while (0)
+#define TRACE2(...) do {} while (0)
+#define TRACE3(...) do {} while (0)
 #endif
 
 #endif

@@ -186,7 +186,7 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 			west_y = t->y;
 
 			link_count = 0;
-			TRACE("tid:%d (x:%d,y:%d)\n", t->id, t->x, t->y);
+			TRACE1("tid:%d (x:%d,y:%d)\n", t->id, t->x, t->y);
 			if (north_y >= 0)
 			{
 				int lid = (north_y * arch->noc_width) + north_x;
@@ -215,14 +215,14 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 			assert(link_count <= 4);
 			for (int i = 0; i < link_count; i++)
 			{
-				//assert(t->links[i] != NULL);
-				TRACE("\tlink[%d]->%d\n", i, (t->links[i])->id);
+				TRACE1("\tlink[%d]->%d\n", i,
+							(t->links[i])->id);
 			}
 		}
 	}
 
 	arch->is_init = 1;
-	TRACE("NoC created, mesh, width:%d height:%d.\n",
+	TRACE1("NoC created, mesh, width:%d height:%d.\n",
 		arch->noc_width, arch->noc_height);
 	return 0;
 }
@@ -389,7 +389,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 
 	c->buffer_pos = BUFFER_SOMA;
 
-	TRACE("Core created id:%d (tile:%d).\n", c->id, t->id);
+	TRACE1("Core created id:%d (tile:%d).\n", c->id, t->id);
 	return c->id;
 }
 
@@ -406,7 +406,7 @@ void arch_create_axon_in(struct architecture *const arch, struct core *const c,
 	// We already know a valid tile was given at this point
 	in->t = c->t;
 
-	TRACE("Axon input created (c:%d.%d)\n", c->t->id, c->id);
+	TRACE2("Axon input created (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
@@ -471,7 +471,7 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 	s->weights_per_word = s->word_bits / s->weight_bits;
 	assert(s->weights_per_word > 0);
 
-	TRACE("Synapse processor created (c:%d.%d)\n", c->t->id, c->id);
+	TRACE1("Synapse processor created (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
@@ -538,7 +538,7 @@ void arch_create_soma(struct architecture *const arch, struct core *const c,
 		}
 	}
 
-	TRACE("Soma processor created (c:%d.%d)\n", c->t->id, c->id);
+	TRACE1("Soma processor created (c:%d.%d)\n", c->t->id, c->id);
 	return;
 }
 
@@ -575,7 +575,7 @@ void arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	// Track the tile the axon interfaces with
 	out->t = c->t;
 
-	TRACE("Axon output created (c:%d.%d)\n", c->t->id, c->id);
+	TRACE1("Axon output created (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
@@ -625,7 +625,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 					cores[x] = NULL;
 				}
 
-				TRACE("Creating axons for neuron %d\n", k);
+				TRACE2("Creating axons for neuron %d\n", k);
 				// Count how many connections go to each core
 				//  from this neuron. This will be used to
 				//  allocate the axon maps and the connections
@@ -634,7 +634,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 					conn < pre_neuron->connection_out_count;
 					conn++)
 				{
-					TRACE("Looking at connection id: %d\n",
+					TRACE2("Looking at connection id: %d\n",
 									conn);
 					struct connection *curr =
 						&(pre_neuron->connections_out[conn]);
@@ -646,7 +646,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 					int core_number = (dest_core->t->id * ARCH_MAX_CORES) + dest_core->id;
 					connection_count[core_number]++;
 					cores[core_number] = dest_core;
-					TRACE("Connected to dest core: %d\n",
+					TRACE2("Connected to dest core: %d\n",
 								core_number);
 				}
 
@@ -669,14 +669,14 @@ void arch_create_axon_maps(struct architecture *const arch)
 						struct core *dest_core = cores[x];
 						struct axon_input *axon_in = &(dest_core->axon_in);
 						int map_count = axon_in->map_count++;
-						TRACE("axon in map count:%d for core:%d.%d, adding %d connections\n",
+						TRACE2("axon in map count:%d for core:%d.%d, adding %d connections\n",
 							map_count, dest_core->id, dest_core->t->id, connection_count[x] );
 						struct axon_map *a = &(axon_in->map[map_count]);
 
-						//INFO("Adding connection to core.\n");
+						TRACE3("Adding connection to core.\n");
 						// Allocate the entry and its connections
-						//INFO("Axon has %d connections; allocating %lu bytes\n",
-						//	connection_count[x], connection_count[x] * sizeof(struct connection));
+						TRACE3("Axon has %d connections; allocating %lu bytes\n",
+							connection_count[x], connection_count[x] * sizeof(struct connection));
 						a->connections = malloc(connection_count[x] * sizeof(struct connection));
 						if (a->connections == NULL)
 						{
@@ -690,14 +690,14 @@ void arch_create_axon_maps(struct architecture *const arch)
 						c->axon_out.map_ptr[map_count] = a;
 						if (pre_neuron->maps_out == NULL)
 						{
-							TRACE("Setting neuron nid:%d axon out.\n", pre_neuron->id);
+							TRACE2("Setting neuron nid:%d axon out.\n", pre_neuron->id);
 							pre_neuron->maps_out =
 								&(c->axon_out.map_ptr[map_count]);
 							assert(pre_neuron->maps_out != NULL);
 							assert(pre_neuron->maps_out[0] != NULL);
 						}
 						pre_neuron->maps_out_count++;
-						TRACE("nid:%d.%d cid:%d.%d added one output axon, axon out map_count:%d, neuron out map count:%d.\n",
+						TRACE2("nid:%d.%d cid:%d.%d added one output axon, axon out map_count:%d, neuron out map count:%d.\n",
 							pre_neuron->group->id, pre_neuron->id, c->t->id, c->id, c->axon_out.map_count, pre_neuron->maps_out_count);
 						axon_count++;
 					}
@@ -717,7 +717,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 					int map_count = p->axon_in.map_count;
 					if (map_count <= 0 || map_count > ARCH_MAX_AXON_MAP)
 					{
-						TRACE("map_count:%d\n", map_count);
+						TRACE2("map_count:%d\n", map_count);
 					}
 					assert(map_count > 0);
 					assert(map_count <= ARCH_MAX_AXON_MAP);
@@ -748,7 +748,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 		}
 	}
 
-	TRACE("Created all axons\n");
+	TRACE1("Created all axons\n");
 
 	// Print summary about axons created
 	// TODO: refactor?
@@ -766,16 +766,19 @@ void arch_create_axon_maps(struct architecture *const arch)
 			core_used = 0;
 			for (int k = 0; k < c->neuron_count; k++)
 			{
-				//struct neuron *n = c->neurons[k];
-				//TRACE("\tnid:%d.%d ", n->group->id, n->id);
-				//TRACE("i:%d o:%d\n",
-				//	n->maps_in_count, n->maps_out_count);
+#ifdef DEBUG
+				struct neuron *n = c->neurons[k];
+#endif
+				TRACE3("\tnid:%d.%d ", n->group->id, n->id);
+				TRACE3("i:%d o:%d\n",
+					n->maps_in_count, n->maps_out_count);
+
 				core_used = 1;
 			}
 
 			if (core_used)
 			{
-				INFO("cid:%d.%d n:%d i:%d o:%d\n", t->id, c->id,
+				TRACE1("cid:%d.%d n:%d i:%d o:%d\n", t->id, c->id,
 					c->neuron_count, c->axon_in.map_count,
 					c->axon_out.map_count);
 				in_count += c->axon_in.map_count;

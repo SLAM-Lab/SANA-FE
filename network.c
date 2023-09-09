@@ -271,7 +271,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	n->dendrite_last_updated = 0;
 
 	assert(n->connections_out == NULL);
-	TRACE("Allocating memory (%d b) for connections\n",
+	TRACE1("Allocating memory (%d b) for connections\n",
 		sizeof(struct connection) * n->max_connections_out);
 	if (n->max_connections_out > 0)
 	{
@@ -297,7 +297,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		con->synaptic_current_decay = 0.0;
 	}
 
-	TRACE("Created neuron: gid:%d nid:%d force:%d thresh:%lf\n",
+	TRACE1("Created neuron: gid:%d nid:%d force:%d thresh:%lf\n",
 					n->group->id, n->id, n->force_update,
 					n->threshold);
 	n->is_init = 1;
@@ -334,7 +334,7 @@ int network_connect_neurons(struct connection *const con,
 		}
 	}
 
-	TRACE("\tAdded con %d.%d->%d.%d (w:%lf)\n",
+	TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n",
 			con->pre_neuron->group->id, con->pre_neuron->id,
 			con->post_neuron->group->id, con->post_neuron->id,
 			con->weight);
@@ -505,7 +505,7 @@ int network_map_hardware(struct neuron *n, struct core *c)
 	assert(c->neurons != NULL);
 	assert(n->core == NULL);
 	n->core = c;
-	TRACE("mapping neuron %d to core %d\n", n->id, c->id);
+	TRACE1("mapping neuron %d to core %d\n", n->id, c->id);
 	c->neurons[c->neuron_count] = n;
 	c->neuron_count++;
 
