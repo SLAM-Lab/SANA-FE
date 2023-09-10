@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 	}
 	network_check_mapped(&net);
 
-	arch_create_axon_maps(arch);
+	arch_create_connection_maps(arch);
 	INFO("Creating probe and perf data files.\n");
 	if (sim.spike_trace_fp != NULL)
 	{

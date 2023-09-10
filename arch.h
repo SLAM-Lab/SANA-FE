@@ -30,10 +30,7 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 //  but these could be reused multiple times. Maybe we need to have an axon map
 //  and the map can have a list based on the neurons that can send out or in
 //  via it. Each unique usage of the map can generate send and receive latency
-// Maybe need to rename the axon_map structure. axon_access maybe? and this
-//  should be allocated dynamically to avoid using too much memory?
-//
-#define ARCH_MAX_AXON_MAP 16384
+#define ARCH_MAX_CONNECTION_MAP 16384
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
@@ -99,14 +96,14 @@ struct message
 {
 	struct tile *src_tile, *dest_tile;
 	struct core *src_core, *dest_core;
-	struct axon_map *dest_axon;
+	struct connection_map *dest_axon;
 	struct neuron *src_neuron;
 	double generation_latency, network_latency, receive_latency;
 	double blocked_latency;
 	int spikes, hops;
 };
 
-struct axon_map
+struct connection_map
 {
 	// List of all neuron connections to send spike to
 	int connection_count, spikes_received, active_synapses;
@@ -120,7 +117,7 @@ struct axon_input
 {
 	char name[MAX_FIELD_LEN];
 	struct tile *t;
-	struct axon_map map[ARCH_MAX_AXON_MAP];
+	struct connection_map map[ARCH_MAX_CONNECTION_MAP];
 	long int packets_in;
 	double energy, time;
 	int packet_size, packets_buffer, spikes_buffer, map_count;
@@ -158,7 +155,7 @@ struct axon_output
 {
 	// The axon output points to a number of axons, stored at the
 	//  post-synaptic core. A neuron can point to a number of these
-	struct axon_map *map_ptr[ARCH_MAX_AXON_MAP];
+	struct connection_map *map_ptr[ARCH_MAX_CONNECTION_MAP];
 	struct tile *t;
 	int map_count;
 	char name[MAX_FIELD_LEN];
@@ -225,8 +222,8 @@ void arch_create_axon_in(struct architecture *const arch, struct core *const c, 
 void arch_create_synapse(struct architecture *const arch, struct core *const c, const struct attributes *const attr, const int attribute_count);
 void arch_create_soma(struct architecture *const arch, struct core *const c, struct attributes *attr, const int attribute_count);
 void arch_create_axon_out(struct architecture *const arch, struct core *const c, struct attributes *attr, const int attribute_count);
-void arch_create_axon_maps(struct architecture *const arch);
-void arch_create_core_axon_map(struct core *const core);
+void arch_create_connection_maps(struct architecture *const arch);
+void arch_create_core_connection_map(struct core *const core);
 
 int arch_parse_neuron_model(char *model_str);
 

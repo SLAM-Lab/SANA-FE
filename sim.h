@@ -52,9 +52,9 @@ int sim_input_spikes(struct network *net);
 int sim_schedule_messages(const struct simulation *const sim, struct timestep *const ts, struct network *net, struct architecture *arch);
 
 void sim_process_neuron(struct timestep *const ts, struct network *net, struct neuron *n);
-double sim_pipeline_receive(struct timestep *const ts, struct core *c, struct axon_map *axon);
+double sim_pipeline_receive(struct timestep *const ts, struct core *c, struct connection_map *axon);
 double sim_neuron_send_spike(struct neuron *n);
-double sim_update_synapse(struct timestep *const ts, struct axon_map *axon, const int synaptic_lookup);
+double sim_update_synapse(struct timestep *const ts, struct connection_map *axon, const int synaptic_lookup);
 double sim_update_dendrite(struct timestep *const ts, struct neuron *n, const double charge);
 double sim_update_soma(struct timestep *const ts, struct neuron *n, const double current_in);
 double sim_update_axon(struct neuron *n);

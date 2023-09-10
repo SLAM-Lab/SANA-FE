@@ -126,22 +126,24 @@ void sim_receive_messages(struct timestep *const ts, struct network *net,
 			struct core *c = &(t->cores[j]);
 			for (int k = 0; k < c->axon_in.map_count; k++)
 			{
-				struct axon_map *a = &(c->axon_in.map[k]);
-				if (a->spikes_received > 0)
+				struct connection_map *axon =
+							&(c->axon_in.map[k]);
+				if (axon->spikes_received > 0)
 				{
 					struct neuron *pre_neuron =
-								a->pre_neuron;
+							axon->pre_neuron;
 					assert(pre_neuron != NULL);
 					struct core *pre_core =
 							pre_neuron->core;
 					assert(pre_core != NULL);
 					struct tile *pre_tile = pre_core->t;
 					assert(pre_tile != NULL);
-					a->network_latency =
+					axon->network_latency =
 						sim_estimate_network_costs(
 							ts, pre_tile, t);
-					a->receive_latency =
-						sim_pipeline_receive(ts, c, a);
+					axon->receive_latency =
+						sim_pipeline_receive(ts, c,
+									axon);
 				}
 			}
 		}
@@ -407,8 +409,8 @@ void sim_process_neuron(struct timestep *const ts, struct network *net,
 	{
 		for (int i = 0; i < n->maps_in_count; i++)
 		{
-			struct axon_map *a = &(n->maps_in[i]);
-			n->processing_latency += sim_update_synapse(ts, a, 1);
+			struct connection_map *axon = &(n->maps_in[i]);
+			n->processing_latency += sim_update_synapse(ts, axon,1);
 		}
 	}
 	else if (c->buffer_pos == BUFFER_DENDRITE)
@@ -417,13 +419,12 @@ void sim_process_neuron(struct timestep *const ts, struct network *net,
 		//  all synaptic currents into the dendrite
 		for (int i = 0; i < n->maps_in_count; i++)
 		{
-			struct axon_map *a = &(n->maps_in[i]);
+			struct connection_map *a = &(n->maps_in[i]);
 			for (int j = 0; j < a->connection_count; j++)
 			{
 				struct connection *con = a->connections[j];
 				n->processing_latency +=
-					sim_update_dendrite(ts, n,
-								con->current);
+					sim_update_dendrite(ts, n,con->current);
 			}
 		}
 	}
@@ -445,7 +446,7 @@ void sim_process_neuron(struct timestep *const ts, struct network *net,
 }
 
 double sim_pipeline_receive(struct timestep *const ts, struct core *c,
-							struct axon_map *axon)
+						struct connection_map *axon)
 {
 	// We receive a spike and process up to the time-step buffer
 	double message_processing_latency = 0.0;
@@ -619,8 +620,9 @@ int sim_input_spikes(struct network *net)
 	return input_spike_count;
 }
 
-double sim_update_synapse(struct timestep *const ts, struct axon_map *axon,
-						const int synaptic_lookup)
+double sim_update_synapse(struct timestep *const ts,
+				struct connection_map *axon,
+				const int synaptic_lookup)
 {
 	// Update all synapses to different neurons in one core. If a synaptic
 	//  lookup, read and accumulate the synaptic weights. Otherwise, just
@@ -692,6 +694,7 @@ double sim_update_synapse(struct timestep *const ts, struct axon_map *axon,
 		post_core->synapse.energy += spike_ops *
 					post_core->synapse.energy_spike_op;
 		//latency += spike_ops * post_core->synapse.time_spike_op;
+		// TODO: generalize, number of parallel processing units
 		latency += ((spike_ops+3) / 4) *
 					(post_core->synapse.time_spike_op * 4);
 		post_core->synapse.total_spikes += spike_ops;
@@ -1100,7 +1103,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 			for (int k = 0; k < n->maps_out_count; k++)
 			{
-				struct axon_map *a = n->maps_out[k];
+				struct connection_map *a = n->maps_out[k];
 				a->network_latency = 0.0;
 				a->receive_latency = 0.0;
 				a->spikes_received = 0;

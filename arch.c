@@ -117,7 +117,7 @@ void arch_free(struct architecture *const arch)
 
 			for (int k = 0; k < c->axon_in.map_count; k++)
 			{
-				struct axon_map *a = &(c->axon_in.map[k]);
+				struct connection_map *a = &(c->axon_in.map[k]);
 				free(a->connections);
 				a->connections = NULL;
 			}
@@ -580,7 +580,7 @@ void arch_create_axon_out(struct architecture *const arch, struct core *const c,
 	return;
 }
 
-void arch_create_axon_maps(struct architecture *const arch)
+void arch_create_connection_maps(struct architecture *const arch)
 {
 	INFO("Creating axon map.\n");
 	// Initialize the axon structures
@@ -590,7 +590,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
-			for (int i = 0; i < ARCH_MAX_AXON_MAP; i++)
+			for (int i = 0; i < ARCH_MAX_CONNECTION_MAP; i++)
 			{
 				c->axon_in.map[i].connection_count = 0;
 				c->axon_in.map[i].active_synapses = 0;
@@ -671,7 +671,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 						int map_count = axon_in->map_count++;
 						TRACE2("axon in map count:%d for core:%d.%d, adding %d connections\n",
 							map_count, dest_core->id, dest_core->t->id, connection_count[x] );
-						struct axon_map *a = &(axon_in->map[map_count]);
+						struct connection_map *a = &(axon_in->map[map_count]);
 
 						TRACE3("Adding connection to core.\n");
 						// Allocate the entry and its connections
@@ -703,7 +703,7 @@ void arch_create_axon_maps(struct architecture *const arch)
 					}
 				}
 				//INFO("nid:%d axon count: %d\n", pre_neuron->id, axon_count);
-				assert(axon_count < ARCH_MAX_AXON_MAP);
+				assert(axon_count < ARCH_MAX_CONNECTION_MAP);
 
 				for (int conn = 0; conn < pre_neuron->connection_out_count; conn++)
 				{
@@ -712,20 +712,20 @@ void arch_create_axon_maps(struct architecture *const arch)
 					struct connection *curr =
 						&(pre_neuron->connections_out[conn]);
 					struct core *p = curr->post_neuron->core;
-					//INFO("adding connection:%d\n", conn);
-					// just add to the current axon
+					TRACE3("adding connection:%d\n", conn);
+					// Just add to the current axon
 					int map_count = p->axon_in.map_count;
-					if (map_count <= 0 || map_count > ARCH_MAX_AXON_MAP)
+					if (map_count <= 0 || map_count > ARCH_MAX_CONNECTION_MAP)
 					{
 						TRACE2("map_count:%d\n", map_count);
 					}
 					assert(map_count > 0);
-					assert(map_count <= ARCH_MAX_AXON_MAP);
-					//INFO("adding to connection to axon:%d\n",
-					//			map_count - 1);
+					assert(map_count <= ARCH_MAX_CONNECTION_MAP);
+					TRACE3("adding to connection to axon:%d\n",
+								map_count - 1);
 					// Access the most recently created axon
 					//  for the core
-					struct axon_map *a =
+					struct connection_map *a =
 						&(p->axon_in.map[map_count-1]);
 					a->connections[a->connection_count++] =
 									curr;

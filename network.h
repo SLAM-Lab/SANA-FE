@@ -44,8 +44,8 @@ struct neuron
 {
 	struct neuron_group *group;
 	struct connection *connections_out;
-	struct axon_map *maps_in;
-	struct axon_map **maps_out;
+	struct connection_map *maps_in;
+	struct connection_map **maps_out;
 
 	// Mapped hardware
 	struct core *core, *post_synaptic_cores;
