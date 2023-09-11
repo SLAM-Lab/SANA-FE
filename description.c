@@ -95,7 +95,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 	int attribute_count = 0;
 	struct tile *t;
 	struct core *c;
-	int ret, tile_id, core_id, first_field;
+	int ret, tile_id, core_offset, first_field;
 	char entry_type;
 
 	entry_type = fields[0][0];
@@ -122,7 +122,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 	}
 	if ((entry_type != '@') && (entry_type != 't') && (entry_type != 'c'))
 	{
-		ret = sscanf(fields[2], "%d", &core_id);
+		ret = sscanf(fields[2], "%d", &core_offset);
 		if (ret < 1)
 		{
 			INFO("Error: Couldn't parse core (%s)\n", fields[0]);
@@ -130,7 +130,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		}
 
 		assert(t != NULL);
-		c = &(t->cores[core_id]);
+		c = &(t->cores[core_offset]);
 		first_field++;
 	}
 
@@ -207,7 +207,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	struct tile *t;
 	struct core *c;
 	int ret, neuron_group_id, neuron_id, neuron_count;
-	int dest_group_id, dest_neuron_id, tile_id, core_id;
+	int dest_group_id, dest_neuron_id, tile_id, core_offset;
 	char entry_type;
 
 	entry_type = fields[0][0];
@@ -218,14 +218,16 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		return RET_OK;
 	}
 
+	neuron_count = 0;
 	neuron_group_id = -1;
 	neuron_id = -1;
 	tile_id = -1;
-	core_id = -1;
+	core_offset = -1;
 	dest_group_id = -1;
 	dest_neuron_id = -1;
 	group = NULL;
 	n = NULL;
+	c = NULL;
 	dest_group = NULL;
 	dest = NULL;
 	if (entry_type == 'g' || entry_type == 'x')
@@ -240,7 +242,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	else if (entry_type == '&')
 	{
 		ret = sscanf(fields[1], "%d.%d@%d.%d", &neuron_group_id,
-				&neuron_id, &tile_id, &core_id);
+				&neuron_id, &tile_id, &core_offset);
 		if (ret < 4)
 		{
 			INFO("Error couldn't parse mapping.\n");
@@ -254,13 +256,13 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		}
 		t = &(arch->tiles[tile_id]);
 
-		if (core_id >= t->core_count)
+		if (core_offset >= t->core_count)
 		{
 			INFO("Error: Core (%d) >= core count (%d)\n",
-						core_id, t->core_count);
+						core_offset, t->core_count);
 			exit(1);
 		}
-		c = &(t->cores[core_id]);
+		c = &(t->cores[core_offset]);
 	}
 	else if (entry_type == 'e')
 	{
@@ -285,18 +287,19 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 
 			TRACE2("Parsed neuron gid:%d nid:%d\n",
 						dest_group_id, neuron_id);
-		}
-		if (dest_neuron_id > -1)
-		{
-			if (dest_neuron_id >= dest_group->neuron_count)
+			if (dest_neuron_id > -1)
 			{
-				INFO("Error: Neuron (%d) >= group neurons (%d).\n",
-				dest_neuron_id, dest_group->neuron_count);
-				return RET_FAIL;
+				if (dest_neuron_id >= dest_group->neuron_count)
+				{
+					INFO("Error: Neuron (%d) >= "
+						"group neurons (%d).\n",
+						dest_neuron_id,
+						dest_group->neuron_count);
+					return RET_FAIL;
+				}
+				dest = &(dest_group->neurons[dest_neuron_id]);
 			}
-			dest = &(dest_group->neurons[dest_neuron_id]);
 		}
-
 	}
 	else // parse neuron or input node
 	{
@@ -320,16 +323,17 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		group = &(net->groups[neuron_group_id]);
 		TRACE2("Parsed neuron gid:%d nid:%d\n",
 						neuron_group_id, neuron_id);
-	}
-	if (neuron_id > -1)
-	{
-		if (neuron_id >= group->neuron_count)
+		if (neuron_id > -1)
 		{
-			INFO("Error: Neuron (%d) >= group neurons (%d).\n",
-						neuron_id, group->neuron_count);
-			return RET_FAIL;
+			if (neuron_id >= group->neuron_count)
+			{
+				INFO("Error: Neuron (%d) >= "
+					"group neurons (%d).\n",
+					neuron_id, group->neuron_count);
+				return RET_FAIL;
+			}
+			n = &(group->neurons[neuron_id]);
 		}
-		n = &(group->neurons[neuron_id]);
 	}
 
 	// Parse attributes from fields

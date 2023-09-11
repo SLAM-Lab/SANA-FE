@@ -181,7 +181,7 @@ struct core
 
 	char name[MAX_FIELD_LEN];
 	double energy, time, blocked_until;
-	int id, buffer_pos, is_blocking;
+	int id, offset, buffer_pos, is_blocking;
 	int neuron_count, curr_neuron, neurons_left, messages_left;
 	int curr_axon, noise_type;
 };
@@ -207,7 +207,7 @@ struct architecture
 	struct tile tiles[ARCH_MAX_TILES];
 	char name[MAX_FIELD_LEN];
 	double time_barrier;
-	int noc_dimensions, noc_width, noc_height, tile_count, topology;
+	int noc_dimensions, noc_width, noc_height, tile_count, core_count;
 	int is_init;
 };
 
@@ -224,6 +224,9 @@ void arch_create_soma(struct architecture *const arch, struct core *const c, str
 void arch_create_axon_out(struct architecture *const arch, struct core *const c, struct attributes *attr, const int attribute_count);
 void arch_create_connection_maps(struct architecture *const arch);
 void arch_create_core_connection_map(struct core *const core);
+void arch_print_connection_map_summary(struct architecture *const arch);
+void arch_map_neuron_connections(struct neuron *const n);
+
 
 int arch_parse_neuron_model(char *model_str);
 

@@ -501,11 +501,13 @@ void network_check_mapped(struct network *const net)
 int network_map_hardware(struct neuron *n, struct core *c)
 {
 	// Map the neuron to hardware units
+	assert(n != NULL);
 	assert(c != NULL);
 	assert(c->neurons != NULL);
 	assert(n->core == NULL);
+
 	n->core = c;
-	TRACE1("mapping neuron %d to core %d\n", n->id, c->id);
+	TRACE1("Mapping neuron %d to core %d\n", n->id, c->id);
 	c->neurons[c->neuron_count] = n;
 	c->neuron_count++;
 
