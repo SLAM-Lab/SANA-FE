@@ -25,21 +25,16 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 
 // Hard define maximum defined h/w sizes
 #define ARCH_MAX_COMPARTMENTS 1024
-// TODO: the axon map label is a bit confusing. Its the possible mappings of
-//  incoming connections to each core. In the hardware, there are 4096 axon maps
-//  but these could be reused multiple times. Maybe we need to have an axon map
-//  and the map can have a list based on the neurons that can send out or in
-//  via it. Each unique usage of the map can generate send and receive latency
 #define ARCH_MAX_CONNECTION_MAP 16384
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
 // TrueNorth
-#define ARCH_MAX_TILES 4096
-#define ARCH_MAX_CORES 1
+//#define ARCH_MAX_TILES 4096
+//#define ARCH_MAX_CORES 1
 // Loihi
-//#define ARCH_MAX_TILES 128
-//#define ARCH_MAX_CORES 4
+#define ARCH_MAX_TILES 128
+#define ARCH_MAX_CORES 4
 
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
@@ -189,8 +184,6 @@ struct core
 struct tile
 {
 	struct core cores[ARCH_MAX_CORES];
-	// TODO: maybe can associate energy and latency with each link, that
-	//  will be the most general way to implement this!
 	struct tile *links[ARCH_MAX_LINKS];
 	char name[MAX_FIELD_LEN];
 	double energy, time;
@@ -226,8 +219,8 @@ void arch_create_connection_maps(struct architecture *const arch);
 void arch_create_core_connection_map(struct core *const core);
 void arch_print_connection_map_summary(struct architecture *const arch);
 void arch_map_neuron_connections(struct neuron *const n);
-
-
+void arch_allocate_connection_map(struct neuron *const pre_neuron, struct core *const post_core, const int connection_count);
+void arch_add_connection_to_map(struct connection *const con, struct core *const post_core);
 int arch_parse_neuron_model(char *model_str);
 
 #endif

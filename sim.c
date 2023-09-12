@@ -958,9 +958,9 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n,
 		v += (double) r;
 	}
 
-	//INFO("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n",
-	//	v, n->threshold, n->group->reset_mode, n->reverse_threshold,
-	//	n->group->reverse_reset_mode);
+	TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n",
+		v, n->threshold, n->group->reset_mode, n->reverse_threshold,
+		n->group->reverse_reset_mode);
 	if (v >= n->threshold)
 	{
 		int reset_mode = n->group->reset_mode;

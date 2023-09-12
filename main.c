@@ -3,7 +3,7 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // main.c - Command line interface
-// Performance simulation for neuromorphic architectures
+// Performance simulation of neuromorphic architectures
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
