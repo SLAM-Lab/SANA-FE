@@ -14,8 +14,7 @@
 int total_connection_count = 0;
 
 int network_create_neuron_group(struct network *net, const int neuron_count,
-				struct attributes *attr,
-				const int attribute_count)
+	struct attributes *attr, const int attribute_count)
 {
 	struct neuron_group *group;
 	int id, ret;
@@ -25,8 +24,8 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 	net->neuron_group_count++;
 
 	group = &(net->groups[id]);
-	group->neurons = (struct neuron *)
-				malloc(sizeof(struct neuron) * neuron_count);
+	group->neurons =
+		(struct neuron *) malloc(sizeof(struct neuron) * neuron_count);
 	if (group->neurons == NULL)
 	{
 		INFO("Error: Couldn't allocate neuron group %d\n", id);
@@ -56,73 +55,75 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		ret = -1;
 		if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf",
-						&group->default_threshold);
+			ret = sscanf(
+				a->value_str, "%lf", &group->default_threshold);
 		}
-		else if (strncmp("reverse_threshold", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("reverse_threshold", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			ret = sscanf(a->value_str, "%lf",
-					&group->default_reverse_threshold);
+				&group->default_reverse_threshold);
 		}
 		else if (strncmp("reset", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf",&group->default_reset);
+			ret = sscanf(
+				a->value_str, "%lf", &group->default_reset);
 		}
 		else if (strncmp("reverse_reset", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(a->value_str, "%lf",
-						&group->default_reverse_reset);
+				&group->default_reverse_reset);
 		}
 		else if (strncmp("reset_mode", a->key, MAX_FIELD_LEN) == 0)
 		{
 			group->reset_mode =
-					network_parse_reset_mode(a->value_str);
+				network_parse_reset_mode(a->value_str);
 			// Was parsed successfully if we got here
 			ret = 1;
 		}
-		else if (strncmp("reverse_reset_mode", a->key, MAX_FIELD_LEN)
-									== 0)
+		else if (strncmp("reverse_reset_mode", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			group->reverse_reset_mode =
-					network_parse_reset_mode(a->value_str);
+				network_parse_reset_mode(a->value_str);
 			// Was parsed successfully if we got here
 			ret = 1;
 		}
 		else if (strncmp("leak_decay", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(a->value_str, "%lf",
-					&group->default_leak_decay);
+				&group->default_leak_decay);
 		}
 		else if (strncmp("leak_bias", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf",
-						&group->default_leak_bias);
+			ret = sscanf(
+				a->value_str, "%lf", &group->default_leak_bias);
 		}
 		else if (strncmp("log_v", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(a->value_str, "%d",
-						&group->default_log_potential);
+				&group->default_log_potential);
 		}
 		else if (strncmp("log_spikes", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%d",
-						&group->default_log_spikes);
+			ret = sscanf(
+				a->value_str, "%d", &group->default_log_spikes);
 		}
 		else if (strncmp("connections_out", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(a->value_str, "%d",
-					&group->default_max_connections_out);
+				&group->default_max_connections_out);
 		}
 		else if (strncmp("force_update", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(a->value_str, "%d",
-						&group->default_force_update);
+				&group->default_force_update);
 		}
 
 		if (ret < 1)
 		{
-			INFO("Invalid attribute (%s:%s)\n",
-							a->key, a->value_str);
+			INFO("Invalid attribute (%s:%s)\n", a->key,
+				a->value_str);
 			exit(1);
 		}
 	}
@@ -141,7 +142,7 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->log_potential = group->default_log_potential;
 		n->force_update = group->default_force_update;
 		n->max_connections_out = group->default_max_connections_out;
-			// Default connections
+		// Default connections
 		n->reset = group->default_reset;
 		n->reverse_reset = group->default_reset;
 		n->threshold = group->default_threshold;
@@ -179,19 +180,19 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 	}
 
 	INFO("Created neuron group gid:%d count:%d "
-		"threshold:%lf neg threshold:%lf "
-		"pos reset:%lf reset mode:%d "
-		"neg reset:%lf neg reset mode:%d\n",
-		group->id, group->neuron_count,
-		group->default_threshold, group->default_reverse_threshold,
-		group->default_reset, group->reset_mode,
-		group->default_reverse_reset, group->reverse_reset_mode);
+	     "threshold:%lf neg threshold:%lf "
+	     "pos reset:%lf reset mode:%d "
+	     "neg reset:%lf neg reset mode:%d\n",
+		group->id, group->neuron_count, group->default_threshold,
+		group->default_reverse_threshold, group->default_reset,
+		group->reset_mode, group->default_reverse_reset,
+		group->reverse_reset_mode);
 
 	return id;
 }
 
 int network_create_neuron(struct neuron *const n, struct attributes *attr,
-				const int attribute_count)
+	const int attribute_count)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
@@ -214,7 +215,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 
 		if (strncmp("bias", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf",&n->bias);
+			ret = sscanf(a->value_str, "%lf", &n->bias);
 		}
 		else if (strncmp("reset", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -222,20 +223,22 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		}
 		else if (strncmp("reverse_reset", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf",&n->reverse_reset);
+			ret = sscanf(a->value_str, "%lf", &n->reverse_reset);
 		}
 		else if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(a->value_str, "%lf", &n->threshold);
 		}
-		else if (strncmp("reverse_threshold", a->key, MAX_FIELD_LEN)==0)
+		else if (strncmp("reverse_threshold", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
-			ret = sscanf(a->value_str, "%lf",&n->reverse_threshold);
+			ret = sscanf(
+				a->value_str, "%lf", &n->reverse_threshold);
 		}
 		else if (strncmp("connections_out", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%d",
-						&n->max_connections_out);
+			ret = sscanf(
+				a->value_str, "%d", &n->max_connections_out);
 		}
 		else if (strncmp("log_spikes", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -257,8 +260,8 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 
 		if (ret < 1)
 		{
-			INFO("Invalid attribute (%s:%s)\n",
-							a->key, a->value_str);
+			INFO("Invalid attribute (%s:%s)\n", a->key,
+				a->value_str);
 			exit(1);
 		}
 	}
@@ -275,8 +278,8 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		sizeof(struct connection) * n->max_connections_out);
 	if (n->max_connections_out > 0)
 	{
-		n->connections_out = (struct connection *)
-		malloc(sizeof(struct connection) * n->max_connections_out);
+		n->connections_out = (struct connection *) malloc(
+			sizeof(struct connection) * n->max_connections_out);
 		if (n->connections_out == NULL)
 		{
 			INFO("Error: Couldn't allocate connection memory.\n");
@@ -298,17 +301,14 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	}
 
 	TRACE1("Created neuron: gid:%d nid:%d force:%d thresh:%lf\n",
-					n->group->id, n->id, n->force_update,
-					n->threshold);
+		n->group->id, n->id, n->force_update, n->threshold);
 	n->is_init = 1;
 	return n->id;
 }
 
 int network_connect_neurons(struct connection *const con,
-				struct neuron *const src,
-				struct neuron *const dest,
-				struct attributes *attr,
-				const int attribute_count)
+	struct neuron *const src, struct neuron *const dest,
+	struct attributes *attr, const int attribute_count)
 {
 	assert(con != NULL);
 	con->pre_neuron = src;
@@ -322,26 +322,23 @@ int network_connect_neurons(struct connection *const con,
 		int ret = -1;
 
 		if ((a->key[0] == 'w') ||
-				(strncmp("weight", a->key, MAX_FIELD_LEN) == 0))
+			(strncmp("weight", a->key, MAX_FIELD_LEN) == 0))
 		{
 			ret = sscanf(a->value_str, "%lf", &con->weight);
 		}
 		if (ret < 1)
 		{
-			INFO("Invalid attribute (%s:%s)\n",
-							a->key, a->value_str);
+			INFO("Invalid attribute (%s:%s)\n", a->key,
+				a->value_str);
 			exit(1);
 		}
 	}
 
-	TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n",
-			con->pre_neuron->group->id, con->pre_neuron->id,
-			con->post_neuron->group->id, con->post_neuron->id,
-			con->weight);
+	TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n", con->pre_neuron->group->id,
+		con->pre_neuron->id, con->post_neuron->group->id,
+		con->post_neuron->id, con->weight);
 	return RET_OK;
 }
-
-
 
 /*
 int network_create_inputs(struct network *const net, const int input_count,
@@ -443,24 +440,24 @@ void network_free(struct network *const net)
 	return;
 }
 
-struct neuron *network_id_to_neuron_ptr(struct network *const net,
-					const struct neuron_id id)
+struct neuron *network_id_to_neuron_ptr(
+	struct network *const net, const struct neuron_id id)
 {
 	struct neuron_group *group;
 	struct neuron *neuron;
 
 	if (id.group < net->neuron_group_count)
 	{
-		INFO("ERROR: Group %d > max %d.\n",
-					id.group, net->neuron_group_count);
+		INFO("ERROR: Group %d > max %d.\n", id.group,
+			net->neuron_group_count);
 		exit(1);
 	}
 
 	group = &(net->groups[id.group]);
 	if (id.neuron < group->neuron_count)
 	{
-		INFO("ERROR: Neuron %d > max %d.\n",
-						id.neuron, group->neuron_count);
+		INFO("ERROR: Neuron %d > max %d.\n", id.neuron,
+			group->neuron_count);
 		exit(1);
 	}
 	neuron = &(group->neurons[id.neuron]);
@@ -468,8 +465,8 @@ struct neuron *network_id_to_neuron_ptr(struct network *const net,
 	return neuron;
 }
 
-void network_set_input(struct network *const net, const int input_id,
-							const double rate)
+void network_set_input(
+	struct network *const net, const int input_id, const double rate)
 {
 	struct input *in = &(net->external_inputs[input_id]);
 	in->rate = rate;
@@ -496,7 +493,6 @@ void network_check_mapped(struct network *const net)
 		}
 	}
 }
-
 
 int network_map_hardware(struct neuron *n, struct core *c)
 {

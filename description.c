@@ -6,17 +6,17 @@
 #include "print.h"
 #include "command.h"
 
-int description_parse_file(FILE *fp, struct network *net,
-						struct architecture *arch)
+int description_parse_file(
+	FILE *fp, struct network *net, struct architecture *arch)
 {
 	char *line;
-	char (*fields)[MAX_FIELD_LEN];
+	char(*fields)[MAX_FIELD_LEN];
 	int ret;
 
 	assert((arch != NULL) || (net != NULL));
 
-	fields = (char (*)[MAX_FIELD_LEN])
-			malloc(sizeof(char[MAX_FIELD_LEN]) * MAX_FIELDS);
+	fields = (char(*)[MAX_FIELD_LEN]) malloc(
+		sizeof(char[MAX_FIELD_LEN]) * MAX_FIELDS);
 	line = (char *) malloc(sizeof(char) * MAX_LINE);
 	ret = RET_OK;
 
@@ -40,7 +40,7 @@ int description_parse_file(FILE *fp, struct network *net,
 }
 
 int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
-				struct network *net, struct architecture *arch)
+	struct network *net, struct architecture *arch)
 {
 	char *token;
 	int field_count, last_char_idx;
@@ -56,7 +56,7 @@ int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
 	}
 
 	field_count = 0;
-	last_char_idx = strlen(line)-1;
+	last_char_idx = strlen(line) - 1;
 	assert(line[last_char_idx] == '\n');
 	line[last_char_idx] = '\0';
 	token = strtok(line, TOKEN_SEPERATORS);
@@ -74,11 +74,10 @@ int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
 			assert(arch->is_init);
 			// The network file description requires an initialized arch
 			//  and a pointer to the network struct
-			return description_read_network_entry(fields,
-							field_count, arch, net);
+			return description_read_network_entry(
+				fields, field_count, arch, net);
 		}
 		return description_read_arch_entry(fields, field_count, arch);
-
 	}
 	else
 	{
@@ -88,8 +87,7 @@ int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
 }
 
 int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
-				const int field_count,
-				struct architecture *arch)
+	const int field_count, struct architecture *arch)
 {
 	struct attributes attributes[128];
 	int attribute_count = 0;
@@ -187,7 +185,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		break;
 	default:
 		INFO("Warning: unrecognized unit (%c) - skipping.\n",
-							entry_type);
+			entry_type);
 		ret = RET_OK;
 		break;
 	}
@@ -196,9 +194,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 }
 
 int description_read_network_entry(char fields[][MAX_FIELD_LEN],
-				const int field_count,
-				struct architecture *arch,
-				struct network *net)
+	const int field_count, struct architecture *arch, struct network *net)
 {
 	struct attributes attributes[DESCRIPTION_MAX_ATTRIBUTES];
 	int attribute_count = 0;
@@ -242,7 +238,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	else if (entry_type == '&')
 	{
 		ret = sscanf(fields[1], "%d.%d@%d.%d", &neuron_group_id,
-				&neuron_id, &tile_id, &core_offset);
+			&neuron_id, &tile_id, &core_offset);
 		if (ret < 4)
 		{
 			INFO("Error couldn't parse mapping.\n");
@@ -250,8 +246,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		}
 		if (tile_id >= arch->tile_count)
 		{
-			INFO("Error: Tile (%d) >= tile count (%d)\n",
-						tile_id, arch->tile_count);
+			INFO("Error: Tile (%d) >= tile count (%d)\n", tile_id,
+				arch->tile_count);
 			exit(1);
 		}
 		t = &(arch->tiles[tile_id]);
@@ -259,7 +255,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		if (core_offset >= t->core_count)
 		{
 			INFO("Error: Core (%d) >= core count (%d)\n",
-						core_offset, t->core_count);
+				core_offset, t->core_count);
 			exit(1);
 		}
 		c = &(t->cores[core_offset]);
@@ -267,9 +263,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	else if (entry_type == 'e')
 	{
 		// Edge on SNN graph (e.g., connection between neurons)
-		ret = sscanf(fields[1], "%d.%d->%d.%d",
-			&neuron_group_id, &neuron_id,
-			&dest_group_id, &dest_neuron_id);
+		ret = sscanf(fields[1], "%d.%d->%d.%d", &neuron_group_id,
+			&neuron_id, &dest_group_id, &dest_neuron_id);
 		if (ret < 4)
 		{
 			INFO("Error couldn't parse connection / edge.\n");
@@ -285,14 +280,14 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			}
 			dest_group = &(net->groups[dest_group_id]);
 
-			TRACE2("Parsed neuron gid:%d nid:%d\n",
-						dest_group_id, neuron_id);
+			TRACE2("Parsed neuron gid:%d nid:%d\n", dest_group_id,
+				neuron_id);
 			if (dest_neuron_id > -1)
 			{
 				if (dest_neuron_id >= dest_group->neuron_count)
 				{
 					INFO("Error: Neuron (%d) >= "
-						"group neurons (%d).\n",
+					     "group neurons (%d).\n",
 						dest_neuron_id,
 						dest_group->neuron_count);
 					return RET_FAIL;
@@ -309,7 +304,6 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			INFO("Error: Couldn't parse neuron (%s)\n", fields[0]);
 			exit(1);
 		}
-
 	}
 
 	if (neuron_group_id > -1)
@@ -321,14 +315,14 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			return RET_FAIL;
 		}
 		group = &(net->groups[neuron_group_id]);
-		TRACE2("Parsed neuron gid:%d nid:%d\n",
-						neuron_group_id, neuron_id);
+		TRACE2("Parsed neuron gid:%d nid:%d\n", neuron_group_id,
+			neuron_id);
 		if (neuron_id > -1)
 		{
 			if (neuron_id >= group->neuron_count)
 			{
 				INFO("Error: Neuron (%d) >= "
-					"group neurons (%d).\n",
+				     "group neurons (%d).\n",
 					neuron_id, group->neuron_count);
 				return RET_FAIL;
 			}
@@ -361,8 +355,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	switch (fields[0][0])
 	{
 	case 'g': // Add neuron group
-		ret = network_create_neuron_group(net, neuron_count, attributes,
-							attribute_count);
+		ret = network_create_neuron_group(
+			net, neuron_count, attributes, attribute_count);
 		break;
 	case 'n': // Add neuron
 		ret = network_create_neuron(n, attributes, attribute_count);
@@ -387,8 +381,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 				exit(1);
 			}
 			con = &(n->connections_out[edge_id]);
-			ret = network_connect_neurons(con, n, dest,
-						attributes, attribute_count);
+			ret = network_connect_neurons(
+				con, n, dest, attributes, attribute_count);
 		}
 		break;
 	case 'x': // Add group of external inputs
@@ -693,9 +687,8 @@ int command_parse_extern_input_node(struct network *const net,
 */
 
 int description_parse_command(char fields[][MAX_FIELD_LEN],
-				const int field_count, struct network *net,
-				struct architecture *arch,
-				struct simulation *sim)
+	const int field_count, struct network *net, struct architecture *arch,
+	struct simulation *sim)
 {
 	int ret;
 	char command_type;
@@ -703,7 +696,7 @@ int description_parse_command(char fields[][MAX_FIELD_LEN],
 	command_type = fields[0][0];
 	// Sanity check input
 	if ((command_type == '\0') || (command_type == '\n') ||
-							(command_type == '#'))
+		(command_type == '#'))
 	{
 		INFO("Warning: No command, skipping.\n");
 		return RET_OK;
@@ -720,7 +713,7 @@ int description_parse_command(char fields[][MAX_FIELD_LEN],
 		break;
 	default:
 		INFO("Warning: unrecognized unit (%c) - skipping.\n",
-							command_type);
+			command_type);
 		ret = RET_OK;
 		break;
 	}

@@ -22,7 +22,7 @@ struct architecture *arch_init(void)
 		printf("%ld\n", sizeof(struct core));
 		printf("%ld\n", sizeof(struct tile));
 		INFO("Error: Couldn't allocate %ld bytes.\n",
-						sizeof(struct architecture));
+			sizeof(struct architecture));
 		INFO("Error: Architecture couldn't be created.\n");
 		exit(1);
 	}
@@ -142,7 +142,7 @@ void arch_free(struct architecture *const arch)
 }
 
 int arch_create_noc(struct architecture *const arch, struct attributes *attr,
-			const int attribute_count)
+	const int attribute_count)
 {
 	int tile_id = 0;
 
@@ -230,19 +230,19 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 			for (int i = 0; i < link_count; i++)
 			{
 				TRACE1("\tlink[%d]->%d\n", i,
-							(t->links[i])->id);
+					(t->links[i])->id);
 			}
 		}
 	}
 
 	arch->is_init = 1;
-	TRACE1("NoC created, mesh, width:%d height:%d.\n",
-		arch->noc_width, arch->noc_height);
+	TRACE1("NoC created, mesh, width:%d height:%d.\n", arch->noc_width,
+		arch->noc_height);
 	return 0;
 }
 
 int arch_create_tile(struct architecture *const arch, struct attributes *attr,
-			const int attribute_count)
+	const int attribute_count)
 {
 	struct tile *t;
 	int id;
@@ -288,37 +288,37 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 
 		if (strncmp("blocking", a->key, MAX_FIELD_LEN) == 0)
 		{
-			t->is_blocking = (strncmp(a->value_str,
-						"True", MAX_FIELD_LEN-1) == 0);
+			t->is_blocking = (strncmp(a->value_str, "True",
+						  MAX_FIELD_LEN - 1) == 0);
 		}
-		else if (strncmp("energy_east_west", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_east_west", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(a->value_str, "%lf", &t->energy_east_west_hop);
 		}
-		else if (strncmp("latency_east_west", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_east_west", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(a->value_str, "%lf", &t->time_east_west_hop);
 		}
-		else if (strncmp("energy_north_south", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_north_south", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(a->value_str, "%lf", &t->energy_north_south_hop);
 		}
 		else if (strncmp("latency_north_south", a->key,
-			MAX_FIELD_LEN) == 0)
+				 MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf", &t->time_north_south_hop);
 		}
 		else if (strncmp("energy_spike_within_tile", a->key,
-			MAX_FIELD_LEN) == 0)
+				 MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
-						&t->energy_spike_within_tile);
+				&t->energy_spike_within_tile);
 		}
 		else if (strncmp("latency_spike_within_tile", a->key,
-			MAX_FIELD_LEN) == 0)
+				 MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf", &t->time_spike_within_tile);
 		}
@@ -328,7 +328,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 }
 
 int arch_create_core(struct architecture *const arch, struct tile *const t,
-			struct attributes *attr, const int attribute_count)
+	struct attributes *attr, const int attribute_count)
 {
 	struct core *c;
 	unsigned int core_id;
@@ -353,7 +353,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 		if (strncmp("blocking", a->key, MAX_FIELD_LEN) == 0)
 		{
 			c->is_blocking = (strncmp("True", a->value_str,
-						MAX_FIELD_LEN-1) == 0);
+						  MAX_FIELD_LEN - 1) == 0);
 		}
 		if (strncmp("noise", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -387,8 +387,8 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 
 	c->neuron_count = 0;
 	c->curr_neuron = 0;
-	c->neurons = (struct neuron **) malloc(sizeof(struct neuron *) *
-							ARCH_MAX_COMPARTMENTS);
+	c->neurons = (struct neuron **) malloc(
+		sizeof(struct neuron *) * ARCH_MAX_COMPARTMENTS);
 	if (c->neurons == NULL)
 	{
 		INFO("Error: Couldn't allocate neuron memory.\n");
@@ -426,8 +426,7 @@ void arch_create_axon_in(struct core *const c)
 }
 
 void arch_create_synapse(struct core *const c,
-				const struct attributes *const attr,
-				const int attribute_count)
+	const struct attributes *const attr, const int attribute_count)
 {
 	struct synapse_processor *s;
 
@@ -458,24 +457,23 @@ void arch_create_synapse(struct core *const c,
 			//  read might return multiple weights
 			sscanf(curr->value_str, "%d", &s->word_bits);
 		}
-		else if (strncmp("energy_memory", curr->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_memory", curr->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(curr->value_str, "%lf",
-						&s->energy_memory_access);
+				&s->energy_memory_access);
 		}
-		else if (strncmp("latency_memory", curr->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_memory", curr->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(curr->value_str, "%lf", &s->time_memory_access);
 		}
-		else if (strncmp("energy_spike", curr->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_spike", curr->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(curr->value_str, "%lf", &s->energy_spike_op);
 		}
-		else if (strncmp("latency_spike", curr->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_spike", curr->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(curr->value_str, "%lf", &s->time_spike_op);
 		}
@@ -491,7 +489,7 @@ void arch_create_synapse(struct core *const c,
 }
 
 void arch_create_soma(struct core *const c, struct attributes *attr,
-			const int attribute_count)
+	const int attribute_count)
 {
 	struct soma_processor *s;
 
@@ -516,37 +514,32 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 		{
 			s->model = arch_parse_neuron_model(a->value_str);
 		}
-		else if (strncmp("energy_active", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_active", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
 				&s->energy_active_neuron_update);
 		}
-		else if (strncmp("latency_active", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_active", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
-					&s->time_active_neuron_update);
+				&s->time_active_neuron_update);
 		}
-		else if (strncmp("energy_inactive", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_inactive", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
-					&s->energy_inactive_neuron_update);
+				&s->energy_inactive_neuron_update);
 		}
-		else if (strncmp("latency_inactive", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_inactive", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(a->value_str, "%lf",
-					&s->time_inactive_neuron_update);
+				&s->time_inactive_neuron_update);
 		}
-		else if (strncmp("energy_spiking", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_spiking", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf", &s->energy_spiking);
 		}
-		else if (strncmp("latency_spiking", a->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_spiking", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf", &s->time_spiking);
 		}
@@ -557,7 +550,7 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 }
 
 void arch_create_axon_out(struct core *const c, struct attributes *attr,
-				const int attribute_count)
+	const int attribute_count)
 {
 	struct axon_output *out;
 
@@ -573,13 +566,11 @@ void arch_create_axon_out(struct core *const c, struct attributes *attr,
 	{
 		struct attributes *curr = &(attr[i]);
 
-		if (strncmp("energy", curr->key,
-			MAX_FIELD_LEN) == 0)
+		if (strncmp("energy", curr->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(curr->value_str, "%lf", &out->energy_access);
 		}
-		else if (strncmp("latency", curr->key,
-			MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency", curr->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(curr->value_str, "%lf", &out->time_access);
 		}
@@ -635,16 +626,16 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 #ifdef DEBUG
 				struct neuron *n = c->neurons[k];
 				TRACE3("\tnid:%d.%d ", n->group->id, n->id);
-				TRACE3("i:%d o:%d\n",
-					n->maps_in_count, n->maps_out_count);
+				TRACE3("i:%d o:%d\n", n->maps_in_count,
+					n->maps_out_count);
 #endif
 				core_used = 1;
 			}
 
 			if (core_used)
 			{
-				TRACE1("cid:%d.%d n:%d i:%d o:%d\n",
-					t->id, c->id, c->neuron_count,
+				TRACE1("cid:%d.%d n:%d i:%d o:%d\n", t->id,
+					c->id, c->neuron_count,
 					c->axon_in.map_count,
 					c->axon_out.map_count);
 				in_count += c->axon_in.map_count;
@@ -663,8 +654,8 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 void arch_map_neuron_connections(struct neuron *const pre_neuron)
 {
 	// Setup the connections between neurons and map them to hardware
-	int connection_count[ARCH_MAX_TILES*ARCH_MAX_CORES];
-	struct core *cores[ARCH_MAX_TILES*ARCH_MAX_CORES];
+	int connection_count[ARCH_MAX_TILES * ARCH_MAX_CORES];
+	struct core *cores[ARCH_MAX_TILES * ARCH_MAX_CORES];
 
 	assert(pre_neuron->core != NULL);
 
@@ -697,8 +688,8 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 		{
 			// Create the connection map, and add it to both the
 			//  destination and source cores
-			arch_allocate_connection_map(pre_neuron, cores[x],
-							connection_count[x]);
+			arch_allocate_connection_map(
+				pre_neuron, cores[x], connection_count[x]);
 			total_map_count++;
 		}
 	}
@@ -711,7 +702,7 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 		// Add every connection to the map. Also link to the map in the
 		//  post synaptic core / neuron
 		struct connection *curr_connection =
-					&(pre_neuron->connections_out[conn]);
+			&(pre_neuron->connections_out[conn]);
 		struct core *post_core = curr_connection->post_neuron->core;
 
 		TRACE3("Adding connection:%d\n", con);
@@ -724,8 +715,7 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 }
 
 void arch_allocate_connection_map(struct neuron *const pre_neuron,
-					struct core *const post_core,
-					const int connection_count)
+	struct core *const post_core, const int connection_count)
 {
 	// For each connected core, create a new axon map at the destination
 	//  core. Then link this axon to output of the source core. Finally
@@ -742,7 +732,7 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 
 	TRACE2("axon in map count:%d for core:%d.%d, adding %d connections\n",
 		map_count, post_core->id, post_core->t->id,
-		connection_count[x] );
+		connection_count[x]);
 	struct connection_map *map = &(axon_in->map[map_count]);
 
 	TRACE3("Adding connection to core.\n");
@@ -763,16 +753,14 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 	pre_core->axon_out.map_ptr[map_count] = map;
 	if (pre_neuron->maps_out == NULL)
 	{
-		TRACE2("Setting neuron nid:%d axon out.\n",
-			pre_neuron->id);
-		pre_neuron->maps_out =
-			&(pre_core->axon_out.map_ptr[map_count]);
+		TRACE2("Setting neuron nid:%d axon out.\n", pre_neuron->id);
+		pre_neuron->maps_out = &(pre_core->axon_out.map_ptr[map_count]);
 		assert(pre_neuron->maps_out != NULL);
 		assert(pre_neuron->maps_out[0] != NULL);
 	}
 	pre_neuron->maps_out_count++;
 	TRACE2("nid:%d.%d cid:%d.%d added one output axon, "
-		"axon out map_count:%d, neuron out map count:%d.\n",
+	       "axon out map_count:%d, neuron out map count:%d.\n",
 		pre_neuron->group->id, pre_neuron->id, pre_core->t->id,
 		pre_core->id, pre_core->axon_out.map_count,
 		pre_neuron->maps_out_count);
@@ -780,8 +768,8 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 	return;
 }
 
-void arch_add_connection_to_map(struct connection *const con,
-				struct core *const post_core)
+void arch_add_connection_to_map(
+	struct connection *const con, struct core *const post_core)
 {
 	// Add a given connection to the connection map in the post-synaptic
 	//  (destination) core. Check to see if we already have a map for this
@@ -794,7 +782,7 @@ void arch_add_connection_to_map(struct connection *const con,
 	TRACE3("Adding to connection to map:%d\n", map_count - 1);
 
 	// Access the most recently created axon for the core
-	struct connection_map *axon = &(post_core->axon_in.map[map_count-1]);
+	struct connection_map *axon = &(post_core->axon_in.map[map_count - 1]);
 	axon->connections[axon->connection_count++] = con;
 	axon->pre_neuron = con->pre_neuron;
 

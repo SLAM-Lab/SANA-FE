@@ -15,8 +15,7 @@
 #include "sim.h"
 
 int command_parse_input_spikes(struct network *const net,
-						char fields[][MAX_FIELD_LEN],
-						const int field_count)
+	char fields[][MAX_FIELD_LEN], const int field_count)
 {
 	double val;
 	int ret, input_count;
@@ -31,17 +30,17 @@ int command_parse_input_spikes(struct network *const net,
 	for (int i = 0; i < input_count; i++)
 	{
 		struct input *in = &(net->external_inputs[i]);
-		ret = sscanf(fields[i+1], "%lf", &val);
+		ret = sscanf(fields[i + 1], "%lf", &val);
 		if (ret < 1)
 		{
 			INFO("Error: Couldn't parse input value (%s)\n",
-								fields[i+1]);
+				fields[i + 1]);
 			return RET_FAIL;
 		}
 		else if (val < 0)
 		{
-			INFO("Warning: id:%d input rate < 0 (%lf)\n",
-							in->id, in->spike_val);
+			INFO("Warning: id:%d input rate < 0 (%lf)\n", in->id,
+				in->spike_val);
 		}
 		//else if (val > 1.0)
 		//{
@@ -56,10 +55,10 @@ int command_parse_input_spikes(struct network *const net,
 }
 
 int command_parse_step_sim(struct network *const net,
-						struct architecture *const arch,
-//						char fields[][MAX_FIELD_LEN],
-//						const int field_count,
-						struct simulation *sim)
+	struct architecture *const arch,
+	//						char fields[][MAX_FIELD_LEN],
+	//						const int field_count,
+	struct simulation *sim)
 {
 	INFO("not implemented\n");
 	sim_timestep(sim, net, arch);
