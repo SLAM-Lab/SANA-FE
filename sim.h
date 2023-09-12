@@ -47,11 +47,11 @@ void sim_init_sim(struct simulation *sim);
 void sim_init_timestep(struct timestep *const ts);
 
 void sim_send_messages(struct simulation *const sim, struct timestep *const ts, struct network *net, struct architecture *arch);
-void sim_receive_messages(struct timestep *const ts, struct network *net, struct architecture *arch);
+void sim_receive_messages(struct timestep *const ts, struct architecture *arch);
 int sim_input_spikes(struct network *net);
-int sim_schedule_messages(const struct simulation *const sim, struct timestep *const ts, struct network *net, struct architecture *arch);
+int sim_schedule_messages(const struct simulation *const sim, struct timestep *const ts, struct architecture *arch);
 
-void sim_process_neuron(struct timestep *const ts, struct network *net, struct neuron *n);
+void sim_process_neuron(struct timestep *const ts, struct neuron *n);
 double sim_pipeline_receive(struct timestep *const ts, struct core *c, struct connection_map *axon);
 double sim_neuron_send_spike(struct neuron *n);
 double sim_update_synapse(struct timestep *const ts, struct connection_map *axon, const int synaptic_lookup);
@@ -69,7 +69,7 @@ double sim_calculate_time(const struct architecture *const arch);
 double sim_calculate_time_old(const struct architecture *const arch);
 long int sim_calculate_packets(const struct architecture *arch);
 
-void sim_write_summary(FILE *fp, const struct architecture *arch, const struct simulation *stats);
+void sim_write_summary(FILE *fp, const struct simulation *stats);
 void sim_spike_trace_write_header(const struct simulation *const sim);
 void sim_potential_trace_write_header(const struct simulation *const sim, const struct network *net);
 void sim_message_trace_write_header(const struct simulation *const sim);
@@ -82,7 +82,6 @@ int sim_poisson_input(const double firing_probability);
 int sim_rate_input(const double firing_rate, double *spike_val);
 
 struct core *sim_init_timing_priority(struct architecture *arch);
-struct core *sim_update_timing_queue(struct architecture *arch,
-						struct core *top_priority);
+struct core *sim_update_timing_queue(struct core *top_priority);
 
 #endif

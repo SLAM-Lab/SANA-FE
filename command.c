@@ -57,8 +57,8 @@ int command_parse_input_spikes(struct network *const net,
 
 int command_parse_step_sim(struct network *const net,
 						struct architecture *const arch,
-						char fields[][MAX_FIELD_LEN],
-						const int field_count,
+//						char fields[][MAX_FIELD_LEN],
+//						const int field_count,
 						struct simulation *sim)
 {
 	INFO("not implemented\n");

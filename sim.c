@@ -27,8 +27,8 @@ struct timestep sim_timestep(struct simulation *const sim,
 	ts.timestep = sim->timesteps;
 	sim_send_messages(sim, &ts, net, arch);
 	sim_input_spikes(net);
-	sim_receive_messages(&ts, net, arch);
-	sim_schedule_messages(sim, &ts, net, arch);
+	sim_receive_messages(&ts, arch);
+	sim_schedule_messages(sim, &ts, arch);
 
 	// Performance statistics for this time step
 	ts.sim_time = sim_calculate_time(arch);
@@ -99,7 +99,7 @@ void sim_send_messages(struct simulation *const sim, struct timestep *const ts,
 			{
 				struct neuron *n = c->neurons[k];
 				assert(n != NULL);
-				sim_process_neuron(ts, net, n);
+				sim_process_neuron(ts, n);
 			}
 		}
 	}
@@ -113,8 +113,7 @@ void sim_send_messages(struct simulation *const sim, struct timestep *const ts,
 	}
 }
 
-void sim_receive_messages(struct timestep *const ts, struct network *net,
-						struct architecture *arch)
+void sim_receive_messages(struct timestep *const ts, struct architecture *arch)
 {
 	#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
@@ -193,7 +192,6 @@ void sim_init_message(struct message *const m)
 
 int sim_schedule_messages(const struct simulation *const sim,
 				struct timestep *const ts,
-				struct network *const net,
 				struct architecture *const arch)
 {
 	struct core *top_priority;
@@ -378,7 +376,7 @@ int sim_schedule_messages(const struct simulation *const sim,
 			top_priority = top_priority->next_timing;
 		}
 
-		top_priority = sim_update_timing_queue(arch, top_priority);
+		top_priority = sim_update_timing_queue(top_priority);
 		if (top_priority != NULL)
 		{
 			TRACE2("\t(cid:%d.%d) time:%e\n",
@@ -391,8 +389,7 @@ int sim_schedule_messages(const struct simulation *const sim,
 	return 0;
 }
 
-void sim_process_neuron(struct timestep *const ts, struct network *net,
-							struct neuron *n)
+void sim_process_neuron(struct timestep *const ts, struct neuron *n)
 {
 	if (!n->is_init)
 	{
@@ -491,8 +488,7 @@ struct core *sim_init_timing_priority(struct architecture *arch)
 	return next;
 }
 
-struct core *sim_update_timing_queue(struct architecture *arch,
-						struct core *top_priority)
+struct core *sim_update_timing_queue(struct core *top_priority)
 {
 	struct core *next, *tmp;
 	int list_depth = 0;
@@ -695,8 +691,8 @@ double sim_update_synapse(struct timestep *const ts,
 					post_core->synapse.energy_spike_op;
 		//latency += spike_ops * post_core->synapse.time_spike_op;
 		// TODO: generalize, number of parallel processing units
-		latency += ((spike_ops+3) / 4) *
-					(post_core->synapse.time_spike_op * 4);
+		latency += floor(((double) spike_ops+3.0) / 4.0) *
+				(post_core->synapse.time_spike_op * 4.0);
 		post_core->synapse.total_spikes += spike_ops;
 		ts->spikes += spike_ops;
 		post_core->synapse.memory_reads += memory_accesses;
@@ -1171,8 +1167,7 @@ void sim_perf_log_timestep(const struct timestep *const ts, FILE *fp)
 	fprintf(fp, "\n");
 }
 
-void sim_write_summary(FILE *fp, const struct architecture *arch,
-						const struct simulation *sim)
+void sim_write_summary(FILE *fp, const struct simulation *sim)
 {
 	// Write the simulation summary to file
 	fprintf(fp, "git_version: %s\n", GIT_COMMIT);

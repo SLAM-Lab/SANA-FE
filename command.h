@@ -19,6 +19,6 @@ struct architecture;
 struct network;
 
 int command_parse_input_spikes(struct network *const net, char fields[][MAX_FIELD_LEN], const int field_count);
-int command_parse_step_sim(struct network *const net, struct architecture *const arch, char fields[][MAX_FIELD_LEN], const int field_count, struct simulation *sim);
+int command_parse_step_sim(struct network *const net, struct architecture *const arch, struct simulation *sim);
 
 #endif

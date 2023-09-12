@@ -8,6 +8,7 @@ etc/
 *.trace
 perf.csv
 .vscode
+.codechecker
 gmon.out
 sim
 __pycache__

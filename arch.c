@@ -289,7 +289,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 		if (strncmp("blocking", a->key, MAX_FIELD_LEN) == 0)
 		{
 			t->is_blocking = (strncmp(a->value_str,
-					"True", MAX_FIELD_LEN) == 0);
+						"True", MAX_FIELD_LEN-1) == 0);
 		}
 		else if (strncmp("energy_east_west", a->key,
 			MAX_FIELD_LEN) == 0)
@@ -352,8 +352,8 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 
 		if (strncmp("blocking", a->key, MAX_FIELD_LEN) == 0)
 		{
-			c->is_blocking = (strncmp(a->value_str, "True",
-						MAX_FIELD_LEN) == 0);
+			c->is_blocking = (strncmp("True", a->value_str,
+						MAX_FIELD_LEN-1) == 0);
 		}
 		if (strncmp("noise", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -408,8 +408,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 	return c->id;
 }
 
-void arch_create_axon_in(struct architecture *const arch, struct core *const c,
-			struct attributes *attr, const int attribute_count)
+void arch_create_axon_in(struct core *const c)
 {
 	struct axon_input *in;
 
@@ -426,7 +425,7 @@ void arch_create_axon_in(struct architecture *const arch, struct core *const c,
 	return;
 }
 
-void arch_create_synapse(struct architecture *const arch, struct core *const c,
+void arch_create_synapse(struct core *const c,
 				const struct attributes *const attr,
 				const int attribute_count)
 {
@@ -491,8 +490,8 @@ void arch_create_synapse(struct architecture *const arch, struct core *const c,
 	return;
 }
 
-void arch_create_soma(struct architecture *const arch, struct core *const c,
-			struct attributes *attr, const int attribute_count)
+void arch_create_soma(struct core *const c, struct attributes *attr,
+			const int attribute_count)
 {
 	struct soma_processor *s;
 
@@ -557,8 +556,8 @@ void arch_create_soma(struct architecture *const arch, struct core *const c,
 	return;
 }
 
-void arch_create_axon_out(struct architecture *const arch, struct core *const c,
-			struct attributes *attr, const int attribute_count)
+void arch_create_axon_out(struct core *const c, struct attributes *attr,
+				const int attribute_count)
 {
 	struct axon_output *out;
 

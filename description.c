@@ -166,11 +166,11 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		ret = arch_create_core(arch, t, attributes, attribute_count);
 		break;
 	case 'i':
-		arch_create_axon_in(arch, c, attributes, attribute_count);
+		arch_create_axon_in(c);
 		ret = RET_OK;
 		break;
 	case 's':
-		arch_create_synapse(arch, c, attributes, attribute_count);
+		arch_create_synapse(c, attributes, attribute_count);
 		ret = RET_OK;
 		break;
 	case 'd':
@@ -178,11 +178,11 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		ret = RET_OK;
 		break;
 	case '+':
-		arch_create_soma(arch, c, attributes, attribute_count);
+		arch_create_soma(c, attributes, attribute_count);
 		ret = RET_OK;
 		break;
 	case 'o':
-		arch_create_axon_out(arch, c, attributes, attribute_count);
+		arch_create_axon_out(c, attributes, attribute_count);
 		ret = RET_OK;
 		break;
 	default:
@@ -377,6 +377,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		else
 		{
 			struct connection *con;
+
+			assert(n != NULL);
 			int edge_id = (n->connection_out_count)++;
 			if (edge_id >= n->max_connections_out)
 			{
@@ -714,8 +716,7 @@ int description_parse_command(char fields[][MAX_FIELD_LEN],
 		ret = command_parse_input_spikes(net, fields, field_count);
 		break;
 	case '*': // Step simulator
-		ret = command_parse_step_sim(net, arch, fields, field_count,
-						sim);
+		ret = command_parse_step_sim(net, arch, sim);
 		break;
 	default:
 		INFO("Warning: unrecognized unit (%c) - skipping.\n",

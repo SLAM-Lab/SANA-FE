@@ -37,7 +37,7 @@ enum input_types
 
 struct neuron_id
 {
-	unsigned int group, neuron;
+	int group, neuron;
 };
 
 struct neuron
