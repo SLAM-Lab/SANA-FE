@@ -65,7 +65,8 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     for src in layer_1.neurons:
         for dest in layer_2.neurons:
             if random.random() < connection_probability:
-                src.add_connection(dest, weight)  # Same weight for all connections
+                # Same weight for all connections
+                src.add_connection(dest, weight)
 
     return network
 
@@ -188,7 +189,8 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
         results = sim.run(generated_arch_filename, NETWORK_FILENAME,
                             timesteps)
 
-        with open(os.path.join(PROJECT_DIR, "runs", "calibration", "sim_spiking.csv"),
+        with open(os.path.join(PROJECT_DIR, "runs",
+                               "calibration", "sim_spiking.csv"),
                   "a") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                             ("neuron_counts", "energy", "time",
@@ -206,12 +208,12 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
 
 mappings = ("fixed", "luke", "split_2")
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
 
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
     energy = {0: [], 256: [], 512: [], 768: [], 1024: []}
-    
+
     # This experiment looks at two fully connected layers, spiking
     if run_experiments:
         with open(f"runs/calibration/sim_spiking.csv", "w") as spiking_csv:
@@ -251,7 +253,7 @@ if __name__ == "__main__":
                 for mapping in mappings:
                     loihi_times_spikes[mapping].append(float(row[mapping]))
                 loihi_energy_spikes.append(float(row["dynamic energy"]))
-        
+
         plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
         # First plot results for the simple fixed mapping, where one layer is on
         #  one core and the second layer is on another
@@ -293,17 +295,18 @@ if __name__ == "__main__":
         plt.savefig("runs/calibration/calibration_energy.pdf")
         plt.savefig("runs/calibration/calibration_energy.png")
 
-        plt.rcParams.update({'font.size': 8, 'lines.markersize': 3})
+        plt.rcParams.update({'font.size': 8, 'lines.markersize': 4})
         ## Plot the effect of cores blocking
         spiking_frame = df.loc[(df["mapping"] == "luke") &
                                (df["tiles_blocking"] == False)]
         cores_nonblocking = spiking_frame.loc[spiking_frame["cores_blocking"] == False]
         cores_blocking = spiking_frame.loc[spiking_frame["cores_blocking"] == True]
 
-        plt.figure(figsize=(2.0, 2.0))
+        plt.figure(figsize=(2.4, 2.4))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(cores_nonblocking["time"] * 1.0e3), "x")
-        plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "o")
+        plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "ko",
+                 fillstyle="none")
 
         #plt.figure(figsize=(2.5, 2.5))
         #plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "-o")
@@ -316,7 +319,7 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=7)
+        plt.legend(("Measured", "Cores non-blocking", "Cores blocking"), fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_2.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_2.png")
@@ -327,18 +330,19 @@ if __name__ == "__main__":
         tiles_nonblocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == False]
         tiles_blocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == True]
 
-        plt.figure(figsize=(2.0, 2.0))
+        plt.figure(figsize=(2.4, 2.4))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["split_2"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(tiles_nonblocking["time"]) * 1.0e3, "x")
-        plt.plot(neuron_counts, np.array(tiles_blocking["time"]) * 1.0e3, "o")
+        plt.plot(neuron_counts, np.array(tiles_blocking["time"]) * 1.0e3, "ko",
+                 fillstyle="none"),
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Uncalibrated", "Calibrated"), fontsize=7)
+        plt.legend(("Measured", "Tiles non-blocking", "Tiles blocking"),
+                    fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_3.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_3.png")
-

@@ -136,22 +136,28 @@ if __name__ == "__main__":
         loihi_energy = df["loihi_energy"].values
         sim_latency = df["sim_latency"].values
         loihi_latency = df["loihi_latency"].values
+        neurons_per_core = df["neurons_per_core"].values
+        cores = df["cores"].values
+        total_neurons = np.array(neurons_per_core * cores, dtype=float)
 
-        plt.rcParams.update({"font.size": 8, "lines.markersize": 2})
-        # Plot the simulated vs measured energy 
-        plt.figure(figsize=(2.6, 2.6))
+        plt.rcParams.update({"font.size": 8, "lines.markersize": 3})
+        # Plot the simulated vs measured energy
+        plt.figure(figsize=(3.0, 3.0))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")
         plt.yscale("log")
-        plt.plot(sim_energy, loihi_energy, "x")
+        cm = plt.colormaps['coolwarm']
+        plt.scatter(sim_energy, loihi_energy, marker="x", c=total_neurons,
+                 cmap=cm, vmin=256, vmax=8192, linewidths=1)
         plt.plot(np.linspace(min(sim_energy), max(sim_energy)),
                  np.linspace(min(sim_energy), max(sim_energy)),
                  "k--", alpha=0.5)
-        
+        plt.colorbar(label="Neurons", shrink=0.5)
+
         plt.minorticks_on()
         plt.xlabel("Simulated Energy (J)")
-        plt.ylabel("Measured Energy (J)") 
+        plt.ylabel("Measured Energy (J)")
         plt.xticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.yticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.tight_layout(pad=0.3)
@@ -161,24 +167,39 @@ if __name__ == "__main__":
                                  "random_energy.png"))
 
         # Plot the simulated vs measured latency
-        plt.figure(figsize=(2.6, 2.6))
+        plt.figure(figsize=(3.0, 3.0))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")
         plt.yscale("log")
-        plt.plot(sim_latency, loihi_latency, "x")
+        #plt.plot(sim_latency, loihi_latency, "x")
+        plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
+                    cmap=cm, vmin=256, vmax=8192, linewidths=1)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")
+        plt.colorbar(label="Neurons", shrink=0.5)
         plt.xlabel("Simulated Latency (s)")
         plt.ylabel("Measured Latency (s)")
         plt.xticks((1.0e-6, 1.0e-5, 1.0e-4))
-        plt.yticks((1.0e-6, 1.0e-5, 1.0e-4)) 
+        plt.yticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.tight_layout(pad=0.3)
         plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
                                  "random_latency.pdf"))
         plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
                                  "random_latency.png"))
 
+
+        absolute_latency_error = np.abs(loihi_latency - sim_latency) / loihi_latency
+        absolute_energy_error = np.abs(loihi_energy - sim_energy) / loihi_energy
+
+        print(f"latency absolute mean error: {np.mean(absolute_latency_error) * 100.0}")
+        print(f"energy absolute mean {np.mean(absolute_energy_error) * 100.0}")
+
+        total_latency_error = (np.sum(loihi_latency) - np.sum(sim_latency)) / np.sum(loihi_latency)
+        total_energy_error = (np.sum(loihi_energy) - np.sum(sim_energy)) / np.sum(loihi_energy)
+
+        print(f"total latency error: {total_latency_error * 100.0}%")
+        print(f"total energy error: {total_energy_error * 100.0}%")
 
 # The old code for another experiment, where we measure simulator performance
 #  across a range of SNNs. Currently just ignore all of this - I didn't figure

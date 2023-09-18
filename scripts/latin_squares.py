@@ -185,9 +185,7 @@ if __name__ == "__main__":
                               "a") as csv_file:
                         writer = csv.writer(csv_file)
                         writer.writerow(row)
-        else:
-            
-            
+
     if plot_experiment:
         sim_df = pd.read_csv(os.path.join(PROJECT_DIR,
                                           "runs", "latin", "sim_latin.csv"))
@@ -205,7 +203,7 @@ if __name__ == "__main__":
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
 
-        plt.plot(sim_energy, loihi_energy, "x")
+        plt.plot(sim_energy, loihi_energy, "x", mew=1.5)
         plt.plot(np.linspace(min(sim_energy), max(sim_energy)),
                  np.linspace(min(sim_energy), max(sim_energy)), "k--")
         plt.xlabel("Simulated Energy ($\mu$J)")
@@ -224,7 +222,7 @@ if __name__ == "__main__":
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
 
-        plt.plot(sim_latency, loihi_latency, "x")
+        plt.plot(sim_latency, loihi_latency, "x", mew=1.5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")
         plt.xlabel("Simulated Latency ($\mu$s)")
@@ -238,5 +236,14 @@ if __name__ == "__main__":
         plt.savefig(os.path.join(PROJECT_DIR, "runs", "latin",
                                  "latin_latency.png"))
 
+        absolute_latency_error = np.abs(loihi_latency - sim_latency) / loihi_latency
+        absolute_energy_error = np.abs(loihi_energy - sim_energy) / loihi_energy
 
+        print(f"latency absolute mean error: {np.mean(absolute_latency_error) * 100.0}")
+        print(f"energy absolute mean {np.mean(absolute_energy_error) * 100.0}")
 
+        total_latency_error = (np.sum(loihi_latency) - np.sum(sim_latency)) / np.sum(loihi_latency)
+        total_energy_error = (np.sum(loihi_energy) - np.sum(sim_energy)) / np.sum(loihi_energy)
+
+        print(f"total latency error: {total_latency_error * 100.0}%")
+        print(f"total energy error: {total_energy_error * 100.0}%")

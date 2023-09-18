@@ -44,8 +44,7 @@ def run_sim(network_path, timesteps, plot_filename):
     spikes_in = spike_data.loc[spike_data["gid.nid"] == 0.0]
     spikes_out = spike_data.loc[spike_data["gid.nid"] == 1.0]
 
-    
-    plt.rcParams.update({'font.size': 8})
+    plt.rcParams.update({'font.size': 8, "lines.markersize": 2})
     plt.figure(figsize=(3.2, 1.6))
     plt.plot(np.arange(0, timesteps-offset), potentials)
     spike_idx = spikes_out.loc[:, "timestep"]
@@ -53,7 +52,7 @@ def run_sim(network_path, timesteps, plot_filename):
     spike_vals = height * np.ones(spike_idx.shape)
     plt.scatter(spike_idx-offset, spike_vals, marker='^', color='red')
     spike_idx = spikes_in.loc[:, "timestep"]
-    spike_vals = min(potentials) * np.ones(spike_idx.shape)
+    spike_vals = (min(potentials) - 1.0) * np.ones(spike_idx.shape)
     plt.scatter(spike_idx-offset, spike_vals, marker='^', color='black')
     plt.xlabel("Simulation Ticks")
     plt.ylabel("Membrane Potential")
