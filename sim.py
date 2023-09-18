@@ -464,5 +464,5 @@ if __name__ == "__main__":
     print(args)
 
     run(args.architecture, args.snn, args.timesteps,
-        log_spikes=args.spikes, log_potentials=args.voltages)
+        spike_trace=args.spikes, potential_trace=args.voltages)
     print("sim finished")
