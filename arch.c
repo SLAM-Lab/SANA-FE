@@ -667,7 +667,7 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 	}
 
 	// Count how many connections go to each core from this neuron
-	TRACE2("Counting connections for neuron nid:%d\n", k);
+	TRACE2("Counting connections for neuron nid:%d\n", pre_neuron->id);
 	for (int conn = 0; conn < pre_neuron->connection_out_count; conn++)
 	{
 		TRACE2("Looking at connection id: %d\n", conn);
@@ -680,7 +680,7 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 		TRACE2("Connected to dest core: %d\n", core_id);
 	}
 
-	TRACE2("Creating connections for neuron nid:%d\n", k);
+	TRACE2("Creating connections for neuron nid:%d\n", pre_neuron->id);
 	int total_map_count = 0;
 	for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES; x++)
 	{
@@ -705,7 +705,7 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 			&(pre_neuron->connections_out[conn]);
 		struct core *post_core = curr_connection->post_neuron->core;
 
-		TRACE3("Adding connection:%d\n", con);
+		TRACE3("Adding connection:%d\n", conn);
 		arch_add_connection_to_map(curr_connection, post_core);
 	}
 	TRACE2("Finished mapping connection to hardware for nid:%d.\n",
@@ -732,15 +732,15 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 
 	TRACE2("axon in map count:%d for core:%d.%d, adding %d connections\n",
 		map_count, post_core->id, post_core->t->id,
-		connection_count[x]);
+		connection_count);
 	struct connection_map *map = &(axon_in->map[map_count]);
 
 	TRACE3("Adding connection to core.\n");
 	// Allocate the map and its connections at the post-synaptic (dest)
 	//  core
 	map_size = connection_count * sizeof(struct connection);
-	TRACE3("Axon has %d connections, allocate %lu bytes\n",
-		connection_count[x], map_size);
+	TRACE3("Axon has %d connections, allocate %d bytes\n",
+		connection_count, map_size);
 	map->connections = malloc(connection_count * map_size);
 	if (map->connections == NULL)
 	{

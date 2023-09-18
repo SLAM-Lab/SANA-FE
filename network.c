@@ -274,7 +274,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	n->dendrite_last_updated = 0;
 
 	assert(n->connections_out == NULL);
-	TRACE1("Allocating memory (%d b) for connections\n",
+	TRACE1("Allocating memory (%lu b) for connections\n",
 		sizeof(struct connection) * n->max_connections_out);
 	if (n->max_connections_out > 0)
 	{

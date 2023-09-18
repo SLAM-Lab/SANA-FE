@@ -31,17 +31,17 @@ We recommend using `conda` to manage environments e.g.,
 
 # To Run an Example
 
-`python sim.py arch/loihi.yaml snn/example.net 10`
+`python3 sim.py arch/loihi.yaml snn/example.net 10`
 
 This simulates 10 time-steps of a tiny connected spiking network.
 
 General usage:
 
-`python sim.py <architecture description> <SNN description> <N timesteps>`
+`python3 sim.py <architecture description> <SNN description> <N timesteps>`
 
 Examples of more advanced usage are given in `scripts/`. This shows how
 more complex simulations and experiments can be created. For example, see
-`python scripts/calibration.py`
+`python3 scripts/calibration.py`
 
 # Input Format
 
