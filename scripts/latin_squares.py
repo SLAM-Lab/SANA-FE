@@ -161,16 +161,16 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiment = False
+    run_experiments = False
     plot_experiment = True
 
-    if run_experiment:
+    if run_experiments:
         if (os.path.isfile(os.path.join(PROJECT_DIR, "runs", "latin",
                            "loihi_latin.csv"))):
             open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
                  "w")
-            with (open(os.path.join(PROJECT_DIR, "runs", "latin",
-                                    "loihi_latin.csv")) as latin_squares_file):
+            with open(os.path.join(PROJECT_DIR, "runs", "latin",
+                                    "loihi_latin.csv")) as latin_squares_file:
                 reader = csv.DictReader(latin_squares_file)
 
                 for line in reader:
@@ -198,7 +198,7 @@ if __name__ == "__main__":
         loihi_latency = df["loihi_latency"].values * 1.0e6
 
         # Plot the simulated vs measured energy
-        plt.rcParams.update({"font.size": 8, "lines.markersize": 5})
+        plt.rcParams.update({"font.size": 7, "lines.markersize": 5})
         plt.figure(figsize=(1.7, 1.7))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
@@ -229,7 +229,7 @@ if __name__ == "__main__":
         plt.ylabel("Measured Latency ($\mu$s)")
         plt.xticks(np.arange(0, 41, 20))
         plt.yticks(np.arange(0, 41, 20))
-        plt.tight_layout()
+        plt.tight_layout(pad=0.3)
 
         plt.savefig(os.path.join(PROJECT_DIR, "runs", "latin",
                                  "latin_latency.pdf"))

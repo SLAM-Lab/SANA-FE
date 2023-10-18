@@ -367,7 +367,7 @@ int sim_schedule_messages(const struct simulation *const sim,
 			TRACE1("\t(cid:%d.%d) finished simulating\n", c->t->id,
 				c->id);
 			// The last neuron's messages are all scheduled, so
-			//  remove  the core from the priority queue
+			//  remove the core from the priority queue
 			cores_left--;
 			assert(cores_left >= 0);
 			top_priority = top_priority->next_timing;

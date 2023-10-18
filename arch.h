@@ -24,8 +24,8 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 #include "description.h"
 
 // Hard define maximum defined h/w sizes
-#define ARCH_MAX_COMPARTMENTS 1024
-#define ARCH_MAX_CONNECTION_MAP 16384
+#define ARCH_MAX_COMPARTMENTS 16384
+#define ARCH_MAX_CONNECTION_MAP 16384*4
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores

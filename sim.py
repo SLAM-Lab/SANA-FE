@@ -57,6 +57,53 @@ class Network:
             for input_node in self.inputs:
                 network_file.write(str(input_node))
 
+    def load(self, filename):
+        with open(filename, 'r') as network_file:
+            for line in network_file:
+                fields = line.split()
+                if fields and fields[0] == 'g':
+                    # TODO: support other fields to be loaded
+                    neuron_count = int(fields[1])
+                    group = self.create_group(0.0, 0.0, 0)
+                    for _ in range(0, neuron_count):
+                        group.create_neuron()
+
+                elif fields and fields[0] == 'n':
+                    pass
+                    #neuron_address = fields[1]
+                    #gid = int(neuron_address.split('.')[0])
+                    #group = self.groups[gid]
+                    #group.create_neuron()
+                elif fields and fields[0] == 'e':
+                    edge_info = fields[1]
+                    src_address = edge_info.split("->")[0]
+                    dest_address = edge_info.split("->")[1]
+
+                    src_gid = int(src_address.split(".")[0])
+                    src_nid = int(src_address.split(".")[1])
+                    src = self.groups[src_gid].neurons[src_nid]
+
+                    dest_gid = int(dest_address.split(".")[0])
+                    dest_nid = int(dest_address.split(".")[1])
+                    dest = self.groups[dest_gid].neurons[dest_nid]
+
+                    weight = None
+                    for f in fields:
+                        if "w=" in f or "weight=" in f:
+                            weight = float(f.split("=")[1])
+                    src.add_connection(dest, weight)
+                elif fields and fields[0] == '&':
+                    # TODO: for now ignore the mappings, the whole reason I'm
+                    #  trying this code is to explore different mappings
+                    pass
+
+        """
+        for g in self.groups:
+            for n in g.neurons:
+                print(n)
+        """
+        return
+
 
 class NeuronGroup:
     def __init__(self, group_id, threshold, reset, leak, log_spikes=None,
@@ -144,6 +191,7 @@ class Neuron:
         self.tile = None
         self.core = None
         self.bias = None
+        self._save_mappings = False
 
     def add_connection(self, dest, weight):
         self.connections.append((dest, weight))
@@ -229,6 +277,7 @@ def create_layer(network, layer_neuron_count, compartments,
         neuron.tile, neuron.core = tile, core
 
     return layer_group
+
 
 ### Architecture description parsing ###
 def parse_file(input_filename, output_filename):

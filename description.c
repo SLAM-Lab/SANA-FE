@@ -280,7 +280,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			}
 			dest_group = &(net->groups[dest_group_id]);
 
-			TRACE2("Parsed neuron gid:%d nid:%d\n", dest_group_id,
+			TRACE3("Parsed neuron gid:%d nid:%d\n", dest_group_id,
 				neuron_id);
 			if (dest_neuron_id > -1)
 			{
@@ -315,7 +315,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			return RET_FAIL;
 		}
 		group = &(net->groups[neuron_group_id]);
-		TRACE2("Parsed neuron gid:%d nid:%d\n", neuron_group_id,
+		TRACE3("Parsed neuron gid:%d nid:%d\n", neuron_group_id,
 			neuron_id);
 		if (neuron_id > -1)
 		{
@@ -336,7 +336,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		char *key, *value_str;
 		struct attributes *attr = &(attributes[attribute_count]);
 
-		TRACE2("Parsing field:%s\n", fields[i]);
+		TRACE3("Parsing field:%s\n", fields[i]);
 		key = strtok(fields[i], "=");
 		value_str = strtok(NULL, "=");
 		if ((key == NULL) || (value_str == NULL))
@@ -346,7 +346,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		}
 		strncpy(attr->key, key, MAX_FIELD_LEN);
 		strncpy(attr->value_str, value_str, MAX_FIELD_LEN);
-		TRACE2("Parsed attribute: %s:%s\n", attr->key, attr->value_str);
+		TRACE3("Parsed attribute: %s:%s\n", attr->key, attr->value_str);
 		attribute_count++;
 	}
 

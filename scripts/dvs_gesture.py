@@ -91,8 +91,8 @@ def parse_loihi_spiketrains(total_timesteps):
 if __name__ == "__main__":
     run_experiments = False
     plot_experiments = True
-    #experiment = "time"
-    experiment = "energy"
+    experiment = "time"
+    #experiment = "energy"
 
     neurons = []
     spiking_times = []
@@ -104,6 +104,7 @@ if __name__ == "__main__":
     energies = np.array(())
     timesteps = 128
     frames = 100
+    #frames = 1
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
@@ -178,7 +179,6 @@ if __name__ == "__main__":
         if experiment == "time":
             plt.rcParams.update({'font.size': 8, 'lines.markersize': 4})
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
-            #times = (times * 0.65) + 0.5e-5
             loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
             #loihi_times = np.array(loihi_data.loc[:, "spiking"] / 1.0e6)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
@@ -238,11 +238,11 @@ if __name__ == "__main__":
             times = np.delete(times,
                     list(range(timesteps-1, timesteps*frames, timesteps)))
             loihi_times = loihi_times[0:timesteps-1,:]
-            plt.figure(figsize=(7.0, 2.0))
+            plt.figure(figsize=(7.0, 1.7))
 
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
-            plt.rcParams.update({'font.size': 8})
+            plt.rcParams.update({'font.size': 7})
             plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
             plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--x")
             plt.legend(("Measured on Loihi", "Simulated"), fontsize=7)
@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
             average_times = total_times / 128
             loihi_average_times = loihi_total_times / 128
-            plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
+            plt.rcParams.update({'font.size': 7, 'lines.markersize': 2})
             #plt.plot(average_times[0:frames] * 1.0e6, loihi_average_times[0:frames] * 1.0e6, "x")
             #plt.plot(np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6,
             #         np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6, "k--")
@@ -305,7 +305,7 @@ if __name__ == "__main__":
             """
 
         if experiment == "energy":
-            plt.rcParams.update({'font.size': 8, 'lines.markersize': 2})
+            plt.rcParams.update({'font.size': 7, 'lines.markersize': 2})
             loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
             loihi_energies = np.array(loihi_data).flatten() * 1.0e6
             energies = np.loadtxt(SIM_ENERGY_DATA_PATH) * 1.0e6
@@ -322,7 +322,7 @@ if __name__ == "__main__":
             plt.xlabel("Simulated Energy ($\mu$J)")
             plt.xticks(np.arange(1, 4.1, 1))
             plt.yticks(np.arange(1, 4.1, 1))
-            plt.tight_layout(pad=0.3)
+            plt.tight_layout(pad=0.5)
             plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
             plt.savefig("runs/dvs/dvs_gesture_sim_energy.pdf")
 

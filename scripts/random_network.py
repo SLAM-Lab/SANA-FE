@@ -140,9 +140,9 @@ if __name__ == "__main__":
         cores = df["cores"].values
         total_neurons = np.array(neurons_per_core * cores, dtype=float)
 
-        plt.rcParams.update({"font.size": 8, "lines.markersize": 3})
+        plt.rcParams.update({"font.size": 7, "lines.markersize": 3})
         # Plot the simulated vs measured energy
-        plt.figure(figsize=(3.0, 3.0))
+        plt.figure(figsize=(3.0, 2.2))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")
@@ -167,7 +167,7 @@ if __name__ == "__main__":
                                  "random_energy.png"))
 
         # Plot the simulated vs measured latency
-        plt.figure(figsize=(3.0, 3.0))
+        plt.figure(figsize=(3.0, 2.2))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")

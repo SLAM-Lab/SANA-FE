@@ -44,7 +44,7 @@ def run_sim(network_path, timesteps, plot_filename):
     spikes_in = spike_data.loc[spike_data["gid.nid"] == 0.0]
     spikes_out = spike_data.loc[spike_data["gid.nid"] == 1.0]
 
-    plt.rcParams.update({'font.size': 8, "lines.markersize": 2})
+    plt.rcParams.update({'font.size': 7, "lines.markersize": 2})
     plt.figure(figsize=(3.2, 1.6))
     plt.plot(np.arange(0, timesteps-offset), potentials)
     spike_idx = spikes_out.loc[:, "timestep"]

@@ -128,7 +128,7 @@ def run_sim_nemo(cores, timesteps, debug=True):
 
 def plot_results():
     df = pd.read_csv(CSV_RESULTS_FILENAME, index_col="cores")
-    plt.rcParams.update({'font.size': 8, 'lines.markersize': 1})
+    plt.rcParams.update({'font.size': 7, 'lines.markersize': 1})
     df.plot.bar(rot=0, figsize=(3.5, 1.6), color=("#ff7f0e", "#1f77b4"))
     plt.xlabel("TrueNorth Core Count")
     plt.ylabel("Run-time (s)")

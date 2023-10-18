@@ -625,8 +625,8 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 			{
 #ifdef DEBUG
 				struct neuron *n = c->neurons[k];
-				TRACE3("\tnid:%d.%d ", n->group->id, n->id);
-				TRACE3("i:%d o:%d\n", n->maps_in_count,
+				TRACE2("\tnid:%d.%d ", n->group->id, n->id);
+				TRACE2("i:%d o:%d\n", n->maps_in_count,
 					n->maps_out_count);
 #endif
 				core_used = 1;
@@ -634,8 +634,8 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 
 			if (core_used)
 			{
-				TRACE1("cid:%d.%d n:%d i:%d o:%d\n", t->id,
-					c->id, c->neuron_count,
+				INFO("cid:%d.%d n:%d i:%d o:%d\n", t->id,
+					c->offset, c->neuron_count,
 					c->axon_in.map_count,
 					c->axon_out.map_count);
 				in_count += c->axon_in.map_count;
@@ -728,6 +728,8 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 	struct core *pre_core = pre_neuron->core;
 	struct axon_input *axon_in = &(post_core->axon_in);
 	int map_count = axon_in->map_count++;
+	assert(axon_in->map_count >= 0);
+	assert(axon_in->map_count < ARCH_MAX_CONNECTION_MAP);
 	int map_size;
 
 	TRACE2("axon in map count:%d for core:%d.%d, adding %d connections\n",
@@ -750,6 +752,8 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 
 	// Link to this map in the pre-synaptic (src) core
 	map_count = pre_core->axon_out.map_count++;
+	assert(pre_core->axon_out.map_count >= 0);
+	assert(pre_core->axon_out.map_count < ARCH_MAX_CONNECTION_MAP);
 	pre_core->axon_out.map_ptr[map_count] = map;
 	if (pre_neuron->maps_out == NULL)
 	{
@@ -759,6 +763,7 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 		assert(pre_neuron->maps_out[0] != NULL);
 	}
 	pre_neuron->maps_out_count++;
+	assert(pre_neuron->maps_out_count >= 0);
 	TRACE2("nid:%d.%d cid:%d.%d added one output axon, "
 	       "axon out map_count:%d, neuron out map count:%d.\n",
 		pre_neuron->group->id, pre_neuron->id, pre_core->t->id,
