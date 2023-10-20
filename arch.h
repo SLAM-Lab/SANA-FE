@@ -33,7 +33,7 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 //#define ARCH_MAX_TILES 4096
 //#define ARCH_MAX_CORES 1
 // Loihi
-#define ARCH_MAX_TILES 128
+#define ARCH_MAX_TILES 256
 #define ARCH_MAX_CORES 4
 
 #define ARCH_MAX_LINKS 4

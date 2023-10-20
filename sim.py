@@ -27,10 +27,12 @@ class Network:
 
     def create_group(self, threshold, reset, leak, log_spikes=False,
                      log_potential=False, force_update=False,
-                     connections_out=None):
+                     connections_out=None, reverse_threshold=None,
+                     reverse_reset_mode=None):
         group_id = len(self.groups)
         group = NeuronGroup(group_id, threshold, reset, leak, log_spikes,
-                            log_potential, force_update, connections_out)
+                            log_potential, force_update, connections_out,
+                            reverse_threshold, reverse_reset_mode)
         self.groups.append(group)
         return group
 
@@ -107,15 +109,16 @@ class Network:
 
 class NeuronGroup:
     def __init__(self, group_id, threshold, reset, leak, log_spikes=None,
-                 log_potential=None, force_update=None, connections_out=None):
+                 log_potential=None, force_update=None, connections_out=None,
+                 reverse_reset=None, reverse_reset_mode=None):
         # TODO: support all features here
         self.id = group_id
         self.neurons = []
         self.threshold = threshold
         self.reset = reset
         self.reset_mode = None
-        self.reverse_reset = None
-        self.reverse_reset_mode = None
+        self.reverse_reset = reverse_reset
+        self.reverse_reset_mode = reverse_reset_mode
         self.reverse_threshold = None
         self.leak_decay = leak
         self.connections_out = connections_out
@@ -256,11 +259,14 @@ def map_neuron_to_compartment(compartments):
 def create_layer(network, layer_neuron_count, compartments,
                  log_spikes=False, log_potential=False, force_update=False,
                  threshold=1.0, reset=0.0, leak=1.0, mappings=None,
-                 connections_out=None):
+                 connections_out=None, reverse_threshold=None,
+                 reverse_reset_mode=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     layer_group = network.create_group(threshold, reset, leak, log_spikes,
                                        log_potential, force_update,
-                                       connections_out=connections_out)
+                                       connections_out=connections_out,
+                                       reverse_threshold=reverse_threshold,
+                                       reverse_reset_mode=reverse_reset_mode)
 
     if mappings is not None:
         assert(len(mappings) == layer_neuron_count)
