@@ -123,7 +123,7 @@ struct synapse_processor
 	char name[MAX_FIELD_LEN];
 	int spikes_buffer;
 	int weights_per_word, word_bits, weight_bits;
-	long int total_spikes, memory_reads;
+	long int spikes_processed, memory_reads;
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
 	double time_spike_op, time_memory_access;
@@ -139,7 +139,7 @@ struct soma_processor
 {
 	char name[MAX_FIELD_LEN];
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
-	long int updates, spikes_sent;
+	long int updates, neurons_fired;
 	double energy, time;
 	double energy_active_neuron_update, time_active_neuron_update;
 	double energy_inactive_neuron_update, time_inactive_neuron_update;
@@ -191,6 +191,7 @@ struct tile
 	double energy_north_south_hop, time_north_south_hop;
 	double energy_spike_within_tile, time_spike_within_tile;
 	double blocked_until;
+	long int hops, messages_received, total_neurons_fired;
 	int id, x, y, core_count, is_blocking;
 	int max_dimensions, width; // For now just support 2 dimensions
 };

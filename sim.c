@@ -32,19 +32,31 @@ struct timestep sim_timestep(struct simulation *const sim,
 	// Performance statistics for this time step
 	ts.sim_time = sim_calculate_time(arch);
 	ts.energy = sim_calculate_energy(arch);
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		struct tile *t = &(arch->tiles[i]);
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
+			ts.spike_count += c->synapse.spikes_processed;
+			ts.total_neurons_fired += c->soma.neurons_fired;
 
-	sim->timesteps++;
-	sim->total_sim_time += ts.sim_time;
-	sim->total_energy += ts.energy;
-	sim->total_spikes += ts.spikes;
-	sim->total_messages_sent += ts.messages_sent;
-	sim->total_neurons_fired += ts.total_neurons_fired;
-
-	TRACE1("Spikes sent: %ld\n", sim->total_spikes);
+		}
+		ts.messages_sent += t->messages_received;
+	}
 	if (sim->perf_fp)
 	{
 		sim_perf_log_timestep(&ts, sim->perf_fp);
 	}
+
+	sim->timesteps++;
+	sim->total_energy += ts.energy;
+	sim->total_sim_time += ts.sim_time;
+	sim->total_spikes += ts.spike_count;
+	sim->total_neurons_fired += ts.total_neurons_fired;
+	sim->total_messages_sent += ts.messages_sent;
+
+	TRACE1("Spikes sent: %ld\n", sim->total_spikes);
 	return ts;
 }
 
@@ -138,7 +150,7 @@ void sim_receive_messages(struct timestep *const ts, struct architecture *arch)
 					assert(pre_tile != NULL);
 					axon->network_latency =
 						sim_estimate_network_costs(
-							ts, pre_tile, t);
+							pre_tile, t);
 					axon->receive_latency =
 						sim_pipeline_receive(
 							ts, c, axon);
@@ -148,8 +160,8 @@ void sim_receive_messages(struct timestep *const ts, struct architecture *arch)
 	}
 }
 
-double sim_estimate_network_costs(struct timestep *const ts,
-	struct tile *const src, struct tile *const dest)
+double sim_estimate_network_costs(struct tile *const src,
+	struct tile *const dest)
 {
 	double network_latency;
 	long int x_hops, y_hops;
@@ -157,23 +169,23 @@ double sim_estimate_network_costs(struct timestep *const ts,
 	assert(src != NULL);
 	assert(dest != NULL);
 
-	src->energy += src->energy_spike_within_tile;
+	dest->energy += src->energy_spike_within_tile;
 	network_latency = src->time_spike_within_tile;
 
 	// Calculate the energy and time for sending spike packets
 	x_hops = abs(src->x - dest->x);
 	y_hops = abs(src->y - dest->y);
 	// E-W hops
-	src->energy += (double) x_hops * src->energy_east_west_hop;
+	dest->energy += (double) x_hops * src->energy_east_west_hop;
 	network_latency += (double) x_hops * src->time_east_west_hop;
 	// N-S hops
-	src->energy += (double) y_hops * src->energy_north_south_hop;
+	dest->energy += (double) y_hops * src->energy_north_south_hop;
 	network_latency += (double) y_hops * src->time_north_south_hop;
 
-	ts->total_hops += (x_hops + y_hops);
-	ts->messages_sent++;
+	dest->hops += (x_hops + y_hops);
+	dest->messages_received++;
 	TRACE1("xhops:%ld yhops%ld total hops:%ld latency:%e\n", x_hops, y_hops,
-		ts->total_hops, network_latency);
+		t->hops, network_latency);
 	return network_latency;
 }
 
@@ -690,8 +702,7 @@ double sim_update_synapse(struct timestep *const ts,
 		// TODO: generalize, number of parallel processing units
 		latency += floor(((double) spike_ops + 3.0) / 4.0) *
 			   (post_core->synapse.time_spike_op * 4.0);
-		post_core->synapse.total_spikes += spike_ops;
-		ts->spikes += spike_ops;
+		post_core->synapse.spikes_processed += spike_ops;
 		post_core->synapse.memory_reads += memory_accesses;
 
 		for (int i = 0; i < axon->connection_count; i++)
@@ -875,7 +886,7 @@ double sim_update_soma_lif(
 			n->potential -= n->threshold;
 		}
 		latency += sim_neuron_send_spike(n);
-		soma->spikes_sent++;
+		soma->neurons_fired++;
 	}
 
 	// Check against reverse threshold
@@ -1112,6 +1123,9 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		t->energy = 0.0;
 		t->time = 0.0;
 		t->blocked_until = 0.0;
+
+		t->hops = 0;
+		t->messages_received = 0;
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
@@ -1129,12 +1143,14 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 			c->synapse.energy = 0.0;
 			c->synapse.time = 0.0;
+			c->synapse.spikes_processed = 0;
 
 			c->dendrite.energy = 0.0;
 			c->dendrite.time = 0.0;
 
 			c->soma.energy = 0.0;
 			c->soma.time = 0.0;
+			c->soma.neurons_fired = 0;
 
 			c->axon_out.energy = 0.0;
 			c->axon_out.time = 0.0;

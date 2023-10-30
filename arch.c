@@ -83,7 +83,7 @@ struct architecture *arch_init(void)
 			c->synapse.weights_per_word = 0;
 			c->synapse.word_bits = 0;
 			c->synapse.weight_bits = 0;
-			c->synapse.total_spikes = 0;
+			c->synapse.spikes_processed = 0;
 			c->synapse.memory_reads = 0;
 			c->synapse.energy = 0.0;
 			c->synapse.time = 0.0;
@@ -97,6 +97,8 @@ struct architecture *arch_init(void)
 
 			c->soma.energy = 0.0;
 			c->soma.time = 0.0;
+			c->soma.neurons_fired = 0;
+
 			c->axon_out.energy = 0.0;
 			c->axon_out.time = 0.0;
 

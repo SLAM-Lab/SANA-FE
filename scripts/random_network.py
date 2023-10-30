@@ -95,7 +95,7 @@ def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_me
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     if run_experiments:
         with open("runs/random/loihi_random.csv", "r") as csv_file:
