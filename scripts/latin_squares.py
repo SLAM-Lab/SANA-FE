@@ -169,14 +169,16 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiment = True
 
     if run_experiments:
         if (os.path.isfile(os.path.join(PROJECT_DIR, "runs", "latin",
                            "loihi_latin.csv"))):
-            open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
-                 "w")
+            with open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
+                 "w") as latin_squares_file:
+                latin_squares_file.write("N,network,sim_energy,sim_latency\n")
+
             with open(os.path.join(PROJECT_DIR, "runs", "latin",
                                     "loihi_latin.csv")) as latin_squares_file:
                 reader = csv.DictReader(latin_squares_file)
