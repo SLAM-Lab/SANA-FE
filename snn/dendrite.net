@@ -1,0 +1,40 @@
+### dendrite.net
+# neuron groups
+g 4 threshold=-1.0 reset=0.0 leak_decay=1.0 reset_mode=hard log_v=1
+
+# neurons
+n 0.0 bias=0.0 dendrites=3
+n 0.1 bias=0.1 threshold=1.0 connections_out=1
+n 0.2 bias=0.2 threshold=1.0 connections_out=1
+n 0.3 bias=1.0 threshold=1.0 connections_out=1
+
+# dendrite compartments
+# g.n.d  (group.neuron.dendrite)
+d 0.0.0 leak=0.9
+d 0.0.1 leak=0.9
+d 0.0.2 leak=0.8
+
+#  n(0.3)         n(0.2)         n(0.1)
+#    |              |              |
+#   \ /            \ /            \ /
+# d(0.0.2) <---> d(0.0.1) <---> d(0.0.0) proximal
+#                                  |
+#                                 \ /
+#                                n(0.0)
+
+# Edges between neurons
+e 0.1->0.0.1 weight=10
+e 0.2->0.0.2 weight=10
+e 0.3->0.0.3 weight=10
+
+# Edges between dendrite compartments
+e 0.0.2->0.0.1 weight=0.2
+e 0.0.1->0.0.2 weight=0.2
+e 0.0.1->0.0.0 weight=0.1
+e 0.0.0->0.0.1 weight=0.1
+
+## Map everything to one core
+&   0.0@0.0
+&   0.1@0.0
+&   0.2@0.0
+&   0.3@0.0

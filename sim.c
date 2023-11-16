@@ -430,13 +430,15 @@ void sim_process_neuron(struct timestep *const ts, struct neuron *n)
 			{
 				struct connection *con = a->connections[j];
 				n->processing_latency += sim_update_dendrite(
-					ts, n, con->current);
+					ts, n, con->post_dendrite_id,
+					con->current);
 			}
 		}
 	}
 	else if (c->buffer_pos == BUFFER_SOMA)
 	{
-		n->processing_latency = sim_update_soma(ts, n, n->charge);
+		n->processing_latency = sim_update_soma(ts, n,
+						n->dendrite_potentials[0]);
 	}
 	else if (c->buffer_pos == BUFFER_AXON_OUT)
 	{
@@ -591,7 +593,7 @@ int sim_input_spikes(struct network *net)
 				post_neuron->current);
 			if (post_neuron->core->buffer_pos == BUFFER_SOMA)
 			{
-				post_neuron->charge += connection_ptr->weight;
+				//post_neuron->charge += connection_ptr->weight;
 			}
 			else
 			{
@@ -672,7 +674,9 @@ double sim_update_synapse(struct timestep *const ts,
 				if (post_core->buffer_pos != BUFFER_DENDRITE)
 				{
 					latency += sim_update_dendrite(
-						ts, post_neuron, con->current);
+						ts, post_neuron,
+						con->post_dendrite_id,
+						con->current);
 				}
 			}
 		}
@@ -720,7 +724,8 @@ double sim_update_synapse(struct timestep *const ts,
 			if (post_core->buffer_pos != BUFFER_DENDRITE)
 			{
 				latency += sim_update_dendrite(
-					ts, post_neuron, con->current);
+					ts, post_neuron,
+					con->post_dendrite_id, con->current);
 			}
 		}
 	}
@@ -728,36 +733,59 @@ double sim_update_synapse(struct timestep *const ts,
 	return latency;
 }
 
-double sim_update_dendrite(
-	struct timestep *const ts, struct neuron *n, const double charge)
+double sim_update_dendrite(struct timestep *const ts, struct neuron *n,
+	const int dendrite_id, const double charge)
 {
-	// TODO: Support dendritic operations, combining the current in
-	//  different neurons in some way, and writing the result to an output
-	double dendritic_current, latency;
-	latency = 0.0;
+	// If a dendrite id is given, process the given charge. If no valid id
+	//  is given (dendrite_id < 0) then just update the dendrite and don't
+	//  add any charge
+	double latency = 0.0;
 
-	dendritic_current = 0.0;
 	while (n->dendrite_last_updated <= ts->timestep)
 	{
 		TRACE3("Updating dendritic current (last_updated:%d, ts:%ld)\n",
 			n->dendrite_last_updated, ts->timestep);
-		n->charge *= n->dendritic_current_decay;
+		// Perform matrix multiplication, updating potentials at
+		//  all compartments based on the weighted adjacency matrix
+		for (int src = 0; src < n->dendrite_count; src++)
+		{
+			for (int dest = 0; dest < n->dendrite_count; dest++)
+			{
+				int weight_idx = (src*n->dendrite_count) + dest;
+				n->next_dendrite_potentials[dest] +=
+					n->dendrite_potentials[src] *
+					n->dendrite_weights[weight_idx];
+			}
+			INFO("0.%d.%d potential:%lf\n", n->id, src,
+				n->dendrite_potentials[src]);
+		}
+		INFO("\n");
+		// Copy the updated dendrite potentials over and reset the
+		//  temporary buffer for calculating the next potentials
+		memcpy(n->dendrite_potentials, n->next_dendrite_potentials,
+			(sizeof(double) * n->dendrite_count));
+		for (int i = 0; i < n->dendrite_count; i++)
+		{
+			n->next_dendrite_potentials[i] = 0.0;
+		}
+
+		TRACE2("nid:%d charge:%lf\n", n->id,
+						n->n->dendrite_potentials[0]);
 		n->dendrite_last_updated++;
-		dendritic_current = n->charge;
-		TRACE2("nid:%d charge:%lf\n", n->id, n->charge);
 	}
 
-	// Update dendritic tap currents
-	// TODO: implement multi-tap models
 	TRACE2("Charge:%lf\n", charge);
-	dendritic_current += charge;
-	n->charge += charge;
+	if (dendrite_id >= 0)
+	{
+		n->dendrite_potentials[dendrite_id] += charge;
+	}
 
 	// Finally, send dendritic current to the soma
-	TRACE2("nid:%d updating dendrite, charge:%lf\n", n->id, n->charge);
+	TRACE2("nid:%d updating dendrite, charge:%lf\n", n->id,
+		n->dendrite_potentials[0]);
 	if (n->core->buffer_pos != BUFFER_SOMA)
 	{
-		latency += sim_update_soma(ts, n, dendritic_current);
+		latency += sim_update_soma(ts, n, n->dendrite_potentials[0]);
 	}
 
 	return latency;
@@ -868,7 +896,6 @@ double sim_update_soma_lif(
 	// Add the synaptic / dendrite current to the potential
 	//printf("n->bias:%lf n->potential before:%lf current_in:%lf\n", n->bias, n->potential, current_in);
 	n->potential += current_in + n->bias;
-	n->charge = 0.0;
 	//printf("n->bias:%lf n->potential after:%lf\n", n->bias, n->potential);
 
 	TRACE1("Updating potential, after:%f\n", n->potential);
@@ -954,7 +981,6 @@ double sim_update_soma_truenorth(
 	// Add the synaptic currents, processed by the dendrite
 	n->potential += current_in + n->bias;
 	n->current = 0.0;
-	n->charge = 0.0;
 
 	// Apply thresholding and reset
 	v = n->potential;

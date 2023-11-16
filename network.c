@@ -151,13 +151,10 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->fired = 0;
 		n->potential = 0.0;
 		n->current = 0.0;
-		n->charge = 0.0;
 		n->bias = 0.0;
 
 		n->leak_decay = group->default_leak_decay;
 		n->leak_bias = group->default_leak_bias;
-		// By default, dendrite current resets every timestep
-		n->dendritic_current_decay = 0.0;
 
 		n->update_needed = 0;
 		n->spike_count = 0;
@@ -208,6 +205,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	/*** Set attributes ***/
 	n->bias = 0.0;
 	n->random_range_mask = 0;
+	n->dendrite_count = 1;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
@@ -215,42 +213,46 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 
 		if (strncmp("bias", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf", &n->bias);
+			ret = sscanf(a->value_str, "%lf", &(n->bias));
 		}
 		else if (strncmp("reset", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf", &n->reset);
+			ret = sscanf(a->value_str, "%lf", &(n->reset));
 		}
 		else if (strncmp("reverse_reset", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf", &n->reverse_reset);
+			ret = sscanf(a->value_str, "%lf", &(n->reverse_reset));
 		}
 		else if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%lf", &n->threshold);
+			ret = sscanf(a->value_str, "%lf", &(n->threshold));
 		}
 		else if (strncmp("reverse_threshold", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
 			ret = sscanf(
-				a->value_str, "%lf", &n->reverse_threshold);
+				a->value_str, "%lf", &(n->reverse_threshold));
 		}
 		else if (strncmp("connections_out", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(
-				a->value_str, "%d", &n->max_connections_out);
+				a->value_str, "%d", &(n->max_connections_out));
 		}
 		else if (strncmp("log_spikes", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%d", &n->log_spikes);
+			ret = sscanf(a->value_str, "%d", &(n->log_spikes));
 		}
 		else if (strncmp("log_v", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%d", &n->log_potential);
+			ret = sscanf(a->value_str, "%d", &(n->log_potential));
 		}
 		else if (strncmp("force_update", a->key, MAX_FIELD_LEN) == 0)
 		{
-			ret = sscanf(a->value_str, "%d", &n->force_update);
+			ret = sscanf(a->value_str, "%d", &(n->force_update));
+		}
+		else if (strncmp("dendrites", a->key, MAX_FIELD_LEN) == 0)
+		{
+			ret = sscanf(a->value_str, "%d", &(n->dendrite_count));
 		}
 		else
 		{
@@ -283,7 +285,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		if (n->connections_out == NULL)
 		{
 			INFO("Error: Couldn't allocate connection memory.\n");
-			return NETWORK_INVALID_NID;
+			exit(1);
 		}
 	}
 
@@ -300,20 +302,89 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		con->synaptic_current_decay = 0.0;
 	}
 
+	if (n->dendrite_count < 1)
+	{
+		INFO("Error: Number of dendrites must be >= 1 (%d)\n",
+			n->dendrite_count);
+		exit(1);
+	}
+	INFO("Allocating %d dendritic compartments.\n", n->dendrite_count);
+	n->dendrite_potentials = (double *) malloc(
+		sizeof(double) * n->dendrite_count);
+	n->next_dendrite_potentials = (double *) malloc(
+		sizeof(double) * n->dendrite_count);
+	n->dendrite_weights = (double *) malloc(
+		sizeof(double) * n->dendrite_count * n->dendrite_count);
+	if ((n->dendrite_potentials == NULL) ||
+		(n->next_dendrite_potentials == NULL) ||
+		(n->dendrite_weights == NULL))
+	{
+		INFO("Error: Couldn't allocate dendrite memory.\n");
+		exit(1);
+	}
+	for (int i = 0; i < n->dendrite_count; i++)
+	{
+		n->dendrite_potentials[i] = 0.0;
+		n->next_dendrite_potentials[i] = 0.0;
+		for (int j = 0; j < n->dendrite_count; j++)
+		{
+			int idx = (i*n->dendrite_count) + j;
+			n->dendrite_weights[idx] = 0.0;
+		}
+	}
+
 	TRACE1("Created neuron: gid:%d nid:%d force:%d thresh:%lf\n",
 		n->group->id, n->id, n->force_update, n->threshold);
 	n->is_init = 1;
 	return n->id;
 }
 
+int network_create_dendrite(struct neuron *const n, const int dendrite_id,
+	struct attributes *attr, const int attribute_count)
+{
+	// Each hardware timestep corresponds to a simulation of the spiking
+	//  network for dt seconds. This relates to the LIF time constant.
+	assert(n != NULL);
+	assert(dendrite_id >= 0);
+	assert(dendrite_id < n->dendrite_count);
+
+	/*** Set attributes ***/
+	n->dendrite_potentials[dendrite_id] = 0.0;
+
+	for (int i = 0; i < attribute_count; i++)
+	{
+		struct attributes *a = &(attr[i]);
+		int ret = -1;
+
+		if (strncmp("leak", a->key, MAX_FIELD_LEN) == 0)
+		{
+			// Index into the adjacency matrix of weights for the
+			//  dendrite of this neuron. The leak will set the
+			//  recurrent edge connected this tap to itself
+			int idx = (dendrite_id*n->dendrite_count) + dendrite_id;
+			ret = sscanf(a->value_str, "%lf",
+				&(n->dendrite_weights[idx]));
+		}
+		if (ret < 1)
+		{
+			INFO("Invalid attribute (%s:%s)\n", a->key,
+				a->value_str);
+			exit(1);
+		}
+	}
+	return RET_OK;
+}
+
 int network_connect_neurons(struct connection *const con,
 	struct neuron *const src, struct neuron *const dest,
-	struct attributes *attr, const int attribute_count)
+	const int dendrite_id, struct attributes *attr,
+	const int attribute_count)
 {
 	assert(con != NULL);
 	con->pre_neuron = src;
 	con->post_neuron = dest;
 	con->weight = 1.0;
+	con->post_dendrite_id = dendrite_id;
 
 	total_connection_count++;
 	for (int i = 0; i < attribute_count; i++)
@@ -321,7 +392,7 @@ int network_connect_neurons(struct connection *const con,
 		struct attributes *a = &(attr[i]);
 		int ret = -1;
 
-		if ((a->key[0] == 'w') ||
+		if ((strncmp("w", a->key, MAX_FIELD_LEN) == 0) ||
 			(strncmp("weight", a->key, MAX_FIELD_LEN) == 0))
 		{
 			ret = sscanf(a->value_str, "%lf", &con->weight);
@@ -339,6 +410,48 @@ int network_connect_neurons(struct connection *const con,
 		con->post_neuron->id, con->weight);
 	return RET_OK;
 }
+
+int network_connect_dendrites(struct neuron *const n, const int src_dendrite_id,
+	const int dest_dendrite_id, struct attributes *attr,
+	const int attribute_count)
+{
+	// Index into adjacency matrix of weights
+	assert(n != NULL);
+	int idx = (src_dendrite_id*n->dendrite_count) + dest_dendrite_id;
+
+	INFO("src:%d dest:%d idx:%d\n", src_dendrite_id, dest_dendrite_id, idx);
+	assert(src_dendrite_id != dest_dendrite_id);
+	assert(src_dendrite_id < n->dendrite_count);
+	assert(dest_dendrite_id < n->dendrite_count);
+
+	for (int i = 0; i < attribute_count; i++)
+	{
+		struct attributes *a = &(attr[i]);
+		int ret = -1;
+
+		if ((strncmp("w", a->key, MAX_FIELD_LEN) == 0) ||
+			(strncmp("weight", a->key, MAX_FIELD_LEN) == 0))
+		{
+			int src_identity = (src_dendrite_id*n->dendrite_count) +
+				src_dendrite_id;
+			double weight;
+			ret = sscanf(a->value_str, "%lf", &weight);
+			// Update the src compartment, subtracting some of its
+			//  potential which is added to the destination
+			//  compartment. Formulate this for the matrix mul
+			n->dendrite_weights[idx] = weight;
+			n->dendrite_weights[src_identity] -= weight;
+		}
+		if (ret < 1)
+		{
+			INFO("Invalid attribute (%s:%s)\n", a->key,
+				a->value_str);
+			exit(1);
+		}
+	}
+	return RET_OK;
+}
+
 
 /*
 int network_create_inputs(struct network *const net, const int input_count,

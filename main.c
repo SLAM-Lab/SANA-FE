@@ -199,6 +199,28 @@ int main(int argc, char *argv[])
 	}
 	network_check_mapped(&net);
 
+	// TODO: remove hacky prints for dendrite debugging
+	for (int i = 0; i < net.neuron_group_count; i++)
+	{
+		struct neuron_group *g = &(net.groups[i]);
+		for (int j = 0; j < g->neuron_count; j++)
+		{
+			/*
+			struct neuron *n = &(g->neurons[j]);
+			INFO("Dendrites for neuron %d\n", n->id);
+			for (int k = 0; k < n->dendrite_count; k++)
+			{
+				for (int m = 0; m < n->dendrite_count; m++)
+				{
+					printf("%lf ",
+						n->dendrite_weights[(k*n->dendrite_count) + m]);
+				}
+				printf("\n");
+			}
+			*/
+		}
+	}
+
 	arch_create_connection_maps(arch);
 	INFO("Creating probe and perf data files.\n");
 	if (sim.spike_trace_fp != NULL)

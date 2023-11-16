@@ -58,22 +58,27 @@ struct neuron
 	// Track the timestep each hardware unit was last updated
 	unsigned int random_range_mask;
 
-	double potential, current, charge, bias;
+	double potential, current, bias;
 	double reset, reverse_reset, threshold, reverse_threshold;
 	double leak_decay, leak_bias, potential_time_const;
-	double dendritic_current_decay, processing_latency;
+	double processing_latency;
 
 	int id, is_init, fired, connection_out_count, max_connections_out;
 	int log_spikes, log_potential, update_needed, force_update, spike_count;
 	int soma_last_updated, dendrite_last_updated;
 	int maps_in_count, maps_out_count;
+
+	// Dendrites
+	int dendrite_count;
+	double *dendrite_potentials, *next_dendrite_potentials;
+	double *dendrite_weights;
 };
 
 struct connection
 {
 	struct neuron *post_neuron, *pre_neuron;
 	double weight, current, synaptic_current_decay;
-	int id, delay;
+	int id, delay, post_dendrite_id;
 };
 
 struct input
@@ -112,6 +117,7 @@ struct core;
 
 void network_init(struct network *const net);
 void network_free(struct network *const net);
+int network_create_dendrite(struct neuron *const n, const int dendrite_id, struct attributes *attr, const int attribute_count);
 int network_create_neuron(struct neuron *const n, struct attributes *attr, const int attribute_count);
 int network_create_neuron_group(struct network *net, const int neuron_count, struct attributes *attr, const int attribute_count);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
@@ -119,7 +125,8 @@ int network_create_inputs(struct network *const net, const int input_count, cons
 int network_create_input_node(struct input *const in, const int connection_count);
 void network_set_input(struct network *const net, const int input_id, const double rate);
 int network_parse_reset_mode(const char *str);
-int network_connect_neurons(struct connection *const con, struct neuron *const src, struct neuron *const dest, struct attributes *attr, const int attribute_count);
+int network_connect_neurons(struct connection *const con, struct neuron *const src, struct neuron *const dest, const int dendrite_id, struct attributes *attr, const int attribute_count);
+int network_connect_dendrites(struct neuron *const n, const int src_dendrite_id, const int dest_dendrite_id, struct attributes *attr, const int attribute_count);
 int network_map_hardware(struct neuron *const n, struct core *c);
 void network_check_mapped(struct network *const net);
 

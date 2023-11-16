@@ -202,8 +202,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	struct neuron *n, *dest;
 	struct tile *t;
 	struct core *c;
-	int ret, neuron_group_id, neuron_id, neuron_count;
-	int dest_group_id, dest_neuron_id, tile_id, core_offset;
+	int ret, neuron_group_id, neuron_id, dendrite_id, dest_dendrite_id;
+	int neuron_count, dest_group_id, dest_neuron_id, tile_id, core_offset;
 	char entry_type;
 
 	entry_type = fields[0][0];
@@ -217,10 +217,12 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	neuron_count = 0;
 	neuron_group_id = -1;
 	neuron_id = -1;
+	dendrite_id = -1;
 	tile_id = -1;
 	core_offset = -1;
 	dest_group_id = -1;
 	dest_neuron_id = -1;
+	dest_dendrite_id = -1;
 	group = NULL;
 	n = NULL;
 	c = NULL;
@@ -262,12 +264,34 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	}
 	else if (entry_type == 'e')
 	{
+		int success = 0;
 		// Edge on SNN graph (e.g., connection between neurons)
+
+		// Neuron to neuron connection (to dendrite 0)
+		dendrite_id = 0;
 		ret = sscanf(fields[1], "%d.%d->%d.%d", &neuron_group_id,
 			&neuron_id, &dest_group_id, &dest_neuron_id);
-		if (ret < 4)
+		success = (ret >= 4);
+		if (!success)
 		{
-			INFO("Error couldn't parse connection / edge.\n");
+			// Neuron to neuron connected at a specific dendrite
+			ret = sscanf(fields[1], "%d.%d->%d.%d.%d",
+				&neuron_group_id, &neuron_id, &dendrite_id,
+				&dest_group_id, &dest_neuron_id);
+			success = (ret >= 5);
+		}
+		if (!success)
+		{
+			// Dendrite to dendrite connection
+			ret = sscanf(fields[1], "%d.%d.%d->%d.%d.%d",
+				&neuron_group_id, &neuron_id, &dendrite_id,
+				&dest_group_id, &dest_neuron_id,
+				&dest_dendrite_id);
+			success = (ret >= 6);
+		}
+		if (!success)
+		{
+			INFO("Error: couldn't parse connection / edge.\n");
 			exit(1);
 		}
 		if (dest_group_id > -1)
@@ -294,6 +318,18 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 				}
 				dest = &(dest_group->neurons[dest_neuron_id]);
 			}
+		}
+	}
+	else if (entry_type == 'd')
+	{
+		// Dendrite compartment
+		ret = sscanf(fields[1], "%d.%d.%d", &neuron_group_id,
+			&neuron_id, &dendrite_id);
+		if (ret < 3)
+		{
+			INFO("Error: Couldn't parse dendrite (%s)\n",
+				fields[0]);
+			exit(1);
 		}
 	}
 	else // parse neuron or input node
@@ -370,19 +406,33 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		}
 		else
 		{
-			struct connection *con;
-
 			assert(n != NULL);
-			int edge_id = (n->connection_out_count)++;
-			if (edge_id >= n->max_connections_out)
+			if (dest_dendrite_id >= 0)
 			{
-				INFO("Edge (%d) >= neuron connections (%d)\n",
-					edge_id, n->max_connections_out);
-				exit(1);
+				assert(n == dest);
+				// Create dendrite to dendrite connection
+				ret = network_connect_dendrites(n, dendrite_id,
+					dest_dendrite_id, attributes,
+					attribute_count);
 			}
-			con = &(n->connections_out[edge_id]);
-			ret = network_connect_neurons(
-				con, n, dest, attributes, attribute_count);
+			else
+			{
+				struct connection *con;
+				int edge_id = (n->connection_out_count)++;
+
+				if (edge_id >= n->max_connections_out)
+				{
+					INFO("Edge (%d) >= neuron connections (%d)\n",
+						edge_id,
+						n->max_connections_out);
+					exit(1);
+				}
+				con = &(n->connections_out[edge_id]);
+				// Create neuron to neuron connection
+				ret = network_connect_neurons(
+					con, n, dest, dendrite_id, attributes,
+					attribute_count);
+			}
 		}
 		break;
 	case 'x': // Add group of external inputs
@@ -396,6 +446,9 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	case '&': // Map neuron to hardware
 		ret = network_map_hardware(n, c);
 		break;
+	case 'd':
+		ret = network_create_dendrite(n, dendrite_id, attributes,
+							attribute_count);
 	}
 
 	return ret;

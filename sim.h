@@ -55,7 +55,7 @@ void sim_process_neuron(struct timestep *const ts, struct neuron *n);
 double sim_pipeline_receive(struct timestep *const ts, struct core *c, struct connection_map *axon);
 double sim_neuron_send_spike(struct neuron *n);
 double sim_update_synapse(struct timestep *const ts, struct connection_map *axon, const int synaptic_lookup);
-double sim_update_dendrite(struct timestep *const ts, struct neuron *n, const double charge);
+double sim_update_dendrite(struct timestep *const ts, struct neuron *n, const int dendrite_id, const double charge);
 double sim_update_soma(struct timestep *const ts, struct neuron *n, const double current_in);
 double sim_update_axon(struct neuron *n);
 double sim_estimate_network_costs(struct tile *const src, struct tile *const dest);
