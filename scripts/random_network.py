@@ -31,7 +31,7 @@ import sim
 random.seed(1)
 
 # Global experiment parameters
-NETWORK_FILENAME = "runs/random/random.net"
+NETWORK_FILENAME = "runs/random/full/random.net"
 ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
@@ -98,13 +98,13 @@ if __name__ == "__main__":
     run_experiments = True
     plot_experiments = True
     if run_experiments:
-        with open("runs/random/loihi_random.csv", "r") as csv_file:
+        with open("runs/random/full/loihi_random.csv", "r") as csv_file:
             reader = csv.DictReader(csv_file)
             fieldnames = reader.fieldnames
             fieldnames.append("sim_energy")
             fieldnames.append("sim_latency")
             fieldnames.append("total_spikes")
-            with open("runs/random/sim_random.csv", "w") as out_file:
+            with open("runs/random/full/sim_random.csv", "w") as out_file:
                 writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                 writer.writeheader()
 
@@ -119,14 +119,14 @@ if __name__ == "__main__":
                 line["sim_energy"] = results["energy"] / TIMESTEPS
                 line["sim_latency"] = results["time"] / TIMESTEPS
                 print(line)
-                with open("runs/random/sim_random.csv", "a") as out_file:
+                with open("runs/random/full/sim_random.csv", "a") as out_file:
                     writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                     writer.writerow(line)
 
     if plot_experiments:
-        sim_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random",
+        sim_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random", "full",
                                          "sim_random.csv"))
-        loihi_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random",
+        loihi_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random", "full",
                                            "loihi_random.csv"))
         df = pd.merge(sim_df, loihi_df)
         # The smallest measurements hit the limits of Loihi's time measuring
@@ -183,9 +183,9 @@ if __name__ == "__main__":
         plt.xticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.yticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.tight_layout(pad=0.3)
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random", "full",
                                  "random_latency.pdf"))
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
+        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random", "full",
                                  "random_latency.png"))
 
 

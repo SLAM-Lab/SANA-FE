@@ -307,11 +307,6 @@ int sim_schedule_messages(const struct simulation *const sim,
 			TRACE1("cid:%d: %d messages left\n", c->id,
 				c->messages_left);
 
-			// Add axon access cost to message latency and energy
-			c->time += c->axon_out.time_access;
-			m.generation_latency += c->axon_out.time_access;
-			c->axon_out.energy += c->axon_out.energy_access;
-
 			// Account for core hardware interactions, blocking the
 			//  message from being scheduled if the receiving h/w
 			//  is busy
@@ -338,13 +333,12 @@ int sim_schedule_messages(const struct simulation *const sim,
 
 			// Calculate when the receiving h/w will be busy until
 			m.dest_tile->blocked_until =
-				c->time + m.dest_axon->network_latency;
+				c->time + m.network_latency;
 
-			c->time += m.dest_axon->network_latency;
 			if (m.dest_core->is_blocking)
 			{
-				m.dest_core->blocked_until =
-					c->time + m.receive_latency;
+				m.dest_core->blocked_until = c->time +
+					m.network_latency + m.receive_latency;
 			}
 			else
 			{
@@ -367,7 +361,14 @@ int sim_schedule_messages(const struct simulation *const sim,
 		}
 
 		// Get the next message, neuron or core
-		if (c->neurons_left && c->messages_left <= 0)
+		if (c->messages_left > 0)
+		{
+			// Add axon access cost to message latency and energy
+			c->time += c->axon_out.time_access;
+			m.generation_latency += c->axon_out.time_access;
+			c->axon_out.energy += c->axon_out.energy_access;
+		}
+		else if (c->neurons_left)
 		{
 			// We just scheduled the last message, get the next
 			//  neuron to process
