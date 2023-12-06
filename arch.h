@@ -92,7 +92,7 @@ struct message
 	struct tile *src_tile, *dest_tile;
 	struct core *src_core, *dest_core;
 	struct connection_map *dest_axon;
-	struct neuron *src_neuron;
+	struct neuron *src_neuron, *dest_neuron;
 	double generation_latency, network_latency, receive_latency;
 	double blocked_latency;
 	int spikes, hops;
@@ -165,6 +165,7 @@ struct core
 	struct tile *t;
 	struct core *next_timing;
 	struct neuron **neurons;
+	struct message curr_message;
 
 	struct axon_input axon_in;
 	struct synapse_processor synapse;
@@ -175,7 +176,7 @@ struct core
 	FILE *noise_stream;
 
 	char name[MAX_FIELD_LEN];
-	double energy, time, blocked_until;
+	double energy, time, blocked_until, latency_after_last_message;
 	int id, offset, buffer_pos, is_blocking;
 	int neuron_count, curr_neuron, neurons_left, messages_left;
 	int curr_axon, noise_type;

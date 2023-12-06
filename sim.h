@@ -81,7 +81,8 @@ void sim_perf_log_timestep(const struct timestep *const ts, FILE *fp);
 int sim_poisson_input(const double firing_probability);
 int sim_rate_input(const double firing_rate, double *spike_val);
 
-struct core *sim_init_timing_priority(struct architecture *arch);
-struct core *sim_update_timing_queue(struct core *top_priority);
+struct core *sim_init_timing_priority(struct architecture *arch, struct timestep *ts);
+void sim_insert_priority_queue(struct core **priority_queue, struct core *c);
+struct core *sim_pop_priority_queue(struct core **priority_queue);
 
 #endif

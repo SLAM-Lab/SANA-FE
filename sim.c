@@ -201,199 +201,207 @@ void sim_init_message(struct message *const m)
 	m->receive_latency = 0.0;
 }
 
+struct message *sim_get_next_message(struct core *c)
+{
+	struct message *m;
+	double neuron_processing_latency;
+
+	// Get the next message
+	if (c->messages_left == 0)
+	{
+		struct neuron *src_neuron;
+
+		neuron_processing_latency = 0.0;
+		while (c->neurons_left > 0)
+		{
+			assert(c->curr_neuron < c->neuron_count);
+			src_neuron = c->neurons[c->curr_neuron];
+			assert(src_neuron != NULL);
+
+			neuron_processing_latency +=
+				src_neuron->processing_latency;
+			if (!(src_neuron->is_init) || !(src_neuron->fired) ||
+				(src_neuron->maps_out_count == 0))
+			{
+				// Neuron isn't initialized, didn't fire or
+				//  has no outgoing connections, so skip it.
+				//  This neuron can't generate any messages.
+				c->curr_neuron++;
+				//INFO("\t curr_neuron:%d neuron_processing_latency:%e\n", c->curr_neuron, neuron_processing_latency);
+				c->neurons_left--;
+				c->curr_axon = 0;
+			}
+			else if (src_neuron->fired)
+			{
+				TRACE2("(cid:%d.%d) nid:%d.%d fired, "
+					"time:%e\n",
+					c->t->id, c->id,
+					src_neuron->group->id,
+					src_neuron->id, c->time);
+				c->messages_left = src_neuron->maps_out_count;
+				c->curr_axon = 0;
+				break;
+			}
+		}
+	}
+	else
+	{
+		neuron_processing_latency = 0.0;
+	}
+
+	if (c->messages_left > 0)
+	{
+		m = &(c->curr_message);
+		sim_init_message(m);
+
+		m->src_neuron = c->neurons[c->curr_neuron];
+		m->dest_axon = m->src_neuron->maps_out[c->curr_axon];
+		m->spikes = m->dest_axon->connection_count;
+		m->src_core = c;
+		m->src_tile = c->t;
+		m->dest_neuron = m->dest_axon->connections[0]->post_neuron;
+		m->dest_core = m->dest_neuron->core;
+		m->dest_tile = m->dest_core->t;
+
+		// Add axon access cost to message latency and energy
+		m->generation_latency = neuron_processing_latency +
+			c->axon_out.time_access;
+		m->network_latency = m->dest_axon->network_latency;
+		m->receive_latency = m->dest_axon->receive_latency;
+		c->axon_out.energy += c->axon_out.energy_access;
+
+		assert(m->src_neuron->maps_out != NULL);
+		assert(m->src_neuron->maps_out[0] != NULL);
+		assert(m->dest_axon != NULL);
+		assert(m->dest_axon->connections != NULL);
+		assert(m->dest_axon->spikes_received > 0);
+		assert(m->src_tile != NULL);
+		assert(m->dest_core != NULL);
+		assert(m->dest_tile != NULL);
+
+		c->curr_axon++;
+		c->messages_left--;
+		if (c->messages_left == 0)
+		{
+			// If we processed the last message for this neuron,
+			//  go to the next neuron
+			c->curr_neuron++;
+			c->neurons_left--;
+			c->curr_axon = 0;
+		}
+	}
+	else
+	{
+		assert(c->neurons_left == 0);
+		// No messages left to process, but track any additional core
+		//  processing time after the last message. Assume we've
+		//  accounted for all mapped neurons
+		m = NULL;
+		c->latency_after_last_message = neuron_processing_latency;
+	}
+
+	return m;
+}
+
 int sim_schedule_messages(const struct simulation *const sim,
 	struct timestep *const ts, struct architecture *const arch)
 {
-	struct core *top_priority;
-	const int core_count = ARCH_MAX_CORES * ARCH_MAX_TILES;
-	int cores_left;
-
-	top_priority = sim_init_timing_priority(arch);
+	struct core *priority_queue;
+	priority_queue = sim_init_timing_priority(arch, ts);
 
 	// Setup timing counters
 	TRACE1("Scheduling global order of messages.\n");
-	cores_left = core_count;
+
+	// While queue isn't empty
+	while (priority_queue != NULL)
+	{
+		// Get the core with the earliest simulation time
+		struct core *c = sim_pop_priority_queue(&priority_queue);
+		struct message *m = &(c->curr_message);
+
+		assert(m->dest_core != NULL);
+		if (m->dest_core->is_blocking)
+		{
+			// Track how long the message is blocked for
+			m->blocked_latency = fmax(m->blocked_latency,
+				m->dest_core->blocked_until - c->time);
+			// Update the core global time, blocking until
+			//  the receiving core is free
+			c->time = fmax(c->time, m->dest_core->blocked_until);
+		}
+		assert(m->dest_tile != NULL);
+		if (m->dest_tile->is_blocking)
+		{
+			m->blocked_latency = fmax(m->blocked_latency,
+				m->dest_tile->blocked_until - c->time);
+			// Update the core global time, blocking until
+			//  the receiving tile is free
+			c->time = fmax(c->time, m->dest_tile->blocked_until);
+		}
+
+		// Set time-stamps, calculating when the receiving H/W will be
+		//  busy until
+		m->dest_tile->blocked_until = c->time + m->network_latency;
+
+		if (m->dest_core->is_blocking)
+		{
+			//INFO("network_latency:%e\n", m->network_latency);
+			//INFO("receive_latency:%e\n", m->receive_latency);
+			m->dest_core->blocked_until = c->time +
+				m->network_latency + m->receive_latency;
+		}
+		else
+		{
+			m->dest_core->blocked_until += m->receive_latency;
+		}
+		TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
+			c->t->id, c->id, m->dest_core->t->id,
+			m->dest_core->id, m->dest_core->blocked_until);
+
+
+		TRACE2("cid:%d axon:%d (%d messages left)\n", c->id,
+			c->curr_axon, c->messages_left);
+		if (sim->log_messages)
+		{
+			sim_trace_record_message(sim, m);
+		}
+
+		// Get the next message, neuron or core
+		m = sim_get_next_message(c);
+		// Regardless of whether we are sending a message, add the
+		//  processing time
+		if (m != NULL)
+		{
+			c->time += m->generation_latency;
+			sim_insert_priority_queue(&priority_queue, c);
+		}
+		else
+		{
+			TRACE2("\t(cid:%d.%d) finished simulating\n", c->t->id,
+				c->id);
+		}
+
+		if (priority_queue != NULL)
+		{
+			TRACE2("\t(cid:%d.%d) time:%e\n",
+				(*priority_queue)->t->id,
+				(*priority_queue)->id, (*priority_queue)->time);
+		}
+	}
+	TRACE1("Neurons fired: %ld\n", ts->total_neurons_fired);
+
+	// Add the processing time of neurons after sending the last message
+	//INFO("** Final times **\n");
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
-			c->neurons_left = c->neuron_count;
-			c->curr_neuron = 0;
-			c->messages_left = 0;
-			c->curr_axon = 0;
+			//INFO("c->time:%e, c->latency_after_last_message:%e\n", c->time, c->latency_after_last_message);
+			c->time += c->latency_after_last_message;
 		}
 	}
-
-	while (cores_left && (top_priority != NULL))
-	{
-		// Get the core with the earliest simulation time
-		struct message m;
-		struct core *c = top_priority;
-
-		// If all messages were processed, get the next spiking neuron
-		//  and see how many spike messages to send
-		sim_init_message(&m);
-		if (c->messages_left <= 0)
-		{
-			// Get the next spiking neuron that sends one or more
-			//  spike messages
-			TRACE2("Getting next firing neuron for cid:%d\n",
-				c->id);
-			while (c->neurons_left > 0)
-			{
-				int nid = c->curr_neuron;
-				assert(nid < c->neuron_count);
-				m.src_neuron = c->neurons[nid];
-				assert(m.src_neuron != NULL);
-
-				c->time += m.src_neuron->processing_latency;
-				m.generation_latency +=
-					m.src_neuron->processing_latency;
-				if (!(m.src_neuron->is_init) ||
-					!(m.src_neuron->fired))
-				{
-					c->curr_neuron++;
-					c->neurons_left--;
-					c->curr_axon = 0;
-				}
-				else if (m.src_neuron->fired)
-				{
-					TRACE2("(cid:%d.%d) nid:%d.%d fired, "
-					       "time:%e\n",
-						c->t->id, c->id,
-						m.src_neuron->group->id,
-						m.src_neuron->id, c->time);
-					ts->total_neurons_fired++;
-					c->messages_left =
-						m.src_neuron->maps_out_count;
-					c->curr_axon = 0;
-
-					break;
-				}
-			}
-		}
-		else
-		{
-			// Schedule this neuron's messages
-			struct neuron *n;
-			int nid = c->curr_neuron;
-
-			m.src_neuron = c->neurons[nid];
-			assert(m.src_neuron->maps_out != NULL);
-			assert(m.src_neuron->maps_out[0] != NULL);
-
-			m.dest_axon = m.src_neuron->maps_out[c->curr_axon];
-			assert(m.dest_axon != NULL);
-			assert(m.dest_axon->connections != NULL);
-			assert(m.dest_axon->spikes_received > 0);
-			m.spikes = m.dest_axon->connection_count;
-			m.src_core = c;
-			m.src_tile = c->t;
-			assert(m.src_tile != NULL);
-
-			n = m.dest_axon->connections[0]->post_neuron;
-			m.receive_latency = m.dest_axon->receive_latency;
-			m.network_latency = m.dest_axon->network_latency;
-			m.dest_core = n->core;
-			m.dest_tile = m.dest_core->t;
-			assert(m.dest_tile != NULL);
-			m.hops = abs(m.src_tile->x - m.dest_tile->x);
-			m.hops += abs(m.src_tile->y - m.dest_tile->y);
-			TRACE1("\t(cid:%d.%d) Sending %d spikes to %d.%d\n",
-				c->t->id, c->id, m.dest_axon->connection_count,
-				m.dest_core->t->id, m.dest_core->id);
-			TRACE1("cid:%d: %d messages left\n", c->id,
-				c->messages_left);
-
-			// Account for core hardware interactions, blocking the
-			//  message from being scheduled if the receiving h/w
-			//  is busy
-			m.blocked_latency = 0.0;
-			if (m.dest_core->is_blocking)
-			{
-				// Track how long the message is blocked for
-				m.blocked_latency = fmax(m.blocked_latency,
-					m.dest_core->blocked_until - c->time);
-				// Update the core global time, blocking until
-				//  the receiving core is free
-				c->time = fmax(
-					c->time, m.dest_core->blocked_until);
-			}
-			if (m.dest_tile->is_blocking)
-			{
-				m.blocked_latency = fmax(m.blocked_latency,
-					m.dest_core->blocked_until - c->time);
-				// Update the core global time, blocking until
-				//  the receiving tile is free
-				c->time = fmax(
-					c->time, m.dest_tile->blocked_until);
-			}
-
-			// Calculate when the receiving h/w will be busy until
-			m.dest_tile->blocked_until =
-				c->time + m.network_latency;
-
-			if (m.dest_core->is_blocking)
-			{
-				m.dest_core->blocked_until = c->time +
-					m.network_latency + m.receive_latency;
-			}
-			else
-			{
-				m.dest_core->blocked_until += m.receive_latency;
-			}
-			TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
-				c->t->id, c->id, m.dest_core->t->id,
-				m.dest_core->id, m.dest_core->blocked_until);
-
-			// Get the next message
-			c->curr_axon++;
-			c->messages_left--;
-			TRACE2("cid:%d axon:%d (%d messages left)\n", c->id,
-				c->curr_axon, c->messages_left);
-			if (sim->log_messages)
-			{
-				sim_trace_record_message(sim, &m);
-			}
-			sim_init_message(&m);
-		}
-
-		// Get the next message, neuron or core
-		if (c->messages_left > 0)
-		{
-			// Add axon access cost to message latency and energy
-			c->time += c->axon_out.time_access;
-			m.generation_latency += c->axon_out.time_access;
-			c->axon_out.energy += c->axon_out.energy_access;
-		}
-		else if (c->neurons_left)
-		{
-			// We just scheduled the last message, get the next
-			//  neuron to process
-			c->curr_neuron++;
-			c->neurons_left--;
-		}
-		if (c->neurons_left <= 0)
-		{
-			TRACE1("\t(cid:%d.%d) finished simulating\n", c->t->id,
-				c->id);
-			// The last neuron's messages are all scheduled, so
-			//  remove the core from the priority queue
-			cores_left--;
-			assert(cores_left >= 0);
-			top_priority = top_priority->next_timing;
-		}
-
-		top_priority = sim_update_timing_queue(top_priority);
-		if (top_priority != NULL)
-		{
-			TRACE2("\t(cid:%d.%d) time:%e\n", top_priority->t->id,
-				top_priority->id, top_priority->time);
-		}
-	}
-	TRACE1("Neurons fired: %ld\n", ts->total_neurons_fired);
 
 	return 0;
 }
@@ -469,57 +477,86 @@ double sim_pipeline_receive(
 	return message_processing_latency;
 }
 
-struct core *sim_init_timing_priority(struct architecture *arch)
+struct core *sim_init_timing_priority(struct architecture *arch, struct timestep *ts)
 {
-	struct core *next = NULL;
+	struct core *priority_queue;
+	priority_queue = NULL;
 
-	// Initialize in reverse order, but assuming all cores start time
-	//  synchronized (time ==), this is arbitrary
-	for (int i = (arch->tile_count - 1); i >= 0; i--)
+	//INFO("Initializing priority queue.\n");
+	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
-		for (int j = (t->core_count - 1); j >= 0; j--)
+		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
-			assert(c->time == 0.0);
-			if (c->neuron_count > 0)
+			c->neurons_left = c->neuron_count;
+			c->curr_neuron = 0;
+			c->messages_left = 0;
+			c->curr_axon = 0;
+
+			struct message *m = sim_get_next_message(c);
+			if (m != NULL) // messages
 			{
-				c->next_timing = next;
-				next = c;
+				c->time = m->generation_latency;
+				sim_insert_priority_queue(&priority_queue, c);
+			}
+			else
+			{
+				//INFO("No messages for core %d.%d\n",
+				//	c->t->id, c->offset);
 			}
 		}
 	}
 
-	for (struct core *curr = next; curr != NULL; curr = curr->next_timing)
+#ifdef DEBUG2
+	int i = 0;
+	for (struct core *curr = priority_queue; curr != NULL; curr = curr->next_timing)
 	{
-		TRACE2("curr:%d.%d\n", curr->t->id, curr->id);
+		TRACE2("(%d) curr:%d.%d t:%e\n", i++, curr->t->id, curr->id,
+			curr->time);
 	}
+#endif
 
-	return next;
+	return priority_queue;
 }
 
-struct core *sim_update_timing_queue(struct core *top_priority)
+struct core *sim_pop_priority_queue(struct core **priority_queue)
 {
-	struct core *next, *tmp;
+	struct core *curr;
+
+	// Pop the first element from the priority queue
+	curr = *priority_queue;
+	*priority_queue = (*priority_queue)->next_timing;
+
+	// For safety, remove current element from queue and unlink
+	curr->next_timing = NULL;
+	return curr;
+}
+
+void sim_insert_priority_queue(struct core **priority_queue, struct core *c)
+{
+	struct core *next;
 	int list_depth = 0;
 
-	if ((top_priority == NULL) || (top_priority->next_timing == NULL) ||
-		(top_priority->time <= top_priority->next_timing->time))
+	assert(priority_queue != NULL);
+
+	//INFO("Inserting into priority queue.\n");
+	if (((*priority_queue) == NULL) || (c->time <= (*priority_queue)->time))
 	{
-		// Do nothing
-		return top_priority;
+		// Queue is empty or this is the earliest time (highest
+		//  priority), make this core the head of the queue
+		c->next_timing = (*priority_queue);
+		*priority_queue = c;
 	}
 	else
 	{
-		struct core *curr = top_priority;
-		next = top_priority->next_timing;
+		struct core *curr = *priority_queue;
+		next = curr->next_timing;
 
-		tmp = top_priority;
-		top_priority = next;
-		// reinsert core into the correct place in the priority list
+		// Reinsert core into the correct place in the priority list
 		while (next != NULL)
 		{
-			if (tmp->time < next->time)
+			if (c->time < next->time)
 			{
 				break;
 			}
@@ -527,20 +564,25 @@ struct core *sim_update_timing_queue(struct core *top_priority)
 			next = curr->next_timing;
 			list_depth++;
 		}
-		curr->next_timing = tmp;
-		tmp->next_timing = next;
+		curr->next_timing = c;
+		c->next_timing = next;
 	}
 
-	for (struct core *tmp = top_priority; tmp != NULL;
+#ifdef DEBUG
+	TRACE3("*** Priority queue ***\n");
+	for (struct core *tmp = *priority_queue; tmp != NULL;
 		tmp = tmp->next_timing)
 	{
+		// TRACE3
 		TRACE3("tmp->time:%e (id:%d)\n", tmp->time, tmp->id);
 		assert((tmp->next_timing == NULL) ||
 			tmp->time <= tmp->next_timing->time);
 	}
-	TRACE2("List depth = %d\n", list_depth);
+	// TRACE2
+	TRACE3("List depth = %d\n", list_depth+1);
+#endif
 
-	return top_priority;
+	return;
 }
 
 int sim_input_spikes(struct network *net)

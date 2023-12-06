@@ -89,10 +89,10 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     experiment = "time"
-    #experiment = "energy"
+    experiment = "energy"
 
     neurons = []
     spiking_times = []

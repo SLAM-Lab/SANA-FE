@@ -6,7 +6,7 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 """
 # External libraries, plotting
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 
 # Other external libraries
@@ -94,8 +94,17 @@ def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_me
     return summary
 
 
+
+def onpick(event, df):
+    N = len(event.ind)
+    if not N:
+        return
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(df.iloc[event.ind])
+
+
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     if run_experiments:
         with open("runs/random/full/loihi_random.csv", "r") as csv_file:
@@ -167,16 +176,20 @@ if __name__ == "__main__":
                                  "random_energy.png"))
 
         # Plot the simulated vs measured latency
-        plt.figure(figsize=(3.0, 2.2))
+        fig = plt.figure(figsize=(3.0, 2.2))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")
         plt.yscale("log")
         #plt.plot(sim_latency, loihi_latency, "x")
         plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
-                    cmap=cm, vmin=256, vmax=8192, linewidths=1)
+                    cmap=cm, vmin=256, vmax=8192, linewidths=1,
+                    picker=True, pickradius=5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")
+        fig.canvas.mpl_connect('pick_event', lambda event: onpick(event, df))
+        pd.options.display.width = 300
+        pd.options.display.max_colwidth = 300
         plt.colorbar(label="Neurons", shrink=0.5)
         plt.xlabel("Simulated Latency (s)")
         plt.ylabel("Measured Latency (s)")
@@ -187,7 +200,7 @@ if __name__ == "__main__":
                                  "random_latency.pdf"))
         plt.savefig(os.path.join(PROJECT_DIR, "runs", "random", "full",
                                  "random_latency.png"))
-
+        plt.show()
 
         absolute_latency_error = np.abs(loihi_latency - sim_latency) / loihi_latency
         absolute_energy_error = np.abs(loihi_energy - sim_energy) / loihi_energy

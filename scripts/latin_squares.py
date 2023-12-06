@@ -169,7 +169,7 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiment = True
 
     if run_experiments:
