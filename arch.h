@@ -139,7 +139,7 @@ struct soma_processor
 {
 	char name[MAX_FIELD_LEN];
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
-	long int updates, neurons_fired;
+	long int active_updates, inactive_updates, neurons_fired;
 	double energy, time;
 	double energy_active_neuron_update, time_active_neuron_update;
 	double energy_inactive_neuron_update, time_inactive_neuron_update;
@@ -188,11 +188,14 @@ struct tile
 	struct tile *links[ARCH_MAX_LINKS];
 	char name[MAX_FIELD_LEN];
 	double energy, time;
-	double energy_east_west_hop, time_east_west_hop;
-	double energy_north_south_hop, time_north_south_hop;
+	double energy_east_hop, time_east_hop;
+	double energy_west_hop, time_west_hop;
+	double energy_north_hop, time_north_hop;
+	double energy_south_hop, time_south_hop;
 	double energy_spike_within_tile, time_spike_within_tile;
 	double blocked_until;
 	long int hops, messages_received, total_neurons_fired;
+	long int east_hops, west_hops, north_hops, south_hops;
 	int id, x, y, core_count, is_blocking;
 	int max_dimensions, width; // For now just support 2 dimensions
 };

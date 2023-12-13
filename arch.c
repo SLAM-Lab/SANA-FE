@@ -39,10 +39,14 @@ struct architecture *arch_init(void)
 
 		t->energy = 0.0;
 		t->time = 0.0;
-		t->energy_east_west_hop = 0.0;
-		t->time_east_west_hop = 0.0;
-		t->energy_north_south_hop = 0.0;
-		t->time_north_south_hop = 0.0;
+		t->energy_east_hop = 0.0;
+		t->time_east_hop = 0.0;
+		t->energy_west_hop = 0.0;
+		t->time_west_hop = 0.0;
+		t->energy_north_hop = 0.0;
+		t->time_north_hop = 0.0;
+		t->energy_south_hop = 0.0;
+		t->time_south_hop = 0.0;
 		t->energy_spike_within_tile = 0.0;
 		t->time_spike_within_tile = 0.0;
 		t->blocked_until = 0.0;
@@ -279,10 +283,14 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 	t->is_blocking = 0;
 	t->energy_spike_within_tile = 0.0;
 	t->time_spike_within_tile = 0.0;
-	t->energy_east_west_hop = 0.0;
-	t->time_east_west_hop = 0.0;
-	t->energy_north_south_hop = 0.0;
-	t->time_north_south_hop = 0.0;
+	t->energy_east_hop = 0.0;
+	t->time_east_hop = 0.0;
+	t->energy_north_hop = 0.0;
+	t->time_north_hop = 0.0;
+	t->energy_west_hop = 0.0;
+	t->time_west_hop = 0.0;
+	t->energy_south_hop = 0.0;
+	t->time_south_hop = 0.0;
 
 	for (int i = 0; i < attribute_count; i++)
 	{
@@ -293,25 +301,45 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 			t->is_blocking = (strncmp(a->value_str, "True",
 						  MAX_FIELD_LEN - 1) == 0);
 		}
-		else if (strncmp("energy_east_west", a->key, MAX_FIELD_LEN) ==
+		else if (strncmp("energy_east", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(a->value_str, "%lf", &t->energy_east_west_hop);
+			sscanf(a->value_str, "%lf", &t->energy_east_hop);
 		}
-		else if (strncmp("latency_east_west", a->key, MAX_FIELD_LEN) ==
+		else if (strncmp("latency_east", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(a->value_str, "%lf", &t->time_east_west_hop);
+			sscanf(a->value_str, "%lf", &t->time_east_hop);
 		}
-		else if (strncmp("energy_north_south", a->key, MAX_FIELD_LEN) ==
+		else if (strncmp("energy_west", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(a->value_str, "%lf", &t->energy_north_south_hop);
+			sscanf(a->value_str, "%lf", &t->energy_east_hop);
 		}
-		else if (strncmp("latency_north_south", a->key,
+		else if (strncmp("latency_west", a->key, MAX_FIELD_LEN) ==
+			0)
+		{
+			sscanf(a->value_str, "%lf", &t->time_east_hop);
+		}
+		else if (strncmp("energy_north", a->key, MAX_FIELD_LEN) ==
+			0)
+		{
+			sscanf(a->value_str, "%lf", &t->energy_north_hop);
+		}
+		else if (strncmp("latency_north", a->key,
 				 MAX_FIELD_LEN) == 0)
 		{
-			sscanf(a->value_str, "%lf", &t->time_north_south_hop);
+			sscanf(a->value_str, "%lf", &t->time_north_hop);
+		}
+		else if (strncmp("energy_south", a->key, MAX_FIELD_LEN) ==
+			0)
+		{
+			sscanf(a->value_str, "%lf", &t->energy_south_hop);
+		}
+		else if (strncmp("latency_south", a->key,
+				 MAX_FIELD_LEN) == 0)
+		{
+			sscanf(a->value_str, "%lf", &t->time_south_hop);
 		}
 		else if (strncmp("energy_spike_within_tile", a->key,
 				 MAX_FIELD_LEN) == 0)
@@ -498,6 +526,9 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 	s = &(c->soma);
 	s->energy = 0.0;
 	s->time = 0.0;
+	s->inactive_updates = 0;
+	s->active_updates = 0;
+	s->neurons_fired = 0;
 
 	/*** Set attributes ***/
 	s->model = NEURON_LIF;

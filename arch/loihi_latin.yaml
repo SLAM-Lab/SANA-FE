@@ -17,10 +17,14 @@ architecture:
         blocking: True
         energy_spike_within_tile: 0.0e-12
         latency_spike_within_tile: 0.0e-12
-        energy_east_west: 3.0e-12
-        latency_east_west: 4.1e-9
-        energy_north_south: 4.2e-12
-        latency_north_south: 6.5e-9
+        energy_east: 3.0e-12
+        latency_east: 4.1e-9
+        energy_west: 3.0e-12
+        latency_west: 4.1e-9
+        energy_north: 4.2e-12
+        latency_north: 6.5e-9
+        energy_south: 4.2e-12
+        latency_south: 6.5e-9
         #energy_spike_within_tile: 0.0
         #latency_spike_within_tile: 0.0
         #energy_east_west: 0.0

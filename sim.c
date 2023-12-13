@@ -169,18 +169,35 @@ double sim_estimate_network_costs(struct tile *const src,
 	assert(src != NULL);
 	assert(dest != NULL);
 
-	dest->energy += src->energy_spike_within_tile;
 	network_latency = src->time_spike_within_tile;
 
 	// Calculate the energy and time for sending spike packets
 	x_hops = abs(src->x - dest->x);
 	y_hops = abs(src->y - dest->y);
 	// E-W hops
-	dest->energy += (double) x_hops * src->energy_east_west_hop;
-	network_latency += (double) x_hops * src->time_east_west_hop;
+
+	if (src->x < dest->x)
+	{
+		dest->east_hops += x_hops;
+		network_latency += (double) x_hops * src->time_east_hop;
+	}
+	else
+	{
+		dest->west_hops += x_hops;
+		network_latency += (double) x_hops * src->time_west_hop;
+	}
+
 	// N-S hops
-	dest->energy += (double) y_hops * src->energy_north_south_hop;
-	network_latency += (double) y_hops * src->time_north_south_hop;
+	if (src->y < dest->y)
+	{
+		dest->north_hops += y_hops;
+		network_latency += (double) y_hops * src->time_north_hop;
+	}
+	else
+	{
+		dest->south_hops += y_hops;
+		network_latency += (double) y_hops * src->time_south_hop;
+	}
 
 	dest->hops += (x_hops + y_hops);
 	dest->messages_received++;
@@ -268,7 +285,7 @@ struct message *sim_get_next_message(struct core *c)
 			c->axon_out.time_access;
 		m->network_latency = m->dest_axon->network_latency;
 		m->receive_latency = m->dest_axon->receive_latency;
-		c->axon_out.energy += c->axon_out.energy_access;
+		c->axon_out.packets_out++;
 
 		assert(m->src_neuron->maps_out != NULL);
 		assert(m->src_neuron->maps_out[0] != NULL);
@@ -643,8 +660,6 @@ int sim_input_spikes(struct network *net)
 			TRACE3("nid:%d Energy after: %lf\n", post_neuron->id,
 				post_neuron->current);
 
-			post_neuron->synapse_hw->energy +=
-				post_neuron->synapse_hw->energy_spike_op;
 			post_neuron->synapse_hw->time +=
 				post_neuron->synapse_hw->time_spike_op;
 
@@ -733,14 +748,9 @@ double sim_update_synapse(struct timestep *const ts,
 			(post_core->synapse.weights_per_word);
 		TRACE2("weights_per_word:%d memory_acceses:%d\n",
 			post_core->synapse.weights_per_word, memory_accesses);
-		post_core->synapse.energy +=
-			memory_accesses *
-			post_core->synapse.energy_memory_access;
 		latency +=
 			memory_accesses * post_core->synapse.time_memory_access;
 
-		post_core->synapse.energy +=
-			spike_ops * post_core->synapse.energy_spike_op;
 		//latency += spike_ops * post_core->synapse.time_spike_op;
 		// TODO: generalize, number of parallel processing units
 		latency += floor(((double) spike_ops + 3.0) / 4.0) *
@@ -812,14 +822,14 @@ double sim_update_soma(
 	double latency = 0.0;
 	struct soma_processor *soma = n->soma_hw;
 
-	if (!n->update_needed)
-	{
-		// Inactive neuron update cost
-		TRACE2("nid:%d not updated.\n", n->id);
-		latency += n->soma_hw->time_inactive_neuron_update;
-		n->soma_hw->energy += n->soma_hw->energy_inactive_neuron_update;
-		return latency;
-	}
+	//if (!n->update_needed)
+	//{
+	//	// Inactive neuron update cost
+	//	TRACE2("nid:%d not updated.\n", n->id);
+	//	latency += n->soma_hw->time_inactive_neuron_update;
+	//	n->soma_hw->inactive_updates++;
+	//	return latency;
+	//}
 
 	TRACE1("nid:%d updating, current_in:%lf\n", n->id, current_in);
 	if (soma->model == NEURON_LIF)
@@ -929,7 +939,6 @@ double sim_update_soma_lif(
 			n->potential -= n->threshold;
 		}
 		latency += sim_neuron_send_spike(n);
-		soma->neurons_fired++;
 	}
 
 	// Check against reverse threshold
@@ -954,8 +963,12 @@ double sim_update_soma_lif(
 	if (n->spike_count || (fabs(n->bias) > 0.0) || n->force_update)
 	{
 		latency += n->soma_hw->time_active_neuron_update;
-		soma->updates++;
-		n->soma_hw->energy += n->soma_hw->energy_active_neuron_update;
+		soma->active_updates++;
+	}
+	else
+	{
+		soma->inactive_updates++;
+		latency += n->soma_hw->time_inactive_neuron_update;
 	}
 
 	return latency;
@@ -1056,7 +1069,7 @@ double sim_neuron_send_spike(struct neuron *n)
 	double latency = 0.0;
 
 	latency += soma->time_spiking;
-	soma->energy += soma->energy_spiking;
+	soma->neurons_fired++;
 	if (n->core->buffer_pos != BUFFER_AXON_OUT)
 	{
 		TRACE1("nid:%d fired.\n", n->id);
@@ -1103,31 +1116,46 @@ double sim_calculate_time(const struct architecture *const arch)
 double sim_calculate_energy(const struct architecture *const arch)
 {
 	// Returns the total energy across the design, for this timestep
-	double total_energy, dendrite_energy, soma_energy, synapse_energy;
-	double axon_energy, network_energy;
+	double network_energy, synapse_energy, soma_energy, axon_out_energy;
+	double total_energy;
 
-	synapse_energy = 0.0;
-	dendrite_energy = 0.0;
-	soma_energy = 0.0;
-	axon_energy = 0.0;
 	network_energy = 0.0;
+	synapse_energy = 0.0;
+	soma_energy = 0.0;
+	axon_out_energy = 0.0;
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
-		network_energy += t->energy;
+		double total_hop_energy = t->east_hops * t->energy_east_hop;
+
+		total_hop_energy += t->west_hops * t->energy_west_hop;
+		total_hop_energy += t->south_hops * t->energy_south_hop;
+		total_hop_energy +=  t->north_hops * t->energy_north_hop;
+		network_energy += total_hop_energy;
 
 		for (int j = 0; j < t->core_count; j++)
 		{
 			const struct core *c = &(t->cores[j]);
-			synapse_energy += c->synapse.energy;
-			soma_energy += c->soma.energy;
-			axon_energy += c->axon_out.energy;
+
+			synapse_energy += c->synapse.spikes_processed *
+				c->synapse.energy_spike_op;
+			soma_energy += c->soma.inactive_updates *
+				c->soma.energy_inactive_neuron_update;
+			soma_energy += c->soma.active_updates *
+				c->soma.energy_active_neuron_update;
+			soma_energy += c->soma.neurons_fired *
+				c->soma.energy_spiking;
+			axon_out_energy += c->axon_out.packets_out *
+				c->axon_out.energy_access;
 		}
 	}
 
-	total_energy = synapse_energy + dendrite_energy + soma_energy +
-		       axon_energy + network_energy;
+	total_energy = synapse_energy + soma_energy + axon_out_energy +
+		network_energy;
+
+	//INFO("old energy:%e new energy:%e\n", total_energy, new_energy);
+	//assert(fabs(total_energy - new_energy) < 1.0E-20);
 	return total_energy;
 }
 
@@ -1168,6 +1196,10 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		t->blocked_until = 0.0;
 
 		t->hops = 0;
+		t->east_hops = 0;
+		t->west_hops = 0;
+		t->south_hops = 0;
+		t->north_hops = 0;
 		t->messages_received = 0;
 		for (int j = 0; j < t->core_count; j++)
 		{
@@ -1193,6 +1225,8 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 			c->soma.energy = 0.0;
 			c->soma.time = 0.0;
+			c->soma.active_updates = 0;
+			c->soma.inactive_updates = 0;
 			c->soma.neurons_fired = 0;
 
 			c->axon_out.energy = 0.0;
