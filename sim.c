@@ -946,14 +946,11 @@ double sim_update_soma_lif(
 	if ((fabs(n->potential) > 0.0) || n->spike_count ||
 		(fabs(n->bias) > 0.0) || n->force_update)
 	{
-		latency += n->soma_hw->time_active_neuron_update;
+		latency += n->soma_hw->time_update_neuron;
 		soma->active_updates++;
 	}
-	else
-	{
-		latency += n->soma_hw->time_inactive_neuron_update;
-		soma->inactive_updates++;
-	}
+
+	latency += n->soma_hw->time_access_neuron;
 
 	return latency;
 }
@@ -1124,10 +1121,10 @@ double sim_calculate_energy(const struct architecture *const arch)
 
 			synapse_energy += c->synapse.spikes_processed *
 				c->synapse.energy_spike_op;
-			soma_energy += c->soma.inactive_updates *
-				c->soma.energy_inactive_neuron_update;
+			soma_energy += c->soma.energy_access_neuron *
+				c->neuron_count;
 			soma_energy += c->soma.active_updates *
-				c->soma.energy_active_neuron_update;
+				c->soma.energy_update_neuron;
 			soma_energy += c->soma.neurons_fired *
 				c->soma.energy_spiking;
 			axon_out_energy += c->axon_out.packets_out *

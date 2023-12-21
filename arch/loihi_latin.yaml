@@ -54,14 +54,15 @@ architecture:
                 model: leaky_integrate_fire
                 hard_reset: True
                 soft_reset: True
-                energy_inactive: 51.2e-12
-                latency_inactive: 6.0e-9
+                energy_access_neuron: 51.2e-12
+                latency_access_neuron: 6.0e-9
                 # Here account for the 6 pJ cost of generating a random number
-                #energy_active: 69.8e-12
-                energy_active: 78.8e-12
-                latency_active: 9.7e-9
-                energy_spiking: 69.3e-12
-                latency_spiking: 30.0e-9
+                energy_update_neuron: 27.6e-12
+                # 78.8e-12 total
+                latency_update_neuron: 3.7e-9
+                # 9.7e-9 total
+                energy_spike_out: 69.3e-12
+                latency_spike_out: 30.0e-9
           synapse:
             - name: core_synapses
               attributes:

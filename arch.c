@@ -532,10 +532,10 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 
 	/*** Set attributes ***/
 	s->model = NEURON_LIF;
-	s->energy_active_neuron_update = 0.0;
-	s->time_active_neuron_update = 0.0;
-	s->energy_inactive_neuron_update = 0.0;
-	s->time_inactive_neuron_update = 0.0;
+	s->energy_update_neuron = 0.0;
+	s->time_update_neuron = 0.0;
+	s->energy_access_neuron = 0.0;
+	s->time_access_neuron = 0.0;
 	s->energy_spiking = 0.0;
 	s->time_spiking = 0.0;
 	s->leak_towards_zero = 1;
@@ -547,32 +547,32 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 		{
 			s->model = arch_parse_neuron_model(a->value_str);
 		}
-		else if (strncmp("energy_active", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_update_neuron", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
-				&s->energy_active_neuron_update);
+				&s->energy_update_neuron);
 		}
-		else if (strncmp("latency_active", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_update_neuron", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
-				&s->time_active_neuron_update);
+				&s->time_update_neuron);
 		}
-		else if (strncmp("energy_inactive", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_access_neuron", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
-				&s->energy_inactive_neuron_update);
+				&s->energy_access_neuron);
 		}
-		else if (strncmp("latency_inactive", a->key, MAX_FIELD_LEN) ==
+		else if (strncmp("latency_access_neuron", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
 			sscanf(a->value_str, "%lf",
-				&s->time_inactive_neuron_update);
+				&s->time_access_neuron);
 		}
-		else if (strncmp("energy_spiking", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("energy_spike_out", a->key, MAX_FIELD_LEN) ==0)
 		{
 			sscanf(a->value_str, "%lf", &s->energy_spiking);
 		}
-		else if (strncmp("latency_spiking", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("latency_spike_out", a->key, MAX_FIELD_LEN)==0)
 		{
 			sscanf(a->value_str, "%lf", &s->time_spiking);
 		}

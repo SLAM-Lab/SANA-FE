@@ -141,8 +141,8 @@ struct soma_processor
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
 	long int active_updates, inactive_updates, neurons_fired;
 	double energy, time;
-	double energy_active_neuron_update, time_active_neuron_update;
-	double energy_inactive_neuron_update, time_inactive_neuron_update;
+	double energy_update_neuron, time_update_neuron;
+	double energy_access_neuron, time_access_neuron;
 	double energy_spiking, time_spiking;
 };
 
