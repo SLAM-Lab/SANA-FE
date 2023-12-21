@@ -359,18 +359,10 @@ int sim_schedule_messages(const struct simulation *const sim,
 		// Set time-stamps, calculating when the receiving H/W will be
 		//  busy until
 		m->dest_tile->blocked_until = c->time + m->network_latency;
+		m->dest_core->blocked_until = fmax(
+			(m->dest_core->blocked_until + m->network_latency + m->receive_latency),
+			(c->time + m->network_latency + m->receive_latency));
 
-		if (m->dest_core->is_blocking)
-		{
-			//INFO("network_latency:%e\n", m->network_latency);
-			//INFO("receive_latency:%e\n", m->receive_latency);
-			m->dest_core->blocked_until = c->time +
-				m->network_latency + m->receive_latency;
-		}
-		else
-		{
-			m->dest_core->blocked_until += m->receive_latency;
-		}
 		TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
 			c->t->id, c->id, m->dest_core->t->id,
 			m->dest_core->id, m->dest_core->blocked_until);
@@ -822,15 +814,6 @@ double sim_update_soma(
 	double latency = 0.0;
 	struct soma_processor *soma = n->soma_hw;
 
-	//if (!n->update_needed)
-	//{
-	//	// Inactive neuron update cost
-	//	TRACE2("nid:%d not updated.\n", n->id);
-	//	latency += n->soma_hw->time_inactive_neuron_update;
-	//	n->soma_hw->inactive_updates++;
-	//	return latency;
-	//}
-
 	TRACE1("nid:%d updating, current_in:%lf\n", n->id, current_in);
 	if (soma->model == NEURON_LIF)
 	{
@@ -960,15 +943,16 @@ double sim_update_soma_lif(
 
 	// Update soma, if there are any received spikes, there is a non-zero
 	//  bias or we force the neuron to update every time-step
-	if (n->spike_count || (fabs(n->bias) > 0.0) || n->force_update)
+	if ((fabs(n->potential) > 0.0) || n->spike_count ||
+		(fabs(n->bias) > 0.0) || n->force_update)
 	{
 		latency += n->soma_hw->time_active_neuron_update;
 		soma->active_updates++;
 	}
 	else
 	{
-		soma->inactive_updates++;
 		latency += n->soma_hw->time_inactive_neuron_update;
+		soma->inactive_updates++;
 	}
 
 	return latency;
