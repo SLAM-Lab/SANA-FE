@@ -38,9 +38,14 @@ struct timestep sim_timestep(struct simulation *const sim,
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
-			ts.spike_count += c->synapse.spikes_processed;
-			ts.total_neurons_fired += c->soma.neurons_fired;
 
+			for (int k = 0; k < ARCH_MAX_UNITS; k++)
+			{
+				ts.spike_count +=
+					c->synapse[k].spikes_processed;
+				ts.total_neurons_fired +=
+					c->soma[k].neurons_fired;
+			}
 		}
 		ts.messages_sent += t->messages_received;
 	}
@@ -633,27 +638,26 @@ int sim_input_spikes(struct network *net)
 			//  Normally, we would have a number of input dimensions
 			//  for a given network
 			struct neuron *post_neuron;
-			struct connection *connection_ptr;
+			struct connection *con;
 
-			connection_ptr = &(in->connections[j]);
-			assert(connection_ptr);
+			con = &(in->connections[j]);
+			assert(con);
 
-			post_neuron = connection_ptr->post_neuron;
+			post_neuron = con->post_neuron;
 			TRACE3("nid:%d Energy before: %lf\n", post_neuron->id,
 				post_neuron->current);
 			if (post_neuron->core->buffer_pos == BUFFER_SOMA)
 			{
-				post_neuron->charge += connection_ptr->weight;
+				post_neuron->charge += con->weight;
 			}
 			else
 			{
-				post_neuron->current += connection_ptr->weight;
+				post_neuron->current += con->weight;
 			}
 			TRACE3("nid:%d Energy after: %lf\n", post_neuron->id,
 				post_neuron->current);
 
-			post_neuron->synapse_hw->time +=
-				post_neuron->synapse_hw->time_spike_op;
+			con->synapse_hw->time += con->synapse_hw->time_spike_op;
 
 			post_neuron->update_needed = 1;
 			post_neuron->spike_count++;
@@ -683,11 +687,11 @@ double sim_update_synapse(struct timestep *const ts,
 	//  update filtered current and any other connection properties
 	struct core *post_core;
 	double latency, min_synaptic_resolution;
-	int spike_ops, memory_accesses;
+	//int spike_ops;
 
 	latency = 0.0;
 	post_core = axon->connections[0]->post_neuron->core;
-	spike_ops = axon->connection_count;
+	//spike_ops = axon->connection_count;
 
 	TRACE1("Updating synapses for (cid:%d)\n", axon->pre_neuron->id);
 	while (axon->last_updated <= ts->timestep)
@@ -707,8 +711,8 @@ double sim_update_synapse(struct timestep *const ts,
 				// "Turn off" synapses that have basically no
 				//  synaptic current left to decay (based on
 				//  the weight resolution)
-				min_synaptic_resolution =
-					1.0 / post_core->synapse.weight_bits;
+				min_synaptic_resolution = (1.0 /
+					con->synapse_hw->weight_bits);
 				if (fabs(con->current) <
 					min_synaptic_resolution)
 				{
@@ -732,23 +736,8 @@ double sim_update_synapse(struct timestep *const ts,
 	if (synaptic_lookup)
 	{
 		axon->active_synapses = axon->connection_count;
-		// Simple memory access model where we consider the number of
-		//  words accessed and the cost per access
-		memory_accesses =
-			(spike_ops +
-				(post_core->synapse.weights_per_word - 1)) /
-			(post_core->synapse.weights_per_word);
-		TRACE2("weights_per_word:%d memory_acceses:%d\n",
-			post_core->synapse.weights_per_word, memory_accesses);
-		latency +=
-			memory_accesses * post_core->synapse.time_memory_access;
 
-		//latency += spike_ops * post_core->synapse.time_spike_op;
-		// TODO: generalize, number of parallel processing units
-		latency += floor(((double) spike_ops + 3.0) / 4.0) *
-			   (post_core->synapse.time_spike_op * 4.0);
-		post_core->synapse.spikes_processed += spike_ops;
-		post_core->synapse.memory_reads += memory_accesses;
+		//post_neuron->synapse_hw->spikes_processed += spike_ops;
 
 		for (int i = 0; i < axon->connection_count; i++)
 		{
@@ -759,8 +748,12 @@ double sim_update_synapse(struct timestep *const ts,
 			post_neuron = con->post_neuron;
 			post_neuron->update_needed = 1;
 			post_neuron->spike_count++;
+
+			assert(con->synapse_hw != NULL);
+			con->synapse_hw->spikes_processed++;
 			TRACE2("Sending spike to nid:%d, current:%lf\n",
 				post_neuron->id, con->current);
+			latency += con->synapse_hw->time_spike_op;
 
 			if (post_core->buffer_pos != BUFFER_DENDRITE)
 			{
@@ -768,6 +761,10 @@ double sim_update_synapse(struct timestep *const ts,
 					ts, post_neuron, con->current);
 			}
 		}
+
+		// TODO: generalize?
+		//latency += floor(((double) spike_ops + 3.0) / 4.0) *
+		//	   (con->synapse_hw->time_spike_op * 4.0);
 	}
 
 	return latency;
@@ -815,7 +812,8 @@ double sim_update_soma(
 	struct soma_processor *soma = n->soma_hw;
 
 	TRACE1("nid:%d updating, current_in:%lf\n", n->id, current_in);
-	if (soma->model == NEURON_LIF)
+	if ((soma->model == NEURON_LIF) ||
+		(soma->model == NEURON_STOCHASTIC_LIF))
 	{
 		latency += sim_update_soma_lif(ts, n, current_in);
 	}
@@ -832,12 +830,14 @@ double sim_update_soma(
 	return latency;
 }
 
-double sim_generate_noise(struct core *c)
+double sim_generate_noise(struct neuron *n)
 {
+	assert(n != NULL);
+	struct soma_processor *soma_hw = n->soma_hw;
 	int noise_val = 0;
 	int ret;
 
-	if (c->noise_type == NOISE_FILE_STREAM)
+	if (soma_hw->noise_type == NOISE_FILE_STREAM)
 	{
 		// With a noise stream, we have a file containing a series of
 		//  random values. This is useful if we want to exactly
@@ -847,13 +847,13 @@ double sim_generate_noise(struct core *c)
 		// If we get to the end of the stream, by default reset it.
 		//  However, it is unlikely the stream will be correct at this
 		//  point
-		if (feof(c->noise_stream))
+		if (feof(soma_hw->noise_stream))
 		{
 			INFO("Warning: At the end of the noise stream. "
 			     "Random values are unlikely to be correct.\n");
-			fseek(c->noise_stream, 0, SEEK_SET);
+			fseek(soma_hw->noise_stream, 0, SEEK_SET);
 		}
-		fgets(noise_str, MAX_NOISE_FILE_ENTRY, c->noise_stream);
+		fgets(noise_str, MAX_NOISE_FILE_ENTRY, soma_hw->noise_stream);
 		ret = sscanf(noise_str, "%d", &noise_val);
 		TRACE2("noise val:%d\n", noise_val);
 		if (ret < 1)
@@ -885,7 +885,8 @@ double sim_update_soma_lif(
 	//  integate inputs and apply any potential leak
 	TRACE1("Updating potential, before:%f\n", n->potential);
 
-	if (soma->model == NEURON_LIF)
+	if ((soma->model == NEURON_LIF) ||
+		(soma->model == NEURON_STOCHASTIC_LIF))
 	{
 		while (n->soma_last_updated <= ts->timestep)
 		{
@@ -895,9 +896,10 @@ double sim_update_soma_lif(
 	}
 
 	// Add randomized noise to potential if enabled
-	if (n->core->noise_type == NOISE_FILE_STREAM)
+	if ((soma->model == NEURON_STOCHASTIC_LIF) &&
+		(soma->noise_type == NOISE_FILE_STREAM))
 	{
-		random_potential = sim_generate_noise(n->core);
+		random_potential = sim_generate_noise(n);
 		n->potential += random_potential;
 	}
 
@@ -947,7 +949,7 @@ double sim_update_soma_lif(
 		(fabs(n->bias) > 0.0) || n->force_update)
 	{
 		latency += n->soma_hw->time_update_neuron;
-		soma->active_updates++;
+		soma->neuron_updates++;
 	}
 
 	latency += n->soma_hw->time_access_neuron;
@@ -1119,14 +1121,21 @@ double sim_calculate_energy(const struct architecture *const arch)
 		{
 			const struct core *c = &(t->cores[j]);
 
-			synapse_energy += c->synapse.spikes_processed *
-				c->synapse.energy_spike_op;
-			soma_energy += c->soma.energy_access_neuron *
-				c->neuron_count;
-			soma_energy += c->soma.active_updates *
-				c->soma.energy_update_neuron;
-			soma_energy += c->soma.neurons_fired *
-				c->soma.energy_spiking;
+			for (int k = 0; k < ARCH_MAX_UNITS; k++)
+			{
+				synapse_energy +=
+					c->synapse[k].spikes_processed *
+					c->synapse[k].energy_spike_op;
+				// TODO: figure which neurons are mapped to this
+				//  soma?
+				soma_energy += c->soma[k].neuron_count *
+					c->soma[k].energy_access_neuron;
+				soma_energy += c->soma[k].neuron_updates *
+					c->soma[k].energy_update_neuron;
+				soma_energy += c->soma[k].neurons_fired *
+					c->soma[k].energy_spiking;
+			}
+
 			axon_out_energy += c->axon_out.packets_out *
 				c->axon_out.energy_access;
 		}
@@ -1196,19 +1205,23 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 			c->axon_in.energy = 0.0;
 			c->axon_in.time = 0;
-
-			c->synapse.energy = 0.0;
-			c->synapse.time = 0.0;
-			c->synapse.spikes_processed = 0;
-
 			c->dendrite.energy = 0.0;
 			c->dendrite.time = 0.0;
 
-			c->soma.energy = 0.0;
-			c->soma.time = 0.0;
-			c->soma.active_updates = 0;
-			c->soma.inactive_updates = 0;
-			c->soma.neurons_fired = 0;
+			for (int k = 0; k < c->synapse_count; k++)
+			{
+				c->synapse[k].energy = 0.0;
+				c->synapse[k].time = 0.0;
+				c->synapse[k].spikes_processed = 0;
+			}
+
+			for (int k = 0; k < c->soma_count; k++)
+			{
+				c->soma[k].energy = 0.0;
+				c->soma[k].time = 0.0;
+				c->soma[k].neuron_updates = 0;
+				c->soma[k].neurons_fired = 0;
+			}
 
 			c->axon_out.energy = 0.0;
 			c->axon_out.time = 0.0;

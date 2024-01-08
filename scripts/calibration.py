@@ -54,11 +54,13 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     layer_1 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
-                               reset=reset)
+                               reset=reset, neuron_model="leaky_integrate_fire",
+                               synapse_model="current_based_compressed")
     layer_2 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
-                               reset=reset)
+                               reset=reset, neuron_model="leaky_integrate_fire",
+                               synapse_model="current_based_compressed")
 
     # Create connections
     weight = 1.0
@@ -71,7 +73,8 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     return network
 
 
-def connected_layers(weights, spiking=True, mapping="luke"):
+def connected_layers(weights, spiking=True, mapping="l2_split",
+                     copy_network=False):
     network = sim.Network(save_mappings=True)
     loihi_compartments = sim.init_compartments(32, 4, 1024)
 
@@ -81,77 +84,87 @@ def connected_layers(weights, spiking=True, mapping="luke"):
     else:  # never spike
         threshold = 2*layer_neuron_count
 
-    neurons_per_core = [0, 0, 0, 0]
-    if mapping == "luke" or mapping == "l2_split" or mapping == "fixed":
-        neurons_per_core[0] = layer_neuron_count
-    elif (mapping == "split_2" or mapping == "l1_split" or mapping == "split_4"
-          or mapping == "split_4_diff_tiles"):
-        neurons_per_core[0] = ((layer_neuron_count + 1) // 2)
-        neurons_per_core[1] = layer_neuron_count // 2
-    else:
-        print("Error: mapping not supported")
-        exit(1)
+    duplicate = (2 if copy_network else 1)
+    for i in range(0, duplicate):
+        neurons_per_core = [0, 0, 0, 0]
+        if (mapping == "luke" or mapping == "l2_split" or mapping == "fixed" or
+            mapping == "split_2_diff_tiles"):
+            neurons_per_core[0] = layer_neuron_count
+        elif (mapping == "split_2" or mapping == "l1_split" or mapping == "split_4"
+            or mapping == "split_4_diff_tiles"):
+            neurons_per_core[0] = ((layer_neuron_count + 1) // 2)
+            neurons_per_core[1] = layer_neuron_count // 2
+        else:
+            print("Error: mapping not supported")
+            exit(1)
 
-    layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
-    for _ in range(0, neurons_per_core[1]):
-        layer_mapping.append((0, 1))
-    for _ in range(0, neurons_per_core[2]):
-        layer_mapping.append((0, 2))
-    for _ in range(0, neurons_per_core[3]):
-        layer_mapping.append((0, 3))
+        layer_mapping = [(0, i) for _ in range(0, neurons_per_core[0])]
+        for _ in range(0, neurons_per_core[1]):
+            layer_mapping.append((0, 1))
+        for _ in range(0, neurons_per_core[2]):
+            layer_mapping.append((0, 2))
+        for _ in range(0, neurons_per_core[3]):
+            layer_mapping.append((0, 3))
 
-    layer_1 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
-                               log_spikes=False, log_potential=False,
-                               force_update=False, threshold=threshold,
-                               reset=0.0, leak=1.0, mappings=layer_mapping)
+        layer_1 = sim.create_layer(network, layer_neuron_count,
+                                   loihi_compartments,
+                                   log_spikes=False, log_potential=False,
+                                   force_update=False, threshold=threshold,
+                                   reset=0.0, leak=1.0, mappings=layer_mapping,
+                                   neuron_model="leaky_integrate_fire",
+                                   synapse_model="current_based_compressed")
 
-    neurons_per_core = [0, 0, 0, 0, 0]
-    if mapping == "luke":
-        neurons_per_core[0] = min(layer_neuron_count, 1024 - layer_neuron_count)
-        neurons_per_core[1] = layer_neuron_count - neurons_per_core[0]
-    elif mapping == "fixed":
-        neurons_per_core[1] = layer_neuron_count
-    elif mapping == "split_2":
-        neurons_per_core[0] = ((layer_neuron_count + 1) // 2)
-        neurons_per_core[1] = layer_neuron_count // 2
-    elif mapping == "l2_split":
-        neurons_per_core[1] = ((layer_neuron_count + 1) // 2)
-        neurons_per_core[2] = layer_neuron_count // 2
-    elif mapping == "split_4":
-        neurons_per_core[2] = ((layer_neuron_count + 1) // 2)
-        neurons_per_core[3] = layer_neuron_count // 2
-    elif mapping == "l1_split":
-        neurons_per_core[2] = layer_neuron_count
-    elif mapping == "split_4_diff_tiles":
-        neurons_per_core[2] = ((layer_neuron_count + 1) // 2)
-        neurons_per_core[3] = 0
-        neurons_per_core[4] = layer_neuron_count // 2
+        neurons_per_core = [0, 0, 0, 0, 0]
+        if mapping == "luke":
+            neurons_per_core[0] = min(layer_neuron_count, 1024 - layer_neuron_count)
+            neurons_per_core[1] = layer_neuron_count - neurons_per_core[0]
+        elif mapping == "fixed":
+            neurons_per_core[1] = layer_neuron_count
+        elif mapping == "split_2":
+            neurons_per_core[0] = ((layer_neuron_count + 1) // 2)
+            neurons_per_core[1] = layer_neuron_count // 2
+        elif mapping == "l2_split":
+            neurons_per_core[1] = ((layer_neuron_count + 1) // 2)
+            neurons_per_core[2] = layer_neuron_count // 2
+        elif mapping == "split_4":
+            neurons_per_core[2] = ((layer_neuron_count + 1) // 2)
+            neurons_per_core[3] = layer_neuron_count // 2
+        elif mapping == "l1_split":
+            neurons_per_core[2] = layer_neuron_count
+        elif mapping == "split_4_diff_tiles":
+            neurons_per_core[2] = ((layer_neuron_count + 1) // 2)
+            neurons_per_core[3] = 0
+            neurons_per_core[4] = layer_neuron_count // 2
+        elif mapping == "split_2_diff_tiles":
+            neurons_per_core[4] = layer_neuron_count
 
-    layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
-    for _ in range(0, neurons_per_core[1]):
-        layer_mapping.append((0, 1))
-    for _ in range(0, neurons_per_core[2]):
-        layer_mapping.append((0, 2))
-    for _ in range(0, neurons_per_core[3]):
-        layer_mapping.append((0, 3))
-    for _ in range(0, neurons_per_core[4]):
-        layer_mapping.append((1, 0))
+        layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
+        for _ in range(0, neurons_per_core[1]):
+            layer_mapping.append((0, 1))
+        for _ in range(0, neurons_per_core[2]):
+            layer_mapping.append((0, 2))
+        for _ in range(0, neurons_per_core[3]):
+            layer_mapping.append((0, 3))
+        for _ in range(0, neurons_per_core[4]):
+            layer_mapping.append((1, i))
 
-    layer_2 = sim.create_layer(network, layer_neuron_count,
-                               loihi_compartments, log_spikes=False,
-                               log_potential=False, force_update=False,
-                               threshold=threshold, reset=0.0, leak=1.0,
-                               mappings=layer_mapping)
+        layer_2 = sim.create_layer(network, layer_neuron_count,
+                                loihi_compartments, log_spikes=False,
+                                log_potential=False, force_update=False,
+                                threshold=threshold, reset=0.0, leak=1.0,
+                                mappings=layer_mapping,
+                                neuron_model="leaky_integrate_fire",
+                                synapse_model="current_based_compressed")
 
-    for src in layer_1.neurons:
-        # Add bias to force neuron to fire
-        src.add_bias(1.0)
-        for dest in layer_2.neurons:
-            # Take the ID of the neuron in the 2nd layer
-            weight = float(weights[src.id][dest.id]) / 256
-            if abs(weight) >= (1.0 / 256):
-                # Zero weights are pruned i.e. removed
-                src.add_connection(dest, weight)
+        for src in layer_1.neurons:
+            # Add bias to force neuron to fire
+            src.add_bias(1.0)
+            for dest in layer_2.neurons:
+                # Take the ID of the neuron in the 2nd layer
+                weight = float(weights[src.id][dest.id]) / 256
+                if abs(weight) >= (1.0 / 256):
+                    # Zero weights are pruned i.e. removed
+                    src.add_connection(dest, weight)
 
     return network
 
@@ -181,8 +194,9 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
     for i in range(1, max_size):
         # Sweep across range of network sizes
         layer_neurons = i*i
+        copy_network = (True if mapping == "split_2_diff_tiles" else False)
         snn = connected_layers(weights[i-1].transpose(), spiking=True,
-                                    mapping=mapping)
+                               mapping=mapping, copy_network=copy_network)
         snn.save(NETWORK_FILENAME)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
@@ -196,7 +210,10 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
                                             ("neuron_counts", "energy", "time",
                                              "mapping", "cores_blocking",
                                              "tiles_blocking"))
-            spiking_writer.writerow({"neuron_counts": layer_neurons*2,
+            neuron_counts = layer_neurons * 2
+            if copy_network:
+                neuron_counts *= 2
+            spiking_writer.writerow({"neuron_counts": neuron_counts,
                                       "time": results["time"],
                                       "energy": results["energy"],
                                       "mapping": mapping,
@@ -206,7 +223,8 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
     return
 
 
-mappings = ("fixed", "luke", "split_2")
+mappings = ("fixed", "l2_split", "split_2", "luke")
+#mappings = ("split_2_diff_tiles",)
 if __name__ == "__main__":
     run_experiments = True
     plot_experiments = True
@@ -240,7 +258,8 @@ if __name__ == "__main__":
     # Read Loihi measurement data from csv, this is only available to me locally
     #  since this is restricted data!
     if plot_experiments:
-        loihi_times_spikes = {"fixed": [], "luke": [], "split_2": []}
+        loihi_times_spikes = {"fixed": [], "l2_split": [], "split_2": [],
+                              "luke": []}
         loihi_energy_spikes = []
 
         spiking_energy = []
@@ -265,9 +284,9 @@ if __name__ == "__main__":
         neuron_counts = np.array(spiking_frame["neuron_counts"])
 
         plt.figure(figsize=(2.2, 2.2))
-        plt.plot(neuron_counts[:-7],
-                 np.array(loihi_times_spikes["luke"][:-7]) * 1.0e3, "-")
-        plt.plot(neuron_counts[:-7], spiking_times[:-7] * 1.0e3, "x")
+        plt.plot(neuron_counts[6:-7],
+                 np.array(loihi_times_spikes["luke"][6:-7]) * 1.0e3, "-")
+        plt.plot(neuron_counts[6:-7], spiking_times[6:-7] * 1.0e3, "x")
         ax = plt.gca()
         ax.set_box_aspect(1)
         print(ax.get_position())
@@ -284,9 +303,16 @@ if __name__ == "__main__":
         plt.savefig("runs/calibration/calibration_time_core.pdf")
         plt.savefig("runs/calibration/calibration_time_core.png")
 
+        energy_error = 100 * np.abs(np.array(loihi_energy_spikes[6:-7]) - spiking_energy[6:-7]) / np.array(loihi_energy_spikes[6:-7])
+        print(energy_error)
+        energy_error = np.mean(np.abs(np.array(loihi_energy_spikes[6:-7]) - spiking_energy[6:-7]) / np.array(loihi_energy_spikes[6:-7]))
+        latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:-7]) - spiking_times[6:-7]) / np.array(loihi_times_spikes["luke"][6:-7]))
+        print(f"Energy error %: {energy_error*100}")
+        print(f"Latency error %: {latency_error*100}")
+
         plt.figure(figsize=(2.2, 2.2))
-        plt.plot(neuron_counts[:-7], np.array(loihi_energy_spikes[:-7]) * 1.0e6, "-")
-        plt.plot(neuron_counts[:-7], np.array(spiking_energy[:-7]) * 1.0e6, "x")
+        plt.plot(neuron_counts[6:-7], np.array(loihi_energy_spikes[6:-7]) * 1.0e6, "-")
+        plt.plot(neuron_counts[6:-7], np.array(spiking_energy[6:-7]) * 1.0e6, "x")
         ax = plt.gca()
         ax.set_box_aspect(1)
         #plt.gca().set_aspect("equal", adjustable="box")
@@ -304,15 +330,15 @@ if __name__ == "__main__":
 
         plt.rcParams.update({'font.size': 7, 'lines.markersize': 4})
         ## Plot the effect of cores blocking
-        spiking_frame = df.loc[(df["mapping"] == "luke") &
+        spiking_frame = df.loc[(df["mapping"] == "l2_split") &
                                (df["tiles_blocking"] == False)]
         cores_nonblocking = spiking_frame.loc[spiking_frame["cores_blocking"] == False]
         cores_blocking = spiking_frame.loc[spiking_frame["cores_blocking"] == True]
 
         plt.figure(figsize=(2.1, 2.1))
-        plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
-        plt.plot(neuron_counts, np.array(cores_nonblocking["time"] * 1.0e3), "x")
-        plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "ko",
+        plt.plot(neuron_counts[6:], np.array(loihi_times_spikes["l2_split"][6:]) * 1.0e3, "-")
+        plt.plot(neuron_counts[6:], np.array(cores_nonblocking["time"][6:] * 1.0e3), "x")
+        plt.plot(neuron_counts[6:], np.array(cores_blocking["time"][6:]) * 1.0e3, "ko",
                  fillstyle="none")
 
         #plt.figure(figsize=(2.5, 2.5))

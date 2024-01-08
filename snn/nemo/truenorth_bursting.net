@@ -1,7 +1,7 @@
 # neuron groups
-g 1 threshold=300  reset=0    reverse_threshold=0   reverse_reset=0   leak_bias=0  reset_mode=hard  reverse_reset_mode=none
-g 1 threshold=18   reset=1    reverse_threshold=0   reverse_reset=1   leak_bias=-1 reset_mode=hard  reverse_reset_mode=saturate
-g 1 threshold=6    reset=0    reverse_threshold=0   reverse_reset=0   leak_bias=0  reset_mode=hard  reverse_reset_mode=saturate
+g 1 threshold=300 soma_model=truenorth  synapse_model=current_based_uncompressed  reset=0  reverse_threshold=0  reverse_reset=0  leak_bias=0  reset_mode=hard  reverse_reset_mode=none
+g 1 threshold=18  soma_model=truenorth  synapse_model=current_based_uncompressed  reset=1  reverse_threshold=0  reverse_reset=1  leak_bias=-1 reset_mode=hard  reverse_reset_mode=saturate
+g 1 threshold=6   soma_model=truenorth  synapse_model=current_based_uncompressed  reset=0  reverse_threshold=0  reverse_reset=0  leak_bias=0  reset_mode=hard  reverse_reset_mode=saturate
 
 n 0.0 bias=1.0 log_spikes=1 force_update=1 connections_out=2
 e 0.0->1.0 w=1.0

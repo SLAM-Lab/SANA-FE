@@ -1,5 +1,5 @@
-g 1  threshold=200  reset=0   reverse_threshold=0   reverse_reset=0   leak_bias=0 reset_mode=hard reverse_reset_mode=none
-g 1  threshold=2    reset=-15 reverse_threshold=-10 reverse_reset=-15 leak_bias=-2 reset_mode=hard reverse_reset_mode=saturate
+g 1  threshold=200  soma_model=truenorth  synapse_model=current_based_uncompressed  reset=0   reverse_threshold=0   reverse_reset=0   leak_bias=0 reset_mode=hard reverse_reset_mode=none
+g 1  threshold=2    soma_model=truenorth  synapse_model=current_based_uncompressed  reset=-15 reverse_threshold=-10 reverse_reset=-15 leak_bias=-2 reset_mode=hard reverse_reset_mode=saturate
 
 n 0.0 bias=1.0 log_spikes=1 log_v=1 force_update=1 connections_out=1
 e 0.0->1.0 w=4.0

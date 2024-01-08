@@ -49,11 +49,7 @@ struct neuron
 
 	// Mapped hardware
 	struct core *core, *post_synaptic_cores;
-	struct synapse_processor *synapse_hw;
-	struct dendrite_processor *dendrite_hw;
 	struct soma_processor *soma_hw;
-	struct axon_output *axon_out;
-	struct axon_input *axon_in;
 
 	// Track the timestep each hardware unit was last updated
 	unsigned int random_range_mask;
@@ -63,8 +59,9 @@ struct neuron
 	double leak_decay, leak_bias, potential_time_const;
 	double dendritic_current_decay, processing_latency;
 
-	int id, is_init, fired, connection_out_count, max_connections_out;
-	int log_spikes, log_potential, update_needed, force_update, spike_count;
+	int id, soma_model, is_init, fired, connection_out_count;
+	int max_connections_out, log_spikes, log_potential, update_needed;
+	int force_update, spike_count;
 	int soma_last_updated, dendrite_last_updated;
 	int maps_in_count, maps_out_count;
 };
@@ -72,8 +69,9 @@ struct neuron
 struct connection
 {
 	struct neuron *post_neuron, *pre_neuron;
+	struct synapse_processor *synapse_hw;
 	double weight, current, synaptic_current_decay;
-	int id, delay;
+	int id, model, delay;
 };
 
 struct input
@@ -91,6 +89,7 @@ struct neuron_group
 	//  hardware i.e. the same core and processor blocks in the core
 	struct neuron *neurons;
 	int id, neuron_count, reset_mode, reverse_reset_mode;
+	int default_soma_model, default_synapse_model;
 	int default_log_potential, default_log_spikes;
 	int default_max_connections_out, default_force_update;
 	double default_threshold, default_reset;
@@ -120,7 +119,6 @@ int network_create_input_node(struct input *const in, const int connection_count
 void network_set_input(struct network *const net, const int input_id, const double rate);
 int network_parse_reset_mode(const char *str);
 int network_connect_neurons(struct connection *const con, struct neuron *const src, struct neuron *const dest, struct attributes *attr, const int attribute_count);
-int network_map_hardware(struct neuron *const n, struct core *c);
 void network_check_mapped(struct network *const net);
 
 #endif

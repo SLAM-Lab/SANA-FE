@@ -47,15 +47,12 @@ struct architecture *arch_init(void)
 		t->time_north_hop = 0.0;
 		t->energy_south_hop = 0.0;
 		t->time_south_hop = 0.0;
-		t->energy_spike_within_tile = 0.0;
-		t->time_spike_within_tile = 0.0;
 		t->blocked_until = 0.0;
 		t->id = -1;
 		t->x = -1;
 		t->y = -1;
 		t->core_count = 0;
 		t->is_blocking = 0;
-		t->max_dimensions = 0;
 		t->width = 0;
 
 		for (int j = 0; j < ARCH_MAX_CORES; j++)
@@ -75,33 +72,37 @@ struct architecture *arch_init(void)
 			c->neurons_left = 0;
 			c->curr_axon = 0;
 
-			c->axon_in.energy = 0.0;
-			c->axon_in.time = 0.0;
-			c->axon_in.packets_in = 0;
-			c->axon_in.packet_size = 0;
-			c->axon_in.packets_buffer = 0;
-			c->axon_in.spikes_buffer = 0;
-			c->axon_in.map_count = 0;
+			for (int k = 0; k < ARCH_MAX_UNITS; k++)
+			{
+				c->axon_in.energy = 0.0;
+				c->axon_in.time = 0.0;
+				c->axon_in.packets_in = 0;
+				c->axon_in.packet_size = 0;
+				c->axon_in.packets_buffer = 0;
+				c->axon_in.spikes_buffer = 0;
+				c->axon_in.map_count = 0;
 
-			c->synapse.spikes_buffer = 0;
-			c->synapse.weights_per_word = 0;
-			c->synapse.word_bits = 0;
-			c->synapse.weight_bits = 0;
-			c->synapse.spikes_processed = 0;
-			c->synapse.memory_reads = 0;
-			c->synapse.energy = 0.0;
-			c->synapse.time = 0.0;
-			c->synapse.energy_spike_op = 0.0;
-			c->synapse.time_spike_op = 0.0;
-			c->synapse.energy_memory_access = 0.0;
-			c->synapse.time_memory_access = 0.0;
+				c->synapse[k].spikes_buffer = 0;
+				c->synapse[k].spikes_processed = 0;
+				c->synapse[k].energy = 0.0;
+				c->synapse[k].time = 0.0;
+				c->synapse[k].energy_spike_op = 0.0;
+				c->synapse[k].time_spike_op = 0.0;
+				c->synapse[k].energy_memory_access = 0.0;
+				c->synapse[k].time_memory_access = 0.0;
+
+
+
+				c->soma[k].energy = 0.0;
+				c->soma[k].time = 0.0;
+				c->soma[k].neurons_fired = 0;
+				c->soma[k].neuron_count = 0;
+
+
+			}
 
 			c->dendrite.energy = 0.0;
 			c->dendrite.time = 0.0;
-
-			c->soma.energy = 0.0;
-			c->soma.time = 0.0;
-			c->soma.neurons_fired = 0;
 
 			c->axon_out.energy = 0.0;
 			c->axon_out.time = 0.0;
@@ -161,7 +162,6 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 	}
 
 	// Default values
-	arch->noc_dimensions = 2;
 	arch->noc_width = -1;
 	arch->noc_height = -1;
 
@@ -169,11 +169,7 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 	{
 		struct attributes *a = &(attr[i]);
 
-		if (strncmp("dimensions", a->key, MAX_FIELD_LEN) == 0)
-		{
-			sscanf(a->value_str, "%d", &arch->noc_dimensions);
-		}
-		else if (strncmp("width", a->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("width", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%d", &arch->noc_width);
 		}
@@ -281,8 +277,6 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 
 	// Set attributes
 	t->is_blocking = 0;
-	t->energy_spike_within_tile = 0.0;
-	t->time_spike_within_tile = 0.0;
 	t->energy_east_hop = 0.0;
 	t->time_east_hop = 0.0;
 	t->energy_north_hop = 0.0;
@@ -341,17 +335,6 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 		{
 			sscanf(a->value_str, "%lf", &t->time_south_hop);
 		}
-		else if (strncmp("energy_spike_within_tile", a->key,
-				 MAX_FIELD_LEN) == 0)
-		{
-			sscanf(a->value_str, "%lf",
-				&t->energy_spike_within_tile);
-		}
-		else if (strncmp("latency_spike_within_tile", a->key,
-				 MAX_FIELD_LEN) == 0)
-		{
-			sscanf(a->value_str, "%lf", &t->time_spike_within_tile);
-		}
 	}
 
 	return t->id;
@@ -375,7 +358,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 
 	/*** Set attributes ***/
 	c->is_blocking = 0;
-	c->noise_type = NOISE_NONE;
+	c->buffer_pos = BUFFER_SOMA;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
@@ -385,38 +368,13 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 			c->is_blocking = (strncmp("True", a->value_str,
 						  MAX_FIELD_LEN - 1) == 0);
 		}
-		if (strncmp("noise", a->key, MAX_FIELD_LEN) == 0)
-		{
-			c->noise_type = NOISE_FILE_STREAM;
-			c->noise_stream = fopen(a->value_str, "r");
-			INFO("Opening noise str: %s\n", a->value_str);
-			if (c->noise_stream == NULL)
-			{
-				INFO("Error: Failed to open noise stream/\n");
-				exit(1);
-			}
-		}
 	}
 
-	c->axon_in.energy = 0.0;
-	c->axon_in.time = 0.0;
-	c->axon_in.t = t;
-
-	c->synapse.energy = 0.0;
-	c->synapse.time = 0.0;
-
-	c->dendrite.energy = 0.0;
-	c->dendrite.time = 0.0;
-
-	c->soma.energy = 0.0;
-	c->soma.time = 0.0;
-
-	c->axon_out.energy = 0.0;
-	c->axon_out.time = 0.0;
-	c->axon_out.t = t;
-
+	// Initialize core state
 	c->neuron_count = 0;
 	c->curr_neuron = 0;
+	c->soma_count = 0;
+	c->synapse_count = 0;
 	c->neurons = (struct neuron **) malloc(
 		sizeof(struct neuron *) * ARCH_MAX_COMPARTMENTS);
 	if (c->neurons == NULL)
@@ -424,15 +382,16 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 		INFO("Error: Couldn't allocate neuron memory.\n");
 		exit(1);
 	}
-	for (int i = 0; i < 1024; i++)
+	for (int i = 0; i < ARCH_MAX_COMPARTMENTS; i++)
 	{
 		c->neurons[i] = NULL;
 	}
-
 	c->energy = 0.0;
 	c->time = 0.0;
 
-	c->buffer_pos = BUFFER_SOMA;
+	// Update misc links between tiles and axon units
+	c->axon_in.t = t;
+	c->axon_out.t = t;
 
 	TRACE1("Core created id:%d (tile:%d).\n", c->id, t->id);
 	return c->id;
@@ -459,14 +418,13 @@ void arch_create_synapse(struct core *const c,
 	const struct attributes *const attr, const int attribute_count)
 {
 	struct synapse_processor *s;
+	int id = c->synapse_count;
 
-	s = &(c->synapse);
+	s = &(c->synapse[id]);
 	s->energy = 0.0;
 	s->time = 0.0;
 
 	/**** Set attributes ****/
-	s->weight_bits = 8;
-	s->word_bits = 64;
 	s->energy_memory_access = 0.0;
 	s->time_memory_access = 0.0;
 	s->energy_spike_op = 0.0;
@@ -475,17 +433,13 @@ void arch_create_synapse(struct core *const c,
 	{
 		const struct attributes *const curr = &(attr[i]);
 
-		if (strncmp("weight_bits", curr->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("model", curr->key, MAX_FIELD_LEN) == 0)
+		{
+			s->model = arch_parse_synapse_model(curr->value_str);
+		}
+		else if (strncmp("weight_bits", curr->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(curr->value_str, "%d", &s->weight_bits);
-		}
-		if (strncmp("word_bits", curr->key, MAX_FIELD_LEN) == 0)
-		{
-			// The word size is the number of bits accessed with
-			//  each memory read. The weight size is the number of
-			//  bits for a single synaptic weight. A single memory
-			//  read might return multiple weights
-			sscanf(curr->value_str, "%d", &s->word_bits);
 		}
 		else if (strncmp("energy_memory", curr->key, MAX_FIELD_LEN) ==
 			0)
@@ -508,10 +462,7 @@ void arch_create_synapse(struct core *const c,
 			sscanf(curr->value_str, "%lf", &s->time_spike_op);
 		}
 	}
-
-	// Round up to the nearest word
-	s->weights_per_word = s->word_bits / s->weight_bits;
-	assert(s->weights_per_word > 0);
+	c->synapse_count++;
 
 	TRACE1("Synapse processor created (c:%d.%d)\n", c->t->id, c->id);
 
@@ -522,13 +473,14 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 	const int attribute_count)
 {
 	struct soma_processor *s;
+	int id = c->soma_count;
 
-	s = &(c->soma);
+	s = &(c->soma[id]);
+	s->neuron_updates = 0;
+	s->neurons_fired = 0;
+	s->neuron_count = 0;
 	s->energy = 0.0;
 	s->time = 0.0;
-	s->inactive_updates = 0;
-	s->active_updates = 0;
-	s->neurons_fired = 0;
 
 	/*** Set attributes ***/
 	s->model = NEURON_LIF;
@@ -539,6 +491,7 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 	s->energy_spiking = 0.0;
 	s->time_spiking = 0.0;
 	s->leak_towards_zero = 1;
+	s->noise_type = NOISE_NONE;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
@@ -576,7 +529,19 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 		{
 			sscanf(a->value_str, "%lf", &s->time_spiking);
 		}
+		else if (strncmp("noise", a->key, MAX_FIELD_LEN) == 0)
+		{
+			s->noise_type = NOISE_FILE_STREAM;
+			s->noise_stream = fopen(a->value_str, "r");
+			INFO("Opening noise str: %s\n", a->value_str);
+			if (s->noise_stream == NULL)
+			{
+				INFO("Error: Failed to open noise stream/\n");
+				exit(1);
+			}
+		}
 	}
+	c->soma_count++;
 
 	TRACE1("Soma processor created (c:%d.%d)\n", c->t->id, c->id);
 	return;
@@ -699,7 +664,7 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 		cores[x] = NULL;
 	}
 
-	// Count how many connections go to each core from this neuron
+	// Count how many connections go out from this neuron to each core
 	TRACE2("Counting connections for neuron nid:%d\n", pre_neuron->id);
 	for (int conn = 0; conn < pre_neuron->connection_out_count; conn++)
 	{
@@ -747,13 +712,51 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 	return;
 }
 
+int arch_map_neuron(struct neuron *n, struct core *c)
+{
+	int soma_id;
+
+	// Map the neuron to hardware units
+	assert(n != NULL);
+	assert(c != NULL);
+	assert(c->neurons != NULL);
+	assert(n->core == NULL);
+
+	n->core = c;
+	TRACE1("Mapping neuron %d to core %d\n", n->id, c->id);
+	c->neurons[c->neuron_count] = n;
+	c->neuron_count++;
+
+	// Map neuron model to soma hardware unit in this core. Search through
+	//  all neuron models implemented by this core and return the one that
+	//  matches.
+	struct soma_processor *soma_hw = NULL;
+	for (soma_id = 0; soma_id < c->soma_count; soma_id++)
+	{
+		soma_hw = &(c->soma[soma_id]);
+		if (n->soma_model == soma_hw->model)
+		{
+			break;
+		}
+	}
+	if (soma_id >= c->soma_count)
+	{
+		INFO("Error: Couldn't map neuron nid:%d (model:%d) "
+			"to any soma h/w.\n", n->id, n->soma_model);
+		exit(1);
+	}
+	n->soma_hw = soma_hw;
+	n->soma_hw->neuron_count++;
+
+	return RET_OK;
+}
+
 void arch_allocate_connection_map(struct neuron *const pre_neuron,
 	struct core *const post_core, const int connection_count)
 {
 	// For each connected core, create a new axon map at the destination
 	//  core. Then link this axon to output of the source core. Finally
-	//  update the presynaptic neuron and postsynaptic neuron to account for
-	//  this
+	//  update the presynaptic neuron and postsynaptic neuron
 	assert(pre_neuron != NULL);
 	assert(post_core != NULL);
 	assert(connection_count >= 0);
@@ -773,6 +776,10 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 	TRACE3("Adding connection to core.\n");
 	// Allocate the map and its connections at the post-synaptic (dest)
 	//  core
+	map->connection_count = 0;
+	map->active_synapses = 0;
+	map->last_updated = -1;
+
 	map_size = connection_count * sizeof(struct connection);
 	TRACE3("Axon has %d connections, allocate %d bytes\n",
 		connection_count, map_size);
@@ -814,6 +821,8 @@ void arch_add_connection_to_map(
 	//  source / destination core combination - if so we can reuse and add
 	//  to that connection map. Otherwise, we need to use a new map.
 	const int map_count = post_core->axon_in.map_count;
+	struct synapse_processor *synapse_hw;
+	int synapse_id;
 
 	assert(map_count > 0);
 	assert(map_count <= ARCH_MAX_CONNECTION_MAP);
@@ -835,16 +844,36 @@ void arch_add_connection_to_map(
 	//  this one, then we need to update and track
 	con->post_neuron->maps_in_count++;
 
+	// Map the connections to the synapse hardware
+	for (synapse_id = 0; synapse_id < post_core->synapse_count;
+		synapse_id++)
+	{
+		synapse_hw = &(post_core->synapse[synapse_id]);
+		if (con->model == synapse_hw->model)
+		{
+			break;
+		}
+	}
+	if (synapse_id >= post_core->synapse_count)
+	{
+		INFO("Error: Could not map connection to synapse h/w.\n");
+	}
+	con->synapse_hw = synapse_hw;
+
 	return;
 }
 
-int arch_parse_neuron_model(char *model_str)
+int arch_parse_neuron_model(const char *model_str)
 {
 	int model;
 
 	if (strcmp(model_str, "leaky_integrate_fire") == 0)
 	{
 		model = NEURON_LIF;
+	}
+	else if (strcmp(model_str, "stochastic_leaky_integrate_fire") == 0)
+	{
+		model = NEURON_STOCHASTIC_LIF;
 	}
 	else if (strcmp(model_str, "truenorth") == 0)
 	{
@@ -853,6 +882,31 @@ int arch_parse_neuron_model(char *model_str)
 	else
 	{
 		INFO("Error: No neuron model specified (%s)\n", model_str);
+		exit(1);
+	}
+
+	return model;
+}
+
+int arch_parse_synapse_model(const char *model_str)
+{
+	int model;
+
+	if (strcmp(model_str, "current_based_uncompressed") == 0)
+	{
+		model = SYNAPSE_CUBA_UNCOMPRESSED;
+	}
+	else if (strcmp(model_str, "current_based_compressed") == 0)
+	{
+		model = SYNAPSE_CUBA_COMPRESSED;
+	}
+	else if (strcmp(model_str, "current_based_conv") == 0)
+	{
+		model = SYNAPSE_CUBA_CONV;
+	}
+	else
+	{
+		INFO("Error: No synapse model specified (%s)\n", model_str);
 		exit(1);
 	}
 

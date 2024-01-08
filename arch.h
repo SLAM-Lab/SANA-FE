@@ -35,6 +35,7 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 // Loihi
 #define ARCH_MAX_TILES 256
 #define ARCH_MAX_CORES 4
+#define ARCH_MAX_UNITS 3
 
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
@@ -55,8 +56,17 @@ enum buffer_positions
 enum neuron_models
 {
 	NEURON_LIF,
+	NEURON_STOCHASTIC_LIF,
 	NEURON_TRUENORTH,
 };
+
+enum synapse_models
+{
+	SYNAPSE_CUBA_UNCOMPRESSED,
+	SYNAPSE_CUBA_COMPRESSED,
+	SYNAPSE_CUBA_CONV,
+};
+
 
 enum neuron_reset_modes
 {
@@ -121,9 +131,8 @@ struct axon_input
 struct synapse_processor
 {
 	char name[MAX_FIELD_LEN];
-	int spikes_buffer;
-	int weights_per_word, word_bits, weight_bits;
-	long int spikes_processed, memory_reads;
+	int model, spikes_buffer, weight_bits;
+	long int spikes_processed;
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
 	double time_spike_op, time_memory_access;
@@ -137,9 +146,11 @@ struct dendrite_processor
 
 struct soma_processor
 {
+	FILE *noise_stream;
 	char name[MAX_FIELD_LEN];
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
-	long int active_updates, inactive_updates, neurons_fired;
+	int noise_type;
+	long int neuron_updates, neurons_fired, neuron_count;
 	double energy, time;
 	double energy_update_neuron, time_update_neuron;
 	double energy_access_neuron, time_access_neuron;
@@ -168,18 +179,16 @@ struct core
 	struct message curr_message;
 
 	struct axon_input axon_in;
-	struct synapse_processor synapse;
+	struct synapse_processor synapse[ARCH_MAX_UNITS];
 	struct dendrite_processor dendrite;
-	struct soma_processor soma;
+	struct soma_processor soma[ARCH_MAX_UNITS];
 	struct axon_output axon_out;
-
-	FILE *noise_stream;
 
 	char name[MAX_FIELD_LEN];
 	double energy, time, blocked_until, latency_after_last_message;
-	int id, offset, buffer_pos, is_blocking;
+	int id, offset, buffer_pos, is_blocking, soma_count, synapse_count;
 	int neuron_count, curr_neuron, neurons_left, messages_left;
-	int curr_axon, noise_type;
+	int curr_axon;
 };
 
 struct tile
@@ -197,7 +206,7 @@ struct tile
 	long int hops, messages_received, total_neurons_fired;
 	long int east_hops, west_hops, north_hops, south_hops;
 	int id, x, y, core_count, is_blocking;
-	int max_dimensions, width; // For now just support 2 dimensions
+	int width; // For now just support 2 dimensions
 };
 
 struct architecture
@@ -205,7 +214,7 @@ struct architecture
 	struct tile tiles[ARCH_MAX_TILES];
 	char name[MAX_FIELD_LEN];
 	double time_barrier;
-	int noc_dimensions, noc_width, noc_height, tile_count, core_count;
+	int noc_width, noc_height, tile_count, core_count;
 	int is_init;
 };
 
@@ -223,9 +232,11 @@ void arch_create_axon_out(struct core *const c, struct attributes *attr, const i
 void arch_create_connection_maps(struct architecture *const arch);
 void arch_create_core_connection_map(struct core *const core);
 void arch_print_connection_map_summary(struct architecture *const arch);
+int arch_map_neuron(struct neuron *const n, struct core *c);
 void arch_map_neuron_connections(struct neuron *const n);
 void arch_allocate_connection_map(struct neuron *const pre_neuron, struct core *const post_core, const int connection_count);
 void arch_add_connection_to_map(struct connection *const con, struct core *const post_core);
-int arch_parse_neuron_model(char *model_str);
+int arch_parse_neuron_model(const char *model_str);
+int arch_parse_synapse_model(const char *model_str);
 
 #endif

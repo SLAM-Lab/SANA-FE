@@ -394,7 +394,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		//ret = network_create_extern_input_node(net, fields, field_count);
 		break;
 	case '&': // Map neuron to hardware
-		ret = network_map_hardware(n, c);
+		ret = arch_map_neuron(n, c);
 		break;
 	}
 
