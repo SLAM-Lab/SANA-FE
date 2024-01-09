@@ -342,15 +342,6 @@ int sim_schedule_messages(const struct simulation *const sim,
 		struct message *m = &(c->curr_message);
 
 		assert(m->dest_core != NULL);
-		if (m->dest_core->is_blocking)
-		{
-			// Track how long the message is blocked for
-			m->blocked_latency = fmax(m->blocked_latency,
-				m->dest_core->blocked_until - c->time);
-			// Update the core global time, blocking until
-			//  the receiving core is free
-			c->time = fmax(c->time, m->dest_core->blocked_until);
-		}
 		assert(m->dest_tile != NULL);
 		if (m->dest_tile->is_blocking)
 		{
@@ -360,13 +351,37 @@ int sim_schedule_messages(const struct simulation *const sim,
 			//  the receiving tile is free
 			c->time = fmax(c->time, m->dest_tile->blocked_until);
 		}
+		if (m->dest_core->is_blocking)
+		{
+			// Track how long the message is blocked for
+			m->blocked_latency = fmax(m->blocked_latency,
+				m->dest_core->blocked_until - c->time);
+			// Update the core global time, blocking until
+			//  the receiving core is free
+			c->time = fmax(c->time, m->dest_core->blocked_until);
+
+			// Calculate when the receiving h/w will be busy
+			//  until
+			if (c->time < m->dest_core->blocked_until)
+			{
+				// If we were trying to send a spike to
+				//  a blocked core, also block the tile
+				//  for this duration as well
+				m->dest_tile->blocked_until =
+					m->dest_core->blocked_until;
+				// Update the core global time, blocking
+				//  until the receiving core is free
+				c->time = m->dest_core->blocked_until;
+			}
+		}
 
 		// Set time-stamps, calculating when the receiving H/W will be
 		//  busy until
-		m->dest_tile->blocked_until = c->time + m->network_latency;
+		c->time += m->network_latency;
 		m->dest_core->blocked_until = fmax(
-			(m->dest_core->blocked_until + m->network_latency + m->receive_latency),
-			(c->time + m->network_latency + m->receive_latency));
+			(m->dest_core->blocked_until + m->network_latency +
+			m->receive_latency),
+			(c->time + m->receive_latency));
 
 		TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
 			c->t->id, c->id, m->dest_core->t->id,

@@ -65,13 +65,13 @@ architecture:
                 model: current_based_uncompressed
                 weight_bits: 8
                 energy_spike: 33.6e-12
-                latency_spike: 4.0e-9
+                latency_spike: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
                 model: current_based_conv
                 weight_bits: 8
                 energy_spike: 24.0e-12
-                latency_spike: 4.0e-9
+                latency_spike: 3.1e-9
           dendrite:
           - name: loihi_dendrites
             attributes:
@@ -81,5 +81,5 @@ architecture:
               attributes:
                 fan_out: 4096
                 protocol: dest_axon
-                energy: 76.8e-12
-                latency: 7.6e-9
+                energy: 111.0e-12
+                latency: 5.1e-9

@@ -313,7 +313,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 		else if (strncmp("latency_west", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(a->value_str, "%lf", &t->time_east_hop);
+			sscanf(a->value_str, "%lf", &t->time_west_hop);
 		}
 		else if (strncmp("energy_north", a->key, MAX_FIELD_LEN) ==
 			0)
