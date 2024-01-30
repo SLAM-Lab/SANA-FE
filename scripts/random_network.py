@@ -171,10 +171,8 @@ if __name__ == "__main__":
         plt.xticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.yticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.tight_layout(pad=0.3)
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random", "full",
-                                 "random_energy.pdf"))
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random", "full",
-                                 "random_energy.png"))
+        plt.savefig(os.path.join(NETWORK_PATH, "random_energy.pdf"))
+        plt.savefig(os.path.join(NETWORK_PATH, "random_energy.png"))
 
         # Plot the simulated vs measured latency
         fig = plt.figure(figsize=(3.0, 2.2))
@@ -197,10 +195,8 @@ if __name__ == "__main__":
         plt.xticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.yticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.tight_layout(pad=0.3)
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random", "full",
-                                 "random_latency.pdf"))
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random", "full",
-                                 "random_latency.png"))
+        plt.savefig(os.path.join(NETWORK_PATH, "random_latency.pdf"))
+        plt.savefig(os.path.join(NETWORK_PATH, "random_latency.png"))
         plt.show()
 
         absolute_latency_error = np.abs(loihi_latency - sim_latency) / loihi_latency
