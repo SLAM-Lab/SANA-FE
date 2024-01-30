@@ -23,7 +23,7 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, PROJECT_DIR)
 import sim
 
-ARCH_FILENAME = "loihi_dvs.yaml"
+ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net"
 LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
@@ -89,10 +89,10 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     experiment = "time"
-    experiment = "energy"
+    #experiment = "energy"
 
     neurons = []
     spiking_times = []

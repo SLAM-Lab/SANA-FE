@@ -34,6 +34,8 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 
 	group->neuron_count = neuron_count;
 
+	group->default_soma_hw_name[0] = 0;
+	group->default_synapse_hw_name[0] = 0;
 	group->default_max_connections_out = 0;
 	group->default_log_potential = 0; // Disabled by default
 	group->default_log_spikes = 0;
@@ -53,7 +55,19 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		struct attributes *a = &(attr[i]);
 
 		ret = -1;
-		if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("soma_hw_name", a->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(group->default_soma_hw_name, a->value_str,
+				MAX_FIELD_LEN);
+			ret = 1;
+		}
+		else if (strncmp("synapse_hw_name", a->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(group->default_synapse_hw_name, a->value_str,
+				MAX_FIELD_LEN);
+			ret = 1;
+		}
+		else if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(
 				a->value_str, "%lf", &group->default_threshold);
@@ -136,6 +150,8 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->id = i;
 		n->group = group;
 		n->connection_out_count = 0;
+		strncpy(n->soma_hw_name, group->default_soma_hw_name,
+			MAX_FIELD_LEN);
 
 		// Initialize neuron using group attributes
 		n->log_spikes = group->default_log_spikes;
@@ -165,11 +181,7 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 
 		// Initially the neuron is not mapped to anything
 		n->core = NULL;
-		n->axon_in = NULL;
-		n->synapse_hw = NULL;
-		n->dendrite_hw = NULL;
 		n->soma_hw = NULL;
-		n->axon_out = NULL;
 
 		n->maps_in = NULL;
 		n->maps_out = NULL;
@@ -213,7 +225,11 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		struct attributes *a = &(attr[i]);
 		int ret = -1;
 
-		if (strncmp("bias", a->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(n->soma_hw_name, a->value_str, MAX_FIELD_LEN);
+		}
+		else if (strncmp("bias", a->key, MAX_FIELD_LEN) == 0)
 		{
 			ret = sscanf(a->value_str, "%lf", &n->bias);
 		}
@@ -273,6 +289,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	n->soma_last_updated = 0;
 	n->dendrite_last_updated = 0;
 
+	n->core = NULL;
 	assert(n->connections_out == NULL);
 	TRACE1("Allocating memory (%lu b) for connections\n",
 		sizeof(struct connection) * n->max_connections_out);
@@ -298,6 +315,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		con->weight = 0.0;
 		con->delay = 0.0;
 		con->synaptic_current_decay = 0.0;
+		con->synapse_hw = NULL;
 	}
 
 	TRACE1("Created neuron: gid:%d nid:%d force:%d thresh:%lf\n",
@@ -311,6 +329,8 @@ int network_connect_neurons(struct connection *const con,
 	struct attributes *attr, const int attribute_count)
 {
 	assert(con != NULL);
+	strncpy(con->synapse_hw_name, dest->group->default_synapse_hw_name,
+		MAX_FIELD_LEN);
 	con->pre_neuron = src;
 	con->post_neuron = dest;
 	con->weight = 1.0;
@@ -324,7 +344,12 @@ int network_connect_neurons(struct connection *const con,
 		if ((a->key[0] == 'w') ||
 			(strncmp("weight", a->key, MAX_FIELD_LEN) == 0))
 		{
-			ret = sscanf(a->value_str, "%lf", &con->weight);
+			ret = sscanf(a->value_str, "%lf", &(con->weight));
+		}
+		else if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(con->synapse_hw_name, a->value_str,
+				MAX_FIELD_LEN);
 		}
 		if (ret < 1)
 		{
@@ -492,28 +517,6 @@ void network_check_mapped(struct network *const net)
 			}
 		}
 	}
-}
-
-int network_map_hardware(struct neuron *n, struct core *c)
-{
-	// Map the neuron to hardware units
-	assert(n != NULL);
-	assert(c != NULL);
-	assert(c->neurons != NULL);
-	assert(n->core == NULL);
-
-	n->core = c;
-	TRACE1("Mapping neuron %d to core %d\n", n->id, c->id);
-	c->neurons[c->neuron_count] = n;
-	c->neuron_count++;
-
-	n->axon_in = &c->axon_in;
-	n->synapse_hw = &c->synapse;
-	n->dendrite_hw = &c->dendrite;
-	n->soma_hw = &c->soma;
-	n->axon_out = &c->axon_out;
-
-	return RET_OK;
 }
 
 int network_parse_reset_mode(const char *str)

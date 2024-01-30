@@ -28,25 +28,17 @@ architecture:
               attributes:
                 type: digital
                 model: truenorth
-                reset: hard
-                reverse_reset: saturate
           synapse:
             - name: core_synapses
               attributes:
-                model: cuba
+                model: current_based_uncompressed
                 weight_bits: 8
-                word_bits: 64
           dendrite:
           - name: core_dendrites
             attributes:
 
           axon_out:
             - name: core_out
-              # axon_out acts like output ports. Loihi needs to figure out the
-              #  destination tiles and axons to send spikes to. If transmitting
-              #  to different neurons on a common core, those are grouped into
-              #  one axon. We have 4096 slots on Loihi to send out packets to
-              #  different receiving axons (i.e. 4096 unique cores).
               attributes:
                 fan_out: 1
                 protocol: dest_axon

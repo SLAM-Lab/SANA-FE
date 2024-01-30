@@ -28,11 +28,14 @@ class Network:
     def create_group(self, threshold, reset, leak, log_spikes=False,
                      log_potential=False, force_update=False,
                      connections_out=None, reverse_threshold=None,
-                     reverse_reset_mode=None):
+                     reverse_reset_mode=None, neuron_model=None,
+                     default_synapse_model=None):
         group_id = len(self.groups)
         group = NeuronGroup(group_id, threshold, reset, leak, log_spikes,
                             log_potential, force_update, connections_out,
-                            reverse_threshold, reverse_reset_mode)
+                            reverse_threshold, reverse_reset_mode,
+                            neuron_model=neuron_model,
+                            default_synapse_model=default_synapse_model)
         self.groups.append(group)
         return group
 
@@ -110,7 +113,8 @@ class Network:
 class NeuronGroup:
     def __init__(self, group_id, threshold, reset, leak, log_spikes=None,
                  log_potential=None, force_update=None, connections_out=None,
-                 reverse_reset=None, reverse_reset_mode=None):
+                 reverse_reset=None, reverse_reset_mode=None,
+                 neuron_model=None, default_synapse_model=None):
         # TODO: support all features here
         self.id = group_id
         self.neurons = []
@@ -125,11 +129,15 @@ class NeuronGroup:
         self.log_spikes = log_spikes
         self.log_potential = log_potential
         self.force_update = force_update
+        self.neuron_model = neuron_model
+        self.default_synapse_model = default_synapse_model
 
     def __str__(self):
         neuron_count = len(self.neurons)
 
         group_str = f"g {neuron_count}"
+        if self.neuron_model is not None:
+            group_str += f" soma_model={self.neuron_model}"
         if self.threshold is not None:
             group_str += f" threshold={self.threshold}"
         if self.reset is not None:
@@ -152,6 +160,8 @@ class NeuronGroup:
             group_str += f" force_update={int(self.force_update)}"
         if self.connections_out is not None:
             group_str += f" connections_out={self.connections_out}"
+        if self.default_synapse_model is not None:
+            group_str += f" synapse_model={self.default_synapse_model}"
 
         group_str += "\n"
         return group_str
@@ -181,6 +191,7 @@ class Input:
                 dest_neuron.group_id, dest_neuron.id, weight)
         line += '\n'
         return line
+
 
 class Neuron:
     def __init__(self, group, neuron_id, log_spikes=None,
@@ -260,13 +271,16 @@ def create_layer(network, layer_neuron_count, compartments,
                  log_spikes=False, log_potential=False, force_update=False,
                  threshold=1.0, reset=0.0, leak=1.0, mappings=None,
                  connections_out=None, reverse_threshold=None,
-                 reverse_reset_mode=None):
+                 reverse_reset_mode=None, neuron_model=None,
+                 synapse_model=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     layer_group = network.create_group(threshold, reset, leak, log_spikes,
                                        log_potential, force_update,
                                        connections_out=connections_out,
                                        reverse_threshold=reverse_threshold,
-                                       reverse_reset_mode=reverse_reset_mode)
+                                       reverse_reset_mode=reverse_reset_mode,
+                                       neuron_model=neuron_model,
+                                       default_synapse_model=synapse_model)
 
     if mappings is not None:
         assert(len(mappings) == layer_neuron_count)
@@ -337,7 +351,7 @@ def parse_tile(tile_dict):
 
     for instance in range(range_min, range_max+1):
         tile_name = tile_name.split("[")[0] + "[{0}]".format(instance)
-        tile_id = create_tile(tile_dict)
+        tile_id = create_tile(tile_dict, tile_name)
 
         # Add any elements local to this h/w structure. They have access to any
         #  elements in the parent structures
@@ -368,11 +382,14 @@ def parse_core(core_dict, tile_id):
 
     for instance in range(range_min, range_max+1):
         core_name = core_name.split("[")[0] + "[{0}]".format(instance)
-        core_id = create_core(tile_id, core_dict)
+        core_id = create_core(tile_id, core_name, core_dict)
         create_axon_in(tile_id, core_id, core_dict["axon_in"][0])
-        create_synapse(tile_id, core_id, core_dict["synapse"][0])
+
+        for synapse in core_dict["synapse"]:
+            create_synapse(tile_id, core_id, synapse)
         create_dendrite(tile_id, core_id, core_dict["dendrite"][0])
-        create_soma(tile_id, core_id, core_dict["soma"][0])
+        for soma in core_dict["soma"]:
+            create_soma(tile_id, core_id, soma)
         create_axon_out(tile_id, core_id, core_dict["axon_out"][0])
 
 
@@ -412,12 +429,12 @@ def format_attributes(attributes):
     return line
 
 
-def create_tile(tile):
+def create_tile(tile, name):
     global _tiles
     tile_id = _tiles
     _tiles += 1
 
-    tile = f"t" + format_attributes(tile["attributes"])
+    tile = f"t {name}" + format_attributes(tile["attributes"])
     _entry_list.append(tile)
     # Track how many cores are in this tile
     _cores_in_tile.append(0)
@@ -425,9 +442,9 @@ def create_tile(tile):
     return tile_id
 
 
-def create_core(tile_id, core_dict):
+def create_core(tile_id, name, core_dict):
     core_id = _cores_in_tile[tile_id]
-    core = f"c {tile_id}" + format_attributes(core_dict["attributes"])
+    core = f"c {name} {tile_id}" + format_attributes(core_dict["attributes"])
     _entry_list.append(core)
     _cores_in_tile[tile_id] += 1
 
@@ -435,31 +452,36 @@ def create_core(tile_id, core_dict):
 
 
 def create_synapse(tile_id, core_id, synapse_dict):
-    synapse = f"s {tile_id} {core_id}" + format_attributes(synapse_dict["attributes"])
+    name = synapse_dict["name"]
+    synapse = f"s {name} {tile_id} {core_id}" + format_attributes(synapse_dict["attributes"])
     _entry_list.append(synapse)
     return
 
 
 def create_dendrite(tile_id, core_id, dendrite_dict):
-    dendrite = f"d {tile_id} {core_id}" + format_attributes(dendrite_dict["attributes"])
+    name = dendrite_dict["name"]
+    dendrite = f"d {name} {tile_id} {core_id}" + format_attributes(dendrite_dict["attributes"])
     _entry_list.append(dendrite)
     return
 
 
 def create_soma(tile_id, core_id, soma_dict):
-    soma = (f"+ {tile_id} {core_id}" + format_attributes(soma_dict["attributes"]))
+    name = soma_dict["name"]
+    soma = (f"+ {name} {tile_id} {core_id}" + format_attributes(soma_dict["attributes"]))
     _entry_list.append(soma)
     return
 
 
 def create_axon_in(tile_id, core_id, axon_dict):
-    axon = f"i {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
+    name = axon_dict["name"]
+    axon = f"i {name} {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
     _entry_list.append(axon)
     return
 
 
 def create_axon_out(tile_id, core_id, axon_dict):
-    axon = f"o {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
+    name = axon_dict["name"]
+    axon = f"o {name} {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
     _entry_list.append(axon)
     return
 
