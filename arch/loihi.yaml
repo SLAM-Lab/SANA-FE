@@ -13,8 +13,6 @@ architecture:
     - name: loihi_tile[0..31]
       attributes:
         blocking: True
-        latency_spike_within_tile: 2.1e-9
-        energy_spike_within_tile: 0.0e-12
         energy_east: 3.0e-12
         latency_east: 4.1e-9
         energy_west: 3.0e-12
@@ -30,6 +28,8 @@ architecture:
           axon_in:
             - name: loihi_in
               attributes:
+                energy_message: 0.0e-12
+                latency_message: 20.0e-9
           soma:
             - name: loihi_lif
               attributes:
@@ -55,13 +55,11 @@ architecture:
             - name: loihi_dense_synapse  # Use the name to link
               attributes:
                 model: current_based
-                weight_bits: 8
                 energy_spike: 35.5e-12
                 latency_spike: 4.0e-9
             - name: loihi_sparse_synapse
               attributes:
                 model: current_based
-                weight_bits: 8
                 energy_spike: 33.6e-12
                 latency_spike: 4.7e-9
             - name: loihi_conv_synapse

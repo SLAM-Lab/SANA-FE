@@ -184,24 +184,24 @@ double sim_estimate_network_costs(struct tile *const src,
 	if (src->x < dest->x)
 	{
 		dest->east_hops += x_hops;
-		network_latency += (double) x_hops * src->time_east_hop;
+		network_latency += (double) x_hops * src->latency_east_hop;
 	}
 	else
 	{
 		dest->west_hops += x_hops;
-		network_latency += (double) x_hops * src->time_west_hop;
+		network_latency += (double) x_hops * src->latency_west_hop;
 	}
 
 	// N-S hops
 	if (src->y < dest->y)
 	{
 		dest->north_hops += y_hops;
-		network_latency += (double) y_hops * src->time_north_hop;
+		network_latency += (double) y_hops * src->latency_north_hop;
 	}
 	else
 	{
 		dest->south_hops += y_hops;
-		network_latency += (double) y_hops * src->time_south_hop;
+		network_latency += (double) y_hops * src->latency_south_hop;
 	}
 
 	dest->hops += (x_hops + y_hops);
@@ -378,6 +378,10 @@ int sim_schedule_messages(const struct simulation *const sim,
 		// Set time-stamps, calculating when the receiving H/W will be
 		//  busy until
 		c->time += m->network_latency;
+		// TODO: for some reason this seems quite important for DVS
+		//  gesture accuracy. The core is busy until the message is
+		//  delivered by the network
+
 		m->dest_core->blocked_until = fmax(
 			(m->dest_core->blocked_until + m->network_latency +
 			m->receive_latency),
@@ -386,7 +390,6 @@ int sim_schedule_messages(const struct simulation *const sim,
 		TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
 			c->t->id, c->id, m->dest_core->t->id,
 			m->dest_core->id, m->dest_core->blocked_until);
-
 
 		TRACE2("cid:%d axon:%d (%d messages left)\n", c->id,
 			c->curr_axon, c->messages_left);
@@ -672,7 +675,7 @@ int sim_input_spikes(struct network *net)
 			TRACE3("nid:%d Energy after: %lf\n", post_neuron->id,
 				post_neuron->current);
 
-			con->synapse_hw->time += con->synapse_hw->time_spike_op;
+			con->synapse_hw->time += con->synapse_hw->latency_spike_op;
 
 			post_neuron->update_needed = 1;
 			post_neuron->spike_count++;
@@ -750,9 +753,12 @@ double sim_update_synapse(struct timestep *const ts,
 
 	if (synaptic_lookup)
 	{
+		if (axon->connection_count > 0)
+		{
+			latency += post_core->axon_in.latency_spike_message;
+			post_core->axon_in.spike_messages_in++;
+		}
 		axon->active_synapses = axon->connection_count;
-
-		//post_neuron->synapse_hw->spikes_processed += spike_ops;
 
 		for (int i = 0; i < axon->connection_count; i++)
 		{
@@ -768,7 +774,7 @@ double sim_update_synapse(struct timestep *const ts,
 			con->synapse_hw->spikes_processed++;
 			TRACE2("Sending spike to nid:%d, current:%lf\n",
 				post_neuron->id, con->current);
-			latency += con->synapse_hw->time_spike_op;
+			latency += con->synapse_hw->latency_spike_op;
 
 			if (post_core->buffer_pos != BUFFER_DENDRITE)
 			{
@@ -776,10 +782,6 @@ double sim_update_synapse(struct timestep *const ts,
 					ts, post_neuron, con->current);
 			}
 		}
-
-		// TODO: generalize?
-		//latency += floor(((double) spike_ops + 3.0) / 4.0) *
-		//	   (con->synapse_hw->time_spike_op * 4.0);
 	}
 
 	return latency;
@@ -963,11 +965,11 @@ double sim_update_soma_lif(
 	if ((fabs(n->potential) > 0.0) || n->spike_count ||
 		(fabs(n->bias) > 0.0) || n->force_update)
 	{
-		latency += n->soma_hw->time_update_neuron;
+		latency += n->soma_hw->latency_update_neuron;
 		soma->neuron_updates++;
 	}
 
-	latency += n->soma_hw->time_access_neuron;
+	latency += n->soma_hw->latency_access_neuron;
 
 	return latency;
 }
@@ -1066,7 +1068,7 @@ double sim_neuron_send_spike(struct neuron *n)
 	struct soma_processor *soma = n->soma_hw;
 	double latency = 0.0;
 
-	latency += soma->time_spiking;
+	latency += soma->latency_spiking;
 	soma->neurons_fired++;
 	if (n->core->buffer_pos != BUFFER_AXON_OUT)
 	{
@@ -1115,9 +1117,10 @@ double sim_calculate_energy(const struct architecture *const arch)
 {
 	// Returns the total energy across the design, for this timestep
 	double network_energy, synapse_energy, soma_energy, axon_out_energy;
-	double total_energy;
+	double axon_in_energy, total_energy;
 
 	network_energy = 0.0;
+	axon_in_energy = 0.0;
 	synapse_energy = 0.0;
 	soma_energy = 0.0;
 	axon_out_energy = 0.0;
@@ -1136,6 +1139,8 @@ double sim_calculate_energy(const struct architecture *const arch)
 		{
 			const struct core *c = &(t->cores[j]);
 
+			axon_in_energy += c->axon_in.spike_messages_in *
+				c->axon_in.energy_spike_message;
 			for (int k = 0; k < ARCH_MAX_UNITS; k++)
 			{
 				synapse_energy +=
@@ -1156,11 +1161,9 @@ double sim_calculate_energy(const struct architecture *const arch)
 		}
 	}
 
-	total_energy = synapse_energy + soma_energy + axon_out_energy +
-		network_energy;
+	total_energy = axon_in_energy + synapse_energy + soma_energy +
+		axon_out_energy + network_energy;
 
-	//INFO("old energy:%e new energy:%e\n", total_energy, new_energy);
-	//assert(fabs(total_energy - new_energy) < 1.0E-20);
 	return total_energy;
 }
 

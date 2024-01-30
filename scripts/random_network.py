@@ -30,8 +30,10 @@ import sim
 # Use a dumb seed to get consistent results
 random.seed(1)
 
+EXPERIMENT = "tiny"
 # Global experiment parameters
-NETWORK_FILENAME = "runs/random/full/random.net"
+NETWORK_PATH = os.path.join("runs", "random", EXPERIMENT)
+NETWORK_FILENAME = os.path.join(NETWORK_PATH, "random.net")
 ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
@@ -107,13 +109,14 @@ if __name__ == "__main__":
     run_experiments = True
     plot_experiments = True
     if run_experiments:
-        with open("runs/random/full/loihi_random.csv", "r") as csv_file:
+        with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),
+            "r") as csv_file:
             reader = csv.DictReader(csv_file)
             fieldnames = reader.fieldnames
             fieldnames.append("sim_energy")
             fieldnames.append("sim_latency")
             fieldnames.append("total_spikes")
-            with open("runs/random/full/sim_random.csv", "w") as out_file:
+            with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "w") as out_file:
                 writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                 writer.writeheader()
 
@@ -128,15 +131,13 @@ if __name__ == "__main__":
                 line["sim_energy"] = results["energy"] / TIMESTEPS
                 line["sim_latency"] = results["time"] / TIMESTEPS
                 print(line)
-                with open("runs/random/full/sim_random.csv", "a") as out_file:
+                with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "a") as out_file:
                     writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                     writer.writerow(line)
 
     if plot_experiments:
-        sim_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random", "full",
-                                         "sim_random.csv"))
-        loihi_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random", "full",
-                                           "loihi_random.csv"))
+        sim_df = pd.read_csv(os.path.join(NETWORK_PATH, "sim_random.csv"))
+        loihi_df = pd.read_csv(os.path.join(NETWORK_PATH, "loihi_random.csv"))
         df = pd.merge(sim_df, loihi_df)
         # The smallest measurements hit the limits of Loihi's time measuring
         #  precision. Filter out these rows

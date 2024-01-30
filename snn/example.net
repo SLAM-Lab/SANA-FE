@@ -2,7 +2,7 @@
 ### Fully connected network, everything spikes on each timestep ###
 # First define the neuron group, specifying the number of neurons and default values:
 #   <count>   <attributes>
-g   6         soma_model=leaky_integrate_fire  synapse_model=current_based_uncompressed  threshold=-1.0  reset=0.0  leak_decay=1.0  reset_mode=hard  reverse_reset_mode=none  log_v=1
+g   6         soma_soma_hw_name=loihi_lif  synapse_model=current_based_uncompressed  threshold=-1.0  reset=0.0  leak_decay=1.0  reset_mode=hard  reverse_reset_mode=none  log_v=1
 
 ## Then define neurons in the group
 # gid nid <attributes>

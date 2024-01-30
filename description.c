@@ -170,7 +170,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		ret = arch_create_core(arch, t, attributes, attribute_count);
 		break;
 	case 'i':
-		arch_create_axon_in(c);
+		arch_create_axon_in(c, name, attributes, attribute_count);
 		ret = RET_OK;
 		break;
 	case 's':

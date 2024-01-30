@@ -40,13 +40,13 @@ struct architecture *arch_init(void)
 		t->energy = 0.0;
 		t->time = 0.0;
 		t->energy_east_hop = 0.0;
-		t->time_east_hop = 0.0;
+		t->latency_east_hop = 0.0;
 		t->energy_west_hop = 0.0;
-		t->time_west_hop = 0.0;
+		t->latency_west_hop = 0.0;
 		t->energy_north_hop = 0.0;
-		t->time_north_hop = 0.0;
+		t->latency_north_hop = 0.0;
 		t->energy_south_hop = 0.0;
-		t->time_south_hop = 0.0;
+		t->latency_south_hop = 0.0;
 		t->blocked_until = 0.0;
 		t->id = -1;
 		t->x = -1;
@@ -76,10 +76,8 @@ struct architecture *arch_init(void)
 			{
 				c->axon_in.energy = 0.0;
 				c->axon_in.time = 0.0;
-				c->axon_in.packets_in = 0;
-				c->axon_in.packet_size = 0;
-				c->axon_in.packets_buffer = 0;
-				c->axon_in.spikes_buffer = 0;
+				c->axon_in.energy_spike_message = 0.0;
+				c->axon_in.latency_spike_message = 0.0;
 				c->axon_in.map_count = 0;
 
 				c->synapse[k].spikes_buffer = 0;
@@ -87,9 +85,9 @@ struct architecture *arch_init(void)
 				c->synapse[k].energy = 0.0;
 				c->synapse[k].time = 0.0;
 				c->synapse[k].energy_spike_op = 0.0;
-				c->synapse[k].time_spike_op = 0.0;
+				c->synapse[k].latency_spike_op = 0.0;
 				c->synapse[k].energy_memory_access = 0.0;
-				c->synapse[k].time_memory_access = 0.0;
+				c->synapse[k].latency_memory_access = 0.0;
 
 
 
@@ -278,13 +276,13 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 	// Set attributes
 	t->is_blocking = 0;
 	t->energy_east_hop = 0.0;
-	t->time_east_hop = 0.0;
+	t->latency_east_hop = 0.0;
 	t->energy_north_hop = 0.0;
-	t->time_north_hop = 0.0;
+	t->latency_north_hop = 0.0;
 	t->energy_west_hop = 0.0;
-	t->time_west_hop = 0.0;
+	t->latency_west_hop = 0.0;
 	t->energy_south_hop = 0.0;
-	t->time_south_hop = 0.0;
+	t->latency_south_hop = 0.0;
 
 	for (int i = 0; i < attribute_count; i++)
 	{
@@ -303,7 +301,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 		else if (strncmp("latency_east", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(a->value_str, "%lf", &t->time_east_hop);
+			sscanf(a->value_str, "%lf", &t->latency_east_hop);
 		}
 		else if (strncmp("energy_west", a->key, MAX_FIELD_LEN) ==
 			0)
@@ -313,7 +311,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 		else if (strncmp("latency_west", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(a->value_str, "%lf", &t->time_west_hop);
+			sscanf(a->value_str, "%lf", &t->latency_west_hop);
 		}
 		else if (strncmp("energy_north", a->key, MAX_FIELD_LEN) ==
 			0)
@@ -323,7 +321,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 		else if (strncmp("latency_north", a->key,
 				 MAX_FIELD_LEN) == 0)
 		{
-			sscanf(a->value_str, "%lf", &t->time_north_hop);
+			sscanf(a->value_str, "%lf", &t->latency_north_hop);
 		}
 		else if (strncmp("energy_south", a->key, MAX_FIELD_LEN) ==
 			0)
@@ -333,7 +331,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 		else if (strncmp("latency_south", a->key,
 				 MAX_FIELD_LEN) == 0)
 		{
-			sscanf(a->value_str, "%lf", &t->time_south_hop);
+			sscanf(a->value_str, "%lf", &t->latency_south_hop);
 		}
 	}
 
@@ -397,17 +395,40 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 	return c->id;
 }
 
-void arch_create_axon_in(struct core *const c)
+void arch_create_axon_in(struct core *const c, const char *const name,
+	const struct attributes *const attr, const int attribute_count)
 {
 	struct axon_input *in;
 
 	in = &(c->axon_in);
 	in->energy = 0.0;
 	in->time = 0.0;
-	in->packet_size = 0;
 	in->map_count = 0;
-	// We already know a valid tile was given at this point
 	in->t = c->t;
+
+	in->energy_spike_message = 0.0;
+	in->latency_spike_message = 0.0;
+	for (int i = 0; i < attribute_count; i++)
+	{
+		const struct attributes *const curr = &(attr[i]);
+
+		if (strncmp("name", curr->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(in->name, curr->value_str, MAX_FIELD_LEN);
+		}
+		else if (strncmp("energy_message", curr->key, MAX_FIELD_LEN) ==
+			0)
+		{
+			sscanf(curr->value_str, "%lf",
+				&in->energy_spike_message);
+		}
+		else if (strncmp("latency_message", curr->key, MAX_FIELD_LEN) ==
+			0)
+		{
+			sscanf(curr->value_str, "%lf",
+				&in->latency_spike_message);
+		}
+	}
 
 	TRACE2("Axon input created (c:%d.%d)\n", c->t->id, c->id);
 
@@ -427,9 +448,9 @@ void arch_create_synapse(struct core *const c, const char *const name,
 
 	/**** Set attributes ****/
 	s->energy_memory_access = 0.0;
-	s->time_memory_access = 0.0;
+	s->latency_memory_access = 0.0;
 	s->energy_spike_op = 0.0;
-	s->time_spike_op = 0.0;
+	s->latency_spike_op = 0.0;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		const struct attributes *const curr = &(attr[i]);
@@ -442,10 +463,6 @@ void arch_create_synapse(struct core *const c, const char *const name,
 		{
 			s->model = arch_parse_synapse_model(curr->value_str);
 		}
-		else if (strncmp("weight_bits", curr->key, MAX_FIELD_LEN) == 0)
-		{
-			sscanf(curr->value_str, "%d", &s->weight_bits);
-		}
 		else if (strncmp("energy_memory", curr->key, MAX_FIELD_LEN) ==
 			0)
 		{
@@ -455,7 +472,7 @@ void arch_create_synapse(struct core *const c, const char *const name,
 		else if (strncmp("latency_memory", curr->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(curr->value_str, "%lf", &s->time_memory_access);
+			sscanf(curr->value_str, "%lf", &s->latency_memory_access);
 		}
 		else if (strncmp("energy_spike", curr->key, MAX_FIELD_LEN) == 0)
 		{
@@ -464,7 +481,7 @@ void arch_create_synapse(struct core *const c, const char *const name,
 		else if (strncmp("latency_spike", curr->key, MAX_FIELD_LEN) ==
 			0)
 		{
-			sscanf(curr->value_str, "%lf", &s->time_spike_op);
+			sscanf(curr->value_str, "%lf", &s->latency_spike_op);
 		}
 	}
 	c->synapse_count++;
@@ -491,11 +508,11 @@ void arch_create_soma(struct core *const c, const char *const name,
 	/*** Set attributes ***/
 	s->model = NEURON_LIF;
 	s->energy_update_neuron = 0.0;
-	s->time_update_neuron = 0.0;
+	s->latency_update_neuron = 0.0;
 	s->energy_access_neuron = 0.0;
-	s->time_access_neuron = 0.0;
+	s->latency_access_neuron = 0.0;
 	s->energy_spiking = 0.0;
-	s->time_spiking = 0.0;
+	s->latency_spiking = 0.0;
 	s->leak_towards_zero = 1;
 	s->noise_type = NOISE_NONE;
 
@@ -515,7 +532,7 @@ void arch_create_soma(struct core *const c, const char *const name,
 		else if (strncmp("latency_update_neuron", a->key, MAX_FIELD_LEN) == 0)
 		{
 			sscanf(a->value_str, "%lf",
-				&s->time_update_neuron);
+				&s->latency_update_neuron);
 		}
 		else if (strncmp("energy_access_neuron", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -526,7 +543,7 @@ void arch_create_soma(struct core *const c, const char *const name,
 			0)
 		{
 			sscanf(a->value_str, "%lf",
-				&s->time_access_neuron);
+				&s->latency_access_neuron);
 		}
 		else if (strncmp("energy_spike_out", a->key, MAX_FIELD_LEN) ==0)
 		{
@@ -534,7 +551,7 @@ void arch_create_soma(struct core *const c, const char *const name,
 		}
 		else if (strncmp("latency_spike_out", a->key, MAX_FIELD_LEN)==0)
 		{
-			sscanf(a->value_str, "%lf", &s->time_spiking);
+			sscanf(a->value_str, "%lf", &s->latency_spiking);
 		}
 		else if (strncmp("noise", a->key, MAX_FIELD_LEN) == 0)
 		{

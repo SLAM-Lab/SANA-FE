@@ -121,9 +121,10 @@ struct axon_input
 	char name[MAX_FIELD_LEN];
 	struct tile *t;
 	struct connection_map map[ARCH_MAX_CONNECTION_MAP];
-	long int packets_in;
+	long int spike_messages_in;
 	double energy, time;
-	int packet_size, packets_buffer, spikes_buffer, map_count;
+	double energy_spike_message, latency_spike_message;
+	int map_count;
 };
 
 struct synapse_processor
@@ -133,7 +134,7 @@ struct synapse_processor
 	long int spikes_processed;
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
-	double time_spike_op, time_memory_access;
+	double latency_spike_op, latency_memory_access;
 };
 
 struct dendrite_processor
@@ -150,9 +151,9 @@ struct soma_processor
 	int noise_type;
 	long int neuron_updates, neurons_fired, neuron_count;
 	double energy, time;
-	double energy_update_neuron, time_update_neuron;
-	double energy_access_neuron, time_access_neuron;
-	double energy_spiking, time_spiking;
+	double energy_update_neuron, latency_update_neuron;
+	double energy_access_neuron, latency_access_neuron;
+	double energy_spiking, latency_spiking;
 };
 
 struct axon_output
@@ -195,10 +196,10 @@ struct tile
 	struct tile *links[ARCH_MAX_LINKS];
 	char name[MAX_FIELD_LEN];
 	double energy, time;
-	double energy_east_hop, time_east_hop;
-	double energy_west_hop, time_west_hop;
-	double energy_north_hop, time_north_hop;
-	double energy_south_hop, time_south_hop;
+	double energy_east_hop, latency_east_hop;
+	double energy_west_hop, latency_west_hop;
+	double energy_north_hop, latency_north_hop;
+	double energy_south_hop, latency_south_hop;
 	double energy_spike_within_tile, time_spike_within_tile;
 	double blocked_until;
 	long int hops, messages_received, total_neurons_fired;
@@ -223,7 +224,7 @@ void arch_free(struct architecture *const arch);
 int arch_create_noc(struct architecture *const arch, struct attributes *attr, const int attribute_count);
 int arch_create_tile(struct architecture *const arch, struct attributes *attr, const int attribute_count);
 int arch_create_core(struct architecture *const arch, struct tile *const t, struct attributes *attr, const int attribute_count);
-void arch_create_axon_in(struct core *const c);
+void arch_create_axon_in(struct core *const c, const char *const name, const struct attributes *const attr, const int attribute_count);
 void arch_create_synapse(struct core *const c, const char *const name, const struct attributes *const attr, const int attribute_count);
 void arch_create_soma(struct core *const c, const char *const name, struct attributes *attr, const int attribute_count);
 void arch_create_axon_out(struct core *const c, struct attributes *attr, const int attribute_count);
