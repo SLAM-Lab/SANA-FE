@@ -214,13 +214,14 @@ double sim_estimate_network_costs(struct tile *const src,
 void sim_init_message(struct message *const m)
 {
 	m->src_neuron = NULL;
-	m->src_tile = NULL;
-	m->src_core = NULL;
-	m->dest_tile = NULL;
-	m->dest_core = NULL;
+	m->dest_neuron = NULL;
 	m->generation_latency = 0.0;
 	m->network_latency = 0.0;
 	m->receive_latency = 0.0;
+	m->hops = 0;
+	m->spikes = 0;
+	m->sent_timestamp = 0.0;
+	m->processed_timestamp = 0.0;
 }
 
 struct message *sim_get_next_message(struct core *c)
@@ -276,14 +277,11 @@ struct message *sim_get_next_message(struct core *c)
 		m = &(c->curr_message);
 		sim_init_message(m);
 
+		m->timestep = -1; // TODO: how to set the timestep
 		m->src_neuron = c->neurons[c->curr_neuron];
 		m->dest_axon = m->src_neuron->maps_out[c->curr_axon];
 		m->spikes = m->dest_axon->connection_count;
-		m->src_core = c;
-		m->src_tile = c->t;
 		m->dest_neuron = m->dest_axon->connections[0]->post_neuron;
-		m->dest_core = m->dest_neuron->core;
-		m->dest_tile = m->dest_core->t;
 
 		// Add axon access cost to message latency and energy
 		m->generation_latency = neuron_processing_latency +
@@ -297,9 +295,6 @@ struct message *sim_get_next_message(struct core *c)
 		assert(m->dest_axon != NULL);
 		assert(m->dest_axon->connections != NULL);
 		assert(m->dest_axon->spikes_received > 0);
-		assert(m->src_tile != NULL);
-		assert(m->dest_core != NULL);
-		assert(m->dest_tile != NULL);
 
 		c->curr_axon++;
 		c->messages_left--;
@@ -341,37 +336,38 @@ int sim_schedule_messages(const struct simulation *const sim,
 		struct core *c = sim_pop_priority_queue(&priority_queue);
 		struct message *m = &(c->curr_message);
 
-		assert(m->dest_core != NULL);
-		assert(m->dest_tile != NULL);
-		if (m->dest_tile->is_blocking)
+		if (m->dest_neuron->core->t->is_blocking)
 		{
 			m->blocked_latency = fmax(m->blocked_latency,
-				m->dest_tile->blocked_until - c->time);
+				m->dest_neuron->core->t->blocked_until -
+				c->time);
 			// Update the core global time, blocking until
 			//  the receiving tile is free
-			c->time = fmax(c->time, m->dest_tile->blocked_until);
+			c->time = fmax(c->time,
+				m->dest_neuron->core->t->blocked_until);
 		}
-		if (m->dest_core->is_blocking)
+		if (m->dest_neuron->core->is_blocking)
 		{
 			// Track how long the message is blocked for
 			m->blocked_latency = fmax(m->blocked_latency,
-				m->dest_core->blocked_until - c->time);
+				m->dest_neuron->core->blocked_until - c->time);
 			// Update the core global time, blocking until
 			//  the receiving core is free
-			c->time = fmax(c->time, m->dest_core->blocked_until);
+			c->time = fmax(c->time,
+				m->dest_neuron->core->blocked_until);
 
 			// Calculate when the receiving h/w will be busy
 			//  until
-			if (c->time < m->dest_core->blocked_until)
+			if (c->time < m->dest_neuron->core->blocked_until)
 			{
 				// If we were trying to send a spike to
 				//  a blocked core, also block the tile
 				//  for this duration as well
-				m->dest_tile->blocked_until =
-					m->dest_core->blocked_until;
+				m->dest_neuron->core->t->blocked_until =
+					m->dest_neuron->core->blocked_until;
 				// Update the core global time, blocking
 				//  until the receiving core is free
-				c->time = m->dest_core->blocked_until;
+				c->time = m->dest_neuron->core->blocked_until;
 			}
 		}
 
@@ -382,9 +378,9 @@ int sim_schedule_messages(const struct simulation *const sim,
 		//  gesture accuracy. The core is busy until the message is
 		//  delivered by the network
 
-		m->dest_core->blocked_until = fmax(
-			(m->dest_core->blocked_until + m->network_latency +
-			m->receive_latency),
+		m->dest_neuron->core->blocked_until = fmax(
+			(m->dest_neuron->core->blocked_until +
+			m->network_latency + m->receive_latency),
 			(c->time + m->receive_latency));
 
 		TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
@@ -1415,25 +1411,27 @@ void sim_trace_record_potentials(
 void sim_trace_record_message(
 	const struct simulation *const sim, const struct message *const m)
 {
-	fprintf(sim->message_trace_fp, "%ld,", sim->timesteps);
+	fprintf(sim->message_trace_fp, "%ld,", m->timestep);
 	assert(m->src_neuron != NULL);
 	fprintf(sim->message_trace_fp, "%d.%d,", m->src_neuron->group->id,
 		m->src_neuron->id);
-	assert(m->src_tile != NULL);
-	assert(m->src_core != NULL);
-	fprintf(sim->message_trace_fp, "%d.%d,", m->src_tile->id,
-		m->src_core->id);
+	assert(m->src_neuron->core != NULL);
+	assert(m->src_neuron->core->t != NULL);
+	fprintf(sim->message_trace_fp, "%d.%d,", m->src_neuron->core->t->id,
+		m->src_neuron->core->id);
 
-	assert(m->dest_tile != NULL);
-	assert(m->dest_tile != NULL);
-	fprintf(sim->message_trace_fp, "%d.%d,", m->dest_tile->id,
-		m->dest_core->id);
+	assert(m->dest_neuron->core != NULL);
+	assert(m->dest_neuron->core->t != NULL);
+	fprintf(sim->message_trace_fp, "%d.%d,", m->dest_neuron->core->t->id,
+		m->dest_neuron->core->id);
 	fprintf(sim->message_trace_fp, "%d,", m->hops);
 	fprintf(sim->message_trace_fp, "%d,", m->spikes);
 	fprintf(sim->message_trace_fp, "%le,", m->generation_latency);
 	fprintf(sim->message_trace_fp, "%le,", m->network_latency);
 	fprintf(sim->message_trace_fp, "%le,", m->receive_latency);
 	fprintf(sim->message_trace_fp, "%le\n", m->blocked_latency);
+	fprintf(sim->message_trace_fp, "%le\n", m->sent_timestamp);
+	fprintf(sim->message_trace_fp, "%le\n", m->processed_timestamp);
 
 	return;
 }

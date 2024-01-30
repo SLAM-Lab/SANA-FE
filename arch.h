@@ -97,12 +97,11 @@ enum noise_type
 
 struct message
 {
-	struct tile *src_tile, *dest_tile;
-	struct core *src_core, *dest_core;
 	struct connection_map *dest_axon;
 	struct neuron *src_neuron, *dest_neuron;
 	double generation_latency, network_latency, receive_latency;
-	double blocked_latency;
+	double blocked_latency, sent_timestamp, processed_timestamp;
+	long int timestep;
 	int spikes, hops;
 };
 
