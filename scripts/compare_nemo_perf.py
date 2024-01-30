@@ -49,9 +49,8 @@ CSV_RESULTS_FILENAME = os.path.join(PROJECT_DIR, "runs", "nemo",
 # Create a random truenorth network, 80% connected to neuron within same
 # core, 20% connected to neurons outside
 def create_nemo_network(cores):
-    network = sim.Network()
-    compartments = sim.init_compartments(cores, 1,
-                                           TRUENORTH_COMPARTMENTS)
+    network = sim.Network(save_mappings=True)
+    compartments = sim.init_compartments(cores, 1, TRUENORTH_COMPARTMENTS)
     print("Creating neuron population")
 
     mappings = []
@@ -102,7 +101,7 @@ def run_sim_sanafe(cores, timesteps):
 # TODO: should we add changes to measure the runtime of simulation and ignore
 #  setup time? Is this even possible
 def run_sim_nemo(cores, timesteps, debug=True):
-    run_command = ["mpirun", NEMO_BIN_PATH,
+    run_command = ["mpirun", "-np", "12", NEMO_BIN_PATH,
                    f"--cores={cores}", f"--end={timesteps}",  "--sync=3",
                    "--rand"]
     if debug:
@@ -132,6 +131,7 @@ def plot_results():
     df.plot.bar(rot=0, figsize=(3.5, 1.6), color=("#ff7f0e", "#1f77b4"))
     plt.xlabel("TrueNorth Core Count")
     plt.ylabel("Run-time (s)")
+    plt.yscale("log")
     plt.minorticks_on()
     plt.tight_layout(pad=0.3)
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.png"))
@@ -153,14 +153,14 @@ if __name__ == "__main__":
         for i, cores in enumerate(core_counts):
             print(f"Running simulation of {cores} cores")
             sanafe_runtimes[i] = run_sim_sanafe(cores, TIMESTEPS)
-            #nemo_runtimes[i] = run_sim_nemo(cores, TIMESTEPS)
+            nemo_runtimes[i] = run_sim_nemo(cores, TIMESTEPS, debug=False)
 
         print(sanafe_runtimes)
-        #with open(CSV_RESULTS_FILENAME, "w") as csv_file:
-        #    writer = csv.writer(csv_file)
-        #    writer.writerow(("cores", "SANA-FE", "NeMo"))
-        #    for i, cores in enumerate(core_counts):
-        #        writer.writerow((cores, sanafe_runtimes[i], nemo_runtimes[i]))
+        with open(CSV_RESULTS_FILENAME, "w") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(("cores", "SANA-FE", "NeMo"))
+            for i, cores in enumerate(core_counts):
+                writer.writerow((cores, sanafe_runtimes[i], nemo_runtimes[i]))
 
         print("Saved results to file")
 
