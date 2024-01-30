@@ -351,7 +351,7 @@ def parse_tile(tile_dict):
 
     for instance in range(range_min, range_max+1):
         tile_name = tile_name.split("[")[0] + "[{0}]".format(instance)
-        tile_id = create_tile(tile_dict)
+        tile_id = create_tile(tile_dict, tile_name)
 
         # Add any elements local to this h/w structure. They have access to any
         #  elements in the parent structures
@@ -382,7 +382,7 @@ def parse_core(core_dict, tile_id):
 
     for instance in range(range_min, range_max+1):
         core_name = core_name.split("[")[0] + "[{0}]".format(instance)
-        core_id = create_core(tile_id, core_dict)
+        core_id = create_core(tile_id, core_name, core_dict)
         create_axon_in(tile_id, core_id, core_dict["axon_in"][0])
 
         for synapse in core_dict["synapse"]:
@@ -429,12 +429,12 @@ def format_attributes(attributes):
     return line
 
 
-def create_tile(tile):
+def create_tile(tile, name):
     global _tiles
     tile_id = _tiles
     _tiles += 1
 
-    tile = f"t" + format_attributes(tile["attributes"])
+    tile = f"t {name}" + format_attributes(tile["attributes"])
     _entry_list.append(tile)
     # Track how many cores are in this tile
     _cores_in_tile.append(0)
@@ -442,9 +442,9 @@ def create_tile(tile):
     return tile_id
 
 
-def create_core(tile_id, core_dict):
+def create_core(tile_id, name, core_dict):
     core_id = _cores_in_tile[tile_id]
-    core = f"c {tile_id}" + format_attributes(core_dict["attributes"])
+    core = f"c {name} {tile_id}" + format_attributes(core_dict["attributes"])
     _entry_list.append(core)
     _cores_in_tile[tile_id] += 1
 
@@ -452,31 +452,36 @@ def create_core(tile_id, core_dict):
 
 
 def create_synapse(tile_id, core_id, synapse_dict):
-    synapse = f"s {tile_id} {core_id}" + format_attributes(synapse_dict["attributes"])
+    name = synapse_dict["name"]
+    synapse = f"s {name} {tile_id} {core_id}" + format_attributes(synapse_dict["attributes"])
     _entry_list.append(synapse)
     return
 
 
 def create_dendrite(tile_id, core_id, dendrite_dict):
-    dendrite = f"d {tile_id} {core_id}" + format_attributes(dendrite_dict["attributes"])
+    name = dendrite_dict["name"]
+    dendrite = f"d {name} {tile_id} {core_id}" + format_attributes(dendrite_dict["attributes"])
     _entry_list.append(dendrite)
     return
 
 
 def create_soma(tile_id, core_id, soma_dict):
-    soma = (f"+ {tile_id} {core_id}" + format_attributes(soma_dict["attributes"]))
+    name = soma_dict["name"]
+    soma = (f"+ {name} {tile_id} {core_id}" + format_attributes(soma_dict["attributes"]))
     _entry_list.append(soma)
     return
 
 
 def create_axon_in(tile_id, core_id, axon_dict):
-    axon = f"i {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
+    name = axon_dict["name"]
+    axon = f"i {name} {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
     _entry_list.append(axon)
     return
 
 
 def create_axon_out(tile_id, core_id, axon_dict):
-    axon = f"o {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
+    name = axon_dict["name"]
+    axon = f"o {name} {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
     _entry_list.append(axon)
     return
 

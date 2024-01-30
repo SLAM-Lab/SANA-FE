@@ -14,6 +14,7 @@
 #define NETWORK_MAX_NEURON_GROUPS 1024
 #define NETWORK_INVALID_NID -1
 #define MAX_FIELDs 128
+#define MAX_FIELD_LEN 64
 
 #include <stdint.h>
 
@@ -51,27 +52,33 @@ struct neuron
 	struct core *core, *post_synaptic_cores;
 	struct soma_processor *soma_hw;
 
+	char soma_hw_name[MAX_FIELD_LEN];
+
 	// Track the timestep each hardware unit was last updated
-	unsigned int random_range_mask;
-
-	double potential, current, charge, bias;
-	double reset, reverse_reset, threshold, reverse_threshold;
-	double leak_decay, leak_bias, potential_time_const;
-	double dendritic_current_decay, processing_latency;
-
-	int id, soma_model, is_init, fired, connection_out_count;
+	int id, is_init, fired, connection_out_count;
 	int max_connections_out, log_spikes, log_potential, update_needed;
 	int force_update, spike_count;
 	int soma_last_updated, dendrite_last_updated;
 	int maps_in_count, maps_out_count;
+
+	// LIF specific
+	unsigned int random_range_mask;
+	double potential, current, charge, bias;
+	double reset, reverse_reset, threshold, reverse_threshold;
+	double leak_decay, leak_bias, potential_time_const;
+	double dendritic_current_decay, processing_latency;
+	// End of LIF specific
 };
 
 struct connection
 {
 	struct neuron *post_neuron, *pre_neuron;
 	struct synapse_processor *synapse_hw;
+	// TODO: create a table of hw unit names and just index into this
+	//  global table (read only)
+	char synapse_hw_name[MAX_FIELD_LEN];
 	double weight, current, synaptic_current_decay;
-	int id, model, delay;
+	int id, delay;
 };
 
 struct input
@@ -88,8 +95,9 @@ struct neuron_group
 	//  same models. If implemented in hardware, they also must share common
 	//  hardware i.e. the same core and processor blocks in the core
 	struct neuron *neurons;
+	char default_soma_hw_name[MAX_FIELD_LEN];
+	char default_synapse_hw_name[MAX_FIELD_LEN];
 	int id, neuron_count, reset_mode, reverse_reset_mode;
-	int default_soma_model, default_synapse_model;
 	int default_log_potential, default_log_spikes;
 	int default_max_connections_out, default_force_update;
 	double default_threshold, default_reset;

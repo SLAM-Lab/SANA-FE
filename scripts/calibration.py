@@ -223,10 +223,10 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
     return
 
 
-mappings = ("fixed", "l2_split", "split_2", "luke")
+mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
 #mappings = ("split_2_diff_tiles",)
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
 
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
@@ -259,7 +259,7 @@ if __name__ == "__main__":
     #  since this is restricted data!
     if plot_experiments:
         loihi_times_spikes = {"fixed": [], "l2_split": [], "split_2": [],
-                              "luke": []}
+                              "luke": [], "split_4": []}
         loihi_energy_spikes = []
 
         spiking_energy = []
@@ -358,23 +358,25 @@ if __name__ == "__main__":
         plt.savefig("runs/calibration/calibration_time_partition_2.png")
 
         # Plot the effect of network tiles blocking
-        spiking_frame = df.loc[(df["mapping"] == "split_2") &
+        spiking_frame = df.loc[(df["mapping"] == "split_4") &
                                (df["cores_blocking"] == True)]
         tiles_nonblocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == False]
         tiles_blocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == True]
 
         plt.figure(figsize=(2.1, 2.1))
-        plt.plot(neuron_counts, np.array(loihi_times_spikes["split_2"]) * 1.0e3, "-")
+        plt.plot(neuron_counts, np.array(loihi_times_spikes["split_4"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(tiles_nonblocking["time"]) * 1.0e3, "x")
-        plt.plot(neuron_counts, np.array(tiles_blocking["time"]) * 1.0e3, "ko",
-                 fillstyle="none"),
+        #plt.plot(neuron_counts, np.array(tiles_blocking["time"]) * 1.0e3, "ko",
+        #         fillstyle="none"),
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Cores blocking", "Tiles blocking"),
+        #plt.legend(("Measured", "Cores blocking", "Tiles blocking"),
+        #            fontsize=7)
+        plt.legend(("Measured", "Cores blocking"),
                     fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_3.pdf")

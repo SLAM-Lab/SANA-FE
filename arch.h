@@ -62,9 +62,7 @@ enum neuron_models
 
 enum synapse_models
 {
-	SYNAPSE_CUBA_UNCOMPRESSED,
-	SYNAPSE_CUBA_COMPRESSED,
-	SYNAPSE_CUBA_CONV,
+	SYNAPSE_CUBA,
 };
 
 
@@ -226,8 +224,8 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr, co
 int arch_create_tile(struct architecture *const arch, struct attributes *attr, const int attribute_count);
 int arch_create_core(struct architecture *const arch, struct tile *const t, struct attributes *attr, const int attribute_count);
 void arch_create_axon_in(struct core *const c);
-void arch_create_synapse(struct core *const c, const struct attributes *const attr, const int attribute_count);
-void arch_create_soma(struct core *const c, struct attributes *attr, const int attribute_count);
+void arch_create_synapse(struct core *const c, const char *const name, const struct attributes *const attr, const int attribute_count);
+void arch_create_soma(struct core *const c, const char *const name, struct attributes *attr, const int attribute_count);
 void arch_create_axon_out(struct core *const c, struct attributes *attr, const int attribute_count);
 void arch_create_connection_maps(struct architecture *const arch);
 void arch_create_core_connection_map(struct core *const core);

@@ -34,8 +34,8 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 
 	group->neuron_count = neuron_count;
 
-	group->default_soma_model = -1;
-	group->default_synapse_model = -1;
+	group->default_soma_hw_name[0] = 0;
+	group->default_synapse_hw_name[0] = 0;
 	group->default_max_connections_out = 0;
 	group->default_log_potential = 0; // Disabled by default
 	group->default_log_spikes = 0;
@@ -55,16 +55,16 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		struct attributes *a = &(attr[i]);
 
 		ret = -1;
-		if (strncmp("soma_model", a->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("soma_hw_name", a->key, MAX_FIELD_LEN) == 0)
 		{
-			group->default_soma_model =
-				arch_parse_neuron_model(a->value_str);
+			strncpy(group->default_soma_hw_name, a->value_str,
+				MAX_FIELD_LEN);
 			ret = 1;
 		}
-		else if (strncmp("synapse_model", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("synapse_hw_name", a->key, MAX_FIELD_LEN) == 0)
 		{
-			group->default_synapse_model =
-				arch_parse_synapse_model(a->value_str);
+			strncpy(group->default_synapse_hw_name, a->value_str,
+				MAX_FIELD_LEN);
 			ret = 1;
 		}
 		else if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
@@ -150,7 +150,8 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->id = i;
 		n->group = group;
 		n->connection_out_count = 0;
-		n->soma_model = group->default_soma_model;
+		strncpy(n->soma_hw_name, group->default_soma_hw_name,
+			MAX_FIELD_LEN);
 
 		// Initialize neuron using group attributes
 		n->log_spikes = group->default_log_spikes;
@@ -224,9 +225,9 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		struct attributes *a = &(attr[i]);
 		int ret = -1;
 
-		if (strncmp("model", a->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
 		{
-			n->soma_model = arch_parse_neuron_model(a->value_str);
+			strncpy(n->soma_hw_name, a->value_str, MAX_FIELD_LEN);
 		}
 		else if (strncmp("bias", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -328,7 +329,8 @@ int network_connect_neurons(struct connection *const con,
 	struct attributes *attr, const int attribute_count)
 {
 	assert(con != NULL);
-	con->model = dest->group->default_synapse_model;
+	strncpy(con->synapse_hw_name, dest->group->default_synapse_hw_name,
+		MAX_FIELD_LEN);
 	con->pre_neuron = src;
 	con->post_neuron = dest;
 	con->weight = 1.0;
@@ -344,9 +346,10 @@ int network_connect_neurons(struct connection *const con,
 		{
 			ret = sscanf(a->value_str, "%lf", &(con->weight));
 		}
-		else if (strncmp("model", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
 		{
-			con->model = arch_parse_synapse_model(a->value_str);
+			strncpy(con->synapse_hw_name, a->value_str,
+				MAX_FIELD_LEN);
 		}
 		if (ret < 1)
 		{

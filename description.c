@@ -90,6 +90,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 	const int field_count, struct architecture *arch)
 {
 	struct attributes attributes[128];
+	char name[MAX_FIELD_LEN];
 	int attribute_count = 0;
 	struct tile *t;
 	struct core *c;
@@ -107,12 +108,17 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 	t = NULL;
 	c = NULL;
 	first_field = 1;
+	if (entry_type != '@')
+	{
+		strncpy(name, fields[1], MAX_FIELD_LEN);
+		first_field++;
+	}
 	if (entry_type != '@' && entry_type != 't')
 	{
-		ret = sscanf(fields[1], "%d", &tile_id);
+		ret = sscanf(fields[2], "%d", &tile_id);
 		if (ret < 1)
 		{
-			INFO("Error: Couldn't parse tile (%s)\n", fields[0]);
+			INFO("Error: Couldn't parse tile ID (%s)\n", fields[2]);
 			exit(1);
 		}
 		t = &(arch->tiles[tile_id]);
@@ -120,10 +126,10 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 	}
 	if ((entry_type != '@') && (entry_type != 't') && (entry_type != 'c'))
 	{
-		ret = sscanf(fields[2], "%d", &core_offset);
+		ret = sscanf(fields[3], "%d", &core_offset);
 		if (ret < 1)
 		{
-			INFO("Error: Couldn't parse core (%s)\n", fields[0]);
+			INFO("Error: Couldn't parse core ID (%s)\n", fields[3]);
 			exit(1);
 		}
 
@@ -168,7 +174,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		ret = RET_OK;
 		break;
 	case 's':
-		arch_create_synapse(c, attributes, attribute_count);
+		arch_create_synapse(c, name, attributes, attribute_count);
 		ret = RET_OK;
 		break;
 	case 'd':
@@ -176,7 +182,7 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 		ret = RET_OK;
 		break;
 	case '+':
-		arch_create_soma(c, attributes, attribute_count);
+		arch_create_soma(c, name, attributes, attribute_count);
 		ret = RET_OK;
 		break;
 	case 'o':

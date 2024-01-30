@@ -414,13 +414,14 @@ void arch_create_axon_in(struct core *const c)
 	return;
 }
 
-void arch_create_synapse(struct core *const c,
+void arch_create_synapse(struct core *const c, const char *const name,
 	const struct attributes *const attr, const int attribute_count)
 {
 	struct synapse_processor *s;
 	int id = c->synapse_count;
 
 	s = &(c->synapse[id]);
+	strncpy(s->name, name, MAX_FIELD_LEN);
 	s->energy = 0.0;
 	s->time = 0.0;
 
@@ -433,7 +434,11 @@ void arch_create_synapse(struct core *const c,
 	{
 		const struct attributes *const curr = &(attr[i]);
 
-		if (strncmp("model", curr->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("name", curr->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(s->name, curr->value_str, MAX_FIELD_LEN);
+		}
+		else if (strncmp("model", curr->key, MAX_FIELD_LEN) == 0)
 		{
 			s->model = arch_parse_synapse_model(curr->value_str);
 		}
@@ -469,13 +474,14 @@ void arch_create_synapse(struct core *const c,
 	return;
 }
 
-void arch_create_soma(struct core *const c, struct attributes *attr,
-	const int attribute_count)
+void arch_create_soma(struct core *const c, const char *const name,
+	struct attributes *attr, const int attribute_count)
 {
 	struct soma_processor *s;
 	int id = c->soma_count;
 
 	s = &(c->soma[id]);
+	strncpy(s->name, name, MAX_FIELD_LEN);
 	s->neuron_updates = 0;
 	s->neurons_fired = 0;
 	s->neuron_count = 0;
@@ -492,6 +498,7 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 	s->time_spiking = 0.0;
 	s->leak_towards_zero = 1;
 	s->noise_type = NOISE_NONE;
+
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
@@ -533,7 +540,7 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 		{
 			s->noise_type = NOISE_FILE_STREAM;
 			s->noise_stream = fopen(a->value_str, "r");
-			INFO("Opening noise str: %s\n", a->value_str);
+			TRACE1("Opening noise str: %s\n", a->value_str);
 			if (s->noise_stream == NULL)
 			{
 				INFO("Error: Failed to open noise stream/\n");
@@ -734,15 +741,15 @@ int arch_map_neuron(struct neuron *n, struct core *c)
 	for (soma_id = 0; soma_id < c->soma_count; soma_id++)
 	{
 		soma_hw = &(c->soma[soma_id]);
-		if (n->soma_model == soma_hw->model)
+		if (strncmp(n->soma_hw_name, soma_hw->name, MAX_FIELD_LEN) == 0)
 		{
 			break;
 		}
 	}
 	if (soma_id >= c->soma_count)
 	{
-		INFO("Error: Couldn't map neuron nid:%d (model:%d) "
-			"to any soma h/w.\n", n->id, n->soma_model);
+		INFO("Error: Could not map neuron nid:%d (hw:%s) "
+			"to any soma h/w.\n", n->id, n->soma_hw_name);
 		exit(1);
 	}
 	n->soma_hw = soma_hw;
@@ -849,7 +856,8 @@ void arch_add_connection_to_map(
 		synapse_id++)
 	{
 		synapse_hw = &(post_core->synapse[synapse_id]);
-		if (con->model == synapse_hw->model)
+		if (strncmp(con->synapse_hw_name, synapse_hw->name,
+			MAX_FIELD_LEN) == 0)
 		{
 			break;
 		}
@@ -857,6 +865,7 @@ void arch_add_connection_to_map(
 	if (synapse_id >= post_core->synapse_count)
 	{
 		INFO("Error: Could not map connection to synapse h/w.\n");
+		exit(1);
 	}
 	con->synapse_hw = synapse_hw;
 
@@ -892,17 +901,9 @@ int arch_parse_synapse_model(const char *model_str)
 {
 	int model;
 
-	if (strcmp(model_str, "current_based_uncompressed") == 0)
+	if (strcmp(model_str, "current_based") == 0)
 	{
-		model = SYNAPSE_CUBA_UNCOMPRESSED;
-	}
-	else if (strcmp(model_str, "current_based_compressed") == 0)
-	{
-		model = SYNAPSE_CUBA_COMPRESSED;
-	}
-	else if (strcmp(model_str, "current_based_conv") == 0)
-	{
-		model = SYNAPSE_CUBA_CONV;
+		model = SYNAPSE_CUBA;
 	}
 	else
 	{
