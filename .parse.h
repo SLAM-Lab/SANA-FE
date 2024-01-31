@@ -1,5 +1,4 @@
-#include "arch.h"
-#include "parse.h"
+#include "arch.hpp"
 
 struct description_block
 {

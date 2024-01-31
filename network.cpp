@@ -7,9 +7,9 @@
 #include <assert.h>
 #include <math.h>
 
-#include "arch.h"
-#include "print.h"
-#include "network.h"
+#include "arch.hpp"
+#include "print.hpp"
+#include "network.hpp"
 
 int total_connection_count = 0;
 

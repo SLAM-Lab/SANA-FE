@@ -15,9 +15,10 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define MAX_NOISE_FILE_ENTRY 128
 
-#include "arch.h"
-#include "network.h"
+#include "arch.hpp"
+#include "network.hpp"
 #include "stdio.h"
+
 
 struct timestep
 {

@@ -18,10 +18,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include "description.h"
-#include "arch.h"
-#include "parse.h"
-#include "print.h"
+#include "description.hpp"
+#include "arch.hpp"
+#include ".parse.hpp"
+#include "print.hpp"
 
 static struct description_block ARCH_BLOCKS[ARCH_MAX_BLOCK_COUNT];
 static int ARCH_BLOCK_COUNT;

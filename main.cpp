@@ -9,12 +9,12 @@
 #include <string.h>
 #include <time.h>
 
-#include "print.h"
-#include "sim.h"
-#include "network.h"
-#include "arch.h"
-#include "description.h"
-#include "command.h"
+#include "print.hpp"
+#include "sim.hpp"
+#include "network.hpp"
+#include "arch.hpp"
+#include "description.hpp"
+#include "command.hpp"
 
 void run(struct simulation *sim, struct network *net, struct architecture *arch);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);

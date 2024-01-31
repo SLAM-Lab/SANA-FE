@@ -1,10 +1,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "description.h"
-#include "arch.h"
-#include "print.h"
-#include "command.h"
+#include "description.hpp"
+#include "arch.hpp"
+#include "print.hpp"
+#include "command.hpp"
 
 int description_parse_file(
 	FILE *fp, struct network *net, struct architecture *arch)

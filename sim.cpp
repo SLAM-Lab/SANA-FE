@@ -13,10 +13,10 @@
 #include <math.h>
 #include <omp.h>
 
-#include "print.h"
-#include "sim.h"
-#include "network.h"
-#include "arch.h"
+#include "print.hpp"
+#include "sim.hpp"
+#include "network.hpp"
+#include "arch.hpp"
 
 void sim_init_fifo(struct message_fifo *f)
 {
@@ -1128,7 +1128,7 @@ double sim_generate_noise(struct neuron *n)
 			     "Random values are unlikely to be correct.\n");
 			fseek(soma_hw->noise_stream, 0, SEEK_SET);
 		}
-		fgets(noise_str, MAX_NOISE_FILE_ENTRY, soma_hw->noise_stream);
+		(void)! fgets(noise_str, MAX_NOISE_FILE_ENTRY, soma_hw->noise_stream);
 		ret = sscanf(noise_str, "%d", &noise_val);
 		TRACE2("noise val:%d\n", noise_val);
 		if (ret < 1)

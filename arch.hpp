@@ -15,8 +15,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "network.h"
-#include "description.h"
+#include "network.hpp"
+#include "description.hpp"
 
 
 // TODO: better dynamically define or allocate these numbers, so that we can
@@ -226,7 +226,7 @@ struct architecture
 	int is_init;
 };
 
-#include "description.h"
+#include "description.hpp"
 
 struct architecture *arch_init(void);
 void arch_free(struct architecture *const arch);

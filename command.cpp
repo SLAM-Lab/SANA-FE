@@ -8,11 +8,11 @@
 #include <string.h>
 #include <assert.h>
 
-#include "print.h"
-#include "arch.h"
-#include "network.h"
-#include "command.h"
-#include "sim.h"
+#include "print.hpp"
+#include "arch.hpp"
+#include "network.hpp"
+#include "command.hpp"
+#include "sim.hpp"
 
 int command_parse_input_spikes(struct network *const net,
 	char fields[][MAX_FIELD_LEN], const int field_count)
