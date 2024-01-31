@@ -18,7 +18,6 @@
 #include "network.hpp"
 #include "description.hpp"
 
-
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
