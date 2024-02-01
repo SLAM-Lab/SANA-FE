@@ -16,7 +16,7 @@
 #include "description.h"
 #include "command.h"
 
-void run(struct simulation *sim, struct network *net, struct architecture *arch);
+void run(struct simulation *sim, struct network *net, struct architecture *arch, struct message_scheduler *const scheduler);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 
 enum program_args
@@ -29,20 +29,24 @@ enum program_args
 
 int main(int argc, char *argv[])
 {
-	FILE *input_fp, *network_fp, *arch_fp;
 	struct simulation sim;
 	struct network net;
+	struct message_scheduler scheduler;
 	struct architecture *arch;
+	struct message *messages;
 	char *filename, *input_buffer;
 	double average_power;
 	int timesteps, ret;
+	FILE *input_fp, *network_fp, *arch_fp;
 
 	filename = NULL;
 	input_fp = NULL;
 	input_buffer = NULL;
+	messages = NULL;
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
 	ret = RET_FAIL;
+
 	arch = arch_init();
 	network_init(&net);
 	sim_init_sim(&sim);
@@ -167,6 +171,7 @@ int main(int argc, char *argv[])
 	{
 		goto clean_up;
 	}
+	arch_init_message_scheduler(&scheduler, arch);
 
 	timesteps = 0;
 	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
@@ -199,6 +204,18 @@ int main(int argc, char *argv[])
 	}
 	network_check_mapped(&net);
 
+	INFO("Allocating message buffer.\n");
+	for (int i = 0; i < ARCH_MAX_CORES; i++)
+	{
+		sim.ts.messages[i] = (struct message *) malloc(
+			sizeof(struct message) * (ARCH_MAX_CONNECTION_MAP+1));
+		if (sim.ts.messages[i] == NULL)
+		{
+			INFO("Error: Couldn't allocate memory buffer.\n");
+			goto clean_up;
+		}
+	}
+
 	arch_create_connection_maps(arch);
 	INFO("Creating probe and perf data files.\n");
 	if (sim.spike_trace_fp != NULL)
@@ -226,7 +243,7 @@ int main(int argc, char *argv[])
 			// Print heart-beat every hundred timesteps
 			INFO("*** Time-step %d ***\n", i+1);
 		}
-		run(&sim, &net, arch);
+		run(&sim, &net, arch, &scheduler);
 	}
 
 	INFO("***** Run Summary *****\n");
@@ -249,10 +266,16 @@ int main(int argc, char *argv[])
 
 clean_up:
 	// Free any larger structures here
+	free(messages);
 	network_free(&net);
 	arch_free(arch);
 	// Free any locally allocated memory here
 	free(input_buffer);
+
+	for (int i = 0; i < ARCH_MAX_CORES; i++)
+	{
+		free(sim.ts.messages[i]);
+	}
 	// Close any open files here
 	if (sim.potential_trace_fp != NULL)
 	{
@@ -285,8 +308,11 @@ clean_up:
 	}
 }
 
-void run(struct simulation *sim, struct network *net, struct architecture *arch)
+void run(struct simulation *sim, struct network *net, struct architecture *arch,
+	struct message_scheduler *const scheduler)
 {
+	// TODO: remove the need to pass the network struct, only the arch
+	//  should be needed (since it links back to the net anyway)
 	// Run neuromorphic hardware simulation for one timestep
 	//  Measure the CPU time it takes and accumulate the stats
 	struct timespec ts_start, ts_end, ts_elapsed;
@@ -294,7 +320,7 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 	// Measure the wall-clock time taken to run the simulation
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
-	sim_timestep(sim, net, arch);
+	sim_timestep(sim, net, arch, scheduler);
 	// Calculate elapsed time
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);

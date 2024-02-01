@@ -61,6 +61,7 @@ int command_parse_step_sim(struct network *const net,
 	struct simulation *sim)
 {
 	INFO("not implemented\n");
-	sim_timestep(sim, net, arch);
+	exit(1);
+	//sim_timestep(sim, net, arch, scheduler);
 	return RET_OK;
 }

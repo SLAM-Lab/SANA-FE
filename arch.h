@@ -31,11 +31,12 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 //  of memory is needed if we want to support lots of large cores
 // TrueNorth
 //#define ARCH_MAX_TILES 4096
-//#define ARCH_MAX_CORES 1
+//#define ARCH_MAX_CORES_PER_TILE 1
 // Loihi
 #define ARCH_MAX_TILES 256
-#define ARCH_MAX_CORES 4
+#define ARCH_MAX_CORES_PER_TILE 4
 #define ARCH_MAX_UNITS 3
+#define ARCH_MAX_CORES (ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE)
 
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
@@ -97,22 +98,29 @@ enum noise_type
 
 struct message
 {
-	struct connection_map *dest_axon;
 	struct neuron *src_neuron, *dest_neuron;
+	struct message *next;
 	double generation_latency, network_latency, receive_latency;
 	double blocked_latency, sent_timestamp, processed_timestamp;
 	long int timestep;
 	int spikes, hops;
 };
 
+struct message_fifo
+{
+	int count;
+	struct message *head, *tail;
+	struct message_fifo *next;  // For priority queue of core fifos
+};
+
 struct connection_map
 {
 	// List of all neuron connections to send spike to
-	int connection_count, spikes_received, active_synapses;
-	long int last_updated;
-	double network_latency, receive_latency;
 	struct connection **connections;
+	struct message message;
 	struct neuron *pre_neuron;
+	long int last_updated;
+	int connection_count, spikes_received, active_synapses;
 };
 
 struct axon_input
@@ -166,15 +174,14 @@ struct axon_output
 
 	long int packets_out;
 	double energy, time;
-	double energy_access, time_access;
+	double energy_access, latency_access;
 };
 
 struct core
 {
 	struct tile *t;
-	struct core *next_timing;
 	struct neuron **neurons;
-	struct message curr_message;
+	struct message_fifo messages_sent;
 
 	struct axon_input axon_in;
 	struct synapse_processor synapse[ARCH_MAX_UNITS];
@@ -183,18 +190,19 @@ struct core
 	struct axon_output axon_out;
 
 	char name[MAX_FIELD_LEN];
-	double energy, time, blocked_until, latency_after_last_message;
+	struct message neuron_processing_latency;  // Since last spike
+	double energy, blocked_until, latency_after_last_message;
 	int id, offset, buffer_pos, is_blocking, soma_count, synapse_count;
-	int neuron_count, curr_neuron, neurons_left, messages_left;
+	int neuron_count, message_count;
 	int curr_axon;
 };
 
 struct tile
 {
-	struct core cores[ARCH_MAX_CORES];
+	struct core cores[ARCH_MAX_CORES_PER_TILE];
 	struct tile *links[ARCH_MAX_LINKS];
 	char name[MAX_FIELD_LEN];
-	double energy, time;
+	double energy;
 	double energy_east_hop, latency_east_hop;
 	double energy_west_hop, latency_west_hop;
 	double energy_north_hop, latency_north_hop;
@@ -211,7 +219,6 @@ struct architecture
 {
 	struct tile tiles[ARCH_MAX_TILES];
 	char name[MAX_FIELD_LEN];
-	double time_barrier;
 	int noc_width, noc_height, tile_count, core_count;
 	int is_init;
 };
@@ -236,5 +243,6 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron, struct core *
 void arch_add_connection_to_map(struct connection *const con, struct core *const post_core);
 int arch_parse_neuron_model(const char *model_str);
 int arch_parse_synapse_model(const char *model_str);
+void arch_init_message(struct message *m);
 
 #endif

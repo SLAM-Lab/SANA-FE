@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
 
 #include "print.h"
 #include "arch.h"
@@ -29,7 +30,6 @@ struct architecture *arch_init(void)
 
 	arch->tile_count = 0;
 	arch->core_count = 0;
-	arch->time_barrier = 0.0;
 	arch->is_init = 0;
 
 	for (int i = 0; i < ARCH_MAX_TILES; i++)
@@ -38,7 +38,6 @@ struct architecture *arch_init(void)
 		struct tile *t = &(arch->tiles[i]);
 
 		t->energy = 0.0;
-		t->time = 0.0;
 		t->energy_east_hop = 0.0;
 		t->latency_east_hop = 0.0;
 		t->energy_west_hop = 0.0;
@@ -55,22 +54,17 @@ struct architecture *arch_init(void)
 		t->is_blocking = 0;
 		t->width = 0;
 
-		for (int j = 0; j < ARCH_MAX_CORES; j++)
+		for (int j = 0; j < ARCH_MAX_CORES_PER_TILE; j++)
 		{
 			// Initialize core
 			struct core *c = &(t->cores[j]);
 			c->t = NULL;
-			c->next_timing = NULL;
 			c->energy = 0.0;
-			c->time = 0.0;
 			c->blocked_until = 0.0;
 			c->id = -1;
 			c->buffer_pos = 0;
 			c->is_blocking = 0;
 			c->neuron_count = 0;
-			c->curr_neuron = 0;
-			c->neurons_left = 0;
-			c->curr_axon = 0;
 
 			for (int k = 0; k < ARCH_MAX_UNITS; k++)
 			{
@@ -89,14 +83,10 @@ struct architecture *arch_init(void)
 				c->synapse[k].energy_memory_access = 0.0;
 				c->synapse[k].latency_memory_access = 0.0;
 
-
-
 				c->soma[k].energy = 0.0;
 				c->soma[k].time = 0.0;
 				c->soma[k].neurons_fired = 0;
 				c->soma[k].neuron_count = 0;
-
-
 			}
 
 			c->dendrite.energy = 0.0;
@@ -111,7 +101,6 @@ struct architecture *arch_init(void)
 				c->axon_in.map[k].connection_count = 0;
 				c->axon_in.map[k].active_synapses = 0;
 				c->axon_in.map[k].spikes_received = 0;
-				c->axon_in.map[k].receive_latency = 0.0;
 				c->axon_out.map_ptr[k] = NULL;
 				c->axon_in.map[k].last_updated = 0;
 				c->axon_in.map[k].pre_neuron = NULL;
@@ -260,12 +249,11 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 
 	t->id = id;
 	t->energy = 0.0;
-	t->time = 0.0;
 
 	t->x = 0;
 	t->y = 0;
 	t->core_count = 0;
-	for (int i = 0; i < ARCH_MAX_CORES; i++)
+	for (int i = 0; i < ARCH_MAX_CORES_PER_TILE; i++)
 	{
 		struct core *c = &(t->cores[i]);
 
@@ -347,7 +335,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 	assert(t != NULL);
 	core_id = t->core_count;
 	t->core_count++;
-	assert(t->core_count <= ARCH_MAX_CORES);
+	assert(t->core_count <= ARCH_MAX_CORES_PER_TILE);
 
 	c = &(t->cores[core_id]);
 	c->offset = core_id;
@@ -370,7 +358,6 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 
 	// Initialize core state
 	c->neuron_count = 0;
-	c->curr_neuron = 0;
 	c->soma_count = 0;
 	c->synapse_count = 0;
 	c->neurons = (struct neuron **) malloc(
@@ -385,11 +372,18 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 		c->neurons[i] = NULL;
 	}
 	c->energy = 0.0;
-	c->time = 0.0;
 
 	// Update misc links between tiles and axon units
 	c->axon_in.t = t;
 	c->axon_out.t = t;
+	arch_init_message(&(c->neuron_processing_latency));
+	c->neuron_processing_latency.generation_latency = 0.0;
+
+	// Init the core message fifo
+	c->messages_sent.count = 0;
+	c->messages_sent.tail = NULL;
+	c->messages_sent.head = NULL;
+	c->messages_sent.next = NULL;
 
 	TRACE1("Core created id:%d (tile:%d).\n", c->id, t->id);
 	return c->id;
@@ -560,7 +554,8 @@ void arch_create_soma(struct core *const c, const char *const name,
 			TRACE1("Opening noise str: %s\n", a->value_str);
 			if (s->noise_stream == NULL)
 			{
-				INFO("Error: Failed to open noise stream/\n");
+				INFO("Error: Failed to open noise stream: %s.\n",
+					a->value_str);
 				exit(1);
 			}
 		}
@@ -583,7 +578,7 @@ void arch_create_axon_out(struct core *const c, struct attributes *attr,
 
 	/*** Set attributes ***/
 	out->energy_access = 0.0;
-	out->time_access = 0.0;
+	out->latency_access = 0.0;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *curr = &(attr[i]);
@@ -594,7 +589,7 @@ void arch_create_axon_out(struct core *const c, struct attributes *attr,
 		}
 		else if (strncmp("latency", curr->key, MAX_FIELD_LEN) == 0)
 		{
-			sscanf(curr->value_str, "%lf", &out->time_access);
+			sscanf(curr->value_str, "%lf", &out->latency_access);
 		}
 	}
 
@@ -676,13 +671,13 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 void arch_map_neuron_connections(struct neuron *const pre_neuron)
 {
 	// Setup the connections between neurons and map them to hardware
-	int connection_count[ARCH_MAX_TILES * ARCH_MAX_CORES];
-	struct core *cores[ARCH_MAX_TILES * ARCH_MAX_CORES];
+	int connection_count[ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE];
+	struct core *cores[ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE];
 
 	assert(pre_neuron->core != NULL);
 
 	// Zero initialize all counters and tracking
-	for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES; x++)
+	for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE; x++)
 	{
 		connection_count[x] = 0;
 		cores[x] = NULL;
@@ -704,7 +699,7 @@ void arch_map_neuron_connections(struct neuron *const pre_neuron)
 
 	TRACE2("Creating connections for neuron nid:%d\n", pre_neuron->id);
 	int total_map_count = 0;
-	for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES; x++)
+	for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE; x++)
 	{
 		if (connection_count[x] > 0)
 		{
@@ -929,4 +924,23 @@ int arch_parse_synapse_model(const char *model_str)
 	}
 
 	return model;
+}
+
+void arch_init_message(struct message *m)
+{
+	// Initialize message variables. Mark most fields as invalid either
+	//  using NaN or -Inf values where possible.
+	m->src_neuron = NULL;
+	m->dest_neuron = NULL;
+	m->generation_latency = NAN;
+	m->network_latency = NAN;
+	m->receive_latency = NAN;
+	m->hops = -1;
+	m->spikes = -1;
+	m->sent_timestamp = -INFINITY;
+	m->processed_timestamp = -INFINITY;
+	m->timestep = -1;
+	m->next = NULL;
+
+	return;
 }
