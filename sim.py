@@ -137,7 +137,7 @@ class NeuronGroup:
 
         group_str = f"g {neuron_count}"
         if self.neuron_model is not None:
-            group_str += f" soma_model={self.neuron_model}"
+            group_str += f" soma_hw_name={self.neuron_model}"
         if self.threshold is not None:
             group_str += f" threshold={self.threshold}"
         if self.reset is not None:
@@ -161,7 +161,7 @@ class NeuronGroup:
         if self.connections_out is not None:
             group_str += f" connections_out={self.connections_out}"
         if self.default_synapse_model is not None:
-            group_str += f" synapse_model={self.default_synapse_model}"
+            group_str += f" synapse_hw_name={self.default_synapse_model}"
 
         group_str += "\n"
         return group_str

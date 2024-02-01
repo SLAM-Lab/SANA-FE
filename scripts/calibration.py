@@ -54,13 +54,13 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     layer_1 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
-                               reset=reset, neuron_model="leaky_integrate_fire",
-                               synapse_model="current_based_compressed")
+                               reset=reset, neuron_model="loihi_lif",
+                               synapse_model="loihi_dense_synapse")
     layer_2 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
-                               reset=reset, neuron_model="leaky_integrate_fire",
-                               synapse_model="current_based_compressed")
+                               reset=reset, neuron_model="loihi_lif",
+                               synapse_model="loihi_dense_synapse")
 
     # Create connections
     weight = 1.0
@@ -111,8 +111,8 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
                                    log_spikes=False, log_potential=False,
                                    force_update=False, threshold=threshold,
                                    reset=0.0, leak=1.0, mappings=layer_mapping,
-                                   neuron_model="leaky_integrate_fire",
-                                   synapse_model="current_based_compressed")
+                                   neuron_model="loihi_lif",
+                                   synapse_model="loihi_dense_synapse")
 
         neurons_per_core = [0, 0, 0, 0, 0]
         if mapping == "luke":
@@ -153,8 +153,8 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
                                 log_potential=False, force_update=False,
                                 threshold=threshold, reset=0.0, leak=1.0,
                                 mappings=layer_mapping,
-                                neuron_model="leaky_integrate_fire",
-                                synapse_model="current_based_compressed")
+                                neuron_model="loihi_lif",
+                                synapse_model="loihi_dense_synapse")
 
         for src in layer_1.neurons:
             # Add bias to force neuron to fire
@@ -226,7 +226,7 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
 #mappings = ("split_2_diff_tiles",)
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
 
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
