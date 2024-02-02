@@ -445,6 +445,7 @@ void arch_create_synapse(struct core *const c, const char *const name,
 	s->latency_memory_access = 0.0;
 	s->energy_spike_op = 0.0;
 	s->latency_spike_op = 0.0;
+	s->weight_bits = 8;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		const struct attributes *const curr = &(attr[i]);
