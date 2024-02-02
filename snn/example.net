@@ -2,11 +2,11 @@
 ### Fully connected network, everything spikes on each timestep ###
 # First define the neuron group, specifying the number of neurons and default values:
 #   <count>   <attributes>
-g   6         soma_soma_hw_name=loihi_lif  synapse_model=current_based_uncompressed  threshold=-1.0  reset=0.0  leak_decay=1.0  reset_mode=hard  reverse_reset_mode=none  log_v=1
+g   6         soma_hw_name=loihi_lif  synapse_hw_name=loihi_sparse_synapse  threshold=-1.0  reset=0.0  leak_decay=1.0  reset_mode=hard  reverse_reset_mode=none  log_v=1
 
 ## Then define neurons in the group
 # gid nid <attributes>
-n   0.0    model=stochastic_leaky_integrate_fire   bias=1.0    connections_out=3
+n   0.0    bias=1.0  connections_out=3
 n   0.1    bias=0.0  connections_out=3  log_spikes=1
 n   0.2    bias=1.0  connections_out=3
 n   0.3    bias=0.0
@@ -14,9 +14,9 @@ n   0.4    bias=1.0
 n   0.5    bias=0.0
 
 ## Next define the edges between neurons
-e   0.0->0.3   weight=1.0  model=current_based_compressed
-e   0.0->0.4   weight=1.0  model=current_based_compressed
-e   0.0->0.5   weight=1.0  model=current_based_compressed
+e   0.0->0.3   weight=1.0
+e   0.0->0.4   weight=1.0
+e   0.0->0.5   weight=1.0
 
 e   0.1->0.3   weight=1.0
 e   0.1->0.3   weight=1.0
