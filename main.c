@@ -16,7 +16,7 @@
 #include "description.h"
 #include "command.h"
 
-void run(struct simulation *sim, struct network *net, struct architecture *arch, struct message_scheduler *const scheduler);
+void run(struct simulation *sim, struct network *net, struct architecture *arch);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 
 enum program_args
@@ -29,11 +29,9 @@ enum program_args
 
 int main(int argc, char *argv[])
 {
-	struct simulation sim;
+	struct simulation *sim;
 	struct network net;
-	struct message_scheduler scheduler;
 	struct architecture *arch;
-	struct message *messages;
 	char *filename, *input_buffer;
 	double average_power;
 	int timesteps, ret;
@@ -42,16 +40,14 @@ int main(int argc, char *argv[])
 	filename = NULL;
 	input_fp = NULL;
 	input_buffer = NULL;
-	messages = NULL;
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
 	ret = RET_FAIL;
 
 	arch = arch_init();
 	network_init(&net);
-	sim_init_sim(&sim);
-
 	INFO("Initializing simulation.\n");
+	sim = sim_init_sim();
 	if (argc < 1)
 	{
 		INFO("Error: No program arguments.\n");
@@ -74,16 +70,16 @@ int main(int argc, char *argv[])
 				argc--;
 				break;
 			case 'p':
-				sim.log_perf = 1;
+				sim->log_perf = 1;
 				break;
 			case 's':
-				sim.log_spikes = 1;
+				sim->log_spikes = 1;
 				break;
 			case 'v':
-				sim.log_potential = 1;
+				sim->log_potential = 1;
 				break;
 			case 'm':
-				sim.log_messages = 1;
+				sim->log_messages = 1;
 				break;
 			default:
 				INFO("Error: Flag %c not recognized.\n",
@@ -118,38 +114,38 @@ int main(int argc, char *argv[])
 		goto clean_up;
 	}
 
-	if (sim.log_potential)
+	if (sim->log_potential)
 	{
-		sim.potential_trace_fp = fopen("potential.trace", "w");
-		if (sim.potential_trace_fp == NULL)
+		sim->potential_trace_fp = fopen("potential.trace", "w");
+		if (sim->potential_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
 			goto clean_up;
 		}
 	}
-	if (sim.log_spikes)
+	if (sim->log_spikes)
 	{
-		sim.spike_trace_fp = fopen("spikes.trace", "w");
-		if (sim.spike_trace_fp == NULL)
+		sim->spike_trace_fp = fopen("spikes.trace", "w");
+		if (sim->spike_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
 			goto clean_up;
 		}
 	}
-	if (sim.log_messages)
+	if (sim->log_messages)
 	{
-		sim.message_trace_fp = fopen("messages.trace", "w");
-		if (sim.message_trace_fp == NULL)
+		sim->message_trace_fp = fopen("messages.trace", "w");
+		if (sim->message_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
 			goto clean_up;
 		}
 
 	}
-	if (sim.log_perf)
+	if (sim->log_perf)
 	{
-		sim.perf_fp = fopen("perf.csv", "w");
-		if (sim.perf_fp == NULL)
+		sim->perf_fp = fopen("perf.csv", "w");
+		if (sim->perf_fp == NULL)
 		{
 			INFO("Error: Couldn't open perf file for writing.\n");
 			goto clean_up;
@@ -171,7 +167,7 @@ int main(int argc, char *argv[])
 	{
 		goto clean_up;
 	}
-	arch_init_message_scheduler(&scheduler, arch);
+	//arch_init_message_scheduler(&scheduler, arch);
 
 	timesteps = 0;
 	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
@@ -204,99 +200,86 @@ int main(int argc, char *argv[])
 	}
 	network_check_mapped(&net);
 
-	INFO("Allocating message buffer.\n");
-	for (int i = 0; i < ARCH_MAX_CORES; i++)
-	{
-		sim.ts.messages[i] = (struct message *) malloc(
-			sizeof(struct message) * (ARCH_MAX_CONNECTION_MAP+1));
-		if (sim.ts.messages[i] == NULL)
-		{
-			INFO("Error: Couldn't allocate memory buffer.\n");
-			goto clean_up;
-		}
-	}
-
 	arch_create_connection_maps(arch);
 	INFO("Creating probe and perf data files.\n");
-	if (sim.spike_trace_fp != NULL)
+	if (sim->spike_trace_fp != NULL)
 	{
-		sim_spike_trace_write_header(&sim);
+		sim_spike_trace_write_header(sim);
 	}
-	if (sim.potential_trace_fp != NULL)
+	if (sim->potential_trace_fp != NULL)
 	{
-		sim_potential_trace_write_header(&sim, &net);
+		sim_potential_trace_write_header(sim, &net);
 	}
-	if (sim.message_trace_fp != NULL)
+	if (sim->message_trace_fp != NULL)
 	{
-		sim_message_trace_write_header(&sim);
+		sim_message_trace_write_header(sim);
 	}
-	if (sim.perf_fp != NULL)
+	if (sim->perf_fp != NULL)
 	{
-		sim_perf_write_header(sim.perf_fp);
+		sim_perf_write_header(sim->perf_fp);
 	}
 	// Step simulation
 	INFO("Running simulation.\n");
-	for (int i = 0; i < timesteps; i++)
+	for (sim->ts.timestep = 1; sim->ts.timestep <= timesteps;
+		(sim->ts.timestep)++)
 	{
-		if ((i+1) % 100 == 0)
+		if ((sim->ts.timestep % 100) == 0)
 		{
 			// Print heart-beat every hundred timesteps
-			INFO("*** Time-step %d ***\n", i+1);
+			INFO("*** Time-step %ld ***\n", sim->ts.timestep);
 		}
-		run(&sim, &net, arch, &scheduler);
+		run(sim, &net, arch);
 	}
 
 	INFO("***** Run Summary *****\n");
-	sim_write_summary(stdout, &sim);
-	if (sim.total_sim_time > 0.0)
+	sim_write_summary(stdout, sim);
+	if (sim->total_sim_time > 0.0)
 	{
-		average_power = sim.total_energy / sim.total_sim_time;
+		average_power = sim->total_energy / sim->total_sim_time;
 	}
 	else
 	{
 		average_power = 0.0;
 	}
 	INFO("Average power consumption: %f W.\n", average_power);
-	sim.stats_fp = fopen("run_summary.yaml", "w");
-	if (sim.stats_fp != NULL)
+	sim->stats_fp = fopen("run_summary.yaml", "w");
+	if (sim->stats_fp != NULL)
 	{
-		sim_write_summary(sim.stats_fp, &sim);
+		sim_write_summary(sim->stats_fp, sim);
 	}
 	INFO("Run finished.\n");
 
 clean_up:
 	// Free any larger structures here
-	free(messages);
 	network_free(&net);
 	arch_free(arch);
 	// Free any locally allocated memory here
 	free(input_buffer);
 
-	for (int i = 0; i < ARCH_MAX_CORES; i++)
-	{
-		free(sim.ts.messages[i]);
-	}
 	// Close any open files here
-	if (sim.potential_trace_fp != NULL)
+	if (sim->potential_trace_fp != NULL)
 	{
-		fclose(sim.potential_trace_fp);
+		fclose(sim->potential_trace_fp);
 	}
-	if (sim.spike_trace_fp != NULL)
+	if (sim->spike_trace_fp != NULL)
 	{
-		fclose(sim.spike_trace_fp);
+		fclose(sim->spike_trace_fp);
 	}
-	if (sim.message_trace_fp != NULL)
+	if (sim->message_trace_fp != NULL)
 	{
-		fclose(sim.message_trace_fp);
+		fclose(sim->message_trace_fp);
 	}
-	if (sim.perf_fp != NULL)
+	if (sim->perf_fp != NULL)
 	{
-		fclose(sim.perf_fp);
+		fclose(sim->perf_fp);
 	}
-	if (sim.stats_fp != NULL)
+	if (sim->stats_fp != NULL)
 	{
-		fclose(sim.stats_fp);
+		fclose(sim->stats_fp);
 	}
+
+	// Free the simulation structure only after we close all files
+	free(sim);
 
 	if (ret == RET_FAIL)
 	{
@@ -308,25 +291,63 @@ clean_up:
 	}
 }
 
-void run(struct simulation *sim, struct network *net, struct architecture *arch,
-	struct message_scheduler *const scheduler)
+void run(struct simulation *sim, struct network *net, struct architecture *arch)
 {
 	// TODO: remove the need to pass the network struct, only the arch
 	//  should be needed (since it links back to the net anyway)
 	// Run neuromorphic hardware simulation for one timestep
 	//  Measure the CPU time it takes and accumulate the stats
 	struct timespec ts_start, ts_end, ts_elapsed;
+	struct timestep *ts = &(sim->ts);
 
 	// Measure the wall-clock time taken to run the simulation
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
-	sim_timestep(sim, net, arch, scheduler);
+	sim_timestep(ts, net, arch);
 	// Calculate elapsed time
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
+
+	sim->total_energy += ts->energy;
+	sim->total_sim_time += ts->sim_time;
+	sim->total_spikes += ts->spike_count;
+	sim->total_neurons_fired += ts->total_neurons_fired;
+	sim->total_messages_sent += ts->packets_sent;
+	if (sim->log_spikes)
+	{
+		sim_trace_record_spikes(sim, net);
+	}
+	if (sim->log_potential)
+	{
+		sim_trace_record_potentials(sim, net);
+	}
+	if (sim->log_perf)
+	{
+		sim_perf_log_timestep(ts, sim->perf_fp);
+	}
+	if (sim->log_messages)
+	{
+		for (int i = 0; i < ARCH_MAX_CORES; i++)
+		{
+			for (int j = 0; j < ts->message_queues[i].count; j++)
+			{
+				struct message *m = &(ts->messages[i][j]);
+				if (m->dest_neuron != NULL)
+				{
+					// Ignore dummy messages (without a
+					//  destination). These are inserted to
+					//  account for processing that doesn't
+					//  result in a spike being sent
+					sim_trace_record_message(sim, m);
+				}
+			}
+		}
+	}
+	sim->timesteps = ts->timestep;
 	sim->wall_time += (double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
 	TRACE1("Time-step took: %fs.\n",
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
+
 }
 
 struct timespec calculate_elapsed_time(struct timespec ts_start,

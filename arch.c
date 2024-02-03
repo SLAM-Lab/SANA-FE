@@ -32,82 +32,6 @@ struct architecture *arch_init(void)
 	arch->core_count = 0;
 	arch->is_init = 0;
 
-	for (int i = 0; i < ARCH_MAX_TILES; i++)
-	{
-		// Initialize tile
-		struct tile *t = &(arch->tiles[i]);
-
-		t->energy = 0.0;
-		t->energy_east_hop = 0.0;
-		t->latency_east_hop = 0.0;
-		t->energy_west_hop = 0.0;
-		t->latency_west_hop = 0.0;
-		t->energy_north_hop = 0.0;
-		t->latency_north_hop = 0.0;
-		t->energy_south_hop = 0.0;
-		t->latency_south_hop = 0.0;
-		t->blocked_until = 0.0;
-		t->id = -1;
-		t->x = -1;
-		t->y = -1;
-		t->core_count = 0;
-		t->is_blocking = 0;
-		t->width = 0;
-
-		for (int j = 0; j < ARCH_MAX_CORES_PER_TILE; j++)
-		{
-			// Initialize core
-			struct core *c = &(t->cores[j]);
-			c->t = NULL;
-			c->energy = 0.0;
-			c->blocked_until = 0.0;
-			c->id = -1;
-			c->buffer_pos = 0;
-			c->is_blocking = 0;
-			c->neuron_count = 0;
-
-			for (int k = 0; k < ARCH_MAX_UNITS; k++)
-			{
-				c->axon_in.energy = 0.0;
-				c->axon_in.time = 0.0;
-				c->axon_in.energy_spike_message = 0.0;
-				c->axon_in.latency_spike_message = 0.0;
-				c->axon_in.map_count = 0;
-
-				c->synapse[k].spikes_buffer = 0;
-				c->synapse[k].spikes_processed = 0;
-				c->synapse[k].energy = 0.0;
-				c->synapse[k].time = 0.0;
-				c->synapse[k].energy_spike_op = 0.0;
-				c->synapse[k].latency_spike_op = 0.0;
-				c->synapse[k].energy_memory_access = 0.0;
-				c->synapse[k].latency_memory_access = 0.0;
-
-				c->soma[k].energy = 0.0;
-				c->soma[k].time = 0.0;
-				c->soma[k].neurons_fired = 0;
-				c->soma[k].neuron_count = 0;
-			}
-
-			c->dendrite.energy = 0.0;
-			c->dendrite.time = 0.0;
-
-			c->axon_out.energy = 0.0;
-			c->axon_out.time = 0.0;
-
-			for (int k = 0; i < ARCH_MAX_CONNECTION_MAP; i++)
-			{
-				// Initialize connection map
-				c->axon_in.map[k].connection_count = 0;
-				c->axon_in.map[k].active_synapses = 0;
-				c->axon_in.map[k].spikes_received = 0;
-				c->axon_out.map_ptr[k] = NULL;
-				c->axon_in.map[k].last_updated = 0;
-				c->axon_in.map[k].pre_neuron = NULL;
-			}
-		}
-	}
-
 	return arch;
 }
 
@@ -376,14 +300,7 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 	// Update misc links between tiles and axon units
 	c->axon_in.t = t;
 	c->axon_out.t = t;
-	arch_init_message(&(c->neuron_processing_latency));
-	c->neuron_processing_latency.generation_latency = 0.0;
-
-	// Init the core message fifo
-	c->messages_sent.count = 0;
-	c->messages_sent.tail = NULL;
-	c->messages_sent.head = NULL;
-	c->messages_sent.next = NULL;
+	arch_init_message(&(c->next_message));
 
 	TRACE1("Core created id:%d (tile:%d).\n", c->id, t->id);
 	return c->id;
@@ -502,10 +419,10 @@ void arch_create_soma(struct core *const c, const char *const name,
 
 	/*** Set attributes ***/
 	s->model = NEURON_LIF;
-	s->energy_update_neuron = 0.0;
-	s->latency_update_neuron = 0.0;
 	s->energy_access_neuron = 0.0;
 	s->latency_access_neuron = 0.0;
+	s->energy_update_neuron = 0.0;
+	s->latency_update_neuron = 0.0;
 	s->energy_spiking = 0.0;
 	s->latency_spiking = 0.0;
 	s->leak_towards_zero = 1;
@@ -652,10 +569,6 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 
 			if (core_used)
 			{
-				INFO("cid:%d.%d n:%d i:%d o:%d\n", t->id,
-					c->offset, c->neuron_count,
-					c->axon_in.map_count,
-					c->axon_out.map_count);
 				in_count += c->axon_in.map_count;
 				out_count += c->axon_out.map_count;
 				core_count++;
@@ -933,9 +846,10 @@ void arch_init_message(struct message *m)
 	//  using NaN or -Inf values where possible.
 	m->src_neuron = NULL;
 	m->dest_neuron = NULL;
-	m->generation_latency = NAN;
+	m->generation_latency = 0.0;
 	m->network_latency = NAN;
 	m->receive_latency = NAN;
+	m->blocked_latency = 0.0;
 	m->hops = -1;
 	m->spikes = -1;
 	m->sent_timestamp = -INFINITY;

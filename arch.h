@@ -25,7 +25,7 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 
 // Hard define maximum defined h/w sizes
 #define ARCH_MAX_COMPARTMENTS 16384
-#define ARCH_MAX_CONNECTION_MAP 16384*4
+#define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*4)
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
@@ -34,6 +34,7 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 //#define ARCH_MAX_CORES_PER_TILE 1
 // Loihi
 #define ARCH_MAX_TILES 256
+//#define ARCH_MAX_TILES 32
 #define ARCH_MAX_CORES_PER_TILE 4
 #define ARCH_MAX_UNITS 3
 #define ARCH_MAX_CORES (ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE)
@@ -117,7 +118,7 @@ struct connection_map
 {
 	// List of all neuron connections to send spike to
 	struct connection **connections;
-	struct message message;
+	struct message *message;
 	struct neuron *pre_neuron;
 	long int last_updated;
 	int connection_count, spikes_received, active_synapses;
@@ -181,7 +182,6 @@ struct core
 {
 	struct tile *t;
 	struct neuron **neurons;
-	struct message_fifo messages_sent;
 
 	struct axon_input axon_in;
 	struct synapse_processor synapse[ARCH_MAX_UNITS];
@@ -190,7 +190,7 @@ struct core
 	struct axon_output axon_out;
 
 	char name[MAX_FIELD_LEN];
-	struct message neuron_processing_latency;  // Since last spike
+	struct message next_message;  // Since last spike
 	double energy, blocked_until, latency_after_last_message;
 	int id, offset, buffer_pos, is_blocking, soma_count, synapse_count;
 	int neuron_count, message_count;
@@ -207,7 +207,6 @@ struct tile
 	double energy_west_hop, latency_west_hop;
 	double energy_north_hop, latency_north_hop;
 	double energy_south_hop, latency_south_hop;
-	double energy_spike_within_tile, time_spike_within_tile;
 	double blocked_until;
 	long int hops, messages_received, total_neurons_fired;
 	long int east_hops, west_hops, north_hops, south_hops;
