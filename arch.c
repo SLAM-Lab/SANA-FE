@@ -91,9 +91,11 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 	}
 	assert((arch->noc_height * arch->noc_width) <= ARCH_MAX_TILES);
 
-	for (int y = 0; y < arch->noc_height; y++)
+	for (int x = 0; x < arch->noc_width; x++)
+	//for (int y = 0; y < arch->noc_height; y++)
 	{
-		for (int x = 0; x < arch->noc_width; x++)
+		//for (int x = 0; x < arch->noc_width; x++)
+		for (int y = 0; y < arch->noc_height; y++)
 		{
 			struct tile *t = &(arch->tiles[tile_id]);
 			int north_x, north_y, east_x, east_y, south_x, south_y;
@@ -846,13 +848,14 @@ void arch_init_message(struct message *m)
 	//  using NaN or -Inf values where possible.
 	m->src_neuron = NULL;
 	m->dest_neuron = NULL;
-	m->generation_latency = 0.0;
-	m->network_latency = NAN;
-	m->receive_latency = NAN;
+	m->generation_delay = 0.0;
+	m->network_delay = NAN;
+	m->receive_delay = NAN;
 	m->blocked_latency = 0.0;
 	m->hops = -1;
 	m->spikes = -1;
 	m->sent_timestamp = -INFINITY;
+	m->received_timestamp = -INFINITY;
 	m->processed_timestamp = -INFINITY;
 	m->timestep = -1;
 	m->next = NULL;

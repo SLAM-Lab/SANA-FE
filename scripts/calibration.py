@@ -30,7 +30,6 @@ import sim
 MAX_TILES = 32
 MAX_CORES = 4
 MAX_COMPARTMENTS = 1024
-NETWORK_FILENAME = "runs/calibration/connected_layers.net"
 ARCH_FILENAME = "arch/loihi.yaml"
 
 import random
@@ -169,21 +168,13 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
     return network
 
 
-def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
-                           max_size=30):
+def run_spiking_experiment(mapping, max_size=30):
     with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
         weights = pickle.load(weights_file)
 
     # Setup the correct blocking and save to a temporary arch file
     with open(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"), "r") as arch_file:
         loihi_arch = yaml.safe_load(arch_file)
-
-    tiles = loihi_arch["architecture"]["tile"]
-    for t in tiles:
-        t["attributes"]["blocking"] = tiles_blocking
-        cores = t["core"]
-        for c in cores:
-            c["attributes"]["blocking"] = cores_blocking
 
     generated_arch_filename = os.path.join(PROJECT_DIR, "runs", "calibration",
                                  "calibrated_loihi.arch")
@@ -197,10 +188,11 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
         copy_network = (True if mapping == "split_2_diff_tiles" else False)
         snn = connected_layers(weights[i-1].transpose(), spiking=True,
                                mapping=mapping, copy_network=copy_network)
-        snn.save(NETWORK_FILENAME)
+        network_filename = f"runs/calibration/snn/connected_layers_N{layer_neurons}_map_{mapping}.net"
+        snn.save(network_filename)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
-        results = sim.run(generated_arch_filename, NETWORK_FILENAME,
+        results = sim.run(generated_arch_filename, network_filename,
                             timesteps)
 
         with open(os.path.join(PROJECT_DIR, "runs",
@@ -208,17 +200,14 @@ def run_spiking_experiment(mapping, cores_blocking, tiles_blocking,
                   "a") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                             ("neuron_counts", "energy", "time",
-                                             "mapping", "cores_blocking",
-                                             "tiles_blocking"))
+                                             "mapping"))
             neuron_counts = layer_neurons * 2
             if copy_network:
                 neuron_counts *= 2
             spiking_writer.writerow({"neuron_counts": neuron_counts,
                                       "time": results["time"],
                                       "energy": results["energy"],
-                                      "mapping": mapping,
-                                      "cores_blocking": cores_blocking,
-                                      "tiles_blocking": tiles_blocking})
+                                      "mapping": mapping})
 
     return
 
@@ -241,12 +230,7 @@ if __name__ == "__main__":
                                         "tiles_blocking"))
             spiking_writer.writeheader()
         for mapping in mappings:
-            run_spiking_experiment(mapping, cores_blocking=False,
-                                   tiles_blocking=False, max_size=30)
-            run_spiking_experiment(mapping, cores_blocking=True,
-                                   tiles_blocking=False, max_size=30)
-            run_spiking_experiment(mapping, cores_blocking=True,
-                                   tiles_blocking=True, max_size=30)
+            run_spiking_experiment(mapping, max_size=30)
         with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
             weights = pickle.load(weights_file)
 
@@ -276,9 +260,7 @@ if __name__ == "__main__":
         plt.rcParams.update({'font.size': 7, 'lines.markersize': 4})
         # First plot results for the simple fixed mapping, where one layer is on
         #  one core and the second layer is on another
-        spiking_frame = df.loc[(df["mapping"] == "luke") &
-                               (df["cores_blocking"] == False) &
-                               (df["tiles_blocking"] == False)]
+        spiking_frame = df.loc[(df["mapping"] == "luke")]
         spiking_times = np.array(spiking_frame["time"])
         spiking_energy = np.array(spiking_frame["energy"])
         neuron_counts = np.array(spiking_frame["neuron_counts"])
@@ -286,7 +268,8 @@ if __name__ == "__main__":
         plt.figure(figsize=(2.2, 2.2))
         plt.plot(neuron_counts[6:-7],
                  np.array(loihi_times_spikes["luke"][6:-7]) * 1.0e3, "-")
-        plt.plot(neuron_counts[6:-7], spiking_times[6:-7] * 1.0e3, "x")
+        plt.plot(neuron_counts[6:-7], spiking_times[6:-7] * 1.0e3, "ko",
+                 fillstyle="none")
         ax = plt.gca()
         ax.set_box_aspect(1)
         print(ax.get_position())
@@ -312,7 +295,8 @@ if __name__ == "__main__":
 
         plt.figure(figsize=(2.2, 2.2))
         plt.plot(neuron_counts[6:-7], np.array(loihi_energy_spikes[6:-7]) * 1.0e6, "-")
-        plt.plot(neuron_counts[6:-7], np.array(spiking_energy[6:-7]) * 1.0e6, "x")
+        plt.plot(neuron_counts[6:-7], np.array(spiking_energy[6:-7]) * 1.0e6, "ko",
+                 fillstyle="none")
         ax = plt.gca()
         ax.set_box_aspect(1)
         #plt.gca().set_aspect("equal", adjustable="box")
@@ -330,15 +314,11 @@ if __name__ == "__main__":
 
         plt.rcParams.update({'font.size': 7, 'lines.markersize': 4})
         ## Plot the effect of cores blocking
-        spiking_frame = df.loc[(df["mapping"] == "l2_split") &
-                               (df["tiles_blocking"] == False)]
-        cores_nonblocking = spiking_frame.loc[spiking_frame["cores_blocking"] == False]
-        cores_blocking = spiking_frame.loc[spiking_frame["cores_blocking"] == True]
+        spiking_frame = df.loc[(df["mapping"] == "l2_split")]
 
         plt.figure(figsize=(2.1, 2.1))
         plt.plot(neuron_counts[6:], np.array(loihi_times_spikes["l2_split"][6:]) * 1.0e3, "-")
-        plt.plot(neuron_counts[6:], np.array(cores_nonblocking["time"][6:] * 1.0e3), "x")
-        plt.plot(neuron_counts[6:], np.array(cores_blocking["time"][6:]) * 1.0e3, "ko",
+        plt.plot(neuron_counts[6:], np.array(spiking_frame["time"][6:]) * 1.0e3, "ko",
                  fillstyle="none")
 
         #plt.figure(figsize=(2.5, 2.5))
@@ -352,22 +332,18 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "No blocking", "Cores blocking"), fontsize=7)
+        plt.legend(("Measured", "Simulated"), fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_2.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_2.png")
 
         # Plot the effect of network tiles blocking
-        spiking_frame = df.loc[(df["mapping"] == "split_4") &
-                               (df["cores_blocking"] == True)]
-        tiles_nonblocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == False]
-        tiles_blocking = spiking_frame.loc[spiking_frame["tiles_blocking"] == True]
+        spiking_frame = df.loc[(df["mapping"] == "split_4")]
 
         plt.figure(figsize=(2.1, 2.1))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["split_4"]) * 1.0e3, "-")
-        plt.plot(neuron_counts, np.array(tiles_nonblocking["time"]) * 1.0e3, "x")
-        #plt.plot(neuron_counts, np.array(tiles_blocking["time"]) * 1.0e3, "ko",
-        #         fillstyle="none"),
+        plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
+                 fillstyle="none")
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
@@ -376,7 +352,7 @@ if __name__ == "__main__":
         plt.minorticks_on()
         #plt.legend(("Measured", "Cores blocking", "Tiles blocking"),
         #            fontsize=7)
-        plt.legend(("Measured", "Cores blocking"),
+        plt.legend(("Measured", "Simulated"),
                     fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_3.pdf")

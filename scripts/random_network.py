@@ -30,7 +30,8 @@ import sim
 # Use a dumb seed to get consistent results
 random.seed(1)
 
-EXPERIMENT = "tiny"
+#EXPERIMENT = "tiny"
+EXPERIMENT = "full"
 # Global experiment parameters
 NETWORK_PATH = os.path.join("runs", "random", EXPERIMENT)
 NETWORK_FILENAME = os.path.join(NETWORK_PATH, "random.net")
@@ -181,8 +182,11 @@ if __name__ == "__main__":
         plt.xscale("log")
         plt.yscale("log")
         #plt.plot(sim_latency, loihi_latency, "x")
-        plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
-                    cmap=cm, vmin=256, vmax=8192, linewidths=1,
+        #plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
+        #            cmap=cm, vmin=256, vmax=8192, linewidths=1,
+        #            picker=True, pickradius=5)
+        plt.scatter(sim_latency, loihi_latency, marker="x", c=df["messages_per_neuron"].values,
+                    cmap=cm, linewidths=1,
                     picker=True, pickradius=5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")

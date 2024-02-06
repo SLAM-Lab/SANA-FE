@@ -9,11 +9,6 @@
 //  neuromorphic computation. The neuromorphic pipeline (which seems sufficient
 //  for any design) is a series of elements:
 
-/*
-axon input -> synapse --------> dendrite ------> soma -------> axon output
-(spikes in) (spikes to current)(process input)(membrane update)(spikes out)
-*/
-
 #ifndef ARCH_HEADER_INCLUDED_
 #define ARCH_HEADER_INCLUDED_
 
@@ -101,10 +96,11 @@ struct message
 {
 	struct neuron *src_neuron, *dest_neuron;
 	struct message *next;
-	double generation_latency, network_latency, receive_latency;
-	double blocked_latency, sent_timestamp, processed_timestamp;
+	double generation_delay, network_delay, receive_delay;
+	double blocked_latency;
+	double sent_timestamp, received_timestamp, processed_timestamp;
 	long int timestep;
-	int spikes, hops;
+	int spikes, hops, in_noc;
 };
 
 struct message_fifo
