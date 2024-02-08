@@ -89,7 +89,7 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -198,11 +198,12 @@ if __name__ == "__main__":
                 #loihi_total_times[i] = np.sum(loihi_times[i*(timesteps-1):(i+1)*(timesteps-1)])
                 loihi_total_times[i] = np.sum(loihi_times[0:timesteps, i])
 
-            """
+            #"""
             plt.figure(figsize=(7, 8))
             plt.subplot(311)
-            plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
-            plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1)*frames], marker='x')
+            FRAMES = 3
+            plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), times[0:(timesteps-1)*FRAMES], '-')
+            plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), np.mean(loihi_times[0:(timesteps-1)*FRAMES], axis=1), '--')
             plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
             plt.legend(("Simulated", "Measured on Loihi"))
             plt.ylabel("Latency (s)")
@@ -210,26 +211,26 @@ if __name__ == "__main__":
 
             # Also plot underneath the different activity on the chip for both my
             #  simulator and Loihi
-            plt.subplot(312)
-            plt.plot(np.arange(1, timesteps+1), analysis["packets"], marker='x')
-            plt.plot(np.arange(1, timesteps+1), analysis["hops"], marker='x')
-            plt.legend(("Packets Sent", "Total Hops"))
-            plt.xlabel("Timestep")
+            #plt.subplot(312)
+            #plt.plot(np.arange(1, timesteps+1), analysis["packets"], marker='x')
+            #plt.plot(np.arange(1, timesteps+1), analysis["hops"], marker='x')
+            #plt.legend(("Packets Sent", "Total Hops"))
+            #plt.xlabel("Timestep")
 
-            plt.subplot(313)
-            plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
+            #plt.subplot(313)
+            #plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
             # Figure out how many neurons fired in the Loihi data
-            fired_count = [len(loihi_spiketrains[i]) for
-                        i in range(0, len(loihi_spiketrains))]
-            plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
-            plt.ylabel("Neurons Fired")
-            plt.xlabel("Timestep")
-            plt.legend(("Simulated", "Measured on Loihi"))
+            #fired_count = [len(loihi_spiketrains[i]) for
+            #            i in range(0, len(loihi_spiketrains))]
+            #plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
+            #plt.ylabel("Neurons Fired")
+            #plt.xlabel("Timestep")
+            #plt.legend(("Simulated", "Measured on Loihi"))
 
-            print("diff = {}".format(
-                analysis["fired"] - np.array(fired_count[0:timesteps])))
-            plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
-            """
+            #print("diff = {}".format(
+            #    analysis["fired"] - np.array(fired_count[0:timesteps])))
+            plt.savefig("runs/dvs/dvs_gesture_sim_time_stats.pdf")
+            #"""
 
             # Plot the latency
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")

@@ -296,7 +296,7 @@ void sim_message_fifo_push(struct message_fifo *queue, struct message *m)
 
 void sim_update_noc_message_counts(const struct message *m,
 	const size_t noc_width, const size_t noc_height,
-	long int messages_in_flight[noc_width][noc_height],
+	double messages_in_flight[noc_width][noc_height],
 	const int message_in)
 {
 	int src_x, src_y, dest_x, dest_y;
@@ -332,34 +332,44 @@ void sim_update_noc_message_counts(const struct message *m,
 	{
 		if (message_in)
 		{
-			messages_in_flight[x][src_y]++;
+			messages_in_flight[x][src_y] += (1.0 / (1.0+m->hops));
 		}
 		else // receive message from NoC
 		{
-			messages_in_flight[x][src_y]--;
+			messages_in_flight[x][src_y] -= (1.0 / (1.0+m->hops));
 		}
-		assert(messages_in_flight[x][src_y] >= 0);
+		//assert(messages_in_flight[x][src_y] >= 0.0);
+		if (messages_in_flight[x][src_y] < 0.0)
+		{
+			//INFO("messages < 0: %lf\n",
+			//	messages_in_flight[x][src_y]);
+		}
 	}
 	for (int y = src_y; y != dest_y; y += y_increment)
 	{
 		if (message_in)
 		{
-			messages_in_flight[dest_x][y]++;
+			messages_in_flight[dest_x][y] += (1.0 / (1.0+m->hops));
 		}
 		else // receive message from NoC
 		{
-			messages_in_flight[dest_x][y]--;
+			messages_in_flight[dest_x][y] -= (1.0 / (1.0+m->hops));
 		}
-		assert(messages_in_flight[dest_x][y] >= 0);
+		///*
+		if (messages_in_flight[dest_x][y] < 0.0)
+		{
+			//INFO("messages < 0: %lf\n", messages_in_flight[dest_x][y]);
+		}
+		//*/
 	}
 
 	if (message_in)
 	{
-		messages_in_flight[dest_x][dest_y]++;
+		messages_in_flight[dest_x][dest_y] += (1.0 / (1.0+m->hops));
 	}
 	else // receive message from NoC
 	{
-		messages_in_flight[dest_x][dest_y]--;
+		messages_in_flight[dest_x][dest_y] -= (1.0 / (1.0+m->hops));
 	}
 
 	return;
@@ -367,7 +377,7 @@ void sim_update_noc_message_counts(const struct message *m,
 
 void sim_update_noc(const double t, struct message_fifo *const messages_received,
 	size_t noc_width, size_t noc_height,
-	long int messages_in_flight[noc_width][noc_height],
+	double messages_in_flight[noc_width][noc_height],
 	long int *messages_in_noc, double *const mean_receiving_time)
 {
 	// TODO: need info on the noc dimensions passed into the function
@@ -440,7 +450,7 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 	struct message_fifo messages_received[ARCH_MAX_CORES];
 	struct message *next_buffered[ARCH_MAX_CORES];
 	struct message_fifo *priority_queue;
-	long int messages_in_flight[8][4]; // TODO: pass into the function
+	double messages_in_flight[8][4]; // TODO: pass into the function
 	long int messages_in_noc;
 	double last_timestamp;
 	double mean_receiving_time;
@@ -454,7 +464,7 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 	{
 		for (int y = 0; y < 4; y++)
 		{
-			messages_in_flight[x][y] = 0;
+			messages_in_flight[x][y] = 0.0;
 		}
 	}
 
@@ -526,7 +536,7 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 			//  and see if we have saturated route.
 			// Calculate messages en route
 
-			int messages_along_route = 0;
+			double messages_along_route = 0.0;
 			int src_x, dest_x, src_y, dest_y;
 
 			src_x = m->src_neuron->core->t->x;
@@ -565,7 +575,7 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 				messages_in_flight[dest_x][dest_y];
 
 			assert(m->hops >= 0);
-			if (messages_along_route > ((m->hops+1) * MAX_MESSAGES_PER_HOP))
+			if ((int) messages_along_route > ((m->hops+1) * MAX_MESSAGES_PER_HOP))
 			{
 				//INFO("Sending core blocked! Mean receiving time:%e\n", mean_receiving_time);
 				// TODO: explore different ways of doing this
@@ -573,11 +583,11 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 				//m->sent_timestamp += mean_receiving_time;
 
 				// This one really doesn't work, way too pessimistic
-				//INFO("messages_along_route:%d hops+1:%d adjust:%d\n",
+				//INFO("messages_along_route:%lf hops+1:%d adjust:%lf\n",
 				//	messages_along_route, m->hops+1,
 				//	messages_along_route-(MAX_MESSAGES_PER_HOP*(m->hops+1)));
-				//m->sent_timestamp +=
-				//	mean_receiving_time * (messages_along_route - ((m->hops+1) * MAX_MESSAGES_PER_HOP));
+				m->sent_timestamp +=
+					mean_receiving_time * (messages_along_route - ((m->hops+1) * MAX_MESSAGES_PER_HOP));
 			}
 
 			// Now, push the message into the right receiving queue
@@ -618,6 +628,7 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 			INFO("mean receiving time:%e receiving time for this message:%e\n", mean_receiving_time, m->receive_delay);
 			INFO("messages in noc:%ld message count for core[%d]:%d\n", messages_in_noc, dest_core, messages_received[dest_core].count);
 			*/
+
 			mean_receiving_time +=
 				(m->receive_delay - mean_receiving_time) /
 				(messages_in_noc + 1);
