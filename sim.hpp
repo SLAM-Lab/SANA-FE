@@ -70,7 +70,11 @@ void sim_init_timestep(struct timestep *const ts);
 void sim_process_neurons(struct timestep *const ts, struct network *net, struct architecture *arch);
 void sim_receive_messages(struct timestep *const sim, struct architecture *arch);
 <<<<<<< HEAD
+<<<<<<< HEAD
 double sim_schedule_messages(struct message_fifo *const messages_sent, const struct scheduler *const scheduler);
+=======
+double sim_schedule_messages(struct message_fifo *const messages_sent);
+>>>>>>> Fixing merge issues
 =======
 double sim_schedule_messages(struct message_fifo *const messages_sent);
 >>>>>>> Fixing merge issues
