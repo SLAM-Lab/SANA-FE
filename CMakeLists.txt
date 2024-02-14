@@ -26,22 +26,22 @@ execute_process(
 
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
-include(FetchContent)
-FetchContent_Declare(
-    pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11
-)
+# include(FetchContent)
+# FetchContent_Declare(
+#     pybind11
+#     GIT_REPOSITORY https://github.com/pybind/pybind11
+# )
 
-FetchContent_GetProperties(pybind11)
-if(NOT pybind11_POPULATED)
-    FetchContent_Populate(pybind11)
-    add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
-endif()
-find_package(pybind11 REQUIRED)
-pybind11_add_module(simcpp 
-	main.cpp sim.cpp
-)
-target_link_libraries(simcpp PUBLIC)
+# FetchContent_GetProperties(pybind11)
+# if(NOT pybind11_POPULATED)
+#     FetchContent_Populate(pybind11)
+#     add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
+# endif()
+# find_package(pybind11 REQUIRED)
+# pybind11_add_module(simcpp 
+# 	main.cpp sim.cpp
+# )
+# target_link_libraries(simcpp PUBLIC)
 
 find_package(OpenMP REQUIRED)
 

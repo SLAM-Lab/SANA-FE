@@ -17,6 +17,7 @@
 #define MAX_FIELD_LEN 64
 
 #include <stdint.h>
+#include "plugins.hpp"
 
 enum connection_config_format
 {
@@ -52,6 +53,8 @@ struct neuron
 	struct core *core, *post_synaptic_cores;
 	struct soma_processor *soma_hw;
 
+	class Base_Soma *soma_class;
+
 	char soma_hw_name[MAX_FIELD_LEN];
 
 	// Track the timestep each hardware unit was last updated
@@ -61,12 +64,16 @@ struct neuron
 	int soma_last_updated, dendrite_last_updated;
 	int maps_in_count, maps_out_count;
 
-	// LIF specific
-	unsigned int random_range_mask;
-	double potential, current, charge, bias;
-	double reset, reverse_reset, threshold, reverse_threshold;
-	double leak_decay, leak_bias, potential_time_const;
 	double dendritic_current_decay, processing_latency;
+	double current, charge;
+	Neuron_Status neuron_status;
+
+	// LIF specific
+	// unsigned int random_range_mask;
+	// double potential, current, charge, bias;
+	// double reset, reverse_reset, threshold, reverse_threshold;
+	// double leak_decay, leak_bias, potential_time_const;
+	// double dendritic_current_decay, processing_latency;
 	// End of LIF specific
 };
 
@@ -97,9 +104,12 @@ struct neuron_group
 	struct neuron *neurons;
 	char default_soma_hw_name[MAX_FIELD_LEN];
 	char default_synapse_hw_name[MAX_FIELD_LEN];
-	int id, neuron_count, reset_mode, reverse_reset_mode;
+	int id, neuron_count;
 	int default_log_potential, default_log_spikes;
 	int default_max_connections_out, default_force_update;
+
+	int reset_mode, reverse_reset_mode;
+	
 	double default_threshold, default_reset;
 	double default_reverse_threshold, default_reverse_reset;
 	double default_leak_decay, default_leak_bias;

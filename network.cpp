@@ -54,7 +54,7 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 	{
 		struct attributes *a = &(attr[i]);
 
-		ret = -1;
+		ret = 1;
 		if (strncmp("soma_hw_name", a->key, MAX_FIELD_LEN) == 0)
 		{
 			strncpy(group->default_soma_hw_name, a->value_str,
@@ -158,24 +158,12 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->log_potential = group->default_log_potential;
 		n->force_update = group->default_force_update;
 		n->max_connections_out = group->default_max_connections_out;
-		// Default connections
-		n->reset = group->default_reset;
-		n->reverse_reset = group->default_reset;
-		n->threshold = group->default_threshold;
-		n->reverse_threshold = group->default_reverse_threshold;
 
 		n->fired = 0;
-		n->potential = 0.0;
-		n->current = 0.0;
-		n->charge = 0.0;
-		n->bias = 0.0;
-
-		n->leak_decay = group->default_leak_decay;
-		n->leak_bias = group->default_leak_bias;
 		// By default, dendrite current resets every timestep
-		n->dendritic_current_decay = 0.0;
 
 		n->update_needed = 0;
+		n->neuron_status = IDLE;
 		n->spike_count = 0;
 		n->connections_out = NULL;
 
@@ -189,6 +177,10 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->maps_out_count = 0;
 
 		n->is_init = 0;
+
+		// Create Soma Class Instance 
+		n->soma_class = get_soma(n->soma_hw_name);
+		n->soma_class->parameters(attr, attribute_count);
 	}
 
 	INFO("Created neuron group gid:%d count:%d "
@@ -215,41 +207,15 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		return NETWORK_INVALID_NID;
 	}
 
-	n->potential = 0.0;
-
 	/*** Set attributes ***/
-	n->bias = 0.0;
-	n->random_range_mask = 0;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
-		int ret = -1;
+		int ret = 1;
 
 		if (strncmp("hw_name", a->key, MAX_FIELD_LEN) == 0)
 		{
 			strncpy(n->soma_hw_name, a->value_str, MAX_FIELD_LEN);
-		}
-		else if (strncmp("bias", a->key, MAX_FIELD_LEN) == 0)
-		{
-			ret = sscanf(a->value_str, "%lf", &n->bias);
-		}
-		else if (strncmp("reset", a->key, MAX_FIELD_LEN) == 0)
-		{
-			ret = sscanf(a->value_str, "%lf", &n->reset);
-		}
-		else if (strncmp("reverse_reset", a->key, MAX_FIELD_LEN) == 0)
-		{
-			ret = sscanf(a->value_str, "%lf", &n->reverse_reset);
-		}
-		else if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
-		{
-			ret = sscanf(a->value_str, "%lf", &n->threshold);
-		}
-		else if (strncmp("reverse_threshold", a->key, MAX_FIELD_LEN) ==
-			0)
-		{
-			ret = sscanf(
-				a->value_str, "%lf", &n->reverse_threshold);
 		}
 		else if (strncmp("connections_out", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -268,11 +234,11 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		{
 			ret = sscanf(a->value_str, "%d", &n->force_update);
 		}
-		else
-		{
-			INFO("Attribute %s not supported.\n", a->key);
-			exit(1);
-		}
+		// else
+		// {
+		// 	INFO("Attribute %s not supported.\n", a->key);
+		// 	exit(1);
+		// }
 
 		if (ret < 1)
 		{
@@ -284,7 +250,8 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 
 	// Set the initial update state, no spikes can arrive before the first
 	//  time-step but we can force the neuron to update, or bias it
-	n->update_needed = (n->force_update || (fabs(n->bias) > 0.0));
+	n->update_needed = n->force_update; // || (fabs(n->bias) > 0.0));
+	n->neuron_status = IDLE;
 
 	n->soma_last_updated = 0;
 	n->dendrite_last_updated = 0;
@@ -318,8 +285,12 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		con->synapse_hw = NULL;
 	}
 
-	TRACE1("Created neuron: gid:%d nid:%d force:%d thresh:%lf\n",
-		n->group->id, n->id, n->force_update, n->threshold);
+	// Create Soma Class Instance
+	n->soma_class = get_soma(n->soma_hw_name);
+	n->soma_class->parameters(attr, attribute_count);
+
+	TRACE1("Created neuron: gid:%d nid:%d force:%d soma:%s\n",
+		n->group->id, n->id, n->force_update, n->soma_hw_name);
 	n->is_init = 1;
 	return n->id;
 }
@@ -350,6 +321,7 @@ int network_connect_neurons(struct connection *const con,
 		{
 			strncpy(con->synapse_hw_name, a->value_str,
 				MAX_FIELD_LEN);
+			ret = 1;
 		}
 		if (ret < 1)
 		{
