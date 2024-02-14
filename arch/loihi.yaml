@@ -44,7 +44,7 @@ architecture:
                 # Noise stream is based on Intel's proprietary data
                 #  TODO: support a LFSR based random number generator that can
                 #   replace this for the public version
-                noise: etc/loihi_random_seq.csv
+                # noise: etc/loihi_random_seq.csv
                 energy_access_neuron: 51.2e-12
                 latency_access_neuron: 6.0e-9
                 # Here account for the 6 pJ cost of generating a random number

@@ -137,6 +137,7 @@ sim/fast:
 .PHONY : sim/fast
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 #=============================================================================
 # Target rules for targets named simcpp
@@ -152,6 +153,8 @@ simcpp/fast:
 .PHONY : simcpp/fast
 
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 arch.o: arch.cpp.o
 
 .PHONY : arch.o
@@ -241,9 +244,12 @@ main.o: main.cpp.o
 main.cpp.o:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.o
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.o
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 .PHONY : main.cpp.o
 
 main.i: main.cpp.i
@@ -254,9 +260,12 @@ main.i: main.cpp.i
 main.cpp.i:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.i
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.i
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 .PHONY : main.cpp.i
 
 main.s: main.cpp.s
@@ -267,9 +276,12 @@ main.s: main.cpp.s
 main.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.s
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.s
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 .PHONY : main.cpp.s
 
 network.o: network.cpp.o
@@ -300,6 +312,9 @@ network.cpp.s:
 .PHONY : network.cpp.s
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> Loihi_lif plugin initial
 plugins.o: plugins.cpp.o
 
 .PHONY : plugins.o
@@ -327,8 +342,11 @@ plugins.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/plugins.cpp.s
 .PHONY : plugins.cpp.s
 
+<<<<<<< HEAD
 =======
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 sim.o: sim.cpp.o
 
 .PHONY : sim.o
@@ -337,9 +355,12 @@ sim.o: sim.cpp.o
 sim.cpp.o:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.o
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.o
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 .PHONY : sim.cpp.o
 
 sim.i: sim.cpp.i
@@ -350,9 +371,12 @@ sim.i: sim.cpp.i
 sim.cpp.i:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.i
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.i
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 .PHONY : sim.cpp.i
 
 sim.s: sim.cpp.s
@@ -363,9 +387,12 @@ sim.s: sim.cpp.s
 sim.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.s
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.s
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 .PHONY : sim.cpp.s
 
 # Help Target
@@ -378,9 +405,12 @@ help:
 	@echo "... edit_cache"
 	@echo "... sim"
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	@echo "... simcpp"
 >>>>>>> Switching to cpp
+=======
+>>>>>>> Loihi_lif plugin initial
 	@echo "... arch.o"
 	@echo "... arch.i"
 	@echo "... arch.s"
@@ -397,11 +427,17 @@ help:
 	@echo "... network.i"
 	@echo "... network.s"
 <<<<<<< HEAD
+<<<<<<< HEAD
 	@echo "... plugins.o"
 	@echo "... plugins.i"
 	@echo "... plugins.s"
 =======
 >>>>>>> Switching to cpp
+=======
+	@echo "... plugins.o"
+	@echo "... plugins.i"
+	@echo "... plugins.s"
+>>>>>>> Loihi_lif plugin initial
 	@echo "... sim.o"
 	@echo "... sim.i"
 	@echo "... sim.s"

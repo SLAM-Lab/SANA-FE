@@ -819,31 +819,19 @@ double sim_update_dendrite(
 		latency += sim_update_soma(ts, n, dendritic_current);
 	}
 
-	return latency;
+	return dendritic_current;
 }
 
 double sim_update_soma(
 	struct timestep *const ts, struct neuron *n, const double current_in)
 {
-	double latency = 0.0;
-	struct soma_processor *soma = n->soma_hw;
+	// struct soma_processor *soma = n->soma_hw;
 
 	TRACE1("nid:%d updating, current_in:%lf\n", n->id, current_in);
-	if ((soma->model == NEURON_LIF) ||
-		(soma->model == NEURON_STOCHASTIC_LIF))
-	{
-		latency += sim_update_soma_lif(ts, n, current_in);
-	}
-	else if (soma->model == NEURON_TRUENORTH)
-	{
-		latency += sim_update_soma_truenorth(ts, n, current_in);
-	}
-	else
-	{
-		INFO("Neuron model not recognised: %d", soma->model);
-		assert(0);
-	}
+	n->neuron_status = n->soma_class->update_soma(current_in);
+	double latency = sim_update_soma_latency(ts, n);
 
+	// TODO: FIX the latency returns
 	return latency;
 }
 
@@ -891,79 +879,27 @@ double sim_generate_noise(struct neuron *n)
 	return (double) noise_val;
 }
 
-double sim_update_soma_lif(
-	struct timestep *const ts, struct neuron *n, const double current_in)
-
+double sim_update_soma_latency(
+	struct timestep *const ts, struct neuron *n)
 {
 	struct soma_processor *soma = n->soma_hw;
-	double random_potential, latency = 0.0;
+	double latency = 0.0;
 
-	// Calculate the change in potential since the last update e.g.
-	//  integate inputs and apply any potential leak
-	TRACE1("Updating potential, before:%f\n", n->potential);
-
-	if ((soma->model == NEURON_LIF) ||
-		(soma->model == NEURON_STOCHASTIC_LIF))
+	while (n->soma_last_updated <= ts->timestep)
 	{
-		while (n->soma_last_updated <= ts->timestep)
-		{
-			n->potential *= n->leak_decay;
-			n->soma_last_updated++;
-		}
+		// n->potential *= n->leak_decay;
+		n->soma_last_updated++;
 	}
 
-	// Add randomized noise to potential if enabled
-	if ((soma->model == NEURON_STOCHASTIC_LIF) &&
-		(soma->noise_type == NOISE_FILE_STREAM))
+	// Check for spiking
+	if (n->neuron_status == FIRED)
 	{
-		random_potential = sim_generate_noise(n);
-		n->potential += random_potential;
-	}
-
-	// Add the synaptic / dendrite current to the potential
-	//printf("n->bias:%lf n->potential before:%lf current_in:%lf\n", n->bias, n->potential, current_in);
-	n->potential += current_in + n->bias;
-	n->charge = 0.0;
-	//printf("n->bias:%lf n->potential after:%lf\n", n->bias, n->potential);
-
-	TRACE1("Updating potential, after:%f\n", n->potential);
-
-	// Check against threshold potential (for spiking)
-	if (((n->bias != 0.0) && (n->potential > n->threshold)) ||
-		((n->bias == 0.0) && (n->potential >= n->threshold)))
-	{
-		if (n->group->reset_mode == NEURON_RESET_HARD)
-		{
-			n->potential = n->reset;
-		}
-		else if (n->group->reset_mode == NEURON_RESET_SOFT)
-		{
-			n->potential -= n->threshold;
-		}
 		latency += sim_neuron_send_spike(n);
-	}
-
-	// Check against reverse threshold
-	if (n->potential < n->reverse_threshold)
-	{
-		if (n->group->reverse_reset_mode == NEURON_RESET_SOFT)
-		{
-			n->potential -= n->reverse_threshold;
-		}
-		else if (n->group->reverse_reset_mode == NEURON_RESET_HARD)
-		{
-			n->potential = n->reverse_reset;
-		}
-		else if (n->group->reverse_reset_mode == NEURON_RESET_SATURATE)
-		{
-			n->potential = n->reverse_threshold;
-		}
 	}
 
 	// Update soma, if there are any received spikes, there is a non-zero
 	//  bias or we force the neuron to update every time-step
-	if ((fabs(n->potential) > 0.0) || n->spike_count ||
-		(fabs(n->bias) > 0.0) || n->force_update)
+	if (n->neuron_status == UPDATED || n->neuron_status == FIRED || n->force_update)
 	{
 		latency += n->soma_hw->latency_update_neuron;
 		soma->neuron_updates++;
@@ -974,94 +910,177 @@ double sim_update_soma_lif(
 	return latency;
 }
 
-double sim_update_soma_truenorth(
-	struct timestep *const ts, struct neuron *n, const double current_in)
-{
-	struct soma_processor *soma = n->soma_hw;
-	double v, latency = 0.0;
-	int randomize_threshold;
+// double sim_update_soma_lif(
+// 	struct timestep *const ts, struct neuron *n, const double current_in)
 
-	// Apply leak
-	while (n->soma_last_updated <= ts->timestep)
-	{
-		// Linear leak
-		if (soma->leak_towards_zero)
-		{
-			// TODO: what happens if we're above zero but by less
-			//  than the leak amount (for convergent), will we
-			//  oscillate between the two? Does it matter
-			if (n->potential > 0.0)
-			{
-				n->potential -= n->leak_bias;
-			}
-			else if (n->potential < 0.0)
-			{
-				n->potential += n->leak_bias;
-			}
-			// else equals zero, so no leak is applied
-		}
-		else
-		{
-			n->potential += n->leak_decay;
-		}
-		n->soma_last_updated++;
-	}
+// {
+// 	struct soma_processor *soma = n->soma_hw;
+// 	double random_potential, latency = 0.0;
 
-	// Add the synaptic currents, processed by the dendrite
-	n->potential += current_in + n->bias;
-	n->current = 0.0;
-	n->charge = 0.0;
+// 	// Calculate the change in potential since the last update e.g.
+// 	//  integate inputs and apply any potential leak
+// 	TRACE1("Updating potential, before:%f\n", n->potential);
 
-	// Apply thresholding and reset
-	v = n->potential;
-	randomize_threshold = (n->random_range_mask != 0);
-	if (randomize_threshold)
-	{
-		unsigned int r = rand() & n->random_range_mask;
-		v += (double) r;
-	}
+// 	if ((soma->model == NEURON_LIF) ||
+// 		(soma->model == NEURON_STOCHASTIC_LIF))
+// 	{
+// 		while (n->soma_last_updated <= ts->timestep)
+// 		{
+// 			n->potential *= n->leak_decay;
+// 			n->soma_last_updated++;
+// 		}
+// 	}
 
-	TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, n->threshold,
-		n->group->reset_mode, n->reverse_threshold,
-		n->group->reverse_reset_mode);
-	if (v >= n->threshold)
-	{
-		int reset_mode = n->group->reset_mode;
-		if (reset_mode == NEURON_RESET_HARD)
-		{
-			n->potential = n->reset;
-		}
-		else if (reset_mode == NEURON_RESET_SOFT)
-		{
-			n->potential -= n->threshold;
-		}
-		else if (reset_mode == NEURON_RESET_SATURATE)
-		{
-			n->potential = n->threshold;
-		}
-		latency += sim_neuron_send_spike(n);
-	}
-	else if (v <= n->reverse_threshold)
-	{
-		int reset_mode = n->group->reverse_reset_mode;
-		if (reset_mode == NEURON_RESET_HARD)
-		{
-			n->potential = n->reverse_reset;
-		}
-		else if (reset_mode == NEURON_RESET_SOFT)
-		{
-			n->potential += n->reverse_threshold;
-		}
-		else if (reset_mode == NEURON_RESET_SATURATE)
-		{
-			n->potential = n->reverse_threshold;
-		}
-		// No spike is generated
-	}
-	TRACE2("potential:%lf threshold %lf\n", n->potential, n->threshold);
+// 	// Add randomized noise to potential if enabled
+// 	if ((soma->model == NEURON_STOCHASTIC_LIF) &&
+// 		(soma->noise_type == NOISE_FILE_STREAM))
+// 	{
+// 		random_potential = sim_generate_noise(n);
+// 		n->potential += random_potential;
+// 	}
 
-	return latency;
-}
+// 	// Add the synaptic / dendrite current to the potential
+// 	//printf("n->bias:%lf n->potential before:%lf current_in:%lf\n", n->bias, n->potential, current_in);
+// 	n->potential += current_in + n->bias;
+// 	n->charge = 0.0;
+// 	//printf("n->bias:%lf n->potential after:%lf\n", n->bias, n->potential);
+
+// 	TRACE1("Updating potential, after:%f\n", n->potential);
+
+// 	// Check against threshold potential (for spiking)
+// 	if (((n->bias != 0.0) && (n->potential > n->threshold)) ||
+// 		((n->bias == 0.0) && (n->potential >= n->threshold)))
+// 	{
+// 		if (n->group->reset_mode == NEURON_RESET_HARD)
+// 		{
+// 			n->potential = n->reset;
+// 		}
+// 		else if (n->group->reset_mode == NEURON_RESET_SOFT)
+// 		{
+// 			n->potential -= n->threshold;
+// 		}
+// 		latency += sim_neuron_send_spike(n);
+// 	}
+
+// 	// Check against reverse threshold
+// 	if (n->potential < n->reverse_threshold)
+// 	{
+// 		if (n->group->reverse_reset_mode == NEURON_RESET_SOFT)
+// 		{
+// 			n->potential -= n->reverse_threshold;
+// 		}
+// 		else if (n->group->reverse_reset_mode == NEURON_RESET_HARD)
+// 		{
+// 			n->potential = n->reverse_reset;
+// 		}
+// 		else if (n->group->reverse_reset_mode == NEURON_RESET_SATURATE)
+// 		{
+// 			n->potential = n->reverse_threshold;
+// 		}
+// 	}
+
+// 	// Update soma, if there are any received spikes, there is a non-zero
+// 	//  bias or we force the neuron to update every time-step
+// 	if ((fabs(n->potential) > 0.0) || n->spike_count ||
+// 		(fabs(n->bias) > 0.0) || n->force_update)
+// 	{
+// 		latency += n->soma_hw->latency_update_neuron;
+// 		soma->neuron_updates++;
+// 	}
+
+// 	latency += n->soma_hw->latency_access_neuron;
+
+// 	return latency;
+// }
+
+// double sim_update_soma_truenorth(
+// 	struct timestep *const ts, struct neuron *n, const double current_in)
+// {
+// 	struct soma_processor *soma = n->soma_hw;
+// 	double v, latency = 0.0;
+// 	int randomize_threshold;
+
+// 	// Apply leak
+// 	while (n->soma_last_updated <= ts->timestep)
+// 	{
+// 		// Linear leak
+// 		if (soma->leak_towards_zero)
+// 		{
+// 			// TODO: what happens if we're above zero but by less
+// 			//  than the leak amount (for convergent), will we
+// 			//  oscillate between the two? Does it matter
+// 			if (n->potential > 0.0)
+// 			{
+// 				n->potential -= n->leak_bias;
+// 			}
+// 			else if (n->potential < 0.0)
+// 			{
+// 				n->potential += n->leak_bias;
+// 			}
+// 			// else equals zero, so no leak is applied
+// 		}
+// 		else
+// 		{
+// 			n->potential += n->leak_decay;
+// 		}
+// 		n->soma_last_updated++;
+// 	}
+
+// 	// Add the synaptic currents, processed by the dendrite
+// 	n->potential += current_in + n->bias;
+// 	n->current = 0.0;
+// 	n->charge = 0.0;
+
+// 	// Apply thresholding and reset
+// 	v = n->potential;
+// 	randomize_threshold = (n->random_range_mask != 0);
+// 	if (randomize_threshold)
+// 	{
+// 		unsigned int r = rand() & n->random_range_mask;
+// 		v += (double) r;
+// 	}
+
+// 	TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, n->threshold,
+// 		n->group->reset_mode, n->reverse_threshold,
+// 		n->group->reverse_reset_mode);
+// 	if (v >= n->threshold)
+// 	{
+// 		int reset_mode = n->group->reset_mode;
+// 		if (reset_mode == NEURON_RESET_HARD)
+// 		{
+// 			n->potential = n->reset;
+// 		}
+// 		else if (reset_mode == NEURON_RESET_SOFT)
+// 		{
+// 			n->potential -= n->threshold;
+// 		}
+// 		else if (reset_mode == NEURON_RESET_SATURATE)
+// 		{
+// 			n->potential = n->threshold;
+// 		}
+// 		latency += sim_neuron_send_spike(n);
+// 	}
+// 	else if (v <= n->reverse_threshold)
+// 	{
+// 		int reset_mode = n->group->reverse_reset_mode;
+// 		if (reset_mode == NEURON_RESET_HARD)
+// 		{
+// 			n->potential = n->reverse_reset;
+// 		}
+// 		else if (reset_mode == NEURON_RESET_SOFT)
+// 		{
+// 			n->potential += n->reverse_threshold;
+// 		}
+// 		else if (reset_mode == NEURON_RESET_SATURATE)
+// 		{
+// 			n->potential = n->reverse_threshold;
+// 		}
+// 		// No spike is generated
+// 	}
+// 	TRACE2("potential:%lf threshold %lf\n", n->potential, n->threshold);
+
+// 	return latency;
+// }
 
 double sim_neuron_send_spike(struct neuron *n)
 {
@@ -1179,7 +1198,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 			// Neurons can be manually forced to update, for example
 			//  if they have a constant input bias
 			n->update_needed |=
-				(n->force_update || (n->bias != 0.0));
+				(n->force_update || (n->neuron_status >= 1));
 			n->processing_latency = 0.0;
 			n->fired = 0;
 
@@ -1388,20 +1407,22 @@ void sim_trace_record_potentials(
 		}
 	}
 
-	for (int i = 0; i < net->neuron_group_count; i++)
-	{
-		const struct neuron_group *group = &(net->groups[i]);
-		for (int j = 0; j < group->neuron_count; j++)
-		{
-			const struct neuron *n = &(group->neurons[j]);
-			if (sim->potential_trace_fp && n->log_potential)
-			{
-				fprintf(sim->potential_trace_fp, "%lf,",
-					n->potential);
-				potential_probe_count++;
-			}
-		}
-	}
+	// Commented out as n->potential does not exist
+
+	// for (int i = 0; i < net->neuron_group_count; i++)
+	// {
+	// 	const struct neuron_group *group = &(net->groups[i]);
+	// 	for (int j = 0; j < group->neuron_count; j++)
+	// 	{
+	// 		const struct neuron *n = &(group->neurons[j]);
+	// 		if (sim->potential_trace_fp && n->log_potential)
+	// 		{
+	// 			fprintf(sim->potential_trace_fp, "%lf,",
+	// 				n->potential);
+	// 			potential_probe_count++;
+	// 		}
+	// 	}
+	// }
 
 	// Each timestep takes up a line in the respective csv file
 	if (sim->potential_trace_fp && (potential_probe_count > 0))
