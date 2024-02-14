@@ -48,6 +48,7 @@ void init_soma(char* name){
         INFO("Error: Couldn't load symbol %s: %s\n", destroy, dlsym_error);
         exit(1);
     }
+    INFO("Loaded plugin symbols for %s.\n", name);
 }
 
 Base_Soma* get_soma(char* name){
