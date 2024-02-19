@@ -285,8 +285,11 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		con->synapse_hw = NULL;
 	}
 
-	// Create Soma Class Instance
-	n->soma_class = get_soma(n->soma_hw_name);
+	// Check if need to create Soma Class instance
+	if (n->soma_class == nullptr){
+		n->soma_class = get_soma(n->soma_hw_name);
+		INFO("Creating new neuron %d\n", n->id);
+	}
 	n->soma_class->parameters(attr, attribute_count);
 
 	TRACE1("Created neuron: gid:%d nid:%d force:%d soma:%s\n",
