@@ -50,7 +50,7 @@ void sim_timestep(struct timestep *const ts,
 	sim_process_neurons(ts, net, arch);
 	sim_receive_messages(ts, arch);
 
-	ts->sim_time = sim_schedule_messages(ts->message_queues);
+	//ts->sim_time = sim_schedule_messages(ts->message_queues);
 	// Performance statistics for this time step
 	ts->energy = sim_calculate_energy(arch);
 
@@ -1728,7 +1728,8 @@ void sim_message_trace_write_header(const struct simulation *const sim)
 	fprintf(sim->message_trace_fp, "timestep,src_neuron,");
 	fprintf(sim->message_trace_fp, "src_hw,dest_hw,hops,spikes,");
 	fprintf(sim->message_trace_fp, "generation_delay,network_delay,");
-	fprintf(sim->message_trace_fp, "processing_latency,blocking_latency\n");
+	fprintf(sim->message_trace_fp, "processing_latency,blocking_latency,");
+	fprintf(sim->message_trace_fp, "sent_timestamp,processed_timestamp\n");
 }
 
 void sim_trace_record_spikes(
