@@ -5,6 +5,7 @@ import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
 import math
 import os
+import queue
 
 np.set_printoptions(threshold=100000)
 np.seterr(invalid='raise')
@@ -193,7 +194,7 @@ def calculate_queue_blocking(K, arrival_rate, mean_service_time,
         print(f"queue length:{queue_length} estimated waiting time:{mean_waiting_time}")
     """
     #else:
-    print("MM1K")
+    print("\tMM1K")
     # No probability density function given, assume M/M/K/1 queue
     server_utilization = ro  # Rho in queueing theory
     #print(f"server utilization: {server_utilization}")
@@ -214,23 +215,27 @@ def calculate_queue_blocking(K, arrival_rate, mean_service_time,
 
     if N is not None and mean_service_time != 0:
         mean_service_rate = (1/mean_service_time)
-        print(f"service rate:{mean_service_rate:e}")
-        time_until_saturation = K / (arrival_rate - mean_service_rate)
-        print(f"time until saturation:{time_until_saturation}")
-        time_until_all_sent = N / arrival_rate
-        print(f"N:{N} K:{K} time until all sent:{time_until_all_sent}")
+        print(f"\tservice rate:{mean_service_rate:e}")
+        #time_until_saturation = K / (arrival_rate - mean_service_rate)
+        #print(f"time until saturation:{time_until_saturation}")
+        #time_until_all_sent = N / arrival_rate
+        #print(f"N:{N} K:{K} time until all sent:{time_until_all_sent}")
 
         #if sim_time is not None:
-        steady_state_ratio = (time_until_all_sent - time_until_saturation) / time_until_all_sent
-        steady_state_ratio = np.clip(steady_state_ratio, 0, 1)
-        steady_state_ratio2 = np.clip(steady_state_ratio, 0, None)
+        #steady_state_ratio = (time_until_all_sent - time_until_saturation) / time_until_all_sent
+        #steady_state_ratio = np.clip(steady_state_ratio, 0, 1)
 
         # TODO: this ratio should change depending on the average depth of the link
         #  i.e., the average capacity of downstream links. The number of packets
         #  needs to be greater than this total capacity before we will see any
         #  blocking effects
+        # N: Messages sent in flow
+        # K: Buffer size
         steady_state_ratio2 = (N - K) / N
-        print(f"sim time:{sim_time} steady state ratio:{steady_state_ratio} steady state ratio2:{steady_state_ratio2}")
+        steady_state_ratio2 = np.clip(steady_state_ratio2, 0, 1)
+        # TODO: HACK - to disable
+        #steady_state_ratio2 = 1.0
+        print(f"\tsim time:{sim_time} steady state ratio2:{steady_state_ratio2}")
         #input()
         probability_blocking *= steady_state_ratio2
 
@@ -246,12 +251,13 @@ def calculate_queue_blocking(K, arrival_rate, mean_service_time,
     effective_utilization = effective_throughput * mean_service_time # rho_e
     queue_length = total_length - effective_utilization
 
-    print(f"server_utilization:{server_utilization} total length:{total_length} total wait:{total_wait}")
-    print(f"prob blocking {probability_blocking} queue length:{queue_length} effective_throughput:{effective_throughput:e} waiting_time:{mean_waiting_time}")
-    ##print(f"mean service rate:{mean_service_rate}")
-
     probability_blocking = np.clip(probability_blocking, 0.0, 1.0)
     mean_waiting_time = np.clip(mean_waiting_time, 0.0, None)
+    queue_length = np.clip(queue_length, 0, None)
+
+    print(f"\tserver_utilization:{server_utilization} total length:{total_length} total wait:{total_wait}")
+    print(f"\tprob blocking {probability_blocking} queue length:{queue_length} effective_throughput:{effective_throughput:e} waiting_time:{mean_waiting_time}")
+    ##print(f"mean service rate:{mean_service_rate}")
 
     return probability_blocking, mean_waiting_time, queue_length
 
@@ -394,7 +400,195 @@ router_link_names = ("north", "east", "south", "west",
                     "net_to_core_1", "net_to_core_2",
                     "net_to_core_3", "net_to_core_4")
 
-def sim_delay(df):
+
+def sim_delay_hops(flows):
+    """Calculate delay of each message based on the hop count
+
+    The simplest delay calculation scheme, beyond just setting network delay=0
+    """
+    delays = np.zeros((128, 128))
+    cost_per_hop = 4.1e-9  # s
+    for src_core, dest_core in flows:
+        src_tile = src_core // 4
+        dest_tile = dest_core // 4
+        src_x = src_tile // 4
+        src_y = src_tile % 4
+        dest_x = dest_tile // 4
+        dest_y = dest_tile % 4
+        x_hops = abs(src_x - dest_x)
+        y_hops = abs(src_y - dest_y)
+        delays[src_core][dest_core] = (x_hops + y_hops) * cost_per_hop
+
+    return delays
+
+import enum
+def sim_schedule_event_based(messages):
+    # Model the queues in each router link as a set of FIFOs. Here we will
+    #  essentially schedule every single event as messages go from router to
+    #  router.
+    noc_buffers = []
+    for x in range(0, 8):
+        y_buffers = []
+        for y in range(0, 4):
+            link_buffers = [[] for _ in range(0, 12)]
+            y_buffers.append(link_buffers)
+        noc_buffers.append(y_buffers)
+
+    class State(enum.Enum):
+        SEND = 1
+        RECEIVE = 2
+
+    def get_next_link(m):
+        if m.pos is None:
+            # if pos is None, the next link is the first one
+            src_tile = m.src_core // 4
+            x = src_tile // 4
+            y = src_tile % 4
+            link = 4 + m.src_core % 4
+        else:
+            x, y, link = m.pos
+            dest_tile = m.dest_core // 4
+            dest_x = dest_tile // 4
+            dest_y = dest_tile % 4
+            if x < dest_x:
+                x = x + 1
+            elif x > dest_x:
+                x = x - 1
+            elif y < dest_y:
+                y = y + 1
+            elif y > dest_y:
+                y = y - 1
+
+            # Work out the direction of the next link
+            if x < dest_x:
+                link = 1
+            elif x > dest_x:
+                link = 3
+            elif y < dest_y:
+                link = 0
+            elif y > dest_y:
+                link = 2
+            else:
+                link = 8 + m.dest_core % 4
+
+        # If the next link is full, it will block us from sending
+        buffer_sizes = (16, 10, 16, 10, 8, 8, 8, 8, 24, 24, 24, 24)
+        if len(noc_buffers[x][y][link]) >= buffer_sizes[link]:
+            return None  # to indicate the next link is full
+        else:
+            return x, y, link
+
+
+    def receive_message(m, t):
+        # Schedule an event to update the noc once we finish processing
+        print(f"Creating a message event for {m} at time {t}")
+        E = {"message": m, "type": State.RECEIVE}
+        priority.append((E, t + m.receive_delay))
+        priority.sort(key=lambda x: x[1], reverse=True)
+        return
+
+
+    def send_message(m, t):
+        print(f"Sending message {m} from cid:{m.src_core}->cid:{m.dest_core}")
+        dest_pos = get_next_link(m)
+        if dest_pos is None:
+            # Message is being blocked by NoC, we need to push this
+            return False
+
+        while (dest_pos is not None and
+               len(noc_buffers[dest_pos[0]][dest_pos[1]][dest_pos[2]]) == 0 and
+               dest_pos[2] < 8):
+            m.pos = dest_pos
+            dest_pos = get_next_link(m)
+
+        dest_x, dest_y, dest_link = dest_pos
+        if dest_link >= 8 and len(noc_buffers[dest_x][dest_y][dest_link]) == 0:
+            # We successfully sent the message across the NoC, no blocking
+            #  We can start receiving the message
+            receive_message(m, t)
+        else:
+            print(f"Message put in queue noc[{dest_x}][{dest_y}][{dest_link}] "
+                  f"Queue len:{len(noc_buffers[dest_x][dest_y][dest_link])}")
+            noc_buffers[dest_x][dest_y][dest_link].append(m)
+
+        print(f"Message sent to {dest_pos}")
+
+    def update_message(m):
+        if src_pos is None:
+            pass
+        else:
+            dest_x, dest_y, dest_link = src_pos
+
+        next_x, next_y, next_link = next_pos
+        dest_pos = src_pos
+        src_x, src_y, src_link = src_pos
+        dest_x, dest_y, dest_link = dest_pos
+        while (len(noc_buffers[dest_x][dest_y][dest_link]) == 0 and
+               next_pos is not None):
+            dest_x, dest_y, dest_link = next_x, next_y, next_link
+            m.pos = next_x, next_y, next_link
+            next_x, next_y, next_link = get_next_link(m)
+
+        print(f"m.pos: {m.pos}->{(dest_x, dest_y, dest_link)}")
+
+        if dest_link > 8 and noc_buffers[dest_x][dest_y][dest_link] == 0:
+            # We successfully sent the message across the NoC, no blocking
+            #  We can start receiving the message
+            receive_message(m)
+        elif m.pos != src_pos:
+            # The message made it some way through the NoC but not to the end,
+            #  so update the corresponding queues
+            if src_pos is not None:
+                noc_buffers[src_x][src_y][src_link].pop()
+            noc_buffers[dest_x][dest_y][dest_link].append()
+
+        exit()
+        return True
+
+    def schedule_next_message(m, t):
+        # Schedule the next message
+        next_message = messages[m.src_core][-1]
+        print(f"Scheduling next message for core:{m.src_core}")
+        E = {"message": next_message, "type": State.SEND}
+        priority.append((E, t + next_message.generation_delay))
+        priority.sort(key=lambda x: x[1], reverse=True)
+        return
+
+    # Initialize priority queue by pushing events to send the first messages
+    priority = []
+    for core in range(0, 128):
+        if len(messages[core]) > 0:
+            first_message = messages[core][-1]
+            E = {"message": first_message, "type": State.SEND}
+            priority.append((E, first_message.generation_delay))
+    priority.sort(key=lambda x: x[1], reverse=True)
+
+    while len(priority) > 0:
+        E, t = priority.pop()
+        print(E)
+        m = E["message"]
+
+        if E["type"] == State.SEND:
+            # First, figure out if we are able to send a message or not. If the NoC
+            #  is blocking, put the message into a pending state
+            m = messages[m.src_core].pop()
+            assert(m == E["message"])
+            print(f"src core:{m.src_core} pos:{m.pos}")
+            m.pending = send_message(m, t)
+            # Message has been sent successfully, schedule the next message
+            if not m.pending and len(messages[m.src_core]) > 0:
+                schedule_next_message(m, t)
+        elif E["type"] == State.RECEIVE:  # State.Receive
+            # Update the state of the NoC. While we encounter queues, pop an
+            #  element from them. If the queue is full, also go to its
+            #  connected neighbours and pop.
+            pass
+    print("*** Finished modeling NoC ***")
+    exit()
+    return
+
+
+def sim_delay_mm1k(df):
     n_cores = 128
     path_counts = np.zeros((n_cores, n_cores), dtype=int)  # [src core, dest core]
     path_arrival_latencies = np.zeros((n_cores, n_cores))
@@ -682,6 +876,74 @@ def sim_delay(df):
     #print(f"mean link transfer delay: {flow_latencies}")
     return flow_latencies, path_counts, path_server_mean_latencies
 
+
+def schedule_messages_simple(messages):
+    neuron_processing = np.zeros((128,))
+    message_receiving = np.zeros((128,))
+    t = 0.0
+    for m in messages:
+        neuron_processing[m.src_core] += m.generation_delay
+        message_receiving[m.dest_core] += m.receive_delay
+
+    for i in range(0, 128):
+        t = max((neuron_processing[i], message_receiving[i], t))
+    return t
+
+
+def schedule_messages_detailed(messages):
+    priority = []
+    receiving_pipeline_busy = np.zeros((128,))
+    # Setup the priority queue, using just a normal list that will be sorted
+    #  after every insert. This was easier than figuring out the PriorityQueue
+    #  class for floating point priority...
+    t = 0.0
+    for core in range(0, 128):
+        if len(messages[core]) > 0:
+            first_message = messages[core][-1]
+            priority.append((core, first_message.generation_delay))
+    priority.sort(key=lambda x: x[1], reverse=True)
+
+    while len(priority) > 0:
+        core, t = priority.pop()
+        m = messages[core].pop()
+        earliest_receive_time = max(t + m.network_delay,
+                                    receiving_pipeline_busy[m.dest_core])
+        receiving_pipeline_busy[m.dest_core] = \
+            earliest_receive_time + m.receive_delay
+
+        # Push next message
+        if len(messages[core]) > 0:
+            next_message = messages[core][-1]
+            priority.append((core, t+next_message.generation_delay))
+            priority.sort(key=lambda x: x[1], reverse=True)
+
+    max_receive = np.max(receiving_pipeline_busy)
+    return max(t, max_receive)
+
+
+class Message:
+    """Spike message timing information"""
+    def __init__(self, generation_delay=None, receive_delay=None,
+                 src_hw=None, dest_hw=None, hops=None):
+        self.generation_delay = float(generation_delay)
+        self.receive_delay = float(receive_delay)
+        self.src_tile, self.src_core = hw_str_to_core(src_hw)
+        self.dest_tile, self.dest_core = hw_str_to_core(dest_hw)
+        self.network_delay = None
+        self.hops = hops
+        self.pos = None
+        return
+
+    def __repr__(self):
+        return str(self) + "\n"
+
+    def __str__(self):
+        s = ""
+        for k,v in self.__dict__.items():
+            s += f"{k}:{v} "
+        return s
+
+
 # 1. Read in the network
 filename = "dvs_messages.trace"
 #filename = "latin_messages.trace"
@@ -695,16 +957,27 @@ total_flow_latencies = np.zeros((timesteps,))
 total_core_latencies = np.zeros((timesteps,))
 max_synapse_processing = np.zeros((timesteps,))
 max_neuron_processing = np.zeros((timesteps,))
+scheduled_latency = np.zeros((timesteps,))
+flow_delays1 = np.zeros((timesteps,))
+path_counts = np.zeros((128, 128), dtype=int)  # [src core, dest core]
 
-for timestep in range(0, timesteps):
-#for timestep in range(102, 103):
+# Queue of messages for each core
+messages = [[] for _ in range(0, 128)]
+
+#for timestep in range(0, timesteps):
+for timestep in range(102, 103):
     message_generation_latencies = np.zeros((128, 128))
     message_receive_latencies = np.zeros((128, 128))
     df_timestep = df[df["timestep"] == timestep]
 
-    for _, row in df_timestep.iterrows():
+    for i, row in df_timestep.iterrows():
         src_tile, src_core = hw_str_to_core(row["src_hw"])
         dest_tile, dest_core = hw_str_to_core(row["dest_hw"])
+        messages[src_core].append(Message(row["generation_delay"],
+                                       row["processing_latency"],
+                                       row["src_hw"], row["dest_hw"],
+                                       row["hops"]))
+
         #message_generation_latencies[src_core, dest_core] += row["generation_delay"]
         if message_generation_latencies[src_core, dest_core] == 0:
             message_generation_latencies[src_core, dest_core] = \
@@ -714,19 +987,31 @@ for timestep in range(0, timesteps):
                 min(message_generation_latencies[src_core, dest_core],
                     row["generation_delay"])
         message_receive_latencies[src_core, dest_core] += row["processing_latency"]
+        path_counts[src_core, dest_core] += 1
+
+    print(f"Scheduling messages for timestep:{timestep}")
+    sim_schedule_event_based(messages)
 
     #TODO explore
     #message_generation_latencies = df_timestep["generation_delay"].min()
     #message_generation_latencies = df_timestep["generation_delay"].min()
 
-    flow_delays, flow_counts, _ = sim_delay(df_timestep)
+    flows = np.argwhere(path_counts >= 1)
+    flow_delays1[timestep] = np.max(sim_delay_hops(flows))
+    flow_delays, flow_counts, _ = sim_delay_mm1k(df_timestep)
+
+    # For all messages, update their network delay based on the average flow
+    #  delay
+    for core in range(0, 128):
+        for m in messages[core]:
+            m.network_delay = flow_delays[core, m.dest_core]
+    scheduled_latency[timestep] = schedule_messages_detailed(messages)
 
     print(f"i:{timestep} max flow delay: {np.max(flow_delays):e}")
     max_latencies[timestep] = np.max(flow_delays)
-    mean_latencies[timestep] = np.mean(flow_delays)
 
-    print(f"mean server:{message_receive_latencies}")
-    print(f"counts:{flow_counts}")
+    #print(f"mean server:{message_receive_latencies}")
+    #print(f"counts:{flow_counts}")
 
     max_neuron_processing[timestep] = np.max(np.sum(message_generation_latencies, axis=1))
     max_synapse_processing[timestep] = np.max(np.sum(message_receive_latencies, axis=0))
@@ -743,12 +1028,13 @@ loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
 loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
 plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
 plt.plot(max_latencies[1:] * 1.0e6)
-#plt.plot(mean_latencies[1:] * 1.0e6)
 plt.plot(max_synapse_processing[1:] * 1.0e6, "--")
 plt.plot(max_neuron_processing[1:] * 1.0e6, "--")
+plt.plot(scheduled_latency[1:] * 1.0e6)
+plt.plot(flow_delays1[1:] * 1.0e6)
 
 #plt.legend(("Measured", "Max", "Mean", "Max Synapse", "Max Neuron"), fontsize=7)
-plt.legend(("Measured", "Max Path Delay", "Max. Message Receiving", "Max. Neuron Processing"), fontsize=7)
+plt.legend(("Measured", "Max Path Delay", "Max. Message Receiving", "Max. Neuron Processing", "Scheduled", "Simple hop latency"), fontsize=7)
 plt.ylabel("Time-step Latency ($\mu$s)")
 plt.xlabel("Time-step")
 plt.yticks(np.arange(0, 61, 10))
