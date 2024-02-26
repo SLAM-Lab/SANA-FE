@@ -107,14 +107,35 @@ def create_pdf(samples):
 
 import scipy
 
+
+def calculate_pk_mmk1n(K, N, ro):
+    assert(K > 0)
+    assert(ro >= 0)
+    p = np.zeros((K+1,))
+
+    if (N > 0):
+        print(f"\tN packets:{N} buffer size:{K}")
+        for k in range(0, K+1):
+            p[k] = scipy.special.binom(N, k) * (ro**k) * math.factorial(k)
+        p = p / np.sum(p)
+        assert(p[0] > 0)  # Normalize to 1
+        p = np.clip(p, 0, 1)
+        print(f":\tp0:{p[0]:e}")
+        print(f"\tpk:{p}")
+
+    return p
+
+
 def calculate_queue_blocking(K, arrival_rate, mean_service_time,
-                             N=None, service_pdf=None):
+                             N=None, service_pdf=None, sim_time=None):
     #print("*** Calculate queue blocking ***")
     #print(f"arrival_rate: {arrival_rate:e}")
     #print(f"mean service time: {mean_service_time:e}")
+    #assert(mean_service_time > 0)
+    #service_rate = 1 / mean_service_time
+
     ro = arrival_rate * mean_service_time
     print(f"arrival_rate:{arrival_rate:e} mean_service_time:{mean_service_time}")
-
     """
     if service_pdf is not None:
         # Probability density function was given, calculate parameters for an
@@ -135,68 +156,99 @@ def calculate_queue_blocking(K, arrival_rate, mean_service_time,
         #print(f"mean waiting time:{mean_waiting_time} mean_service_time:{mean_service_time}")
     else:
     """
+    """
     if N is not None:
+        print("MM1KN")
         # Calculate p0
-        p = np.zeros((K,))
-        print(f"N packets:{N} buffer size:{K}")
-        for k in range(0, K):
-            p[k] = scipy.special.binom(N, k) * (ro**k) * math.factorial(k)
-        p = p / np.sum(p)
-        assert(p[0] > 0)  # Normalize to 1
-        p = np.clip(p, 0, 1)
-        print(f"{p[0]:e}")
-        print(f"{p}")
-
         server_utilization = ro  # Rho in queueing theory
         # TODO: we need to reevaluate p[k] for size N-1?
         # TODO: simplify the formula, we don't need to do the factorial.
         #  I think we actually want perm nPr -- or N_Pk
         #  way
-        probability_blocking = p[0] * scipy.special.binom(N-1, K) * ro**K
+        print("Calculating Pk(N-1, 1, K)")
+        p = calculate_pk_mmk1n(K, N-1, ro)
+        probability_blocking = p[K]
         probability_blocking = np.nan_to_num(probability_blocking)
-        print(f"prob blocking:{probability_blocking:e}")
         #exit()
-        effective_throughput = arrival_rate * (1 - probability_blocking)
-        total_length = 0
-        for k in range(0, K):
-            total_length += k * p[k]
-        print(f"estimated total length:{total_length}")
+        print("Calculating Pk(N, 1, K)")
+        p = calculate_pk_mmk1n(K, N, ro)
+        effective_throughput = arrival_rate * (1 - probability_blocking)  # lambda_e
+        #total_length = 0  # L
+        queue_length = 0
+        for k in range(1, K+1):
+            queue_length += (k-1) * p[k]
+            #total_length += k * p[k]
 
+        total_length = queue_length
         if total_length > 0:
-            total_wait = total_length / effective_throughput
+            total_wait = total_length / effective_throughput  # W
         else:
-            total_wait = 0
-        mean_waiting_time = total_wait - mean_service_time
+            total_wait = 0  # W
+        mean_waiting_time = total_wait - mean_service_time  # Wq
         effective_utilization = effective_throughput * mean_service_time # rho_e
-        queue_length = total_length - effective_utilization
-        print(f"estimated waiting time:{mean_waiting_time}")
+        #queue_length = total_length - effective_utilization
 
+        print(f"mean service time:{mean_service_time} arrival rate:{arrival_rate:e} server_utilization:{server_utilization}")
+        print(f"prob blocking:{probability_blocking:e} total length:{total_length} total waiting time:{total_wait} effective_throughput:{effective_throughput:e}")
+        print(f"queue length:{queue_length} estimated waiting time:{mean_waiting_time}")
+    """
+    #else:
+    print("MM1K")
+    # No probability density function given, assume M/M/K/1 queue
+    server_utilization = ro  # Rho in queueing theory
+    #print(f"server utilization: {server_utilization}")
+    if (server_utilization == 1):
+        probability_blocking = 1 / (K+1)
+        total_length = K/2
     else:
-        # No probability density function given, assume M/M/K/1 queue
-        server_utilization = ro  # Rho in queueing theory
-        #print(f"server utilization: {server_utilization}")
-        if (server_utilization == 1):
-            probability_blocking = 1 / (K+1)
-            total_length = K/2
-        else:
-            probability_blocking = ((1 - ro)*(ro**K)) / (1 - (ro**(K+1)))
-            total_length = (server_utilization/(1.0-server_utilization))
-            total_length -= (((K+1) * (server_utilization**(K+1))) /
-                             (1 - server_utilization**(K+1)))  # L
+        probability_blocking = ((1 - ro)*(ro**K)) / (1 - (ro**(K+1)))
+        total_length = (server_utilization/(1.0-server_utilization))
+        total_length -= (((K+1) * (server_utilization**(K+1))) /
+                            (1 - server_utilization**(K+1)))  # L
 
-        # lambda_e == effective throughput
-        effective_throughput = arrival_rate * (1 - probability_blocking)
-        if total_length > 0:
-            total_wait = total_length / effective_throughput
-        else:
-            total_wait = 0
-        mean_waiting_time = total_wait - mean_service_time
+    #p = np.zeros((K+1))
+    #p[0] = (1-ro) / (1-(ro**(K+1)))
+    #for k in range(0, K+1):
+    #    p[k] = ro**k * p[0]
+    #print(f"p:{p}")
 
-        effective_utilization = effective_throughput * mean_service_time # rho_e
-        queue_length = total_length - effective_utilization
+    if N is not None and mean_service_time != 0:
+        mean_service_rate = (1/mean_service_time)
+        print(f"service rate:{mean_service_rate:e}")
+        time_until_saturation = K / (arrival_rate - mean_service_rate)
+        print(f"time until saturation:{time_until_saturation}")
+        time_until_all_sent = N / arrival_rate
+        print(f"N:{N} K:{K} time until all sent:{time_until_all_sent}")
 
-        print(f"server_utilization:{server_utilization} total length:{total_length} queue length:{queue_length} effective_throughput:{effective_throughput:e}")
-        ##print(f"mean service rate:{mean_service_rate}")
+        #if sim_time is not None:
+        steady_state_ratio = (time_until_all_sent - time_until_saturation) / time_until_all_sent
+        steady_state_ratio = np.clip(steady_state_ratio, 0, 1)
+        steady_state_ratio2 = np.clip(steady_state_ratio, 0, None)
+
+        # TODO: this ratio should change depending on the average depth of the link
+        #  i.e., the average capacity of downstream links. The number of packets
+        #  needs to be greater than this total capacity before we will see any
+        #  blocking effects
+        steady_state_ratio2 = (N - K) / N
+        print(f"sim time:{sim_time} steady state ratio:{steady_state_ratio} steady state ratio2:{steady_state_ratio2}")
+        #input()
+        probability_blocking *= steady_state_ratio2
+
+
+    # lambda_e == effective throughput
+    effective_throughput = arrival_rate * (1 - probability_blocking)
+    if total_length > 0:
+        total_wait = total_length / effective_throughput
+    else:
+        total_wait = 0
+    mean_waiting_time = total_wait - mean_service_time
+
+    effective_utilization = effective_throughput * mean_service_time # rho_e
+    queue_length = total_length - effective_utilization
+
+    print(f"server_utilization:{server_utilization} total length:{total_length} total wait:{total_wait}")
+    print(f"prob blocking {probability_blocking} queue length:{queue_length} effective_throughput:{effective_throughput:e} waiting_time:{mean_waiting_time}")
+    ##print(f"mean service rate:{mean_service_rate}")
 
     probability_blocking = np.clip(probability_blocking, 0.0, 1.0)
     mean_waiting_time = np.clip(mean_waiting_time, 0.0, None)
@@ -208,7 +260,7 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
                         link_server_time, contention_waiting_time,
                         router_link_flows, path_arrival_rates, flows,
                         prob_link_blocking, link_arrival_count,
-                        messages_buffered):
+                        messages_buffered, max_neuron_processing):
     print("** Update buffer queue **")
     links_out = dependencies.out_edges(link)
     print(f"links_out:{links_out}")
@@ -228,7 +280,7 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
             path_idx = flows[f]
             arrival_rate_between_links += path_arrival_rates[path_idx[0],
                                                              path_idx[1]]
-            #print(f"flow:{f} path idx:{path_idx} arrival:{path_arrival_rates[path_idx[0], path_idx[1]]:e}")
+            print(f"flow:{f} path idx:{path_idx} arrival:{path_arrival_rates[path_idx[0], path_idx[1]]:e}")
 
         print(f"contention waiting time:{contention_waiting_time[downstream_idx]:e}")
         print(f"arrival rate between links {link_idx}->{downstream_idx} = "
@@ -256,13 +308,13 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
     # else this is a leaf link, and the service time is already given by the path
 
     #"""
-    if link == 0 or link == 2:  # Network tile to network tile
+    if link_idx[2] == 0 or link_idx[2] == 2:  # Network tile to network tile
         buffer_size = 16
-    elif link == 1 or link == 3:
+    elif link_idx[2] == 1 or link_idx[2] == 3:
         buffer_size = 10
-    elif (link >= 4 and link < 8):  # Cores to network
+    elif (link_idx[2] >= 4 and link_idx[2] < 8):  # Cores to network
         buffer_size = 8
-    elif link >= 8:  # Network to cores
+    elif link_idx[2] >= 8:  # Network to cores
         buffer_size = 24
     #"""
 
@@ -270,7 +322,14 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
         calculate_queue_blocking(buffer_size, link_arrival_rates[link_idx],
                                  link_server_time[link_idx],
                                  N=link_arrival_count[link_idx],
-                                 service_pdf=None)
+                                 service_pdf=None,
+                                 sim_time=max_neuron_processing)
+    #prob_blocked, link_waiting_time, queue_length = \
+    #    calculate_queue_blocking(buffer_size, link_arrival_rates[link_idx],
+    #                             link_server_time[link_idx],
+    #                             N=None,
+    #                             service_pdf=None,
+    #                             sim_time=max_neuron_processing)
 
     """
     prob_blocked1, link_waiting_time1 = \
@@ -296,7 +355,8 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
 def update_contention_queue(dependencies, link, link_arrival_rates,
                             contention_waiting_time,
                             prob_link_blocking,
-                            link_server_time):
+                            link_server_time,
+                            sim_time):
     print("** Update contention queue **")
     links_in = dependencies.in_edges(link)
     print(f"links_in:{links_in}")
@@ -319,7 +379,8 @@ def update_contention_queue(dependencies, link, link_arrival_rates,
 
         _, contention_waiting_time[link_idx], _ = \
             calculate_queue_blocking(link_in_count, link_arrival_rates[link_idx],
-                                    contention_server_time, None)
+                                    contention_server_time, None,
+                                    sim_time=sim_time)
     print(f"contention waiting time:{contention_waiting_time[link_idx]}")
     print ("**end of contention**")
 
@@ -333,7 +394,7 @@ router_link_names = ("north", "east", "south", "west",
                     "net_to_core_1", "net_to_core_2",
                     "net_to_core_3", "net_to_core_4")
 
-def sim_timestep(df):
+def sim_delay(df):
     n_cores = 128
     path_counts = np.zeros((n_cores, n_cores), dtype=int)  # [src core, dest core]
     path_arrival_latencies = np.zeros((n_cores, n_cores))
@@ -382,8 +443,12 @@ def sim_timestep(df):
 
     #path_arrival_rates = np.divide(path_counts, np.max(path_arrival_latencies),
     #                               where=path_counts>0)  # packets/s
-    path_arrival_rates = np.divide(path_counts, path_arrival_latencies,
+    path_arrival_rates = np.divide(path_counts, path_arrival_latencies*10,
                                    where=path_counts>0)  # packets/s
+
+    # Treat the neuron processing time as the simulation window
+    max_neuron_processing = np.max(np.sum(path_arrival_latencies, axis=1))
+
     #print(np.ma.masked_less(path_server_rates, 1.0))
     flows = np.argwhere(path_counts >= 1)
     # Figure out the distribution of latencies for each flow
@@ -421,17 +486,18 @@ def sim_timestep(df):
         dest_x = dest_tile // 4
         dest_y = dest_tile % 4
         path_rate = path_arrival_rates[src_core, dest_core]
+        path_count = path_counts[src_core, dest_core]
 
         # Account for all the hops in between the src and dest tile
         initial_direction = 4 + (src_core % 4)
-        router_link_counts[src_x, src_y, initial_direction] += 1
+        router_link_counts[src_x, src_y, initial_direction] += path_count
         router_link_arrival_rates[src_x, src_y, initial_direction] += path_rate
         router_link_flows[graph_index(src_x, src_y, initial_direction)].append(idx)
         prev_link = (src_x, src_y, initial_direction)
 
         while src_x < dest_x:
             src_x += 1
-            router_link_counts[src_x, src_y, 1] += 1  # east
+            router_link_counts[src_x, src_y, 1] += path_count  # east
             router_link_arrival_rates[src_x, src_y, 1] += path_rate
             router_link_flows[graph_index(src_x, src_y, 1)].append(idx)
             dependencies.add_edge(graph_index(*prev_link),
@@ -440,7 +506,7 @@ def sim_timestep(df):
 
         while src_x > dest_x:
             src_x -= 1
-            router_link_counts[src_x, src_y, 3] += 1  # west
+            router_link_counts[src_x, src_y, 3] += path_count  # west
             router_link_arrival_rates[src_x, src_y, 3] += path_rate
             router_link_flows[graph_index(src_x, src_y, 3)].append(idx)
             dependencies.add_edge(graph_index(*prev_link),
@@ -449,7 +515,7 @@ def sim_timestep(df):
 
         while src_y < dest_y:
             src_y += 1
-            router_link_counts[src_x, src_y, 0] += 1  # north
+            router_link_counts[src_x, src_y, 0] += path_count  # north
             router_link_arrival_rates[src_x, src_y, 0] += path_rate
             router_link_flows[graph_index(src_x, src_y, 0)].append(idx)
             dependencies.add_edge(graph_index(*prev_link),
@@ -458,7 +524,7 @@ def sim_timestep(df):
 
         while src_y > dest_y:
             src_y -= 1
-            router_link_counts[src_x, src_y, 2] += 1  # south
+            router_link_counts[src_x, src_y, 2] += path_count  # south
             router_link_arrival_rates[src_x, src_y, 2] += path_rate
             router_link_flows[graph_index(src_x, src_y, 2)].append(idx)
             dependencies.add_edge(graph_index(*prev_link),
@@ -466,7 +532,7 @@ def sim_timestep(df):
             prev_link = (src_x, src_y, 2)
 
         final_direction = 8 + (dest_core % 4)
-        router_link_counts[src_x, src_y, final_direction] += 1
+        router_link_counts[src_x, src_y, final_direction] += path_count
         router_link_arrival_rates[src_x, src_y, final_direction] += path_rate
         router_link_flows[graph_index(src_x, src_y, final_direction)].append(idx)
         dependencies.add_edge(graph_index(*prev_link),
@@ -499,19 +565,21 @@ def sim_timestep(df):
     #print(sorted_links)
     for link in sorted_links:
         print(f"UPDATING LINK: {link}")
-        link_wait_time = update_buffer_queue(dependencies, link,
-                                            router_link_arrival_rates,
-                                            mean_link_service_time,
-                                            contention_waiting_time,
-                                            router_link_flows,
-                                            path_arrival_rates, flows,
-                                            prob_link_blocking,
-                                            router_link_counts,
-                                            messages_buffered)
+        link_wait_time = \
+            update_buffer_queue(dependencies, link, router_link_arrival_rates,
+                                mean_link_service_time,
+                                contention_waiting_time,
+                                router_link_flows,
+                                path_arrival_rates, flows,
+                                prob_link_blocking,
+                                router_link_counts,
+                                messages_buffered,
+                                max_neuron_processing)
         mean_link_waiting_time[reverse_graph_index(link)] = link_wait_time
         update_contention_queue(dependencies, link, router_link_arrival_rates,
                                 contention_waiting_time, prob_link_blocking,
-                                mean_link_service_time)
+                                mean_link_service_time,
+                                max_neuron_processing)
 
 
     # Now go through all flows, and calculate the delay for each flows path
@@ -591,6 +659,7 @@ def sim_timestep(df):
     create_subplots(prob_link_blocking, "Probability of Blocking")
     create_subplots(mean_link_waiting_time, "Mean Link Wait Time")
     create_subplots(messages_buffered, "Messaged Buffered")
+    create_subplots(router_link_counts, "Link Counts")
 
     # Plot a heat map
     plt.figure()
@@ -601,7 +670,15 @@ def sim_timestep(df):
     plt.scatter(x, y, c=flow_latencies, cmap="YlOrRd", s=0.4)
     plt.colorbar()
 
+    plt.figure()
+    plt.title("Path Mean Receive Latencies")
+    plt.xlabel("Source Core")
+    plt.ylabel("Destination Core")
+    x, y = np.meshgrid(np.linspace(0, 127, 128), np.linspace(0, 127, 128))
+    plt.scatter(x, y, c=path_server_mean_latencies, cmap="YlOrRd", s=0.4)
+    plt.colorbar()
     """
+
     #print(f"mean link transfer delay: {flow_latencies}")
     return flow_latencies, path_counts, path_server_mean_latencies
 
@@ -617,27 +694,43 @@ mean_latencies = np.zeros((timesteps,))
 total_flow_latencies = np.zeros((timesteps,))
 total_core_latencies = np.zeros((timesteps,))
 max_synapse_processing = np.zeros((timesteps,))
+max_neuron_processing = np.zeros((timesteps,))
+
 for timestep in range(0, timesteps):
-#for timestep in range(43, 44):
+#for timestep in range(102, 103):
+    message_generation_latencies = np.zeros((128, 128))
+    message_receive_latencies = np.zeros((128, 128))
     df_timestep = df[df["timestep"] == timestep]
-    flow_delays, flow_counts, flow_mean_server_time = sim_timestep(df_timestep)
+
+    for _, row in df_timestep.iterrows():
+        src_tile, src_core = hw_str_to_core(row["src_hw"])
+        dest_tile, dest_core = hw_str_to_core(row["dest_hw"])
+        #message_generation_latencies[src_core, dest_core] += row["generation_delay"]
+        if message_generation_latencies[src_core, dest_core] == 0:
+            message_generation_latencies[src_core, dest_core] = \
+                row["generation_delay"]
+        else:
+            message_generation_latencies[src_core, dest_core] += \
+                min(message_generation_latencies[src_core, dest_core],
+                    row["generation_delay"])
+        message_receive_latencies[src_core, dest_core] += row["processing_latency"]
+
+    #TODO explore
+    #message_generation_latencies = df_timestep["generation_delay"].min()
+    #message_generation_latencies = df_timestep["generation_delay"].min()
+
+    flow_delays, flow_counts, _ = sim_delay(df_timestep)
 
     print(f"i:{timestep} max flow delay: {np.max(flow_delays):e}")
     max_latencies[timestep] = np.max(flow_delays)
     mean_latencies[timestep] = np.mean(flow_delays)
-    total_flow_latencies[timestep] = np.max(np.multiply(flow_delays, flow_counts))
-    total_core_latencies[timestep] = np.max(np.sum(np.multiply(flow_delays, flow_counts), axis=1))
 
-    print(f"mean server:{flow_mean_server_time}")
+    print(f"mean server:{message_receive_latencies}")
     print(f"counts:{flow_counts}")
 
-    max_synapse_processing[timestep] = np.max(np.multiply(flow_counts, flow_mean_server_time))
-    #total_latencies[timestep] = np.max(flow_delays)
+    max_neuron_processing[timestep] = np.max(np.sum(message_generation_latencies, axis=1))
+    max_synapse_processing[timestep] = np.max(np.sum(message_receive_latencies, axis=0))
 
-    #print(f"product:{np.multiply(flow_counts, flow_mean_server_time)}")
-    #print(np.max(np.multiply(flow_counts, flow_mean_server_time)))
-    #print(np.argmax(np.multiply(flow_counts, flow_mean_server_time), axis=1))
-    #input()
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
@@ -649,13 +742,13 @@ plt.figure()
 loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
 loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
 plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
-plt.plot(max_latencies * 1.0e6)
-plt.plot(mean_latencies * 1.0e6)
-plt.plot(max_synapse_processing * 1.0e6)
-plt.plot(total_flow_latencies * 1.0e6)
-plt.plot(total_core_latencies * 1.0e6)
+plt.plot(max_latencies[1:] * 1.0e6)
+#plt.plot(mean_latencies[1:] * 1.0e6)
+plt.plot(max_synapse_processing[1:] * 1.0e6, "--")
+plt.plot(max_neuron_processing[1:] * 1.0e6, "--")
 
-plt.legend(("Measured", "Max", "Mean", "Max Synapse", "Total Flow", "Total Core"), fontsize=7)
+#plt.legend(("Measured", "Max", "Mean", "Max Synapse", "Max Neuron"), fontsize=7)
+plt.legend(("Measured", "Max Path Delay", "Max. Message Receiving", "Max. Neuron Processing"), fontsize=7)
 plt.ylabel("Time-step Latency ($\mu$s)")
 plt.xlabel("Time-step")
 plt.yticks(np.arange(0, 61, 10))
