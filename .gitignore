@@ -1,4 +1,4 @@
-runs/
+runs/*
 debug/
 release/
 etc/

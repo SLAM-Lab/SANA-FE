@@ -360,3 +360,27 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 
 	return ts_elapsed;
 }
+
+void test_pybind(void){
+	INFO("Printing through Pybind!\n");
+}
+
+PYBIND11_MODULE(simcpp, m) {
+    m.doc() = R"pbdoc(
+        SANA-FE Cpp Module with Pybind11 
+        --------------------------------
+
+        .. currentmodule:: simcpp
+
+        .. autosummary::
+           :toctree: _generate
+
+           test_pybind
+    )pbdoc";
+
+    m.def("test_pybind", &test_pybind, R"pbdoc(
+        test_pybind function from main.cpp
+
+        Test pybind11 functionality.
+    )pbdoc");
+}
