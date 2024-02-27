@@ -15,6 +15,7 @@
 #include "arch.hpp"
 #include "description.hpp"
 #include "command.hpp"
+#include "pybind11/pybind11.h"
 
 void run(struct simulation *sim, struct network *net, struct architecture *arch);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
