@@ -797,6 +797,12 @@ double sim_update_soma(
 
 	TRACE1("nid:%d updating, current_in:%lf\n", n->id, current_in);
 	n->neuron_status = n->soma_class->update_soma(current_in);
+
+	if (n->forced_spikes > 0){
+		n->neuron_status = FIRED;
+		n->forced_spikes--;
+	}
+
 	double latency = sim_update_soma_latency(ts, n);
 
 	// TODO: FIX the latency returns

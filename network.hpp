@@ -67,6 +67,7 @@ struct neuron
 	double dendritic_current_decay, processing_latency;
 	double current, charge;
 	Neuron_Status neuron_status;
+	int forced_spikes;
 
 	// LIF specific
 	// unsigned int random_range_mask;
