@@ -31,7 +31,7 @@ find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 pybind11_add_module(simcpp 
-	module.cpp
+	${SOURCE_FILES}
 )
 target_link_libraries(simcpp PRIVATE ${PYTHON_LIBRARIES})
 target_link_libraries(simcpp PRIVATE pybind11::pybind11)

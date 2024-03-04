@@ -18,6 +18,8 @@
 #include "main.hpp"
 #include "pybind11/pybind11.h"
 
+namespace py = pybind11;
+
 class SANA_FE{
 	public:
 		struct simulation *sim;
@@ -36,7 +38,7 @@ class SANA_FE{
 			INFO("Initializing simulation.\n");
 			sim = sim_init_sim();
 		}
-		int forceSpike(int group_id, int n_id, int num_spikes){
+		int force_spike(int group_id, int n_id, int num_spikes){
 			if (num_spikes < 0)
 				return -1;
 			if (group_id >= net.neuron_group_count)
@@ -51,158 +53,111 @@ class SANA_FE{
 				run(sim, &net, arch);
 			}
 		}
-
-		// Temporary functions
-		void parseArgs(int argc, char *argv[]){
-			char *filename;
-			int ret;
-			FILE *network_fp, *arch_fp;
-
-			if (argc < 1)
+		void set_input(char *filename){
+			input_fp = fopen(filename, "r");
+			if (input_fp == NULL)
 			{
-				INFO("Error: No program arguments.\n");
+				INFO("Error: Couldn't open inputs %s.\n", filename);
 				clean_up(RET_FAIL);
 			}
+		}
+		void set_perf_flag(bool flag = true){
+			if (flag){
+				sim->log_perf = 1;
 
-			argc--;
-			argv++;
-
-			// Parse optional args
-			while (argc > 2)
-			{
-				if (argv[0][0] == '-')
-				{
-					switch (argv[0][1])
-					{
-					case 'i':
-						filename = argv[1];
-						argv++;
-						argc--;
-						break;
-					case 'p':
-						sim->log_perf = 1;
-						break;
-					case 's':
-						sim->log_spikes = 1;
-						break;
-					case 'v':
-						sim->log_potential = 1;
-						break;
-					case 'm':
-						sim->log_messages = 1;
-						break;
-					default:
-						INFO("Error: Flag %c not recognized.\n",
-										argv[0][1]);
-						break;
-					}
-					argc--;
-					argv++;
-				}
-				else
-				{
-					break;
-				}
-			}
-
-			if (filename)
-			{
-				input_fp = fopen(filename, "r");
-				if (input_fp == NULL)
-				{
-					INFO("Error: Couldn't open inputs %s.\n", filename);
-					clean_up(RET_FAIL);
-				}
-			}
-
-			if (argc < PROGRAM_NARGS)
-			{
-				INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
-						"-v<potential trace> -i <input vectors>] "
-						"<arch description> <network description> "
-									"<timesteps>\n");
-				clean_up(RET_FAIL);
-			}
-
-			if (sim->log_potential)
-			{
-				sim->potential_trace_fp = fopen("potential.trace", "w");
-				if (sim->potential_trace_fp == NULL)
-				{
-					INFO("Error: Couldn't open trace file for writing.\n");
-					clean_up(RET_FAIL);
-				}
-			}
-			if (sim->log_spikes)
-			{
-				sim->spike_trace_fp = fopen("spikes.trace", "w");
-				if (sim->spike_trace_fp == NULL)
-				{
-					INFO("Error: Couldn't open trace file for writing.\n");
-					clean_up(RET_FAIL);
-				}
-			}
-			if (sim->log_messages)
-			{
-				sim->message_trace_fp = fopen("messages.trace", "w");
-				if (sim->message_trace_fp == NULL)
-				{
-					INFO("Error: Couldn't open trace file for writing.\n");
-					clean_up(RET_FAIL);
-				}
-
-			}
-			if (sim->log_perf)
-			{
 				sim->perf_fp = fopen("perf.csv", "w");
 				if (sim->perf_fp == NULL)
 				{
 					INFO("Error: Couldn't open perf file for writing.\n");
 					clean_up(RET_FAIL);
 				}
+				sim_perf_write_header(sim->perf_fp);
 			}
+			else{
+				sim->log_perf = 0;
+				if (sim->perf_fp != NULL)
+					fclose(sim->perf_fp);
+			}
+		}
+		void set_spike_flag(bool flag = true){
+			if (flag){
+				sim->log_spikes = 1;
 
-			// Read in program args, sanity check and parse inputs
-			filename = argv[ARCH_FILENAME];
-			arch_fp = fopen(filename, "r");
+				sim->spike_trace_fp = fopen("spikes.trace", "w");
+				if (sim->spike_trace_fp == NULL)
+				{
+					INFO("Error: Couldn't open trace file for writing.\n");
+					clean_up(RET_FAIL);
+				}
+				sim_spike_trace_write_header(sim);
+			}
+			else{
+				sim->log_spikes = 0;
+				if (sim->spike_trace_fp != NULL)
+					fclose(sim->spike_trace_fp);
+			}
+		}
+		void set_pot_flag(bool flag = true){
+			if (flag){
+				sim->log_potential = 1;
+
+				sim->potential_trace_fp = fopen("potential.trace", "w");
+				if (sim->potential_trace_fp == NULL)
+				{
+					INFO("Error: Couldn't open trace file for writing.\n");
+					clean_up(RET_FAIL);
+				}
+				sim_potential_trace_write_header(sim, &net);
+			}
+			else{
+				sim->log_potential = 0;
+				if (sim->potential_trace_fp != NULL)
+					fclose(sim->potential_trace_fp);
+			}
+		}
+		void set_mess_flag(bool flag = true){
+			if (flag){
+				sim->log_messages = 1;
+
+				sim->message_trace_fp = fopen("messages.trace", "w");
+				if (sim->message_trace_fp == NULL)
+				{
+					INFO("Error: Couldn't open trace file for writing.\n");
+					clean_up(RET_FAIL);
+				}
+				sim_message_trace_write_header(sim);
+			}
+			else{
+				sim->log_messages = 0;
+				if (sim->message_trace_fp != NULL)
+					fclose(sim->message_trace_fp);
+			}
+		}
+		void set_arch(char* filename){
+			FILE* arch_fp = fopen(filename, "r");
 			if (arch_fp == NULL)
 			{
 				INFO("Error: Architecture file %s failed to open.\n", filename);
 				clean_up(RET_FAIL);
 			}
-			ret = description_parse_file(arch_fp, NULL, arch);
+			int ret = description_parse_file(arch_fp, NULL, arch);
 			//arch_print_description(&description, 0);
 			fclose(arch_fp);
 			if (ret == RET_FAIL)
 			{
 				clean_up(RET_FAIL);
 			}
-			//arch_init_message_scheduler(&scheduler, arch);
-
-			timesteps = 0;
-			ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
-			if (ret < 1)
-			{
-				INFO("Error: Time-steps must be integer > 0 (%s).\n",
-									argv[TIMESTEPS]);
-				clean_up(RET_FAIL);
-			}
-			else if (timesteps <= 0)
-			{
-				INFO("Error: Time-steps must be > 0 (%d)\n", timesteps);
-				clean_up(RET_FAIL);
-			}
-
-			filename = argv[NETWORK_FILENAME];
-			// Create the network
-			network_fp = fopen(filename, "r");
+			arch_create_connection_maps(arch);
+		}
+		void set_net(char* filename){
+			FILE* network_fp = fopen(filename, "r");
 			if (network_fp == NULL)
 			{
 				INFO("Network data (%s) failed to open.\n", filename);
 				clean_up(RET_FAIL);
 			}
 			INFO("Reading network from file.\n");
-			ret = description_parse_file(network_fp, &net, arch);
+			int ret = description_parse_file(network_fp, &net, arch);
 			fclose(network_fp);
 			if (ret == RET_FAIL)
 			{
@@ -210,23 +165,9 @@ class SANA_FE{
 			}
 			network_check_mapped(&net);
 
-			arch_create_connection_maps(arch);
-			INFO("Creating probe and perf data files.\n");
-			if (sim->spike_trace_fp != NULL)
-			{
-				sim_spike_trace_write_header(sim);
-			}
-			if (sim->potential_trace_fp != NULL)
-			{
-				sim_potential_trace_write_header(sim, &net);
-			}
-			if (sim->message_trace_fp != NULL)
-			{
-				sim_message_trace_write_header(sim);
-			}
-			if (sim->perf_fp != NULL)
-			{
-				sim_perf_write_header(sim->perf_fp);
+			// Change Potential logging with new headers from net.
+			if (sim->log_potential){
+				set_pot_flag(true);
 			}
 		}
 
@@ -286,6 +227,7 @@ PYBIND11_MODULE(simcpp, m) {
            :toctree: _generate
 
            test_pybind
+		   SANA_FE
     )pbdoc";
 
     m.def("test_pybind", &test_pybind, R"pbdoc(
@@ -293,4 +235,18 @@ PYBIND11_MODULE(simcpp, m) {
 
         Test pybind11 functionality.
     )pbdoc");
+
+	py::class_<SANA_FE>(m, "SANA_FE")
+		.def(py::init())
+		.def("init", &SANA_FE::init)
+        .def("force_spike", &SANA_FE::force_spike)
+        .def("run_timesteps", &SANA_FE::run_timesteps)
+		.def("set_input", &SANA_FE::set_input)
+		.def("set_perf_flag", &SANA_FE::set_perf_flag)
+		.def("set_spike_flag", &SANA_FE::set_spike_flag)
+		.def("set_pot_flag", &SANA_FE::set_pot_flag)
+		.def("set_mess_flag", &SANA_FE::set_mess_flag)
+		.def("set_arch", &SANA_FE::set_arch)
+		.def("set_net", &SANA_FE::set_net)
+		.def("clean_up", &SANA_FE::clean_up);
 }
