@@ -15,33 +15,21 @@
 #include "arch.hpp"
 #include "description.hpp"
 #include "command.hpp"
-#include "main.hpp"
+#include "module.hpp"
 
 int main(int argc, char *argv[])
 {
-	struct simulation *sim;
-	struct network net;
-	struct architecture *arch;
-	char *filename, *input_buffer;
-	double average_power;
+	SANA_FE sana_fe;
 	int timesteps, ret;
-	FILE *input_fp, *network_fp, *arch_fp;
 
-	filename = NULL;
-	input_fp = NULL;
-	input_buffer = NULL;
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
 	ret = RET_FAIL;
 
-	arch = arch_init();
-	network_init(&net);
-	INFO("Initializing simulation.\n");
-	sim = sim_init_sim();
 	if (argc < 1)
 	{
 		INFO("Error: No program arguments.\n");
-		goto clean_up;
+		sana_fe.clean_up(RET_FAIL);
 	}
 	// First arg is always program name, skip
 	argc--;
@@ -55,21 +43,21 @@ int main(int argc, char *argv[])
 			switch (argv[0][1])
 			{
 			case 'i':
-				filename = argv[1];
+				sana_fe.set_input(argv[1]);
 				argv++;
 				argc--;
 				break;
 			case 'p':
-				sim->log_perf = 1;
+				sana_fe.set_perf_flag();
 				break;
 			case 's':
-				sim->log_spikes = 1;
+				sana_fe.set_spike_flag();
 				break;
 			case 'v':
-				sim->log_potential = 1;
+				sana_fe.set_pot_flag();
 				break;
 			case 'm':
-				sim->log_messages = 1;
+				sana_fe.set_mess_flag();
 				break;
 			default:
 				INFO("Error: Flag %c not recognized.\n",
@@ -85,22 +73,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (filename)
-	{
-		input_fp = fopen(filename, "r");
-		if (input_fp == NULL)
-		{
-			INFO("Error: Couldn't open inputs %s.\n", filename);
-			goto clean_up;
-		}
-	}
-
 	if (argc < PROGRAM_NARGS)
 	{
 		INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
 				"-v<potential trace> -m <message trace>] "
 				"<arch description> <network description> "
 							"<timesteps>\n");
+		sana_fe.clean_up(RET_FAIL);
 		goto clean_up;
 	}
 
@@ -138,26 +117,14 @@ int main(int argc, char *argv[])
 		if (sim->perf_fp == NULL)
 		{
 			INFO("Error: Couldn't open perf file for writing.\n");
+			sana_fe.clean_up(RET_FAIL);
 			goto clean_up;
 		}
 	}
 
 	// Read in program args, sanity check and parse inputs
-	filename = argv[ARCH_FILENAME];
-	arch_fp = fopen(filename, "r");
-	if (arch_fp == NULL)
-	{
-		INFO("Error: Architecture file %s failed to open.\n", filename);
-		goto clean_up;
-	}
-	ret = description_parse_file(arch_fp, NULL, arch);
-	//arch_print_description(&description, 0);
-	fclose(arch_fp);
-	if (ret == RET_FAIL)
-	{
-		goto clean_up;
-	}
-	//arch_init_message_scheduler(&scheduler, arch);
+	sana_fe.set_arch(argv[ARCH_FILENAME]);
+	sana_fe.set_arch(argv[NETWORK_FILENAME]);
 
 	timesteps = 0;
 	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
@@ -165,80 +132,33 @@ int main(int argc, char *argv[])
 	{
 		INFO("Error: Time-steps must be integer > 0 (%s).\n",
 							argv[TIMESTEPS]);
-		goto clean_up;
+		sana_fe.clean_up(RET_FAIL);
 	}
 	else if (timesteps <= 0)
 	{
 		INFO("Error: Time-steps must be > 0 (%d)\n", timesteps);
-		goto clean_up;
+		sana_fe.clean_up(RET_FAIL);
 	}
 
-	filename = argv[NETWORK_FILENAME];
-	// Create the network
-	network_fp = fopen(filename, "r");
-	if (network_fp == NULL)
-	{
-		INFO("Network data (%s) failed to open.\n", filename);
-		goto clean_up;
-	}
-	INFO("Reading network from file.\n");
-	ret = description_parse_file(network_fp, &net, arch);
-	fclose(network_fp);
-	if (ret == RET_FAIL)
-	{
-		goto clean_up;
-	}
-	network_check_mapped(&net);
-
-	arch_create_connection_maps(arch);
-	INFO("Creating probe and perf data files.\n");
-	if (sim->spike_trace_fp != NULL)
-	{
-		sim_spike_trace_write_header(sim);
-	}
-	if (sim->potential_trace_fp != NULL)
-	{
-		sim_potential_trace_write_header(sim, &net);
-	}
-	if (sim->message_trace_fp != NULL)
-	{
-		sim_message_trace_write_header(sim);
-	}
-	if (sim->perf_fp != NULL)
-	{
-		sim_perf_write_header(sim->perf_fp);
-	}
 	// Step simulation
 	INFO("Running simulation.\n");
-	for (sim->ts.timestep = 1; sim->ts.timestep <= timesteps;
-		(sim->ts.timestep)++)
+	for (long timestep = 1; timestep <= timesteps; timestep++)
 	{
-		if ((sim->ts.timestep % 100) == 0)
+		if ((timestep % 100) == 0)
 		{
 			// Print heart-beat every hundred timesteps
-			INFO("*** Time-step %ld ***\n", sim->ts.timestep);
+			INFO("*** Time-step %ld ***\n", timestep);
 		}
-		run(sim, &net, arch);
+		sana_fe.run_timesteps();
 	}
 
 	INFO("***** Run Summary *****\n");
-	sim_write_summary(stdout, sim);
-	if (sim->total_sim_time > 0.0)
-	{
-		average_power = sim->total_energy / sim->total_sim_time;
-	}
-	else
-	{
-		average_power = 0.0;
-	}
+	sana_fe.sim_summary();
+	double average_power = sana_fe.get_power();
 	INFO("Average power consumption: %f W.\n", average_power);
-	sim->stats_fp = fopen("run_summary.yaml", "w");
-	if (sim->stats_fp != NULL)
-	{
-		sim_write_summary(sim->stats_fp, sim);
-	}
 	INFO("Run finished.\n");
 
+<<<<<<< HEAD
 clean_up:
 	// Free any larger structures here
 	network_free(&net);
@@ -348,4 +268,7 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	}
 
 	return ts_elapsed;
+=======
+	sana_fe.clean_up(RET_OK);
+>>>>>>> Switching to class-based execution
 }
