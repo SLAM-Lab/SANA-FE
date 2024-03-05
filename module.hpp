@@ -23,6 +23,7 @@ class SANA_FE{
 		int timesteps;
 		FILE *input_fp;
 
+        SANA_FE();
 		void init();
 		int force_spike(int group_id, int n_id, int num_spikes);
 		void run_timesteps(int timesteps = 1);

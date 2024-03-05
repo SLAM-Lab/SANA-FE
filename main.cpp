@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
 
 	// Read in program args, sanity check and parse inputs
 	sana_fe.set_arch(argv[ARCH_FILENAME]);
-	sana_fe.set_arch(argv[NETWORK_FILENAME]);
+	sana_fe.set_net(argv[NETWORK_FILENAME]);
 
 	timesteps = 0;
 	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
