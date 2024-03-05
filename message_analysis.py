@@ -19,8 +19,8 @@ logging.addLevelName(logging.TRACE, "TRACE")
 logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
 logging.trace = partial(logging.log, logging.TRACE)
 #logging.basicConfig(format=FORMAT, level=logging.TRACE, stream=sys.stdout)
-logging.basicConfig(format=FORMAT, level=logging.INFO, stream=sys.stdout)
-#logging.basicConfig(format=FORMAT, level=logging.WARNING, stream=sys.stdout)
+#logging.basicConfig(format=FORMAT, level=logging.INFO, stream=sys.stdout)
+logging.basicConfig(format=FORMAT, level=logging.WARNING, stream=sys.stdout)
 
 
 def hw_str_to_core(hw_str):
@@ -544,10 +544,10 @@ def sim_schedule_event_based_v2(messages):
         for buf in noc_buffers[next_x][next_y][:8]:
             if len(buf) > 0:
                 m = buf[-1]
-                logging.debug(f"checking contention m:{m} pos:{x,y,link}")
+                logging.debug(f"Checking contention m:{m} pos:{x,y,link}")
                 target_x, target_y, target_link = get_next_downstream_link(m)
                 logging.debug(f"m:{m} targeting link {target_x,target_y,target_link}")
-                if (target_x == x) and (target_y == y) and (target_link == link):
+                if not m.pending and (target_x == x) and (target_y == y) and (target_link == link):
                     logging.debug(f"m:{m} competing over the dest link, buffer len:{len(noc_buffers[target_x][target_y][target_link])}")
                     masked[m.pos[2]] = \
                         last_sent_buffers[m.pos[0], m.pos[1], m.pos[2]]
@@ -575,6 +575,8 @@ def sim_schedule_event_based_v2(messages):
             E = {"message": first_message, "type": State.SEND}
             priority.append((E, first_message.generation_delay))
     priority.sort(key=lambda x: x[1], reverse=True)
+
+    hop_delay = 6.5e-9  # s
 
     event_count = 0
     t = 0
@@ -608,7 +610,8 @@ def sim_schedule_event_based_v2(messages):
                     if len(noc_buffers[next_x][next_y][next_link]) == 1:
                         hop_event = {"type": State.HOP, "message": m}
                         logging.debug(f"Creating HOP event:{hop_event}")
-                        priority.append((hop_event, t))
+                        m.pending = True
+                        priority.append((hop_event, t + hop_delay))
 
                     # If there are more messages in this core's send queue, also
                     #  schedule a send event if there's space in the buffer
@@ -635,9 +638,12 @@ def sim_schedule_event_based_v2(messages):
             message_hopped = False
             link_unblocked = False
             buffer_sizes = (16, 10, 16, 10, 8, 8, 8, 8, 24, 24, 24, 24)
-            buffer_size = buffer_sizes[link]
+            if link is not None:
+                buffer_size = buffer_sizes[link]
+            else:
+                buffer_size = None
 
-            if link >= 8 and (len(received_messages[m.dest_core]) == 0 or
+            if link is not None and link >= 8 and (len(received_messages[m.dest_core]) == 0 or
                 received_messages[m.dest_core][0].t_finished_processing is not None):
                 # Link->core hop, message is received by core
                 logging.debug(f"Message hopping to dest core:{m.dest_core}")
@@ -646,11 +652,12 @@ def sim_schedule_event_based_v2(messages):
                 assert(noc_buffers[x][y][link].pop() == m)
 
                 received_messages[m.dest_core].insert(0, m)
-                m.pos = None
+                m.pos = None, None, None
                 receive_event = {"type": State.RECEIVE, "message": m}
                 logging.debug(f"Creating RECEIVE event:{receive_event}")
                 priority.append((receive_event, t + m.receive_delay))
-            elif link < 8:  # Normal link->link hop
+            elif link is not None and link < 8:  # Normal link->link hop
+                m.pending = False
                 dest_pos = get_next_downstream_link(m)
                 dest_x, dest_y, dest_link = dest_pos
                 logging.debug(f"Message {m} hop to {dest_pos}")
@@ -668,14 +675,18 @@ def sim_schedule_event_based_v2(messages):
                         logging.debug(f"Message m:{m} is at head of next queue")
                         hop_event = {"type": State.HOP, "message": m}
                         logging.debug(f"Creating a second HOP event for same message:{hop_event}")
-                        priority.append((hop_event, t))
+                        m.pending = True
+                        priority.append((hop_event, t + hop_delay))
+            logging.debug(f"Message {m} hopped:{message_hopped} unblocked link:{link_unblocked}")
 
             # After popping the current message, we may need to schedule the
             #  next message at the head of the buffer
             if message_hopped and len(noc_buffers[x][y][link]) > 0:
+                assert(not noc_buffers[x][y][link][-1].pending)
                 hop_event = {"type": State.HOP, "message": noc_buffers[x][y][link][-1]}
                 logging.debug(f"Creating next HOP event for same link:{hop_event}")
-                priority.append((hop_event, t))
+                noc_buffers[x][y][link][-1].pending = True
+                priority.append((hop_event, t + hop_delay))
 
             # If src link was previously full, we have now unblocked the link,
             #  so look to the upstream link for the next message to grab
@@ -693,9 +704,14 @@ def sim_schedule_event_based_v2(messages):
                     logging.debug(f"Getting next message at:{next_x,next_y,next_link}")
                     if next_link is not None:
                         next_message = noc_buffers[next_x][next_y][next_link][-1]
-                        logging.debug(f"Message {next_message} will be sent from upstream link")
-                        hop_event = {"type": State.HOP, "message": next_message}
-                        priority.append((hop_event, t))
+
+                        if not next_message.pending:
+                            logging.debug(f"Message {next_message} will be sent from upstream link")
+                            hop_event = {"type": State.HOP, "message": next_message}
+                            next_message.pending = True
+                            priority.append((hop_event, t + hop_delay))
+                        else:
+                            logging.debug(f"Message {next_message} upstream was PENDING")
 
             priority.sort(key=lambda x: x[1], reverse=True)
 
@@ -714,10 +730,32 @@ def sim_schedule_event_based_v2(messages):
                 logging.debug(f"Process next message:{next_message}")
                 next_message_event = {"type": State.HOP, "message": next_message}
                 logging.debug(f"Create HOP event:{next_message_event}")
-                priority.append((next_message_event, t))
+                next_message.pending = True
+                priority.append((next_message_event, t + hop_delay))
                 priority.sort(key=lambda x: x[1], reverse=True)
         else:
             raise Exception(f"Error: Event:{E} not supported")
+
+        # Check to see if any messages can progress through the NoC,
+        #  unaccounted for. This may happen when there are non-zero transfer
+        #  delays, and messages fail to HOP as the result of events
+        for x in range(0, 8):
+            for y in range(0, 4):
+                for link in range(0, 12):
+                    if (len(noc_buffers[x][y][link]) > 0 and
+                        noc_buffers[x][y][link][-1].pending == False):
+                        m = noc_buffers[x][y][link][-1]
+                        next_pos = get_next_downstream_link(m)
+                        next_x, next_y, next_link = next_pos
+
+                        if next_link is not None:
+                            logging.debug(f"Message {m} can go to next link")
+                            m.pending = True
+                            hop_event = {"type": State.HOP, "message": m}
+                            logging.debug(f"Updating NoC with HOP event:{hop_event}")
+                            priority.append((hop_event, t + hop_delay))
+                            priority.sort(key=lambda x: x[1], reverse=True)
+
 
         # Check here that the total messages in the system are consistent
         total_in_system = 0
@@ -748,15 +786,15 @@ def sim_schedule_event_based_v2(messages):
         for m in m_q:
             total_messages_received += 1
 
-    logging.info(f"Total received:{total_messages_received} total sent:{total_messages_sent}")
-    assert(all([len(m) == 0 for m in messages]))
-    assert(total_messages_received == total_messages_sent)
-
     for x in range(0, 8):
         for y in range(0, 4):
             for link in range(0, 12):
                 logging.trace(f"Link {x,y,link}:{noc_buffers[x][y][link]}")
                 assert(len(noc_buffers[x][y][link]) == 0)
+
+    logging.info(f"Total received:{total_messages_received} total sent:{total_messages_sent}")
+    assert(all([len(m) == 0 for m in messages]))
+    assert(total_messages_received == total_messages_sent)
 
     logging.info(f"*** Finished modeling NoC, {event_count} events processed ***")
     return t
@@ -1143,7 +1181,7 @@ class Message:
         return str(self)
 
     def __str__(self):
-        s = f"0x{self.id:x}:({self.src_core}->{self.dest_core})@{self.pos}"
+        s = f"0x{self.id:x}:({self.src_core}->{self.dest_core})@{self.pos} p:{self.pending}"
         return s
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1185,6 +1223,7 @@ for timestep in range(0, timesteps):
 #for timestep in range(0, 32):
 #for timestep in range(0, 22):
 #for timestep in range(50, 51):
+#for timestep in range(50, 60):
 #"""
     message_generation_latencies = np.zeros((128, 128))
     message_receive_latencies = np.zeros((128, 128))
@@ -1206,12 +1245,12 @@ for timestep in range(0, timesteps):
         message_counts[timestep] += 1
 
     # Display the breakdown of synapse latencies
-    rx = np.sum(message_receive_latencies[:,:], axis=0) * 1.0e6
-    print(f"height: {rx}")
-    total = 0
-    for r in rx:
-        plt.bar(("Timestep 50",), r, bottom=total)
-        total += r
+    #rx = np.sum(message_receive_latencies[:,:], axis=0) * 1.0e6
+    #print(f"height: {rx}")
+    #total = 0
+    #for r in rx:
+    #    plt.bar(("Timestep 50",), r, bottom=total)
+    #    total += r
 
     print(f"** Scheduling messages for timestep:{timestep} **")
     event_based_latencies[timestep] = sim_schedule_event_based_v2(messages.copy())
