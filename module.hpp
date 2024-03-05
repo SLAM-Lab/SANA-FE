@@ -6,6 +6,8 @@
 #include "command.hpp"
 #include "pybind11/pybind11.h"
 
+#define PYBIND11_DETAILED_ERROR_MESSAGES
+
 enum program_args
 {
 	ARCH_FILENAME,

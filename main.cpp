@@ -10,11 +10,6 @@
 #include <time.h>
 
 #include "print.hpp"
-#include "sim.hpp"
-#include "network.hpp"
-#include "arch.hpp"
-#include "description.hpp"
-#include "command.hpp"
 #include "module.hpp"
 
 int main(int argc, char *argv[])

@@ -321,15 +321,15 @@ PYBIND11_MODULE(simcpp, m) {
 		.def(py::init())
 		.def("init", &SANA_FE::init)
         .def("force_spike", &SANA_FE::force_spike)
-        .def("run_timesteps", &SANA_FE::run_timesteps)
+        .def("run_timesteps", &SANA_FE::run_timesteps, py::arg("timesteps") = 1)
 		.def("set_input", &SANA_FE::set_input)
-		.def("set_perf_flag", &SANA_FE::set_perf_flag)
-		.def("set_spike_flag", &SANA_FE::set_spike_flag)
-		.def("set_pot_flag", &SANA_FE::set_pot_flag)
-		.def("set_mess_flag", &SANA_FE::set_mess_flag)
+		.def("set_perf_flag", &SANA_FE::set_perf_flag, py::arg("flag") = true)
+		.def("set_spike_flag", &SANA_FE::set_spike_flag, py::arg("flag") = true)
+		.def("set_pot_flag", &SANA_FE::set_pot_flag, py::arg("flag") = true)
+		.def("set_mess_flag", &SANA_FE::set_mess_flag, py::arg("flag") = true)
 		.def("set_arch", &SANA_FE::set_arch)
 		.def("set_net", &SANA_FE::set_net)
 		.def("get_power", &SANA_FE::get_power)
 		.def("sim_summarry", &SANA_FE::sim_summary)
-		.def("clean_up", &SANA_FE::clean_up);
+		.def("clean_up", &SANA_FE::clean_up, py::arg("ret") = 1);
 }
