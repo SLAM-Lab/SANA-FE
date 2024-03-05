@@ -19,8 +19,8 @@ logging.addLevelName(logging.TRACE, "TRACE")
 logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
 logging.trace = partial(logging.log, logging.TRACE)
 #logging.basicConfig(format=FORMAT, level=logging.TRACE, stream=sys.stdout)
-#logging.basicConfig(format=FORMAT, level=logging.INFO, stream=sys.stdout)
-logging.basicConfig(format=FORMAT, level=logging.WARNING, stream=sys.stdout)
+logging.basicConfig(format=FORMAT, level=logging.INFO, stream=sys.stdout)
+#logging.basicConfig(format=FORMAT, level=logging.WARNING, stream=sys.stdout)
 
 
 def hw_str_to_core(hw_str):
@@ -139,9 +139,11 @@ def calculate_pk_mmk1n(K, N, ro):
 
     return p
 
+BUFFER_SIZES = (16, 10, 16, 10, 8, 8, 8, 8, 24, 24, 24, 24)
 
 def calculate_queue_blocking(K, arrival_rate, mean_service_time,
-                             N=None, service_pdf=None, sim_time=None):
+                             N=None, service_pdf=None, sim_time=None,
+                             remaining_flow_capacity=None):
     #print("*** Calculate queue blocking ***")
     #print(f"arrival_rate: {arrival_rate:e}")
     #print(f"mean service time: {mean_service_time:e}")
@@ -226,7 +228,7 @@ def calculate_queue_blocking(K, arrival_rate, mean_service_time,
     #    p[k] = ro**k * p[0]
     #print(f"p:{p}")
 
-    if N is not None and mean_service_time != 0:
+    if (N is not None and mean_service_time != 0):
         mean_service_rate = (1/mean_service_time)
         print(f"\tservice rate:{mean_service_rate:e}")
         #time_until_saturation = K / (arrival_rate - mean_service_rate)
@@ -244,14 +246,21 @@ def calculate_queue_blocking(K, arrival_rate, mean_service_time,
         #  blocking effects
         # N: Messages sent in flow
         # K: Buffer size
+        # TODO: introduce new K - the remaining flow (buffer) capacity
         steady_state_ratio2 = (N - K) / N
+        steady_state_ratio3 = (N - remaining_flow_capacity) / N
+
         steady_state_ratio2 = np.clip(steady_state_ratio2, 0, 1)
+        steady_state_ratio3 = np.clip(steady_state_ratio3, 0, 1)
+
         # TODO: HACK - to disable
         #steady_state_ratio2 = 1.0
         print(f"\tsim time:{sim_time} steady state ratio2:{steady_state_ratio2}")
-        #input()
-        probability_blocking *= steady_state_ratio2
-
+        print(f"\tK:{K} vs capacity:{remaining_flow_capacity}")
+        #probability_blocking *= steady_state_ratio2
+        print(f"before:{probability_blocking*steady_state_ratio2} vs after:{probability_blocking*steady_state_ratio3} accounting for remaining capacity")
+        #probability_blocking *= steady_state_ratio2
+        probability_blocking *= steady_state_ratio3
 
     # lambda_e == effective throughput
     effective_throughput = arrival_rate * (1 - probability_blocking)
@@ -279,7 +288,8 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
                         link_server_time, contention_waiting_time,
                         router_link_flows, path_arrival_rates, flows,
                         prob_link_blocking, link_arrival_count,
-                        messages_buffered, max_neuron_processing):
+                        messages_buffered, max_neuron_processing,
+                        remaining_link_capacity):
     print("** Update buffer queue **")
     links_out = dependencies.out_edges(link)
     print(f"links_out:{links_out}")
@@ -321,28 +331,25 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
     # link
     if (len(links_out) > 0) and (link_arrival_rates[link_idx] > 0):
         link_server_time[link_idx] /= link_arrival_rates[link_idx]
-    print(f"buffer server time: {link_server_time[link_idx]}")
+    print(f"link server time: {link_server_time[link_idx]}")
     assert(link_server_time[link_idx] != math.nan)
     assert(link_server_time[link_idx] < 1.0)
     # else this is a leaf link, and the service time is already given by the path
 
     #"""
-    if link_idx[2] == 0 or link_idx[2] == 2:  # Network tile to network tile
-        buffer_size = 16
-    elif link_idx[2] == 1 or link_idx[2] == 3:
-        buffer_size = 10
-    elif (link_idx[2] >= 4 and link_idx[2] < 8):  # Cores to network
-        buffer_size = 8
-    elif link_idx[2] >= 8:  # Network to cores
-        buffer_size = 24
+    buffer_size = BUFFER_SIZES[link_idx[2]]
     #"""
 
+    # Calculate the remaining flow capacity for this link, that means traversing
+    #  the rest of the flow and counting the x, y links
+    #calculate_remaining_flow(flow, link)
     prob_blocked, link_waiting_time, queue_length = \
         calculate_queue_blocking(buffer_size, link_arrival_rates[link_idx],
                                  link_server_time[link_idx],
                                  N=link_arrival_count[link_idx],
                                  service_pdf=None,
-                                 sim_time=max_neuron_processing)
+                                 sim_time=max_neuron_processing,
+                                 remaining_flow_capacity=remaining_link_capacity[link_idx])
     #prob_blocked, link_waiting_time, queue_length = \
     #    calculate_queue_blocking(buffer_size, link_arrival_rates[link_idx],
     #                             link_server_time[link_idx],
@@ -368,6 +375,7 @@ def update_buffer_queue(dependencies, link, link_arrival_rates,
     print(f"link buffer waiting:{link_waiting_time:e}")
     prob_link_blocking[link_idx] = np.clip(prob_blocked, 0, 1)
     messages_buffered[link_idx] = np.clip(queue_length, 0, None)
+    #print(f"link server time: {link_server_time}")
     return link_waiting_time
 
 
@@ -435,15 +443,13 @@ def sim_delay_hops(flows):
     return delays
 
 
-def sim_schedule_event_based(messages):
+def sim_schedule_event_based_v2(messages):
     # Model the queues in each router link as a set of FIFOs. Here we will
     #  essentially schedule every single event as messages go from router to
     #  router.
     noc_buffers = []
+    received_messages = [[] for _ in range(0, 128)]
     last_sent_buffers = np.zeros((8, 4, 12))
-    pending_messages = [None for _ in range(0, 128)]
-    receiving_messages = [None for _ in range(0, 128)]
-    processed_messages = [[] for _ in range(0, 128)]
     all_messages = set()
 
     total_messages_sent = 0
@@ -462,103 +468,8 @@ def sim_schedule_event_based(messages):
 
     class State(enum.Enum):
         SEND = 1
-        RECEIVE = 2
-
-    def update_noc(t):
-        # TODO: this is probably simpler for handling pending messages
-        #  Go through all cores and check for any pending messages
-        # Go through all pending messages and router links and check if any
-        #  messages can now progress further through the NoC
-        for x in range(0, 8):
-            for y in range(0, 4):
-                for link in range(4, 8):
-                    if len(noc_buffers[x][y][link]):
-                        src_core = (x*16)+(y*4)+(link%4)
-                        m = pending_messages[src_core]
-                        if m is not None:
-                            if len(noc_buffers[x][y][link]) < 8:
-                                m.pending = False
-                                pending_messages[src_core] = None
-                                send_message(m, t)
-                                # Schedule the next messages if applicable
-                                if len(messages[m.src_core]) > 0:
-                                    next_message = messages[m.src_core].pop()
-                                    logging.debug(f"After pending message handled, scheduled m:{next_message}")
-                                    message_sent = send_message(next_message, t)
-                                    logging.info(f"Message m:{next_message} sent:{message_sent} at t={t}")
-                                    if next_message.pending:
-                                        pending_messages[next_message.src_core] = next_message
-                                    elif len(messages[next_message.src_core]) > 0:
-                                        logging.debug("Message sent ok, schedule next message in queue")
-                                        # TODO: when we schedule the next message,
-                                        #  that will occur some time after the prev
-                                        #  message.
-                                        schedule_next_message(next_message, t)
-                #for link in (0, 1, 2, 3, 8, 9, 10, 11):
-                #    if len(noc_buffers[x][y][link]) > 0:
-                #        update_message(noc_buffers[x][y][link][-1], t)
-
-    def sanity_check_noc():
-        logging.trace("Sanity checking NoC state")
-        for src in range(0, 128):
-            # Assert that we can't have a pending message and space in that
-            #  buffer
-            tile = src // 4
-            x = tile // 4
-            y = tile % 4
-            link = 4 + (src % 4)
-            if pending_messages[src]:
-                buffer_size = 8
-                logging.trace(f"core:{src} link:{link} "
-                             f"pending:{pending_messages[src]} "
-                             f"buf out len:{len(noc_buffers[x][y][link])}")
-                assert(len(noc_buffers[x][y][link]) >= buffer_size)
-
-        logging.trace("Checking to see links aren't jammed")
-        for x in range(0, 8):
-            for y in range(0, 4):
-                for link in range(0, 4):
-                    if len(noc_buffers[x][y][link]) > 0:
-                        m = noc_buffers[x][y][link][-1]
-                        logging.info(f"checking m:{m}")
-                        dest_tile = m.dest_core // 4
-                        dest_x = dest_tile // 4
-                        dest_y = dest_tile % 4
-
-                        if dest_y > y:
-                            next_x, next_y = x, y+1
-                        elif dest_x > x:
-                            next_x, next_y = x+1, y
-                        elif dest_y < y:
-                            next_x, next_y = x, y-1
-                        elif dest_x < x:
-                            next_x, next_y = x-1, y
-                        else:
-                            next_x, next_y = x, y
-
-                        if x < dest_x:
-                            next_link = 1  # East
-                        elif x > dest_x:
-                            next_link = 3  # West
-                        elif y < dest_y:
-                            next_link = 0  # North
-                        elif y > dest_y:
-                            next_link = 2  # South
-                        else:
-                            next_link = 8 + (m.dest_core % 4)
-
-                        buffer_sizes = (16, 10, 16, 10, 8, 8, 8, 8, 24, 24, 24, 24)
-                        logging.trace(f"link {x,y,link}->{next_x,next_y,next_link} "
-                                     f"buffer len:{len(noc_buffers[next_x][next_y][next_link])} "
-                                     f"max len:{buffer_sizes[next_link]}")
-                        assert(len(noc_buffers[next_x][next_y][next_link]) == \
-                               buffer_sizes[next_link])
-                for link in range(8, 12):
-                    for m in noc_buffers[x][y][link]:
-                        if (m.dest_core % 4) != (link % 4):
-                            logging.trace(f"m:{m} and link:{link}")
-                        assert((m.dest_core % 4) == (link % 4))
-        return
+        HOP = 2
+        RECEIVE = 3
 
     def get_next_downstream_link(m):
         x, y, link = m.pos
@@ -568,7 +479,7 @@ def sim_schedule_event_based(messages):
             next_x = src_tile // 4
             next_y = src_tile % 4
             next_link = 4 + (m.src_core % 4)
-            logging.debug(f"m:{m} entered at link {next_x, next_y, next_link}")
+            logging.debug(f"m:{m} would enter NoC at link {next_x, next_y, next_link}")
         else:
             assert(link < 8)  # Already at destination link
             dest_tile = m.dest_core // 4
@@ -600,160 +511,14 @@ def sim_schedule_event_based(messages):
         # If the next link is full, it will block any sending link
         buffer_sizes = (16, 10, 16, 10, 8, 8, 8, 8, 24, 24, 24, 24)
         if len(noc_buffers[next_x][next_y][next_link]) >= buffer_sizes[next_link]:
-            logging.debug(f"next link {next_x,next_y,next_link} is full i.e., blocking")
+            logging.debug(f"Next link {next_x,next_y,next_link} is blocking")
             return None, None, None  # To indicate the next link is full
         else:
-            logging.debug(f"next link: {next_x, next_y, next_link}")
+            logging.debug(f"Next link {next_x, next_y, next_link} is available")
             return next_x, next_y, next_link
 
-
-    def receive_message(m, t):
-        # Schedule an event to update the NoC once we finish processing
-        logging.debug(f"creating a RECEIVE event for m:{m} at t={t}")
-        E = {"message": m, "type": State.RECEIVE}
-        priority.append((E, t + m.receive_delay))
-        priority.sort(key=lambda x: x[1], reverse=True)
-        assert(receiving_messages[m.dest_core] is None)
-        receiving_messages[m.dest_core] = m
-        logging.trace(f"receiving messages:{receiving_messages}")
-        return
-
-    def send_message(m, t):
-        logging.debug(f"Sending message {m}@t:{t}")
-        dest_pos = get_next_downstream_link(m)
-        dest_x, dest_y, dest_link = dest_pos
-
-        if dest_link is None:
-            logging.debug(f"First link is busy, set message m:{m} as pending")
-            # Message is being blocked by NoC, we need to push this
-            m.pending = True
-            pending_messages[m.src_core] = m
-            logging.debug(f"Pending:{pending_messages}")
-            return False
-        else:
-            m.pending = False
-
-        m.pos = dest_pos
-        logging.debug(f"m:{m} m.pos:{m.pos}")
-        x, y, link = m.pos
-        while (dest_link is not None and
-               (len(noc_buffers[dest_x][dest_y][dest_link]) == 0) and
-               dest_link < 8):
-            # Update the router tracking of which links have been used
-            logging.debug(f"Router link ({x},{y},{link}) "
-                         f"accessed router @ t={t}")
-            last_sent_buffers[x, y, link] = t
-            dest_pos = get_next_downstream_link(m)
-            dest_x, dest_y, dest_link = dest_pos
-
-            if dest_link is not None:
-                m.pos = dest_pos
-                logging.debug(f"m:{m} m.pos:{m.pos}")
-                x, y, link = m.pos
-
-        if (len(noc_buffers[x][y][link]) == 0
-            and receiving_messages[m.dest_core] is None and (link >= 8)):
-            # We successfully sent the message across the NoC, no blocking
-            #  We can start receiving the message
-            receive_message(m, t)
-            logging.info(f"Message m:{m} sent and received at core {m.dest_core}")
-        else:
-            logging.info(f"Message m:{m} sent")
-            logging.debug(f"len buffer[{x,y,link}]:{len(noc_buffers[x][y][link])}")
-            noc_buffers[x][y][link].insert(0, m)
-
-        logging.debug(f"Message m:{m} stored at pos q{m.pos}")
-        return True
-
-    def update_message(m, t):
-        # Update a message in the NoC. Assuming that a queue upstream has become
-        #  available, this means the message can possibly make its way to its
-        #  destination core now
-        src_x, src_y, src_link = m.pos
-        hops = 0
-
-        if src_link < 8:
-            logging.debug(f"Get next link for m:{m}")
-            # If we are not at a dest link, so somewhere inside the NoC, find
-            #  the next link for message m
-            dest_pos = get_next_downstream_link(m)
-            dest_x, dest_y, dest_link = dest_pos
-
-            logging.debug(f"Updating m:{m} at link {m.pos}")
-            if dest_link is None:
-                logging.debug("Next link is blocked, message can't go anywhere")
-                return False
-        else:
-            # Message m is at its destination link waiting for the dest core
-            #  to become available
-            logging.debug(f"m:{m} already at dest link")
-            dest_x, dest_y, dest_link = src_x, src_y, src_link
-
-        assert(dest_x is not None)
-        assert(dest_y is not None)
-        assert(dest_link is not None)
-
-        # While there are free spaces downstream, this message will hop across
-        #  the NoC
-        while (dest_link is not None and
-               len(noc_buffers[dest_x][dest_y][dest_link]) == 0 and
-               dest_link < 8):
-            logging.debug(f"m:{m} found buffer space at link {dest_x,dest_y,dest_link}")
-            m.pos = dest_pos
-            dest_pos = get_next_downstream_link(m)
-            assert(dest_pos != m.pos)
-            dest_x, dest_y, dest_link = dest_pos
-            x, y, link = m.pos
-            last_sent_buffers[x, y, link] = t
-            hops += 1
-
-        if dest_link is not None:
-            m.pos = dest_x, dest_y, dest_link
-
-        if dest_link is not None and dest_link >= 8:
-            # Message made it to its dest link
-            logging.debug(f"dest:{dest_link} "
-                         f"len:{len(noc_buffers[dest_x][dest_y][dest_link])} "
-                         f"rx:{receiving_messages[m.dest_core]}")
-
-            if (len(noc_buffers[dest_x][dest_y][dest_link]) == 0 and
-                receiving_messages[m.dest_core] is None):
-                # We successfully sent the message across the NoC, and the
-                #  receiving core is free to receive the new message
-                logging.info(f"message m:{m} started being received at core:{m.dest_core} at t={t}")
-                receive_message(m, t)
-                # Don't store the message in any buffer or queue, it was
-                #  received and processed
-                m.pos = None, None, None
-                dest_x, dest_y, dest_link = None, None, None
-            else:
-                logging.debug(f"message waiting to be received, don't receive it")
-
-        noc_buffers[src_x][src_y][src_link].pop()
-        x, y, link = m.pos
-        if link is not None:
-            noc_buffers[x][y][link].insert(0, m)
-
-        logging.debug(f"message m:{m} moved from {(src_x,src_y,src_link)}->"
-                        f"{(x,y,link)} dest:{dest_x,dest_y,dest_link}")
-        logging.debug(f"message m:{m} moved {hops} hops")
-
-        return True
-
-    def schedule_next_message(m, t):
-        # Schedule the next message
-        assert(len(messages[m.src_core]) > 0)
-        next_message = messages[m.src_core][-1]
-        assert(next_message != m)
-
-        logging.debug(f"Scheduling SEND message for m:{next_message}, from core:{m.src_core}")
-        E = {"message": next_message, "type": State.SEND}
-        priority.append((E, t + next_message.generation_delay))
-        priority.sort(key=lambda x: x[1], reverse=True)
-        return
-
     def get_next_upstream_link(x, y, link):
-        """Figure out the upstream link to grab a message from"""
+        # Figure out the upstream link to grab a message from
 
         # First figure out the src router position
         if link < 8 and link >= 4:  # This is a link from src core->NoC
@@ -801,90 +566,7 @@ def sim_schedule_event_based(messages):
             logging.debug("No competing links upstream")
             return None, None, None
 
-    def unblock_link(x, y, link, t):
-        # The link was blocked until we updated it
-        logging.debug(f"Link {x, y, link} was blocking and is now unblocked")
-        # Find the next link and get its first message, if it exists
-        if link >= 4 and link < 8:
-            src_core = (x*16)+(y*4)+(link%4)
-            logging.debug(f"src core {src_core} unblocked, checking pending")
-            m = pending_messages[src_core]
-            pending_messages[src_core] = None
-            logging.debug(f"Pending message:{m}")
-            next_x, next_y, next_link = None, None, None
-
-            if m is not None:  # Pending message found that will now be sent
-                logging.info(f"Pending message m:{m} entered NoC ")
-                m.pending = False
-                # Message has been waiting as pending, so send it out
-                #  immediately
-                send_message(m, t)
-                # Schedule the next messages if applicable, or put it into the
-                #  pending state
-                if len(messages[m.src_core]) > 0:
-                    next_message = messages[m.src_core].pop()
-                    logging.debug(f"After pending message handled, scheduled m:{next_message}")
-                    message_sent = send_message(next_message, t)
-                    logging.info(f"Message m:{next_message} sent:{message_sent} at t={t}")
-                    if not next_message.pending and len(messages[next_message.src_core]) > 0:
-                        logging.debug("Message sent ok, schedule next message in queue")
-                        schedule_next_message(next_message, t)
-        else:  # A router->router link
-            buffered_messages = buffer_sizes[link]
-            while len(noc_buffers[x][y][link]) < buffer_sizes[link]:
-                logging.debug(f"Getting upstream link for {x,y,link}")
-                next_pos = get_next_upstream_link(x, y, link)
-                logging.debug(f"Upstream link is:{next_pos}")
-                # Get the next link to win arbitration to send to the current
-                #  link
-                next_x, next_y, next_link = next_pos
-
-                if (next_link is not None and len(noc_buffers[next_x][next_y][next_link]) > 0):
-                    logging.debug(f"Checking upstream link messages for link {next_x,next_y,next_link}")
-                    buffered_messages = len(noc_buffers[next_x][next_y][next_link])
-
-                    upstream_link_sending = True
-                    messages_sent = 0
-                    # Unblock as messages in the buffer queue as possible
-                    while (upstream_link_sending and
-                        len(noc_buffers[next_x][next_y][next_link]) > 0):
-                        assert(noc_buffers[next_x][next_y][next_link][-1].pos == \
-                                (next_x, next_y, next_link))
-                        upstream_link_sending = \
-                            update_message(noc_buffers[next_x][next_y][next_link][-1], t)
-                        logging.debug(f"Upstream link ok to send more messages:{upstream_link_sending}")
-                        messages_sent += 1
-
-                    logging.debug(f"{messages_sent} messages sent after unblocking link {next_x, next_y, next_link}")
-                    logging.debug(f"buffered messages:{buffered_messages} buffer_sizes[]={buffer_sizes[next_link]}")
-                    if buffered_messages >= buffer_sizes[next_link]:
-                        unblock_link(next_x, next_y, next_link, t)
-                    else:
-                        logging.debug(f"Upstream link {next_x, next_y, next_link} "
-                                    f"{buffered_messages} messages remaining before updating, "
-                                    f"{len(noc_buffers[next_x][next_y][next_link])} after updating")
-                        break
-                    x, y, link = next_x, next_y, next_link
-                else:  # There is no upstream link with messages
-                    src_core = (x*16)+(y*4)+(link%4)
-                    logging.debug(f"src core {src_core} checking pending")
-                    m = pending_messages[src_core]
-                    if m is not None:
-                        logging.info(f"Pending message m:{m} entered NoC ")
-                        m.pending = False
-                        send_message(m, t)
-                        # Schedule the next messages if applicable
-                        if len(messages[m.src_core]) > 0 :
-                            next_message = messages[m.src_core].pop()
-                            logging.debug(f"After pending message handled, scheduled m:{next_message}")
-                            message_sent = send_message(next_message, t)
-                            logging.info(f"Message m:{next_message} sent:{message_sent} at t={t}")
-                            if not next_message.pending and len(messages[next_message.src_core]) > 0:
-                                schedule_next_message(next_message, t)
-                    break
-
-        return
-
+    # *** MAIN CODE ***
     # Initialize priority queue by pushing events to send the first messages
     priority = []
     for core in range(0, 128):
@@ -893,69 +575,149 @@ def sim_schedule_event_based(messages):
             E = {"message": first_message, "type": State.SEND}
             priority.append((E, first_message.generation_delay))
     priority.sort(key=lambda x: x[1], reverse=True)
-    last_t = 0
 
+    event_count = 0
+    t = 0
     while len(priority) > 0:
         E, t = priority.pop()
+        event_count += 1
         logging.info("")
-        logging.info(f"************ EVENT E:{E} @ t={t} ************")
+        logging.info(f"******** EVENT {event_count:x} E:{E} @ t={t} ********")
         m = E["message"]
 
         if E["type"] == State.SEND:
-            # First, figure out if we are able to send a message or not. If the
-            #  NoC is blocking, put the message into a pending state. TODO:
-            #  I thin the receive event will need a pending buffer per core
-            #  to know.
-            m = messages[m.src_core].pop()
-            assert(m == E["message"])
-            logging.debug(f"Sending message m:{m} pending:{m.pending}")
+            # Get the next message for this core and send it into the NoC if
+            #  possible
+            if len(messages[m.src_core]) > 0 and messages[m.src_core][-1] == m:
+                logging.debug(f"Sending message m:{m} pending:{m.pending}")
+                next_pos = get_next_downstream_link(m)
+                next_x, next_y, next_link = next_pos
 
-            send_message(m, t)
+                # If the link to the NoC is blocked, set the message as pending and
+                #  do nothing
+                if next_link is None:
+                    m.pending = True
+                else: # Else if there's space in the link to the NoC
+                    #  Send message to first link
+                    messages[m.src_core].pop()
+                    m.pending = False
+                    m.pos = next_pos
+                    noc_buffers[next_x][next_y][next_link].insert(0, m)
+                    # If this message is at the head of the buffer FIFO, schedule
+                    #  the next hop
+                    if len(noc_buffers[next_x][next_y][next_link]) == 1:
+                        hop_event = {"type": State.HOP, "message": m}
+                        logging.debug(f"Creating HOP event:{hop_event}")
+                        priority.append((hop_event, t))
 
-            logging.debug(f"m:{m} pending:{m.pending}")
-            logging.trace(f"pending:{pending_messages}")
-            # Message has been sent successfully, schedule the next message
-            if m.pending:
-                pending_messages[m.src_core] = m
-            elif len(messages[m.src_core]) > 0:
-                logging.debug("Message sent ok, schedule next message in queue")
-                schedule_next_message(m, t)
-
-        elif E["type"] == State.RECEIVE:  # State.Receive
-            logging.info(f"Message m:{m} finished being received by core:{m.dest_core} at t={t}")
-            receiving_messages[m.dest_core] = None
-            m.t_finished_processing = t
-            processed_messages[m.dest_core].append(m)
-            dest_tile = m.dest_core // 4
-            x = dest_tile // 4
-            y = dest_tile % 4
-            link = 8 + (m.dest_core % 4)
-            logging.debug(f"Checking link[{x,y,link} for messages, "
-                          f" count={len(noc_buffers[x][y][link])}")
-            logging.trace(f"link: {noc_buffers[x][y][link]}")
-            if len(noc_buffers[x][y][link]) > 0:  # Another message in the queue
-                logging.debug("link is not empty, getting next message")
-                # Start processing the next message in the receive queue
-                buffered_messages = len(noc_buffers[x][y][link])
-                next_m = noc_buffers[x][y][link].pop()
-                logging.debug(f"next m:{next_m}")
-                assert(next_m.pos == (x, y, link))
-                logging.info(f"message m:{next_m} started being received at core:{m.dest_core} at t={t}")
-                receive_message(next_m, t)
-
-                # While router links are unblocked, pop one element and look
-                #  downstream for the next message(s) to fill the gap
-                buffer_sizes = (16, 10, 16, 10, 8, 8, 8, 8, 24, 24, 24, 24)
-                if buffered_messages >= buffer_sizes[link]:
-                    unblock_link(x, y, link, t)
+                    # If there are more messages in this core's send queue, also
+                    #  schedule a send event if there's space in the buffer
+                    if len(messages[m.src_core]) > 0:
+                        next_message = messages[m.src_core][-1]
+                        send_event = {"type": State.SEND, "message": next_message}
+                        priority.append((send_event,
+                                        t + next_message.generation_delay))
+                        logging.debug(f"Creating SEND event from SEND:{send_event}")
             else:
-                logging.debug("Next link is empty, finished receiving")
+                # Corner case where both a SEND event and a HOP event can
+                #  create the same new SEND event.This happens when a HOP
+                #  unblocks a src link, triggering us to schedule the next
+                #  message to be sent from the src core.
+                logging.debug("Message was already SENT, ignoring event")
+            # Resort the priority queue to be in order
+            priority.sort(key=lambda x: x[1], reverse=True)
+
+        elif E["type"] == State.HOP:
+            # First deal with this message
+            x, y, link = m.pos
+            #  If next link is dest core and the core can receive, then add this
+            #   message to the queue and create a receive event
+            message_hopped = False
+            link_unblocked = False
+            buffer_sizes = (16, 10, 16, 10, 8, 8, 8, 8, 24, 24, 24, 24)
+            buffer_size = buffer_sizes[link]
+
+            if link >= 8 and (len(received_messages[m.dest_core]) == 0 or
+                received_messages[m.dest_core][0].t_finished_processing is not None):
+                # Link->core hop, message is received by core
+                logging.debug(f"Message hopping to dest core:{m.dest_core}")
+                message_hopped = True
+                link_unblocked = (len(noc_buffers[x][y][link]) == buffer_size)
+                assert(noc_buffers[x][y][link].pop() == m)
+
+                received_messages[m.dest_core].insert(0, m)
+                m.pos = None
+                receive_event = {"type": State.RECEIVE, "message": m}
+                logging.debug(f"Creating RECEIVE event:{receive_event}")
+                priority.append((receive_event, t + m.receive_delay))
+            elif link < 8:  # Normal link->link hop
+                dest_pos = get_next_downstream_link(m)
+                dest_x, dest_y, dest_link = dest_pos
+                logging.debug(f"Message {m} hop to {dest_pos}")
+                if dest_link is not None:
+                    logging.debug("Hopping and dest link is available")
+                    message_hopped = True
+                    link_unblocked = (len(noc_buffers[x][y][link]) == buffer_size)
+                    assert(noc_buffers[x][y][link].pop() == m)
+                    noc_buffers[dest_x][dest_y][dest_link].insert(0, m)
+                    m.pos = dest_pos
+
+                    # If this message is at the head of the FIFO, schedule the
+                    #  next hop
+                    if len(noc_buffers[dest_x][dest_y][dest_link]) == 1:
+                        logging.debug(f"Message m:{m} is at head of next queue")
+                        hop_event = {"type": State.HOP, "message": m}
+                        logging.debug(f"Creating a second HOP event for same message:{hop_event}")
+                        priority.append((hop_event, t))
+
+            # After popping the current message, we may need to schedule the
+            #  next message at the head of the buffer
+            if message_hopped and len(noc_buffers[x][y][link]) > 0:
+                hop_event = {"type": State.HOP, "message": noc_buffers[x][y][link][-1]}
+                logging.debug(f"Creating next HOP event for same link:{hop_event}")
+                priority.append((hop_event, t))
+
+            # If src link was previously full, we have now unblocked the link,
+            #  so look to the upstream link for the next message to grab
+            if link_unblocked:
+                logging.debug("While hopping message, link was unblocked")
+                # If link is core's sending queue, schedule another SEND
+                if link >= 4 and link < 8 and len(messages[m.src_core]) > 0:
+                    send_event = {"type": State.SEND,
+                                  "message": messages[m.src_core][-1]}
+                    logging.debug(f"Creating SEND event from HOP:{send_event}")
+                    priority.append((send_event, t + messages[m.src_core][-1].generation_delay))
+                elif link < 4 or link >= 8:
+                    next_x, next_y, next_link = \
+                        get_next_upstream_link(x, y, link)
+                    logging.debug(f"Getting next message at:{next_x,next_y,next_link}")
+                    if next_link is not None:
+                        next_message = noc_buffers[next_x][next_y][next_link][-1]
+                        logging.debug(f"Message {next_message} will be sent from upstream link")
+                        hop_event = {"type": State.HOP, "message": next_message}
+                        priority.append((hop_event, t))
+
+            priority.sort(key=lambda x: x[1], reverse=True)
+
+        elif E["type"] == State.RECEIVE:
+            logging.info(f"Message m:{m} finished being received by core:{m.dest_core} at t={t}")
+            # Mark message as received
+            m.t_finished_processing = t
+            # Now that we finished receiving, we can start processing another
+            #  message in the NoC to core buffer if applicable
+            dest_tile = m.dest_core // 4
+            dest_x = dest_tile // 4
+            dest_y = dest_tile % 4
+            dest_link = (m.dest_core % 4) + 8
+            if len(noc_buffers[dest_x][dest_y][dest_link]) > 0:
+                next_message = noc_buffers[dest_x][dest_y][dest_link][-1]
+                logging.debug(f"Process next message:{next_message}")
+                next_message_event = {"type": State.HOP, "message": next_message}
+                logging.debug(f"Create HOP event:{next_message_event}")
+                priority.append((next_message_event, t))
+                priority.sort(key=lambda x: x[1], reverse=True)
         else:
             raise Exception(f"Error: Event:{E} not supported")
-        update_noc(t)
-        assert(t >= last_t)
-        last_t = max(t, last_t)
-        # TODO: sanity check is broken or overly sensitive in some casses
 
         # Check here that the total messages in the system are consistent
         total_in_system = 0
@@ -970,56 +732,34 @@ def sim_schedule_event_based(messages):
                     total_in_system += len(noc_buffers[x][y][link])
                     for m in noc_buffers[x][y][link]:
                         check_messages.add(m)
-        for m_q in processed_messages:
+        for m_q in received_messages:
             total_in_system += len(m_q)
             for m in m_q:
                 check_messages.add(m)
-            check_messages.add(m)
-        for m in receiving_messages:
-            if m is not None:
-                total_in_system += 1
-                check_messages.add(m)
-        for m in pending_messages:
-            if m is not None:
-                total_in_system += 1
-                check_messages.add(m)
 
-        logging.debug(f"total in system:{total_in_system} total messages:{total_messages_sent}")
+        logging.debug(f"Total messages in system:{total_in_system} Total messages sent:{total_messages_sent}")
         missing = set(all_messages) ^ set(check_messages)
-        logging.debug(f"missing messages: {missing}")
-        #assert(total_in_system == total_messages_sent)
-        #sanity_check_noc()
+        logging.debug(f"Missing messages: {missing}")
+        assert(total_in_system == total_messages_sent)
         # ** end of event loop **
 
-    # Do final sanity checks
-    for c, m in enumerate(messages):
-        logging.trace(f"{c}:{m}")
+    total_messages_received = 0
+    for _, m_q in enumerate(received_messages):
+        for m in m_q:
+            total_messages_received += 1
+
+    logging.info(f"Total received:{total_messages_received} total sent:{total_messages_sent}")
+    assert(all([len(m) == 0 for m in messages]))
+    assert(total_messages_received == total_messages_sent)
 
     for x in range(0, 8):
         for y in range(0, 4):
-            for link in range(0, 4):
-                logging.trace(f"{x,y,link}: {noc_buffers[x][y][link]}")
+            for link in range(0, 12):
+                logging.trace(f"Link {x,y,link}:{noc_buffers[x][y][link]}")
+                assert(len(noc_buffers[x][y][link]) == 0)
 
-    logging.trace(f"receiving:{receiving_messages}")
-    logging.trace(f"pending:{pending_messages}")
-    total_messages_received = 0
-    """
-    for c, m_q in enumerate(processed_messages):
-        print(f"Dest core {c}:")
-        for m in m_q:
-            total_messages_received += 1
-            print(f"\t\tm:{m} gen delay:{m.generation_delay} rcv delay:{m.receive_delay} processed:{m.t_finished_processing}")
-    """
-    print(f"total received:{total_messages_received} total sent:{total_messages_sent}")
-
-    #assert(all([p is None for p in pending_messages]))
-    #assert(all([r is None for r in receiving_messages]))
-    #assert(all([len(m) == 0 for m in messages]))
-    #assert(total_messages_received == total_messages_sent)
-
-    print("*** Finished modeling NoC ***")
-    #exit()
-    return last_t
+    logging.info(f"*** Finished modeling NoC, {event_count} events processed ***")
+    return t
 
 
 def sim_delay_mm1k(df):
@@ -1041,6 +781,8 @@ def sim_delay_mm1k(df):
     dependencies = nx.DiGraph()
     # Flatten graph index into 1-dimension
     dependencies.add_nodes_from(range(0, 8*4*12))
+    # Track the flow links
+    flow_links = [[[] for _ in range(0, 128)] for _ in range(0, 128)]
 
     # Parse the rate of messages between two cores in the network and build a
     #  dependency graph
@@ -1122,15 +864,18 @@ def sim_delay_mm1k(df):
         router_link_arrival_rates[src_x, src_y, initial_direction] += path_rate
         router_link_flows[graph_index(src_x, src_y, initial_direction)].append(idx)
         prev_link = (src_x, src_y, initial_direction)
+        flow_links[src_core][dest_core].append(prev_link)
 
         while src_x < dest_x:
             src_x += 1
             router_link_counts[src_x, src_y, 1] += path_count  # east
             router_link_arrival_rates[src_x, src_y, 1] += path_rate
             router_link_flows[graph_index(src_x, src_y, 1)].append(idx)
+            flow_links[src_core][dest_core].append(idx)
             dependencies.add_edge(graph_index(*prev_link),
                                 graph_index(src_x, src_y, 1))
             prev_link = (src_x, src_y, 1)
+            flow_links[src_x][src_y].append(prev_link)
 
         while src_x > dest_x:
             src_x -= 1
@@ -1140,6 +885,7 @@ def sim_delay_mm1k(df):
             dependencies.add_edge(graph_index(*prev_link),
                                 graph_index(src_x, src_y, 3))
             prev_link = (src_x, src_y, 3)
+            flow_links[src_core][dest_core].append(prev_link)
 
         while src_y < dest_y:
             src_y += 1
@@ -1149,6 +895,7 @@ def sim_delay_mm1k(df):
             dependencies.add_edge(graph_index(*prev_link),
                                 graph_index(src_x, src_y, 0))
             prev_link = (src_x, src_y, 0)
+            flow_links[src_core][dest_core].append(prev_link)
 
         while src_y > dest_y:
             src_y -= 1
@@ -1158,6 +905,7 @@ def sim_delay_mm1k(df):
             dependencies.add_edge(graph_index(*prev_link),
                                 graph_index(src_x, src_y, 2))
             prev_link = (src_x, src_y, 2)
+            flow_links[src_core][dest_core].append(prev_link)
 
         final_direction = 8 + (dest_core % 4)
         router_link_counts[src_x, src_y, final_direction] += path_count
@@ -1165,6 +913,7 @@ def sim_delay_mm1k(df):
         router_link_flows[graph_index(src_x, src_y, final_direction)].append(idx)
         dependencies.add_edge(graph_index(*prev_link),
                             graph_index(src_x, src_y, final_direction))
+        flow_links[src_core][dest_core].append((src_x, src_y, final_direction))
 
         # Track the service time at the receiving link
         mean_link_service_time[src_x, src_y, final_direction] = \
@@ -1182,12 +931,26 @@ def sim_delay_mm1k(df):
     #pos=graphviz_layout(dependencies, prog='dot')
     #nx.draw(dependencies, pos, with_labels=False, arrows=True, node_size=0.5)
 
+    # Go over all links in every flow, from dest to src,
+    #  and track the total reamining flow capacity for that link
+    remaining_link_capacity = np.zeros((8, 4, 12))
+    for flow in flows:
+        src_core, dest_core = flow
+        flow_capacity = 0
+        src_core, dest_core = flow
+        print(f"src:{src_core} dest:{dest_core}")
+        for link in flow_links[src_core][dest_core][::-1]:
+            flow_capacity += BUFFER_SIZES[link[2]]
+            weight = (path_arrival_rates[src_core,dest_core] / router_link_arrival_rates[link])
+            print(f"\t\tFlow:{flow} link:{link} capacity:{flow_capacity} weight:{weight}")
+            remaining_link_capacity[link] += (flow_capacity * \
+                (path_arrival_rates[src_core,dest_core] / router_link_arrival_rates[link]))
+    print(f"Capacities at all links:{remaining_link_capacity}")
 
     # Now iterate over all flows again in reverse topological order, and
     #  calculate the contention delay followed by the service time at each
     #  link queue. Calculate the total arrival rate at each queue.
         # Calculate the average contention delay for this link
-
 
     sorted_links.reverse()
     #print(sorted_links)
@@ -1202,13 +965,14 @@ def sim_delay_mm1k(df):
                                 prob_link_blocking,
                                 router_link_counts,
                                 messages_buffered,
-                                max_neuron_processing)
+                                max_neuron_processing,
+                                remaining_link_capacity)
         mean_link_waiting_time[reverse_graph_index(link)] = link_wait_time
+        print(f"mean link wait times:{link_wait_time}")
         update_contention_queue(dependencies, link, router_link_arrival_rates,
                                 contention_waiting_time, prob_link_blocking,
                                 mean_link_service_time,
                                 max_neuron_processing)
-
 
     # Now go through all flows, and calculate the delay for each flows path
     flow_latencies = np.zeros((128, 128))
@@ -1224,7 +988,7 @@ def sim_delay_mm1k(df):
         dest_x = dest_tile // 4
         dest_y = dest_tile % 4
 
-            # Account for all the hops in between the src and dest tile
+        # Account for all the hops in between the src and dest tile
         initial_direction = 4 + (src_core % 4)
         flow_latencies[src_core, dest_core] += \
             mean_link_waiting_time[src_x, src_y, initial_direction]
@@ -1252,6 +1016,7 @@ def sim_delay_mm1k(df):
         final_direction = 8 + (dest_core % 4)
         flow_latencies[src_core, dest_core] += \
             mean_link_waiting_time[dest_x, dest_y, final_direction]
+
 
     """
     # Plot a heat map
@@ -1288,6 +1053,7 @@ def sim_delay_mm1k(df):
     create_subplots(mean_link_waiting_time, "Mean Link Wait Time")
     create_subplots(messages_buffered, "Messaged Buffered")
     create_subplots(router_link_counts, "Link Counts")
+    create_subplots(remaining_link_capacity, "Remaining Link Capacity")
 
     # Plot a heat map
     plt.figure()
@@ -1305,10 +1071,12 @@ def sim_delay_mm1k(df):
     x, y = np.meshgrid(np.linspace(0, 127, 128), np.linspace(0, 127, 128))
     plt.scatter(x, y, c=path_server_mean_latencies, cmap="YlOrRd", s=0.4)
     plt.colorbar()
+    #plt.show()
     """
-
+    send_blocking_time = prob_link_blocking[:,:,4:8] * mean_link_service_time[:,:,4:8]
+    print(f"sender blocked time:{send_blocking_time}")
     #print(f"mean link transfer delay: {flow_latencies}")
-    return flow_latencies, path_counts, path_server_mean_latencies
+    return flow_latencies, path_counts, path_server_mean_latencies, send_blocking_time
 
 
 def schedule_messages_simple(messages):
@@ -1378,32 +1146,46 @@ class Message:
         s = f"0x{self.id:x}:({self.src_core}->{self.dest_core})@{self.pos}"
         return s
 
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
+NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
+DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
+LOIHI_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_TIME_DATA_FILENAME)
 
 # 1. Read in the network
-filename = "dvs_messages.trace"
+DVS_FRAME = 16
+filename = f"runs/noc/dvs/frame_{DVS_FRAME}.trace"
 #filename = "latin_messages.trace"
+#filename = f"runs/noc/bio/connected_layers_N841_map_luke.trace"
 df = pd.read_csv(filename, converters={"src_hw": str, "dest_hw": str})
 
 timesteps = 128
+#timesteps = 2
 max_latencies = np.zeros((timesteps,))
 mean_latencies = np.zeros((timesteps,))
 total_flow_latencies = np.zeros((timesteps,))
 total_core_latencies = np.zeros((timesteps,))
 max_synapse_processing = np.zeros((timesteps,))
+total_synapse_processing = np.zeros((timesteps,))
 max_neuron_processing = np.zeros((timesteps,))
 scheduled_latency = np.zeros((timesteps,))
 flow_delays1 = np.zeros((timesteps,))
 event_based_latencies = np.zeros((timesteps,))
+
+message_counts = np.zeros((timesteps,), dtype=int)
+message_counts_tile_9 = np.zeros((timesteps,))
+
+
 path_counts = np.zeros((128, 128), dtype=int)  # [src core, dest core]
 
 # Queue of messages for each core
 messages = [[] for _ in range(0, 128)]
 
 for timestep in range(0, timesteps):
-#for timestep in range(103, 104):
+#for timestep in range(0, 32):
+#for timestep in range(0, 22):
+#for timestep in range(50, 51):
 #"""
-#for timestep in range(60, 70):
-#for timestep in range(62, 63):
     message_generation_latencies = np.zeros((128, 128))
     message_receive_latencies = np.zeros((128, 128))
     df_timestep = df[df["timestep"] == timestep]
@@ -1416,22 +1198,23 @@ for timestep in range(0, timesteps):
                                        row["src_hw"], row["dest_hw"],
                                        row["hops"], id))
 
-
         message_generation_latencies[src_core, dest_core] += row["generation_delay"]
-        """
-        if message_generation_latencies[src_core, dest_core] == 0:
-            message_generation_latencies[src_core, dest_core] = \
-                row["generation_delay"]
-        else:
-            message_generation_latencies[src_core, dest_core] += \
-                min(message_generation_latencies[src_core, dest_core],
-                    row["generation_delay"])
-        """
         message_receive_latencies[src_core, dest_core] += row["processing_latency"]
         path_counts[src_core, dest_core] += 1
+        if src_tile == 9:
+            message_counts_tile_9[timestep] += 1
+        message_counts[timestep] += 1
 
-    print(f"Scheduling messages for timestep:{timestep}")
-    event_based_latencies[timestep] = sim_schedule_event_based(messages.copy())
+    # Display the breakdown of synapse latencies
+    rx = np.sum(message_receive_latencies[:,:], axis=0) * 1.0e6
+    print(f"height: {rx}")
+    total = 0
+    for r in rx:
+        plt.bar(("Timestep 50",), r, bottom=total)
+        total += r
+
+    print(f"** Scheduling messages for timestep:{timestep} **")
+    event_based_latencies[timestep] = sim_schedule_event_based_v2(messages.copy())
 
     #TODO explore
     #message_generation_latencies = df_timestep["generation_delay"].min()
@@ -1439,57 +1222,108 @@ for timestep in range(0, timesteps):
 
     flows = np.argwhere(path_counts >= 1)
     flow_delays1[timestep] = np.max(sim_delay_hops(flows))
-    flow_delays, flow_counts, _ = sim_delay_mm1k(df_timestep)
+    # TODO: enable again
+    #"""
+    flow_delays, flow_counts, _, send_block_times = sim_delay_mm1k(df_timestep)
 
+    # TODO: refactor this into its own function
+    print(f"send_block_times:{send_block_times}")
+    print(f"max(send_block_times):{np.max(send_block_times)}")
+    send_block_times = send_block_times.flatten()
     # For all messages, update their network delay based on the average flow
     #  delay
     for core in range(0, 128):
         for m in messages[core]:
-            m.network_delay = flow_delays[core, m.dest_core]
+            #m.network_delay = flow_delays[core, m.dest_core]
+            m.network_delay = 0
+            #m.network_delay = 25*flow_delays[core, m.dest_core]
+            # TODO: this delay seems off by about a factor of 4?
+            # TOD+O: hack removed but see what is needed
+            m.generation_delay += 0.2*send_block_times[core]
+            #m.generation_delay += 5.0e-9
+            #message_generation_latencies[core, m.dest_core] += 5.0e-9
+    #input()
     scheduled_latency[timestep] = schedule_messages_detailed(messages)
 
-    print(f"i:{timestep} max flow delay: {np.max(flow_delays):e}")
-    max_latencies[timestep] = np.max(flow_delays)
+    #print(f"i:{timestep} max flow delay: {np.max(flow_delays):e}")
+    #max_latencies[timestep] = np.max(flow_delays)
+    #"""
+
 
     #print(f"mean server:{message_receive_latencies}")
     #print(f"counts:{flow_counts}")
 
     max_neuron_processing[timestep] = np.max(np.sum(message_generation_latencies, axis=1))
     max_synapse_processing[timestep] = np.max(np.sum(message_receive_latencies, axis=0))
+    total_synapse_processing[timestep] = np.sum(message_receive_latencies)
+    print(total_synapse_processing[timestep])
     max_core = np.argmax(np.sum(message_receive_latencies, axis=0))
     print(f"Max synapse processing happens on core:{max_core}")
-    print(message_receive_latencies[:,max_core])
-    print(np.sum(message_receive_latencies[:,max_core]))
+    print(f"Receiving latencies: {message_receive_latencies[:,max_core]}")
+    print(f"Total latencies: {np.sum(message_receive_latencies[:,max_core])}")
+    print(f"Finished scheduling messages for timestep:{timestep}")
     #exit()
 
-np.savetxt("runs/analysis/event_based_latencies.csv", event_based_latencies,
-           delimiter=",")
-
+#np.savetxt("runs/noc/dvs/event_based_latencies.csv", event_based_latencies,
+#           delimiter=",")
+#np.loadtxt("runs/noc/event_based_latencies.csv", delimiter=",")
 #"""
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
-NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
-DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
-LOIHI_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_TIME_DATA_FILENAME)
+#exit()
 
-np.loadtxt("runs/analysis/event_based_latencies.csv", delimiter=",")
-plt.figure()
+sim_time = np.zeros((timesteps,))
+for i in range(0, timesteps):
+    sim_time[i] = max(max_synapse_processing[i], max_neuron_processing[i])
+
+plt.figure(figsize=(10,2))
 loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
-loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
-plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
+loihi_times = np.array(loihi_data.loc[:,:] / 1.0e6)
+plt.plot(np.arange(2, timesteps), loihi_times[0:timesteps-2, DVS_FRAME] * 1.0e6, "-o")
+#plt.plot(loihi_times[0:128,DVS_FRAME] * 1.0e6, "-")
 #plt.plot(max_latencies[1:] * 1.0e6)
-plt.plot(max_synapse_processing[1:] * 1.0e6, "--")
-plt.plot(max_neuron_processing[1:] * 1.0e6, "--")
-#plt.plot(scheduled_latency[1:] * 1.0e6)
+plt.plot(np.arange(2, timesteps), max_synapse_processing[2:] * 1.0e6, "--")
+plt.plot(np.arange(2, timesteps), max_neuron_processing[2:] * 1.0e6, "--")
+#plt.plot(np.arange(2, timesteps), sim_time[2:] * 1.0e6)
+plt.plot(np.arange(2, timesteps), scheduled_latency[2:] * 1.0e6)
+
+#plt.plot(np.arange(2, timesteps), message_counts[2:] * 7.7e-3)
+#plt.plot(np.arange(2, timesteps), message_counts[2:])
+#plt.plot(np.arange(2, timesteps), message_counts_tile_9[2:] * 7.7e-3)
+
+#plt.plot(np.arange(2, timesteps), total_synapse_processing[2:] * 1.0e6)
 #plt.plot(flow_delays1[1:] * 1.0e6)
-plt.plot(event_based_latencies[1:] * 1.0e6)
+plt.plot(np.arange(2, timesteps), event_based_latencies[2:] * 1.0e6)
+
+mean_loihi = np.sum(loihi_times[0:timesteps, DVS_FRAME]) / timesteps
+mean_scheduled = np.sum(scheduled_latency[:]) / timesteps
+
+print(f"scheduled latencies:{scheduled_latency}")
+print(f"mean scheduled:{mean_scheduled:e}")
+print(f"mean loihi:{mean_loihi:e}")
 
 #plt.legend(("Measured", "Max", "Mean", "Max Synapse", "Max Neuron"), fontsize=7)
-plt.legend(("Measured", "Synapse", "Neuron", "Event-based simulation"))
+#plt.legend(("Measured", "Synapse", "Neuron", "Event-based simulation"))
+#plt.legend(("Measured", "Synapse", "Neuron", "Max of Synapse and Neuron", "Tile 8 Messages", "Total Synapse"))
+plt.legend(("Measured", "Synapse", "Neuron", "Max of Synapse and Neuron", "Event Based"))
+
 plt.ylabel("Time-step Latency ($\mu$s)")
 plt.xlabel("Time-step")
 plt.yticks(np.arange(0, 61, 10))
-plt.savefig("runs/dvs_gesture_message_analysis.pdf")
+plt.savefig("runs/noc/dvs/series.pdf")
+
+plt.figure()
+plt.scatter(message_counts, message_counts_tile_9)
+
+
+# Calculate the error and where it comes from
+
+prediction_error = loihi_times[0:timesteps-2, DVS_FRAME] - sim_time[2:]
+mean_error = np.mean(prediction_error)
+
+print(f"sim time:{sim_time[2:]}")
+print(f"loihi time:{loihi_times[0:timestep-1, DVS_FRAME]}")
+print(f"prediction error: {prediction_error}")
+print(f"mean error:{mean_error}")
+
 
 plt.show()
