@@ -23,7 +23,7 @@ void init_soma(char* name){
     strcat(destroy, name);
 
     // load the soma library
-    void* soma = dlopen(lib_path, RTLD_LAZY);
+    void* soma = dlopen(lib_path, RTLD_LAZY | RTLD_GLOBAL );
     if (!soma) {
         INFO("Error: Couldn't load library %s\n", lib_path);
         exit(1);

@@ -6,7 +6,7 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 
 sim.py - Simulator script and utility functionality
 """
-import subprocess
+import sys
 import os
 import yaml
 
@@ -628,23 +628,29 @@ def run(arch_path, network_path, timesteps,
     parsed_filename = os.path.join(run_dir,
                                    os.path.basename(arch_path) + ".parsed")
     parse_file(arch_path, parsed_filename)
-    # Parse inputs and run simulation
-    args = []
-    if spike_trace:
-        args.append("-s",)
-    if potential_trace:
-        args.append("-v")
-    if perf_trace:
-        args.append("-p")
-    if message_trace:
-        args.append("-m")
-    command = [os.path.join(project_dir, "sim"),] + args + [parsed_filename,
-               network_path, f"{timesteps}"]
 
-    print("Command: {0}".format(" ".join(command)))
-    ret = subprocess.call(command)
-    if ret != 0:
-        raise RuntimeError(f"Error: Simulator kernel failed (code={ret}).")
+    # Set some flags for the dynamic linking library
+    # Important to do before importing the simcpp .so library!
+    sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
+    import simcpp as sim
+
+    # Parse inputs and run simulation
+    sana_fe = sim.SANA_FE()
+    if spike_trace:
+        sana_fe.set_spike_flag()
+    if potential_trace:
+        sana_fe.set_pot_flag()
+    if perf_trace:
+        sana_fe.set_perf_flag()
+    if message_trace:
+        sana_fe.set_mess_flag()
+    
+    sana_fe.set_arch(parsed_filename)
+    sana_fe.set_net(network_path)
+
+    sana_fe.run_timesteps(timesteps)
+
+    sana_fe.sim_summary()
 
     with open("run_summary.yaml", "r") as run_summary:
         results = yaml.safe_load(run_summary)

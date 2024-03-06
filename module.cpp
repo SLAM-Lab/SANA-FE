@@ -330,6 +330,6 @@ PYBIND11_MODULE(simcpp, m) {
 		.def("set_arch", &SANA_FE::set_arch)
 		.def("set_net", &SANA_FE::set_net)
 		.def("get_power", &SANA_FE::get_power)
-		.def("sim_summarry", &SANA_FE::sim_summary)
+		.def("sim_summary", &SANA_FE::sim_summary)
 		.def("clean_up", &SANA_FE::clean_up, py::arg("ret") = 1);
 }
