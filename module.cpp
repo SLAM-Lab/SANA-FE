@@ -33,10 +33,12 @@ int SANA_FE::force_spike(int group_id, int n_id, int num_spikes){
 	return num_spikes;
 }
 void SANA_FE::run_timesteps(int timesteps){
+	store_data_init(&run_data, sim, timesteps);
 	for (int i = 0; i < timesteps; ++i){
 		++sim->ts.timestep;
 		run(sim, &net, arch);
 	}
+	store_data(&run_data, sim);
 }
 void SANA_FE::set_input(char *filename){
 	input_fp = fopen(filename, "r");
@@ -177,6 +179,16 @@ void SANA_FE::sim_summary(){
 		sim_write_summary(sim->stats_fp, sim);
 	}
 }
+void SANA_FE::run_summary(){
+	print_run_data(stdout, &run_data);
+
+	// Could write intermediate run data here
+	// sim->stats_fp = fopen("run_summary.yaml", "w");
+	// if (sim->stats_fp != NULL)
+	// {
+	// 	sim_write_summary(sim->stats_fp, sim);
+	// }
+}
 void SANA_FE::clean_up(description_ret ret){
 	// Free any larger structures here
 	network_free(&net);
@@ -293,6 +305,37 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	return ts_elapsed;
 }
 
+void store_data_init(run_ts_data* data, simulation* sim, int timesteps){
+	data->energy = sim->total_energy;
+	data->time = sim->total_sim_time;
+	data->spikes = sim->total_spikes;
+	data->packets = sim->total_messages_sent;
+	data->neurons = sim->total_neurons_fired;
+	data->wall_time = sim->wall_time;
+	data->timestep_start = sim->timesteps;
+	data->timesteps = timesteps;
+}
+
+void store_data(run_ts_data* data, simulation* sim){
+	data->energy = sim->total_energy - data->energy;
+	data->time = sim->total_sim_time - data->time;
+	data->spikes = sim->total_spikes - data->spikes;
+	data->packets = sim->total_messages_sent - data->packets;
+	data->neurons = sim->total_neurons_fired - data->neurons;
+	data->wall_time = sim->wall_time - data->wall_time;
+}
+
+void print_run_data(FILE *fp, run_ts_data* data){
+	fprintf(fp, "energy: %e\n", data->energy);
+	fprintf(fp, "time: %e\n", data->time);
+	fprintf(fp, "total_spikes: %ld\n", data->spikes);
+	fprintf(fp, "total_packets: %ld\n", data->packets);
+	fprintf(fp, "total_neurons_fired: %ld\n", data->neurons);
+	fprintf(fp, "wall_time: %lf\n", data->wall_time);
+	fprintf(fp, "executed from: %ld to %ld timesteps\n", data->timestep_start,
+	data->timestep_start+data->timesteps);
+}
+
 void test_pybind(void){
 	INFO("Printing through Pybind!\n");
 }
@@ -331,5 +374,6 @@ PYBIND11_MODULE(simcpp, m) {
 		.def("set_net", &SANA_FE::set_net)
 		.def("get_power", &SANA_FE::get_power)
 		.def("sim_summary", &SANA_FE::sim_summary)
+		.def("run_summary", &SANA_FE::run_summary)
 		.def("clean_up", &SANA_FE::clean_up, py::arg("ret") = 1);
 }
