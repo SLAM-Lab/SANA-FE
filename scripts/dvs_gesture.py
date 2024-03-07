@@ -134,7 +134,6 @@ if __name__ == "__main__":
 
         for inputs in range(0, frames):
         #for inputs in range(0, 1):
-        #for inputs in range(16, 17):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
             input_filename = os.path.join(NETWORK_DIR, f"inputs{inputs}.net")
@@ -203,7 +202,7 @@ if __name__ == "__main__":
             #"""
             plt.figure(figsize=(7, 8))
             plt.subplot(311)
-            FRAMES = 3
+            FRAMES = 1
             plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), times[0:(timesteps-1)*FRAMES], '-')
             plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), np.mean(loihi_times[0:(timesteps-1)*FRAMES], axis=1), '--')
             plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))

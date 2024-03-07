@@ -363,6 +363,7 @@ void sim_update_noc_message_counts(
 	}
 	else // Message leaving the NoC
 	{
+		//printf("Message leaving NoC\n");
 		noc->messages_in_flight[dest_x][dest_y] -=
 			(1.0 / (1.0+m->hops));
 		if ((noc->messages_in_noc) > 1)
@@ -534,7 +535,8 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 			if (messages_along_route > path_capacity)
 			{
 				m->sent_timestamp +=
-					noc.mean_in_flight_receive_delay;
+					(messages_along_route - path_capacity) * noc.mean_in_flight_receive_delay;
+				//m->sent_timestamp += noc.mean_in_flight_receive_delay;
 			}
 
 			// Now, push the message into the right receiving queue
@@ -547,8 +549,12 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 			//  receiving times in-flight in the network
 			sim_update_noc_message_counts(m, &noc, 1);
 
+			double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / 8;
+
+			//printf("messages along:%d\n", messages_along_route);
+			//network_delay = fmax(m->network_delay, network_delay);
 			earliest_received_time =
-				m->sent_timestamp + m->network_delay;
+				m->sent_timestamp + network_delay;
 			m->received_timestamp =
 				fmax(m->dest_neuron->core->blocked_until,
 					earliest_received_time);
