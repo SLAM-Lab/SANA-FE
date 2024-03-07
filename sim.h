@@ -28,6 +28,15 @@ struct timestep
 	double energy, sim_time;
 };
 
+struct noc_timings
+{
+	struct message_fifo messages_received[ARCH_MAX_CORES];
+	size_t noc_width, noc_height;
+	double messages_in_flight[8][4];
+	long int messages_in_noc;
+	double mean_in_flight_receive_delay;
+};
+
 struct simulation
 {
 	struct timestep ts;
@@ -46,6 +55,8 @@ void sim_init_timestep(struct timestep *const ts);
 void sim_process_neurons(struct timestep *const ts, struct network *net, struct architecture *arch);
 void sim_receive_messages(struct timestep *const sim, struct architecture *arch);
 double sim_schedule_messages(struct message_fifo *const messages_sent);
+double sim_schedule_messages_blocking(struct message_fifo *const messages_sent);
+double sim_schedule_messages_simplest(struct message_fifo *const messages_sent);
 // TODO: reimplement
 int sim_input_spikes(struct network *net);
 
@@ -64,7 +75,6 @@ double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n, co
 void sim_reset_measurements(struct network *net, struct architecture *arch);
 double sim_calculate_energy(const struct architecture *const arch);
 double sim_calculate_time(const struct architecture *const arch);
-double sim_calculate_time_old(const struct architecture *const arch);
 long int sim_calculate_packets(const struct architecture *arch);
 
 void sim_write_summary(FILE *fp, const struct simulation *stats);
