@@ -19,7 +19,6 @@ import sys
 import os
 import numpy as np
 import pandas as pd
-import yaml
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
@@ -173,13 +172,13 @@ def run_spiking_experiment(mapping, max_size=30):
         weights = pickle.load(weights_file)
 
     # Setup the correct blocking and save to a temporary arch file
-    with open(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"), "r") as arch_file:
-        loihi_arch = yaml.safe_load(arch_file)
+    #with open(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"), "r") as arch_file:
+    #    loihi_arch = yaml.safe_load(arch_file)
 
-    generated_arch_filename = os.path.join(PROJECT_DIR, "runs", "calibration",
-                                 "calibrated_loihi.arch")
-    with open(generated_arch_filename, "w") as arch_file:
-        yaml.safe_dump(loihi_arch, arch_file)
+    #generated_arch_filename = os.path.join(PROJECT_DIR, "runs", "calibration",
+    #                             "calibrated_loihi.arch")
+    #with open(generated_arch_filename, "w") as arch_file:
+    #    yaml.safe_dump(loihi_arch, arch_file)
 
     timesteps = 1
     for i in range(1, max_size):
@@ -192,7 +191,7 @@ def run_spiking_experiment(mapping, max_size=30):
         snn.save(network_filename)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
-        results = sim.run(generated_arch_filename, network_filename,
+        results = sim.run(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"), network_filename,
                             timesteps)
 
         with open(os.path.join(PROJECT_DIR, "runs",
@@ -226,8 +225,7 @@ if __name__ == "__main__":
         with open(f"runs/calibration/sim_spiking.csv", "w") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                        ("neuron_counts", "energy", "time",
-                                        "mapping", "cores_blocking",
-                                        "tiles_blocking"))
+                                        "mapping"))
             spiking_writer.writeheader()
         for mapping in mappings:
             run_spiking_experiment(mapping, max_size=30)
@@ -350,10 +348,25 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        #plt.legend(("Measured", "Cores blocking", "Tiles blocking"),
-        #            fontsize=7)
         plt.legend(("Measured", "Simulated"),
                     fontsize=7)
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/calibration/calibration_time_partition_3.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_3.png")
+
+        spiking_frame = df.loc[(df["mapping"] == "luke")]
+        plt.figure(figsize=(2.1, 2.1))
+        plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
+        plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
+                 fillstyle="none")
+        plt.gca().set_box_aspect(1)
+        plt.yscale("linear")
+        plt.xscale("linear")
+        plt.ylabel("Time-step Latency (ms)")
+        plt.xlabel("Neurons")
+        plt.minorticks_on()
+        plt.legend(("Measured", "Simulated"),
+                    fontsize=7)
+        plt.tight_layout(pad=0.3)
+        plt.savefig("runs/calibration/calibration_time_partition_luke.pdf")
+        plt.savefig("runs/calibration/calibration_time_partition_luke.png")

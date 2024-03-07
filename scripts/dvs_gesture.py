@@ -90,7 +90,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 if __name__ == "__main__":
     run_experiments = True
-    plot_experiments = False
+    plot_experiments = True
     experiment = "time"
     #experiment = "energy"
 
@@ -132,8 +132,9 @@ if __name__ == "__main__":
         elif experiment == "time":
             open(SIM_TIME_DATA_PATH, "w")
 
-        #for inputs in range(0, frames):
-        for inputs in range(51, 52):
+        for inputs in range(0, frames):
+        #for inputs in range(0, 1):
+        #for inputs in range(16, 17):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
             input_filename = os.path.join(NETWORK_DIR, f"inputs{inputs}.net")

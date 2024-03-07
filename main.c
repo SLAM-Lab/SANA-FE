@@ -332,14 +332,7 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 			for (int j = 0; j < ts->message_queues[i].count; j++)
 			{
 				struct message *m = &(ts->messages[i][j]);
-				if (m->dest_neuron != NULL)
-				{
-					// Ignore dummy messages (without a
-					//  destination). These are inserted to
-					//  account for processing that doesn't
-					//  result in a spike being sent
-					sim_trace_record_message(sim, m);
-				}
+				sim_trace_record_message(sim, m);
 			}
 		}
 	}
