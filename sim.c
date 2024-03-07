@@ -308,6 +308,14 @@ void sim_update_noc_message_counts(
 	// Go along x path, then y path (dimension order routing), and increment
 	//  or decrement counter depending on the operation
 	int x_increment, y_increment;
+	double adjust = (1.0 / (1.0+m->hops));
+
+	if (!message_in)
+	{
+		adjust *= -1;
+	}
+
+
 	if (src_x < dest_x)
 	{
 		x_increment = 1;
@@ -324,38 +332,70 @@ void sim_update_noc_message_counts(
 	{
 		y_increment = -1;
 	}
+	int prev_direction = 0;
 	for (int x = src_x; x != dest_x; x += x_increment)
 	{
-		if (message_in)
+		noc->messages_in_flight[x][src_y] += adjust;
+
+		int direction;
+		if (x_increment > 0)
 		{
-			noc->messages_in_flight[x][src_y] +=
-				(1.0 / (1.0+m->hops));
+			direction = EAST;
 		}
-		else // receive message from NoC
+		else
 		{
-			noc->messages_in_flight[x][src_y] -=
-				(1.0 / (1.0+m->hops));
+			direction = WEST;
 		}
+		if (x == src_x)
+		{
+			noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4] += adjust / 2;
+		}
+		else
+		{
+			noc->noc_messages_in[x][src_y][direction] += adjust / 2;
+		}
+		noc->noc_messages_out[x][src_y][direction] += adjust / 2;
+		prev_direction = direction;
 	}
 	for (int y = src_y; y != dest_y; y += y_increment)
 	{
-		if (message_in)
+		int direction;
+		if (src_x == dest_x && y == src_y)
 		{
-			noc->messages_in_flight[dest_x][y] +=
-				(1.0 / (1.0+m->hops));
+			noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4] += adjust / 2;
 		}
-		else // receive message from NoC
+		else
 		{
-			noc->messages_in_flight[dest_x][y] -=
-				(1.0 / (1.0+m->hops));
+			noc->noc_messages_in[dest_x][y][prev_direction] += adjust / 2;
 		}
+
+		if (y_increment > 0)
+		{
+			direction = NORTH;
+		}
+		else
+		{
+			direction = SOUTH;
+		}
+		noc->noc_messages_out[dest_x][y][direction] += adjust / 2;
+		noc->messages_in_flight[dest_x][y] += adjust;
 	}
+
+	if ((src_x == dest_x) && (src_y == dest_y))
+	{
+		noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4] += adjust / 2;
+	}
+	else
+	{
+		noc->noc_messages_in[dest_x][dest_y][prev_direction] += adjust / 2;
+	}
+	noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4] += adjust / 2;
+	noc->messages_in_flight[dest_x][dest_y] += adjust;
+
 
 	// Update rolling averages and message counters
 	if (message_in)  // Message entering NoC
 	{
-		noc->messages_in_flight[dest_x][dest_y] +=
-			(1.0 / (1.0+m->hops));
 		noc->mean_in_flight_receive_delay +=
 			(m->receive_delay - noc->mean_in_flight_receive_delay) /
 				(noc->messages_in_noc + 1);
@@ -364,8 +404,6 @@ void sim_update_noc_message_counts(
 	else // Message leaving the NoC
 	{
 		//printf("Message leaving NoC\n");
-		noc->messages_in_flight[dest_x][dest_y] -=
-			(1.0 / (1.0+m->hops));
 		if ((noc->messages_in_noc) > 1)
 		{
 			noc->mean_in_flight_receive_delay +=
@@ -387,7 +425,8 @@ double sim_calculate_messages_along_route(struct message *m,
 	struct noc_timings *noc)
 {
 	int src_x, dest_x, src_y, dest_y;
-	int x_increment, y_increment, messages_along_route;
+	int x_increment, y_increment;
+	double messages_along_route, messages_along_route_original;
 
 	assert(m != NULL);
 	src_x = m->src_neuron->core->t->x;
@@ -395,6 +434,8 @@ double sim_calculate_messages_along_route(struct message *m,
 	src_y = m->src_neuron->core->t->y;
 	dest_y = m->dest_neuron->core->t->y;
 	messages_along_route = 0;
+	messages_along_route_original = 0;
+	int direction;
 
 	if (src_x < dest_x)
 	{
@@ -412,20 +453,78 @@ double sim_calculate_messages_along_route(struct message *m,
 	{
 		y_increment = -1;
 	}
+	//messages_along_route_original +=
+	//		noc->messages_in_flight[src_x][src_y];
+	int prev_direction;
 	for (int x = src_x; x != dest_x; x += x_increment)
 	{
-		messages_along_route +=
+		int direction = 0;
+		if (x_increment > 0)
+		{
+			direction = EAST;
+		}
+		else
+		{
+			direction = WEST;
+		}
+		messages_along_route_original +=
 			noc->messages_in_flight[x][src_y];
+		if (x == src_x)
+		{
+			messages_along_route += noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4];
+		}
+		else
+		{
+			messages_along_route += noc->noc_messages_in[x][src_y][direction];
+		}
+		messages_along_route +=
+			noc->noc_messages_out[x][src_y][direction];
+		prev_direction = direction;
 	}
+
 	for (int y = src_y; y != dest_y; y += y_increment)
 	{
+		if (src_x == dest_x && y == src_y)
+		{
+			messages_along_route += noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4];
+		}
+		else
+		{
+			messages_along_route +=
+				noc->noc_messages_in[dest_x][y][prev_direction];
+		}
+
+		if (y_increment > 0)
+		{
+			direction = NORTH;
+		}
+		else
+		{
+			direction = SOUTH;
+		}
+		messages_along_route += noc->noc_messages_out[dest_x][y][direction];
+		prev_direction = direction;
+	}
+	messages_along_route_original +=
+		noc->messages_in_flight[dest_x][dest_y];
+	// Handle the last tile
+	if (src_x == dest_x && src_y == dest_y)
+	{
 		messages_along_route +=
-			noc->messages_in_flight[dest_x][y];
+			noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4];
+	}
+	else
+	{
+		messages_along_route +=
+			noc->noc_messages_in[dest_x][dest_y][prev_direction];
 	}
 	messages_along_route +=
-		noc->messages_in_flight[dest_x][dest_y];
+		noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4];
 
-	return messages_along_route;
+	//printf("original:%f new:%f\n", messages_along_route_original, messages_along_route);
+	assert(messages_along_route >= -0.1);
+	//assert(fabs(messages_along_route - messages_along_route_original) < 0.01);
+	return (int) messages_along_route;
 }
 
 void sim_update_noc(const double t, struct noc_timings *noc)
@@ -474,6 +573,11 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 		for (int y = 0; y < 4; y++)
 		{
 			noc.messages_in_flight[x][y] = 0.0;
+			for (int k = 0; k < 8; k++)
+			{
+				noc.noc_messages_in[x][y][k] = 0.0;
+				noc.noc_messages_out[x][y][k] = 0.0;
+			}
 		}
 	}
 	for (int i = 0; i < ARCH_MAX_CORES; i++)
@@ -549,10 +653,10 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 			//  receiving times in-flight in the network
 			sim_update_noc_message_counts(m, &noc, 1);
 
-			double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / 8;
+			double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / (m->hops+1);
+			//double network_delay = m->network_delay;
 
 			//printf("messages along:%d\n", messages_along_route);
-			//network_delay = fmax(m->network_delay, network_delay);
 			earliest_received_time =
 				m->sent_timestamp + network_delay;
 			m->received_timestamp =

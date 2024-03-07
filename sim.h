@@ -33,8 +33,18 @@ struct noc_timings
 	struct message_fifo messages_received[ARCH_MAX_CORES];
 	size_t noc_width, noc_height;
 	double messages_in_flight[8][4];
+	double noc_messages_in[8][4][8];
+	double noc_messages_out[8][4][8];
 	long int messages_in_noc;
 	double mean_in_flight_receive_delay;
+};
+
+enum direction
+{
+	NORTH = 4,
+	EAST,
+	SOUTH,
+	WEST
 };
 
 struct simulation
