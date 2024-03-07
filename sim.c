@@ -518,8 +518,8 @@ double sim_calculate_messages_along_route(struct message *m,
 		messages_along_route +=
 			noc->noc_messages_in[dest_x][dest_y][prev_direction];
 	}
-	messages_along_route +=
-		noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4];
+	//messages_along_route +=
+	//	noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4];
 
 	//printf("original:%f new:%f\n", messages_along_route_original, messages_along_route);
 	assert(messages_along_route >= -0.1);
