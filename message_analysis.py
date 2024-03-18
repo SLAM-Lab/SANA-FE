@@ -908,8 +908,6 @@ def sim_delay_mm1k(df):
     for _, row in df.iterrows():
         src_tile, src_core = hw_str_to_core(row["src_hw"])
         dest_tile, dest_core = hw_str_to_core(row["dest_hw"])
-        if dest_core is None:
-            continue
         path_arrival_latencies[src_core, dest_core] += row["generation_delay"]
         #if row["processing_latency" != 0]:
         #    print(f"latency:{path_arrival_latencies[src_core, dest_core]}")
@@ -1436,7 +1434,7 @@ print(f"mean loihi:{mean_loihi:e}")
 #plt.legend(("Measured", "Max", "Mean", "Max Synapse", "Max Neuron"), fontsize=7)
 #plt.legend(("Measured", "Synapse", "Neuron", "Event-based simulation"))
 #plt.legend(("Measured", "Synapse", "Neuron", "Max of Synapse and Neuron", "Tile 8 Messages", "Total Synapse"))
-plt.legend(("Measured", "Synapse", "Neuron","Event Based"))
+plt.legend(("Measured", "Synapse", "Neuron", "Event Based"))
 
 plt.ylabel("Time-step Latency ($\mu$s)")
 plt.xlabel("Time-step")

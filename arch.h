@@ -95,9 +95,9 @@ enum noise_type
 struct message
 {
 	struct neuron *src_neuron, *dest_neuron;
-	struct message *next_sent, *next_scheduled;
+	struct message *next;
 	double generation_delay, network_delay, receive_delay;
-	double blocked_latency, event_timestamp, earliest_received_timestamp;
+	double blocked_latency;
 	double sent_timestamp, received_timestamp, processed_timestamp;
 	long int timestep;
 	int spikes, hops, in_noc;

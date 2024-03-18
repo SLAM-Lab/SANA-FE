@@ -185,7 +185,7 @@ if __name__ == "__main__":
         #plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
         #            cmap=cm, vmin=256, vmax=8192, linewidths=1,
         #            picker=True, pickradius=5)
-        plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
+        plt.scatter(sim_latency, loihi_latency, marker="x", c=df["messages_per_neuron"].values,
                     cmap=cm, linewidths=1,
                     picker=True, pickradius=5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),

@@ -857,11 +857,8 @@ void arch_init_message(struct message *m)
 	m->sent_timestamp = -INFINITY;
 	m->received_timestamp = -INFINITY;
 	m->processed_timestamp = -INFINITY;
-	m->earliest_received_timestamp = -INFINITY;
-	m->event_timestamp = 0.0;
 	m->timestep = -1;
-	m->next_sent = NULL;
-	m->next_scheduled = NULL;
+	m->next = NULL;
 
 	return;
 }

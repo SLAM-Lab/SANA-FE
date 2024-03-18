@@ -263,7 +263,7 @@ struct message *sim_message_fifo_pop(struct message_fifo *queue)
 		assert(queue->head != NULL);
 		queue->count--;
 		m = queue->tail;
-		queue->tail = queue->tail->next_sent;
+		queue->tail = queue->tail->next;
 		if (queue->count <= 0)
 		{
 			queue->head = NULL;
@@ -279,15 +279,14 @@ void sim_message_fifo_push(struct message_fifo *queue, struct message *m)
 	assert(queue->count >= 0);
 	assert(m != NULL);
 
-	m->next_sent = NULL;
-	m->next_scheduled = NULL;
+	m->next = NULL;
 	if (queue->count == 0)
 	{
 		queue->tail = m;
 	}
 	else
 	{
-		queue->head->next_sent = m;
+		queue->head->next = m;
 	}
 	queue->head = m;
 	queue->count++;
@@ -456,7 +455,7 @@ double sim_calculate_messages_along_route(struct message *m,
 	}
 	//messages_along_route_original +=
 	//		noc->messages_in_flight[src_x][src_y];
-	int prev_direction = m->src_neuron->core->id % 4;
+	int prev_direction;
 	for (int x = src_x; x != dest_x; x += x_increment)
 	{
 		int direction = 0;
@@ -531,7 +530,6 @@ double sim_calculate_messages_along_route(struct message *m,
 void sim_update_noc(const double t, struct noc_timings *noc)
 {
 	// TODO: pass noc dimensions in
-	// TODO: pass max core count in too (in noc struct)
 	for (int i = 0; i < ARCH_MAX_CORES; i++)
 	{
 		struct message_fifo *q;
@@ -539,25 +537,20 @@ void sim_update_noc(const double t, struct noc_timings *noc)
 
 		q = &(noc->messages_received[i]);
 		m = q->tail;
-		//while (m != NULL) // TODO: just iterate while t >= m->received_timestamp
-		//{
-		while (m != NULL &&
-			m->in_noc &&
-			(m->received_timestamp >= 0.0) &&
-			(t >= m->received_timestamp))
+		while (m != NULL)
 		{
-			// Mark the message as not in the NoC, moving it
-			//  from the network to the receiving core
-			TRACE2("removing message from NoC at t=%e\n", t);
-			m->in_noc = 0;
-			sim_message_fifo_pop(q);
-			// Go along the message path and decrement tile
-			//  message counters
-			sim_update_noc_message_counts(m, noc, 0);
-			m = m->next_sent;
-
+			if (m->in_noc && (t >= m->received_timestamp))
+			{
+				// Mark the message as not in the NoC, moving it
+				//  from the network to the receiving core
+				m->in_noc = 0;
+				sim_message_fifo_pop(q);
+				// Go along the message path and decrement tile
+				//  message counters
+				sim_update_noc_message_counts(m, noc, 0);
+			}
+			m = m->next;
 		}
-		//}
 	}
 
 	return;
@@ -567,7 +560,7 @@ void sim_update_noc(const double t, struct noc_timings *noc)
 
 double sim_schedule_messages(struct message_fifo *const messages_sent)
 {
-	struct message *priority_queue;
+	struct message_fifo *priority_queue;
 	struct noc_timings noc;
 	double last_timestamp;
 
@@ -612,14 +605,13 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 	//  to process network messages
 	while (priority_queue != NULL)  // Queue isn't empty
 	{
-		//struct message_fifo *q;
+		struct message_fifo *q;
 		struct message *next_message, *m;
 
 		// Get the core's queue with the earliest simulation time
-		m = sim_pop_priority_queue(&priority_queue);
-		//m = sim_message_fifo_pop(q);
-		TRACE2("Event at time:%e\n", m->event_timestamp);
-		last_timestamp = fmax(last_timestamp, m->event_timestamp);
+		q = sim_pop_priority_queue(&priority_queue);
+		m = sim_message_fifo_pop(q);
+		last_timestamp = fmax(last_timestamp, m->sent_timestamp);
 
 		// Update the Network-on-Chip state
 		sim_update_noc(m->sent_timestamp, &noc);
@@ -635,101 +627,67 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 			//  into the network i.e., is the route to the dest core
 			//  saturated and likely to block? Sum along the route
 			//  and see if we have saturated route.
-			if (m->earliest_received_timestamp > 0)
+			double earliest_received_time;
+			int messages_along_route;
+			int path_capacity;
+
+			messages_along_route = (int)
+				sim_calculate_messages_along_route(m, &noc);
+
+			// TODO: parameterize average path capacity
+			path_capacity = (m->hops+1) * MAX_MESSAGES_PER_HOP;
+			if (messages_along_route > path_capacity)
 			{
-				TRACE2("message %d->%d is being RECEIVED at time %e\n",
-					m->src_neuron->id, m->dest_neuron->id,
-					m->event_timestamp);
-				//printf("messages along:%d\n", messages_along_route);
-				m->received_timestamp = fmax(
-					(m->dest_neuron->core->blocked_until),
-					(m->earliest_received_timestamp));
-				m->dest_neuron->core->blocked_until =
-					m->received_timestamp;
-				m->dest_neuron->core->blocked_until +=
-					m->receive_delay;
-				m->processed_timestamp =
-					m->dest_neuron->core->blocked_until;
-				last_timestamp = fmax(last_timestamp,
-					m->processed_timestamp);
+				m->sent_timestamp +=
+					(messages_along_route - path_capacity) * noc.mean_in_flight_receive_delay;
+				//m->sent_timestamp += noc.mean_in_flight_receive_delay;
 			}
-			else  // send message
-			{
-				TRACE2("message %d->%d is being SENT at time:%e\n",
-					m->src_neuron->id, m->dest_neuron->id,
-					m->event_timestamp);
-				double earliest_received_time;
-				int messages_along_route;
-				int path_capacity;
-				messages_along_route = (int)
-					sim_calculate_messages_along_route(
-						m, &noc);
-				TRACE2("hops:%d messages along route:%d mean delay:%e\n",
-					m->hops, messages_along_route, noc.mean_in_flight_receive_delay);
 
-				// TODO: parameterize average path capacity
-				path_capacity = (m->hops+1) * MAX_MESSAGES_PER_HOP;
-				if (messages_along_route > path_capacity)
-				{
-					m->sent_timestamp +=
-						(messages_along_route - path_capacity) * noc.mean_in_flight_receive_delay;
-					//m->sent_timestamp += noc.mean_in_flight_receive_delay;
-				}
-				last_timestamp = fmax(last_timestamp,
-					m->sent_timestamp);
-				// Get the next message for this core
-				next_message = m->next_sent;
-				if (next_message != NULL)
-				{
-					// If applicable, schedule this next message immediately
-					//  after the current message finishes sending
-					next_message->sent_timestamp =
-						m->sent_timestamp +
-						next_message->generation_delay;
-					next_message->event_timestamp =
-						next_message->sent_timestamp;
-					last_timestamp = fmax(last_timestamp,
-						next_message->event_timestamp);
-					sim_insert_priority_queue(
-						&priority_queue, next_message);
-				}
-				else
-				{
-					TRACE2("\tcid:%d.%d finished scheduling its neurons\n",
-						m->src_neuron->core->t->id,
-						m->src_neuron->core->id);
-				}
+			// Now, push the message into the right receiving queue
+			//  Calculate the network delay and when the message
+			//  is received
+			m->in_noc = 1;
+			sim_message_fifo_push(
+				&(noc.messages_received[dest_core]), m);
+			// Update the rolling average for message
+			//  receiving times in-flight in the network
+			sim_update_noc_message_counts(m, &noc, 1);
 
-				// Now, push the message into the right receiving queue
-				//  Calculate the network delay and when the message
-				//  is received
-				m->in_noc = 1;
-				sim_message_fifo_push(
-					&(noc.messages_received[dest_core]), m);
-				// Update the rolling average for message
-				//  receiving times in-flight in the network
-				sim_update_noc_message_counts(m, &noc, 1);
+			double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / (m->hops+1);
+			//double network_delay = m->network_delay;
 
-				m->network_delay =
-					messages_along_route * noc.mean_in_flight_receive_delay / (m->hops+1);
-				// This tends to overpredict latency significantly
-				//m->network_delay =
-				//	fmin(path_capacity, messages_along_route) *
-				//	noc.mean_in_flight_receive_delay;
-				earliest_received_time =
-					m->sent_timestamp + m->network_delay;
-				//m->received_timestamp =
-				//	fmax(m->dest_neuron->core->blocked_until,
-				//		earliest_received_time);
-				//m->received_timestamp = earliest_received_time;
+			//printf("messages along:%d\n", messages_along_route);
+			earliest_received_time =
+				m->sent_timestamp + network_delay;
+			m->received_timestamp =
+				fmax(m->dest_neuron->core->blocked_until,
+					earliest_received_time);
+			m->dest_neuron->core->blocked_until = fmax(
+				(m->dest_neuron->core->blocked_until +
+				m->receive_delay),
+				(earliest_received_time + m->receive_delay));
+			m->processed_timestamp =
+				m->dest_neuron->core->blocked_until;
+			last_timestamp =
+				fmax(last_timestamp, m->processed_timestamp);
+		}
 
-				// Push receive event at t=m->send_timestamp + m->network_delay
-				m->earliest_received_timestamp = earliest_received_time;
-				m->event_timestamp = earliest_received_time;
-				last_timestamp = fmax(last_timestamp,
-					m->event_timestamp);
-				sim_insert_priority_queue(&priority_queue, m);
-			}
+		// Get the next message for this core
+		next_message = q->tail;
+		if (next_message != NULL)
+		{
+			// If applicable, schedule this next message immediately
+			//  after the current message finishes sending
+			next_message->sent_timestamp = m->sent_timestamp +
+				next_message->generation_delay;
+			last_timestamp = fmax(last_timestamp,
+				next_message->sent_timestamp);
+			sim_insert_priority_queue(&priority_queue, q);
+		}
+		else
+		{
+			TRACE2("\t(cid:%d.%d) finished simulating\n", c->t->id,
+				c->id);
 		}
 
 		if (priority_queue != NULL)
@@ -744,9 +702,152 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 	return last_timestamp;
 }
 
+/*
+double sim_schedule_messages_blocking(struct message_fifo *const messages_sent)
+{
+	// TODO: this code doesn't really seem to work at all... it overly
+	//  aggressively blocks and so doesn't really add any value
+	struct message_fifo *priority_queue;
+	double last_timestamp, t;
+
+	priority_queue = sim_init_timing_priority(messages_sent);
+	last_timestamp = 0.0;
+	// Setup timing counters
+	TRACE1("Scheduling global order of messages.\n");
+
+	double average_receiving_delay[128][128];
+	double average_send_time[128][128];
+	int path_counts[128][128];
+	int path_hops[128][128];
+	int messages_until_path_full[128][128];
+
+	for (int i = 0; i < 128; i++)
+	{
+		if ((messages_sent[i].count > 0))
+		{
+			struct message *m = (messages_sent[i]).tail;
+
+			for (int j = 0; j < 128; j++)
+			{
+				path_counts[i][j] = 0;
+				average_receiving_delay[i][j] = 0.0;
+				average_send_time[i][j] = 0.0;
+			}
+
+			while ((m != NULL) && (m->dest_neuron != NULL))
+			{
+				assert(i == m->src_neuron->core->id);
+				assert(m->dest_neuron->core->id >= 0 &&
+					m->dest_neuron->core->id < ARCH_MAX_CORES);
+				average_send_time[i][m->dest_neuron->core->id] +=
+					m->generation_delay;
+				average_receiving_delay[i][m->dest_neuron->core->id] +=
+					m->receive_delay;
+				path_counts[i][m->dest_neuron->core->id]++;
+				path_hops[i][m->dest_neuron->core->id] = m->hops;
+				m = m->next;
+			}
+		}
+	}
+	for (int i = 0; i < 128; i++)
+	{
+		for (int j = 0; j < 128; j++)
+		{
+			if (path_counts[i][j] > 0)
+			{
+				average_receiving_delay[i][j] /= path_counts[i][j];
+				average_send_time[i][j] /= path_counts[i][j];
+
+				double send_rate = 1.0 / average_send_time[i][j];
+				double receive_rate = 1.0 / average_receiving_delay[i][j];
+				double fill_rate = send_rate / (send_rate - receive_rate);
+				int path_capacity = 32 + path_hops[i][j] * 16;
+				messages_until_path_full[i][j] = (int) path_capacity * fill_rate;
+			}
+			else
+			{
+				average_receiving_delay[i][j] = 0.0;
+			}
+		}
+	}
+
+	// While queue isn't empty
+	while (priority_queue != NULL)
+	{
+		// Get the core with the earliest simulation time
+		struct message_fifo *q =
+			sim_pop_priority_queue(&priority_queue);
+		struct message *m = sim_message_fifo_pop(q);
+		last_timestamp = fmax(last_timestamp, m->generation_delay);
+
+		if (m->dest_neuron != NULL)
+		{
+			// Set time-stamps, calculating when the receiving H/W
+			//  will be busy until
+			last_timestamp =
+				fmax(last_timestamp, m->sent_timestamp);
+
+			if (messages_until_path_full[m->src_neuron->core->id][m->dest_neuron->core->id] <= 0)
+			{
+				printf("adding:%e\n", average_receiving_delay[m->src_neuron->core->id][m->dest_neuron->core->id]);
+				m->sent_timestamp +=
+					average_receiving_delay[m->src_neuron->core->id][m->dest_neuron->core->id];
+			}
+			else
+			{
+				messages_until_path_full[m->src_neuron->core->id][m->dest_neuron->core->id]--;
+			}
+
+			m->dest_neuron->core->blocked_until = fmax(
+				(m->dest_neuron->core->blocked_until + m->receive_delay),
+				(m->sent_timestamp + m->network_delay + m->receive_delay));
+			m->processed_timestamp =
+				m->dest_neuron->core->blocked_until;
+
+			last_timestamp =
+				fmax(last_timestamp, m->processed_timestamp);
+
+			INFO("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
+				m->src_neuron->core->t->id, m->src_neuron->core->id, m->dest_neuron->core->t->id,
+				m->dest_neuron->core->id, m->dest_neuron->core->blocked_until);
+		}
+
+		// The time that the last message sent is the time that we
+		//  start the next message's processing
+		t = m->sent_timestamp;
+		// Get the next message, neuron or core
+		m = q->tail;
+		// Regardless of whether we are sending a message, add the
+		//  processing time
+		if (m != NULL)
+		{
+			m->sent_timestamp = t + m->generation_delay;
+			last_timestamp =
+				fmax(last_timestamp, m->sent_timestamp);
+			sim_insert_priority_queue(&priority_queue, q);
+		}
+		else
+		{
+			TRACE2("\t(cid:%d.%d) finished simulating\n", c->t->id,
+				c->id);
+		}
+
+		if (priority_queue != NULL)
+		{
+			TRACE2("\t(cid:%d.%d) time:%e\n",
+				(*priority_queue)->t->id,
+				(*priority_queue)->id, (*priority_queue)->time);
+		}
+	}
+	TRACE1("Neurons fired: %ld\n", ts->total_neurons_fired);
+
+	return last_timestamp;
+}
+*/
+
 double sim_schedule_messages_simplest(struct message_fifo *const messages_sent)
 {
-	struct message *priority_queue;
+	struct message_fifo *priority_queue;
 	double last_timestamp, t;
 
 	priority_queue = sim_init_timing_priority(messages_sent);
@@ -757,9 +858,10 @@ double sim_schedule_messages_simplest(struct message_fifo *const messages_sent)
 	// While queue isn't empty
 	while (priority_queue != NULL)
 	{
-		// Get the message with the earliest simulation time
-		struct message *m =
+		// Get the core with the earliest simulation time
+		struct message_fifo *q =
 			sim_pop_priority_queue(&priority_queue);
+		struct message *m = sim_message_fifo_pop(q);
 		last_timestamp = fmax(last_timestamp, m->generation_delay);
 
 		if (m->dest_neuron != NULL)
@@ -770,8 +872,8 @@ double sim_schedule_messages_simplest(struct message_fifo *const messages_sent)
 				fmax(last_timestamp, m->sent_timestamp);
 			m->dest_neuron->core->blocked_until = fmax(
 				(m->dest_neuron->core->blocked_until +
-				m->receive_delay),
-				(m->sent_timestamp + m->network_delay + m->receive_delay));
+				m->network_delay + m->receive_delay),
+				(m->sent_timestamp + m->receive_delay));
 			m->processed_timestamp =
 				m->dest_neuron->core->blocked_until;
 			last_timestamp =
@@ -786,7 +888,7 @@ double sim_schedule_messages_simplest(struct message_fifo *const messages_sent)
 		//  start the next message's processing
 		t = m->sent_timestamp;
 		// Get the next message, neuron or core
-		m = sim_message_fifo_pop(&(messages_sent[m->src_neuron->core->id]));
+		m = q->tail;
 		// Regardless of whether we are sending a message, add the
 		//  processing time
 		if (m != NULL)
@@ -794,7 +896,7 @@ double sim_schedule_messages_simplest(struct message_fifo *const messages_sent)
 			m->sent_timestamp = t + m->generation_delay;
 			last_timestamp =
 				fmax(last_timestamp, m->sent_timestamp);
-			sim_insert_priority_queue(&priority_queue, m);
+			sim_insert_priority_queue(&priority_queue, q);
 		}
 		else
 		{
@@ -889,23 +991,22 @@ double sim_pipeline_receive(
 	return message_processing_latency;
 }
 
-struct message *sim_init_timing_priority(
-	struct message_fifo *const message_send_queues)
+struct message_fifo *sim_init_timing_priority(
+	struct message_fifo *const message_queues)
 {
-	struct message *priority_queue;
+	struct message_fifo *priority_queue;
 	priority_queue = NULL;
 
 	TRACE1("Initializing priority queue.\n");
 	for (int i = 0; i < ARCH_MAX_CORES; i++)
 	{
-		if ((message_send_queues[i]).count > 0) // messages
+		if ((message_queues[i]).count > 0) // messages
 		{
-			TRACE1("Inserting into send queue\n");
-			struct message *m = (message_send_queues[i]).tail;
+			struct message *m = (message_queues[i]).tail;
 			assert(m != NULL);
 			m->sent_timestamp = m->generation_delay;
-			m->event_timestamp = m->sent_timestamp;
-			sim_insert_priority_queue(&priority_queue, m);
+			sim_insert_priority_queue(&priority_queue,
+				&(message_queues[i]));
 		}
 		else
 		{
@@ -914,100 +1015,86 @@ struct message *sim_init_timing_priority(
 	}
 
 #ifdef DEBUG2
-//#if 1
 	int i = 0;
-	for (struct message *curr = priority_queue; curr != NULL;
-		curr = curr->next_scheduled)
+	for (struct core *curr = priority_queue; curr != NULL; curr = curr->next)
 	{
-		if (curr->dest_neuron == NULL)
-		{
-			printf("%d m:%d->x", i, curr->src_neuron->id);
-		}
-		else
-		{
-			printf("%d m:%d->%d", i, curr->src_neuron->id, curr->dest_neuron->id);
-		}
-		i++;
+		// TODO
 	}
 #endif
 
 	return priority_queue;
 }
 
-struct message *sim_pop_priority_queue(struct message **priority_queue)
+struct message_fifo *sim_pop_priority_queue(
+	struct message_fifo **priority_queue)
 {
-	struct message *curr;
+	struct message_fifo *curr;
 
 	// Pop the first element from the priority queue
 	curr = *priority_queue;
-	*priority_queue = (*priority_queue)->next_scheduled;
+	*priority_queue = (*priority_queue)->next;
 
 	// For safety, remove current element from queue and unlink
-	curr->next_scheduled = NULL;
+	curr->next = NULL;
 	return curr;
 }
 
-void sim_insert_priority_queue(
-	struct message **priority_queue, struct message *m)
+void sim_insert_priority_queue(struct message_fifo **priority_queue,
+	struct message_fifo *core_message_fifo)
 {
-	struct message *next;
+	struct message_fifo *next;
 	int list_depth = 0;
 
 	// TODO: implement heap-based priority queue rather than list-based.
 	//  Will achieve O(lg N) insertion time rather than O(N)
 
 	assert(priority_queue != NULL);
-	assert(m != NULL);
+	assert(core_message_fifo != NULL);
+	assert(core_message_fifo->tail != NULL);
 
-	TRACE1("Inserting into priority queue.\n");
+	//INFO("Inserting into priority queue.\n");
 	if (((*priority_queue) == NULL) ||
-		(m->event_timestamp <= (*priority_queue)->event_timestamp))
+		(core_message_fifo->tail->sent_timestamp <=
+		(*priority_queue)->tail->sent_timestamp))
 	{
 		// Queue is empty or this is the earliest time (highest
-		//  priority), make this queue the head (top priority)
-		m->next_scheduled = (*priority_queue);
-		*priority_queue = m;
+		//  priority), make this core the head of the queue
+		core_message_fifo->next = (*priority_queue);
+		*priority_queue = core_message_fifo;
 	}
 	else
 	{
-		struct message *curr = *priority_queue;
-		next = curr->next_scheduled;
+		struct message_fifo *curr = *priority_queue;
+		next = curr->next;
 
 		// Reinsert core into the correct place in the priority list
 		while (next != NULL)
 		{
-			if ((m->event_timestamp < next->event_timestamp))
+			if (core_message_fifo->tail->sent_timestamp <
+				next->tail->sent_timestamp)
 			{
 				break;
 			}
 			curr = next;
-			next = curr->next_scheduled;
+			next = curr->next;
 			list_depth++;
 		}
-		curr->next_scheduled = m;
-		m->next_scheduled = next;
+		curr->next = core_message_fifo;
+		core_message_fifo->next = next;
 	}
 
 #ifdef DEBUG
-//#if 1
-	printf("*** Priority queue ***\n");
-	for (struct message *m = *priority_queue; m != NULL;
-		m = m->next_scheduled)
+	TRACE3("*** Priority queue ***\n");
+	for (struct core *tmp = *priority_queue; tmp != NULL;
+		tmp = tmp->next_timing)
 	{
 		// TRACE3
-		if (m->dest_neuron == NULL)
-		{
-			printf("m->time:%e (id:%d->x)\n", m->event_timestamp, m->src_neuron->id);
-		}
-		else
-		{
-			printf("m->time:%e (id:%d->%d)\n", m->event_timestamp, m->src_neuron->id, m->dest_neuron->id);
-		}
-		assert((m->next_scheduled == NULL) ||
-			m->event_timestamp <= m->next_scheduled->event_timestamp);
+		TRACE3("tmp->time:%e (id:%d)\n", tmp->time, tmp->id);
+		assert((tmp->next_timing == NULL) ||
+			tmp->time <= tmp->next_timing->time);
 	}
 	// TRACE2
-	printf("List depth = %d\n", list_depth+1);
+	TRACE3("List depth = %d\n", list_depth+1);
 #endif
 
 	return;

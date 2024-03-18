@@ -99,9 +99,9 @@ void sim_perf_log_timestep(const struct timestep *const ts, FILE *fp);
 int sim_poisson_input(const double firing_probability);
 int sim_rate_input(const double firing_rate, double *spike_val);
 
-struct message *sim_init_timing_priority(struct message_fifo *const send_queues);
-void sim_insert_priority_queue(struct message **priority_queue, struct message *m);
-struct message *sim_pop_priority_queue(struct message **priority_queue);
+struct message_fifo *sim_init_timing_priority(struct message_fifo *const send_queues);
+void sim_insert_priority_queue(struct message_fifo **priority_queue, struct message_fifo *c);
+struct message_fifo *sim_pop_priority_queue(struct message_fifo **priority_queue);
 
 void sim_message_fifo_push(struct message_fifo *queue, struct message *m);
 struct message *sim_message_fifo_pop(struct message_fifo *queue);
