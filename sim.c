@@ -537,18 +537,15 @@ void sim_update_noc(const double t, struct noc_timings *noc)
 
 		q = &(noc->messages_received[i]);
 		m = q->tail;
-		while (m != NULL)
+		while (m != NULL && m->in_noc && (t >= m->received_timestamp))
 		{
-			if (m->in_noc && (t >= m->received_timestamp))
-			{
-				// Mark the message as not in the NoC, moving it
-				//  from the network to the receiving core
-				m->in_noc = 0;
-				sim_message_fifo_pop(q);
-				// Go along the message path and decrement tile
-				//  message counters
-				sim_update_noc_message_counts(m, noc, 0);
-			}
+			// Mark the message as not in the NoC, moving it
+			//  from the network to the receiving core
+			m->in_noc = 0;
+			sim_message_fifo_pop(q);
+			// Go along the message path and decrement tile
+			//  message counters
+			sim_update_noc_message_counts(m, noc, 0);
 			m = m->next;
 		}
 	}
