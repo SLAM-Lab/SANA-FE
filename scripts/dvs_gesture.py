@@ -102,6 +102,7 @@ if __name__ == "__main__":
     spiking_network_energy = []
     times = np.array(())
     energies = np.array(())
+    hops = np.array(())
     timesteps = 128
     frames = 100
     #frames = 1
@@ -131,6 +132,7 @@ if __name__ == "__main__":
             open(SIM_ENERGY_DATA_PATH, "w")
         elif experiment == "time":
             open(SIM_TIME_DATA_PATH, "w")
+        open("hops.csv", "w")
 
         for inputs in range(0, frames):
         #for inputs in range(0, 1):
@@ -154,7 +156,10 @@ if __name__ == "__main__":
             analysis = parse_stats(stats)
             times = np.append(times, analysis["times"])
             energies = np.append(energies, analysis["total_energy"] / timesteps)
+            hops = np.append(hops, analysis["hops"])
 
+            with open("hops.csv", "a") as hops_file:
+                np.savetxt("hops.csv", hops, delimiter=",")
             if experiment == "time":
                 with open(SIM_TIME_DATA_PATH, "a") as time_file:
                     np.savetxt(SIM_TIME_DATA_PATH, times, delimiter=",")
@@ -180,7 +185,9 @@ if __name__ == "__main__":
         if experiment == "time":
             plt.rcParams.update({'font.size': 8, 'lines.markersize': 4})
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
+            hops = np.loadtxt("hops.csv", delimiter=",")
             loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
+            hops_data = pd.read_csv("hops.csv")
             #loihi_times = np.array(loihi_data.loc[:, "spiking"] / 1.0e6)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
 
@@ -189,13 +196,17 @@ if __name__ == "__main__":
             #  timestep-1)
             times = np.delete(times,
                             list(range(timesteps, timesteps*frames, timesteps)))
+            hops = np.delete(hops,
+                            list(range(timesteps, timesteps*frames, timesteps)))
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps, timesteps*frames, timesteps)))
 
             total_times = np.zeros(frames)
+            total_hops = np.zeros(frames)
             loihi_total_times = np.zeros(frames)
             for i in range(0, frames):
                 total_times[i] = np.sum(times[i*(timesteps-1):(i+1)*(timesteps-1)])
+                total_hops[i] = np.sum(hops[i*(timesteps-1):(i+1)*(timesteps-1)])
                 #loihi_total_times[i] = np.sum(loihi_times[i*(timesteps-1):(i+1)*(timesteps-1)])
                 loihi_total_times[i] = np.sum(loihi_times[0:timesteps, i])
 
@@ -268,9 +279,14 @@ if __name__ == "__main__":
             #plt.plot(np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6,
             #         np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6, "k--")
 
-            plt.plot(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "x")
+            cm = plt.colormaps['coolwarm']
+
+            #print(total_hops)
+            #exit()
+            plt.scatter(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, marker="x", s=0.1, cmap=cm, c=np.array(total_hops))
             plt.plot(np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6),
                      np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6), "k--")
+            plt.colorbar(label="Total Hops", shrink=0.5)
             #plt.xticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
             #plt.yticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
             plt.ylabel("Measured Latency ($\mu$s)")

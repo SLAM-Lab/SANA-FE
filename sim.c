@@ -18,6 +18,8 @@
 #include "network.h"
 #include "arch.h"
 
+#define MAX_MESSAGES_PER_HOP 16
+
 void sim_init_fifo(struct message_fifo *f)
 {
 	f->count = 0;
@@ -63,6 +65,8 @@ void sim_timestep(struct timestep *const ts,
 			}
 			ts->packets_sent += c->axon_out.packets_out;
 		}
+		ts->total_hops += t->hops;
+
 	}
 
 	TRACE1("Spikes sent: %ld\n", sim->total_spikes);
@@ -308,13 +312,15 @@ void sim_update_noc_message_counts(
 	// Go along x path, then y path (dimension order routing), and increment
 	//  or decrement counter depending on the operation
 	int x_increment, y_increment;
-	double adjust = (1.0 / (1.0+m->hops));
+	double adjust_original = (1.0 / (1.0+m->hops));
+	double adjust = (1.0 / (2.0+m->hops));
+	//double adjust = (1.0 / (1.0+m->hops));
 
 	if (!message_in)
 	{
 		adjust *= -1;
+		adjust_original *= -1;
 	}
-
 
 	if (src_x < dest_x)
 	{
@@ -332,10 +338,10 @@ void sim_update_noc_message_counts(
 	{
 		y_increment = -1;
 	}
-	int prev_direction = 0;
+	int prev_direction = m->src_neuron->core->id % 4;
 	for (int x = src_x; x != dest_x; x += x_increment)
 	{
-		noc->messages_in_flight[x][src_y] += adjust;
+		noc->messages_in_flight[x][src_y] += adjust_original;
 
 		int direction;
 		if (x_increment > 0)
@@ -348,13 +354,14 @@ void sim_update_noc_message_counts(
 		}
 		if (x == src_x)
 		{
-			noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4] += adjust / 2;
+			noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4] += adjust;
+			//noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4] += adjust / 2;
 		}
 		else
 		{
-			noc->noc_messages_in[x][src_y][direction] += adjust / 2;
+			noc->noc_messages_in[x][src_y][direction] += adjust;
 		}
-		noc->noc_messages_out[x][src_y][direction] += adjust / 2;
+		noc->noc_messages_out[x][src_y][direction] += adjust;
 		prev_direction = direction;
 	}
 	for (int y = src_y; y != dest_y; y += y_increment)
@@ -362,11 +369,12 @@ void sim_update_noc_message_counts(
 		int direction;
 		if (src_x == dest_x && y == src_y)
 		{
-			noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4] += adjust / 2;
+			noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4] += adjust;
+			//noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4] += adjust / 2;
 		}
 		else
 		{
-			noc->noc_messages_in[dest_x][y][prev_direction] += adjust / 2;
+			noc->noc_messages_in[dest_x][y][prev_direction] += adjust;
 		}
 
 		if (y_increment > 0)
@@ -377,21 +385,23 @@ void sim_update_noc_message_counts(
 		{
 			direction = SOUTH;
 		}
-		noc->noc_messages_out[dest_x][y][direction] += adjust / 2;
-		noc->messages_in_flight[dest_x][y] += adjust;
+		noc->noc_messages_out[dest_x][y][direction] += adjust;
+		noc->messages_in_flight[dest_x][y] += adjust_original;
+		prev_direction = direction;
 	}
 
 	if ((src_x == dest_x) && (src_y == dest_y))
 	{
-		noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4] += adjust / 2;
+		//noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4] += adjust / 2;
+		noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4] += adjust;
 	}
 	else
 	{
-		noc->noc_messages_in[dest_x][dest_y][prev_direction] += adjust / 2;
+		noc->noc_messages_in[dest_x][dest_y][prev_direction] += adjust;
 	}
-	noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4] += adjust / 2;
-	noc->messages_in_flight[dest_x][dest_y] += adjust;
-
+	noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4] += adjust;
+	//noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4] += adjust;
+	noc->messages_in_flight[dest_x][dest_y] += adjust_original;
 
 	// Update rolling averages and message counters
 	if (message_in)  // Message entering NoC
@@ -399,6 +409,7 @@ void sim_update_noc_message_counts(
 		noc->mean_in_flight_receive_delay +=
 			(m->receive_delay - noc->mean_in_flight_receive_delay) /
 				(noc->messages_in_noc + 1);
+		noc->mean_hops += (m->hops - noc->mean_hops) / (noc->messages_in_noc + 1);
 		noc->messages_in_noc++;
 	}
 	else // Message leaving the NoC
@@ -409,6 +420,8 @@ void sim_update_noc_message_counts(
 			noc->mean_in_flight_receive_delay +=
 			(noc->mean_in_flight_receive_delay - m->receive_delay) /
 				(noc->messages_in_noc - 1);
+			noc->mean_hops += (noc->mean_hops - m->hops) /
+				(noc->messages_in_noc - 1);
 		}
 		else
 		{
@@ -416,6 +429,74 @@ void sim_update_noc_message_counts(
 		}
 
 		noc->messages_in_noc--;
+	}
+	long int noc_capacity = 0;
+	long int total_links_in, links_in, total_links_out, links_out;
+	total_links_out = 0;
+	total_links_in = 0;
+	for (int x = 0; x < 8; x++)
+	{
+		for (int y = 0; y < 4; y++)
+		{
+			links_out = 0;
+			links_in = 0;
+			double total_in, total_out;
+			total_in = 0.0;
+			total_out = 0.0;
+			for (int link = 0; link < 8; link++)
+			{
+				if (noc->noc_messages_in[x][y][link] > 0.01)
+				{
+					noc_capacity +=
+						MAX_MESSAGES_PER_HOP;
+					links_in++;
+					total_links_in++;
+				}
+
+				total_in += noc->noc_messages_in[x][y][link];
+				total_out += noc->noc_messages_out[x][y][link];
+				if (noc->noc_messages_out[x][y][link] > 0.01)
+				{
+					links_out++;
+					total_links_out++;
+				}
+			}
+			// Links out
+			///*
+			for (int link = 0; link < 4; link++)
+			{
+				if (noc->noc_messages_out[x][y][link] > 0.01)
+				{
+					noc_capacity +=
+						MAX_MESSAGES_PER_HOP;
+				}
+			}
+			//INFO("x:%d y:%d links in:%ld links out:%ld total_in:%lf total out:%lf\n", x, y, links_in, links_out, total_in, total_out);
+			//*/
+		}
+	}
+	//INFO("total links in:%ld total links out:%ld\n", total_links_in, total_links_out);
+
+	noc->noc_capacity = MAX(noc->noc_capacity, noc_capacity);
+	noc->noc_capacity = 6144;
+	if (noc->noc_capacity <= 0.0)
+	{
+		noc->utilization = 1.0;
+	}
+	else
+	{
+		noc->utilization =
+			(double) noc->messages_in_noc / noc->noc_capacity;
+		// Clip between [0,1]
+		noc->utilization = fmin(1.0, noc->utilization);
+		noc->utilization = fmax(0.0, noc->utilization);
+	}
+
+	TRACE1("total messages:%ld total capacity:%ld ratio:%lf\n",
+		noc->messages_in_noc, noc->noc_capacity, noc->utilization);
+	if (m->dest_neuron != NULL)
+	{
+		TRACE1("m:%d->%d in:%d\n", m->src_neuron->id, m->dest_neuron->id, message_in);
 	}
 
 	return;
@@ -477,8 +558,8 @@ double sim_calculate_messages_along_route(struct message *m,
 		{
 			messages_along_route += noc->noc_messages_in[x][src_y][direction];
 		}
-		messages_along_route +=
-			noc->noc_messages_out[x][src_y][direction];
+		//messages_along_route +=
+		//	noc->noc_messages_out[x][src_y][direction];
 		prev_direction = direction;
 	}
 
@@ -502,7 +583,9 @@ double sim_calculate_messages_along_route(struct message *m,
 		{
 			direction = SOUTH;
 		}
-		messages_along_route += noc->noc_messages_out[dest_x][y][direction];
+		messages_along_route_original +=
+			noc->messages_in_flight[dest_x][y];
+		//messages_along_route += noc->noc_messages_out[dest_x][y][direction];
 		prev_direction = direction;
 	}
 	messages_along_route_original +=
@@ -537,23 +620,24 @@ void sim_update_noc(const double t, struct noc_timings *noc)
 
 		q = &(noc->messages_received[i]);
 		m = q->tail;
-		while (m != NULL && m->in_noc && (t >= m->received_timestamp))
+		while (m != NULL)
 		{
-			// Mark the message as not in the NoC, moving it
-			//  from the network to the receiving core
-			m->in_noc = 0;
-			sim_message_fifo_pop(q);
-			// Go along the message path and decrement tile
-			//  message counters
-			sim_update_noc_message_counts(m, noc, 0);
+			if (m->in_noc && (t >= m->received_timestamp))
+			{
+				// Mark the message as not in the NoC, moving it
+				//  from the network to the receiving core
+				m->in_noc = 0;
+				sim_message_fifo_pop(q);
+				// Go along the message path and decrement tile
+				//  message counters
+				sim_update_noc_message_counts(m, noc, 0);
+			}
 			m = m->next;
 		}
 	}
 
 	return;
 }
-
-#define MAX_MESSAGES_PER_HOP 16
 
 double sim_schedule_messages(struct message_fifo *const messages_sent)
 {
@@ -565,6 +649,8 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 	//  known from the architecture description
 	noc.messages_in_noc = 0;
 	noc.mean_in_flight_receive_delay = 0.0;
+	noc.mean_hops = 0.0;
+	noc.noc_capacity = 0;
 	for (int x = 0; x < 8; x++)
 	{
 		for (int y = 0; y < 4; y++)
@@ -632,6 +718,7 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 				sim_calculate_messages_along_route(m, &noc);
 
 			// TODO: parameterize average path capacity
+			//path_capacity = (m->hops+2) * MAX_MESSAGES_PER_HOP;
 			path_capacity = (m->hops+1) * MAX_MESSAGES_PER_HOP;
 			if (messages_along_route > path_capacity)
 			{
@@ -650,7 +737,13 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 			//  receiving times in-flight in the network
 			sim_update_noc_message_counts(m, &noc, 1);
 
+			//double network_delay = fmin(path_capacity, messages_along_route) * noc.mean_in_flight_receive_delay / (m->hops+2);
+			//double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / (m->hops+2);
 			double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / (m->hops+1);
+			//double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / (noc.mean_hops+1);
+			//double network_delay = fmin(messages_along_route, path_capacity) * noc.mean_in_flight_receive_delay; // * noc.utilization;
+			TRACE1("path capacity:%d messages:%d\n", path_capacity, messages_along_route);
+			//double network_delay = messages_along_route * noc.mean_in_flight_receive_delay / 5.0;
 			//double network_delay = m->network_delay;
 
 			//printf("messages along:%d\n", messages_along_route);

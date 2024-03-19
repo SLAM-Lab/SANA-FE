@@ -35,8 +35,8 @@ struct noc_timings
 	double messages_in_flight[8][4];
 	double noc_messages_in[8][4][8];
 	double noc_messages_out[8][4][8];
-	long int messages_in_noc;
-	double mean_in_flight_receive_delay;
+	long int messages_in_noc, noc_capacity;
+	double mean_in_flight_receive_delay, mean_hops, utilization;
 };
 
 enum direction
