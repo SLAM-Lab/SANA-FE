@@ -89,7 +89,7 @@ def parse_loihi_spiketrains(total_timesteps):
     return spiketrain
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -279,22 +279,23 @@ if __name__ == "__main__":
             #plt.plot(np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6,
             #         np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6, "k--")
 
-            cm = plt.colormaps['coolwarm']
+            #cm = plt.colormaps['coolwarm']
 
             #print(total_hops)
             #exit()
-            plt.scatter(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, marker="x", s=0.1, cmap=cm, c=np.array(total_hops))
+            #plt.scatter(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, marker="x", s=0.1, cmap=cm, c=np.array(total_hops))
+            plt.plot(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "x")
             plt.plot(np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6),
                      np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6), "k--")
-            plt.colorbar(label="Total Hops", shrink=0.5)
+            #plt.colorbar(label="Total Hops", shrink=0.5)
             #plt.xticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
             #plt.yticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
             plt.ylabel("Measured Latency ($\mu$s)")
             plt.xlabel("Simulated Latency ($\mu$s)")
-            plt.xlim((10, 40))
-            plt.ylim((10, 40))
-            plt.xticks(np.arange(10, 41, 10))
-            plt.yticks(np.arange(10, 41, 10))
+            plt.xlim((10, 30))
+            plt.ylim((10, 30))
+            plt.xticks(np.arange(10, 31, 10))
+            plt.yticks(np.arange(10, 31, 10))
             plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_correlation.pdf")
             plt.savefig("runs/dvs/dvs_gesture_sim_correlation.png")

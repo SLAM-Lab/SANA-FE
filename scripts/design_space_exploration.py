@@ -34,9 +34,9 @@ if run_experiment:
     with open("runs/dse/latin_results.csv", "w") as dse_results:
         dse_results.write("cores,compartments,energy,latency\n")
 
-    with open("arch/loihi_latin.yaml", "rb") as loihi_file:
+    with open("arch/loihi.yaml", "rb") as loihi_file:
         loihi_baseline_latin = yaml.safe_load(loihi_file)
-    with open("arch/loihi_dvs.yaml", "rb") as loihi_file:
+    with open("arch/loihi.yaml", "rb") as loihi_file:
         loihi_baseline_dvs = yaml.safe_load(loihi_file)
 
     for cores, compartments in zip(core_counts, compartment_counts):

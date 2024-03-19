@@ -18,7 +18,7 @@
 #include "network.h"
 #include "arch.h"
 
-#define MAX_MESSAGES_PER_HOP 16
+#define MAX_MESSAGES_PER_HOP 12
 
 void sim_init_fifo(struct message_fifo *f)
 {
@@ -123,7 +123,7 @@ void sim_init_timestep(struct timestep *const ts)
 void sim_process_neurons(struct timestep *const ts, struct network *net,
 	struct architecture *arch)
 {
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -169,7 +169,7 @@ void sim_process_neurons(struct timestep *const ts, struct network *net,
 void sim_receive_messages(struct timestep *const ts,
 	struct architecture *arch)
 {
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
