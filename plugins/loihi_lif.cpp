@@ -125,6 +125,11 @@ class loihi_lif: public Base_Soma {
                     // Was parsed successfully if we got here
                     ret = 1;
                 }
+                else if (strncmp("input_spike", a->key, MAX_FIELD_LEN) == 0){
+                    double res;
+                    ret = sscanf(a->value_str, "%lf", &res);
+                    potential += res;
+                }
                 if (ret < 1)
                 {
                     INFO("Invalid attribute (%s:%s)\n", a->key,
