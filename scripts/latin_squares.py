@@ -56,7 +56,9 @@ def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
                                    reset=0.0,
                                    leak=1,
                                    reverse_threshold=-2**7 + 1.0,
-                                   reverse_reset_mode="saturate")
+                                   reverse_reset_mode="saturate",
+                                   soma_hw_name="loihi_stochastic_lif",
+                                   synapse_hw_name="loihi_sparse_synapse")
             for neuron in wta.neurons:
                 neuron.add_bias(1 * 2**7)
             row.append(wta)

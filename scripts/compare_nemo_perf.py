@@ -61,7 +61,9 @@ def create_nemo_network(cores):
     #  threshold and forced updates i.e., spikes every timestep
     population = sim.create_layer(network, cores*TRUENORTH_COMPARTMENTS,
                                     compartments, 0, 0, 1, 0.0, -1.0, 0.0,
-                                    mappings=mappings, connections_out=1)
+                                    mappings=mappings, connections_out=1,
+                                    soma_hw_name="core_soma",
+                                    synapse_hw_name="core_synapses")
 
     print("Generating randomized network connections")
     weight = 1
@@ -140,7 +142,7 @@ def plot_results():
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot = True
     if run_experiments:
         core_counts = (32, 64, 128, 256, 512, 1024)

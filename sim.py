@@ -28,14 +28,14 @@ class Network:
     def create_group(self, threshold, reset, leak, log_spikes=False,
                      log_potential=False, force_update=False,
                      connections_out=None, reverse_threshold=None,
-                     reverse_reset_mode=None, neuron_model=None,
-                     default_synapse_model=None):
+                     reverse_reset_mode=None, soma_hw_name=None,
+                     synapse_hw_name=None):
         group_id = len(self.groups)
         group = NeuronGroup(group_id, threshold, reset, leak, log_spikes,
                             log_potential, force_update, connections_out,
                             reverse_threshold, reverse_reset_mode,
-                            neuron_model=neuron_model,
-                            default_synapse_model=default_synapse_model)
+                            soma_hw_name=soma_hw_name,
+                            synapse_hw_name=synapse_hw_name)
         self.groups.append(group)
         return group
 
@@ -114,7 +114,7 @@ class NeuronGroup:
     def __init__(self, group_id, threshold, reset, leak, log_spikes=None,
                  log_potential=None, force_update=None, connections_out=None,
                  reverse_reset=None, reverse_reset_mode=None,
-                 neuron_model=None, default_synapse_model=None):
+                 soma_hw_name=None, synapse_hw_name=None):
         # TODO: support all features here
         self.id = group_id
         self.neurons = []
@@ -129,15 +129,13 @@ class NeuronGroup:
         self.log_spikes = log_spikes
         self.log_potential = log_potential
         self.force_update = force_update
-        self.neuron_model = neuron_model
-        self.default_synapse_model = default_synapse_model
+        self.soma_hw_name = soma_hw_name
+        self.synapse_hw_name = synapse_hw_name
 
     def __str__(self):
         neuron_count = len(self.neurons)
 
         group_str = f"g {neuron_count}"
-        if self.neuron_model is not None:
-            group_str += f" soma_hw_name={self.neuron_model}"
         if self.threshold is not None:
             group_str += f" threshold={self.threshold}"
         if self.reset is not None:
@@ -160,8 +158,10 @@ class NeuronGroup:
             group_str += f" force_update={int(self.force_update)}"
         if self.connections_out is not None:
             group_str += f" connections_out={self.connections_out}"
-        if self.default_synapse_model is not None:
-            group_str += f" synapse_hw_name={self.default_synapse_model}"
+        if self.soma_hw_name is not None:
+            group_str += f" soma_hw_name={self.soma_hw_name}"
+        if self.synapse_hw_name is not None:
+            group_str += f" synapse_hw_name={self.synapse_hw_name}"
 
         group_str += "\n"
         return group_str
@@ -271,16 +271,16 @@ def create_layer(network, layer_neuron_count, compartments,
                  log_spikes=False, log_potential=False, force_update=False,
                  threshold=1.0, reset=0.0, leak=1.0, mappings=None,
                  connections_out=None, reverse_threshold=None,
-                 reverse_reset_mode=None, neuron_model=None,
-                 synapse_model=None):
+                 reverse_reset_mode=None, soma_hw_name=None,
+                 synapse_hw_name=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     layer_group = network.create_group(threshold, reset, leak, log_spikes,
                                        log_potential, force_update,
                                        connections_out=connections_out,
                                        reverse_threshold=reverse_threshold,
                                        reverse_reset_mode=reverse_reset_mode,
-                                       neuron_model=neuron_model,
-                                       default_synapse_model=synapse_model)
+                                       soma_hw_name=soma_hw_name,
+                                       synapse_hw_name=synapse_hw_name)
 
     if mappings is not None:
         assert(len(mappings) == layer_neuron_count)

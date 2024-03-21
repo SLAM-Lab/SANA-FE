@@ -40,7 +40,8 @@ void sim_timestep(struct timestep *const ts,
 	sim_process_neurons(ts, net, arch);
 	sim_receive_messages(ts, arch);
 
-	ts->sim_time = sim_schedule_messages(ts->message_queues);
+	ts->sim_time = sim_schedule_messages(ts->message_queues,
+		arch->noc_width, arch->noc_height);
 	//ts->sim_time = sim_schedule_messages_simplest(ts->message_queues);
 	//ts->sim_time = sim_schedule_messages_blocking(ts->message_queues);
 	// Performance statistics for this time step
@@ -77,6 +78,11 @@ struct simulation *sim_init_sim(void)
 {
 	struct simulation *sim =
 		(struct simulation *) malloc(sizeof(struct simulation));
+	if (sim == NULL)
+	{
+		INFO("Error: Couldn't create sim struct.\n");
+		exit(1);
+	}
 
 	sim->total_energy = 0.0;   // Joules
 	sim->total_sim_time = 0.0; // Seconds
@@ -123,7 +129,7 @@ void sim_init_timestep(struct timestep *const ts)
 void sim_process_neurons(struct timestep *const ts, struct network *net,
 	struct architecture *arch)
 {
-//#pragma omp parallel for
+#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -169,7 +175,7 @@ void sim_process_neurons(struct timestep *const ts, struct network *net,
 void sim_receive_messages(struct timestep *const ts,
 	struct architecture *arch)
 {
-//#pragma omp parallel for
+#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -312,14 +318,14 @@ void sim_update_noc_message_counts(
 	// Go along x path, then y path (dimension order routing), and increment
 	//  or decrement counter depending on the operation
 	int x_increment, y_increment;
-	double adjust_original = (1.0 / (1.0+m->hops));
+	//double adjust_original = (1.0 / (1.0+m->hops));
 	double adjust = (1.0 / (2.0+m->hops));
 	//double adjust = (1.0 / (1.0+m->hops));
 
 	if (!message_in)
 	{
 		adjust *= -1;
-		adjust_original *= -1;
+		//adjust_original *= -1;
 	}
 
 	if (src_x < dest_x)
@@ -338,10 +344,10 @@ void sim_update_noc_message_counts(
 	{
 		y_increment = -1;
 	}
-	int prev_direction = m->src_neuron->core->id % 4;
+	int prev_direction = 4 + (m->src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
 	for (int x = src_x; x != dest_x; x += x_increment)
 	{
-		noc->messages_in_flight[x][src_y] += adjust_original;
+		//noc->messages_in_flight[x][src_y] += adjust_original;
 
 		int direction;
 		if (x_increment > 0)
@@ -354,14 +360,14 @@ void sim_update_noc_message_counts(
 		}
 		if (x == src_x)
 		{
-			noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4] += adjust;
+			noc->noc_messages_in[x][src_y][4 + (m->src_neuron->core->id % ARCH_MAX_CORES_PER_TILE)] += adjust;
 			//noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4] += adjust / 2;
 		}
 		else
 		{
 			noc->noc_messages_in[x][src_y][direction] += adjust;
 		}
-		noc->noc_messages_out[x][src_y][direction] += adjust;
+		//noc->noc_messages_out[x][src_y][direction] += adjust;
 		prev_direction = direction;
 	}
 	for (int y = src_y; y != dest_y; y += y_increment)
@@ -369,7 +375,7 @@ void sim_update_noc_message_counts(
 		int direction;
 		if (src_x == dest_x && y == src_y)
 		{
-			noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4] += adjust;
+			noc->noc_messages_in[dest_x][y][4 + (m->src_neuron->core->id % ARCH_MAX_CORES_PER_TILE)] += adjust;
 			//noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4] += adjust / 2;
 		}
 		else
@@ -386,22 +392,22 @@ void sim_update_noc_message_counts(
 			direction = SOUTH;
 		}
 		noc->noc_messages_out[dest_x][y][direction] += adjust;
-		noc->messages_in_flight[dest_x][y] += adjust_original;
+		//noc->messages_in_flight[dest_x][y] += adjust_original;
 		prev_direction = direction;
 	}
 
 	if ((src_x == dest_x) && (src_y == dest_y))
 	{
 		//noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4] += adjust / 2;
-		noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4] += adjust;
+		noc->noc_messages_in[dest_x][dest_y][4 + (m->src_neuron->core->id % ARCH_MAX_CORES_PER_TILE)] += adjust;
 	}
 	else
 	{
 		noc->noc_messages_in[dest_x][dest_y][prev_direction] += adjust;
 	}
-	noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4] += adjust;
+	noc->noc_messages_out[dest_x][dest_y][4 + (m->dest_neuron->core->id % ARCH_MAX_CORES_PER_TILE)] += adjust;
 	//noc->noc_messages_out[dest_x][dest_y][m->dest_neuron->core->id % 4] += adjust;
-	noc->messages_in_flight[dest_x][dest_y] += adjust_original;
+	//noc->messages_in_flight[dest_x][dest_y] += adjust_original;
 
 	// Update rolling averages and message counters
 	if (message_in)  // Message entering NoC
@@ -430,20 +436,22 @@ void sim_update_noc_message_counts(
 
 		noc->messages_in_noc--;
 	}
+	/*
 	long int noc_capacity = 0;
 	long int total_links_in, links_in, total_links_out, links_out;
 	total_links_out = 0;
 	total_links_in = 0;
-	for (int x = 0; x < 8; x++)
+
+	for (int x = 0; x < noc->noc_width; x++)
 	{
-		for (int y = 0; y < 4; y++)
+		for (int y = 0; y < noc->noc_height; y++)
 		{
 			links_out = 0;
 			links_in = 0;
 			double total_in, total_out;
 			total_in = 0.0;
 			total_out = 0.0;
-			for (int link = 0; link < 8; link++)
+			for (int link = 0; link < 4+ARCH_MAX_CORES_PER_TILE; link++)
 			{
 				if (noc->noc_messages_in[x][y][link] > 0.01)
 				{
@@ -462,8 +470,8 @@ void sim_update_noc_message_counts(
 				}
 			}
 			// Links out
-			///*
-			for (int link = 0; link < 4; link++)
+			//
+			for (int link = 4; link < 4+ARCH_MAX_CORES_PER_TILE; link++)
 			{
 				if (noc->noc_messages_out[x][y][link] > 0.01)
 				{
@@ -472,11 +480,13 @@ void sim_update_noc_message_counts(
 				}
 			}
 			//INFO("x:%d y:%d links in:%ld links out:%ld total_in:%lf total out:%lf\n", x, y, links_in, links_out, total_in, total_out);
-			//*/
+			//
 		}
 	}
 	//INFO("total links in:%ld total links out:%ld\n", total_links_in, total_links_out);
+	*/
 
+	/*
 	noc->noc_capacity = MAX(noc->noc_capacity, noc_capacity);
 	noc->noc_capacity = 6144;
 	if (noc->noc_capacity <= 0.0)
@@ -498,6 +508,7 @@ void sim_update_noc_message_counts(
 	{
 		TRACE1("m:%d->%d in:%d\n", m->src_neuron->id, m->dest_neuron->id, message_in);
 	}
+	*/
 
 	return;
 }
@@ -552,7 +563,8 @@ double sim_calculate_messages_along_route(struct message *m,
 			noc->messages_in_flight[x][src_y];
 		if (x == src_x)
 		{
-			messages_along_route += noc->noc_messages_in[x][src_y][m->src_neuron->core->id % 4];
+			messages_along_route += noc->noc_messages_in[x][src_y][
+				4+m->src_neuron->core->id % ARCH_MAX_CORES_PER_TILE];
 		}
 		else
 		{
@@ -567,7 +579,8 @@ double sim_calculate_messages_along_route(struct message *m,
 	{
 		if (src_x == dest_x && y == src_y)
 		{
-			messages_along_route += noc->noc_messages_in[dest_x][y][m->src_neuron->core->id % 4];
+			messages_along_route += noc->noc_messages_in[dest_x][y][
+				4+m->src_neuron->core->id % ARCH_MAX_CORES_PER_TILE];
 		}
 		else
 		{
@@ -594,7 +607,7 @@ double sim_calculate_messages_along_route(struct message *m,
 	if (src_x == dest_x && src_y == dest_y)
 	{
 		messages_along_route +=
-			noc->noc_messages_in[dest_x][dest_y][m->src_neuron->core->id % 4];
+			noc->noc_messages_in[dest_x][dest_y][4+m->src_neuron->core->id % ARCH_MAX_CORES_PER_TILE];
 	}
 	else
 	{
@@ -639,7 +652,8 @@ void sim_update_noc(const double t, struct noc_timings *noc)
 	return;
 }
 
-double sim_schedule_messages(struct message_fifo *const messages_sent)
+double sim_schedule_messages(struct message_fifo *const messages_sent,
+				const int noc_width, const int noc_height)
 {
 	struct message_fifo *priority_queue;
 	struct noc_timings noc;
@@ -651,12 +665,14 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 	noc.mean_in_flight_receive_delay = 0.0;
 	noc.mean_hops = 0.0;
 	noc.noc_capacity = 0;
-	for (int x = 0; x < 8; x++)
+	noc.noc_width = noc_width;
+	noc.noc_height = noc_height;
+	for (int x = 0; x < noc.noc_width; x++)
 	{
-		for (int y = 0; y < 4; y++)
+		for (int y = 0; y < noc.noc_height; y++)
 		{
 			noc.messages_in_flight[x][y] = 0.0;
-			for (int k = 0; k < 8; k++)
+			for (int k = 0; k < 4+ARCH_MAX_CORES_PER_TILE; k++)
 			{
 				noc.noc_messages_in[x][y][k] = 0.0;
 				noc.noc_messages_out[x][y][k] = 0.0;
@@ -667,8 +683,6 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 	{
 		sim_init_fifo(&(noc.messages_received[i]));
 	}
-	noc.noc_width = 8;
-	noc.noc_height = 4;
 
 	priority_queue = sim_init_timing_priority(messages_sent);
 	last_timestamp = 0.0;
@@ -748,7 +762,7 @@ double sim_schedule_messages(struct message_fifo *const messages_sent)
 
 			//printf("messages along:%d\n", messages_along_route);
 			earliest_received_time =
-				m->sent_timestamp + network_delay;
+				m->sent_timestamp + fmax(m->network_delay, network_delay);
 			m->received_timestamp =
 				fmax(m->dest_neuron->core->blocked_until,
 					earliest_received_time);

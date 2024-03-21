@@ -27,16 +27,22 @@
 // TrueNorth
 //#define ARCH_MAX_TILES 4096
 //#define ARCH_MAX_CORES_PER_TILE 1
+//#define ARCH_MAX_X (64)
+//#define ARCH_MAX_Y (64)
 // Loihi
 #define ARCH_MAX_TILES 256
 //#define ARCH_MAX_TILES 32
 #define ARCH_MAX_CORES_PER_TILE 4
+#define ARCH_MAX_X (8*4)
+#define ARCH_MAX_Y (4*4)
+
 #define ARCH_MAX_UNITS 3
 #define ARCH_MAX_CORES (ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE)
 
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
 #define ARCH_MAX_ATTRIBUTES 256
+
 
 #define ARCH_INVALID_ID -1
 enum buffer_positions

@@ -22,6 +22,8 @@ import latin_squares
 # For a range of core sizes, the total number of neurons is always the same
 core_counts = (8, 16, 32, 64, 128, 170, 256, 512)
 compartment_counts = (16384, 8192, 4096, 2048, 1024, 768, 512, 256)
+widths = (1, 1, 2, 4, 8, 12, 16, 32)
+heights = (4, 4, 4, 4, 4, 4, 4, 4)
 
 cores_per_tile = 4
 
@@ -39,7 +41,7 @@ if run_experiment:
     with open("arch/loihi.yaml", "rb") as loihi_file:
         loihi_baseline_dvs = yaml.safe_load(loihi_file)
 
-    for cores, compartments in zip(core_counts, compartment_counts):
+    for cores, compartments, width, height in zip(core_counts, compartment_counts, widths, heights):
         mapping_file = f"{cores}c_{compartments}cx_mapping.net"
         mapping_path = os.path.join(PROJECT_DIR, "runs", "dse", "mappings",
                                     mapping_file)
@@ -49,6 +51,11 @@ if run_experiment:
         tile_name = f"loihi_tile[0..{max_tile-1}]"
         loihi_baseline_latin["architecture"]["tile"][0]["name"] = tile_name
         loihi_baseline_dvs["architecture"]["tile"][0]["name"] = tile_name
+
+        loihi_baseline_latin["architecture"]["attributes"]["width"] = width
+        loihi_baseline_latin["architecture"]["attributes"]["height"] = height
+        loihi_baseline_dvs["architecture"]["attributes"]["width"] = width
+        loihi_baseline_dvs["architecture"]["attributes"]["height"] = height
 
         design_path_latin = os.path.join(PROJECT_DIR, "runs", "dse",
                                    f"loihi_{cores}c_latin.yaml")
@@ -90,6 +97,7 @@ if run_experiment:
 if plot_results:
     energies = []
     latencies = []
+
     with open("runs/dse/latin_results.csv", "r") as dse_results:
         reader = csv.reader(dse_results)
         next(reader)

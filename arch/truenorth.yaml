@@ -24,14 +24,14 @@ architecture:
                 fan_in: 256
                 protocol: dest_axon
           soma:
-            - name: core_truenorth
+            - name: core_soma
               attributes:
                 type: digital
                 model: truenorth
           synapse:
             - name: core_synapses
               attributes:
-                model: current_based_uncompressed
+                model: current_based
                 weight_bits: 8
           dendrite:
           - name: core_dendrites
