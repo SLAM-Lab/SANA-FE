@@ -22,15 +22,22 @@ void SANA_FE::init(){
 	INFO("Initializing simulation.\n");
 	sim = sim_init_sim();
 }
-int SANA_FE::force_spike(int group_id, int n_id, int num_spikes){
-	if (num_spikes < 0)
+int SANA_FE::update_neuron(int group_id, int n_id, char* keys, char* vals, int count){
+	// TODO: Change this to parameter generic
+	if (count < 1)
 		return -1;
 	if (group_id >= net.neuron_group_count)
 		return -1;
 	if (n_id >= net.groups[group_id].neuron_count)
 		return -1;
-	net.groups[group_id].neurons[n_id].forced_spikes = num_spikes;
-	return num_spikes;
+	struct attributes attr[128];
+	for (int i = 0; i < count; ++i){
+		strcpy(&attr->key[i], &keys[i]);
+		strcpy(&attr->value_str[i], &vals[i]);
+		INFO("neuron: %d.%d updated with key: %s and val: %s", group_id, n_id, &keys[i], &vals[i]);
+	}
+	net.groups[group_id].neurons[n_id].soma_class->parameters(attr, count);
+	return 1;
 }
 void SANA_FE::run_timesteps(int timesteps){
 	store_data_init(&run_data, sim, timesteps);
@@ -363,7 +370,7 @@ PYBIND11_MODULE(simcpp, m) {
 	py::class_<SANA_FE>(m, "SANA_FE")
 		.def(py::init())
 		.def("init", &SANA_FE::init)
-        .def("force_spike", &SANA_FE::force_spike)
+        .def("update_neuron", &SANA_FE::update_neuron)
         .def("run_timesteps", &SANA_FE::run_timesteps, py::arg("timesteps") = 1)
 		.def("set_input", &SANA_FE::set_input)
 		.def("set_perf_flag", &SANA_FE::set_perf_flag, py::arg("flag") = true)

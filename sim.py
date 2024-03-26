@@ -661,6 +661,30 @@ def run(arch_path, network_path, timesteps,
 
             if user_in == "q" or user_in == "quit":
                 break
+            if user_in.startswith("u"):
+                try:
+                    group_id = int(user_in[2])
+                except ValueError:
+                    print("Error: Expected int. Got \"{user_in[2]}\".")
+                    exit(1)
+
+                try:
+                    n_id = int(user_in[4])
+                except ValueError:
+                    print("Error: Expected int. Got \"{user_in[2]}\".")
+                    exit(1)
+
+                user_in = user_in[6:]
+                keys = []
+                vals = []
+
+                for k, v in (pair.split('=') for pair in user_in.split()):
+                    keys += [k]
+                    vals += [v]
+                
+                sana_fe.update_neuron(group_id, n_id, keys, vals, len(keys))
+
+                continue
             try:
                 timesteps = int(user_in)
             except ValueError:

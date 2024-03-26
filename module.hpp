@@ -36,7 +36,7 @@ class SANA_FE{
 
         SANA_FE();
 		void init();
-		int force_spike(int group_id, int n_id, int num_spikes);
+		int update_neuron(int group_id, int n_id, char* keys, char* vals, int count);
 		void run_timesteps(int timesteps = 1);
 		void set_input(char *filename);
 		void set_perf_flag(bool flag = true);
