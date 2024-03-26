@@ -5,8 +5,11 @@
 #include "description.hpp"
 #include "command.hpp"
 #include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
+
+using namespace std;
 
 enum program_args
 {
@@ -36,7 +39,7 @@ class SANA_FE{
 
         SANA_FE();
 		void init();
-		int update_neuron(int group_id, int n_id, char* keys, char* vals, int count);
+		int update_neuron(int group_id, int n_id, vector<string> kwargs, int count);
 		void run_timesteps(int timesteps = 1);
 		void set_input(char *filename);
 		void set_perf_flag(bool flag = true);

@@ -665,34 +665,31 @@ def run(arch_path, network_path, timesteps,
                 try:
                     group_id = int(user_in[2])
                 except ValueError:
-                    print("Error: Expected int. Got \"{user_in[2]}\".")
+                    print(f"Error: Expected int. Got \"{user_in[2]}\".")
                     exit(1)
 
                 try:
                     n_id = int(user_in[4])
                 except ValueError:
-                    print("Error: Expected int. Got \"{user_in[2]}\".")
+                    print(f"Error: Expected int. Got \"{user_in[4]}\".")
                     exit(1)
 
                 user_in = user_in[6:]
-                keys = []
-                vals = []
-
-                for k, v in (pair.split('=') for pair in user_in.split()):
-                    keys += [k]
-                    vals += [v]
+                kwargs = user_in.split(" ")
                 
-                sana_fe.update_neuron(group_id, n_id, keys, vals, len(keys))
+                print(group_id, n_id, kwargs, len(kwargs))
+                sana_fe.update_neuron(group_id, n_id, kwargs, len(kwargs))
 
+                timesteps = 0
                 continue
             try:
                 timesteps = int(user_in)
             except ValueError:
-                print("Error: Expected int. Got {user_in}.")
+                print(f"Error: Expected int. Got {user_in}.")
                 exit(1)
     else:
         if timesteps < 1:
-            print("Error: Given {timesteps} timesteps, require int > 1.")
+            print(f"Error: Given {timesteps} timesteps, require int > 1.")
             exit(1)
         sana_fe.run_timesteps(timesteps)
     
