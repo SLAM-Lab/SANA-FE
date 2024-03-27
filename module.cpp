@@ -130,6 +130,16 @@ void SANA_FE::set_mess_flag(bool flag){
 			fclose(sim->message_trace_fp);
 	}
 }
+void SANA_FE::set_gui_flag(bool flag){
+	if (flag){
+		sim->gui_on = 1;
+		arch->spike_vector_on = 1;
+	}
+	else{
+		sim->gui_on = 0;
+		arch->spike_vector_on = 0;
+	}
+}
 void SANA_FE::set_arch(char* filename){
 	FILE* arch_fp = fopen(filename, "r");
 	if (arch_fp == NULL)
@@ -189,15 +199,20 @@ void SANA_FE::sim_summary(){
 		sim_write_summary(sim->stats_fp, sim);
 	}
 }
-void SANA_FE::run_summary(){
+vector<vector<int>> SANA_FE::run_summary(){
 	print_run_data(stdout, &run_data);
 
 	// Could write intermediate run data here
 	// sim->stats_fp = fopen("run_summary.yaml", "w");
 	// if (sim->stats_fp != NULL)
 	// {
-	// 	sim_write_summary(sim->stats_fp, sim);
+	// 	print_run_data(sim->stats_fp, &run_data);
 	// }
+
+	// Return 2D vector of spiking tiles, auto clears
+	// vector after return.
+	Vector_Cleanup_Class help_class(arch);
+	return arch->spike_vector;
 }
 void SANA_FE::clean_up(int ret){
 	// Free any larger structures here
@@ -346,10 +361,6 @@ void print_run_data(FILE *fp, run_ts_data* data){
 	data->timestep_start+data->timesteps);
 }
 
-void test_pybind(void){
-	INFO("Printing through Pybind!\n");
-}
-
 PYBIND11_MODULE(simcpp, m) {
     m.doc() = R"pbdoc(
         SANA-FE Cpp Module with Pybind11 
@@ -360,15 +371,8 @@ PYBIND11_MODULE(simcpp, m) {
         .. autosummary::
            :toctree: _generate
 
-           test_pybind
 		   SANA_FE
     )pbdoc";
-
-    m.def("test_pybind", &test_pybind, R"pbdoc(
-        test_pybind function from main.cpp
-
-        Test pybind11 functionality.
-    )pbdoc");
 
 	py::class_<SANA_FE>(m, "SANA_FE")
 		.def(py::init())
@@ -380,6 +384,7 @@ PYBIND11_MODULE(simcpp, m) {
 		.def("set_spike_flag", &SANA_FE::set_spike_flag, py::arg("flag") = true)
 		.def("set_pot_flag", &SANA_FE::set_pot_flag, py::arg("flag") = true)
 		.def("set_mess_flag", &SANA_FE::set_mess_flag, py::arg("flag") = true)
+		.def("set_gui_flag", &SANA_FE::set_gui_flag, py::arg("flag") = true)
 		.def("set_arch", &SANA_FE::set_arch)
 		.def("set_net", &SANA_FE::set_net)
 		.def("get_power", &SANA_FE::get_power)

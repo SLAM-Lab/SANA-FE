@@ -625,7 +625,7 @@ project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
         run_dir=os.path.join(project_dir, "runs"), perf_trace=False,
         spike_trace=False, potential_trace=False, message_trace=False,
-        run_alive=False):
+        run_alive=False, gui=False):
     parsed_filename = os.path.join(run_dir,
                                    os.path.basename(arch_path) + ".parsed")
     parse_file(arch_path, parsed_filename)
@@ -645,6 +645,8 @@ def run(arch_path, network_path, timesteps,
         sana_fe.set_perf_flag()
     if message_trace:
         sana_fe.set_mess_flag()
+    if gui:
+        sana_fe.set_gui_flag()
     
     sana_fe.set_arch(parsed_filename)
     sana_fe.set_net(network_path)
@@ -721,11 +723,12 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--messages", help="Trace messages", action="store_true")
     parser.add_argument("-v", "--voltages", help="Trace membrane voltages", action="store_true")
     parser.add_argument("-r", "--run", help="Keep simulation alive", action="store_true")
+    parser.add_argument("-g", "--gui", help="Turn on gui traces", action="store_true")
 
     args = parser.parse_args()
     print(args)
 
     run(args.architecture, args.snn, args.timesteps, spike_trace=args.spikes,
         potential_trace=args.voltages, perf_trace=args.perf,
-        message_trace=args.messages, run_alive=args.run)
+        message_trace=args.messages, run_alive=args.run, gui=args.gui)
     print("sim finished")

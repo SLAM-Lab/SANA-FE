@@ -50,9 +50,13 @@ void sim_timestep(struct timestep *const ts,
 	// Performance statistics for this time step
 	ts->energy = sim_calculate_energy(arch);
 
+	// Setup spike vector
+	vector<int> spike_tile_vec = vector<int>(ARCH_MAX_TILES);
+
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
+		int tile_spike_count = 0;
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
@@ -60,6 +64,8 @@ void sim_timestep(struct timestep *const ts,
 			for (int k = 0; k < c->synapse_count; k++)
 			{
 				ts->spike_count +=
+					c->synapse[k].spikes_processed;
+				tile_spike_count += 
 					c->synapse[k].spikes_processed;
 			}
 			for (int k = 0; k < c->soma_count; k++)
@@ -69,6 +75,10 @@ void sim_timestep(struct timestep *const ts,
 			}
 			ts->packets_sent += c->axon_out.packets_out;
 		}
+		spike_tile_vec[i] = tile_spike_count;
+	}
+	if (arch->spike_vector_on){
+		arch->spike_vector.push_back(spike_tile_vec);
 	}
 
 	TRACE1("Spikes sent: %ld\n", sim->total_spikes);

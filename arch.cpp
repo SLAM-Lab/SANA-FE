@@ -32,6 +32,7 @@ struct architecture *arch_init(void)
 	arch->core_count = 0;
 	arch->noc_buffer_size = 0;
 	arch->is_init = 0;
+	arch->spike_vector_on = 0;
 
 	return arch;
 }

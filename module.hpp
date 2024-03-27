@@ -46,12 +46,25 @@ class SANA_FE{
 		void set_spike_flag(bool flag = true);
 		void set_pot_flag(bool flag = true);
 		void set_mess_flag(bool flag = true);
+		void set_gui_flag(bool flag = true);
 		void set_arch(char* filename);
 		void set_net(char* filename);
         double get_power();
         void sim_summary();
-		void run_summary();
+		vector<vector<int>> run_summary();
 		void clean_up(int ret = RET_OK);
+		~SANA_FE(){clean_up();};
+};
+class Vector_Cleanup_Class{
+	public:
+		struct architecture* arch;
+		Vector_Cleanup_Class(){}
+		Vector_Cleanup_Class(struct architecture* arch){
+			this->arch = arch;
+		}
+		~Vector_Cleanup_Class(){
+			arch->spike_vector.clear();
+		}
 };
 
 void run(struct simulation *sim, struct network *net, struct architecture *arch);

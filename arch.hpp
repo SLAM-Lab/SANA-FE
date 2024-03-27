@@ -15,9 +15,15 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 #include "network.hpp"
 #include "description.hpp"
 
+using namespace std;
+
+// Hard define maximum defined h/w sizes
+#define ARCH_MAX_COMPARTMENTS 16384
+#define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*4)
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
@@ -223,11 +229,15 @@ struct architecture
 	char name[MAX_FIELD_LEN];
 	int noc_width, noc_height, noc_buffer_size, tile_count, core_count;
 	int is_init;
+
+	vector<vector<int>> spike_vector;
+	int spike_vector_on;
 };
 
 #include "description.hpp"
 
 struct architecture *arch_init(void);
+void free_spike_vector(struct architecture* arch);
 void arch_free(struct architecture *const arch);
 int arch_create_noc(struct architecture *const arch, struct attributes *attr, const int attribute_count);
 int arch_create_tile(struct architecture *const arch, struct attributes *attr, const int attribute_count);
