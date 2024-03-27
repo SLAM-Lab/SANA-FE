@@ -51,7 +51,7 @@ class SANA_FE{
         double get_power();
         void sim_summary();
 		void run_summary();
-		void clean_up(description_ret ret = RET_OK);
+		void clean_up(int ret = RET_OK);
 };
 
 void run(struct simulation *sim, struct network *net, struct architecture *arch);

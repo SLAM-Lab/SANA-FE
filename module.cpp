@@ -199,7 +199,7 @@ void SANA_FE::run_summary(){
 	// 	sim_write_summary(sim->stats_fp, sim);
 	// }
 }
-void SANA_FE::clean_up(description_ret ret){
+void SANA_FE::clean_up(int ret){
 	// Free any larger structures here
 	network_free(&net);
 	arch_free(arch);
@@ -385,5 +385,5 @@ PYBIND11_MODULE(simcpp, m) {
 		.def("get_power", &SANA_FE::get_power)
 		.def("sim_summary", &SANA_FE::sim_summary)
 		.def("run_summary", &SANA_FE::run_summary)
-		.def("clean_up", &SANA_FE::clean_up, py::arg("ret") = 1);
+		.def("clean_up", &SANA_FE::clean_up, py::arg("ret") = 0);
 }

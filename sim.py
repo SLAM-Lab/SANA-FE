@@ -699,6 +699,8 @@ def run(arch_path, network_path, timesteps,
     with open("run_summary.yaml", "r") as run_summary:
         results = yaml.safe_load(run_summary)
 
+    sana_fe.clean_up()
+
     return results
 
 
