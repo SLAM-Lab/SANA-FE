@@ -107,7 +107,7 @@ def onpick(event, df):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     if run_experiments:
         with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),

@@ -28,15 +28,19 @@ struct timestep
 	double energy, sim_time;
 };
 
-struct noc_timings
+struct noc_info
 {
 	struct message_fifo messages_received[ARCH_MAX_CORES];
 	size_t noc_width, noc_height;
-	double messages_in_flight[ARCH_MAX_X][ARCH_MAX_Y];
 	double noc_messages_in[ARCH_MAX_X][ARCH_MAX_Y][4+ARCH_MAX_CORES_PER_TILE];
-	double noc_messages_out[ARCH_MAX_X][ARCH_MAX_Y][4+ARCH_MAX_CORES_PER_TILE];
-	long int messages_in_noc, noc_capacity;
-	double mean_in_flight_receive_delay, mean_hops, utilization;
+	double core_finished_receiving[ARCH_MAX_CORES];
+	double mean_in_flight_receive_delay;
+	long int messages_in_noc;
+};
+
+struct scheduler
+{
+	int noc_width, noc_height, buffer_size;
 };
 
 enum direction
@@ -64,9 +68,7 @@ void sim_init_timestep(struct timestep *const ts);
 
 void sim_process_neurons(struct timestep *const ts, struct network *net, struct architecture *arch);
 void sim_receive_messages(struct timestep *const sim, struct architecture *arch);
-double sim_schedule_messages(struct message_fifo *const messages_sent, const int noc_width, const int noc_height);
-double sim_schedule_messages_blocking(struct message_fifo *const messages_sent);
-double sim_schedule_messages_simplest(struct message_fifo *const messages_sent);
+double sim_schedule_messages(struct message_fifo *const messages_sent, const struct scheduler *const scheduler);
 // TODO: reimplement
 int sim_input_spikes(struct network *net);
 

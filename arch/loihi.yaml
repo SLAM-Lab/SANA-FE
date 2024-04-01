@@ -8,6 +8,7 @@ architecture:
     topology: mesh
     width: 8
     height: 4
+    link_buffer_size: 16
 
   tile:
     - name: loihi_tile[0..31]

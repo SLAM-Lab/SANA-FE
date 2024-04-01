@@ -30,14 +30,15 @@
 //#define ARCH_MAX_COMPARTMENTS 256
 
 // Loihi
-#define ARCH_MAX_TILES 256
-//#define ARCH_MAX_TILES 32
+//#define ARCH_MAX_TILES 256
+#define ARCH_MAX_TILES 32
 #define ARCH_MAX_CORES_PER_TILE 4
 #define ARCH_MAX_X (8*4)
 #define ARCH_MAX_Y (4*4)
 // Hard define maximum defined h/w sizes
-#define ARCH_MAX_COMPARTMENTS 16384
-#define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*4)
+//#define ARCH_MAX_COMPARTMENTS 16384
+#define ARCH_MAX_COMPARTMENTS 1024
+#define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*16)
 
 #define ARCH_MAX_UNITS 3
 #define ARCH_MAX_CORES (ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE)
@@ -195,7 +196,7 @@ struct core
 
 	char name[MAX_FIELD_LEN];
 	struct message next_message;  // Since last spike
-	double energy, blocked_until, latency_after_last_message;
+	double energy, latency_after_last_message;
 	int id, offset, buffer_pos, is_blocking, soma_count, synapse_count;
 	int neuron_count, message_count;
 	int curr_axon;
@@ -211,7 +212,6 @@ struct tile
 	double energy_west_hop, latency_west_hop;
 	double energy_north_hop, latency_north_hop;
 	double energy_south_hop, latency_south_hop;
-	double blocked_until;
 	long int hops, messages_received, total_neurons_fired;
 	long int east_hops, west_hops, north_hops, south_hops;
 	int id, x, y, core_count, is_blocking;
@@ -222,7 +222,7 @@ struct architecture
 {
 	struct tile tiles[ARCH_MAX_TILES];
 	char name[MAX_FIELD_LEN];
-	int noc_width, noc_height, tile_count, core_count;
+	int noc_width, noc_height, noc_buffer_size, tile_count, core_count;
 	int is_init;
 };
 

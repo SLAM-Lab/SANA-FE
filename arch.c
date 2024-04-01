@@ -30,6 +30,7 @@ struct architecture *arch_init(void)
 
 	arch->tile_count = 0;
 	arch->core_count = 0;
+	arch->noc_buffer_size = 0;
 	arch->is_init = 0;
 
 	return arch;
@@ -75,6 +76,7 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 	// Default values
 	arch->noc_width = -1;
 	arch->noc_height = -1;
+	arch->noc_buffer_size = 0;
 
 	for (int i = 0; i < attribute_count; i++)
 	{
@@ -88,13 +90,15 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 		{
 			sscanf(a->value_str, "%d", &arch->noc_height);
 		}
+		else if (strncmp("link_buffer_size", a->key, MAX_FIELD_LEN) == 0)
+		{
+			sscanf(a->value_str, "%d", &arch->noc_buffer_size);
+		}
 	}
 	assert((arch->noc_height * arch->noc_width) <= ARCH_MAX_TILES);
 
 	for (int x = 0; x < arch->noc_width; x++)
-	//for (int y = 0; y < arch->noc_height; y++)
 	{
-		//for (int x = 0; x < arch->noc_width; x++)
 		for (int y = 0; y < arch->noc_height; y++)
 		{
 			struct tile *t = &(arch->tiles[tile_id]);
