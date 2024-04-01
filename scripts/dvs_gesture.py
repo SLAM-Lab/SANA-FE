@@ -183,13 +183,16 @@ if __name__ == "__main__":
         """
         # Plot the latency
         if experiment == "time":
-            plt.rcParams.update({'font.size': 8, 'lines.markersize': 4})
+            plt.rcParams.update({'font.size': 6, 'lines.markersize': 4})
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
             hops = np.loadtxt("hops.csv", delimiter=",")
             loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
             hops_data = pd.read_csv("hops.csv")
+            event_based_data = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "noc", "dvs", "event_based_latencies.csv"))
+
             #loihi_times = np.array(loihi_data.loc[:, "spiking"] / 1.0e6)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
+            event_based_times = np.array(event_based_data.loc[:, :])
 
             # There is a weird effect, that the first sample of all inputs > 1 is
             #  a 0 value. Just ignore the entries for both arrays (so we have
@@ -200,6 +203,7 @@ if __name__ == "__main__":
                             list(range(timesteps, timesteps*frames, timesteps)))
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps, timesteps*frames, timesteps)))
+
 
             total_times = np.zeros(frames)
             total_hops = np.zeros(frames)
@@ -251,30 +255,33 @@ if __name__ == "__main__":
             times = np.delete(times,
                     list(range(timesteps-1, timesteps*frames, timesteps)))
             loihi_times = loihi_times[0:timesteps-1,:]
-            plt.figure(figsize=(7.0, 1.7))
+            plt.figure(figsize=(7.0, 1.6))
 
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
-            plt.rcParams.update({'font.size': 7})
+            plt.rcParams.update({'font.size': 6})
             plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
-            plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--x")
-            plt.legend(("Measured on Loihi", "Simulated"), fontsize=7)
+            plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--")
+            plt.plot(np.arange(1, timesteps-1), event_based_times[1:(timesteps-1)] * 1.0e6, ":k")
+            plt.legend(("Measured on Loihi", "SANA-FE predictions", "Event-based predictions"),
+                       fontsize=6)
             plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")
             plt.yticks(np.arange(0, 61, 10))
+            plt.minorticks_on()
             plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_time.pdf")
             plt.savefig("runs/dvs/dvs_gesture_sim_time.png")
 
             # Plot the correlation between simulated and measured time-step latency
-            plt.figure(figsize=(1.7, 1.7))
+            plt.figure(figsize=(1.5, 1.5))
             plt.minorticks_on()
             plt.gca().set_box_aspect(1)
             #plt.plot(times[0:frames*(timesteps-1)], loihi_times[0:frames*(timesteps-1)], "x")
 
             average_times = total_times / 128
             loihi_average_times = loihi_total_times / 128
-            plt.rcParams.update({'font.size': 7, 'lines.markersize': 2})
+            plt.rcParams.update({'font.size': 6, 'lines.markersize': 2})
             #plt.plot(average_times[0:frames] * 1.0e6, loihi_average_times[0:frames] * 1.0e6, "x")
             #plt.plot(np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6,
             #         np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6, "k--")
@@ -324,7 +331,7 @@ if __name__ == "__main__":
             """
 
         if experiment == "energy":
-            plt.rcParams.update({'font.size': 7, 'lines.markersize': 2})
+            plt.rcParams.update({'font.size': 6, 'lines.markersize': 2})
             loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
             loihi_energies = np.array(loihi_data).flatten() * 1.0e6
             energies = np.loadtxt(SIM_ENERGY_DATA_PATH) * 1.0e6

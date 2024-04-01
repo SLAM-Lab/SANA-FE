@@ -44,8 +44,8 @@ def run_sim(network_path, timesteps, plot_filename):
     spikes_in = spike_data.loc[spike_data["gid.nid"] == 0.0]
     spikes_out = spike_data.loc[spike_data["gid.nid"] == 1.0]
 
-    plt.rcParams.update({'font.size': 7, "lines.markersize": 2})
-    plt.figure(figsize=(3.2, 1.6))
+    plt.rcParams.update({'font.size': 6, "lines.markersize": 2})
+    plt.figure(figsize=(3.2, 1.5))
     plt.plot(np.arange(0, timesteps-offset), potentials)
     spike_idx = spikes_out.loc[:, "timestep"]
     height = max(potentials) + 2
@@ -66,7 +66,7 @@ def run_sim(network_path, timesteps, plot_filename):
 
 
 def run_experiment():
-    run_sim("snn/nemo/truenorth_phasic.net", 1200, "runs/nemo/phasic.png")
+    run_sim("snn/nemo/truenorth_phasic.net", 1200, "runs/nemo/phasic.pdf")
     run_sim("snn/nemo/truenorth_bursting.net", 1200, "runs/nemo/bursting.pdf")
 
 if __name__ == "__main__":

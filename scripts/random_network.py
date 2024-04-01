@@ -107,7 +107,7 @@ def onpick(event, df):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     if run_experiments:
         with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),
@@ -151,9 +151,10 @@ if __name__ == "__main__":
         cores = df["cores"].values
         total_neurons = np.array(neurons_per_core * cores, dtype=float)
 
-        plt.rcParams.update({"font.size": 7, "lines.markersize": 3})
+        plt.rcParams.update({"font.size": 6, "lines.markersize": 2})
         # Plot the simulated vs measured energy
-        plt.figure(figsize=(3.0, 2.2))
+        #plt.figure(figsize=(3.0, 2.2))
+        plt.figure(figsize=(1.5, 1.5))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")
@@ -164,19 +165,20 @@ if __name__ == "__main__":
         plt.plot(np.linspace(min(sim_energy), max(sim_energy)),
                  np.linspace(min(sim_energy), max(sim_energy)),
                  "k--", alpha=0.5)
-        plt.colorbar(label="Neurons", shrink=0.5)
+        #plt.colorbar(label="Neurons", shrink=0.5)
 
         plt.minorticks_on()
         plt.xlabel("Simulated Energy (J)")
         plt.ylabel("Measured Energy (J)")
         plt.xticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.yticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
-        plt.tight_layout(pad=0.3)
+        plt.tight_layout(pad=0.1)
         plt.savefig(os.path.join(NETWORK_PATH, "random_energy.pdf"))
         plt.savefig(os.path.join(NETWORK_PATH, "random_energy.png"))
 
         # Plot the simulated vs measured latency
-        fig = plt.figure(figsize=(3.0, 2.2))
+        #fig = plt.figure(figsize=(3.0, 2.2))
+        fig = plt.figure(figsize=(2.0, 1.8))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")
@@ -185,7 +187,7 @@ if __name__ == "__main__":
         #plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
         #            cmap=cm, vmin=256, vmax=8192, linewidths=1,
         #            picker=True, pickradius=5)
-        plt.scatter(sim_latency, loihi_latency, marker="x", c=df["messages_per_neuron"].values,
+        plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
                     cmap=cm, linewidths=1,
                     picker=True, pickradius=5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
@@ -193,12 +195,13 @@ if __name__ == "__main__":
         fig.canvas.mpl_connect('pick_event', lambda event: onpick(event, df))
         pd.options.display.width = 300
         pd.options.display.max_colwidth = 300
-        plt.colorbar(label="Neurons", shrink=0.5)
+        cbar = plt.colorbar(label="Neurons", shrink=0.5)
+        cbar.set_ticks(ticks=[2000, 4000, 6000, 8000], labels=["2k", "4k", "6k", "8k"])
         plt.xlabel("Simulated Latency (s)")
         plt.ylabel("Measured Latency (s)")
         plt.xticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.yticks((1.0e-6, 1.0e-5, 1.0e-4))
-        plt.tight_layout(pad=0.3)
+        plt.tight_layout(pad=0.1)
         plt.savefig(os.path.join(NETWORK_PATH, "random_latency.pdf"))
         plt.savefig(os.path.join(NETWORK_PATH, "random_latency.png"))
         plt.show()

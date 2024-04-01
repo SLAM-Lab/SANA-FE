@@ -129,12 +129,14 @@ def run_sim_nemo(cores, timesteps, debug=True):
 
 def plot_results():
     df = pd.read_csv(CSV_RESULTS_FILENAME, index_col="cores")
-    plt.rcParams.update({'font.size': 7, 'lines.markersize': 1})
-    df.plot.bar(rot=0, figsize=(3.5, 1.6), color=("#ff7f0e", "#1f77b4"))
+    plt.rcParams.update({'font.size': 6, 'lines.markersize': 1})
+    df.plot.bar(rot=0, figsize=(3.5, 1.4), color=("#ff7f0e", "#1f77b4"))
+    ax = plt.gca()
     plt.xlabel("TrueNorth Core Count")
     plt.ylabel("Run-time (s)")
     plt.yscale("log")
-    plt.minorticks_on()
+    #plt.minorticks_on()
+    ax.tick_params(axis='y', which='minor', labelbottom=False)
     plt.tight_layout(pad=0.3)
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.png"))
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.pdf"))
@@ -142,8 +144,8 @@ def plot_results():
 
 
 if __name__ == "__main__":
-    run_experiments = True
-    plot = True
+    run_experiments = False
+    plot_experiments = True
     if run_experiments:
         core_counts = (32, 64, 128, 256, 512, 1024)
         print(f"Running experiments with following core counts: {core_counts}")
@@ -166,5 +168,5 @@ if __name__ == "__main__":
 
         print("Saved results to file")
 
-    if plot:
+    if plot_experiments:
         plot_results()

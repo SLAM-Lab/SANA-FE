@@ -597,6 +597,10 @@ def sim_schedule_event_based_v2(df):
     priority.sort(key=lambda x: x[1], reverse=True)
 
     hop_delay = 6.5e-9  # s
+    max_buffer_len = np.zeros((8, 4, 12))
+    #hop_delay = 0.0e-9
+    #hop_delay = 5.0e-9
+    #hop_delay = 1.0e-8
 
     event_count = 0
     t = 0
@@ -809,6 +813,15 @@ def sim_schedule_event_based_v2(df):
 
                             priority.sort(key=lambda x: x[1], reverse=True)
 
+        buffer_len = np.zeros((8, 4, 12))
+        for x in range(0, 8):
+            for y in range(0, 4):
+                for link in range(0, 12):
+                    buffer_len[x, y, link] = len(noc_buffers[x][y][link])
+
+        #print(max_buffer_len)
+        max_buffer_len = np.maximum(max_buffer_len, buffer_len)
+
         # Check here that the total messages in the system are consistent
         total_in_system = 0
         check_messages = set()
@@ -839,6 +852,7 @@ def sim_schedule_event_based_v2(df):
         # ** END OF EVENT LOOP **
 
     print(f"forced through count:{forced_count}")
+    print(f"max buffer:{max_buffer_len[:,:,8:12]}")
     #input()
 
     # Calculate some additional stats
@@ -1282,7 +1296,8 @@ LOIHI_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_TIME_DATA_FILENAME)
 
 # 1. Read in the network
 DVS_FRAME = 0
-filename = f"runs/noc/dvs/frame_{DVS_FRAME}_v2.trace"
+#DVS_FRAME = 11
+filename = f"runs/noc/dvs/frame_{DVS_FRAME}.trace"
 #filename = "latin_messages.trace"
 #filename = f"runs/noc/bio/connected_layers_N841_map_luke.trace"
 #filename = "runs/noc/bio/connected_layers_N529_map_split_4.trace"
@@ -1392,8 +1407,8 @@ for timestep in range(0, timesteps):
     print(f"Finished scheduling messages for timestep:{timestep}")
     #exit()
 
-#np.savetxt("runs/noc/dvs/event_based_latencies.csv", event_based_latencies,
-#           delimiter=",")
+np.savetxt("runs/noc/dvs/event_based_latencies.csv", event_based_latencies,
+           delimiter=",")
 #np.loadtxt("runs/noc/event_based_latencies.csv", delimiter=",")
 #"""
 

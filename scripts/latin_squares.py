@@ -171,7 +171,7 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiment = True
 
     if run_experiments:
@@ -210,8 +210,8 @@ if __name__ == "__main__":
         loihi_latency = df["loihi_latency"].values * 1.0e6
 
         # Plot the simulated vs measured energy
-        plt.rcParams.update({"font.size": 7, "lines.markersize": 5})
-        plt.figure(figsize=(1.7, 1.7))
+        plt.rcParams.update({"font.size": 6, "lines.markersize": 5})
+        plt.figure(figsize=(1.5, 1.5))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
 
@@ -230,7 +230,7 @@ if __name__ == "__main__":
                                  "latin_energy.png"))
 
         # Plot the simulated vs measured latency
-        plt.figure(figsize=(1.7, 1.7))
+        plt.figure(figsize=(1.5, 1.5))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
 

@@ -27,7 +27,7 @@ heights = (4, 4, 4, 4, 4, 4, 4, 4)
 
 cores_per_tile = 4
 
-run_experiment = True
+run_experiment = False
 plot_results = True
 
 if run_experiment:
@@ -104,7 +104,7 @@ if plot_results:
         for line in reader:
             energies.append(float(line[2]))
             latencies.append(float(line[3]))
-    plt.rcParams.update({'font.size': 7, 'lines.markersize': 1})
+    plt.rcParams.update({'font.size': 6, 'lines.markersize': 1})
 
     labels = [f"<{c}c,{n}n>" for c, n in
             zip(core_counts, compartment_counts)]
@@ -113,7 +113,7 @@ if plot_results:
     #plt.bar(labels, np.array(energies) / energies[4], width=0.2)
     #plt.bar(labels, np.array(latencies) / latencies[4], width=0.2)
 
-    df.plot.bar(rot=30, figsize=(3.6, 1.8), color=("#ff7f0e", "#1f77b4"), secondary_y="Latencies", legend=False)
+    df.plot.bar(rot=30, figsize=(3.5, 1.8), color=("#ff7f0e", "#1f77b4"), secondary_y="Latencies", legend=False)
     ax = plt.gca()
     plt.xlabel("Design Configuration")
     ax1, ax2 = plt.gcf().get_axes()
@@ -156,7 +156,7 @@ if plot_results:
     labels = [f"<{c}c,{n}n>" for c, n in
             zip(core_counts, compartment_counts)]
     print(labels)
-    plt.rcParams.update({'font.size': 7, 'lines.markersize': 1})
+    plt.rcParams.update({'font.size': 6, 'lines.markersize': 1})
     plt.figure(figsize=(3.5, 2.0))
     plt.bar(labels, np.array(latencies) * 1.0e3, width=0.5)
     plt.xlabel("Design Configuration")
@@ -180,7 +180,7 @@ if plot_results:
     #plt.bar(labels, np.array(energies) / energies[4], width=0.2)
     #plt.bar(labels, np.array(latencies) / latencies[4], width=0.2)
 
-    df.plot.bar(rot=30, figsize=(3.6, 1.8), color=("#ff7f0e", "#1f77b4"), secondary_y="Latencies", legend=False)
+    df.plot.bar(rot=30, figsize=(3.5, 1.8), color=("#ff7f0e", "#1f77b4"), secondary_y="Latencies", legend=False)
     ax = plt.gca()
     plt.xlabel("Design Configuration")
     ax1, ax2 = plt.gcf().get_axes()

@@ -18,9 +18,7 @@
 #include "network.h"
 #include "description.h"
 
-// Hard define maximum defined h/w sizes
-#define ARCH_MAX_COMPARTMENTS 16384
-#define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*4)
+
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
@@ -29,12 +27,17 @@
 //#define ARCH_MAX_CORES_PER_TILE 1
 //#define ARCH_MAX_X (64)
 //#define ARCH_MAX_Y (64)
+//#define ARCH_MAX_COMPARTMENTS 256
+
 // Loihi
 #define ARCH_MAX_TILES 256
 //#define ARCH_MAX_TILES 32
 #define ARCH_MAX_CORES_PER_TILE 4
 #define ARCH_MAX_X (8*4)
 #define ARCH_MAX_Y (4*4)
+// Hard define maximum defined h/w sizes
+#define ARCH_MAX_COMPARTMENTS 16384
+#define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*4)
 
 #define ARCH_MAX_UNITS 3
 #define ARCH_MAX_CORES (ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE)
@@ -42,7 +45,6 @@
 #define ARCH_MAX_LINKS 4
 #define ARCH_MAX_DESCRIPTION_LINE 256
 #define ARCH_MAX_ATTRIBUTES 256
-
 
 #define ARCH_INVALID_ID -1
 enum buffer_positions
