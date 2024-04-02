@@ -668,21 +668,26 @@ int arch_map_neuron(struct neuron *n, struct core *c)
 
 	// Map neuron model to soma hardware unit in this core. Search through
 	//  all neuron models implemented by this core and return the one that
-	//  matches.
-	struct soma_processor *soma_hw = NULL;
-	for (soma_id = 0; soma_id < c->soma_count; soma_id++)
+	//  matches. If no soma hardware is specified, default to the first
+	//  one defined
+	struct soma_processor *soma_hw = &(c->soma[0]);
+	if (n->soma_hw_name[0])
 	{
-		soma_hw = &(c->soma[soma_id]);
-		if (strncmp(n->soma_hw_name, soma_hw->name, MAX_FIELD_LEN) == 0)
+		for (soma_id = 0; soma_id < c->soma_count; soma_id++)
 		{
-			break;
+			soma_hw = &(c->soma[soma_id]);
+			if (strncmp(n->soma_hw_name, soma_hw->name,
+				MAX_FIELD_LEN) == 0)
+			{
+				break;
+			}
 		}
-	}
-	if (soma_id >= c->soma_count)
-	{
-		INFO("Error: Could not map neuron nid:%d (hw:%s) "
-			"to any soma h/w.\n", n->id, n->soma_hw_name);
-		exit(1);
+		if (soma_id >= c->soma_count)
+		{
+			INFO("Error: Could not map neuron nid:%d (hw:%s) "
+				"to any soma h/w.\n", n->id, n->soma_hw_name);
+			exit(1);
+		}
 	}
 	n->soma_hw = soma_hw;
 	n->soma_hw->neuron_count++;
@@ -783,21 +788,27 @@ void arch_add_connection_to_map(
 	//  this one, then we need to update and track
 	con->post_neuron->maps_in_count++;
 
-	// Map the connections to the synapse hardware
-	for (synapse_id = 0; synapse_id < post_core->synapse_count;
+	// Map the connections to the synapse hardware. Default to the first
+	//  defined unit.
+	synapse_hw = &(post_core->synapse[0]);
+	if (con->synapse_hw_name[0])
+	{
+		// Search for the specified synapse hardware
+		for (synapse_id = 0; synapse_id < post_core->synapse_count;
 		synapse_id++)
-	{
-		synapse_hw = &(post_core->synapse[synapse_id]);
-		if (strncmp(con->synapse_hw_name, synapse_hw->name,
-			MAX_FIELD_LEN) == 0)
 		{
-			break;
+			synapse_hw = &(post_core->synapse[synapse_id]);
+			if (strncmp(con->synapse_hw_name, synapse_hw->name,
+				MAX_FIELD_LEN) == 0)
+			{
+				break;
+			}
 		}
-	}
-	if (synapse_id >= post_core->synapse_count)
-	{
-		INFO("Error: Could not map connection to synapse h/w.\n");
-		exit(1);
+		if (synapse_id >= post_core->synapse_count)
+		{
+			INFO("Error: Could not map connection to synapse h/w.\n");
+			exit(1);
+		}
 	}
 	con->synapse_hw = synapse_hw;
 

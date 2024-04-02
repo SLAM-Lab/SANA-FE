@@ -225,7 +225,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		struct attributes *a = &(attr[i]);
 		int ret = -1;
 
-		if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("hw_name", a->key, MAX_FIELD_LEN) == 0)
 		{
 			strncpy(n->soma_hw_name, a->value_str, MAX_FIELD_LEN);
 		}
@@ -346,7 +346,7 @@ int network_connect_neurons(struct connection *const con,
 		{
 			ret = sscanf(a->value_str, "%lf", &(con->weight));
 		}
-		else if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("hw_name", a->key, MAX_FIELD_LEN) == 0)
 		{
 			strncpy(con->synapse_hw_name, a->value_str,
 				MAX_FIELD_LEN);
