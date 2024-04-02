@@ -679,11 +679,23 @@ def run(arch_path, network_path, timesteps,
                 user_in = user_in[6:]
                 kwargs = user_in.split(" ")
                 
-                print(group_id, n_id, kwargs, len(kwargs))
+                # print(group_id, n_id, kwargs, len(kwargs))
                 sana_fe.update_neuron(group_id, n_id, kwargs, len(kwargs))
 
                 timesteps = 0
                 continue
+            if user_in.startswith("s"):
+                try:
+                    group_id = int(user_in[2])
+                except ValueError:
+                    print(f"Error: Expected int. Got \"{user_in[2]}\".")
+                    exit(1)
+
+                print(sana_fe.get_status(group_id))
+
+                timesteps = 0
+                continue
+
             try:
                 timesteps = int(user_in)
             except ValueError:

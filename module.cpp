@@ -189,6 +189,18 @@ double SANA_FE::get_power(){
 		return 0.0;
 	}
 }
+vector<int> SANA_FE::get_status(int gid){
+	vector<int> statuses = vector<int>();
+	if (gid >= net.neuron_group_count){
+		INFO("Error: Got gid of %d with only %d groups in net.\n",
+			gid, net.neuron_group_count);
+		return statuses;
+	}
+	for (int i = 0; i < net.groups[gid].neuron_count; ++i){
+		statuses.push_back(net.groups[gid].neurons[i].neuron_status);
+	}
+	return statuses;
+}
 
 void SANA_FE::sim_summary(){
 	sim_write_summary(stdout, sim);
@@ -388,6 +400,7 @@ PYBIND11_MODULE(simcpp, m) {
 		.def("set_arch", &SANA_FE::set_arch)
 		.def("set_net", &SANA_FE::set_net)
 		.def("get_power", &SANA_FE::get_power)
+		.def("get_status", &SANA_FE::get_status)
 		.def("sim_summary", &SANA_FE::sim_summary)
 		.def("run_summary", &SANA_FE::run_summary)
 		.def("clean_up", &SANA_FE::clean_up, py::arg("ret") = 0);

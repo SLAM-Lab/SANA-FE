@@ -50,6 +50,7 @@ class SANA_FE{
 		void set_arch(char* filename);
 		void set_net(char* filename);
         double get_power();
+		vector<int> get_status(int gid);
         void sim_summary();
 		vector<vector<int>> run_summary();
 		void clean_up(int ret = RET_OK);
