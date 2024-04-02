@@ -9,11 +9,9 @@ architecture:
     width: 8
     height: 4
     link_buffer_size: 16
-
   tile:
     - name: loihi_tile[0..31]
       attributes:
-        blocking: True
         energy_east: 3.0e-12
         latency_east: 4.1e-9
         energy_west: 3.0e-12
@@ -25,7 +23,6 @@ architecture:
       core:
         - name: loihi_core[0..3]
           attributes:
-            blocking: True
           axon_in:
             - name: loihi_in
               attributes:

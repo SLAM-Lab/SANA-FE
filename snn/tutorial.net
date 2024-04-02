@@ -1,0 +1,19 @@
+### tutorial.net
+## Groups and neurons
+g 2 threshold=1.0 reset=0.0 soma_hw_name=demo_soma_default
+g 2 threshold=2.0 reset=0.0
+n 0.0 bias=1.0 connections_out=2
+n 0.1 bias=1.0 connections_out=1
+n 1.0 bias=0.0
+n 1.1 bias=0.0
+
+## Edges
+e 0.0->1.0 weight=-1.0
+e 0.0->1.1 weight=-2.0
+e 0.1->1.1 weight=3.0
+
+## Mappings
+& 0.0@0.0
+& 0.1@0.0
+& 1.0@0.1
+& 1.1@0.1

@@ -74,8 +74,8 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 	}
 
 	// Default values
-	arch->noc_width = -1;
-	arch->noc_height = -1;
+	arch->noc_width = 1;
+	arch->noc_height = 1;
 	arch->noc_buffer_size = 0;
 
 	for (int i = 0; i < attribute_count; i++)
@@ -90,7 +90,8 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 		{
 			sscanf(a->value_str, "%d", &arch->noc_height);
 		}
-		else if (strncmp("link_buffer_size", a->key, MAX_FIELD_LEN) == 0)
+		else if (strncmp("link_buffer_size", a->key, MAX_FIELD_LEN) ==
+			0)
 		{
 			sscanf(a->value_str, "%d", &arch->noc_buffer_size);
 		}
@@ -144,7 +145,7 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 				t->links[link_count] = &(arch->tiles[lid]);
 				link_count++;
 			}
-			assert(link_count > 0);
+			assert(link_count >= 0);
 			assert(link_count <= 4);
 			for (int i = 0; i < link_count; i++)
 			{
@@ -192,7 +193,6 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 	}
 
 	// Set attributes
-	t->is_blocking = 0;
 	t->energy_east_hop = 0.0;
 	t->latency_east_hop = 0.0;
 	t->energy_north_hop = 0.0;
@@ -206,12 +206,7 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 	{
 		struct attributes *a = &(attr[i]);
 
-		if (strncmp("blocking", a->key, MAX_FIELD_LEN) == 0)
-		{
-			t->is_blocking = (strncmp(a->value_str, "True",
-						  MAX_FIELD_LEN - 1) == 0);
-		}
-		else if (strncmp("energy_east", a->key, MAX_FIELD_LEN) ==
+		if (strncmp("energy_east", a->key, MAX_FIELD_LEN) ==
 			0)
 		{
 			sscanf(a->value_str, "%lf", &t->energy_east_hop);
@@ -273,16 +268,18 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 	c->t = t;
 
 	/*** Set attributes ***/
-	c->is_blocking = 0;
 	c->buffer_pos = BUFFER_SOMA;
 	for (int i = 0; i < attribute_count; i++)
 	{
 		struct attributes *a = &(attr[i]);
 
-		if (strncmp("blocking", a->key, MAX_FIELD_LEN) == 0)
+		if (strncmp("buffer_before", a->key, MAX_FIELD_LEN) == 0)
 		{
-			c->is_blocking = (strncmp("True", a->value_str,
-						  MAX_FIELD_LEN - 1) == 0);
+			if (strncmp("soma", a->value_str, MAX_FIELD_LEN) ==
+				0)
+			{
+				c->buffer_pos = BUFFER_SOMA;
+			}
 		}
 	}
 

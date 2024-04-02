@@ -31,7 +31,7 @@ We recommend using `conda` to manage environments e.g.,
 
 # To Run an Example
 
-`python3 sim.py arch/loihi.yaml snn/example.net 10`
+`python3 sim.py arch/example.yaml snn/example.net 10`
 
 This simulates 10 time-steps of a tiny connected spiking network.
 

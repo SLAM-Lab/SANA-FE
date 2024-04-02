@@ -57,8 +57,10 @@ int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
 
 	field_count = 0;
 	last_char_idx = strlen(line) - 1;
-	assert(line[last_char_idx] == '\n');
-	line[last_char_idx] = '\0';
+	if (line[last_char_idx] == '\n')
+	{
+		line[last_char_idx] = '\0';
+	}
 	token = strtok(line, TOKEN_SEPERATORS);
 	while (token != NULL)
 	{

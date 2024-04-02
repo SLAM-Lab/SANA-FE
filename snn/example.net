@@ -1,36 +1,27 @@
 ### example.net
-### Fully connected network, everything spikes on each timestep ###
-# First define the neuron group, specifying the number of neurons and default values:
-#   <count>   <attributes>
-g   6         soma_hw_name=loihi_lif  synapse_hw_name=loihi_sparse_synapse  threshold=-1.0  reset=0.0  leak_decay=1.0  reset_mode=hard  reverse_reset_mode=none  log_v=1
+#   <count> <attributes>
+g   3       threshold=1.0
+g   3       threshold=2.0 soma_hw_name=demo_soma_alt
 
-## Then define neurons in the group
-# gid nid <attributes>
-n   0.0    bias=1.0  connections_out=3
-n   0.1    bias=0.0  connections_out=3  log_spikes=1
-n   0.2    bias=1.0  connections_out=3
-n   0.3    bias=0.0
-n   0.4    bias=1.0
-n   0.5    bias=0.0
+## Neuron groups
+# gid.nid <attributes>
+n   0.0    bias=1.0  connections_out=1
+n   0.1    bias=0.0  connections_out=1
+n   0.2    bias=1.0  connections_out=1
+n   1.0    bias=0.0
+n   1.1    bias=1.0
+n   1.2    bias=0.0
 
-## Next define the edges between neurons
-e   0.0->0.3   weight=1.0
-e   0.0->0.4   weight=1.0
-e   0.0->0.5   weight=1.0
+## Edges
+e   0.0->1.0   weight=-1.0
+e   0.0->1.2   weight=-2.0
+e   0.0->1.2   weight=3.0
 
-e   0.1->0.3   weight=1.0
-e   0.1->0.3   weight=1.0
-e   0.1->0.3   weight=1.0
-
-e   0.2->0.3   weight=1.0
-e   0.2->0.4   weight=1.0
-e   0.2->0.5   weight=1.0
-
-## Finally map neurons (group.neuron) to hardware (tile.core)
-#   neuron@core
+## Mappings
+#   group.neuron@tile.core
 &   0.0@0.0
 &   0.1@0.0
-&   0.2@0.0
-&   0.3@0.1
-&   0.4@0.1
-&   0.5@0.1
+&   0.2@0.1
+&   1.0@0.0
+&   1.1@0.0
+&   1.2@0.1

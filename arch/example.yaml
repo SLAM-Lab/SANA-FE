@@ -1,0 +1,57 @@
+architecture:
+  name: demo
+  attributes:
+    link_buffer_size: 4
+    width: 2
+    height: 1
+  tile:
+    - name: demo_tile[0..1]
+      attributes:
+        energy_north_hop: 2.0e-12
+        latency_north_hop: 1.4e-9
+        energy_east_hop: 2.5e-12
+        latency_east_hop: 1.2e-9
+        energy_south_hop: 2.0e-12
+        latency_south_hop: 1.5e-9
+        energy_west_hop: 1.8e-12
+        latency_west_hop: 2.0e-9
+      core:
+        - name: demo_core[0..3]
+          attributes:
+            buffer_before: soma
+          axon_in:
+            - name: demo_in
+              attributes:
+          synapse:
+            - name: demo_synapse
+              attributes:
+                model: current_based
+                energy_process_spike: 20.0e-12
+                latency_process_spike: 3.0e-9
+          dendrite:
+            - name: demo_dendrite
+              attributes:
+          soma:
+            - name: demo_soma_default
+              attributes:
+                model: leaky_integrate_fire
+                energy_access_neuron: 20.0e-12
+                latency_access_neuron: 3.0e-9
+                energy_update_neuron: 10.0e-12
+                latency_update_neuron: 1.0e-9
+                energy_spike_out: 60.0e-12
+                latency_spike_out: 30.0e-9
+            - name: demo_soma_alt
+              attributes:
+                model: leaky_integrate_fire
+                energy_access_neuron: 50.0e-12
+                latency_access_neuron: 5.0e-9
+                energy_update_neuron: 60.0e-12
+                latency_update_neuron: 10.0e-9
+                energy_spike_out: 30.0e-12
+                latency_spike_out: 3.0e-9
+          axon_out:
+            - name: demo_out
+              attributes:
+                energy_message_out: 100.0e-12
+                latency_message_out: 5.0e-9

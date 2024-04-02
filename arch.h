@@ -30,11 +30,11 @@
 //#define ARCH_MAX_COMPARTMENTS 256
 
 // Loihi
-//#define ARCH_MAX_TILES 256
-#define ARCH_MAX_TILES 32
+#define ARCH_MAX_TILES 256
+//#define ARCH_MAX_TILES 32
 #define ARCH_MAX_CORES_PER_TILE 4
 #define ARCH_MAX_X (8*4)
-#define ARCH_MAX_Y (4*4)
+#define ARCH_MAX_Y (4*2)
 // Hard define maximum defined h/w sizes
 //#define ARCH_MAX_COMPARTMENTS 16384
 #define ARCH_MAX_COMPARTMENTS 1024
@@ -197,7 +197,7 @@ struct core
 	char name[MAX_FIELD_LEN];
 	struct message next_message;  // Since last spike
 	double energy, latency_after_last_message;
-	int id, offset, buffer_pos, is_blocking, soma_count, synapse_count;
+	int id, offset, buffer_pos, soma_count, synapse_count;
 	int neuron_count, message_count;
 	int curr_axon;
 };
@@ -214,7 +214,7 @@ struct tile
 	double energy_south_hop, latency_south_hop;
 	long int hops, messages_received, total_neurons_fired;
 	long int east_hops, west_hops, north_hops, south_hops;
-	int id, x, y, core_count, is_blocking;
+	int id, x, y, core_count;
 	int width; // For now just support 2 dimensions
 };
 
