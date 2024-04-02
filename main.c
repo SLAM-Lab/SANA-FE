@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
 	if (argc < PROGRAM_NARGS)
 	{
 		INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
-				"-v<potential trace> -i <input vectors>] "
+				"-v<potential trace> -m <message trace>] "
 				"<arch description> <network description> "
 							"<timesteps>\n");
 		goto clean_up;

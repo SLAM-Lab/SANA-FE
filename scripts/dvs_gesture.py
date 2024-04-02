@@ -149,7 +149,8 @@ if __name__ == "__main__":
 
             # Use a pre-generated network for a realistic use case i.e.
             #  dvs-gesture
-            sim.run(ARCH_PATH, GENERATED_NETWORK_PATH, timesteps)
+            sim.run(ARCH_PATH, GENERATED_NETWORK_PATH, timesteps,
+                    perf_trace=True)
             # Parse the detailed perf statistics
             print("Reading performance data")
             stats = pd.read_csv(os.path.join(PROJECT_DIR, "perf.csv"))

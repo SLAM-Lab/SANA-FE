@@ -171,15 +171,6 @@ def run_spiking_experiment(mapping, max_size=30):
     with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
         weights = pickle.load(weights_file)
 
-    # Setup the correct blocking and save to a temporary arch file
-    #with open(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"), "r") as arch_file:
-    #    loihi_arch = yaml.safe_load(arch_file)
-
-    #generated_arch_filename = os.path.join(PROJECT_DIR, "runs", "calibration",
-    #                             "calibrated_loihi.arch")
-    #with open(generated_arch_filename, "w") as arch_file:
-    #    yaml.safe_dump(loihi_arch, arch_file)
-
     timesteps = 1
     for i in range(1, max_size):
         # Sweep across range of network sizes
@@ -191,8 +182,8 @@ def run_spiking_experiment(mapping, max_size=30):
         snn.save(network_filename)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
-        results = sim.run(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"), network_filename,
-                            timesteps)
+        results = sim.run(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"),
+                          network_filename, timesteps)
 
         with open(os.path.join(PROJECT_DIR, "runs",
                                "calibration", "sim_spiking.csv"),
