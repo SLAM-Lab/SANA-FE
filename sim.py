@@ -267,6 +267,96 @@ def map_neuron_to_compartment(compartments):
     return None, None
 
 
+def create_connected_layer(network, prev_layer, input_shape, weights,
+                           compartments, log_spikes=False, log_potential=False,
+                           force_update=False, threshold=1.0, reset=0.0,
+                           leak=1.0, mappings=None, reverse_threshold=None,
+                           reverse_reset_mode=None, soma_hw_name=None,
+                           synapse_hw_name=None):
+    layer_neuron_count = weights.shape[1]
+    layer = create_layer(network, layer_neuron_count, compartments,
+                         log_spikes=log_spikes, log_potential=log_potential,
+                         force_update=force_update,
+                         threshold=threshold, reset=reset, leak=leak,
+                         mappings=mappings, connections_out=None,
+                         reverse_threshold=reverse_threshold,
+                         reverse_reset_mode=reverse_reset_mode,
+                         soma_hw_name=soma_hw_name,
+                         synapse_hw_name=synapse_hw_name)
+
+    for src in prev_layer.neurons:
+        for dest in layer.neurons:
+            # Take the ID of the neuron in the 2nd layer
+            weight = weights[src.id, dest.id]
+            src.add_connection(dest, weight)
+
+    return layer
+
+
+def create_conv_layer(network, input_layer, input_shape, filters, compartments,
+                      stride=1, pad=0, log_spikes=False, log_potential=False,
+                      force_update=False, threshold=1.0, reset=0.0,
+                      leak=1.0, mappings=None, reverse_threshold=None,
+                      reverse_reset_mode=None, soma_hw_name=None,
+                      synapse_hw_name=None):
+
+    # Calculate dimensions of this layer
+    input_width = input_shape[0]
+    input_height = input_shape[1]
+    input_channels = input_shape[2]
+
+    kernel_width = filters.shape[0]
+    kernel_height = filters.shape[1]
+    kernel_channels = filters.shape[2]
+    kernel_count = filters.shape[3]
+
+    output_width = ((input_width + (2*pad) - kernel_width) // stride) + 1
+    output_height = ((input_height + (2*pad) - kernel_height) // stride) + 1
+
+    output_channels = kernel_count
+    assert(kernel_channels == input_channels)
+
+    layer_neuron_count = output_channels * output_width * output_height
+    output_layer = create_layer(network, layer_neuron_count, compartments,
+                                log_spikes=log_spikes,
+                                log_potential=log_potential,
+                                force_update=force_update,
+                                threshold=threshold, reset=reset, leak=leak,
+                                mappings=mappings, connections_out=None,
+                                reverse_threshold=reverse_threshold,
+                                reverse_reset_mode=reverse_reset_mode,
+                                soma_hw_name=soma_hw_name,
+                                synapse_hw_name=synapse_hw_name)
+
+    # Create the convolutional connections
+    for c_out in range(0, output_channels):
+        for y_out in range(0, output_height):
+            for x_out in range(0, output_width):
+                dest_idx = c_out * output_width * output_height
+                dest_idx += y_out * output_width
+                dest_idx += x_out
+
+                dest = output_layer.neurons[dest_idx]
+                for c_in in range(0, input_channels):
+                    for y_kernel in range(0, kernel_height):
+                       if not 0 <= y_out*stride + y_kernel < input_height:
+                            continue
+                       for x_kernel in range(0, kernel_width):
+                            if not 0 <= x_out*stride + x_kernel < input_width:
+                                continue
+
+                            # Calculate the index of the src neuron
+                            src_idx = c_in * input_width * input_height
+                            src_idx += ((y_out*stride) + y_kernel)*input_width
+                            src_idx += ((x_out*stride) + x_kernel)
+                            src = input_layer.neurons[src_idx]
+
+                            weight = filters[y_kernel, x_kernel, c_in, c_out]
+                            src.add_connection(dest, weight)
+
+    return output_layer
+
+
 def create_layer(network, layer_neuron_count, compartments,
                  log_spikes=False, log_potential=False, force_update=False,
                  threshold=1.0, reset=0.0, leak=1.0, mappings=None,
@@ -286,7 +376,7 @@ def create_layer(network, layer_neuron_count, compartments,
         assert(len(mappings) == layer_neuron_count)
 
     for i in range(0, layer_neuron_count):
-        if (i % 10000) == 0:
+        if (i % 1000) == 0:
             print(f"Creating neuron {i}")
         neuron = layer_group.create_neuron()
 
