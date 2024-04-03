@@ -18,3 +18,4 @@ simcpp.*
 _deps/
 build/
 CMakeFiles/
+Makefile

@@ -75,7 +75,9 @@ void sim_timestep(struct timestep *const ts,
 			}
 			ts->packets_sent += c->axon_out.packets_out;
 		}
-		spike_tile_vec[i] = tile_spike_count;
+		if (arch->spike_vector_on){
+			spike_tile_vec[i] = tile_spike_count;
+		}
 	}
 	if (arch->spike_vector_on){
 		arch->spike_vector.push_back(spike_tile_vec);

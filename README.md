@@ -9,18 +9,18 @@ A framework to model energy and performance of neuromorphic hardware.
 
 # To Build
 
-This project uses a Makefile based build. To build use:
-`make`
+This project uses CMake to create Makefiles. Use with:
+`cmake .`
 
-For debug builds with verbose output you can run
-`make debug`
+Then build Makefiles with:
+`make`
 
 ## Dependencies
 
-Building this project requires `make` and a compiler that supports the C99
+Building this project requires `cmake`, `make`, and a compiler that supports the C++11
 standard.
 
-This project uses Python to launch simulations, parse input files and process
+This project uses Python to launch simulations, parse input files, and process
 simulation results. Most project features require Python 3.8 or later, and the
 modules listed in `requirements.txt`.
 
@@ -59,6 +59,8 @@ Flags:
 * `-s`: Enable spike traces to `spikes.trace`
 * `-p`: Record the simulated performance of each timestep to `perf.csv`
 * `-m`: Enable message traces to `messages.trace`
+* `-r`: Launch command-line interface for continuous execution.
+* `-g`: Enable gui-specific simulation traces.
 
 ## SNN Description
 
@@ -69,7 +71,8 @@ followed by one required field and then any number of named attributes.
 Fields are separated by one or more spaces.
 
 Attributes are defined using the syntax: `<attribute>=<value>`. Note, there
-is no space before or after the equals.
+is no space before or after the equals. The attribute `soma_hw_name` is required
+to be set for every neuron or neuron group.
 
 A neuron group is some population of neurons. The group defines any common
 parameters e.g., for a layer of a deep SNN.
@@ -160,20 +163,70 @@ estimates.
 
 `run_summary.yaml`: High-level statistics for the simulation e.g. runtime
 
+# Soma Plugin Model
+
+SANA-FE's plugin model utilizes shared .so C++ files to execute all soma
+calculations. There are some common plugins provided in the `/plugins`
+folder along with their corresponding .cpp file.
+
+To specify the soma plugin, several steps need to be taken:
+1. The plugin name needs to be specified in the
+architecture yaml file under `soma: -name:`
+2. The plugin name is set in the net file with the keyword
+`soma_hw_name`.
+3. The `/plugins` file contains the plugin compiled into a file with the
+format `[plugin name].so`.
+
+Each plugin holds a class that executes the functionality of the soma.
+On every creation of a neuron, a new instance of the specific plugin
+class will be created and stored.
+
+## Creating a New Plugin
+
+SANA-FE's plugin model makes it easy to create new soma classes and
+integrate them directly into your SNN execution. There are, however,
+two main interfacing requirements to allow plugins to smoothly execute.
+
+1. The plugin class must extend the `Base_Soma` located in `plugins.hpp`.
+This includes implementing the base constructor, `update_soma`, and
+`parameters` functions.
+2. Two class factory functions need to be created. These have to be in the 
+format `create_[plugin_name]` and `destroy_[plugin_name]`. These functions
+are used to get an instance of the class.
+
+It is recommended new users read through the loihi_lif.cpp file to see what
+an example soma class looks like. The `update_soma` function will be passed
+the input current spike as a double and returns `Neuron_Status`, an enum
+representing whether the neuron is idle, updated, or fired. The `parameters`
+function takes in a struct of `attributes` with a specified int length.
+These parameters are arbitrary keyword=value pairs that can pass in any
+information to the class. This is where parameters specified in the network
+file will be passed to.
+
+To compile a .cpp file into the desired .so plugin file, run these commands
+from within the plugins folder:
+`g++ -c -fPIC -o [plugin_name].o [plugin_name].cpp`
+`gcc -shared -o [plugin_name].so [plugin_name].o`
+
+The .so should be kept, the .o file is unnecessary and can be deleted.
+
 # Project Code
 
-This project has been written in C and Python. See header files for more
-detail.
+This project has been written in C, C++, and Python. See header files for
+more detail.
 
 `sim.py`
-`main.c`
-`sim.c`
-`network.c`
-`arch.c`
-`description.c`
-`command.c`
+`main.cpp`
+`sim.cpp`
+`network.cpp`
+`arch.cpp`
+`description.cpp`
+`command.cpp`
+`plugins.cpp`
+`module.cpp`
 
 C code has been written based on the C99 standard.
+C++ code has been written based on the C++11 standard.
 
 # Contact
 James Boyle: james.boyle@utexas.edu

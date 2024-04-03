@@ -204,7 +204,6 @@ extern "C" Base_Soma* create_loihi_lif() {
     return new loihi_lif();
 }
 
-// Memory Leak?
 extern "C" void destroy_loihi_lif(Base_Soma* lif) {
     delete lif;
 }
