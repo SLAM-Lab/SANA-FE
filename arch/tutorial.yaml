@@ -1,3 +1,9 @@
+# tutorial.yaml
+# Exercise 1) Set the cost of a neuron updating to 2 ns and 2 pJ
+# Exercise 2) Duplicate tiles 2 times and each core 4 times within every tile
+#  (8 cores total)
+# Exercise 3) Add a new synapse unit for compressed synapses. The energy and
+#  latency costs for reading a compressed synapse is 0.5 pJ and 2 ns
 architecture:
   name: tutorial
   attributes:
@@ -7,13 +13,13 @@ architecture:
   tile:
     - name: tutorial_tile
       attributes:
-        energy_north_hop: 0.0
+        energy_north_hop: 1.0e-12
         latency_north_hop: 1.0e-9
-        energy_east_hop: 0.0
+        energy_east_hop: 1.0e-12
         latency_east_hop: 1.0e-9
-        energy_south_hop: 0.0
+        energy_south_hop: 1.0e-12
         latency_south_hop: 1.0e-9
-        energy_west_hop: 0.0
+        energy_west_hop: 1.0e-12
         latency_west_hop: 1.0e-9
       core:
         - name: tutorial_core
@@ -23,7 +29,7 @@ architecture:
             - name: tutorial_axon_in
               attributes:
           synapse:
-            - name: tutorial_synapse_first
+            - name: tutorial_synapse_uncompressed
               attributes:
                 model: current_based
                 energy_process_spike: 1.0e-12
