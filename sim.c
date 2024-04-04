@@ -106,6 +106,7 @@ struct simulation *sim_init_sim(void)
 	for (int i = 0; i < ARCH_MAX_CORES; i++)
 	{
 		sim_init_fifo(&(sim->ts.message_queues[i]));
+		sim->ts.message_counts[i] = 0;
 	}
 
 	return sim;
@@ -117,6 +118,7 @@ void sim_init_timestep(struct timestep *const ts)
 	for (int i = 0; i < ARCH_MAX_CORES; i++)
 	{
 		sim_init_fifo(&(ts->message_queues[i]));
+		ts->message_counts[i] = 0;
 	}
 	ts->total_neurons_fired = 0L;
 	ts->spikes = 0L;
@@ -149,7 +151,7 @@ void sim_process_neurons(struct timestep *const ts, struct network *net,
 
 			if (c->neuron_count > 0)
 			{
-				message_count = ts->message_queues[c->id].count;
+				message_count = ts->message_counts[c->id];
 				// Add a dummy message to account for neuron
 				//  processing that does not result in any sent
 				//  messages. To do this, set the dest neuron
@@ -169,6 +171,7 @@ void sim_process_neurons(struct timestep *const ts, struct network *net,
 				sim_message_fifo_push(
 					&(ts->message_queues[c->id]),
 					dummy_message);
+				ts->message_counts[c->id]++;
 			}
 		}
 	}
@@ -1333,7 +1336,6 @@ void sim_neuron_send_spike_message(struct timestep *const ts,
 	struct neuron *n)
 {
 	struct core *c = n->core;
-	TRACE1("nid:%d sending spike(s).\n", n->id);
 	int core_id = n->core->id;
 
 
@@ -1358,6 +1360,7 @@ void sim_neuron_send_spike_message(struct timestep *const ts,
 			c->next_message.generation_delay +
 			c->axon_out.latency_access;
 		sim_message_fifo_push(&(ts->message_queues[core_id]), m);
+		ts->message_counts[core_id]++;
 
 		c->axon_out.packets_out++;
 
@@ -1586,8 +1589,7 @@ void sim_message_trace_write_header(const struct simulation *const sim)
 	fprintf(sim->message_trace_fp, "timestep,src_neuron,");
 	fprintf(sim->message_trace_fp, "src_hw,dest_hw,hops,spikes,");
 	fprintf(sim->message_trace_fp, "generation_delay,network_delay,");
-	fprintf(sim->message_trace_fp, "processing_latency,blocking_latency,");
-	fprintf(sim->message_trace_fp, "sent_timestamp,processed_timestamp\n");
+	fprintf(sim->message_trace_fp, "processing_latency,blocking_latency\n");
 }
 
 void sim_trace_record_spikes(
@@ -1694,9 +1696,7 @@ void sim_trace_record_message(
 	fprintf(sim->message_trace_fp, "%le,", m->generation_delay);
 	fprintf(sim->message_trace_fp, "%le,", m->network_delay);
 	fprintf(sim->message_trace_fp, "%le,", m->receive_delay);
-	fprintf(sim->message_trace_fp, "%le,", m->blocked_latency);
-	fprintf(sim->message_trace_fp, "%le,", m->sent_timestamp);
-	fprintf(sim->message_trace_fp, "%le\n", m->processed_timestamp);
+	fprintf(sim->message_trace_fp, "%le\n", m->blocked_latency);
 
 	return;
 }

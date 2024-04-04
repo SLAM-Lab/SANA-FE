@@ -25,6 +25,7 @@ struct timestep
 	struct message_fifo message_queues[ARCH_MAX_CORES];
 	long int timestep, spike_count, total_hops, packets_sent;
 	long int total_neurons_fired, spikes;
+	int message_counts[ARCH_MAX_CORES];
 	double energy, sim_time;
 };
 

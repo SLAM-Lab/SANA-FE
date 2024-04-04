@@ -1,9 +1,9 @@
 ### tutorial.net
 ## Groups and neurons
-g 2 threshold=1.0 reset=0.0 soma_hw_name=demo_soma_default
+g 2 threshold=1.0 reset=0.0 soma_hw_name=demo_soma_default log_spikes=1 log_v=1
 g 2 threshold=2.0 reset=0.0
-n 0.0 bias=1.0 connections_out=2
-n 0.1 bias=1.0 connections_out=1
+n 0.0 bias=0.2 connections_out=2
+n 0.1 bias=0.5 connections_out=1
 n 1.0 bias=0.0
 n 1.1 bias=0.0
 

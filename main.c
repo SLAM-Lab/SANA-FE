@@ -329,7 +329,7 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 	{
 		for (int i = 0; i < ARCH_MAX_CORES; i++)
 		{
-			for (int j = 0; j < ts->message_queues[i].count; j++)
+			for (int j = 0; j < ts->message_counts[i]; j++)
 			{
 				struct message *m = &(ts->messages[i][j]);
 				sim_trace_record_message(sim, m);
