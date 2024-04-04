@@ -1,0 +1,48 @@
+architecture:
+  name: tutorial
+  attributes:
+    link_buffer_size: 1
+    width: 2
+    height: 1
+  tile:
+    - name: tutorial_tile
+      attributes:
+        energy_north_hop: 0.0
+        latency_north_hop: 1.0e-9
+        energy_east_hop: 0.0
+        latency_east_hop: 1.0e-9
+        energy_south_hop: 0.0
+        latency_south_hop: 1.0e-9
+        energy_west_hop: 0.0
+        latency_west_hop: 1.0e-9
+      core:
+        - name: tutorial_core
+          attributes:
+            buffer_before: soma
+          axon_in:
+            - name: tutorial_axon_in
+              attributes:
+          synapse:
+            - name: tutorial_synapse_first
+              attributes:
+                model: current_based
+                energy_process_spike: 1.0e-12
+                latency_process_spike: 1.0e-9
+          dendrite:
+            - name: demo_dendrite
+              attributes:
+          soma:
+            - name: tutorial_soma
+              attributes:
+                model: leaky_integrate_fire
+                energy_access_neuron: 1.0e-12
+                latency_access_neuron: 1.0e-9
+                energy_update_neuron: 2.0e-12
+                latency_update_neuron: 2.0e-9
+                energy_spike_out: 3.0e-12
+                latency_spike_out: 3.0e-9
+          axon_out:
+            - name: tutorial_axon_out
+              attributes:
+                energy_message_out: 4.0e-12
+                latency_message_out: 4.0e-9
