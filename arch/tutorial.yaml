@@ -37,8 +37,8 @@ architecture:
                 model: leaky_integrate_fire
                 energy_access_neuron: 1.0e-12
                 latency_access_neuron: 1.0e-9
-                energy_update_neuron: 2.0e-12
-                latency_update_neuron: 2.0e-9
+                energy_update_neuron: 0.0e-12
+                latency_update_neuron: 0.0e-9
                 energy_spike_out: 3.0e-12
                 latency_spike_out: 3.0e-9
           axon_out:
