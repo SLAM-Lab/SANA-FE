@@ -5,7 +5,9 @@ CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -fopenmp
 #RELFLAGS=-Ofast
 RELFLATS=-O0
 DEBUGFLAGS=-DDEBUG -no-pie -pg -O0
-GIT_COMMIT=$(shell ./scripts/git_status.sh)
+# TODO: only enable this feature if the git repository is owned by the same
+#  user as the one running the script
+#GIT_COMMIT=$(shell ./scripts/git_status.sh)
 
 LIBS=-lrt -lm
 DEPS=sim.h print.h command.h network.h arch.h description.h
