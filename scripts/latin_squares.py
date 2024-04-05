@@ -36,8 +36,10 @@ def calculate_graph_index(N, row, col, digit):
 def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
                  neurons_per_core=LOIHI_COMPARTMENTS):
     network = sim.Network(save_mappings=True)
-    compartments = sim.init_compartments(tiles, cores_per_tile,
-                                         neurons_per_core)
+    arch = sim.Architecture()
+    # TODO: fix this
+    #compartments = sim.init_compartments(tiles, cores_per_tile,
+    #                                     neurons_per_core)
     print(f"Creating WTA networks for {N} digits")
     #G = nx.DiGraph()
     #G.add_nodes_from(range(0, N**3))
@@ -48,7 +50,7 @@ def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
     for i in range(0, N):
         row = []
         for j in range(0, N):
-            wta = sim.create_layer(network, N, compartments,
+            wta = sim.create_layer(network, N,
                                    log_spikes=False,
                                    log_potential=False,
                                    force_update=False,

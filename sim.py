@@ -312,7 +312,7 @@ def map_neurons_to_cores(neurons, arch, core_count):
 def create_connected_layer(network, prev_layer, input_shape, weights,
                            log_spikes=False, log_potential=False,
                            force_update=False, threshold=1.0, reset=0.0,
-                           leak=1.0, mappings=None, reverse_threshold=None,
+                           leak=1.0, reverse_threshold=None,
                            reverse_reset_mode=None, soma_hw_name=None,
                            synapse_hw_name=None):
     layer_neuron_count = weights.shape[1]
@@ -320,7 +320,7 @@ def create_connected_layer(network, prev_layer, input_shape, weights,
                          log_spikes=log_spikes, log_potential=log_potential,
                          force_update=force_update,
                          threshold=threshold, reset=reset, leak=leak,
-                         mappings=mappings, connections_out=None,
+                         connections_out=None,
                          reverse_threshold=reverse_threshold,
                          reverse_reset_mode=reverse_reset_mode,
                          soma_hw_name=soma_hw_name,
@@ -338,7 +338,7 @@ def create_connected_layer(network, prev_layer, input_shape, weights,
 def create_conv_layer(network, input_layer, input_shape, filters,
                       stride=1, pad=0, log_spikes=False, log_potential=False,
                       force_update=False, threshold=1.0, reset=0.0,
-                      leak=1.0, mappings=None, reverse_threshold=None,
+                      leak=1.0, reverse_threshold=None,
                       reverse_reset_mode=None, soma_hw_name=None,
                       synapse_hw_name=None):
 
@@ -364,7 +364,7 @@ def create_conv_layer(network, input_layer, input_shape, filters,
                                 log_potential=log_potential,
                                 force_update=force_update,
                                 threshold=threshold, reset=reset, leak=leak,
-                                mappings=mappings, connections_out=None,
+                                connections_out=None,
                                 reverse_threshold=reverse_threshold,
                                 reverse_reset_mode=reverse_reset_mode,
                                 soma_hw_name=soma_hw_name,
@@ -401,10 +401,10 @@ def create_conv_layer(network, input_layer, input_shape, filters,
 
 def create_layer(network, layer_neuron_count,
                  log_spikes=False, log_potential=False, force_update=False,
-                 threshold=1.0, reset=0.0, leak=1.0, mappings=None,
+                 threshold=1.0, reset=0.0, leak=1.0,
                  connections_out=None, reverse_threshold=None,
                  reverse_reset_mode=None, soma_hw_name=None,
-                 synapse_hw_name=None):
+                 synapse_hw_name=None, biases=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     layer_group = network.create_group(threshold, reset, leak, log_spikes,
                                        log_potential, force_update,
@@ -414,18 +414,13 @@ def create_layer(network, layer_neuron_count,
                                        soma_hw_name=soma_hw_name,
                                        synapse_hw_name=synapse_hw_name)
 
-    if mappings is not None:
-        assert(len(mappings) == layer_neuron_count)
+    if biases is not None:
+        assert(len(biases) == layer_neuron_count)
 
     for i in range(0, layer_neuron_count):
         if (i % 1000) == 0:
             print(f"Creating neuron {i}")
         neuron = layer_group.create_neuron()
-
-        if mappings is not None:
-            neuron.tile, neuron.core = mappings[i]
-        #else:
-        #    tile, core = map_neuron_to_compartment(network.compartments)
 
     return layer_group
 

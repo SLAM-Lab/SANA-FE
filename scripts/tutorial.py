@@ -15,7 +15,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 NETWORK_PATH = os.path.join(PROJECT_DIR, "snn", "dvs_challenge.net")
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", "loihi.yaml")
-TIMESTEPS = 100
+TIMESTEPS = 1000
 
 sys.path.insert(0, PROJECT_DIR)
 import sim
@@ -68,8 +68,6 @@ sim.map_neuron_group_to_cores(layer5, arch, 1)
 
 # Save the network to file. Note that this file may require a large amount of
 #  disk space
-network.save(os.path.join(PROJECT_DIR, "runs", "dvs_challenge.net"),
-             save_mappings=True)
-
-
+network.save(NETWORK_PATH, save_mappings=True)
+# Run the network you just generated on Loihi
 sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS)
