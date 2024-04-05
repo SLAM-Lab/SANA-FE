@@ -268,14 +268,52 @@ def map_neuron_to_compartment(arch, core=None):
     return None, None
 
 
+def map_neuron_group_to_cores(neuron_group, arch, core_count):
+    return map_neurons_to_cores(neuron_group.neurons, arch, core_count)
+
+
+def map_neurons_to_cores(neurons, arch, core_count):
+    """Map neurons to one or more cores"""
+    neuron_count = len(neurons)
+    neurons_per_core = neuron_count // core_count
+    print(f"Mapping {neuron_count} neurons to {core_count} cores")
+
+    # Map N sequential cores. Find the first empty core
+    first_unused_core = arch.compartments.index(arch.max_compartments)
+
+    # Create a list of the cores to map to (absolute ID)
+    cores = list(range(first_unused_core, (first_unused_core+core_count)))
+
+    # Go through list and assign compartments of each entry
+    map_neurons = [neurons_per_core] * (core_count)
+    map_neurons[-1] += (neuron_count - (neurons_per_core*core_count))
+    assert(sum(map_neurons) == neuron_count)
+
+    mapping = dict(zip(cores, map_neurons))
+    print(f"Mapping dictionary: {mapping}")
+
+    curr_neuron = 0
+    for core in mapping.keys():
+        # For the last core, map all remaining neurons
+        for _ in range(0, mapping[core]):
+            n = neurons[curr_neuron]
+            mapped_core = map_neuron_to_compartment(arch,
+                                                    core=core)
+            n.tile, n.core = arch.core_to_address[mapped_core]
+            curr_neuron += 1
+
+    assert(curr_neuron == neuron_count)
+    return mapping
+
+
 def create_connected_layer(network, prev_layer, input_shape, weights,
-                           compartments, log_spikes=False, log_potential=False,
+                           log_spikes=False, log_potential=False,
                            force_update=False, threshold=1.0, reset=0.0,
                            leak=1.0, mappings=None, reverse_threshold=None,
                            reverse_reset_mode=None, soma_hw_name=None,
                            synapse_hw_name=None):
     layer_neuron_count = weights.shape[1]
-    layer = create_layer(network, layer_neuron_count, compartments,
+    layer = create_layer(network, layer_neuron_count,
                          log_spikes=log_spikes, log_potential=log_potential,
                          force_update=force_update,
                          threshold=threshold, reset=reset, leak=leak,
@@ -294,7 +332,7 @@ def create_connected_layer(network, prev_layer, input_shape, weights,
     return layer
 
 
-def create_conv_layer(network, input_layer, input_shape, filters, compartments,
+def create_conv_layer(network, input_layer, input_shape, filters,
                       stride=1, pad=0, log_spikes=False, log_potential=False,
                       force_update=False, threshold=1.0, reset=0.0,
                       leak=1.0, mappings=None, reverse_threshold=None,
@@ -318,7 +356,7 @@ def create_conv_layer(network, input_layer, input_shape, filters, compartments,
     assert(kernel_channels == input_channels)
 
     layer_neuron_count = output_channels * output_width * output_height
-    output_layer = create_layer(network, layer_neuron_count, compartments,
+    output_layer = create_layer(network, layer_neuron_count,
                                 log_spikes=log_spikes,
                                 log_potential=log_potential,
                                 force_update=force_update,
@@ -358,9 +396,9 @@ def create_conv_layer(network, input_layer, input_shape, filters, compartments,
     return output_layer
 
 
-def create_layer(network, layer_neuron_count, compartments,
+def create_layer(network, layer_neuron_count,
                  log_spikes=False, log_potential=False, force_update=False,
-                 threshold=1.0, reset=0.0, leak=1.0,
+                 threshold=1.0, reset=0.0, leak=1.0, mappings=None,
                  connections_out=None, reverse_threshold=None,
                  reverse_reset_mode=None, soma_hw_name=None,
                  synapse_hw_name=None, biases=None):
@@ -376,12 +414,12 @@ def create_layer(network, layer_neuron_count, compartments,
     for i in range(0, layer_neuron_count):
         if (i % 1000) == 0:
             print(f"Creating neuron {i}")
-        layer_group.create_neuron()
+        neuron = layer_group.create_neuron()
 
-    if biases is not None:
-        assert(len(biases) == layer_neuron_count)
-        for bias, neuron in zip(biases, layer_group.neurons):
-            neuron.add_bias(bias)
+        if mappings is not None:
+            neuron.tile, neuron.core = mappings[i]
+        #else:
+        #    tile, core = map_neuron_to_compartment(network.compartments)
 
     return layer_group
 
