@@ -14,8 +14,8 @@ environment and the Docker virtual environment!
 requires GCC, make, Python 3.6 or later and the pyyaml library to build and run.
 Setup should be straightforward on any standard Linux distro.)
 
-    docker pull jamesaboyle/sana-fe:latest
-    docker run --mount type=bind,source="$(pwd)",target="/home/tutorial/sana-fe" --entrypoint "/bin/bash" -it jamesaboyle/sana-fe:v1
+    docker pull jamesaboyle/sana-fe:v1
+    docker run --mount type=bind,source="$(pwd)",target="/home/tutorial" --entrypoint "/bin/bash" -it jamesaboyle/sana-fe:v1
 
 To run SANA-FE for the first time:
 
