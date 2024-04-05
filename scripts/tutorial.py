@@ -40,24 +40,24 @@ def check_mapping(network):
 network = sim.Network()
 arch = sim.Architecture()
 
-kernels = np.load("dvs_challenge.npz")
+snn = np.load(os.path.join(PROJECT_DIR, "..", "dvs_challenge.npz"))
 # TODO: save the updated model so we just have to load the model and the weights
 # Convert the DVS gesture categorization model to SANA-FE's format
 
-biases = np.zeros((1024))
-layer0 = sim.create_layer(network, 1024, threshold=255, biases=biases)
-# TODO: set the biases for one input frame
+biases = snn["inputs"]
+thresholds = snn["thresholds"]
+layer0 = sim.create_layer(network, 1024, threshold=thresholds[0], biases=biases)
 layer1 = sim.create_conv_layer(network, layer0, (32, 32, 1),  # 3600 neurons
-                               kernels["conv1"], stride=2, threshold=420,
+                               snn["conv1"], stride=2, threshold=thresholds[1],
                                )
 layer2 = sim.create_conv_layer(network, layer1, (15, 15, 16),  # 5408 neurons
-                               kernels["conv2"], stride=1, threshold=351)
+                               snn["conv2"], stride=1, threshold=thresholds[2])
 layer3 = sim.create_conv_layer(network, layer2, (13, 13, 32),  # 7744 neurons
-                               kernels["conv3"], stride=1, threshold=276)
+                               snn["conv3"], stride=1, threshold=thresholds[3])
 layer4 = sim.create_conv_layer(network, layer3, (11, 11, 64),  # 891 neurons
-                               kernels["conv4"], stride=1, threshold=371)
+                               snn["conv4"], stride=1, threshold=thresholds[4])
 layer5 = sim.create_connected_layer(network, layer4, (9, 9, 11),  # 11 neurons
-                                    kernels["dense1"], threshold=341)
+                                    snn["dense1"], threshold=thresholds[5])
 
 sim.map_neuron_group_to_cores(layer0, arch, 1)
 sim.map_neuron_group_to_cores(layer1, arch, 4)
@@ -70,4 +70,5 @@ sim.map_neuron_group_to_cores(layer5, arch, 1)
 #  disk space
 network.save(NETWORK_PATH, save_mappings=True)
 # Run the network you just generated on Loihi
+# Comment out this line to stop simulation runs:w
 sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS)
