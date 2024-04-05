@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 
 	if (sim->log_potential)
 	{
-		sim->potential_trace_fp = fopen("potential.trace", "w");
+		sim->potential_trace_fp = fopen("potential.csv", "w");
 		if (sim->potential_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 	}
 	if (sim->log_spikes)
 	{
-		sim->spike_trace_fp = fopen("spikes.trace", "w");
+		sim->spike_trace_fp = fopen("spikes.csv", "w");
 		if (sim->spike_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 	}
 	if (sim->log_messages)
 	{
-		sim->message_trace_fp = fopen("messages.trace", "w");
+		sim->message_trace_fp = fopen("messages.csv", "w");
 		if (sim->message_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
