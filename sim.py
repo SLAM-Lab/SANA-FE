@@ -293,7 +293,7 @@ def map_neurons_to_cores(neurons, arch, core_count):
     assert(sum(map_neurons) == neuron_count)
 
     mapping = dict(zip(cores, map_neurons))
-    print(f"Mapping dictionary: {mapping}")
+    #print(f"Mapping dictionary: {mapping}")
 
     curr_neuron = 0
     for core in mapping.keys():
@@ -414,13 +414,15 @@ def create_layer(network, layer_neuron_count,
                                        soma_hw_name=soma_hw_name,
                                        synapse_hw_name=synapse_hw_name)
 
-    if biases is not None:
-        assert(len(biases) == layer_neuron_count)
-
     for i in range(0, layer_neuron_count):
         if (i % 1000) == 0:
             print(f"Creating neuron {i}")
-        neuron = layer_group.create_neuron()
+        layer_group.create_neuron()
+
+    if biases is not None:
+        assert(len(biases) == layer_neuron_count)
+        for bias, neuron in zip(biases, layer_group.neurons):
+            neuron.add_bias(bias)
 
     return layer_group
 
