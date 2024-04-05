@@ -105,7 +105,7 @@ void SanaFe::open_spike_trace(void)
 {
 	sim->log_spikes = 1;
 
-	sim->spike_trace_fp = fopen("spikes.trace", "w");
+	sim->spike_trace_fp = fopen("spikes.csv", "w");
 	if (sim->spike_trace_fp == NULL)
 	{
 		INFO("Error: Couldn't open trace file for writing.\n");
@@ -118,7 +118,7 @@ void SanaFe::open_potential_trace(void)
 {
 	sim->log_potential = 1;
 
-	sim->potential_trace_fp = fopen("potential.trace", "w");
+	sim->potential_trace_fp = fopen("potential.csv", "w");
 	if (sim->potential_trace_fp == NULL)
 	{
 		INFO("Error: Couldn't open trace file for writing.\n");
@@ -131,7 +131,7 @@ void SanaFe::open_message_trace(void)
 {
 	sim->log_messages = 1;
 
-	sim->message_trace_fp = fopen("messages.trace", "w");
+	sim->message_trace_fp = fopen("messages.csv", "w");
 	if (sim->message_trace_fp == NULL)
 	{
 		INFO("Error: Couldn't open trace file for writing.\n");
