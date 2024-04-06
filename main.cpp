@@ -10,11 +10,11 @@
 #include <time.h>
 
 #include "print.hpp"
-#include "module.hpp"
+#include "sim.hpp"
 
 int main(int argc, char *argv[])
 {
-	SANA_FE sana_fe;
+	sana_fe sim;
 	int timesteps, ret;
 
 	// Assume that if we don't get to the point where we write this with
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	if (argc < 1)
 	{
 		INFO("Error: No program arguments.\n");
-		sana_fe.clean_up(RET_FAIL);
+		sim.clean_up(RET_FAIL);
 	}
 	// First arg is always program name, skip
 	argc--;
@@ -38,21 +38,21 @@ int main(int argc, char *argv[])
 			switch (argv[0][1])
 			{
 			case 'i':
-				sana_fe.set_input(argv[1]);
+				sim.set_input(argv[1]);
 				argv++;
 				argc--;
 				break;
 			case 'p':
-				sana_fe.set_perf_flag();
+				sim.open_perf_trace();
 				break;
 			case 's':
-				sana_fe.set_spike_flag();
+				sim.open_spike_trace();
 				break;
 			case 'v':
-				sana_fe.set_pot_flag();
+				sim.open_potential_trace();
 				break;
 			case 'm':
-				sana_fe.set_mess_flag();
+				sim.open_message_trace();
 				break;
 			default:
 				INFO("Error: Flag %c not recognized.\n",
@@ -74,52 +74,13 @@ int main(int argc, char *argv[])
 				"-v<potential trace> -m <message trace>] "
 				"<arch description> <network description> "
 							"<timesteps>\n");
-		sana_fe.clean_up(RET_FAIL);
-		goto clean_up;
-	}
-
-	if (sim->log_potential)
-	{
-		sim->potential_trace_fp = fopen("potential.csv", "w");
-		if (sim->potential_trace_fp == NULL)
-		{
-			INFO("Error: Couldn't open trace file for writing.\n");
-			goto clean_up;
-		}
-	}
-	if (sim->log_spikes)
-	{
-		sim->spike_trace_fp = fopen("spikes.csv", "w");
-		if (sim->spike_trace_fp == NULL)
-		{
-			INFO("Error: Couldn't open trace file for writing.\n");
-			goto clean_up;
-		}
-	}
-	if (sim->log_messages)
-	{
-		sim->message_trace_fp = fopen("messages.csv", "w");
-		if (sim->message_trace_fp == NULL)
-		{
-			INFO("Error: Couldn't open trace file for writing.\n");
-			goto clean_up;
-		}
-
-	}
-	if (sim->log_perf)
-	{
-		sim->perf_fp = fopen("perf.csv", "w");
-		if (sim->perf_fp == NULL)
-		{
-			INFO("Error: Couldn't open perf file for writing.\n");
-			sana_fe.clean_up(RET_FAIL);
-			goto clean_up;
-		}
+		sim.clean_up(RET_FAIL);
+		return 0;
 	}
 
 	// Read in program args, sanity check and parse inputs
-	sana_fe.set_arch(argv[ARCH_FILENAME]);
-	sana_fe.set_net(argv[NETWORK_FILENAME]);
+	sim.set_arch(argv[ARCH_FILENAME]);
+	sim.set_net(argv[NETWORK_FILENAME]);
 
 	timesteps = 0;
 	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
@@ -127,12 +88,12 @@ int main(int argc, char *argv[])
 	{
 		INFO("Error: Time-steps must be integer > 0 (%s).\n",
 							argv[TIMESTEPS]);
-		sana_fe.clean_up(RET_FAIL);
+		sim.clean_up(RET_FAIL);
 	}
 	else if (timesteps <= 0)
 	{
 		INFO("Error: Time-steps must be > 0 (%d)\n", timesteps);
-		sana_fe.clean_up(RET_FAIL);
+		sim.clean_up(RET_FAIL);
 	}
 
 	// Step simulation
@@ -144,58 +105,19 @@ int main(int argc, char *argv[])
 			// Print heart-beat every hundred timesteps
 			INFO("*** Time-step %ld ***\n", timestep);
 		}
-		sana_fe.run_timesteps();
+		sim.run_timesteps();
 	}
 
 	INFO("***** Run Summary *****\n");
-	sana_fe.sim_summary();
-	double average_power = sana_fe.get_power();
+	sim.sim_summary();
+	double average_power = sim.get_power();
 	INFO("Average power consumption: %f W.\n", average_power);
 	INFO("Run finished.\n");
 
-<<<<<<< HEAD
-clean_up:
-	// Free any larger structures here
-	network_free(&net);
-	arch_free(arch);
-	// Free any locally allocated memory here
-	free(input_buffer);
-
-	// Close any open files here
-	if (sim->potential_trace_fp != NULL)
-	{
-		fclose(sim->potential_trace_fp);
-	}
-	if (sim->spike_trace_fp != NULL)
-	{
-		fclose(sim->spike_trace_fp);
-	}
-	if (sim->message_trace_fp != NULL)
-	{
-		fclose(sim->message_trace_fp);
-	}
-	if (sim->perf_fp != NULL)
-	{
-		fclose(sim->perf_fp);
-	}
-	if (sim->stats_fp != NULL)
-	{
-		fclose(sim->stats_fp);
-	}
-
-	// Free the simulation structure only after we close all files
-	free(sim);
-
-	if (ret == RET_FAIL)
-	{
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
+	return 0;
 }
 
+/*
 void run(struct simulation *sim, struct network *net, struct architecture *arch)
 {
 	// TODO: remove the need to pass the network struct, only the arch
@@ -247,6 +169,7 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
 
 }
+*/
 
 struct timespec calculate_elapsed_time(struct timespec ts_start,
 							struct timespec ts_end)
@@ -263,7 +186,4 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	}
 
 	return ts_elapsed;
-=======
-	sana_fe.clean_up(RET_OK);
->>>>>>> Switching to class-based execution
 }

@@ -647,7 +647,7 @@ def run(arch_path, network_path, timesteps,
         sana_fe.set_mess_flag()
     if gui:
         sana_fe.set_gui_flag()
-    
+
     sana_fe.set_arch(parsed_filename)
     sana_fe.set_net(network_path)
 
@@ -706,7 +706,7 @@ def run(arch_path, network_path, timesteps,
             print(f"Error: Given {timesteps} timesteps, require int > 1.")
             exit(1)
         sana_fe.run_timesteps(timesteps)
-    
+
     print('-----------Total Run Summary-----------')
     sana_fe.sim_summary()
 
