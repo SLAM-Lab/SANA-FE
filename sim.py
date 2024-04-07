@@ -633,18 +633,18 @@ def run(arch_path, network_path, timesteps,
     # Set some flags for the dynamic linking library
     # Important to do before importing the simcpp .so library!
     sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
-    import simcpp as sim
+    import sanafe as sim
 
     # Parse inputs and run simulation
-    sana_fe = sim.SANA_FE()
+    sana_fe = sim.sana_fe()
     if spike_trace:
-        sana_fe.set_spike_flag()
+        sana_fe.open_spike_trace()
     if potential_trace:
-        sana_fe.set_pot_flag()
+        sana_fe.open_potential_trace()
     if perf_trace:
-        sana_fe.set_perf_flag()
+        sana_fe.open_perf_trace()
     if message_trace:
-        sana_fe.set_mess_flag()
+        sana_fe.open_message_trace()
     if gui:
         sana_fe.set_gui_flag()
 

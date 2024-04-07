@@ -12,10 +12,11 @@
 #ifndef ARCH_HEADER_INCLUDED_
 #define ARCH_HEADER_INCLUDED_
 
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <vector>
+
 #include "network.hpp"
 #include "description.hpp"
 
@@ -97,13 +98,6 @@ enum arch_description_blocks
 	ARCH_DESCRIPTION_AXON_OUT,
 };
 
-enum noise_type
-{
-	NOISE_NONE = -1,
-	NOISE_FILE_STREAM,
-	// TODO: implement different random noise generators
-};
-
 struct message
 {
 	struct neuron *src_neuron, *dest_neuron;
@@ -132,9 +126,16 @@ struct connection_map
 	int connection_count, spikes_received, active_synapses;
 };
 
+enum noise_type
+{
+	NOISE_NONE = -1,
+	NOISE_FILE_STREAM,
+	// TODO: implement different random noise generators
+};
+
 struct axon_input
 {
-	char name[MAX_FIELD_LEN];
+	std::string name;
 	struct tile *t;
 	struct connection_map map[ARCH_MAX_CONNECTION_MAP];
 	long int spike_messages_in;
@@ -145,7 +146,7 @@ struct axon_input
 
 struct synapse_processor
 {
-	char name[MAX_FIELD_LEN];
+	std::string name;
 	int model, spikes_buffer, weight_bits;
 	long int spikes_processed;
 	double energy, time;
@@ -155,14 +156,14 @@ struct synapse_processor
 
 struct dendrite_processor
 {
-	char name[MAX_FIELD_LEN];
+	std::string name;
 	double energy, time;
 };
 
 struct soma_processor
 {
 	FILE *noise_stream;
-	char name[MAX_FIELD_LEN];
+	std::string name;
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
 	int noise_type;
 	long int neuron_updates, neurons_fired, neuron_count;
@@ -179,7 +180,7 @@ struct axon_output
 	struct connection_map *map_ptr[ARCH_MAX_CONNECTION_MAP];
 	struct tile *t;
 	int map_count;
-	char name[MAX_FIELD_LEN];
+	std::string name;
 
 	long int packets_out;
 	double energy, time;
@@ -197,7 +198,7 @@ struct core
 	struct soma_processor soma[ARCH_MAX_UNITS];
 	struct axon_output axon_out;
 
-	char name[MAX_FIELD_LEN];
+	std::string name;
 	struct message next_message;  // Since last spike
 	double energy, latency_after_last_message;
 	int id, offset, buffer_pos, soma_count, synapse_count;
@@ -209,7 +210,7 @@ struct tile
 {
 	struct core cores[ARCH_MAX_CORES_PER_TILE];
 	struct tile *links[ARCH_MAX_LINKS];
-	char name[MAX_FIELD_LEN];
+	std::string name;
 	double energy;
 	double energy_east_hop, latency_east_hop;
 	double energy_west_hop, latency_west_hop;
@@ -224,7 +225,7 @@ struct tile
 struct architecture
 {
 	struct tile tiles[ARCH_MAX_TILES];
-	char name[MAX_FIELD_LEN];
+	std::string name;
 	int noc_width, noc_height, noc_buffer_size, tile_count, core_count;
 	int is_init;
 
@@ -251,8 +252,8 @@ int arch_map_neuron(struct neuron *const n, struct core *c);
 void arch_map_neuron_connections(struct neuron *const n);
 void arch_allocate_connection_map(struct neuron *const pre_neuron, struct core *const post_core, const int connection_count);
 void arch_add_connection_to_map(struct connection *const con, struct core *const post_core);
-int arch_parse_neuron_model(const char *model_str);
-int arch_parse_synapse_model(const char *model_str);
+int arch_parse_neuron_model(const std::string &model_str);
+int arch_parse_synapse_model(const std::string &model_str);
 void arch_init_message(struct message *m);
 
 #endif

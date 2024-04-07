@@ -13,7 +13,6 @@
 
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
-#define MAX_NOISE_FILE_ENTRY 128
 
 #include "arch.hpp"
 #include "network.hpp"
@@ -64,8 +63,8 @@ struct simulation
 	FILE *stats_fp;
 };
 
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
+//#include "pybind11/pybind11.h"
+//#include "pybind11/stl.h"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
@@ -109,8 +108,8 @@ public:
 	void open_potential_trace(void);
 	void open_message_trace(void);
 	void set_gui_flag(bool flag = true);
-	void set_arch(char* filename);
-	void set_net(char* filename);
+	void set_arch(const char *filename);
+	void set_net(const char *filename);
         double get_power();
 	vector<int> get_status(int gid);
         void sim_summary();
@@ -119,7 +118,8 @@ public:
 	~sana_fe() { clean_up(); };
 };
 
-class Vector_Cleanup_Class{
+class Vector_Cleanup_Class
+{
 public:
 	struct architecture* arch;
 	Vector_Cleanup_Class(){}

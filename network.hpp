@@ -16,7 +16,8 @@
 #define MAX_FIELDs 128
 #define MAX_FIELD_LEN 64
 
-#include <stdint.h>
+#include <cstdint>
+#include <list>
 #include "plugins.hpp"
 
 enum connection_config_format
@@ -42,20 +43,30 @@ struct neuron_id
 	int group, neuron;
 };
 
+struct connection
+{
+	struct neuron *post_neuron, *pre_neuron;
+	struct synapse_processor *synapse_hw;
+	// TODO: create a table of hw unit names and just index into this
+	//  global table (read only)
+	std::string synapse_hw_name;
+	double weight, current, synaptic_current_decay;
+	int id, delay;
+};
+
 struct neuron
 {
 	struct neuron_group *group;
-	struct connection *connections_out;
+	std::vector<connection> connections_out;
 	struct connection_map *maps_in;
 	struct connection_map **maps_out;
 
 	// Mapped hardware
 	struct core *core, *post_synaptic_cores;
 	struct soma_processor *soma_hw;
+	std::string soma_hw_name;
 
-	class Base_Soma *soma_class;
-
-	char soma_hw_name[MAX_FIELD_LEN];
+	class Soma_Model *soma_model;
 
 	// Track the timestep each hardware unit was last updated
 	int id, is_init, fired, connection_out_count;
@@ -78,17 +89,6 @@ struct neuron
 	// End of LIF specific
 };
 
-struct connection
-{
-	struct neuron *post_neuron, *pre_neuron;
-	struct synapse_processor *synapse_hw;
-	// TODO: create a table of hw unit names and just index into this
-	//  global table (read only)
-	char synapse_hw_name[MAX_FIELD_LEN];
-	double weight, current, synaptic_current_decay;
-	int id, delay;
-};
-
 struct input
 {
 	struct connection *connections;
@@ -102,15 +102,14 @@ struct neuron_group
 	//  parameters (and possibly hardware). All neurons must be based on the
 	//  same models. If implemented in hardware, they also must share common
 	//  hardware i.e. the same core and processor blocks in the core
-	struct neuron *neurons;
-	char default_soma_hw_name[MAX_FIELD_LEN];
-	char default_synapse_hw_name[MAX_FIELD_LEN];
+	std::vector<neuron> neurons;
+	std::string default_soma_hw_name;
+	std::string default_synapse_hw_name;
 	int id, neuron_count;
 	int default_log_potential, default_log_spikes;
 	int default_max_connections_out, default_force_update;
 
 	int reset_mode, reverse_reset_mode;
-	
 	double default_threshold, default_reset;
 	double default_reverse_threshold, default_reverse_reset;
 	double default_leak_decay, default_leak_bias;
@@ -130,14 +129,16 @@ struct core;
 
 void network_init(struct network *const net);
 void network_free(struct network *const net);
-int network_create_neuron(struct neuron *const n, struct attributes *attr, const int attribute_count);
-int network_create_neuron_group(struct network *net, const int neuron_count, struct attributes *attr, const int attribute_count);
+int network_create_neuron(struct neuron *const n, const std::list<attribute> &attr);
+int network_create_neuron_group(struct network &net, const int neuron_count, const std::list<attribute> &attr);
 struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
 int network_create_inputs(struct network *const net, const int input_count, const int input_type);
 int network_create_input_node(struct input *const in, const int connection_count);
 void network_set_input(struct network *const net, const int input_id, const double rate);
-int network_parse_reset_mode(const char *str);
-int network_connect_neurons(struct connection *const con, struct neuron *const src, struct neuron *const dest, struct attributes *attr, const int attribute_count);
+int network_parse_reset_mode(const std::string &str);
+int network_connect_neurons(struct connection &con, struct neuron *const src, struct neuron *const dest, const std::list<attribute> &attr);
 void network_check_mapped(struct network *const net);
+
+
 
 #endif

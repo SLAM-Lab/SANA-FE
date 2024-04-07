@@ -13,36 +13,51 @@
 
 namespace py = pybind11;
 
-SANA_FE::SANA_FE(){
+sana_fe::sana_fe()
+{
 	init();
 }
-void SANA_FE::init(){
+void sana_fe::init()
+{
 	arch = arch_init();
 	network_init(&net);
 	INFO("Initializing simulation.\n");
 	sim = sim_init_sim();
 }
-int SANA_FE::update_neuron(int group_id, int n_id, vector<string> kwargs, int count){
-	for (string item: kwargs){
+int sana_fe::update_neuron(int group_id, int n_id, vector<string> kwargs,
+	int count)
+{
+	for (string item: kwargs)
+	{
 		INFO("Kwarg: %s\n", item.c_str());
 	}
 	if (count < 1)
+	{
 		return -1;
+	}
 	if (group_id >= net.neuron_group_count)
+	{
 		return -1;
+	}
 	if (n_id >= net.groups[group_id].neuron_count)
+	{
 		return -1;
+	}
+
 	struct attributes attr[128];
-	for (int i = 0; i < count; ++i){
+	for (int i = 0; i < count; ++i)
+	{
 		string s = kwargs[i];
 		strcpy(&attr->key[i], s.substr(0, s.find('=')).c_str());
 		strcpy(&attr->value_str[i], s.substr(s.find('=')+1).c_str());
-		INFO("neuron: %d.%d updated with key: %s and val: %s\n", group_id, n_id, &attr->key[i], &attr->value_str[i]);
+		INFO("neuron: %d.%d updated with key: %s and val: %s\n",
+			group_id, n_id, &attr->key[i], &attr->value_str[i]);
 	}
 	net.groups[group_id].neurons[n_id].soma_class->parameters(attr, count);
 	return 1;
 }
-void SANA_FE::run_timesteps(int timesteps){
+
+void sana_fe::run_timesteps(int timesteps){
 	store_data_init(&run_data, sim, timesteps);
 	for (int i = 0; i < timesteps; ++i){
 		++sim->ts.timestep;
@@ -50,7 +65,7 @@ void SANA_FE::run_timesteps(int timesteps){
 	}
 	store_data(&run_data, sim);
 }
-void SANA_FE::set_input(char *filename){
+void sana_fe::set_input(char *filename){
 	input_fp = fopen(filename, "r");
 	if (input_fp == NULL)
 	{
@@ -58,7 +73,7 @@ void SANA_FE::set_input(char *filename){
 		clean_up(RET_FAIL);
 	}
 }
-void SANA_FE::set_perf_flag(bool flag){
+void sana_fe::set_perf_flag(bool flag){
 	if (flag){
 		sim->log_perf = 1;
 
@@ -76,25 +91,20 @@ void SANA_FE::set_perf_flag(bool flag){
 			fclose(sim->perf_fp);
 	}
 }
-void SANA_FE::set_spike_flag(bool flag){
-	if (flag){
-		sim->log_spikes = 1;
+void sana_fe::open_spike_trace(void)
+{
+	sim->log_spikes = 1;
 
-		sim->spike_trace_fp = fopen("spikes.trace", "w");
-		if (sim->spike_trace_fp == NULL)
-		{
-			INFO("Error: Couldn't open trace file for writing.\n");
-			clean_up(RET_FAIL);
-		}
-		sim_spike_trace_write_header(sim);
+	sim->spike_trace_fp = fopen("spikes.trace", "w");
+	if (sim->spike_trace_fp == NULL)
+	{
+		INFO("Error: Couldn't open trace file for writing.\n");
+		clean_up(RET_FAIL);
 	}
-	else{
-		sim->log_spikes = 0;
-		if (sim->spike_trace_fp != NULL)
-			fclose(sim->spike_trace_fp);
-	}
+	sim_spike_trace_write_header(sim);
 }
-void SANA_FE::set_pot_flag(bool flag){
+void sana_fe::open_potential_trace(void)
+{
 	if (flag){
 		sim->log_potential = 1;
 
@@ -112,35 +122,26 @@ void SANA_FE::set_pot_flag(bool flag){
 			fclose(sim->potential_trace_fp);
 	}
 }
-void SANA_FE::set_mess_flag(bool flag){
-	if (flag){
-		sim->log_messages = 1;
 
-		sim->message_trace_fp = fopen("messages.trace", "w");
-		if (sim->message_trace_fp == NULL)
-		{
-			INFO("Error: Couldn't open trace file for writing.\n");
-			clean_up(RET_FAIL);
-		}
-		sim_message_trace_write_header(sim);
+void sana_fe::open_message_trace(void)
+{
+	sim->log_messages = 1;
+
+	sim->message_trace_fp = fopen("messages.trace", "w");
+	if (sim->message_trace_fp == NULL)
+	{
+		INFO("Error: Couldn't open trace file for writing.\n");
+		clean_up(RET_FAIL);
 	}
-	else{
-		sim->log_messages = 0;
-		if (sim->message_trace_fp != NULL)
-			fclose(sim->message_trace_fp);
-	}
+	sim_message_trace_write_header(sim);
 }
-void SANA_FE::set_gui_flag(bool flag){
-	if (flag){
-		sim->gui_on = 1;
-		arch->spike_vector_on = 1;
-	}
-	else{
-		sim->gui_on = 0;
-		arch->spike_vector_on = 0;
-	}
+
+void sana_fe::set_gui_flag(bool flag){
+	sim->gui_on = 1;
+	arch->spike_vector_on = 1;
 }
-void SANA_FE::set_arch(char* filename){
+void sana_fe::set_arch(char* filename)
+{
 	FILE* arch_fp = fopen(filename, "r");
 	if (arch_fp == NULL)
 	{
@@ -155,7 +156,8 @@ void SANA_FE::set_arch(char* filename){
 		clean_up(RET_FAIL);
 	}
 }
-void SANA_FE::set_net(char* filename){
+
+void sana_fe::set_net(char* filename){
 	FILE* network_fp = fopen(filename, "r");
 	if (network_fp == NULL)
 	{
@@ -179,7 +181,8 @@ void SANA_FE::set_net(char* filename){
 	}
 }
 
-double SANA_FE::get_power(){
+double sana_fe::get_power()
+{
 	if (sim->total_sim_time > 0.0)
 	{
 		return sim->total_energy / sim->total_sim_time;
@@ -189,20 +192,24 @@ double SANA_FE::get_power(){
 		return 0.0;
 	}
 }
-vector<int> SANA_FE::get_status(int gid){
+vector<int> sana_fe::get_status(int gid){
 	vector<int> statuses = vector<int>();
-	if (gid >= net.neuron_group_count){
+
+	if (gid >= net.neuron_group_count)
+	{
 		INFO("Error: Got gid of %d with only %d groups in net.\n",
 			gid, net.neuron_group_count);
 		return statuses;
 	}
-	for (int i = 0; i < net.groups[gid].neuron_count; ++i){
+	for (int i = 0; i < net.groups[gid].neuron_count; ++i)
+	{
 		statuses.push_back(net.groups[gid].neurons[i].neuron_status);
 	}
 	return statuses;
 }
 
-void SANA_FE::sim_summary(){
+void sana_fe::sim_summary()
+{
 	sim_write_summary(stdout, sim);
 
 	sim->stats_fp = fopen("run_summary.yaml", "w");
@@ -211,7 +218,8 @@ void SANA_FE::sim_summary(){
 		sim_write_summary(sim->stats_fp, sim);
 	}
 }
-vector<vector<int>> SANA_FE::run_summary(){
+vector<vector<int>> SANA_FE::run_summary()
+{
 	print_run_data(stdout, &run_data);
 
 	// Could write intermediate run data here
@@ -226,7 +234,9 @@ vector<vector<int>> SANA_FE::run_summary(){
 	Vector_Cleanup_Class help_class(arch);
 	return arch->spike_vector;
 }
-void SANA_FE::clean_up(int ret){
+
+void sana_fe::clean_up(int ret)
+{
 	// Free any larger structures here
 	network_free(&net);
 	arch_free(arch);
@@ -325,8 +335,8 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 
 }
 
-struct timespec calculate_elapsed_time(struct timespec ts_start,
-							struct timespec ts_end)
+struct timespec calculate_elapsed_time(
+	struct timespec ts_start, struct timespec ts_end)
 {
 	// Calculate elapsed wall-clock time between ts_start and ts_end
 	struct timespec ts_elapsed;
@@ -342,7 +352,8 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	return ts_elapsed;
 }
 
-void store_data_init(run_ts_data* data, simulation* sim, int timesteps){
+void store_data_init(run_ts_data* data, simulation* sim, int timesteps)
+{
 	data->energy = sim->total_energy;
 	data->time = sim->total_sim_time;
 	data->spikes = sim->total_spikes;
@@ -353,7 +364,8 @@ void store_data_init(run_ts_data* data, simulation* sim, int timesteps){
 	data->timesteps = timesteps;
 }
 
-void store_data(run_ts_data* data, simulation* sim){
+void store_data(run_ts_data* data, simulation* sim)
+{
 	data->energy = sim->total_energy - data->energy;
 	data->time = sim->total_sim_time - data->time;
 	data->spikes = sim->total_spikes - data->spikes;
@@ -362,7 +374,8 @@ void store_data(run_ts_data* data, simulation* sim){
 	data->wall_time = sim->wall_time - data->wall_time;
 }
 
-void print_run_data(FILE *fp, run_ts_data* data){
+void print_run_data(FILE *fp, run_ts_data* data)
+{
 	fprintf(fp, "energy: %e\n", data->energy);
 	fprintf(fp, "time: %e\n", data->time);
 	fprintf(fp, "total_spikes: %ld\n", data->spikes);
@@ -373,9 +386,9 @@ void print_run_data(FILE *fp, run_ts_data* data){
 	data->timestep_start+data->timesteps);
 }
 
-PYBIND11_MODULE(simcpp, m) {
+PYBIND11_MODULE(sanafe, m) {
     m.doc() = R"pbdoc(
-        SANA-FE Cpp Module with Pybind11 
+        SANA-FE CPP Module with Pybind11
         --------------------------------
 
         .. currentmodule:: simcpp
@@ -385,23 +398,23 @@ PYBIND11_MODULE(simcpp, m) {
 
 		   SANA_FE
     )pbdoc";
-
-	py::class_<SANA_FE>(m, "SANA_FE")
+`
+	py::class_<sana_fe>(m, "sana_fe")
 		.def(py::init())
-		.def("init", &SANA_FE::init)
-        .def("update_neuron", &SANA_FE::update_neuron)
-        .def("run_timesteps", &SANA_FE::run_timesteps, py::arg("timesteps") = 1)
-		.def("set_input", &SANA_FE::set_input)
-		.def("set_perf_flag", &SANA_FE::set_perf_flag, py::arg("flag") = true)
-		.def("set_spike_flag", &SANA_FE::set_spike_flag, py::arg("flag") = true)
-		.def("set_pot_flag", &SANA_FE::set_pot_flag, py::arg("flag") = true)
-		.def("set_mess_flag", &SANA_FE::set_mess_flag, py::arg("flag") = true)
-		.def("set_gui_flag", &SANA_FE::set_gui_flag, py::arg("flag") = true)
-		.def("set_arch", &SANA_FE::set_arch)
-		.def("set_net", &SANA_FE::set_net)
-		.def("get_power", &SANA_FE::get_power)
-		.def("get_status", &SANA_FE::get_status)
-		.def("sim_summary", &SANA_FE::sim_summary)
-		.def("run_summary", &SANA_FE::run_summary)
-		.def("clean_up", &SANA_FE::clean_up, py::arg("ret") = 0);
+		.def("init", &sana_fe::init)
+        .def("update_neuron", &sana_fe::update_neuron)
+        .def("run_timesteps", &sana_fe::run_timesteps, py::arg("timesteps") = 1)
+		.def("set_input", &sana_fe::set_input)
+		.def("open_perf_trace", &sana_fe::set_perf_flag, py::arg("flag") = true)
+		.def("open_spike_trace", &sana_fe::set_spike_flag, py::arg("flag") = true)
+		.def("open_potential_trace", &sana_fe::set_pot_flag, py::arg("flag") = true)
+		.def("open_message_trace", &sana_fe::set_mess_flag, py::arg("flag") = true)
+		.def("set_gui_flag", &sana_fe::set_gui_flag, py::arg("flag") = true)
+		.def("set_arch", &sana_fe::set_arch)
+		.def("set_net", &sana_fe::set_net)
+		.def("get_power", &sana_fe::get_power)
+		.def("get_status", &sana_fe::get_status)
+		.def("sim_summary", &sana_fe::sim_summary)
+		.def("run_summary", &sana_fe::run_summary)
+		.def("clean_up", &sana_fe::clean_up, py::arg("ret") = 0);
 }

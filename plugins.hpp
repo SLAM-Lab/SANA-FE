@@ -1,24 +1,24 @@
 #ifndef PLUGINS_HPP
 #define PLUGINS_HPP
-#include "description.hpp"
+#include <string>
+#include <list>
 
-#define MAX_SOMA_CLASSES MAX_FIELD_LEN
-#define MAX_SOMA_LEN MAX_FIELD_LEN
+#include "description.hpp"
 
 enum Neuron_Status { IDLE, UPDATED, FIRED};
 
-class Base_Soma {
+class Soma_Model {
 public:
-	Base_Soma(){}
-    virtual ~Base_Soma(){}
-	virtual Neuron_Status update_soma(double input) = 0;
-	virtual void parameters(struct attributes* attr, const int attribute_count) = 0;
+	Soma_Model(){}
+	virtual ~Soma_Model(){}
+	virtual Neuron_Status update(double input) = 0;
+	virtual void set_attributes(const std::list<attribute> &attr) = 0;
 };
 
-typedef Base_Soma* _create_soma();
-typedef void _destroy_soma(Base_Soma*);
+typedef Soma_Model *_create_soma(void);
+typedef void _destroy_soma(Soma_Model *model);
 
-void init_soma(char* name);
-Base_Soma* get_soma(char* name);
+void plugin_init_soma(char* name);
+Soma_Model *plugin_get_soma(const std::string &name);
 
 #endif

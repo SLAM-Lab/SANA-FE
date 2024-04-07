@@ -3,39 +3,36 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // network.c
-#include <stdlib.h>
-#include <assert.h>
-#include <math.h>
+#include <cstdlib>
+#include <cassert>
+#include <cmath>
+#include <sstream>
+#include <list>
 
 #include "arch.hpp"
 #include "print.hpp"
 #include "network.hpp"
+#include "models.hpp"
 
 int total_connection_count = 0;
 
-int network_create_neuron_group(struct network *net, const int neuron_count,
-	struct attributes *attr, const int attribute_count)
+int network_create_neuron_group(struct network &net, const int neuron_count,
+	const std::list<attribute> &attr)
 {
 	struct neuron_group *group;
 	int id, ret;
 
-	id = net->neuron_group_count;
+	id = net.neuron_group_count;
 	assert(id < NETWORK_MAX_NEURON_GROUPS);
-	net->neuron_group_count++;
+	net.neuron_group_count++;
 
-	group = &(net->groups[id]);
-	group->neurons =
-		(struct neuron *) malloc(sizeof(struct neuron) * neuron_count);
-	if (group->neurons == NULL)
-	{
-		INFO("Error: Couldn't allocate neuron group %d\n", id);
-		exit(1);
-	}
-
+	INFO("Creating neuron group: %d with %d neurons\n", id, neuron_count);
+	group = &(net.groups[id]);
+	group->neurons.reserve(neuron_count);
 	group->neuron_count = neuron_count;
 
-	group->default_soma_hw_name[0] = 0;
-	group->default_synapse_hw_name[0] = 0;
+	group->default_soma_hw_name = "";
+	group->default_synapse_hw_name = "";
 	group->default_max_connections_out = 0;
 	group->default_log_potential = 0; // Disabled by default
 	group->default_log_spikes = 0;
@@ -50,94 +47,83 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 	//  next timestep is 100% of the previous timestep's
 	group->default_leak_decay = 1.0;
 	group->default_leak_bias = 0.0;
-	for (int i = 0; i < attribute_count; i++)
+	// TODO: change how group attributes are handled. Maybe don't bother
+	//  parsing them. Just parse them over and over for each new neuron?
+	//  Or create a neuron object that is the template to copy the rest
+	//  from
+	for (auto a: attr)
 	{
-		struct attributes *a = &(attr[i]);
-
 		ret = 1;
-		if (strncmp("soma_hw_name", a->key, MAX_FIELD_LEN) == 0)
+		std::istringstream ss(a.value_str);
+		if (a.key == "soma_hw_name")
 		{
-			strncpy(group->default_soma_hw_name, a->value_str,
-				MAX_FIELD_LEN);
+			group->default_soma_hw_name = a.value_str;
 			ret = 1;
 		}
-		else if (strncmp("synapse_hw_name", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "synapse_hw_name")
 		{
-			strncpy(group->default_synapse_hw_name, a->value_str,
-				MAX_FIELD_LEN);
+			group->default_synapse_hw_name = a.value_str;
 			ret = 1;
 		}
-		else if (strncmp("threshold", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "threshold")
 		{
-			ret = sscanf(
-				a->value_str, "%lf", &group->default_threshold);
+			ss >> group->default_threshold;
 		}
-		else if (strncmp("reverse_threshold", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "reverse_threshold")
 		{
-			ret = sscanf(a->value_str, "%lf",
-				&group->default_reverse_threshold);
+			ss >> group->default_reverse_threshold;
 		}
-		else if (strncmp("reset", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "reset")
 		{
-			ret = sscanf(
-				a->value_str, "%lf", &group->default_reset);
+			ss >> group->default_reset;
 		}
-		else if (strncmp("reverse_reset", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "reverse_reset")
 		{
-			ret = sscanf(a->value_str, "%lf",
-				&group->default_reverse_reset);
+			ss >> group->default_reverse_reset;
 		}
-		else if (strncmp("reset_mode", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "reset_mode")
 		{
 			group->reset_mode =
-				network_parse_reset_mode(a->value_str);
+				network_parse_reset_mode(a.value_str);
 			// Was parsed successfully if we got here
 			ret = 1;
 		}
-		else if (strncmp("reverse_reset_mode", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key =="reverse_reset_mode")
 		{
 			group->reverse_reset_mode =
-				network_parse_reset_mode(a->value_str);
+				network_parse_reset_mode(a.value_str);
 			// Was parsed successfully if we got here
 			ret = 1;
 		}
-		else if (strncmp("leak_decay", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key =="leak_decay")
 		{
-			ret = sscanf(a->value_str, "%lf",
-				&group->default_leak_decay);
+			ss >> group->default_leak_decay;
 		}
-		else if (strncmp("leak_bias", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key =="leak_bias")
 		{
-			ret = sscanf(
-				a->value_str, "%lf", &group->default_leak_bias);
+			ss >> group->default_leak_bias;
 		}
-		else if (strncmp("log_v", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key =="log_v")
 		{
-			ret = sscanf(a->value_str, "%d",
-				&group->default_log_potential);
+			ss >> group->default_log_potential;
 		}
-		else if (strncmp("log_spikes", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key =="log_spikes")
 		{
-			ret = sscanf(
-				a->value_str, "%d", &group->default_log_spikes);
+			ss >> group->default_log_spikes;
 		}
-		else if (strncmp("connections_out", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key =="connections_out")
 		{
-			ret = sscanf(a->value_str, "%d",
-				&group->default_max_connections_out);
+			ss >> group->default_max_connections_out;
 		}
-		else if (strncmp("force_update", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key =="force_update")
 		{
-			ret = sscanf(a->value_str, "%d",
-				&group->default_force_update);
+			ss >> group->default_force_update;
 		}
 
 		if (ret < 1)
 		{
-			INFO("Invalid attribute (%s:%s)\n", a->key,
-				a->value_str);
+			INFO("Invalid attribute (%s:%s)\n", a.key.c_str(),
+				a.value_str.c_str());
 			exit(1);
 		}
 	}
@@ -145,42 +131,47 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 	// Initialize all neurons in this group
 	for (int i = 0; i < group->neuron_count; i++)
 	{
-		struct neuron *n = &(group->neurons[i]);
-
-		n->id = i;
-		n->group = group;
-		n->connection_out_count = 0;
-		strncpy(n->soma_hw_name, group->default_soma_hw_name,
-			MAX_FIELD_LEN);
+		neuron n;
+		n.id = i;
+		n.group = group;
+		n.connection_out_count = 0;
+		INFO("Default soma name:%s\n", group->default_soma_hw_name.c_str());
+		INFO("n id:%d\n", n.id);
+		n.soma_hw_name = "";
+		n.soma_hw_name = group->default_soma_hw_name,
 
 		// Initialize neuron using group attributes
-		n->log_spikes = group->default_log_spikes;
-		n->log_potential = group->default_log_potential;
-		n->force_update = group->default_force_update;
-		n->max_connections_out = group->default_max_connections_out;
+		n.log_spikes = group->default_log_spikes;
+		n.log_potential = group->default_log_potential;
+		n.force_update = group->default_force_update;
+		n.max_connections_out = group->default_max_connections_out;
 
-		n->fired = 0;
+		n.fired = 0;
 		// By default, dendrite current resets every timestep
 
-		n->update_needed = 0;
-		n->neuron_status = IDLE;
-		n->spike_count = 0;
-		n->connections_out = NULL;
+		n.update_needed = 0;
+		n.neuron_status = IDLE;
+		n.spike_count = 0;
 
 		// Initially the neuron is not mapped to anything
-		n->core = NULL;
-		n->soma_hw = NULL;
+		n.core = NULL;
+		n.soma_hw = NULL;
 
-		n->maps_in = NULL;
-		n->maps_out = NULL;
-		n->maps_in_count = 0;
-		n->maps_out_count = 0;
+		n.maps_in = NULL;
+		n.maps_out = NULL;
+		n.maps_in_count = 0;
+		n.maps_out_count = 0;
 
-		n->is_init = 0;
+		n.is_init = 0;
 
-		// Create Soma Class Instance 
-		n->soma_class = get_soma(n->soma_hw_name);
-		n->soma_class->parameters(attr, attribute_count);
+		// Create Soma Class Instance
+		// TODO: problem with this is we now make the soma name
+		//  optional! Fix this
+		//n.soma_model = plugin_get_soma(n.soma_hw_name);
+		n.soma_model = new Loihi_Lif_Model();
+		n.soma_model->set_attributes(attr);
+
+		group->neurons.push_back(n);
 	}
 
 	INFO("Created neuron group gid:%d count:%d "
@@ -195,8 +186,8 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 	return id;
 }
 
-int network_create_neuron(struct neuron *const n, struct attributes *attr,
-	const int attribute_count)
+int network_create_neuron(
+	struct neuron *const n, const std::list<attribute> &attr)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
@@ -208,42 +199,36 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	}
 
 	/*** Set attributes ***/
-	for (int i = 0; i < attribute_count; i++)
+	for (auto a: attr)
 	{
-		struct attributes *a = &(attr[i]);
 		int ret = 1;
 
-		if (strncmp("hw_name", a->key, MAX_FIELD_LEN) == 0)
+		std::istringstream ss(a.value_str);
+		if (a.key == "hw_name")
 		{
-			strncpy(n->soma_hw_name, a->value_str, MAX_FIELD_LEN);
+			n->soma_hw_name = a.value_str;
 		}
-		else if (strncmp("connections_out", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "connections_out")
 		{
-			ret = sscanf(
-				a->value_str, "%d", &n->max_connections_out);
+			ss >> n->max_connections_out;
 		}
-		else if (strncmp("log_spikes", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "log_spikes")
 		{
-			ret = sscanf(a->value_str, "%d", &n->log_spikes);
+			ss >> n->log_spikes;
 		}
-		else if (strncmp("log_v", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "log_v")
 		{
-			ret = sscanf(a->value_str, "%d", &n->log_potential);
+			ss >> n->log_potential;
 		}
-		else if (strncmp("force_update", a->key, MAX_FIELD_LEN) == 0)
+		else
 		{
-			ret = sscanf(a->value_str, "%d", &n->force_update);
+		 	TRACE1("Attribute %s not supported.\n", a->key);
 		}
-		// else
-		// {
-		// 	INFO("Attribute %s not supported.\n", a->key);
-		// 	exit(1);
-		// }
 
 		if (ret < 1)
 		{
-			INFO("Invalid attribute (%s:%s)\n", a->key,
-				a->value_str);
+			INFO("Invalid attribute (%s:%s)\n", a.key.c_str(),
+				a.value_str.c_str());
 			exit(1);
 		}
 	}
@@ -257,86 +242,55 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	n->dendrite_last_updated = 0;
 
 	n->core = NULL;
-	assert(n->connections_out == NULL);
-	TRACE1("Allocating memory (%lu b) for connections\n",
-		sizeof(struct connection) * n->max_connections_out);
-	if (n->max_connections_out > 0)
-	{
-		n->connections_out = (struct connection *) malloc(
-			sizeof(struct connection) * n->max_connections_out);
-		if (n->connections_out == NULL)
-		{
-			INFO("Error: Couldn't allocate connection memory.\n");
-			return NETWORK_INVALID_NID;
-		}
-	}
-
-	// Zero initialize all connections
-	for (int i = 0; i < n->max_connections_out; i++)
-	{
-		struct connection *con = &(n->connections_out[i]);
-		con->id = i;
-		con->current = 0.0;
-		con->pre_neuron = NULL;
-		con->post_neuron = NULL;
-		con->weight = 0.0;
-		con->delay = 0.0;
-		con->synaptic_current_decay = 0.0;
-		con->synapse_hw = NULL;
-	}
+	assert(n->connections_out.size() = 0);
+	n->connections_out.reserve(n->max_connections_out);
 
 	// Check if need to create Soma Class instance
-	if (n->soma_class == nullptr){
-		n->soma_class = get_soma(n->soma_hw_name);
+	if (n->soma_model == nullptr)
+	{
+		// TODO: remove hack, make this user input
+		INFO("Soma hw name:%s", n->soma_hw_name.c_str());
+		//n->soma_model = plugin_get_soma(n->soma_hw_name);
+		n->soma_model = new Loihi_Lif_Model();
 		INFO("Creating new neuron %d\n", n->id);
 	}
-	n->soma_class->parameters(attr, attribute_count);
+	n->soma_model->set_attributes(attr);
 
 	TRACE1("Created neuron: gid:%d nid:%d force:%d soma:%s\n",
-		n->group->id, n->id, n->force_update, n->soma_hw_name);
+		n->group->id, n->id, n->force_update, n->soma_hw_name.c_str());
 	n->is_init = 1;
 	return n->id;
 }
 
-int network_connect_neurons(struct connection *const con,
+int network_connect_neurons(struct connection &con,
 	struct neuron *const src, struct neuron *const dest,
-	struct attributes *attr, const int attribute_count)
+	const std::list<attribute> &attr)
 {
-	assert(con != NULL);
-	strncpy(con->synapse_hw_name, dest->group->default_synapse_hw_name,
-		MAX_FIELD_LEN);
-	con->pre_neuron = src;
-	con->post_neuron = dest;
-	con->weight = 1.0;
+	INFO("dest id:%d\n", dest->id);
+	INFO("dest group:%d\n", dest->group->id);
+	INFO("default synapse name len:%ld\n", dest->group->default_synapse_hw_name.length());
+	INFO("con hw:%s\n", con.synapse_hw_name.c_str());
+	con.synapse_hw_name = dest->group->default_synapse_hw_name;
+	con.pre_neuron = src;
+	con.post_neuron = dest;
+	con.weight = 1.0;
 
-	total_connection_count++;
-	for (int i = 0; i < attribute_count; i++)
+	for (auto a: attr)
 	{
-		struct attributes *a = &(attr[i]);
-		int ret = -1;
-
-		if ((a->key[0] == 'w') ||
-			(strncmp("weight", a->key, MAX_FIELD_LEN) == 0))
+		std::istringstream ss(a.value_str);
+		if ((a.key[0] == 'w') || (a.key == "weight"))
 		{
-			ret = sscanf(a->value_str, "%lf", &(con->weight));
+			ss >> con.weight;
 		}
-		else if (strncmp("hw_name", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "hw_name")
 		{
-			strncpy(con->synapse_hw_name, a->value_str,
-				MAX_FIELD_LEN);
-			ret = 1;
-		}
-		if (ret < 1)
-		{
-			INFO("Invalid attribute (%s:%s)\n", a->key,
-				a->value_str);
-			exit(1);
+			con.synapse_hw_name = a.value_str;
 		}
 	}
 
-	TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n", con->pre_neuron->group->id,
-		con->pre_neuron->id, con->post_neuron->group->id,
-		con->post_neuron->id, con->weight);
+	TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n", con.pre_neuron->group->id,
+		con.pre_neuron->id, con.post_neuron->group->id,
+		con.post_neuron->id, con.weight);
 	return RET_OK;
 }
 
@@ -417,19 +371,6 @@ void network_init(struct network *const net)
 
 void network_free(struct network *const net)
 {
-	for (int i = 0; i < net->neuron_group_count; i++)
-	{
-		struct neuron_group *group = &(net->groups[i]);
-
-		// First free all the allocated connections in each neuron
-		for (int j = 0; j < group->neuron_count; j++)
-		{
-			free(group->neurons[j].connections_out);
-		}
-		// Finally free the neurons allocated in the group
-		free(net->groups[i].neurons);
-	}
-
 	for (int i = 0; i < net->external_input_count; i++)
 	{
 		struct input *in = &(net->external_inputs[i]);
@@ -492,33 +433,4 @@ void network_check_mapped(struct network *const net)
 			}
 		}
 	}
-}
-
-int network_parse_reset_mode(const char *str)
-{
-	int reset_mode = -1;
-
-	if (strcmp(str, "none") == 0)
-	{
-		reset_mode = NEURON_NO_RESET;
-	}
-	else if (strcmp(str, "soft") == 0)
-	{
-		reset_mode = NEURON_RESET_SOFT;
-	}
-	else if (strcmp(str, "hard") == 0)
-	{
-		reset_mode = NEURON_RESET_HARD;
-	}
-	else if (strcmp(str, "saturate") == 0)
-	{
-		reset_mode = NEURON_RESET_SATURATE;
-	}
-	else
-	{
-		INFO("Error: reset mode not recognized.");
-		exit(1);
-	}
-
-	return reset_mode;
 }

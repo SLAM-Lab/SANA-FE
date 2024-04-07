@@ -15,7 +15,7 @@ add_compile_options(
 )
 
 file (GLOB SOURCE_FILES "*.cpp")
-file (GLOB HEADER_FILES "*.h")
+file (GLOB HEADER_FILES "*.hpp")
 
 # Get the latest commit hash
 execute_process(
@@ -26,19 +26,19 @@ execute_process(
 
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
-find_package(pybind11 CONFIG)
+#find_package(pybind11 CONFIG)
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-pybind11_add_module(
-    sanafe
-	${SOURCE_FILES}
-)
-target_link_libraries(sanafe PRIVATE ${PYTHON_LIBRARIES})
-target_link_libraries(sanafe PRIVATE pybind11::pybind11)
-target_link_libraries(sanafe PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
-target_link_libraries(sanafe PUBLIC)
+#pybind11_add_module(
+#    sanafe
+#	${SOURCE_FILES}
+#)
+#target_link_libraries(sanafe PRIVATE ${PYTHON_LIBRARIES})
+#target_link_libraries(sanafe PRIVATE pybind11::pybind11)
+#target_link_libraries(sanafe PRIVATE OpenMP::OpenMP_CXX)
+#target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
+#target_link_libraries(sanafe PUBLIC)
 
 find_package(OpenMP REQUIRED)
 
@@ -49,6 +49,6 @@ target_sources(
 )
 
 target_link_libraries(sim PRIVATE ${PYTHON_LIBRARIES})
-target_link_libraries(sim PRIVATE pybind11::pybind11)
+#target_link_libraries(sim PRIVATE pybind11::pybind11)
 target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})

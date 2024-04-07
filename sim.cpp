@@ -3,30 +3,18 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 //  sim.c
-
-// TODO:
-// j* ust have a single set of message lists for each core and write to them
-//  in the sim routine. Instead of storing a message in each axon and copying
-//  the data
-// * figure out about this timestep struct. maybe the timestep struct goes instead
-//  of the whole simulation struct? The simulation struct is for the higher
-//  level routines? When we simulate a timestep, we should only return details
-//  about the timestep. The bigger simulator loop should accumulate results.
-
-// * account for final dummy message which adds all remaining neuron processing
-//    time. Need to support 1 extra message per core in theory
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <cmath>
 #include <omp.h>
+#include <vector>
+#include <list>
 
 #include "print.hpp"
 #include "sim.hpp"
 #include "network.hpp"
 #include "arch.hpp"
-
-namespace py = pybind11;
 
 sana_fe::sana_fe()
 {
@@ -39,8 +27,8 @@ void sana_fe::init()
 	INFO("Initializing simulation.\n");
 	sim = sim_init_sim();
 }
-int sana_fe::update_neuron(int group_id, int n_id, vector<string> kwargs,
-	int count)
+int sana_fe::update_neuron(
+	int group_id, int n_id, std::vector<string> kwargs, int count)
 {
 	for (string item: kwargs)
 	{
@@ -59,17 +47,18 @@ int sana_fe::update_neuron(int group_id, int n_id, vector<string> kwargs,
 		return -1;
 	}
 
-	struct attributes attr[128];
-	for (int i = 0; i < count; ++i)
+	std::list<attribute> attr;
+	for (auto s: kwargs)
 	{
-		string s = kwargs[i];
-		strcpy(&attr->key[i], s.substr(0, s.find('=')).c_str());
-		strcpy(&attr->value_str[i], s.substr(s.find('=')+1).c_str());
+		std::string key = s.substr(0, s.find('=')).c_str();
+		std::string value_str = s.substr(s.find('=')+1).c_str();
+		attribute a = { key, value_str };
+		attr.push_back(a);
 		INFO("neuron: %d.%d updated with key: %s and val: %s\n",
-			group_id, n_id, &attr->key[i], &attr->value_str[i]);
+			group_id, n_id, key.c_str(), value_str.c_str());
 	}
-	net.groups[group_id].neurons[n_id].soma_class->parameters(attr, count);
-	return 1;
+	net.groups[group_id].neurons[n_id].soma_model->set_attributes(attr);
+	return 0;
 }
 
 void sana_fe::run_timesteps(int timesteps){
@@ -145,34 +134,37 @@ void sana_fe::set_gui_flag(bool flag)
 	arch->spike_vector_on = flag;
 }
 
-void sana_fe::set_arch(char* filename)
+void sana_fe::set_arch(const char *filename)
 {
-	FILE* arch_fp = fopen(filename, "r");
-	if (arch_fp == NULL)
+	//FILE* arch_fp = fopen(filename, "r");
+	std::fstream arch_fp;
+	arch_fp.open(filename);
+	if (arch_fp.fail())
 	{
 		INFO("Error: Architecture file %s failed to open.\n", filename);
 		clean_up(RET_FAIL);
 	}
-	int ret = description_parse_file(arch_fp, NULL, arch);
-	//arch_print_description(&description, 0);
-	fclose(arch_fp);
+	int ret = description_parse_file(arch_fp, *arch);
+	arch_fp.close();
 	if (ret == RET_FAIL)
 	{
 		clean_up(RET_FAIL);
 	}
 }
 
-void sana_fe::set_net(char* filename)
+void sana_fe::set_net(const char *filename)
 {
-	FILE* network_fp = fopen(filename, "r");
-	if (network_fp == NULL)
+	//FILE* network_fp = fopen(filename, "r");
+	std::fstream network_fp;
+	network_fp.open(filename);
+	if (network_fp.fail())
 	{
 		INFO("Network data (%s) failed to open.\n", filename);
 		clean_up(RET_FAIL);
 	}
 	INFO("Reading network from file.\n");
-	int ret = description_parse_file(network_fp, &net, arch);
-	fclose(network_fp);
+	int ret = description_parse_file(network_fp, net, *arch);
+	network_fp.close();
 	if (ret == RET_FAIL)
 	{
 		clean_up(RET_FAIL);
@@ -198,6 +190,7 @@ double sana_fe::get_power()
 		return 0.0;
 	}
 }
+
 vector<int> sana_fe::get_status(int gid){
 	vector<int> statuses = vector<int>();
 
@@ -224,6 +217,7 @@ void sana_fe::sim_summary()
 		sim_write_summary(sim->stats_fp, sim);
 	}
 }
+
 vector<vector<int>> sana_fe::run_summary()
 {
 	print_run_data(stdout, &run_data);
@@ -1459,7 +1453,7 @@ double sim_update_soma(
 	// struct soma_processor *soma = n->soma_hw;
 
 	TRACE1("nid:%d updating, current_in:%lf\n", n->id, current_in);
-	n->neuron_status = n->soma_class->update_soma(current_in);
+	n->neuron_status = n->soma_model->update(current_in);
 
 	if (n->forced_spikes > 0){
 		n->neuron_status = FIRED;
@@ -1470,50 +1464,6 @@ double sim_update_soma(
 
 	// TODO: FIX the latency returns
 	return latency;
-}
-
-double sim_generate_noise(struct neuron *n)
-{
-	assert(n != NULL);
-	struct soma_processor *soma_hw = n->soma_hw;
-	int noise_val = 0;
-	int ret;
-
-	if (soma_hw->noise_type == NOISE_FILE_STREAM)
-	{
-		// With a noise stream, we have a file containing a series of
-		//  random values. This is useful if we want to exactly
-		//  replicate h/w without knowing how the stream is generated.
-		//  We can record the random sequence and replicate it here
-		char noise_str[MAX_NOISE_FILE_ENTRY];
-		// If we get to the end of the stream, by default reset it.
-		//  However, it is unlikely the stream will be correct at this
-		//  point
-		if (feof(soma_hw->noise_stream))
-		{
-			INFO("Warning: At the end of the noise stream. "
-			     "Random values are unlikely to be correct.\n");
-			fseek(soma_hw->noise_stream, 0, SEEK_SET);
-		}
-		(void)! fgets(noise_str, MAX_NOISE_FILE_ENTRY, soma_hw->noise_stream);
-		ret = sscanf(noise_str, "%d", &noise_val);
-		TRACE2("noise val:%d\n", noise_val);
-		if (ret < 1)
-		{
-			INFO("Error: invalid noise stream entry.\n");
-		}
-	}
-
-	// Get the number of noise bits required TODO: generalize
-	int sign_bit = noise_val & 0x100;
-	noise_val &= 0x7f; // TODO: hack, fixed for 8 bits
-	if (sign_bit)
-	{
-		// Sign extend
-		noise_val |= ~(0x7f);
-	}
-
-	return (double) noise_val;
 }
 
 double sim_update_soma_latency(
@@ -1547,92 +1497,6 @@ double sim_update_soma_latency(
 
 	return latency;
 }
-
-// double sim_update_soma_lif(
-// 	struct timestep *const ts, struct neuron *n, const double current_in)
-
-// {
-// 	struct soma_processor *soma = n->soma_hw;
-// 	double random_potential, latency = 0.0;
-
-// 	// Calculate the change in potential since the last update e.g.
-// 	//  integate inputs and apply any potential leak
-// 	TRACE1("Updating potential, before:%f\n", n->potential);
-
-// 	while (n->soma_last_updated <= ts->timestep)
-// 	{
-// 		n->potential *= n->leak_decay;
-// 		n->soma_last_updated++;
-// 	}
-
-// 	// Add randomized noise to potential if enabled
-// 	if ((soma->model == NEURON_STOCHASTIC_LIF) &&
-// 		(soma->noise_type == NOISE_FILE_STREAM))
-// 	{
-// 		random_potential = sim_generate_noise(n);
-// 		n->potential += random_potential;
-// 	}
-
-// 	// Add the synaptic / dendrite current to the potential
-// 	//printf("n->bias:%lf n->potential before:%lf current_in:%lf\n", n->bias, n->potential, current_in);
-// 	n->potential += current_in + n->bias;
-// 	n->charge = 0.0;
-// 	//printf("n->bias:%lf n->potential after:%lf\n", n->bias, n->potential);
-
-// 	TRACE1("Updating potential, after:%f\n", n->potential);
-
-// 	// Check against threshold potential (for spiking)
-// 	if (((n->bias != 0.0) && (n->potential > n->threshold)) ||
-// 		((n->bias == 0.0) && (n->potential >= n->threshold)))
-// 	{
-// 		if (n->group->reset_mode == NEURON_RESET_HARD)
-// 		{
-// 			n->potential = n->reset;
-// 		}
-// 		else if (n->group->reset_mode == NEURON_RESET_SOFT)
-// 		{
-// 			n->potential -= n->threshold;
-// 		}
-// 		n->fired = 1;
-// 		soma->neurons_fired++;
-// 		latency += soma->latency_spiking;
-// 		if (n->core->buffer_pos != BUFFER_AXON_OUT)
-// 		{
-// 			sim_neuron_send_spike_message(ts, n);
-// 		}
-// 	}
-
-// 	// Check against reverse threshold
-// 	if (n->potential < n->reverse_threshold)
-// 	{
-// 		if (n->group->reverse_reset_mode == NEURON_RESET_SOFT)
-// 		{
-// 			n->potential -= n->reverse_threshold;
-// 		}
-// 		else if (n->group->reverse_reset_mode == NEURON_RESET_HARD)
-// 		{
-// 			n->potential = n->reverse_reset;
-// 		}
-// 		else if (n->group->reverse_reset_mode == NEURON_RESET_SATURATE)
-// 		{
-// 			n->potential = n->reverse_threshold;
-// 		}
-// 	}
-
-// 	// Update soma, if there are any received spikes, there is a non-zero
-// 	//  bias or we force the neuron to update every time-step
-// 	if ((fabs(n->potential) > 0.0) || n->spike_count ||
-// 		(fabs(n->bias) > 0.0) || n->force_update)
-// 	{
-// 		// Neuron is turned on and potential write
-// 		latency += n->soma_hw->latency_update_neuron;
-// 		soma->neuron_updates++;
-// 	}
-
-// 	latency += n->soma_hw->latency_access_neuron;
-
-// 	return latency;
-// }
 
 // double sim_update_soma_truenorth(
 // 	struct timestep *const ts, struct neuron *n, const double current_in)
@@ -2173,6 +2037,7 @@ int sim_rate_input(const double firing_rate, double *current)
 	return input_fired;
 }
 
+/*
 PYBIND11_MODULE(sanafe, m)
 {
 	m.doc() = R"pbdoc(
@@ -2186,22 +2051,23 @@ PYBIND11_MODULE(sanafe, m)
 
 		   SANA_FE
 	)pbdoc";
-	py::class_<sana_fe>(m, "sana_fe")
-		.def(py::init())
+	pybind11::class_<sana_fe>(m, "sana_fe")
+		.def(pybind11::init())
 		.def("init", &sana_fe::init)
         .def("update_neuron", &sana_fe::update_neuron)
-        .def("run_timesteps", &sana_fe::run_timesteps, py::arg("timesteps")=1)
+        .def("run_timesteps", &sana_fe::run_timesteps, pybind11::arg("timesteps")=1)
 		.def("set_input", &sana_fe::set_input)
 		.def("open_perf_trace", &sana_fe::open_perf_trace)
 		.def("open_spike_trace", &sana_fe::open_spike_trace)
 		.def("open_potential_trace", &sana_fe::open_potential_trace)
 		.def("open_message_trace", &sana_fe::open_message_trace)
-		.def("set_gui_flag", &sana_fe::set_gui_flag, py::arg("flag")=true)
+		.def("set_gui_flag", &sana_fe::set_gui_flag, pybind11::arg("flag")=true)
 		.def("set_arch", &sana_fe::set_arch)
 		.def("set_net", &sana_fe::set_net)
 		.def("get_power", &sana_fe::get_power)
 		.def("get_status", &sana_fe::get_status)
 		.def("sim_summary", &sana_fe::sim_summary)
 		.def("run_summary", &sana_fe::run_summary)
-		.def("clean_up", &sana_fe::clean_up, py::arg("ret") = 0);
+		.def("clean_up", &sana_fe::clean_up, pybind11::arg("ret") = 0);
 }
+*/

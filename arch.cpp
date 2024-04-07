@@ -3,10 +3,14 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // arch.c
-#include <ctype.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <math.h>
+#include <cctype>
+#include <cstdlib>
+#include <cassert>
+#include <cmath>
+
+#include <list>
+#include <iostream>
+#include <sstream>
 
 #include "print.hpp"
 #include "arch.hpp"
@@ -61,12 +65,12 @@ void arch_free(struct architecture *const arch)
 	free(arch);
 }
 
-int arch_create_noc(struct architecture *const arch, struct attributes *attr,
+int arch_create_noc(struct architecture &arch, std::list<attribute> &attr,
 	const int attribute_count)
 {
 	int tile_id = 0;
 
-	if (arch->tile_count <= 0)
+	if (arch.tile_count <= 0)
 	{
 		// The NoC interconnect is built after tiles are all defined
 		//  This is because we link the tiles together in the NoC mesh
@@ -75,35 +79,33 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 	}
 
 	// Default values
-	arch->noc_width = 1;
-	arch->noc_height = 1;
-	arch->noc_buffer_size = 0;
+	arch.noc_width = 1;
+	arch.noc_height = 1;
+	arch.noc_buffer_size = 0;
 
-	for (int i = 0; i < attribute_count; i++)
+	for (auto a: attr)
 	{
-		struct attributes *a = &(attr[i]);
-
-		if (strncmp("width", a->key, MAX_FIELD_LEN) == 0)
+		std::istringstream ss(a.value_str);
+		if (a.key == "width")
 		{
-			sscanf(a->value_str, "%d", &arch->noc_width);
+			ss >> arch.noc_width;
 		}
-		else if (strncmp("height", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "height")
 		{
-			sscanf(a->value_str, "%d", &arch->noc_height);
+			ss >> arch.noc_height;
 		}
-		else if (strncmp("link_buffer_size", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "link_buffer_size")
 		{
-			sscanf(a->value_str, "%d", &arch->noc_buffer_size);
+			ss >> arch.noc_buffer_size;
 		}
 	}
-	assert((arch->noc_height * arch->noc_width) <= ARCH_MAX_TILES);
+	assert((arch.noc_height * arch.noc_width) <= ARCH_MAX_TILES);
 
-	for (int x = 0; x < arch->noc_width; x++)
+	for (int x = 0; x < arch.noc_width; x++)
 	{
-		for (int y = 0; y < arch->noc_height; y++)
+		for (int y = 0; y < arch.noc_height; y++)
 		{
-			struct tile *t = &(arch->tiles[tile_id]);
+			struct tile *t = &(arch.tiles[tile_id]);
 			int north_x, north_y, east_x, east_y, south_x, south_y;
 			int west_x, west_y, link_count;
 
@@ -124,26 +126,26 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 			TRACE1("tid:%d (x:%d,y:%d)\n", t->id, t->x, t->y);
 			if (north_y >= 0)
 			{
-				int lid = (north_y * arch->noc_width) + north_x;
-				t->links[link_count] = &(arch->tiles[lid]);
+				int lid = (north_y * arch.noc_width) + north_x;
+				t->links[link_count] = &(arch.tiles[lid]);
 				link_count++;
 			}
-			if (east_x < arch->noc_width)
+			if (east_x < arch.noc_width)
 			{
-				int lid = (east_y * arch->noc_width) + east_x;
-				t->links[link_count] = &(arch->tiles[lid]);
+				int lid = (east_y * arch.noc_width) + east_x;
+				t->links[link_count] = &(arch.tiles[lid]);
 				link_count++;
 			}
-			if (south_y < arch->noc_height)
+			if (south_y < arch.noc_height)
 			{
-				int lid = (south_y * arch->noc_width) + south_x;
-				t->links[link_count] = &(arch->tiles[lid]);
+				int lid = (south_y * arch.noc_width) + south_x;
+				t->links[link_count] = &(arch.tiles[lid]);
 				link_count++;
 			}
 			if (west_x >= 0)
 			{
-				int lid = (west_y * arch->noc_width) + west_x;
-				t->links[link_count] = &(arch->tiles[lid]);
+				int lid = (west_y * arch.noc_width) + west_x;
+				t->links[link_count] = &(arch.tiles[lid]);
 				link_count++;
 			}
 			assert(link_count >= 0);
@@ -156,14 +158,14 @@ int arch_create_noc(struct architecture *const arch, struct attributes *attr,
 		}
 	}
 
-	arch->is_init = 1;
-	TRACE1("NoC created, mesh, width:%d height:%d.\n", arch->noc_width,
-		arch->noc_height);
+	arch.is_init = 1;
+	TRACE1("NoC created, mesh, width:%d height:%d.\n", arch.noc_width,
+		arch.noc_height);
 	return 0;
 }
 
-int arch_create_tile(struct architecture *const arch, struct attributes *attr,
-	const int attribute_count)
+int arch_create_tile(
+	struct architecture *const arch, const std::list<attribute> &attr)
 {
 	struct tile *t;
 	int id;
@@ -203,57 +205,49 @@ int arch_create_tile(struct architecture *const arch, struct attributes *attr,
 	t->energy_south_hop = 0.0;
 	t->latency_south_hop = 0.0;
 
-	for (int i = 0; i < attribute_count; i++)
+	for (auto a: attr)
 	{
-		struct attributes *a = &(attr[i]);
-
-		if (strncmp("energy_east", a->key, MAX_FIELD_LEN) ==
-			0)
+		std::istringstream ss(a.value_str);
+		if (a.key == "energy_east")
 		{
-			sscanf(a->value_str, "%lf", &t->energy_east_hop);
+			ss >> t->energy_east_hop;
 		}
-		else if (strncmp("latency_east", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "latency_east")
 		{
-			sscanf(a->value_str, "%lf", &t->latency_east_hop);
+			ss >> t->latency_east_hop;
 		}
-		else if (strncmp("energy_west", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "energy_west")
 		{
-			sscanf(a->value_str, "%lf", &t->energy_east_hop);
+			ss >> t->energy_west_hop;
 		}
-		else if (strncmp("latency_west", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "latency_west")
 		{
-			sscanf(a->value_str, "%lf", &t->latency_west_hop);
+			ss >> t->latency_west_hop;
 		}
-		else if (strncmp("energy_north", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "energy_north")
 		{
-			sscanf(a->value_str, "%lf", &t->energy_north_hop);
+			ss >> t->energy_north_hop;
 		}
-		else if (strncmp("latency_north", a->key,
-				 MAX_FIELD_LEN) == 0)
+		else if (a.key == "latency_north")
 		{
-			sscanf(a->value_str, "%lf", &t->latency_north_hop);
+			ss >> t->latency_north_hop;
 		}
-		else if (strncmp("energy_south", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "energy_south")
 		{
-			sscanf(a->value_str, "%lf", &t->energy_south_hop);
+			ss >> t->energy_south_hop;
 		}
-		else if (strncmp("latency_south", a->key,
-				 MAX_FIELD_LEN) == 0)
+		else if (a.key == "latency_south")
 		{
-			sscanf(a->value_str, "%lf", &t->latency_south_hop);
+			ss >> t->latency_south_hop;
 		}
 	}
 
 	return t->id;
 }
 
-int arch_create_core(struct architecture *const arch, struct tile *const t,
-	struct attributes *attr, const int attribute_count)
+int arch_create_core(
+	struct architecture *const arch, struct tile *const t,
+	const std::list<attribute> &attr)
 {
 	struct core *c;
 	unsigned int core_id;
@@ -270,14 +264,11 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 
 	/*** Set attributes ***/
 	c->buffer_pos = BUFFER_SOMA;
-	for (int i = 0; i < attribute_count; i++)
+	for (auto a: attr)
 	{
-		struct attributes *a = &(attr[i]);
-
-		if (strncmp("buffer_before", a->key, MAX_FIELD_LEN) == 0)
+		if (a.key == "buffer_before")
 		{
-			if (strncmp("soma", a->value_str, MAX_FIELD_LEN) ==
-				0)
+			if (a.value_str == "soma")
 			{
 				c->buffer_pos = BUFFER_SOMA;
 			}
@@ -310,8 +301,9 @@ int arch_create_core(struct architecture *const arch, struct tile *const t,
 	return c->id;
 }
 
-void arch_create_axon_in(struct core *const c, const char *const name,
-	const struct attributes *const attr, const int attribute_count)
+void arch_create_axon_in(
+	struct core *const c, const char *const name,
+	const std::list<attribute> &attr)
 {
 	struct axon_input *in;
 
@@ -323,25 +315,20 @@ void arch_create_axon_in(struct core *const c, const char *const name,
 
 	in->energy_spike_message = 0.0;
 	in->latency_spike_message = 0.0;
-	for (int i = 0; i < attribute_count; i++)
+	for (auto curr: attr)
 	{
-		const struct attributes *const curr = &(attr[i]);
-
-		if (strncmp("name", curr->key, MAX_FIELD_LEN) == 0)
+		std::istringstream ss(curr.value_str);
+		if (curr.key == "name")
 		{
-			strncpy(in->name, curr->value_str, MAX_FIELD_LEN);
+			in->name = curr.value_str;
 		}
-		else if (strncmp("energy_message", curr->key, MAX_FIELD_LEN) ==
-			0)
+		else if (curr.key == "energy_message")
 		{
-			sscanf(curr->value_str, "%lf",
-				&in->energy_spike_message);
+			ss >> in->energy_spike_message;
 		}
-		else if (strncmp("latency_message", curr->key, MAX_FIELD_LEN) ==
-			0)
+		else if (curr.key == "latency_message")
 		{
-			sscanf(curr->value_str, "%lf",
-				&in->latency_spike_message);
+			ss >> in->latency_spike_message;
 		}
 	}
 
@@ -350,14 +337,14 @@ void arch_create_axon_in(struct core *const c, const char *const name,
 	return;
 }
 
-void arch_create_synapse(struct core *const c, const char *const name,
-	const struct attributes *const attr, const int attribute_count)
+void arch_create_synapse(struct core *const c, const std::string &name,
+	const std::list<attribute> &attr)
 {
 	struct synapse_processor *s;
 	int id = c->synapse_count;
 
 	s = &(c->synapse[id]);
-	strncpy(s->name, name, MAX_FIELD_LEN);
+	s->name = name;
 	s->energy = 0.0;
 	s->time = 0.0;
 
@@ -367,37 +354,32 @@ void arch_create_synapse(struct core *const c, const char *const name,
 	s->energy_spike_op = 0.0;
 	s->latency_spike_op = 0.0;
 	s->weight_bits = 8;
-	for (int i = 0; i < attribute_count; i++)
+	for (auto curr: attr)
 	{
-		const struct attributes *const curr = &(attr[i]);
-
-		if (strncmp("name", curr->key, MAX_FIELD_LEN) == 0)
+		std::istringstream ss(curr.value_str);
+		if (curr.key == "name")
 		{
-			strncpy(s->name, curr->value_str, MAX_FIELD_LEN);
+			s->name = curr.value_str;
 		}
-		else if (strncmp("model", curr->key, MAX_FIELD_LEN) == 0)
+		else if (curr.key == "model")
 		{
-			s->model = arch_parse_synapse_model(curr->value_str);
+			s->model = arch_parse_synapse_model(curr.value_str);
 		}
-		else if (strncmp("energy_memory", curr->key, MAX_FIELD_LEN) ==
-			0)
+		else if (curr.key == "energy_memory")
 		{
-			sscanf(curr->value_str, "%lf",
-				&s->energy_memory_access);
+			ss >> s->energy_memory_access;
 		}
-		else if (strncmp("latency_memory", curr->key, MAX_FIELD_LEN) ==
-			0)
+		else if (curr.key == "latency_memory")
 		{
-			sscanf(curr->value_str, "%lf", &s->latency_memory_access);
+			ss >> s->latency_memory_access;
 		}
-		else if (strncmp("energy_spike", curr->key, MAX_FIELD_LEN) == 0)
+		else if (curr.key == "energy_spike")
 		{
-			sscanf(curr->value_str, "%lf", &s->energy_spike_op);
+			ss >> s->energy_spike_op;
 		}
-		else if (strncmp("latency_spike", curr->key, MAX_FIELD_LEN) ==
-			0)
+		else if (curr.key == "latency_spike")
 		{
-			sscanf(curr->value_str, "%lf", &s->latency_spike_op);
+			ss >> s->latency_spike_op;
 		}
 	}
 	c->synapse_count++;
@@ -408,13 +390,13 @@ void arch_create_synapse(struct core *const c, const char *const name,
 }
 
 void arch_create_soma(struct core *const c, const char *const name,
-	struct attributes *attr, const int attribute_count)
+	std::list<attribute> &attr)
 {
 	struct soma_processor *s;
 	int id = c->soma_count;
 
 	s = &(c->soma[id]);
-	strncpy(s->name, name, MAX_FIELD_LEN);
+	s->name = name;
 	s->neuron_updates = 0;
 	s->neurons_fired = 0;
 	s->neuron_count = 0;
@@ -432,52 +414,46 @@ void arch_create_soma(struct core *const c, const char *const name,
 	s->leak_towards_zero = 1;
 	s->noise_type = NOISE_NONE;
 
-	for (int i = 0; i < attribute_count; i++)
+	for (auto a: attr)
 	{
-		struct attributes *a = &(attr[i]);
-
-		if (strncmp("model", a->key, MAX_FIELD_LEN) == 0)
+		std::istringstream ss(a.value_str);
+		if (a.key == "model")
 		{
-			s->model = arch_parse_neuron_model(a->value_str);
+			s->model = arch_parse_neuron_model(a.value_str);
 		}
-		else if (strncmp("energy_update_neuron", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "energy_update_neuron")
 		{
-			sscanf(a->value_str, "%lf",
-				&s->energy_update_neuron);
+			ss >> s->energy_update_neuron;
 		}
-		else if (strncmp("latency_update_neuron", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "latency_update_neuron")
 		{
-			sscanf(a->value_str, "%lf",
-				&s->latency_update_neuron);
+			ss >> s->latency_update_neuron;
 		}
-		else if (strncmp("energy_access_neuron", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "energy_access_neuron")
 		{
-			sscanf(a->value_str, "%lf",
-				&s->energy_access_neuron);
+			ss >> s->energy_access_neuron;
 		}
-		else if (strncmp("latency_access_neuron", a->key, MAX_FIELD_LEN) ==
-			0)
+		else if (a.key == "latency_access_neuron")
 		{
-			sscanf(a->value_str, "%lf",
-				&s->latency_access_neuron);
+			ss >> s->latency_access_neuron;
 		}
-		else if (strncmp("energy_spike_out", a->key, MAX_FIELD_LEN) ==0)
+		else if (a.key == "energy_spike_out")
 		{
-			sscanf(a->value_str, "%lf", &s->energy_spiking);
+			ss >> s->energy_spiking;
 		}
-		else if (strncmp("latency_spike_out", a->key, MAX_FIELD_LEN)==0)
+		else if (a.key == "latency_spike_out")
 		{
-			sscanf(a->value_str, "%lf", &s->latency_spiking);
+			ss >> s->latency_spiking;
 		}
-		else if (strncmp("noise", a->key, MAX_FIELD_LEN) == 0)
+		else if (a.key == "noise")
 		{
 			s->noise_type = NOISE_FILE_STREAM;
-			s->noise_stream = fopen(a->value_str, "r");
-			TRACE1("Opening noise str: %s\n", a->value_str);
+			s->noise_stream = fopen(a.value_str.c_str(), "r");
+			TRACE1("Opening noise str: %s\n", a.value_str.c_str());
 			if (s->noise_stream == NULL)
 			{
 				INFO("Error: Failed to open noise stream: %s.\n",
-					a->value_str);
+					a.value_str.c_str());
 				exit(1);
 			}
 		}
@@ -488,8 +464,8 @@ void arch_create_soma(struct core *const c, const char *const name,
 	return;
 }
 
-void arch_create_axon_out(struct core *const c, struct attributes *attr,
-	const int attribute_count)
+void arch_create_axon_out(
+	struct core *const c, const std::list<attribute> &attr)
 {
 	struct axon_output *out;
 
@@ -501,17 +477,16 @@ void arch_create_axon_out(struct core *const c, struct attributes *attr,
 	/*** Set attributes ***/
 	out->energy_access = 0.0;
 	out->latency_access = 0.0;
-	for (int i = 0; i < attribute_count; i++)
+	for (auto curr: attr)
 	{
-		struct attributes *curr = &(attr[i]);
-
-		if (strncmp("energy", curr->key, MAX_FIELD_LEN) == 0)
+		std::istringstream ss(curr.value_str);
+		if (curr.key == "energy")
 		{
-			sscanf(curr->value_str, "%lf", &out->energy_access);
+			ss >> out->energy_access;
 		}
-		else if (strncmp("latency", curr->key, MAX_FIELD_LEN) == 0)
+		else if (curr.key == "latency")
 		{
-			sscanf(curr->value_str, "%lf", &out->latency_access);
+			ss >> out->latency_access;
 		}
 	}
 
@@ -674,8 +649,7 @@ int arch_map_neuron(struct neuron *n, struct core *c)
 		for (soma_id = 0; soma_id < c->soma_count; soma_id++)
 		{
 			soma_hw = &(c->soma[soma_id]);
-			if (strncmp(n->soma_hw_name, soma_hw->name,
-				MAX_FIELD_LEN) == 0)
+			if (n->soma_hw_name == soma_hw->name)
 			{
 				break;
 			}
@@ -683,7 +657,8 @@ int arch_map_neuron(struct neuron *n, struct core *c)
 		if (soma_id >= c->soma_count)
 		{
 			INFO("Error: Could not map neuron nid:%d (hw:%s) "
-				"to any soma h/w.\n", n->id, n->soma_hw_name);
+				"to any soma h/w.\n", n->id,
+				n->soma_hw_name.c_str());
 			exit(1);
 		}
 	}
@@ -764,7 +739,7 @@ void arch_add_connection_to_map(
 	//  to that connection map. Otherwise, we need to use a new map.
 	const int map_count = post_core->axon_in.map_count;
 	struct synapse_processor *synapse_hw;
-	int synapse_id;
+	int synapse_id = -1;
 
 	assert(map_count > 0);
 	assert(map_count <= ARCH_MAX_CONNECTION_MAP);
@@ -796,8 +771,7 @@ void arch_add_connection_to_map(
 		synapse_id++)
 		{
 			synapse_hw = &(post_core->synapse[synapse_id]);
-			if (strncmp(con->synapse_hw_name, synapse_hw->name,
-				MAX_FIELD_LEN) == 0)
+			if (con->synapse_hw_name == synapse_hw->name)
 			{
 				break;
 			}
@@ -811,7 +785,8 @@ void arch_add_connection_to_map(
 	if (synapse_id >= post_core->synapse_count)
 	{
 		INFO("Error: Could not map connection to synapse h/w.\n");
-		INFO("Synapse_id %d and Synapse_count %d\n", synapse_id, post_core->synapse_count);
+		INFO("Synapse_id %d and Synapse_count %d\n",
+			synapse_id, post_core->synapse_count);
 		exit(1);
 	}
 	con->synapse_hw = synapse_hw;
@@ -819,42 +794,44 @@ void arch_add_connection_to_map(
 	return;
 }
 
-int arch_parse_neuron_model(const char *model_str)
+int arch_parse_neuron_model(const std::string &model_str)
 {
 	int model;
 
-	if (strcmp(model_str, "leaky_integrate_fire") == 0)
+	if (model_str == "leaky_integrate_fire")
 	{
 		model = NEURON_LIF;
 	}
-	else if (strcmp(model_str, "stochastic_leaky_integrate_fire") == 0)
+	else if (model_str == "stochastic_leaky_integrate_fire")
 	{
 		model = NEURON_STOCHASTIC_LIF;
 	}
-	else if (strcmp(model_str, "truenorth") == 0)
+	else if (model_str == "truenorth")
 	{
 		model = NEURON_TRUENORTH;
 	}
 	else
 	{
-		INFO("Error: No neuron model specified (%s)\n", model_str);
+		INFO("Error: No neuron model specified (%s)\n",
+			model_str.c_str());
 		exit(1);
 	}
 
 	return model;
 }
 
-int arch_parse_synapse_model(const char *model_str)
+int arch_parse_synapse_model(const std::string &model_str)
 {
 	int model;
 
-	if (strcmp(model_str, "current_based") == 0)
+	if (model_str == "current_based")
 	{
 		model = SYNAPSE_CUBA;
 	}
 	else
 	{
-		INFO("Error: No synapse model specified (%s)\n", model_str);
+		INFO("Error: No synapse model specified (%s)\n",
+			model_str.c_str());
 		exit(1);
 	}
 

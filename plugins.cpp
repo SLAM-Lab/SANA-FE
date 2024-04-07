@@ -3,67 +3,67 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 //  plugins.cpp
-#include <dlfcn.h>
-#include <string.h>
+#include <string>
 #include <iostream>
 #include <map>
+#include <dlfcn.h>
+
 #include "plugins.hpp"
 #include "print.hpp"
 
 std::map<std::string, _create_soma *> create_soma;
 std::map<std::string, _destroy_soma *> destroy_soma;
 
-void init_soma(char *name)
+void plugin_init_soma(const std::string &name)
 {
-	char lib_path[11 + MAX_SOMA_LEN] = "./plugins/";
-	strcat(lib_path, name);
-	strcat(lib_path, ".so");
-	char create[8 + MAX_SOMA_LEN] = "create_";
-	strcat(create, name);
-	char destroy[9 + MAX_SOMA_LEN] = "destroy_";
-	strcat(destroy, name);
+	const std::string lib_path = "./plugins/" + name + ".so";
+	const std::string create = "create_" + name;
+	const std::string destroy = "destroy_" + name;
 
-	// load the soma library
-	void *soma = dlopen(lib_path, RTLD_LAZY | RTLD_GLOBAL);
+	// Load the soma library
+	void *soma = dlopen(lib_path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
 	if (!soma)
 	{
-		INFO("Error: Couldn't load library %s\n", lib_path);
+		INFO("Error: Couldn't load library %s\n", lib_path.c_str());
 		exit(1);
 	}
 
-	// reset errors
+	// Reset DLL errors
 	dlerror();
 
 	// Function to create an instance of the Soma class
-	_create_soma *create_func = (_create_soma *) dlsym(soma, create);
-	create_soma[std::string(name)] = create_func;
+	_create_soma *create_func = (_create_soma *) dlsym(soma,create.c_str());
+	create_soma[name] = create_func;
 	const char *dlsym_error = dlerror();
 	if (dlsym_error)
 	{
-		INFO("Error: Couldn't load symbol %s: %s\n", create,
+		INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
 			dlsym_error);
 		exit(1);
 	}
 
 	// Function to destroy an instance of the Soma class
-	destroy_soma[std::string(name)] =
-		(_destroy_soma *) dlsym(soma, destroy);
+	destroy_soma[name] =
+		(_destroy_soma *) dlsym(soma, destroy.c_str());
+
 	dlsym_error = dlerror();
 	if (dlsym_error)
 	{
-		INFO("Error: Couldn't load symbol %s: %s\n", destroy,
+		INFO("Error: Couldn't load symbol %s: %s\n", destroy.c_str(),
 			dlsym_error);
 		exit(1);
 	}
-	INFO("Loaded plugin symbols for %s.\n", name);
+	INFO("Loaded plugin symbols for %s.\n", name.c_str());
 }
 
-Base_Soma *get_soma(char *name)
+Soma_Model *plugin_get_soma(const std::string &name)
 {
-	std::string name_s = std::string(name);
-	if (!create_soma.count(name_s))
+	INFO("Getting soma:%s\n", name.c_str());
+
+	if (!create_soma.count(name))
 	{
-		init_soma(name);
+		plugin_init_soma(name);
 	}
-	return create_soma[name_s]();
+
+	return create_soma[name]();
 }

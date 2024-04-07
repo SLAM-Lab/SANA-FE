@@ -65,7 +65,6 @@ class loihi_lif: public Base_Soma {
             current = 0.0;
             // charge = 0.0;
             bias = 0.0;
-            
             // dendritic_current_decay = 0.0;
             reset_mode = 0;
             reverse_reset_mode = 0;
@@ -139,8 +138,8 @@ class loihi_lif: public Base_Soma {
             }
         }
 
-        Neuron_Status update_soma(double input){
-
+        Neuron_Status update_soma(double input)
+        {
             Neuron_Status neuron_status = IDLE;
 
         	// Calculate the change in potential since the last update e.g.
