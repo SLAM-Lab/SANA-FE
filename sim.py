@@ -620,7 +620,7 @@ def create_noc(noc_dict):
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
-        run_dir=os.path.join(project_dir, "runs"), perf_trace=False,
+        run_dir=os.path.join(project_dir), perf_trace=False,
         spike_trace=False, potential_trace=False, message_trace=False,
         run_alive=False, gui=False):
     parsed_filename = os.path.join(run_dir,

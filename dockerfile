@@ -1,9 +1,22 @@
-FROM node:18-alpine
+FROM node:18-alpine AS make-sanafe
 
 RUN apk add bash gcc g++ musl-dev python3 py3-pip python3-dev
 RUN apk add make git
 
-RUN mkdir /home/tutorial
-RUN python3 -m venv /home/tutorial/venv && . /home/tutorial/venv/bin/activate && pip install --upgrade pip && pip install pyyaml numpy
-COPY dvs_challenge.npz /home/tutorial/dvs_challenge.npz
+RUN mkdir /home/build_tutorial
+RUN git clone https://github.com/SLAM-Lab/SANA-FE /home/build_tutorial/sana-fe
+RUN cd /home/build_tutorial/sana-fe && make
+
+FROM node:18-alpine AS sanafe
+RUN apk add bash python3 py3-pip
+RUN mkdir /tutorial
+RUN python3 -m venv /tutorial/venv && . /tutorial/venv/bin/activate && pip install --upgrade pip && pip install pyyaml numpy
+
+COPY dvs_challenge.npz /tutorial/dvs_challenge.npz
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim /tutorial/sim
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim.py /tutorial/sim.py
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/arch/ /tutorial/arch
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/snn/ /tutorial/snn
+RUN mkdir /tutorial/scripts
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/scripts/tutorial.py /tutorial/scripts/tutorial.py
 

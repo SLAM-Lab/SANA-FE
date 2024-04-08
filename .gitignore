@@ -5,8 +5,12 @@ etc/
 *.swp
 *.yaml
 *.png
-*.trace
+*.npz
+*.parsed
 perf.csv
+messages.csv
+potential.csv
+spikes.csv
 .vscode
 .codechecker
 gmon.out
