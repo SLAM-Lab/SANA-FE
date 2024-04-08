@@ -1163,7 +1163,6 @@ void sim_insert_priority_queue(MessageFifo **priority_queue,
 	MessageFifo &core_message_fifo)
 {
 	MessageFifo *next;
-	int list_depth = 0;
 
 	// TODO: implement heap-based priority queue rather than list-based.
 	//  Will achieve O(lg N) insertion time rather than O(N)
@@ -1199,7 +1198,6 @@ void sim_insert_priority_queue(MessageFifo **priority_queue,
 			}
 			curr = next;
 			next = curr->next;
-			list_depth++;
 		}
 		curr->next = &core_message_fifo;
 		core_message_fifo.next = next;
@@ -1215,8 +1213,6 @@ void sim_insert_priority_queue(MessageFifo **priority_queue,
 		assert((tmp->next_timing == NULL) ||
 			tmp->time <= tmp->next_timing->time);
 	}
-	// TRACE2
-	TRACE3("List depth = %d\n", list_depth+1);
 #endif
 
 	return;
@@ -1672,7 +1668,6 @@ void sim_trace_record_spikes(
 	const Simulation &sim, const Network &net)
 {
 	// A trace of all spikes that are generated
-	int spike_probe_count = 0;
 	assert(sim.spike_trace_fp != NULL);
 
 	for (auto &group: net.groups)
@@ -1684,7 +1679,6 @@ void sim_trace_record_spikes(
 				fprintf(sim.spike_trace_fp, "%d.%d,%ld\n",
 					n.parent_group_id, n.id,
 					sim.timesteps);
-				spike_probe_count++;
 			}
 		}
 	}
