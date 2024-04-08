@@ -40,7 +40,7 @@ def check_mapping(network):
 network = sim.Network()
 arch = sim.Architecture()
 
-snn = np.load(os.path.join(PROJECT_DIR, "..", "dvs_challenge.npz"))
+snn = np.load(os.path.join(PROJECT_DIR, "dvs_challenge.npz"))
 # TODO: save the updated model so we just have to load the model and the weights
 # Convert the DVS gesture categorization model to SANA-FE's format
 
