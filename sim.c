@@ -131,7 +131,7 @@ void sim_init_timestep(struct timestep *const ts)
 void sim_process_neurons(struct timestep *const ts, struct network *net,
 	struct architecture *arch)
 {
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -180,7 +180,7 @@ void sim_process_neurons(struct timestep *const ts, struct network *net,
 void sim_receive_messages(struct timestep *const ts,
 	struct architecture *arch)
 {
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -821,7 +821,6 @@ void sim_insert_priority_queue(struct message_fifo **priority_queue,
 	struct message_fifo *core_message_fifo)
 {
 	struct message_fifo *next;
-	int list_depth = 0;
 
 	// TODO: implement heap-based priority queue rather than list-based.
 	//  Will achieve O(lg N) insertion time rather than O(N)
@@ -854,7 +853,7 @@ void sim_insert_priority_queue(struct message_fifo **priority_queue,
 			}
 			curr = next;
 			next = curr->next;
-			list_depth++;
+			//list_depth++;
 		}
 		curr->next = core_message_fifo;
 		core_message_fifo->next = next;
@@ -1596,7 +1595,6 @@ void sim_trace_record_spikes(
 	const struct simulation *const sim, const struct network *net)
 {
 	// A trace of all spikes that are generated
-	int spike_probe_count = 0;
 	assert(sim->spike_trace_fp != NULL);
 
 	for (int i = 0; i < net->external_input_count; i++)
@@ -1620,7 +1618,6 @@ void sim_trace_record_spikes(
 			{
 				fprintf(sim->spike_trace_fp, "%d.%d,%ld\n",
 					n->group->id, n->id, sim->timesteps);
-				spike_probe_count++;
 			}
 		}
 	}

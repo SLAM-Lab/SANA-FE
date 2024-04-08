@@ -1,6 +1,7 @@
-#CC=clang-3.8
+#CC=clang
 CC=gcc
-CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -fopenmp
+CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g
+#CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -fopenmp
 #CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -pg -fopenmp
 #RELFLAGS=-Ofast
 RELFLATS=-O0
