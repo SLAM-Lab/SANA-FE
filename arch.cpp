@@ -9,6 +9,7 @@
 #include <cmath>
 
 #include <list>
+#include <set>
 #include <iostream>
 #include <sstream>
 
@@ -17,60 +18,59 @@
 #include "network.hpp"
 #include "description.hpp"
 
-struct architecture *arch_init(void)
+Architecture::Architecture()
 {
-	struct architecture *arch;
+	noc_buffer_size = 0;
+	noc_init = false;
 
-	arch = (struct architecture *) malloc(sizeof(struct architecture));
-	if (arch == NULL)
-	{
-		printf("%ld\n", sizeof(struct core));
-		printf("%ld\n", sizeof(struct tile));
-		INFO("Error: Couldn't allocate %ld bytes.\n",
-			sizeof(struct architecture));
-		INFO("Error: Architecture couldn't be created.\n");
-		exit(1);
-	}
-
-	arch->tile_count = 0;
-	arch->core_count = 0;
-	arch->noc_buffer_size = 0;
-	arch->is_init = 0;
-	arch->spike_vector_on = 0;
-
-	return arch;
+	// TODO: remove these
+	spike_vector_on = false;
+	return;
 }
 
-void arch_free(struct architecture *const arch)
+int Architecture::get_core_count()
 {
-	for (int i = 0; i < arch->tile_count; i++)
+	int core_count = 0;
+	for (auto &tile: tiles)
 	{
-		struct tile *t = &(arch->tiles[i]);
-
-		for (int j = 0; j < t->core_count; j++)
-		{
-			struct core *c = &(t->cores[j]);
-
-			free(c->neurons);
-			c->neurons = NULL;
-
-			for (int k = 0; k < c->axon_in.map_count; k++)
-			{
-				struct connection_map *a = &(c->axon_in.map[k]);
-				free(a->connections);
-				a->connections = NULL;
-			}
-		}
+		core_count += tile.cores.size();
 	}
-	free(arch);
+
+	return core_count;
 }
 
-int arch_create_noc(struct architecture &arch, std::list<attribute> &attr,
-	const int attribute_count)
+Message::Message()
 {
-	int tile_id = 0;
+	// Initialize message variables. Mark most fields as invalid either
+	//  using NaN or -Inf values where possible.
+	src_neuron = nullptr;
 
-	if (arch.tile_count <= 0)
+	dummy_message = false;
+	generation_delay = 0.0;
+	network_delay = NAN;
+	receive_delay = NAN;
+	blocked_latency = 0.0;
+	hops = -1;
+	spikes = -1;
+	sent_timestamp = -INFINITY;
+	received_timestamp = -INFINITY;
+	processed_timestamp = -INFINITY;
+	timestep = -1;
+	next = nullptr;
+
+	src_x = -1;
+	src_y = -1;
+	dest_x = -1;
+	dest_y = -1;
+	dest_core_id = -1;
+	dest_tile_id = -1;
+	dest_axon_id = -1;
+}
+
+int arch_create_noc(struct Architecture &arch, const std::list<Attribute> &attr)
+{
+	const int tile_count = arch.tiles.size();
+	if (tile_count <= 0)
 	{
 		// The NoC interconnect is built after tiles are all defined
 		//  This is because we link the tiles together in the NoC mesh
@@ -100,357 +100,250 @@ int arch_create_noc(struct architecture &arch, std::list<attribute> &attr,
 		}
 	}
 	assert((arch.noc_height * arch.noc_width) <= ARCH_MAX_TILES);
-
-	for (int x = 0; x < arch.noc_width; x++)
-	{
-		for (int y = 0; y < arch.noc_height; y++)
-		{
-			struct tile *t = &(arch.tiles[tile_id]);
-			int north_x, north_y, east_x, east_y, south_x, south_y;
-			int west_x, west_y, link_count;
-
-			tile_id++;
-			t->x = x;
-			t->y = y;
-
-			north_x = t->x;
-			north_y = t->y - 1;
-			east_x = t->x + 1;
-			east_y = t->y;
-			south_x = t->x;
-			south_y = t->y + 1;
-			west_x = t->x - 1;
-			west_y = t->y;
-
-			link_count = 0;
-			TRACE1("tid:%d (x:%d,y:%d)\n", t->id, t->x, t->y);
-			if (north_y >= 0)
-			{
-				int lid = (north_y * arch.noc_width) + north_x;
-				t->links[link_count] = &(arch.tiles[lid]);
-				link_count++;
-			}
-			if (east_x < arch.noc_width)
-			{
-				int lid = (east_y * arch.noc_width) + east_x;
-				t->links[link_count] = &(arch.tiles[lid]);
-				link_count++;
-			}
-			if (south_y < arch.noc_height)
-			{
-				int lid = (south_y * arch.noc_width) + south_x;
-				t->links[link_count] = &(arch.tiles[lid]);
-				link_count++;
-			}
-			if (west_x >= 0)
-			{
-				int lid = (west_y * arch.noc_width) + west_x;
-				t->links[link_count] = &(arch.tiles[lid]);
-				link_count++;
-			}
-			assert(link_count >= 0);
-			assert(link_count <= 4);
-			for (int i = 0; i < link_count; i++)
-			{
-				TRACE1("\tlink[%d]->%d\n", i,
-					(t->links[i])->id);
-			}
-		}
-	}
-
-	arch.is_init = 1;
+	arch.noc_init = 1;
 	TRACE1("NoC created, mesh, width:%d height:%d.\n", arch.noc_width,
 		arch.noc_height);
 	return 0;
 }
 
-int arch_create_tile(
-	struct architecture *const arch, const std::list<attribute> &attr)
+int arch_create_tile(Architecture &arch, const std::list<Attribute> &attr)
+
 {
-	struct tile *t;
-	int id;
+	Tile tile;
+	const int tile_count = arch.tiles.size();
 
-	if (arch->tile_count >= ARCH_MAX_TILES)
-	{
-		INFO("Error: Only %d tiles supported.\n", ARCH_MAX_TILES);
-		exit(1);
-	}
-
-	id = arch->tile_count;
-	arch->tile_count++;
-	assert(arch->tile_count <= ARCH_MAX_TILES);
-	t = &(arch->tiles[id]);
-
-	t->id = id;
-	t->energy = 0.0;
-
-	t->x = 0;
-	t->y = 0;
-	t->core_count = 0;
-	for (int i = 0; i < ARCH_MAX_CORES_PER_TILE; i++)
-	{
-		struct core *c = &(t->cores[i]);
-
-		c->id = i;
-		c->t = t;
-	}
+	tile.id = tile_count;
+	tile.energy = 0.0;
+	tile.x = 0;
+	tile.y = 0;
 
 	// Set attributes
-	t->energy_east_hop = 0.0;
-	t->latency_east_hop = 0.0;
-	t->energy_north_hop = 0.0;
-	t->latency_north_hop = 0.0;
-	t->energy_west_hop = 0.0;
-	t->latency_west_hop = 0.0;
-	t->energy_south_hop = 0.0;
-	t->latency_south_hop = 0.0;
+	tile.energy_east_hop = 0.0;
+	tile.latency_east_hop = 0.0;
+	tile.energy_north_hop = 0.0;
+	tile.latency_north_hop = 0.0;
+	tile.energy_west_hop = 0.0;
+	tile.latency_west_hop = 0.0;
+	tile.energy_south_hop = 0.0;
+	tile.latency_south_hop = 0.0;
 
 	for (auto a: attr)
 	{
 		std::istringstream ss(a.value_str);
 		if (a.key == "energy_east")
 		{
-			ss >> t->energy_east_hop;
+			ss >> tile.energy_east_hop;
 		}
 		else if (a.key == "latency_east")
 		{
-			ss >> t->latency_east_hop;
+			ss >> tile.latency_east_hop;
 		}
 		else if (a.key == "energy_west")
 		{
-			ss >> t->energy_west_hop;
+			ss >> tile.energy_west_hop;
 		}
 		else if (a.key == "latency_west")
 		{
-			ss >> t->latency_west_hop;
+			ss >> tile.latency_west_hop;
 		}
 		else if (a.key == "energy_north")
 		{
-			ss >> t->energy_north_hop;
+			ss >> tile.energy_north_hop;
 		}
 		else if (a.key == "latency_north")
 		{
-			ss >> t->latency_north_hop;
+			ss >> tile.latency_north_hop;
 		}
 		else if (a.key == "energy_south")
 		{
-			ss >> t->energy_south_hop;
+			ss >> tile.energy_south_hop;
 		}
 		else if (a.key == "latency_south")
 		{
-			ss >> t->latency_south_hop;
+			ss >> tile.latency_south_hop;
 		}
 	}
 
-	return t->id;
+	arch.tiles.push_back(tile);
+	return tile.id;
 }
 
 int arch_create_core(
-	struct architecture *const arch, struct tile *const t,
-	const std::list<attribute> &attr)
+	Architecture &arch, Tile &tile, const std::list<Attribute> &attr)
 {
-	struct core *c;
-	unsigned int core_id;
+	const int core_offset = tile.cores.size();
+	Core c;
+	c.offset = core_offset;
+	c.id = arch.get_core_count();
+	c.parent_tile_id = tile.id;
+	c.max_neurons = 1024;
 
-	assert(t != NULL);
-	core_id = t->core_count;
-	t->core_count++;
-	assert(t->core_count <= ARCH_MAX_CORES_PER_TILE);
-
-	c = &(t->cores[core_id]);
-	c->offset = core_id;
-	c->id = arch->core_count++;
-	c->t = t;
-
-	/*** Set attributes ***/
-	c->buffer_pos = BUFFER_SOMA;
+	// *** Set attributes ***
+	c.buffer_pos = BUFFER_SOMA;
 	for (auto a: attr)
 	{
 		if (a.key == "buffer_before")
 		{
 			if (a.value_str == "soma")
 			{
-				c->buffer_pos = BUFFER_SOMA;
+				c.buffer_pos = BUFFER_SOMA;
 			}
+		}
+		else if (a.key == "max_neurons")
+		{
+			std::istringstream ss(a.value_str);
+			ss >> c.max_neurons;
 		}
 	}
 
 	// Initialize core state
-	c->neuron_count = 0;
-	c->soma_count = 0;
-	c->synapse_count = 0;
-	c->neurons = (struct neuron **) malloc(
-		sizeof(struct neuron *) * ARCH_MAX_COMPARTMENTS);
-	if (c->neurons == NULL)
-	{
-		INFO("Error: Couldn't allocate neuron memory.\n");
-		exit(1);
-	}
-	for (int i = 0; i < ARCH_MAX_COMPARTMENTS; i++)
-	{
-		c->neurons[i] = NULL;
-	}
-	c->energy = 0.0;
+	c.soma_count = 0;
+	c.synapse_count = 0;
+	c.energy = 0.0;
 
-	// Update misc links between tiles and axon units
-	c->axon_in.t = t;
-	c->axon_out.t = t;
-	arch_init_message(&(c->next_message));
+	c.next_message = Message();
+	tile.cores.push_back(c);
 
-	TRACE1("Core created id:%d (tile:%d).\n", c->id, t->id);
-	return c->id;
+	TRACE1("Core created id:%d.%d (tile:%d).\n", c.parent_tile_id, .id);
+	return c.id;
 }
 
 void arch_create_axon_in(
-	struct core *const c, const char *const name,
-	const std::list<attribute> &attr)
+	Core &c, const std::string &name, const std::list<Attribute> &attr)
 {
-	struct axon_input *in;
+	struct AxonInUnit in;
+	in.energy = 0.0;
+	in.time = 0.0;
+	in.parent_tile_id = c.parent_tile_id;
 
-	in = &(c->axon_in);
-	in->energy = 0.0;
-	in->time = 0.0;
-	in->map_count = 0;
-	in->t = c->t;
-
-	in->energy_spike_message = 0.0;
-	in->latency_spike_message = 0.0;
+	in.energy_spike_message = 0.0;
+	in.latency_spike_message = 0.0;
 	for (auto curr: attr)
 	{
 		std::istringstream ss(curr.value_str);
 		if (curr.key == "name")
 		{
-			in->name = curr.value_str;
+			in.name = curr.value_str;
 		}
 		else if (curr.key == "energy_message")
 		{
-			ss >> in->energy_spike_message;
+			ss >> in.energy_spike_message;
 		}
 		else if (curr.key == "latency_message")
 		{
-			ss >> in->latency_spike_message;
+			ss >> in.latency_spike_message;
 		}
 	}
 
+	c.axon_in_hw.push_back(in);
 	TRACE2("Axon input created (c:%d.%d)\n", c->t->id, c->id);
 
 	return;
 }
 
-void arch_create_synapse(struct core *const c, const std::string &name,
-	const std::list<attribute> &attr)
+void arch_create_synapse(struct Core &c, const std::string &name,
+	const std::list<Attribute> &attr)
 {
-	struct synapse_processor *s;
-	int id = c->synapse_count;
-
-	s = &(c->synapse[id]);
-	s->name = name;
-	s->energy = 0.0;
-	s->time = 0.0;
+	SynapseUnit s;
+	s.name = name;
+	s.energy = 0.0;
+	s.time = 0.0;
 
 	/**** Set attributes ****/
-	s->energy_memory_access = 0.0;
-	s->latency_memory_access = 0.0;
-	s->energy_spike_op = 0.0;
-	s->latency_spike_op = 0.0;
-	s->weight_bits = 8;
+	s.energy_memory_access = 0.0;
+	s.latency_memory_access = 0.0;
+	s.energy_spike_op = 0.0;
+	s.latency_spike_op = 0.0;
+	s.weight_bits = 8;
 	for (auto curr: attr)
 	{
 		std::istringstream ss(curr.value_str);
 		if (curr.key == "name")
 		{
-			s->name = curr.value_str;
+			s.name = curr.value_str;
 		}
 		else if (curr.key == "model")
 		{
-			s->model = arch_parse_synapse_model(curr.value_str);
+			s.model = arch_parse_synapse_model(curr.value_str);
 		}
 		else if (curr.key == "energy_memory")
 		{
-			ss >> s->energy_memory_access;
+			ss >> s.energy_memory_access;
 		}
 		else if (curr.key == "latency_memory")
 		{
-			ss >> s->latency_memory_access;
+			ss >> s.latency_memory_access;
 		}
 		else if (curr.key == "energy_spike")
 		{
-			ss >> s->energy_spike_op;
+			ss >> s.energy_spike_op;
 		}
 		else if (curr.key == "latency_spike")
 		{
-			ss >> s->latency_spike_op;
+			ss >> s.latency_spike_op;
 		}
 	}
-	c->synapse_count++;
+	c.synapse.push_back(s);
 
-	TRACE1("Synapse processor created (c:%d.%d)\n", c->t->id, c->id);
+	TRACE1("Synapse processor created (c:%d.%d)\n", c.parent_tile_id, c.id);
 
 	return;
 }
 
-void arch_create_soma(struct core *const c, const char *const name,
-	std::list<attribute> &attr)
+void arch_create_soma(struct Core &c, const std::string &name,
+	const std::list<Attribute> &attr)
 {
-	struct soma_processor *s;
-	int id = c->soma_count;
-
-	s = &(c->soma[id]);
-	s->name = name;
-	s->neuron_updates = 0;
-	s->neurons_fired = 0;
-	s->neuron_count = 0;
-	s->energy = 0.0;
-	s->time = 0.0;
+	SomaUnit s;
+	s.name = name;
+	s.neuron_updates = 0;
+	s.neurons_fired = 0;
+	s.neuron_count = 0;
+	s.energy = 0.0;
+	s.time = 0.0;
 
 	/*** Set attributes ***/
-	s->model = NEURON_LIF;
-	s->energy_access_neuron = 0.0;
-	s->latency_access_neuron = 0.0;
-	s->energy_update_neuron = 0.0;
-	s->latency_update_neuron = 0.0;
-	s->energy_spiking = 0.0;
-	s->latency_spiking = 0.0;
-	s->leak_towards_zero = 1;
-	s->noise_type = NOISE_NONE;
+	s.energy_access_neuron = 0.0;
+	s.latency_access_neuron = 0.0;
+	s.energy_update_neuron = 0.0;
+	s.latency_update_neuron = 0.0;
+	s.energy_spiking = 0.0;
+	s.latency_spiking = 0.0;
+	s.leak_towards_zero = 1;
+	s.noise_type = NOISE_NONE;
 
 	for (auto a: attr)
 	{
 		std::istringstream ss(a.value_str);
-		if (a.key == "model")
+		if (a.key == "energy_update_neuron")
 		{
-			s->model = arch_parse_neuron_model(a.value_str);
-		}
-		else if (a.key == "energy_update_neuron")
-		{
-			ss >> s->energy_update_neuron;
+			ss >> s.energy_update_neuron;
 		}
 		else if (a.key == "latency_update_neuron")
 		{
-			ss >> s->latency_update_neuron;
+			ss >> s.latency_update_neuron;
 		}
 		else if (a.key == "energy_access_neuron")
 		{
-			ss >> s->energy_access_neuron;
+			ss >> s.energy_access_neuron;
 		}
 		else if (a.key == "latency_access_neuron")
 		{
-			ss >> s->latency_access_neuron;
+			ss >> s.latency_access_neuron;
 		}
 		else if (a.key == "energy_spike_out")
 		{
-			ss >> s->energy_spiking;
+			ss >> s.energy_spiking;
 		}
 		else if (a.key == "latency_spike_out")
 		{
-			ss >> s->latency_spiking;
+			ss >> s.latency_spiking;
 		}
 		else if (a.key == "noise")
 		{
-			s->noise_type = NOISE_FILE_STREAM;
-			s->noise_stream = fopen(a.value_str.c_str(), "r");
+			s.noise_type = NOISE_FILE_STREAM;
+			s.noise_stream = fopen(a.value_str.c_str(), "r");
 			TRACE1("Opening noise str: %s\n", a.value_str.c_str());
-			if (s->noise_stream == NULL)
+			if (s.noise_stream == NULL)
 			{
 				INFO("Error: Failed to open noise stream: %s.\n",
 					a.value_str.c_str());
@@ -458,87 +351,80 @@ void arch_create_soma(struct core *const c, const char *const name,
 			}
 		}
 	}
-	c->soma_count++;
+	c.soma.push_back(s);
 
-	TRACE1("Soma processor created (c:%d.%d)\n", c->t->id, c->id);
+	TRACE1("Soma processor created (c:%d.%d)\n", c.parent_tile_id,
+		c.offset);
 	return;
 }
 
-void arch_create_axon_out(
-	struct core *const c, const std::list<attribute> &attr)
+void arch_create_axon_out(struct Core &c, const std::list<Attribute> &attr)
 {
-	struct axon_output *out;
-
-	out = &(c->axon_out);
-	out->packets_out = 0;
-	out->energy = 0.0;
-	out->time = 0.0;
+	AxonOutUnit out;
+	out.packets_out = 0;
+	out.energy = 0.0;
+	out.time = 0.0;
 
 	/*** Set attributes ***/
-	out->energy_access = 0.0;
-	out->latency_access = 0.0;
+	out.energy_access = 0.0;
+	out.latency_access = 0.0;
 	for (auto curr: attr)
 	{
 		std::istringstream ss(curr.value_str);
 		if (curr.key == "energy")
 		{
-			ss >> out->energy_access;
+			ss >> out.energy_access;
 		}
 		else if (curr.key == "latency")
 		{
-			ss >> out->latency_access;
+			ss >> out.latency_access;
 		}
 	}
 
-	out->map_count = 0;
 	// Track the tile the axon interfaces with
-	out->t = c->t;
-	TRACE1("Axon output created (c:%d.%d)\n", c->t->id, c->id);
+	out.parent_tile_id = c.parent_tile_id;
+	c.axon_out_hw.push_back(out);
+	TRACE1("Axon output created (c:%d.%d)\n", c.parent_tile_id, c.offset);
 
 	return;
 }
 
-void arch_create_connection_maps(struct architecture *const arch)
+void arch_create_axons(struct Architecture &arch)
 {
 	TRACE1("Creating all connection maps.\n");
-	for (int i = 0; i < arch->tile_count; i++)
+	for (auto &tile: arch.tiles)
 	{
-		struct tile *t = &(arch->tiles[i]);
-		for (int j = 0; j < t->core_count; j++)
+		for (auto &c: tile.cores)
 		{
-			struct core *c = &(t->cores[j]);
-			for (int k = 0; k < c->neuron_count; k++)
+			for (auto n_ptr: c.neurons)
 			{
-				arch_map_neuron_connections(c->neurons[k]);
+				arch_map_neuron_connections(*n_ptr);
 			}
 		}
 	}
 
 	TRACE1("Finished creating connection maps.\n");
-	arch_print_connection_map_summary(arch);
+	arch_print_axon_summary(arch);
 }
 
-void arch_print_connection_map_summary(struct architecture *const arch)
+void arch_print_axon_summary(struct Architecture &arch)
 {
-	int in_count, out_count, core_count, core_used;
+	int in_count, out_count, core_used;
 	in_count = 0;
 	out_count = 0;
-	core_count = 0;
 
 	INFO("** Mapping summary **\n");
-	for (int i = 0; i < arch->tile_count; i++)
+	for (auto &tile: arch.tiles)
 	{
 		// For debug only, print the axon maps
-		struct tile *t = &(arch->tiles[i]);
-		for (int j = 0; j < t->core_count; j++)
+		for (auto &c: tile.cores)
 		{
-			struct core *c = &(t->cores[j]);
-
 			core_used = 0;
-			for (int k = 0; k < c->neuron_count; k++)
+			for (std::vector<Neuron *>::size_type k = 0;
+				k < c.neurons.size(); k++)
 			{
 #ifdef DEBUG
-				struct neuron *n = c->neurons[k];
+				Neuron *n = c->neurons[k];
 				TRACE2("\tnid:%d.%d ", n->group->id, n->id);
 				TRACE2("i:%d o:%d\n", n->maps_in_count,
 					n->maps_out_count);
@@ -548,12 +434,13 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 
 			if (core_used)
 			{
-				in_count += c->axon_in.map_count;
-				out_count += c->axon_out.map_count;
-				core_count++;
+				// TODO: update these counts of axons
+				//in_count += c.axon_in_hw.axons;
+				//out_count += c.axon_out.map_count;
 			}
 		}
 	}
+	const int core_count = arch.get_core_count();
 	INFO("Total cores: %d\n", core_count);
 	INFO("Average in map count: %lf\n", (double) in_count / core_count);
 	INFO("Average out map count: %lf\n", (double) out_count / core_count);
@@ -561,263 +448,173 @@ void arch_print_connection_map_summary(struct architecture *const arch)
 	return;
 }
 
-void arch_map_neuron_connections(struct neuron *const pre_neuron)
+void arch_map_neuron_connections(Neuron &pre_neuron)
 {
 	// Setup the connections between neurons and map them to hardware
-	int connection_count[ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE];
-	struct core *cores[ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE];
+	assert(pre_neuron.core != nullptr);
 
-	assert(pre_neuron->core != NULL);
-
-	// Zero initialize all counters and tracking
-	for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE; x++)
+	// Figure out the unique set of cores that this neuron broadcasts to
+	INFO("Counting connections for neuron nid:%d\n", pre_neuron.id);
+	std::set<Core *> cores_out;
+	for (Connection &curr_connection: pre_neuron.connections_out)
 	{
-		connection_count[x] = 0;
-		cores[x] = NULL;
+		INFO("Looking at connection id: %d\n", curr_connection.id);
+		Core *dest_core = curr_connection.post_neuron->core;
+		cores_out.insert(dest_core);
+		INFO("Connected to dest core: %d\n", dest_core->id);
 	}
 
-	// Count how many connections go out from this neuron to each core
-	TRACE2("Counting connections for neuron nid:%d\n", pre_neuron->id);
-	for (int conn = 0; conn < pre_neuron->connection_out_count; conn++)
+	INFO("Creating connections for neuron nid:%d to %lu core(s)\n",
+		pre_neuron.id, cores_out.size());
+	for (Core *dest_core: cores_out)
 	{
-		TRACE2("Looking at connection id: %d\n", conn);
-		struct connection *curr = &(pre_neuron->connections_out[conn]);
-		struct core *dest_core = curr->post_neuron->core;
-		int core_id = dest_core->id;
-
-		connection_count[core_id]++;
-		cores[core_id] = dest_core;
-		TRACE2("Connected to dest core: %d\n", core_id);
+		// Create the axon, and add it to both the destination and
+		//  source cores
+		arch_allocate_axon(pre_neuron, *dest_core);
 	}
+	TRACE3("Counted all maps for nid:%d count: %d\n",
+		pre_neuron.id);
 
-	TRACE2("Creating connections for neuron nid:%d\n", pre_neuron->id);
-	int total_map_count = 0;
-	for (int x = 0; x < ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE; x++)
+	for (Connection &curr_connection: pre_neuron.connections_out)
 	{
-		if (connection_count[x] > 0)
-		{
-			// Create the connection map, and add it to both the
-			//  destination and source cores
-			arch_allocate_connection_map(
-				pre_neuron, cores[x], connection_count[x]);
-			total_map_count++;
-		}
-	}
-	TRACE3("Counted all maps for nid:%d connection map count: %d\n",
-		pre_neuron->id, total_map_count);
-	assert(total_map_count < ARCH_MAX_CONNECTION_MAP);
-
-	for (int conn = 0; conn < pre_neuron->connection_out_count; conn++)
-	{
-		// Add every connection to the map. Also link to the map in the
+		// Add every connection to the axon. Also link to the map in the
 		//  post synaptic core / neuron
-		struct connection *curr_connection =
-			&(pre_neuron->connections_out[conn]);
-		struct core *post_core = curr_connection->post_neuron->core;
-
-		TRACE3("Adding connection:%d\n", conn);
-		arch_add_connection_to_map(curr_connection, post_core);
+		Core &post_core = *(curr_connection.post_neuron->core);
+		INFO("Adding connection:%d\n", curr_connection.id);
+		arch_add_connection_to_axon(curr_connection, post_core);
 	}
-	TRACE2("Finished mapping connection to hardware for nid:%d.\n",
-		pre_neuron->id);
+	INFO("Finished mapping connections to hardware for nid:%d.%d.\n",
+		pre_neuron.parent_group_id, pre_neuron.id);
 
 	return;
 }
 
-int arch_map_neuron(struct neuron *n, struct core *c)
+int arch_map_neuron(Neuron &n, Core &c)
 {
-	int soma_id;
-
 	// Map the neuron to hardware units
-	assert(n != NULL);
-	assert(c != NULL);
-	assert(c->neurons != NULL);
-	assert(n->core == NULL);
+	assert(n.core == NULL);
 
-	n->core = c;
-	TRACE1("Mapping neuron %d to core %d\n", n->id, c->id);
-	c->neurons[c->neuron_count] = n;
-	c->neuron_count++;
+	n.core = &c;
+	TRACE1("Mapping neuron %d to core %d\n", n.id, c->id);
+	c.neurons.push_back(&n);
+
+	if (c.neurons.size() > c.max_neurons)
+	{
+		INFO("Error: Exceeded maximum neurons per core (%lu)",
+			c.max_neurons);
+		exit(1);
+	}
 
 	// Map neuron model to soma hardware unit in this core. Search through
 	//  all neuron models implemented by this core and return the one that
 	//  matches. If no soma hardware is specified, default to the first
 	//  one defined
-	struct soma_processor *soma_hw = &(c->soma[0]);
-	if (n->soma_hw_name[0])
+	n.soma_hw = &(c.soma[0]);
+	if (n.soma_hw_name.length() > 0)
 	{
-		for (soma_id = 0; soma_id < c->soma_count; soma_id++)
+		bool soma_found = false;
+		for (auto &soma_hw: c.soma)
 		{
-			soma_hw = &(c->soma[soma_id]);
-			if (n->soma_hw_name == soma_hw->name)
+			if (n.soma_hw_name == soma_hw.name)
 			{
-				break;
+				n.soma_hw = &soma_hw;
+				soma_found = true;
 			}
 		}
-		if (soma_id >= c->soma_count)
+		if (!soma_found)
 		{
 			INFO("Error: Could not map neuron nid:%d (hw:%s) "
-				"to any soma h/w.\n", n->id,
-				n->soma_hw_name.c_str());
+				"to any soma h/w.\n", n.id,
+				n.soma_hw_name.c_str());
 			exit(1);
 		}
 	}
-	n->soma_hw = soma_hw;
-	n->soma_hw->neuron_count++;
+	n.soma_hw->neuron_count++;
+
+	// TODO: support multiple axon outputs
+	n.axon_out_hw = &(c.axon_out_hw[0]);
 
 	return RET_OK;
 }
 
-void arch_allocate_connection_map(struct neuron *const pre_neuron,
-	struct core *const post_core, const int connection_count)
+void arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 {
-	// For each connected core, create a new axon map at the destination
-	//  core. Then link this axon to output of the source core. Finally
+	// Create a new input axon at a receiving (destination) core
+	//  Then create the output axon at the sending core. Finally
 	//  update the presynaptic neuron and postsynaptic neuron
-	assert(pre_neuron != NULL);
-	assert(post_core != NULL);
-	assert(connection_count >= 0);
 
-	struct core *pre_core = pre_neuron->core;
-	struct axon_input *axon_in = &(post_core->axon_in);
-	int map_count = axon_in->map_count++;
-	assert(axon_in->map_count >= 0);
-	assert(axon_in->map_count < ARCH_MAX_CONNECTION_MAP);
-	int map_size;
-
-	TRACE2("axon in map count:%d for core:%d.%d, adding %d connections\n",
-		map_count, post_core->id, post_core->t->id,
-		connection_count);
-	struct connection_map *map = &(axon_in->map[map_count]);
+	Core &pre_core = *(pre_neuron.core);
 
 	TRACE3("Adding connection to core.\n");
-	// Allocate the map and its connections at the post-synaptic (dest)
-	//  core
-	map->connection_count = 0;
-	map->active_synapses = 0;
-	map->last_updated = -1;
+	// Allocate the axon and its connections at the post-synaptic core
+	AxonInModel in;
+	in.active_synapses = 0;
+	in.last_updated = -1;
+	post_core.axons_in.push_back(in);
+	const int new_axon_in_address = post_core.axons_in.size() - 1;
 
-	map_size = connection_count * sizeof(struct connection);
-	TRACE3("Axon has %d connections, allocate %d bytes\n",
-		connection_count, map_size);
-	map->connections = (connection**) malloc(connection_count * map_size);
-	if (map->connections == NULL)
-	{
-		INFO("Error: Couldn't allocate map memory.\n");
-		exit(1);
-	}
+	// Add the axon at the sending, pre-synaptic core
+	INFO("axon in address:%d for core:%d.%d\n",
+		new_axon_in_address, post_core.parent_tile_id, post_core.id);
+	AxonOutModel out;
+	out.dest_axon_id = new_axon_in_address;
+	out.dest_core_offset = post_core.offset;
+	out.dest_tile_id = post_core.parent_tile_id;
+	out.src_neuron_id = pre_neuron.id;
+	pre_core.axons_out.push_back(out);
+	const int new_axon_out_address = pre_core.axons_out.size() - 1;
 
-	// Link to this map in the pre-synaptic (src) core
-	map_count = pre_core->axon_out.map_count++;
-	assert(pre_core->axon_out.map_count >= 0);
-	assert(pre_core->axon_out.map_count < ARCH_MAX_CONNECTION_MAP);
-	pre_core->axon_out.map_ptr[map_count] = map;
-	if (pre_neuron->maps_out == NULL)
-	{
-		TRACE2("Setting neuron nid:%d axon out.\n", pre_neuron->id);
-		pre_neuron->maps_out = &(pre_core->axon_out.map_ptr[map_count]);
-		assert(pre_neuron->maps_out != NULL);
-		assert(pre_neuron->maps_out[0] != NULL);
-	}
-	pre_neuron->maps_out_count++;
-	assert(pre_neuron->maps_out_count >= 0);
-	TRACE2("nid:%d.%d cid:%d.%d added one output axon, "
-	       "axon out map_count:%d, neuron out map count:%d.\n",
-		pre_neuron->group->id, pre_neuron->id, pre_core->t->id,
-		pre_core->id, pre_core->axon_out.map_count,
-		pre_neuron->maps_out_count);
+	// Then add the output axon to the sending pre-synaptic neuron
+	pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
+	INFO("nid:%d.%d cid:%d.%d added one output axon address %d.\n",
+		pre_neuron.parent_group_id, pre_neuron.id,
+		pre_core.parent_tile_id, pre_core.offset,
+		new_axon_out_address);
 
 	return;
 }
 
-void arch_add_connection_to_map(
-	struct connection *const con, struct core *const post_core)
+void arch_add_connection_to_axon(Connection &con, Core &post_core)
 {
-	// Add a given connection to the connection map in the post-synaptic
-	//  (destination) core. Check to see if we already have a map for this
-	//  source / destination core combination - if so we can reuse and add
-	//  to that connection map. Otherwise, we need to use a new map.
-	const int map_count = post_core->axon_in.map_count;
-	struct synapse_processor *synapse_hw;
-	int synapse_id = -1;
+	// Add a given connection to the axon in the post-synaptic
+	//  (destination) core
+	TRACE3("Adding to connection to axon:%lu\n",
+		post_core.axons_out.size()-1);
 
-	assert(map_count > 0);
-	assert(map_count <= ARCH_MAX_CONNECTION_MAP);
-	TRACE3("Adding to connection to map:%d\n", map_count - 1);
+	post_core.synapses.push_back(&con);
+	const std::vector<Connection *>::size_type synapse_address =
+		post_core.synapses.size() - 1;
 
-	// Access the most recently created axon for the core
-	struct connection_map *axon = &(post_core->axon_in.map[map_count - 1]);
-	axon->connections[axon->connection_count++] = con;
-	axon->pre_neuron = con->pre_neuron;
+	// Access the most recently created axon in for the post-synaptic core
+	AxonInModel &last_added_target_axon = post_core.axons_in.back();
+	last_added_target_axon.synapse_addresses.push_back(synapse_address);
 
-	// Update the post synaptic neuron to track
-	if (con->post_neuron->maps_in == NULL)
+	// Map the connection to the synapse hardware
+	const std::vector<SynapseUnit>::size_type default_hw_id = 0;
+	// Default to the first defined hardware unit (there must be at least
+	// one hardware unit defined)
+	SynapseUnit &synapse_hw = post_core.synapse[default_hw_id];
+	if (con.synapse_hw_name.length() > 0)
 	{
-		// Point to the first mapping
-		con->post_neuron->maps_in = axon;
-	}
-
-	// We might add a bunch of connections from another core coming into
-	//  this one, then we need to update and track
-	con->post_neuron->maps_in_count++;
-
-	// Map the connections to the synapse hardware. Default to the first
-	//  defined unit.
-	synapse_hw = &(post_core->synapse[0]);
-	if (con->synapse_hw_name[0])
-	{
+		bool mapped = false;
 		// Search for the specified synapse hardware
-		for (synapse_id = 0; synapse_id < post_core->synapse_count;
-		synapse_id++)
+		for (auto &synapse_hw: post_core.synapse)
 		{
-			synapse_hw = &(post_core->synapse[synapse_id]);
-			if (con->synapse_hw_name == synapse_hw->name)
+			if (con.synapse_hw_name == synapse_hw.name)
 			{
+				mapped = true;
 				break;
 			}
 		}
-		if (synapse_id >= post_core->synapse_count)
+		if (!mapped)
 		{
 			INFO("Error: Could not map connection to synapse h/w.\n");
 			exit(1);
 		}
 	}
-	if (synapse_id >= post_core->synapse_count)
-	{
-		INFO("Error: Could not map connection to synapse h/w.\n");
-		INFO("Synapse_id %d and Synapse_count %d\n",
-			synapse_id, post_core->synapse_count);
-		exit(1);
-	}
-	con->synapse_hw = synapse_hw;
+	con.synapse_hw = &synapse_hw;
 
 	return;
-}
-
-int arch_parse_neuron_model(const std::string &model_str)
-{
-	int model;
-
-	if (model_str == "leaky_integrate_fire")
-	{
-		model = NEURON_LIF;
-	}
-	else if (model_str == "stochastic_leaky_integrate_fire")
-	{
-		model = NEURON_STOCHASTIC_LIF;
-	}
-	else if (model_str == "truenorth")
-	{
-		model = NEURON_TRUENORTH;
-	}
-	else
-	{
-		INFO("Error: No neuron model specified (%s)\n",
-			model_str.c_str());
-		exit(1);
-	}
-
-	return model;
 }
 
 int arch_parse_synapse_model(const std::string &model_str)
@@ -836,25 +633,4 @@ int arch_parse_synapse_model(const std::string &model_str)
 	}
 
 	return model;
-}
-
-void arch_init_message(struct message *m)
-{
-	// Initialize message variables. Mark most fields as invalid either
-	//  using NaN or -Inf values where possible.
-	m->src_neuron = NULL;
-	m->dest_neuron = NULL;
-	m->generation_delay = 0.0;
-	m->network_delay = NAN;
-	m->receive_delay = NAN;
-	m->blocked_latency = 0.0;
-	m->hops = -1;
-	m->spikes = -1;
-	m->sent_timestamp = -INFINITY;
-	m->received_timestamp = -INFINITY;
-	m->processed_timestamp = -INFINITY;
-	m->timestep = -1;
-	m->next = NULL;
-
-	return;
 }

@@ -14,10 +14,9 @@
 #include "description.hpp"
 #include "arch.hpp"
 #include "print.hpp"
-#include "command.hpp"
 
-int description_parse_file(
-	std::fstream &fp, struct architecture &arch)
+int description_parse_arch_file(
+	std::fstream &fp, Architecture &arch)
 {
 	std::string line;
 	int ret = RET_OK;
@@ -34,12 +33,12 @@ int description_parse_file(
 
 		description_read_arch_entry(fields, arch);
 	}
-
+	INFO("File parsed.\n");
 	return ret;
 }
 
-int description_parse_file(
-	std::fstream &fp, struct network &net, struct architecture &arch)
+int description_parse_net_file(
+	std::fstream &fp, struct Network &net, Architecture &arch)
 {
 	std::string line;
 	int ret = RET_OK;
@@ -63,7 +62,7 @@ int description_parse_file(
 std::vector<std::string> description_get_fields(const std::string &line)
 {
 	// Get all the fields from a line of text. Every field is separated by
-	//  whitespace and has the format <attribute>=<value>
+	//  whitespace and has the format <Attribute>=<value>
 	// Returns a vector of field strings
 	const auto field_delimiters = R"( |\t|\n)";
 	const std::regex re(field_delimiters);
@@ -80,19 +79,17 @@ std::vector<std::string> description_get_fields(const std::string &line)
 }
 
 int description_read_arch_entry(
-	const std::vector<std::string> &fields, struct architecture &arch)
+	const std::vector<std::string> &fields, Architecture &arch)
 {
-	int ret= RET_OK;
-	/*
-	std::vector<attributes> attributes;
-	std::string name;
-	struct tile *t;
-	struct core *c;
-	int ret, tile_id, core_offset, first_field;
-	char entry_type;
+	int ret = RET_OK;
 
-	auto it = fields.front();
-	entry_type = it[0];
+	std::list<Attribute> attributes;
+	std::string name;
+	Tile *t;
+	Core *c;
+	int tile_id, core_offset, first_field;
+
+	const char entry_type = fields[0][0];
 	// Sanity check input
 	if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#'))
 	{
@@ -105,72 +102,82 @@ int description_read_arch_entry(
 	first_field = 1;
 	if (entry_type != '@')
 	{
-		name = (*it);
-		it = it.next();
+		name = fields[1];
+		first_field++;
 	}
 	if (entry_type != '@' && entry_type != 't')
 	{
-		ret = sscanf(fields[2], "%d", &tile_id);
+		ret = sscanf(fields[2].c_str(), "%d", &tile_id);
 		if (ret < 1)
 		{
-			INFO("Error: Couldn't parse tile ID (%s)\n", fields[2]);
+			INFO("Error: Couldn't parse tile ID (%s)\n",
+				fields[2].c_str());
 			exit(1);
 		}
-		t = &(arch->tiles[tile_id]);
-		it = it.next();
+		t = &(arch.tiles[tile_id]);
+		first_field++;
 	}
 	if ((entry_type != '@') && (entry_type != 't') && (entry_type != 'c'))
 	{
-		ret = sscanf(fields[3], "%d", &core_offset);
+		ret = sscanf(fields[3].c_str(), "%d", &core_offset);
 		if (ret < 1)
 		{
-			INFO("Error: Couldn't parse core ID (%s)\n", fields[3]);
+			INFO("Error: Couldn't parse core ID (%s)\n",
+				fields[3].c_str());
 			exit(1);
 		}
 
 		assert(t != NULL);
 		c = &(t->cores[core_offset]);
-		it = it.next();
+		first_field++;
 	}
 
-	while (it != fields.end())
+	// Parse attributes from fields
+	for (std::vector<std::string>::size_type i = first_field;
+		i < fields.size(); i++)
 	{
-		char *key, *value_str;
-		std::string key, value_str;
+		INFO("Parsing field:%s\n", fields[i].c_str());
 
-		TRACE2("Parsing field:%s\n", fields[i]);
-		key = strtok(*it, "=");
-		value_str = strtok(NULL, "=");
-		if ((key == NULL) || (value_str == NULL))
+		if ((fields[i].length() < 3))
 		{
-			INFO("Invalid attribute: %s\n", fields[i]);
-			exit(1);
+			INFO("Error: Invalid field: %s\n", fields[i].c_str());
+			continue;
 		}
-		strncpy(attr->key, key, MAX_FIELD_LEN);
-		strncpy(attr->value_str, value_str, MAX_FIELD_LEN);
-		TRACE2("Parsed attribute: %s:%s\n", attr->key, attr->value_str);
-		attributes.push_back(attribute);
-		it = it.next();
+
+		int pos = fields[i].find_first_of('=');
+		std::string key = fields[i].substr(0, pos);
+		std::string value_str = fields[i].substr(pos+1);
+
+		if ((key.length() == 0) || (value_str.length() == 0))
+		{
+			INFO("Invalid attribute: %s\n", fields[i].c_str());
+			continue;
+		}
+
+		Attribute attr = { key, value_str };
+		INFO("Parsed attribute: %s:%s\n", attr.key.c_str(),
+			attr.value_str.c_str());
+		attributes.push_back(attr);
 	}
 
 	// Process the command and create the unit
 	switch (entry_type)
 	{
 	case '@':
-		ret = arch_create_noc(arch, attributes, attribute_count);
+		ret = arch_create_noc(arch, attributes);
 		break;
 	case 't':
-		ret = arch_create_tile(arch, attributes, attribute_count);
+		ret = arch_create_tile(arch, attributes);
 		break;
 	case 'c':
-		ret = arch_create_core(arch, t, attributes, attribute_count);
+		ret = arch_create_core(arch, *t, attributes);
 		break;
 	case 'i':
-		arch_create_axon_in(c, name, attributes, attribute_count);
+		arch_create_axon_in(*c, name.c_str(), attributes);
 		ret = RET_OK;
 		break;
 	case 's':
-		arch_create_synapse(c, name, attributes, attribute_count);
+		arch_create_synapse(*c, name.c_str(), attributes);
 		ret = RET_OK;
 		break;
 	case 'd':
@@ -178,11 +185,11 @@ int description_read_arch_entry(
 		ret = RET_OK;
 		break;
 	case '+':
-		arch_create_soma(c, name, attributes, attribute_count);
+		arch_create_soma(*c, name.c_str(), attributes);
 		ret = RET_OK;
 		break;
 	case 'o':
-		arch_create_axon_out(c, attributes, attribute_count);
+		arch_create_axon_out(*c, attributes);
 		ret = RET_OK;
 		break;
 	default:
@@ -191,21 +198,25 @@ int description_read_arch_entry(
 		ret = RET_OK;
 		break;
 	}
-	*/
+
 	return ret;
 }
 
 int description_read_network_entry(
-	const std::vector<std::string> &fields, struct architecture &arch,
-	struct network &net)
+	const std::vector<std::string> &fields, Architecture &arch,
+	Network &net)
 {
-	std::list<attribute> attributes;
-	struct neuron_group *group, *dest_group;
-	struct neuron *n, *dest;
-	struct tile *t;
-	struct core *c;
-	int ret, neuron_group_id, neuron_id, neuron_count;
-	int dest_group_id, dest_neuron_id, tile_id, core_offset;
+	std::list<Attribute> attributes;
+	NeuronGroup *group, *dest_group;
+	Neuron *n, *dest;
+	Tile *t;
+	Core *c;
+	int ret, neuron_count;
+	std::vector<Tile>::size_type tile_id;
+	std::vector<Core>::size_type core_offset;
+	std::vector<NeuronGroup>::size_type neuron_group_id, dest_group_id;
+	std::vector<Neuron>::size_type neuron_id, dest_neuron_id;
+	bool group_set, neuron_set;
 
 	const char entry_type = fields[0][0];
 	// Sanity check input
@@ -221,17 +232,15 @@ int description_read_network_entry(
 	}
 
 	neuron_count = 0;
-	neuron_group_id = -1;
-	neuron_id = -1;
-	tile_id = -1;
-	core_offset = -1;
-	dest_group_id = -1;
-	dest_neuron_id = -1;
-	group = NULL;
-	n = NULL;
-	c = NULL;
-	dest_group = NULL;
-	dest = NULL;
+	group = nullptr;
+	n = nullptr;
+	c = nullptr;
+	dest_group = nullptr;
+	dest = nullptr;
+
+	group_set = false;
+	neuron_set = false;
+
 	if (entry_type == 'g')
 	{
 		std::istringstream ss(fields[1]);
@@ -245,33 +254,35 @@ int description_read_network_entry(
 	}
 	else if (entry_type == '&')
 	{
-		ret = sscanf(fields[1].c_str(), "%d.%d@%d.%d", &neuron_group_id,
-			&neuron_id, &tile_id, &core_offset);
+		ret = sscanf(fields[1].c_str(), "%lu.%lu@%lu.%lu",
+			&neuron_group_id, &neuron_id, &tile_id, &core_offset);
 		if (ret < 4)
 		{
 			INFO("Error couldn't parse mapping.\n");
 			exit(1);
 		}
-		if (tile_id >= arch.tile_count)
+		if (tile_id >= arch.tiles.size())
 		{
-			INFO("Error: Tile (%d) >= tile count (%d)\n", tile_id,
-				arch.tile_count);
+			INFO("Error: Tile (%lu) >= tile count (%lu)\n", tile_id,
+				arch.tiles.size());
 			exit(1);
 		}
 		t = &(arch.tiles[tile_id]);
 
-		if (core_offset >= t->core_count)
+		if (core_offset >= t->cores.size())
 		{
-			INFO("Error: Core (%d) >= core count (%d)\n",
-				core_offset, t->core_count);
+			INFO("Error: Core (%lu) >= core count (%lu)\n",
+				core_offset, t->cores.size());
 			exit(1);
 		}
 		c = &(t->cores[core_offset]);
+		group_set = true;
+		neuron_set = true;
 	}
 	else if (entry_type == 'e')
 	{
 		// Edge on SNN graph (e.g., connection between neurons)
-		ret = sscanf(fields[1].c_str(), "%d.%d->%d.%d",
+		ret = sscanf(fields[1].c_str(), "%lu.%lu->%lu.%lu",
 			&neuron_group_id, &neuron_id, &dest_group_id,
 			&dest_neuron_id);
 		if (ret < 4)
@@ -279,35 +290,31 @@ int description_read_network_entry(
 			INFO("Error couldn't parse connection / edge.\n");
 			exit(1);
 		}
-		if (dest_group_id > -1)
+		if (dest_group_id >= net.groups.size())
 		{
-			if (dest_group_id >= net.neuron_group_count)
-			{
-				INFO("Error: Group (%d) >= group count (%d).\n",
-					dest_group_id, net.neuron_group_count);
-				return RET_FAIL;
-			}
-			dest_group = &(net.groups[dest_group_id]);
-
-			TRACE3("Parsed neuron gid:%d nid:%d\n", dest_group_id,
-				neuron_id);
-			if (dest_neuron_id > -1)
-			{
-				if (dest_neuron_id >= dest_group->neuron_count)
-				{
-					INFO("Error: Neuron (%d) >= "
-					     "group neurons (%d).\n",
-						dest_neuron_id,
-						dest_group->neuron_count);
-					return RET_FAIL;
-				}
-				dest = &(dest_group->neurons[dest_neuron_id]);
-			}
+			INFO("Error: Group (%lu) >= group count (%lu).\n",
+				dest_group_id, net.groups.size());
+			return RET_FAIL;
 		}
+		dest_group = &(net.groups[dest_group_id]);
+
+		TRACE3("Parsed neuron gid:%lu nid:%lu\n", dest_group_id,
+			neuron_id);
+		if (dest_neuron_id >= dest_group->neurons.size())
+		{
+			INFO("Error: Neuron (%lu) >= "
+				"group neurons (%lu).\n",
+				dest_neuron_id,
+				dest_group->neurons.size());
+			return RET_FAIL;
+		}
+		dest = &(dest_group->neurons[dest_neuron_id]);
+		group_set = true;
+		neuron_set = true;
 	}
-	else // parse neuron or input node
+	else if (entry_type == 'n') // parse neuron
 	{
-		ret = sscanf(fields[1].c_str(), "%d.%d", &neuron_group_id,
+		ret = sscanf(fields[1].c_str(), "%lu.%lu", &neuron_group_id,
 			&neuron_id);
 		if (ret < 2)
 		{
@@ -315,26 +322,28 @@ int description_read_network_entry(
 				fields[0].c_str());
 			exit(1);
 		}
+		group_set = true;
+		neuron_set = true;
 	}
 
-	if (neuron_group_id > -1)
+	if (group_set)
 	{
-		if (neuron_group_id >= net.neuron_group_count)
+		if (neuron_group_id >= net.groups.size())
 		{
-			INFO("Error: Group (%d) >= group count (%d).\n",
-				neuron_group_id, net.neuron_group_count);
+			INFO("Error: Group (%lu) >= group count (%lu).\n",
+				neuron_group_id, net.groups.size());
 			return RET_FAIL;
 		}
 		group = &(net.groups[neuron_group_id]);
 		TRACE3("Parsed neuron gid:%d nid:%d\n", neuron_group_id,
 			neuron_id);
-		if (neuron_id > -1)
+		if (neuron_set)
 		{
-			if (neuron_id >= group->neuron_count)
+			if (neuron_id >= group->neurons.size())
 			{
-				INFO("Error: Neuron (%d) >= "
-				     "group neurons (%d).\n",
-					neuron_id, group->neuron_count);
+				INFO("Error: Neuron (%lu) >= "
+				     "group neurons (%lu).\n",
+					neuron_id, group->neurons.size());
 				return RET_FAIL;
 			}
 			n = &(group->neurons[neuron_id]);
@@ -362,7 +371,7 @@ int description_read_network_entry(
 			continue;
 		}
 
-		attribute attr = { key, value_str };
+		Attribute attr = { key, value_str };
 		INFO("Parsed attribute: %s:%s\n", attr.key.c_str(),
 			attr.value_str.c_str());
 		attributes.push_back(attr);
@@ -377,11 +386,11 @@ int description_read_network_entry(
 			net, neuron_count, attributes);
 		break;
 	case 'n': // Add neuron
-		ret = network_create_neuron(n, attributes);
+		ret = network_create_neuron(*n, attributes);
 		break;
 	case 'e':
 	{
-		connection con;
+		Connection con;
 		assert(n != NULL);
 		// Zero initialize all connections TODO: put in constructors
 		con.id = n->connections_out.size();
@@ -394,12 +403,12 @@ int description_read_network_entry(
 		con.synapse_hw = NULL;
 		n->connections_out.push_back(con);
 		ret = network_connect_neurons(
-			n->connections_out[n->connections_out.size()-1], n, dest,
-			attributes);
+			n->connections_out[n->connections_out.size()-1],
+			*n, *dest, attributes);
 		break;
 	}
 	case '&': // Map neuron to hardware
-		ret = arch_map_neuron(n, c);
+		ret = arch_map_neuron(*n, *c);
 		break;
 	default:
 		break;
@@ -445,12 +454,12 @@ int command_parse_neuron_group(struct network *const net,
 	}
 }
 
-int description_parse_neuron(struct network *const net, struct architecture *arch,
+int description_parse_neuron(struct network *const net, Architecture *arch,
 				char fields[][MAX_FIELD_LEN],
 				const int field_count)
 {
 	struct neuron_group *group;
-	struct neuron *n;
+	Neuron *n;
 	double bias;
 	int neuron_group_id, neuron_id, connection_count;
 	int log_spikes, log_potential, force_update, ret;
@@ -508,8 +517,8 @@ int description_parse_neuron(struct network *const net, struct architecture *arc
 	{
 		// Parse each connection
 		struct neuron_group *dest_group;
-		struct neuron *src, *dest;
-		struct connection *con;
+		Neuron *src, *dest;
+		Connection *con;
 		double weight;
 		int dest_gid, dest_nid;
 		const int curr_field = NEURON_FIELDS + (i*CONNECTION_FIELDS);
@@ -557,7 +566,7 @@ int description_parse_neuron(struct network *const net, struct architecture *arc
 }
 
 int description_parse_command(char fields[][MAX_FIELD_LEN],
-	const int field_count, struct network *net, struct architecture *arch,
+	const int field_count, struct network *net, Architecture *arch,
 	struct simulation *sim)
 {
 	int ret;

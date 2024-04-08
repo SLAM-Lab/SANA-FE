@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <map>
 
 #include "network.hpp"
 #include "description.hpp"
@@ -26,30 +27,16 @@ using namespace std;
 // TODO: better dynamically define or allocate these numbers, so that we can
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
-// TrueNorth
-//#define ARCH_MAX_TILES 4096
-//#define ARCH_MAX_CORES_PER_TILE 1
+#define ARCH_MAX_TILES 32
+#define ARCH_MAX_CORES_PER_TILE 4
+#define ARCH_MAX_CORES 128
 //#define ARCH_MAX_X (64)
 //#define ARCH_MAX_Y (64)
 //#define ARCH_MAX_COMPARTMENTS 256
 
 // Loihi
-#define ARCH_MAX_TILES 256
-//#define ARCH_MAX_TILES 32
-#define ARCH_MAX_CORES_PER_TILE 4
 #define ARCH_MAX_X (8*4)
 #define ARCH_MAX_Y (4*2)
-// Hard define maximum defined h/w sizes
-//#define ARCH_MAX_COMPARTMENTS 16384
-#define ARCH_MAX_COMPARTMENTS 1024
-#define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*16)
-
-#define ARCH_MAX_UNITS 3
-#define ARCH_MAX_CORES (ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE)
-
-#define ARCH_MAX_LINKS 4
-#define ARCH_MAX_DESCRIPTION_LINE 256
-#define ARCH_MAX_ATTRIBUTES 256
 
 #define ARCH_INVALID_ID -1
 enum buffer_positions
@@ -63,18 +50,10 @@ enum buffer_positions
 	BUFFER_POSITIONS,
 };
 
-enum neuron_models
-{
-	NEURON_LIF,
-	NEURON_STOCHASTIC_LIF,
-	NEURON_TRUENORTH,
-};
-
 enum synapse_models
 {
 	SYNAPSE_CUBA,
 };
-
 
 enum neuron_reset_modes
 {
@@ -98,118 +77,129 @@ enum arch_description_blocks
 	ARCH_DESCRIPTION_AXON_OUT,
 };
 
-struct message
+struct Message
 {
-	struct neuron *src_neuron, *dest_neuron;
-	struct message *next;
+	Neuron *src_neuron;
+	Message *next;
 	double generation_delay, network_delay, receive_delay;
 	double blocked_latency;
 	double sent_timestamp, received_timestamp, processed_timestamp;
 	long int timestep;
-	int spikes, hops, in_noc;
+	int spikes, hops;
+	int src_x, dest_x, src_y, dest_y;
+	int dest_core_id, dest_tile_id, dest_axon_id;
+	bool dummy_message, in_noc;
+
+	Message();
 };
 
-struct message_fifo
+struct MessageFifo
 {
 	int count;
-	struct message *head, *tail;
-	struct message_fifo *next;  // For priority queue of core fifos
+	Message *head, *tail;
+	struct MessageFifo *next;  // For priority queue of core fifos
 };
 
-struct connection_map
-{
-	// List of all neuron connections to send spike to
-	struct connection **connections;
-	struct message *message;
-	struct neuron *pre_neuron;
-	long int last_updated;
-	int connection_count, spikes_received, active_synapses;
-};
-
-enum noise_type
+enum NoiseType
 {
 	NOISE_NONE = -1,
 	NOISE_FILE_STREAM,
 	// TODO: implement different random noise generators
 };
 
-struct axon_input
+struct AxonInUnit
 {
 	std::string name;
-	struct tile *t;
-	struct connection_map map[ARCH_MAX_CONNECTION_MAP];
 	long int spike_messages_in;
 	double energy, time;
 	double energy_spike_message, latency_spike_message;
-	int map_count;
+	int parent_tile_id;
 };
 
-struct synapse_processor
+struct SynapseUnit
 {
 	std::string name;
-	int model, spikes_buffer, weight_bits;
+	int model, weight_bits;
 	long int spikes_processed;
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
 	double latency_spike_op, latency_memory_access;
 };
 
-struct dendrite_processor
+struct DendriteUnit
 {
 	std::string name;
 	double energy, time;
 };
 
-struct soma_processor
+struct SomaUnit
 {
 	FILE *noise_stream;
 	std::string name;
-	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
-	int noise_type;
 	long int neuron_updates, neurons_fired, neuron_count;
 	double energy, time;
 	double energy_update_neuron, latency_update_neuron;
 	double energy_access_neuron, latency_access_neuron;
 	double energy_spiking, latency_spiking;
+	int leak_towards_zero, reset_mode, reverse_reset_mode;
+	int noise_type;
 };
 
-struct axon_output
+struct AxonOutUnit
 {
 	// The axon output points to a number of axons, stored at the
 	//  post-synaptic core. A neuron can point to a number of these
-	struct connection_map *map_ptr[ARCH_MAX_CONNECTION_MAP];
-	struct tile *t;
-	int map_count;
 	std::string name;
-
 	long int packets_out;
 	double energy, time;
 	double energy_access, latency_access;
+	int parent_tile_id;
 };
 
-struct core
+struct AxonInModel
 {
-	struct tile *t;
-	struct neuron **neurons;
+	// List of all neuron connections to send spike to
+	AxonInUnit *axon_in_unit;
+	std::vector<int> synapse_addresses;
 
-	struct axon_input axon_in;
-	struct synapse_processor synapse[ARCH_MAX_UNITS];
-	struct dendrite_processor dendrite;
-	struct soma_processor soma[ARCH_MAX_UNITS];
-	struct axon_output axon_out;
+	Message *message;
+	long int last_updated;
+	int spikes_received, active_synapses;
+};
+
+struct AxonOutModel
+{
+	// List of all neuron connections to send spike to
+	AxonOutUnit *axon_out_unit;
+	int dest_axon_id, dest_tile_id, dest_core_offset;
+	int src_neuron_id;
+};
+
+struct Core
+{
+	std::vector<AxonInUnit> axon_in_hw;
+	std::vector<SynapseUnit> synapse;
+	std::vector<DendriteUnit> dendrite;
+	std::vector <SomaUnit> soma;
+	std::vector<AxonOutUnit> axon_out_hw;
+
+	MessagesIn messages_in;
+	std::vector<AxonInModel> axons_in;
+	std::vector<Neuron *> neurons;
+	std::vector<Connection *> synapses;
+	std::vector<AxonOutModel> axons_out;
 
 	std::string name;
-	struct message next_message;  // Since last spike
+	Message next_message;  // Since last spike
+	std::vector<Neuron *>::size_type max_neurons;
 	double energy, latency_after_last_message;
-	int id, offset, buffer_pos, soma_count, synapse_count;
-	int neuron_count, message_count;
-	int curr_axon;
+	int parent_tile_id, id, offset, buffer_pos, soma_count, synapse_count;
+	int message_count;
 };
 
-struct tile
+struct Tile
 {
-	struct core cores[ARCH_MAX_CORES_PER_TILE];
-	struct tile *links[ARCH_MAX_LINKS];
+	std::vector<Core> cores;
 	std::string name;
 	double energy;
 	double energy_east_hop, latency_east_hop;
@@ -218,42 +208,46 @@ struct tile
 	double energy_south_hop, latency_south_hop;
 	long int hops, messages_received, total_neurons_fired;
 	long int east_hops, west_hops, north_hops, south_hops;
-	int id, x, y, core_count;
+	int id, x, y;
 	int width; // For now just support 2 dimensions
 };
 
-struct architecture
+class Architecture
 {
-	struct tile tiles[ARCH_MAX_TILES];
+public:
+	std::vector<Tile> tiles;
 	std::string name;
-	int noc_width, noc_height, noc_buffer_size, tile_count, core_count;
-	int is_init;
+	int noc_width, noc_height, noc_buffer_size;
+	bool noc_init;
 
-	vector<vector<int>> spike_vector;
-	int spike_vector_on;
+	// TODO: get rid of these
+	bool spike_vector_on;
+	std::vector<std::vector<int>> spike_vector;
+
+	Architecture();
+	int get_core_count();
 };
 
 #include "description.hpp"
 
-struct architecture *arch_init(void);
-void free_spike_vector(struct architecture* arch);
-void arch_free(struct architecture *const arch);
-int arch_create_noc(struct architecture *const arch, struct attributes *attr, const int attribute_count);
-int arch_create_tile(struct architecture *const arch, struct attributes *attr, const int attribute_count);
-int arch_create_core(struct architecture *const arch, struct tile *const t, struct attributes *attr, const int attribute_count);
-void arch_create_axon_in(struct core *const c, const char *const name, const struct attributes *const attr, const int attribute_count);
-void arch_create_synapse(struct core *const c, const char *const name, const struct attributes *const attr, const int attribute_count);
-void arch_create_soma(struct core *const c, const char *const name, struct attributes *attr, const int attribute_count);
-void arch_create_axon_out(struct core *const c, struct attributes *attr, const int attribute_count);
-void arch_create_connection_maps(struct architecture *const arch);
-void arch_create_core_connection_map(struct core *const core);
-void arch_print_connection_map_summary(struct architecture *const arch);
-int arch_map_neuron(struct neuron *const n, struct core *c);
-void arch_map_neuron_connections(struct neuron *const n);
-void arch_allocate_connection_map(struct neuron *const pre_neuron, struct core *const post_core, const int connection_count);
-void arch_add_connection_to_map(struct connection *const con, struct core *const post_core);
+void free_spike_vector(Architecture* arch);
+void arch_free(Architecture *const arch);
+int arch_create_noc(Architecture &arch, const std::list<Attribute> &attr);
+int arch_create_tile(Architecture &arch, const std::list<Attribute> &attr);
+int arch_create_core(Architecture &arch, Tile &t, const std::list<Attribute> &attr);
+void arch_create_axon_in(Core &c, const std::string &name, const std::list<Attribute> &attr);
+void arch_create_synapse(Core &c, const std::string &name, const std::list<Attribute> &attr);
+void arch_create_soma(Core &c, const std::string &name, const std::list<Attribute> &attr);
+void arch_create_axon_out(Core &c, const std::list<Attribute> &attr);
+void arch_create_axons(Architecture &arch);
+void arch_create_core_axon(Core &core);
+void arch_print_axon_summary(Architecture &arch);
+int arch_map_neuron(Neuron &n, Core &c);
+void arch_map_neuron_connections(Neuron &n);
+void arch_allocate_axon(Neuron &pre_neuron, Core &post_core);
+void arch_add_connection_to_axon(Connection &con, Core &post_core);
 int arch_parse_neuron_model(const std::string &model_str);
 int arch_parse_synapse_model(const std::string &model_str);
-void arch_init_message(struct message *m);
+void arch_init_message(Message &m);
 
 #endif

@@ -14,23 +14,25 @@
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
+#include <memory>
 #include "arch.hpp"
 #include "network.hpp"
 #include "stdio.h"
 
-struct timestep
+struct Timestep
 {
-	struct message messages[ARCH_MAX_CORES][ARCH_MAX_CONNECTION_MAP+1];
-	struct message_fifo message_queues[ARCH_MAX_CORES];
+	std::vector<std::list<Message> > messages;
+	std::vector<MessageFifo> message_queues;
 	long int timestep, spike_count, total_hops, packets_sent;
 	long int total_neurons_fired, spikes;
-	int message_counts[ARCH_MAX_CORES];
 	double energy, sim_time;
+
+	Timestep(const int core_count, const long int ts);
 };
 
-struct noc_info
+struct NocInfo
 {
-	struct message_fifo messages_received[ARCH_MAX_CORES];
+	struct MessageFifo messages_received[ARCH_MAX_CORES];
 	int noc_width, noc_height;
 	double noc_messages_in[ARCH_MAX_X][ARCH_MAX_Y][4+ARCH_MAX_CORES_PER_TILE];
 	double core_finished_receiving[ARCH_MAX_CORES];
@@ -38,12 +40,12 @@ struct noc_info
 	long int messages_in_noc;
 };
 
-struct scheduler
+struct Scheduler
 {
 	int noc_width, noc_height, buffer_size;
 };
 
-enum direction
+enum Direction
 {
 	NORTH = 0,
 	EAST,
@@ -51,9 +53,8 @@ enum direction
 	WEST
 };
 
-struct simulation
+struct Simulation
 {
-	struct timestep ts;
 	long int timesteps, total_spikes, total_messages_sent;
 	long int total_neurons_fired;
 	double total_energy, total_sim_time, wall_time;
@@ -61,14 +62,14 @@ struct simulation
 	int gui_on;
 	FILE *spike_trace_fp, *potential_trace_fp, *message_trace_fp, *perf_fp;
 	FILE *stats_fp;
+
+	Simulation();
 };
 
 //#include "pybind11/pybind11.h"
 //#include "pybind11/stl.h"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
-
-using namespace std;
 
 enum program_args
 {
@@ -87,20 +88,19 @@ struct run_ts_data
 	long int timestep_start, timesteps;
 };
 
-
-class sana_fe
+class SanaFe
 {
 public:
-	struct simulation *sim;
-	struct network net;
-	struct architecture *arch;
+	std::unique_ptr<Simulation> sim;
+	Network net;
+	Architecture *arch;
 	int timesteps;
 	FILE *input_fp;
 	struct run_ts_data run_data;
 
-        sana_fe();
+        SanaFe();
 	void init();
-	int update_neuron(int group_id, int n_id, vector<string> kwargs, int count);
+	int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<string> kwargs, int count);
 	void run_timesteps(int timesteps = 1);
 	void set_input(char *filename);
 	void open_perf_trace(void);
@@ -111,81 +111,79 @@ public:
 	void set_arch(const char *filename);
 	void set_net(const char *filename);
         double get_power();
-	vector<int> get_status(int gid);
+	std::vector<int> get_status(const std::vector<NeuronGroup>::size_type gid);
         void sim_summary();
-	vector<vector<int>> run_summary();
+	std::vector<std::vector<int>> run_summary();
 	void clean_up(int ret = RET_OK);
-	~sana_fe() { clean_up(); };
+	~SanaFe() { clean_up(); };
 };
 
 class Vector_Cleanup_Class
 {
 public:
-	struct architecture* arch;
+	Architecture* arch;
 	Vector_Cleanup_Class(){}
-	Vector_Cleanup_Class(struct architecture* arch)
+	Vector_Cleanup_Class(Architecture* arch)
 	{
 		this->arch = arch;
 	}
 	~Vector_Cleanup_Class()
 	{
-		arch->spike_vector.clear();
+		//arch->spike_vector.clear();
 	}
 };
 
-void run(struct simulation *sim, struct network *net, struct architecture *arch);
+void run(Simulation &sim, Network &net, Architecture &arch);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
-void store_data_init(run_ts_data* data, simulation* sim, int timesteps);
-void store_data(run_ts_data* data, simulation* sim);
+void store_data_init(run_ts_data *data, Simulation &sim, int timesteps);
+void store_data(run_ts_data *data, Simulation &sim);
 void print_run_data(FILE *fp, run_ts_data* data);
 
+void sim_timestep(Timestep &ts, Network &net, Architecture &arch);
+std::unique_ptr<Simulation> sim_init_sim(void);
+void sim_init_timestep(Timestep &ts, Architecture &arch);
 
-void sim_timestep(struct timestep *const ts, struct network *const net, struct architecture *const arch);
-struct simulation *sim_init_sim(void);
-void sim_init_timestep(struct timestep *const ts);
-
-void sim_process_neurons(struct timestep *const ts, struct network *net, struct architecture *arch);
-void sim_receive_messages(struct timestep *const sim, struct architecture *arch);
-double sim_schedule_messages(struct message_fifo *const messages_sent, const struct scheduler *const scheduler);
+void sim_process_neurons(Timestep &ts, Network &net, Architecture &arch);
+void sim_receive_messages(Timestep &sim, Architecture &arch);
+double sim_schedule_messages(std::vector<MessageFifo> &messages_sent, const Scheduler &scheduler);
 // TODO: reimplement
-int sim_input_spikes(struct network *net);
+int sim_input_spikes(Network &net);
 
-void sim_process_neuron(struct timestep *const ts, struct neuron *n);
-double sim_pipeline_receive(struct timestep *const ts, struct core *c, struct connection_map *axon);
-double sim_update_synapse(struct timestep *const ts, struct connection_map *axon, const int synaptic_lookup);
-double sim_update_dendrite(struct timestep *const ts, struct neuron *n, const double charge);
-double sim_update_soma(struct timestep *const ts, struct neuron *n, const double current_in);
-double sim_update_axon(struct neuron *n);
-double sim_estimate_network_costs(struct tile *const src, struct tile *const dest);
-void sim_neuron_send_spike_message(struct timestep *const ts, struct neuron *n);
+void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n);
+double sim_pipeline_receive(Timestep &ts, Architecture &arch, Core &c, Message &m);
+double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c, const int synapse_address, const bool synaptic_lookup);
+double sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n, const double charge);
+double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n, const double current_in);
+double sim_update_axon(Neuron &n);
+double sim_estimate_network_costs(Tile &src, Tile &dest);
+void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n);
 
-double sim_update_soma_latency(struct timestep *const ts, struct neuron *n);
-double sim_update_soma_lif(struct timestep *const ts, struct neuron *n, const double current_in);
-double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n, const double current_in);
+double sim_update_soma_lif(Timestep &ts, Neuron &n, const double current_in);
+double sim_update_soma_truenorth(Timestep &ts, Neuron &n, const double current_in);
 
-void sim_reset_measurements(struct network *net, struct architecture *arch);
-double sim_calculate_energy(const struct architecture *const arch);
-double sim_calculate_time(const struct architecture *const arch);
-long int sim_calculate_packets(const struct architecture *arch);
+void sim_reset_measurements(Network &net, Architecture &arch);
+double sim_calculate_energy(const Architecture &arch);
+double sim_calculate_time(const Architecture &arch);
+long int sim_calculate_packets(const Architecture &arch);
 
-void sim_write_summary(FILE *fp, const struct simulation *stats);
-void sim_spike_trace_write_header(const struct simulation *const sim);
-void sim_potential_trace_write_header(const struct simulation *const sim, const struct network *net);
-void sim_message_trace_write_header(const struct simulation *const sim);
-void sim_trace_record_spikes(const struct simulation *const sim, const struct network *net);
-void sim_trace_record_potentials(const struct simulation *const sim, const struct network *net);
-void sim_trace_record_message(const struct simulation *const sim, const struct message *const m);
+void sim_write_summary(FILE *fp, const Simulation &stats);
+void sim_spike_trace_write_header(const Simulation &sim);
+void sim_potential_trace_write_header(const Simulation &sim, const Network &net);
+void sim_message_trace_write_header(const Simulation &sim);
+void sim_trace_record_spikes(const Simulation &sim, const Network &net);
+void sim_trace_record_potentials(const Simulation &sim, const Network &net);
+void sim_trace_record_message(const Simulation &sim, const Message &m);
 void sim_perf_write_header(FILE *perf_fp);
-void sim_perf_log_timestep(const struct timestep *const ts, FILE *fp);
+void sim_perf_log_timestep(const Timestep &ts, FILE *fp);
 int sim_poisson_input(const double firing_probability);
 int sim_rate_input(const double firing_rate, double *spike_val);
 
-struct message_fifo *sim_init_timing_priority(struct message_fifo *const send_queues);
-void sim_insert_priority_queue(struct message_fifo **priority_queue, struct message_fifo *c);
-struct message_fifo *sim_pop_priority_queue(struct message_fifo **priority_queue);
+MessageFifo *sim_init_timing_priority(std::vector<MessageFifo> &message_queues);
+void sim_insert_priority_queue(MessageFifo **priority_queue, MessageFifo &c);
+MessageFifo *sim_pop_priority_queue(MessageFifo **priority_queue);
 
-void sim_message_fifo_push(struct message_fifo *queue, struct message *m);
-struct message *sim_message_fifo_pop(struct message_fifo *queue);
+void sim_message_fifo_push(struct MessageFifo &queue, Message &m);
+Message *sim_message_fifo_pop(struct MessageFifo &queue);
 
 
 #endif

@@ -7,29 +7,29 @@
 #include <fstream>
 #include <vector>
 
-enum description_ret
+enum DescriptionRet
 {
 	RET_FAIL = -1,
 	RET_OK = 0, // Anything >= 0 means successfully parsed
 };
 
-struct attribute
+struct Attribute
 {
 	std::string key, value_str;
 };
 
 // Forward struct declarations
-struct architecture;
-struct network;
-struct simulation;
+struct Architecture;
+struct Network;
+struct Simulation;
 #include <stdio.h>
 
-int description_parse_file(std::fstream &fp, struct architecture &arch);
-int description_parse_file(std::fstream &fp, struct network &net, struct architecture &arch);
-int description_read_line(const std::string line, std::vector<std::string> fields, struct network &net, struct architecture &arch);
+int description_parse_arch_file(std::fstream &fp, Architecture &arch);
+int description_parse_net_file(std::fstream &fp, Network &net, Architecture &arch);
+int description_read_line(const std::string line, std::vector<std::string> fields, Network &net, Architecture &arch);
 std::vector<std::string> description_get_fields(const std::string &line);
-int description_read_arch_entry(const std::vector<std::string> &fields, struct architecture &arch);
-int description_read_network_entry(const std::vector<std::string> &fields, struct architecture &arch, struct network &net);
-//int description_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch, struct simulation *sim);
+int description_read_arch_entry(const std::vector<std::string> &fields, Architecture &arch);
+int description_read_network_entry(const std::vector<std::string> &fields, Architecture &arch, Network &net);
+//int description_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, Network *net, Architecture *arch, struct simulation *sim);
 
 #endif

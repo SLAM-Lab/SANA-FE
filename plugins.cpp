@@ -56,7 +56,7 @@ void plugin_init_soma(const std::string &name)
 	INFO("Loaded plugin symbols for %s.\n", name.c_str());
 }
 
-Soma_Model *plugin_get_soma(const std::string &name)
+SomaModel *plugin_get_soma(const std::string &name)
 {
 	INFO("Getting soma:%s\n", name.c_str());
 

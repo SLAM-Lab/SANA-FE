@@ -7,13 +7,13 @@
 
 #define MAX_NOISE_FILE_ENTRY 128
 
-class Loihi_Lif_Model: public Soma_Model
+class LoihiLifModel: public SomaModel
 {
 public:
-        Loihi_Lif_Model();
-	~Loihi_Lif_Model();
-	void set_attributes(const std::list<attribute> &attr);
-	Neuron_Status update(const double current_in);
+        LoihiLifModel();
+	~LoihiLifModel();
+	void set_attributes(const std::list<Attribute> &attr);
+	NeuronStatus update(const double current_in);
 private:
 	int soma_last_updated, reset_mode, reverse_reset_mode;
         int noise_type;
@@ -21,5 +21,7 @@ private:
 	double potential, leak_decay, bias, threshold, reverse_threshold;
         double reset, reverse_reset, leak_bias;
 };
+
+int model_parse_reset_mode(const std::string &str);
 
 #endif

@@ -173,7 +173,7 @@ void sana_fe::set_net(char* filename){
 	}
 	network_check_mapped(&net);
 
-	arch_create_connection_maps(arch);
+	arch_create_axons(arch);
 
 	// Change Potential logging with new headers from net.
 	if (sim->log_potential){
@@ -316,7 +316,7 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 		{
 			for (int j = 0; j < ts->message_queues[i].count; j++)
 			{
-				struct message *m = &(ts->messages[i][j]);
+				Message *m = &(ts->messages[i][j]);
 				if (m->dest_neuron != NULL)
 				{
 					// Ignore dummy messages (without a

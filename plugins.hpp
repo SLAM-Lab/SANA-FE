@@ -5,20 +5,20 @@
 
 #include "description.hpp"
 
-enum Neuron_Status { IDLE, UPDATED, FIRED};
+enum NeuronStatus { IDLE, UPDATED, FIRED};
 
-class Soma_Model {
+class SomaModel {
 public:
-	Soma_Model(){}
-	virtual ~Soma_Model(){}
-	virtual Neuron_Status update(double input) = 0;
-	virtual void set_attributes(const std::list<attribute> &attr) = 0;
+	SomaModel(){}
+	virtual ~SomaModel(){}
+	virtual NeuronStatus update(double input) = 0;
+	virtual void set_attributes(const std::list<Attribute> &attr) = 0;
 };
 
-typedef Soma_Model *_create_soma(void);
-typedef void _destroy_soma(Soma_Model *model);
+typedef SomaModel *_create_soma(void);
+typedef void _destroy_soma(SomaModel *model);
 
 void plugin_init_soma(char* name);
-Soma_Model *plugin_get_soma(const std::string &name);
+SomaModel *plugin_get_soma(const std::string &name);
 
 #endif

@@ -20,7 +20,7 @@
 #include <list>
 #include "plugins.hpp"
 
-enum connection_config_format
+enum ConnectionConfigFormat
 {
 	// This is the structure of the CSV format for specifying synaptic
 	//  connections in a network for this simulator.  Each row represents
@@ -31,45 +31,39 @@ enum connection_config_format
 	CONNECTION_FIELDS,
 };
 
-enum input_types
-{
-	INPUT_EVENT,
-	INPUT_RATE,
-	INPUT_POISSON,
-};
+struct Core;
+struct Neuron;
+struct NeuronGroup;
+struct SomaUnit;
+struct SomaModel;
+struct SynapseUnit;
+struct AxonOutUnit;
 
-struct neuron_id
+struct Connection
 {
-	int group, neuron;
-};
-
-struct connection
-{
-	struct neuron *post_neuron, *pre_neuron;
-	struct synapse_processor *synapse_hw;
-	// TODO: create a table of hw unit names and just index into this
-	//  global table (read only)
+	Neuron *post_neuron, *pre_neuron;
+	SynapseUnit *synapse_hw;
 	std::string synapse_hw_name;
 	double weight, current, synaptic_current_decay;
-	int id, delay;
+	int id, delay, last_updated;
 };
 
-struct neuron
+struct Neuron
 {
-	struct neuron_group *group;
-	std::vector<connection> connections_out;
-	struct connection_map *maps_in;
-	struct connection_map **maps_out;
+	std::vector<Connection> connections_out;
+	// std::vector<Axon> maps_in;
+	std::vector<int> axon_out_addresses;
 
 	// Mapped hardware
-	struct core *core, *post_synaptic_cores;
-	struct soma_processor *soma_hw;
+	Core *core, *post_synaptic_cores;
+	SomaUnit *soma_hw;
+	AxonOutUnit *axon_out_hw;
 	std::string soma_hw_name;
 
-	class Soma_Model *soma_model;
+	SomaModel *model;
 
 	// Track the timestep each hardware unit was last updated
-	int id, is_init, fired, connection_out_count;
+	int id, parent_group_id, is_init, fired, connection_out_count;
 	int max_connections_out, log_spikes, log_potential, update_needed;
 	int force_update, spike_count;
 	int soma_last_updated, dendrite_last_updated;
@@ -77,67 +71,37 @@ struct neuron
 
 	double dendritic_current_decay, processing_latency;
 	double current, charge;
-	Neuron_Status neuron_status;
+	NeuronStatus neuron_status;
 	int forced_spikes;
-
-	// LIF specific
-	// unsigned int random_range_mask;
-	// double potential, current, charge, bias;
-	// double reset, reverse_reset, threshold, reverse_threshold;
-	// double leak_decay, leak_bias, potential_time_const;
-	// double dendritic_current_decay, processing_latency;
-	// End of LIF specific
 };
 
-struct input
-{
-	struct connection *connections;
-	double rate, spike_val; // rate only applies to poisson and rate-based
-	int post_connection_count, type, id, send_spike;
-};
-
-struct neuron_group
+struct NeuronGroup
 {
 	// A neuron group is a collection of neurons that share common
-	//  parameters (and possibly hardware). All neurons must be based on the
-	//  same models. If implemented in hardware, they also must share common
-	//  hardware i.e. the same core and processor blocks in the core
-	std::vector<neuron> neurons;
+	//  parameters. All neurons must be based on the same neuron model.
+	std::vector<Neuron> neurons;
 	std::string default_soma_hw_name;
 	std::string default_synapse_hw_name;
-	int id, neuron_count;
+
+	int id;
 	int default_log_potential, default_log_spikes;
 	int default_max_connections_out, default_force_update;
-
-	int reset_mode, reverse_reset_mode;
-	double default_threshold, default_reset;
-	double default_reverse_threshold, default_reverse_reset;
-	double default_leak_decay, default_leak_bias;
 };
 
-struct network
+struct Network
 {
-	struct neuron_group groups[NETWORK_MAX_NEURON_GROUPS];
-	struct input *external_inputs;
-	int neuron_group_count, external_input_count;
+	std::vector<NeuronGroup> groups;
 };
 
-struct architecture;
-struct attributes;
-struct core;
+struct Architecture;
+struct Core;
 
-
-void network_init(struct network *const net);
-void network_free(struct network *const net);
-int network_create_neuron(struct neuron *const n, const std::list<attribute> &attr);
-int network_create_neuron_group(struct network &net, const int neuron_count, const std::list<attribute> &attr);
-struct neuron *network_id_to_neuron_ptr(struct network *const net, const struct neuron_id id);
-int network_create_inputs(struct network *const net, const int input_count, const int input_type);
-int network_create_input_node(struct input *const in, const int connection_count);
-void network_set_input(struct network *const net, const int input_id, const double rate);
+int network_create_neuron(Neuron &n, const std::list<Attribute> &attr);
+int network_create_neuron_group(Network &net, const int neuron_count, const std::list<Attribute> &attr);
+//Neuron *network_id_to_neuron_ptr(Network *const net, const NeuronId id);
 int network_parse_reset_mode(const std::string &str);
-int network_connect_neurons(struct connection &con, struct neuron *const src, struct neuron *const dest, const std::list<attribute> &attr);
-void network_check_mapped(struct network *const net);
+int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::list<Attribute> &attr);
+void network_check_mapped(Network &net);
 
 
 

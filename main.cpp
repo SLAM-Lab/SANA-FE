@@ -14,7 +14,7 @@
 
 int main(int argc, char *argv[])
 {
-	sana_fe sim;
+	SanaFe sim;
 	int timesteps, ret;
 
 	// Assume that if we don't get to the point where we write this with
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 }
 
 /*
-void run(struct simulation *sim, struct network *net, struct architecture *arch)
+void run(struct simulation *sim, struct network *net, Architecture *arch)
 {
 	// TODO: remove the need to pass the network struct, only the arch
 	//  should be needed (since it links back to the net anyway)
@@ -158,7 +158,7 @@ void run(struct simulation *sim, struct network *net, struct architecture *arch)
 		{
 			for (int j = 0; j < ts->message_counts[i]; j++)
 			{
-				struct message *m = &(ts->messages[i][j]);
+				Message *m = &(ts->messages[i][j]);
 				sim_trace_record_message(sim, m);
 			}
 		}

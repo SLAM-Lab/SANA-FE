@@ -11,7 +11,7 @@ endif()
 project(sana-fe)
 
 add_compile_options(
-    -ldl -Wall -pedantic -Werror -g -fopenmp -Wno-stringop-truncation
+    -ldl -Wall -pedantic -Werror -g -fopenmp -Wno-stringop-truncation -O0
 )
 
 file (GLOB SOURCE_FILES "*.cpp")
