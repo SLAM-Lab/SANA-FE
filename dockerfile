@@ -19,4 +19,5 @@ COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim.py /tutorial/sim.py
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/arch/*.yaml /tutorial/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/snn/*.net /tutorial/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/scripts/challenge.py /tutorial/
-ENTRYPOINT exec /bin/bash /tutorial/setup_tutorial.sh && exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
+#ENTRYPOINT exec /bin/bash /tutorial/setup_tutorial.sh && exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
+ENTRYPOINT exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
