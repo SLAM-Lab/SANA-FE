@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023 - The University of Texas at Austin
+Copyright (c) 2024 - The University of Texas at Austin
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
@@ -8,13 +8,14 @@ tutorial.py: NICE 2024 Tutorial
 """
 import sys
 import os
-#from tensorflow.keras import models
 import numpy as np
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
-NETWORK_PATH = os.path.join(PROJECT_DIR, "snn", "dvs_challenge.net")
-ARCH_PATH = os.path.join(PROJECT_DIR, "arch", "loihi.yaml")
+#NETWORK_PATH = os.path.join(PROJECT_DIR, "snn", "dvs_challenge.net")
+NETWORK_PATH = os.path.join(PROJECT_DIR, "files", "dvs_challenge.net")
+#ARCH_PATH = os.path.join(PROJECT_DIR, "arch", "loihi.yaml")
+ARCH_PATH = os.path.join(PROJECT_DIR, "files", "loihi.yaml")
 TIMESTEPS = 1000
 
 sys.path.insert(0, PROJECT_DIR)
