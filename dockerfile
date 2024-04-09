@@ -13,10 +13,10 @@ RUN mkdir /tutorial
 RUN python3 -m venv /tutorial/venv && . /tutorial/venv/bin/activate && pip install --upgrade pip && pip install pyyaml numpy
 
 COPY dvs_challenge.npz /tutorial/dvs_challenge.npz
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/setup_tutorial.sh
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim /tutorial/sim
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim.py /tutorial/sim.py
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/arch/ /tutorial/arch
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/snn/ /tutorial/snn
-RUN mkdir /tutorial/scripts
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/scripts/tutorial.py /tutorial/scripts/tutorial.py
-
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/arch/*.yaml /tutorial/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/snn/*.net /tutorial/files
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/scripts/tutorial.py /tutorial/files
+ENTRYPOINT exec /bin/bash /tutorial/setup_tutorial.sh && exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
