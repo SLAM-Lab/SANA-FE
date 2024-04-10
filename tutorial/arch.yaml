@@ -1,5 +1,5 @@
-# tutorial.yaml
-# Exercise 1) Set the cost of a neuron update in the soma from 0 ns to 2 ns and from 0 pJ to 2 pJ
+## arch.yaml
+# Exercise 1) Set the costs of a neuron update in the soma from 0.0 ns to 2.0 ns and from 0.0 pJ to 2.0 pJ
 # Exercise 2) Duplicate tiles 2 times and each core 4 times within every tile (8 cores total). (For a hint look at files/loihi.yaml)
 # Exercise 3) Add a new synapse unit for compressed synapses. The energy and latency costs for reading a compressed synapse is 0.5 pJ and 2 ns
 architecture:
