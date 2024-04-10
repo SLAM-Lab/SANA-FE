@@ -45,8 +45,8 @@ paste):
 
     python3 sim.py tutorial/arch.yaml tutorial/snn.net 1000
 
-While running you should see SANA-FE print to the console. SANA-FE dumps
-information about the initialized SNN and design, followed by a heart-beat after
+SANA-FE should run and print to the console. SANA-FE dumps information about the
+initialized SNN and design, followed by a heart-beat after
 every 100 time-steps, and finally summarizes run statistics before exiting.
 
 Next, we will finish writing an architecture description. Inside
