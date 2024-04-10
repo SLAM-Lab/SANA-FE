@@ -8,6 +8,7 @@ RUN git clone https://github.com/SLAM-Lab/SANA-FE /home/build_tutorial/sana-fe
 RUN cd /home/build_tutorial/sana-fe && make
 
 FROM node:18-alpine AS sanafe
+RUN apk add vim emacs
 RUN apk add bash python3 py3-pip
 RUN mkdir /tutorial
 RUN python3 -m venv /tutorial/venv && . /tutorial/venv/bin/activate && pip install --upgrade pip && pip install pyyaml numpy
