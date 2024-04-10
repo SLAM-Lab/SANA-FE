@@ -50,11 +50,11 @@ initialized SNN and design, followed by a heart-beat after
 every 100 time-steps, and finally summarizes run statistics before exiting.
 
 Next, we will finish writing an architecture description. Inside
-`tutorial/tutorial.yaml` there is an incomplete architecture. Follow the three
+`tutorial/arch.yaml` there is an incomplete architecture. Follow the three
 exercises to complete the design.
 
 Then, we will finish a corresponding mapped SNN. Again, complete the three
-exercises to define the SNN in `tutorial/tutorial.net`
+exercises to define the SNN in `tutorial/snn.net`
 
 Once both architecture and SNN have been completed, we will look at the
 outputs SANA-FE can generate for these files. Start by running and looking at
@@ -87,7 +87,7 @@ Finally, run a script that launches a simulation a larger application
 The script loads the convolutional kernel weights and generates the SNN.
 Then, the script maps each layer of the SNN across one or more cores on Loihi.
 The script saves this mapped SNN in SANA-FE's format, and launches a simulation
-from the Python script with performance tracing.
+from the Python script with performance traces.
 
 ## Challenge ##
 
