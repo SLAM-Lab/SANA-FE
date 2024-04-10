@@ -467,6 +467,8 @@ def parse_arch(arch):
 
 def parse_tile(tile_dict):
     tile_name = tile_dict["name"]
+    tile_name = tile_name.replace(" ", "_")
+    tile_name = tile_name.replace("\t", "_")
     # Work out how many instances of this tile to create
     if "[" in tile_name:
         # Can use notation [min..max] to indicate range of elements
@@ -491,6 +493,8 @@ def parse_tile(tile_dict):
 
 def parse_core(core_dict, tile_id):
     core_name = core_dict["name"]
+    core_name = core_name.replace(" ", "_")
+    core_name = core_name.replace("\t", "_")
 
     # Work out how many instances of this tile to create
     if "[" in core_name:
