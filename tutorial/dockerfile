@@ -17,10 +17,8 @@ COPY --from=make-sanafe /home/build_tutorial/dvs_challenge.npz /tutorial/dvs_cha
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/setup_tutorial.sh /
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim /
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim.py /
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/example.yaml /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/tutorial.yaml /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/loihi.yaml /home/
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/example.net /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/tutorial.net /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/challenge.py /home/
 RUN chmod 755 /tutorial/setup_tutorial.sh

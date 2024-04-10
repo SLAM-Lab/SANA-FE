@@ -43,7 +43,7 @@ directory and run the simulation script with the commands below. Note that
 Linux is case-sensitive so reproduce these commands exactly (e.g., copy and
 paste):
 
-    python3 sim.py tutorial/tutorial.yaml tutorial/tutorial.net 1000
+    python3 sim.py tutorial/arch.yaml tutorial/snn.net 1000
 
 While running you should see SANA-FE print to the console. SANA-FE dumps
 information about the initialized SNN and design, followed by a heart-beat after
@@ -61,13 +61,13 @@ outputs SANA-FE can generate for these files. Start by running and looking at
 the summary file. This file matches the summary printed by SANA-FE after
 it finishes a simulation.
 
-    python3 sim.py tutorial/tutorial.yaml tutorial/tutorial.net 10
+    python3 sim.py tutorial/arch.yaml tutorial/snn.net 10
     cat run_summary.yaml
 
 Next, run another simulation but with the spike and potential trace flags set.
 Two traces will be generated: `spikes.csv` and `potential.csv`.
 
-    python3 sim.py -s -v tutorial/tutorial.yaml tutorial/tutorial.net 10
+    python3 sim.py -s -v tutorial/arch.yaml tutorial/snn.net 10
     cat spikes.csv
     cat potential.csv
 
@@ -75,14 +75,14 @@ Then, run the same simulation but with message and performance traces
 enabled instead. Two different traces will be generated: `perf.csv` and
 `messages.csv`.
 
-    python3 sim.py -m -p tutorial/tutorial.yaml tutorial/tutorial.net 10
+    python3 sim.py -m -p tutorial/arch.yaml tutorial/snn.net 10
     cat perf.csv
     cat messages.csv
 
 Finally, run a script that launches a simulation a larger application
 (DVS gesture categorization) running on a real-world architecture (Loihi).
 
-    python3 tutorial/challenge.py
+    python3 tutorial/dvs_challenge.py
 
 The script loads the convolutional kernel weights and generates the SNN.
 Then, the script maps each layer of the SNN across one or more cores on Loihi.
