@@ -48,7 +48,7 @@ to define the SNN.
 Now that we have finished defining an architecture and SNN, we will look at the
 outputs SANA-FE can generate for these files.
 
-    python3 sim.py files/tutorial.yaml files/tutorial.net
+    python3 sim.py files/tutorial.yaml files/tutorial.net 10
     cat run_summary.yaml
 
 Next we enable spike and potential traces and run another simulation. Two traces
