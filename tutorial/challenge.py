@@ -12,10 +12,8 @@ import numpy as np
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
-#NETWORK_PATH = os.path.join(PROJECT_DIR, "snn", "dvs_challenge.net")
-NETWORK_PATH = os.path.join(PROJECT_DIR, "files", "dvs_challenge.net")
-#ARCH_PATH = os.path.join(PROJECT_DIR, "arch", "loihi.yaml")
-ARCH_PATH = os.path.join(PROJECT_DIR, "files", "loihi.yaml")
+NETWORK_PATH = os.path.join(PROJECT_DIR, "tutorial", "dvs_challenge.net")
+ARCH_PATH = os.path.join(PROJECT_DIR, "tutorial", "loihi.yaml")
 TIMESTEPS = 1000
 
 sys.path.insert(0, PROJECT_DIR)
@@ -41,7 +39,7 @@ def check_mapping(network):
 network = sim.Network()
 arch = sim.Architecture()
 
-snn = np.load(os.path.join(PROJECT_DIR, "dvs_challenge.npz"))
+snn = np.load(os.path.join(PROJECT_DIR, "tutorial", "dvs_challenge.npz"))
 # TODO: save the updated model so we just have to load the model and the weights
 # Convert the DVS gesture categorization model to SANA-FE's format
 

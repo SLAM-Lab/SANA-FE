@@ -1,0 +1,27 @@
+FROM node:18-alpine AS make-sanafe
+
+RUN apk add bash gcc g++ musl-dev python3 py3-pip python3-dev
+RUN apk add make git
+
+RUN mkdir /home/build_tutorial
+RUN git clone https://github.com/SLAM-Lab/SANA-FE /home/build_tutorial/sana-fe
+RUN cd /home/build_tutorial/sana-fe && make
+RUN wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1WkbJZFasTe-v8vTYXrUaz_1e-p_xHMEj' -O /home/build_tutorial/dvs_challenge.npz
+
+FROM node:18-alpine AS sanafe
+RUN apk add vim emacs
+RUN apk add bash python3 py3-pip py3-yaml py3-numpy
+RUN mkdir /tutorial
+
+COPY --from=make-sanafe /home/build_tutorial/dvs_challenge.npz /tutorial/dvs_challenge.npz
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/setup_tutorial.sh /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim.py /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/example.yaml /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/tutorial.yaml /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/loihi.yaml /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/example.net /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/tutorial.net /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/challenge.py /home/
+RUN chmod 755 /tutorial/setup_tutorial.sh
+ENTRYPOINT exec /bin/bash -c "/tutorial/setup_tutorial.sh & trap : TERM INT; sleep infinity & wait"
