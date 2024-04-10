@@ -9,9 +9,8 @@ RUN cd /home/build_tutorial/sana-fe && make
 
 FROM node:18-alpine AS sanafe
 RUN apk add vim emacs
-RUN apk add bash python3 py3-pip
+RUN apk add bash python3 py3-pip py3-yaml py3-numpy
 RUN mkdir /tutorial
-RUN python3 -m venv /tutorial/venv && . /tutorial/venv/bin/activate && pip install --upgrade pip && pip install pyyaml numpy
 
 COPY dvs_challenge.npz /tutorial/dvs_challenge.npz
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/setup_tutorial.sh /tutorial/
