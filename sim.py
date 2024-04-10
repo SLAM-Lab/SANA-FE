@@ -628,7 +628,18 @@ def run(arch_path, network_path, timesteps,
         spike_trace=False, potential_trace=False, message_trace=False):
     parsed_filename = os.path.join(run_dir,
                                    os.path.basename(arch_path) + ".parsed")
-    parse_file(arch_path, parsed_filename)
+    try:
+        parse_file(arch_path, parsed_filename)
+    except yaml.parser.ParserError as yaml_parse_exc:
+        print("Error: Invalid YAML file given.")
+        if "expected '<document start>'" in str(yaml_parse_exc):
+            print("Did you mix up the order of simulator files?")
+            print("Run 'python3 sim.py' to check usage.")
+    except yaml.scanner.ScannerError as yaml_parse_exc:
+        print("Error: Problem parsing YAML file.")
+        print(f"Full Error: '{yaml_parse_exc}'")
+        exit()
+
     # Parse inputs and run simulation
     args = []
     if spike_trace:
@@ -650,6 +661,7 @@ def run(arch_path, network_path, timesteps,
     with open("run_summary.yaml", "r") as run_summary:
         results = yaml.safe_load(run_summary)
 
+
     return results
 
 
@@ -670,8 +682,6 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--messages", help="Trace messages", action="store_true")
 
     args = parser.parse_args()
-    print(args)
-
     run(args.architecture, args.snn, args.timesteps, spike_trace=args.spikes,
         potential_trace=args.voltages, perf_trace=args.perf,
         message_trace=args.messages)
