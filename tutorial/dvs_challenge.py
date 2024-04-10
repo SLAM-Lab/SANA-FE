@@ -19,30 +19,12 @@ TIMESTEPS = 1000
 sys.path.insert(0, PROJECT_DIR)
 import sim
 
-def check_mapping(network):
-    # Check that all neurons are mapped to a core
-    neurons_mapped_to_cores = [0 for _ in range(0, 128)]
-    for n in network.neurons:
-        if n.core is None:
-            print("Error: Neuron n{n.id} is not mapped!")
-            return False
-        else:
-            neurons_mapped_to_cores[n.core] += 1
-
-    for core in range(0, 128):
-        if neurons_mapped_to_cores[core] > 1024:
-            print("Error: Core {core} has > 1024 neurons mapped")
-            return False
-
-    return True
-
 network = sim.Network()
 arch = sim.Architecture()
 
 snn = np.load(os.path.join(PROJECT_DIR, "tutorial", "dvs_challenge.npz"))
-# TODO: save the updated model so we just have to load the model and the weights
-# Convert the DVS gesture categorization model to SANA-FE's format
 
+# Convert the DVS gesture categorization model to SANA-FE's format
 biases = snn["inputs"]
 thresholds = snn["thresholds"]
 layer0 = sim.create_layer(network, 1024, threshold=thresholds[0], biases=biases)
