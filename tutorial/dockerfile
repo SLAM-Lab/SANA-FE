@@ -21,5 +21,6 @@ COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/arch.yaml /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/loihi.yaml /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/snn.net /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/dvs_challenge.py /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/TUTORIAL.md /home/
 RUN chmod 755 /setup_tutorial.sh
 ENTRYPOINT exec /bin/bash -c "/setup_tutorial.sh & trap : TERM INT; sleep infinity & wait"
