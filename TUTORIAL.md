@@ -14,10 +14,11 @@ Either using the Docker desktop GUI or command line, pull the docker image:
     jamesaboyle/sana-fe:latest
 
 Now launch a docker container using this image. The easiest way to do this is
-using the Docker GUI. When launching a container with the GUI, it is possible
-to export the /tutorial/files directory to anywhere on your local machine.
-This will give you access to all the tutorial files outside the docker
-environment.
+using the Docker Desktop GUI. When launching a container with the GUI it is
+possible to export a directory: under "Optional Settings" create a new volume.
+The "Host path" is set to whatever folder on your local machine you want to use.
+The "Container path" should be set to `/tutorial/files`. This step will give you
+access to all the tutorial files outside the docker environment.
 
 ## Trying out SANA-FE ##
 
@@ -25,7 +26,6 @@ To run SANA-FE for the first time, load the Python dependencies and run
 the simulation script:
 
     cd /tutorial
-    source venv/bin/activate
     python3 sim.py files/example.yaml files/example.net 1000
 
 Next, we will look at an incomplete architecture. Inside this file are three
