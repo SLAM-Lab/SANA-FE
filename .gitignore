@@ -2,6 +2,7 @@ runs/
 debug/
 release/
 etc/
+tutorial/dvs_challenge.net
 *.swp
 *.yaml
 *.png
