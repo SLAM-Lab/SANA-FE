@@ -91,7 +91,8 @@ int description_read_arch_entry(
 
 	const char entry_type = fields[0][0];
 	// Sanity check input
-	if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#'))
+	if ((entry_type == '\0') || (entry_type == '\n') ||
+		(entry_type == '#') || (entry_type == '\r'))
 	{
 		TRACE1("Warning: No entry, skipping\n");
 		return RET_OK;
@@ -220,7 +221,8 @@ int description_read_network_entry(
 
 	const char entry_type = fields[0][0];
 	// Sanity check input
-	if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#'))
+	if ((entry_type == '\0') || (entry_type == '\n') ||
+		(entry_type == '#') || (entry_type == '\r'))
 	{
 		TRACE1("Warning: No entry, skipping\n");
 		return RET_OK;
@@ -323,6 +325,10 @@ int description_read_network_entry(
 		}
 		group_set = true;
 		neuron_set = true;
+	}
+	else
+	{
+		INFO("Error: Invalid entry type (%s)", fields[0].c_str());
 	}
 
 	if (group_set)
