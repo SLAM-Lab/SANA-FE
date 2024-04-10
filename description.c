@@ -57,7 +57,12 @@ int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
 
 	field_count = 0;
 	last_char_idx = strlen(line) - 1;
-	if (line[last_char_idx] == '\n')
+	// Remove any newline characters from the line buffer
+	if ((strlen(line) > 1) && line[last_char_idx-1] == '\r')
+	{
+		line[last_char_idx-1] = '\0';
+	}
+	if ((strlen(line) > 0) && (line[last_char_idx] == '\n'))
 	{
 		line[last_char_idx] = '\0';
 	}
@@ -101,7 +106,8 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 
 	entry_type = fields[0][0];
 	// Sanity check input
-	if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#'))
+	if ((entry_type == '\0') || (entry_type == '\n') ||
+		(entry_type == '#') || (entry_type == '\r'))
 	{
 		TRACE1("Warning: No entry, skipping\n");
 		return RET_OK;
@@ -216,7 +222,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 
 	entry_type = fields[0][0];
 	// Sanity check input
-	if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#'))
+	if ((entry_type == '\0') || (entry_type == '\n') ||
+		(entry_type == '#') || (entry_type == '\r'))
 	{
 		TRACE1("Warning: No entry, skipping\n");
 		return RET_OK;
@@ -234,7 +241,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	c = NULL;
 	dest_group = NULL;
 	dest = NULL;
-	if (entry_type == 'g' || entry_type == 'x')
+	if (entry_type == 'g')
 	{
 		ret = sscanf(fields[1], "%d", &neuron_count);
 		if (ret < 1)
@@ -304,7 +311,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			}
 		}
 	}
-	else // parse neuron or input node
+	else if (entry_type == 'n') // parse neuron or input node
 	{
 		ret = sscanf(fields[1], "%d.%d", &neuron_group_id, &neuron_id);
 		if (ret < 2)
@@ -312,6 +319,10 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			INFO("Error: Couldn't parse neuron (%s)\n", fields[0]);
 			exit(1);
 		}
+	}
+	else
+	{
+		INFO("Error: Invalid entry type (%s)", fields[0]);
 	}
 
 	if (neuron_group_id > -1)
