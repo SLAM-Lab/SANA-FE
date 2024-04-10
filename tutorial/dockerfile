@@ -13,13 +13,13 @@ RUN apk add vim emacs
 RUN apk add bash python3 py3-pip py3-yaml py3-numpy
 RUN mkdir /tutorial
 
-COPY --from=make-sanafe /home/build_tutorial/dvs_challenge.npz /tutorial/dvs_challenge.npz
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/setup_tutorial.sh /
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim /
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/sim.py /
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/tutorial.yaml /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/setup_tutorial.sh /
+COPY --from=make-sanafe /home/build_tutorial/dvs_challenge.npz /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/arch.yaml /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/loihi.yaml /home/
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/tutorial.net /home/
-COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/challenge.py /home/
-RUN chmod 755 /tutorial/setup_tutorial.sh
-ENTRYPOINT exec /bin/bash -c "/tutorial/setup_tutorial.sh & trap : TERM INT; sleep infinity & wait"
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/snn.net /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/dvs_challenge.py /home/
+RUN chmod 755 /setup_tutorial.sh
+ENTRYPOINT exec /bin/bash -c "/setup_tutorial.sh & trap : TERM INT; sleep infinity & wait"
