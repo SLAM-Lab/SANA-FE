@@ -723,7 +723,10 @@ def run(arch_path, network_path, timesteps,
     print('-----------Total Run Summary-----------')
     sana_fe.sim_summary()
 
-    with open("run_summary.yaml", "r") as run_summary:
+    if out_dir is None:
+        out_dir = ""
+    summary_file = os.path.join(out_dir, "run_summary.yaml")
+    with open(summary_file, "r") as run_summary:
         results = yaml.safe_load(run_summary)
 
     return results
