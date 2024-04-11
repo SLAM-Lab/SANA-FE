@@ -62,7 +62,7 @@ the summary file. This file matches the summary printed by SANA-FE after
 it finishes a simulation.
 
     python3 sim.py -o tutorial tutorial/arch.yaml tutorial/snn.net 10
-    cat run_summary.yaml
+    cat tutorial/run_summary.yaml
 
 Next, run another simulation but with the spike and potential trace flags set.
 Two traces will be generated: `spikes.csv` and `potential.csv`.

@@ -44,7 +44,6 @@ int main(int argc, char *argv[])
 					throw std::invalid_argument(
 					"Error: No output dir given.\n");
 				}
-				INFO("argc:%d\n", argc);
 				argc--;
 				argv++;
 				std::string out_dir(argv[0]);
