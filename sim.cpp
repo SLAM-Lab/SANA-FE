@@ -77,21 +77,37 @@ void SanaFe::run_timesteps(int timesteps)
 	store_data(&run_data, *sim);
 }
 
-void SanaFe::set_input(char *filename)
+void SanaFe::set_spike_trace(const bool enable)
 {
-	input_fp = fopen(filename, "r");
-	if (input_fp == NULL)
-	{
-		INFO("Error: Couldn't open inputs %s.\n", filename);
-		clean_up(RET_FAIL);
-	}
+	sim->log_spikes = enable;
+}
+
+void SanaFe::set_potential_trace(const bool enable)
+{
+	sim->log_potential = enable;
+}
+
+void SanaFe::set_perf_trace(const bool enable)
+{
+	sim->log_perf = enable;
+}
+
+void SanaFe::set_message_trace(const bool enable)
+{
+	sim->log_messages = enable;
 }
 
 void SanaFe::open_perf_trace(void)
 {
 	sim->log_perf = 1;
 
-	sim->perf_fp = fopen("perf.csv", "w");
+	// TODO: warning, this is specific to Linux
+	// To be more portable, consider using the filesystem library in C++17
+	std::string perf_path = out_dir + std::string("/perf.csv");
+	sim->perf_fp = fopen(perf_path.c_str(), "w");
+	std::cout << perf_path << std::endl;
+	std::cout << out_dir << std::endl;
+	exit(1);
 	if (sim->perf_fp == NULL)
 	{
 		INFO("Error: Couldn't open perf file for writing.\n");
@@ -105,7 +121,8 @@ void SanaFe::open_spike_trace(void)
 {
 	sim->log_spikes = 1;
 
-	sim->spike_trace_fp = fopen("spikes.csv", "w");
+	std::string spike_path = out_dir + std::string("/spike.csv");
+	sim->spike_trace_fp = fopen(spike_path.c_str(), "w");
 	if (sim->spike_trace_fp == NULL)
 	{
 		INFO("Error: Couldn't open trace file for writing.\n");
@@ -118,7 +135,8 @@ void SanaFe::open_potential_trace(void)
 {
 	sim->log_potential = 1;
 
-	sim->potential_trace_fp = fopen("potential.csv", "w");
+	std::string potential_path = out_dir + "/potential.csv";
+	sim->potential_trace_fp = fopen(potential_path.c_str(), "w");
 	if (sim->potential_trace_fp == NULL)
 	{
 		INFO("Error: Couldn't open trace file for writing.\n");
@@ -131,7 +149,8 @@ void SanaFe::open_message_trace(void)
 {
 	sim->log_messages = 1;
 
-	sim->message_trace_fp = fopen("messages.csv", "w");
+	std::string message_path = out_dir + "/messages.csv";
+	sim->message_trace_fp = fopen(message_path.c_str(), "w");
 	if (sim->message_trace_fp == NULL)
 	{
 		INFO("Error: Couldn't open trace file for writing.\n");
@@ -144,6 +163,18 @@ void SanaFe::set_gui_flag(bool flag)
 {
 	sim->gui_on = flag;
 	arch->spike_vector_on = flag;
+}
+
+void SanaFe::set_out_dir(std::string dir)
+{
+	if (dir.length() == 0)
+	{
+		out_dir = ".";
+	}
+	else
+	{
+		out_dir = dir;
+	}
 }
 
 void SanaFe::set_arch(const char *filename)
@@ -578,7 +609,7 @@ void sim_receive_messages(Timestep &ts, Architecture &arch)
 	{
 		for (Core &c: tile.cores)
 		{
-			INFO("Processing %lu messages for cid:%d.%d\n",
+			INFO("Processing %lu message(s) for cid:%d.%d\n",
 				c.messages_in.size(), tile.id, c.offset);
 			for (auto &m: c.messages_in)
 			{
@@ -1101,6 +1132,8 @@ double sim_pipeline_receive(Timestep &ts, Architecture &arch,
 	TRACE1("Receiving messages for cid:%d\n", c.id);
 	if (c.buffer_pos >= BUFFER_SYNAPSE)
 	{
+		assert(m.dest_axon_id >= 0);
+		assert(static_cast<size_t>(m.dest_axon_id) < c.axons_in.size());
 		AxonInModel &a = c.axons_in[m.dest_axon_id];
 		for (int s: a.synapse_addresses)
 		{
@@ -1795,11 +1828,11 @@ PYBIND11_MODULE(sanafe, m)
 		.def("init", &SanaFe::init)
         .def("update_neuron", &SanaFe::update_neuron)
         .def("run_timesteps", &SanaFe::run_timesteps, pybind11::arg("timesteps")=1)
-		.def("set_input", &SanaFe::set_input)
-		.def("open_perf_trace", &SanaFe::open_perf_trace)
-		.def("open_spike_trace", &SanaFe::open_spike_trace)
-		.def("open_potential_trace", &SanaFe::open_potential_trace)
-		.def("open_message_trace", &SanaFe::open_message_trace)
+		.def("set_perf_trace", &SanaFe::set_perf_trace, pybind11::arg("enable")=true)
+		.def("set_spike_trace", &SanaFe::set_spike_trace, pybind11::arg("enable")=true)
+		.def("set_potential_trace", &SanaFe::set_potential_trace, pybind11::arg("enable")=true)
+		.def("set_message_trace", &SanaFe::set_message_trace, pybind11::arg("enable")=true)
+		.def("set_out_dir", &SanaFe::set_out_dir)
 		.def("set_gui_flag", &SanaFe::set_gui_flag, pybind11::arg("flag")=true)
 		.def("set_arch", &SanaFe::set_arch)
 		.def("set_net", &SanaFe::set_net)

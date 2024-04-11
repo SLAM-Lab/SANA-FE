@@ -61,23 +61,23 @@ outputs SANA-FE can generate for these files. Start by running and looking at
 the summary file. This file matches the summary printed by SANA-FE after
 it finishes a simulation.
 
-    python3 sim.py tutorial/arch.yaml tutorial/snn.net 10
+    python3 sim.py -o tutorial tutorial/arch.yaml tutorial/snn.net 10
     cat run_summary.yaml
 
 Next, run another simulation but with the spike and potential trace flags set.
 Two traces will be generated: `spikes.csv` and `potential.csv`.
 
-    python3 sim.py -s -v tutorial/arch.yaml tutorial/snn.net 10
-    cat spikes.csv
-    cat potential.csv
+    python3 sim.py -s -v -o tutorial tutorial/arch.yaml tutorial/snn.net 10
+    cat tutorial/spikes.csv
+    cat tutorial/potential.csv
 
 Then, run the same simulation but with message and performance traces
 enabled instead. Two different traces will be generated: `perf.csv` and
 `messages.csv`.
 
-    python3 sim.py -m -p tutorial/arch.yaml tutorial/snn.net 10
-    cat perf.csv
-    cat messages.csv
+    python3 sim.py -m -p -o tutorial tutorial/arch.yaml tutorial/snn.net 10
+    cat tutorial/perf.csv
+    cat tutorial/messages.csv
 
 Finally, run a script that launches a simulation a larger application
 (DVS gesture categorization) running on a real-world architecture (Loihi).
@@ -91,7 +91,8 @@ from the Python script with performance traces.
 
 ## Challenge ##
 
-After running the DVS gesture challenge, there is an open-ended challenge:
+Now that we have showcased a real-world example, there is an open-ended
+challenge:
 
 Optimize the mapping of the DVS gesture SNN to Loihi cores to get the lowest
 power usage.

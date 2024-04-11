@@ -37,22 +37,33 @@ int main(int argc, char *argv[])
 		{
 			switch (argv[0][1])
 			{
-			case 'i':
-				sim.set_input(argv[1]);
-				argv++;
+			case 'o':
+			{
+				if (argc <= 0)
+				{
+					throw std::invalid_argument(
+					"Error: No output dir given.\n");
+				}
+				INFO("argc:%d\n", argc);
 				argc--;
+				argv++;
+				std::string out_dir(argv[0]);
+				// TODO: fix this for C++
+				INFO("Writing output to %s\n", out_dir.c_str());
+				sim.set_out_dir(out_dir);
 				break;
+			}
 			case 'p':
-				sim.open_perf_trace();
+				sim.set_perf_trace(true);
 				break;
 			case 's':
-				sim.open_spike_trace();
+				sim.set_spike_trace(true);
 				break;
 			case 'v':
-				sim.open_potential_trace();
+				sim.set_potential_trace(true);
 				break;
 			case 'm':
-				sim.open_message_trace();
+				sim.set_message_trace(true);
 				break;
 			default:
 				INFO("Error: Flag %c not recognized.\n",
@@ -72,10 +83,28 @@ int main(int argc, char *argv[])
 	{
 		INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
 				"-v<potential trace> -m <message trace>] "
+				"-o <output directory>"
 				"<arch description> <network description> "
 							"<timesteps>\n");
 		sim.clean_up(RET_FAIL);
 		return 0;
+	}
+
+	if (sim.sim->log_perf)
+	{
+		sim.open_perf_trace();
+	}
+	if (sim.sim->log_spikes)
+	{
+		sim.open_spike_trace();
+	}
+	if (sim.sim->log_potential)
+	{
+		sim.open_potential_trace();
+	}
+	if (sim.sim->log_messages)
+	{
+		sim.open_message_trace();
 	}
 
 	// Read in program args, sanity check and parse inputs

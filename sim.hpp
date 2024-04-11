@@ -98,12 +98,17 @@ public:
 	int timesteps;
 	FILE *input_fp;
 	struct run_ts_data run_data;
+	std::string out_dir;
 
         SanaFe();
 	void init();
 	int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<string> kwargs, int count);
 	void run_timesteps(int timesteps = 1);
-	void set_input(char *filename);
+	void set_spike_trace(const bool enable=true);
+	void set_potential_trace(const bool enable=true);
+	void set_perf_trace(const bool enable=true);
+	void set_message_trace(const bool enable=true);
+	void set_out_dir(const std::string dir);
 	void open_perf_trace(void);
 	void open_spike_trace(void);
 	void open_potential_trace(void);
