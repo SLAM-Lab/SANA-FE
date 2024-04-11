@@ -64,4 +64,4 @@ network.save(NETWORK_PATH, save_mappings=True)
 
 # Run the network you just generated on Loihi
 # Comment out this line to stop simulation runs
-sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS)
+sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS, out_dir="tutorial")

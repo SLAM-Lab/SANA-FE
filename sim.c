@@ -103,6 +103,7 @@ struct simulation *sim_init_sim(void)
 	sim->perf_fp = NULL;
 	sim->message_trace_fp = NULL;
 	sim->stats_fp = NULL;
+	strncpy(sim->out_dir, ".", MAX_FIELD_LEN);
 	for (int i = 0; i < ARCH_MAX_CORES; i++)
 	{
 		sim_init_fifo(&(sim->ts.message_queues[i]));

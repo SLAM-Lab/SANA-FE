@@ -625,7 +625,8 @@ def create_noc(noc_dict):
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
         run_dir=os.path.join(project_dir), perf_trace=False,
-        spike_trace=False, potential_trace=False, message_trace=False):
+        spike_trace=False, potential_trace=False, message_trace=False,
+        out_dir=None):
     parsed_filename = os.path.join(run_dir,
                                    os.path.basename(arch_path) + ".parsed")
     try:
@@ -650,6 +651,9 @@ def run(arch_path, network_path, timesteps,
         args.append("-p")
     if message_trace:
         args.append("-m")
+    if out_dir is not None:
+        args.append("-o")
+        args.append(f"{out_dir}")
     command = [os.path.join(project_dir, "sim"),] + args + [parsed_filename,
                network_path, f"{timesteps}"]
 
@@ -676,6 +680,7 @@ if __name__ == "__main__":
     parser.add_argument("architecture", help="Architecture description (YAML) file path", type=str)
     parser.add_argument("snn", help="Spiking Neural Network description file path", type=str)
     parser.add_argument("timesteps", help="Number of timesteps to simulate", type=int)
+    parser.add_argument("-o", "--out_dir", help="Output directory", type=str, required=False)
     parser.add_argument("-s", "--spikes", help="Trace spikes", action="store_true")
     parser.add_argument("-v", "--voltages", help="Trace neuron voltages", action="store_true")
     parser.add_argument("-p", "--perf", help="Trace perf", action="store_true")
@@ -684,5 +689,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run(args.architecture, args.snn, args.timesteps, spike_trace=args.spikes,
         potential_trace=args.voltages, perf_trace=args.perf,
-        message_trace=args.messages)
+        message_trace=args.messages, out_dir=args.out_dir)
     print("sim finished")

@@ -59,6 +59,7 @@ struct simulation
 	long int total_neurons_fired;
 	double total_energy, total_sim_time, wall_time;
 	int log_perf, log_spikes, log_potential, log_messages;
+	char out_dir[MAX_FIELD_LEN];
 	FILE *spike_trace_fp, *potential_trace_fp, *message_trace_fp, *perf_fp;
 	FILE *stats_fp;
 };

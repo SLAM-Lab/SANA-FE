@@ -32,14 +32,11 @@ int main(int argc, char *argv[])
 	struct simulation *sim;
 	struct network net;
 	struct architecture *arch;
-	char *filename, *input_buffer;
+	char *filename;
 	double average_power;
 	int timesteps, ret;
-	FILE *input_fp, *network_fp, *arch_fp;
+	FILE *network_fp, *arch_fp;
 
-	filename = NULL;
-	input_fp = NULL;
-	input_buffer = NULL;
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
 	ret = RET_FAIL;
@@ -64,11 +61,6 @@ int main(int argc, char *argv[])
 		{
 			switch (argv[0][1])
 			{
-			case 'i':
-				filename = argv[1];
-				argv++;
-				argc--;
-				break;
 			case 'p':
 				sim->log_perf = 1;
 				break;
@@ -80,6 +72,19 @@ int main(int argc, char *argv[])
 				break;
 			case 'm':
 				sim->log_messages = 1;
+				break;
+			case 'o':
+				if (argc <= 0)
+				{
+					INFO("Error: No output dir given.\n");
+					exit(1);
+				}
+				INFO("argc:%d\n", argc);
+				argc--;
+				argv++;
+				INFO("argc:%d\n", argc);
+				strncpy(sim->out_dir, argv[0], MAX_FIELD_LEN);
+				INFO("Writing output to %s\n", sim->out_dir);
 				break;
 			default:
 				INFO("Error: Flag %c not recognized.\n",
@@ -95,20 +100,12 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (filename)
-	{
-		input_fp = fopen(filename, "r");
-		if (input_fp == NULL)
-		{
-			INFO("Error: Couldn't open inputs %s.\n", filename);
-			goto clean_up;
-		}
-	}
-
+	INFO("argc:%d\n", argc);
 	if (argc < PROGRAM_NARGS)
 	{
 		INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
-				"-v<potential trace> -m <message trace>] "
+				"-v<potential trace> -m<message trace> "
+				"-o <output directory>] "
 				"<arch description> <network description> "
 							"<timesteps>\n");
 		goto clean_up;
@@ -116,7 +113,10 @@ int main(int argc, char *argv[])
 
 	if (sim->log_potential)
 	{
-		sim->potential_trace_fp = fopen("potential.csv", "w");
+		char file_path[2*MAX_FIELD_LEN];
+		strncpy(file_path, sim->out_dir, MAX_FIELD_LEN);
+		strncat(file_path, "/potential.csv", MAX_FIELD_LEN);
+		sim->potential_trace_fp = fopen(file_path, "w");
 		if (sim->potential_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
@@ -125,7 +125,10 @@ int main(int argc, char *argv[])
 	}
 	if (sim->log_spikes)
 	{
-		sim->spike_trace_fp = fopen("spikes.csv", "w");
+		char file_path[2*MAX_FIELD_LEN];
+		strncpy(file_path, sim->out_dir, MAX_FIELD_LEN);
+		strncat(file_path, "/spikes.csv", MAX_FIELD_LEN);
+		sim->spike_trace_fp = fopen(file_path, "w");
 		if (sim->spike_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
@@ -134,7 +137,10 @@ int main(int argc, char *argv[])
 	}
 	if (sim->log_messages)
 	{
-		sim->message_trace_fp = fopen("messages.csv", "w");
+		char file_path[2*MAX_FIELD_LEN];
+		strncpy(file_path, sim->out_dir, MAX_FIELD_LEN);
+		strncat(file_path, "/messages.csv", MAX_FIELD_LEN);
+		sim->message_trace_fp = fopen(file_path, "w");
 		if (sim->message_trace_fp == NULL)
 		{
 			INFO("Error: Couldn't open trace file for writing.\n");
@@ -144,7 +150,10 @@ int main(int argc, char *argv[])
 	}
 	if (sim->log_perf)
 	{
-		sim->perf_fp = fopen("perf.csv", "w");
+		char file_path[2*MAX_FIELD_LEN];
+		strncpy(file_path, sim->out_dir, MAX_FIELD_LEN);
+		strncat(file_path, "/perf.csv", MAX_FIELD_LEN);
+		sim->perf_fp = fopen(file_path, "w");
 		if (sim->perf_fp == NULL)
 		{
 			INFO("Error: Couldn't open perf file for writing.\n");
@@ -242,7 +251,10 @@ int main(int argc, char *argv[])
 		average_power = 0.0;
 	}
 	INFO("Average power consumption: %f W.\n", average_power);
-	sim->stats_fp = fopen("run_summary.yaml", "w");
+	char file_path[2*MAX_FIELD_LEN];
+	strncpy(file_path, sim->out_dir, MAX_FIELD_LEN);
+	strncat(file_path, "/run_summary.yaml", MAX_FIELD_LEN);
+	sim->stats_fp = fopen(file_path, "w");
 	if (sim->stats_fp != NULL)
 	{
 		sim_write_summary(sim->stats_fp, sim);
@@ -253,8 +265,6 @@ clean_up:
 	// Free any larger structures here
 	network_free(&net);
 	arch_free(arch);
-	// Free any locally allocated memory here
-	free(input_buffer);
 
 	// Close any open files here
 	if (sim->potential_trace_fp != NULL)
