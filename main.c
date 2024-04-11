@@ -79,10 +79,8 @@ int main(int argc, char *argv[])
 					INFO("Error: No output dir given.\n");
 					exit(1);
 				}
-				INFO("argc:%d\n", argc);
 				argc--;
 				argv++;
-				INFO("argc:%d\n", argc);
 				strncpy(sim->out_dir, argv[0], MAX_FIELD_LEN);
 				INFO("Writing output to %s\n", sim->out_dir);
 				break;
