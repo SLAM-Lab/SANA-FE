@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include <omp.h>
+//#include <omp.h>
 
 #include "print.h"
 #include "sim.h"

@@ -7,17 +7,21 @@
 # Group 0
 g 2 threshold=1.0 reset=0.0 log_spikes=1 log_v=1
 # Group 1
-g 1 threshold=2.0 reset=0.0
+g 2 threshold=2.0 reset=0.0
 
 ## Neurons
 n 0.0 bias=0.2 connections_out=2
-n 0.1 connections_out=1
+n 0.1 connections_out=1 bias=0.5
 n 1.0 bias=0.0
+n 1.1
 
 ## Edges
 e 0.0->1.0 weight=-1.0
+e 0.0->1.1 weight=-2
+e 0.1->1.1 weight=3
 
 ## Mappings
 & 0.0@0.0
 & 0.1@0.0
 & 1.0@0.0
+& 1.1@0.1

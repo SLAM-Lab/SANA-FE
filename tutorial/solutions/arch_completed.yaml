@@ -1,5 +1,5 @@
 ## arch.yaml
-# Exercise 1) Set the costs of a neuron update in the soma from 0.0 ns to 2.0 ns and from 0.0 pJ to 2.0 pJ. Note that ns=e-9 and pJ=e-12.
+# Exercise 1) Set the costs of a neuron update in the soma from 0.0 ns to 2.0 ns and from 0.0 pJ to 2.0 pJ
 # Exercise 2) Duplicate tiles 2 times and each core 4 times within every tile (8 cores total). (For a hint look at files/loihi.yaml)
 # Exercise 3) Add a new synapse unit for compressed synapses. The energy and latency costs for reading a compressed synapse is 0.5 pJ and 2 ns
 architecture:
@@ -9,7 +9,7 @@ architecture:
     width: 2
     height: 1
   tile:
-    - name: tutorial_tile
+    - name: tutorial_tile[0..1]
       attributes:
         energy_north_hop: 1.0e-12
         latency_north_hop: 1.0e-9
@@ -20,7 +20,7 @@ architecture:
         energy_west_hop: 1.0e-12
         latency_west_hop: 1.0e-9
       core:
-        - name: tutorial_core
+        - name: tutorial_core[0..3]
           attributes:
             buffer_before: soma
           axon_in:
@@ -32,6 +32,11 @@ architecture:
                 model: current_based
                 energy_process_spike: 1.0e-12
                 latency_process_spike: 1.0e-9
+            - name: tutorial_synapse_compressed
+              attributes:
+                model: current_based
+                energy_process_spike: 0.5e-12
+                latency_process_spike: 2.0e-9
           dendrite:
             - name: demo_dendrite
               attributes:
@@ -41,8 +46,8 @@ architecture:
                 model: leaky_integrate_fire
                 energy_access_neuron: 1.0e-12
                 latency_access_neuron: 1.0e-9
-                energy_update_neuron: 0.0e-12
-                latency_update_neuron: 0.0e-9
+                energy_update_neuron: 2.0e-12
+                latency_update_neuron: 2.0e-9
                 energy_spike_out: 3.0e-12
                 latency_spike_out: 3.0e-9
           axon_out:

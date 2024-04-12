@@ -211,7 +211,7 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 	assert(n != NULL);
 	if (n->is_init)
 	{
-		INFO("Error: Trying to redefine neuron %d.\n", n->id);
+		INFO("Error: Trying to redefine same neuron twice %d.\n", n->id);
 		return NETWORK_INVALID_NID;
 	}
 

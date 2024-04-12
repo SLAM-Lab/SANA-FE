@@ -9,8 +9,8 @@ DEBUGFLAGS=-DDEBUG -no-pie -pg -O0
 # TODO: only enable this feature if the git repository is owned by the same
 #  user as the one running the script
 #GIT_COMMIT=$(shell ./scripts/git_status.sh)
-
-LIBS=-lrt -lm
+#LIBS=-lrt -lm
+LIBS=-lm
 DEPS=sim.h print.h command.h network.h arch.h description.h
 OBJ=main.o sim.o command.o network.o arch.o description.o
 DEBUGDIR=debug

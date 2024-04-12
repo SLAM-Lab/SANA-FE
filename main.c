@@ -98,7 +98,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	INFO("argc:%d\n", argc);
 	if (argc < PROGRAM_NARGS)
 	{
 		INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
