@@ -1,0 +1,8 @@
+git_version: 
+energy: 3.498000e-09
+sim_time: 3.498000e-06
+total_spikes: 166
+total_packets: 166
+total_neurons_fired: 166
+wall_time: 0.051990
+timesteps: 1000

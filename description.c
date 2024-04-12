@@ -27,9 +27,12 @@ int description_parse_file(
 	}
 	else
 	{
+		int line_number = 1;
 		while (fgets(line, MAX_LINE, fp) && (ret != RET_FAIL))
 		{
-			ret = description_read_line(line, fields, net, arch);
+			ret = description_read_line(
+				line, fields, net, arch, line_number);
+			line_number++;
 		}
 	}
 
@@ -40,7 +43,7 @@ int description_parse_file(
 }
 
 int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
-	struct network *net, struct architecture *arch)
+	struct network *net, struct architecture *arch, const int line_number)
 {
 	char *token;
 	int field_count, last_char_idx;
@@ -82,7 +85,7 @@ int description_read_line(char *line, char fields[][MAX_FIELD_LEN],
 			// The network file description requires an initialized arch
 			//  and a pointer to the network struct
 			return description_read_network_entry(
-				fields, field_count, arch, net);
+				fields, field_count, arch, net, line_number);
 		}
 		return description_read_arch_entry(fields, field_count, arch);
 	}
@@ -208,7 +211,8 @@ int description_read_arch_entry(char fields[][MAX_FIELD_LEN],
 }
 
 int description_read_network_entry(char fields[][MAX_FIELD_LEN],
-	const int field_count, struct architecture *arch, struct network *net)
+	const int field_count, struct architecture *arch, struct network *net,
+	const int line_number)
 {
 	struct attributes attributes[DESCRIPTION_MAX_ATTRIBUTES];
 	int attribute_count = 0;
@@ -225,7 +229,7 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	if ((entry_type == '\0') || (entry_type == '\n') ||
 		(entry_type == '#') || (entry_type == '\r'))
 	{
-		TRACE1("Warning: No entry, skipping\n");
+		TRACE1("Warning: No entry, skipping line %d\n", line_number);
 		return RET_OK;
 	}
 
@@ -246,7 +250,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		ret = sscanf(fields[1], "%d", &neuron_count);
 		if (ret < 1)
 		{
-			INFO("Error: Couldn't parse count (%s)\n", fields[0]);
+			INFO("Error: Line %d: Couldn't parse count (%s)\n",
+				line_number, fields[0]);
 			exit(1);
 		}
 	}
@@ -256,21 +261,23 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			&neuron_id, &tile_id, &core_offset);
 		if (ret < 4)
 		{
-			INFO("Error couldn't parse mapping.\n");
+			INFO("Error: Line %d: Couldn't parse mapping. "
+			"(Format should be src_gid.src_nid@dst_gid.dst_nid)\n",
+				line_number);
 			exit(1);
 		}
 		if (tile_id >= arch->tile_count)
 		{
-			INFO("Error: Tile (%d) >= tile count (%d)\n", tile_id,
-				arch->tile_count);
+			INFO("Error: Line %d: Tile (%d) >= tile count (%d)\n",
+				line_number, tile_id, arch->tile_count);
 			exit(1);
 		}
 		t = &(arch->tiles[tile_id]);
 
 		if (core_offset >= t->core_count)
 		{
-			INFO("Error: Core (%d) >= core count (%d)\n",
-				core_offset, t->core_count);
+			INFO("Error: Line %d: Core (%d) >= core count (%d)\n",
+				line_number, core_offset, t->core_count);
 			exit(1);
 		}
 		c = &(t->cores[core_offset]);
@@ -282,15 +289,18 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			&neuron_id, &dest_group_id, &dest_neuron_id);
 		if (ret < 4)
 		{
-			INFO("Error couldn't parse connection / edge.\n");
+			INFO("Error: Line %d: Couldn't parse connection / edge.\n",
+				line_number);
 			exit(1);
 		}
 		if (dest_group_id > -1)
 		{
 			if (dest_group_id >= net->neuron_group_count)
 			{
-				INFO("Error: Group (%d) >= group count (%d).\n",
-					dest_group_id, net->neuron_group_count);
+				INFO("Error: Line %d: "
+					"Group (%d) >= group count (%d).\n",
+					line_number, dest_group_id,
+					net->neuron_group_count);
 				return RET_FAIL;
 			}
 			dest_group = &(net->groups[dest_group_id]);
@@ -301,11 +311,11 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			{
 				if (dest_neuron_id >= dest_group->neuron_count)
 				{
-					INFO("Error: Trying to access neuron "
-						"(%d.%d) but group %d only "
-						"allocates %d neurons.\n",
-						dest_group->id, dest_neuron_id,
-						dest_group->id,
+					INFO("Error: Line %d: Trying to access "
+						"neuron (%d.%d) but group %d "
+						"only allocates %d neurons.\n",
+						line_number, dest_group->id,
+						dest_neuron_id, dest_group->id,
 						dest_group->neuron_count);
 					return RET_FAIL;
 				}
@@ -324,15 +334,17 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 	}
 	else
 	{
-		INFO("Error: Invalid entry type (%s)", fields[0]);
+		INFO("Error: Line %d: Invalid entry type (%s)\n", line_number,
+			fields[0]);
 	}
 
 	if (neuron_group_id > -1)
 	{
 		if (neuron_group_id >= net->neuron_group_count)
 		{
-			INFO("Error: Group (%d) >= group count (%d).\n",
-				neuron_group_id, net->neuron_group_count);
+			INFO("Error: Line %d: Group (%d) >= group count (%d).\n",
+				line_number, neuron_group_id,
+				net->neuron_group_count);
 			return RET_FAIL;
 		}
 		group = &(net->groups[neuron_group_id]);
@@ -342,12 +354,11 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		{
 			if (neuron_id >= group->neuron_count)
 			{
-				INFO("Error: Trying to access neuron "
+				INFO("Error: Line %d: Trying to access neuron "
 					"(%d.%d) but group %d only "
 					"allocates %d neuron(s).\n",
-					group->id, neuron_id,
-					group->id,
-					group->neuron_count);
+					line_number, group->id, neuron_id,
+					group->id, group->neuron_count);
 				return RET_FAIL;
 			}
 			n = &(group->neurons[neuron_id]);
@@ -365,7 +376,8 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 		value_str = strtok(NULL, "=");
 		if ((key == NULL) || (value_str == NULL))
 		{
-			INFO("Invalid attribute: %s\n", fields[i]);
+			INFO("Error: Line %d: Invalid attribute: %s\n",
+				line_number, fields[i]);
 			exit(1);
 		}
 		strncpy(attr->key, key, MAX_FIELD_LEN);
@@ -400,8 +412,9 @@ int description_read_network_entry(char fields[][MAX_FIELD_LEN],
 			int edge_id = (n->connection_out_count)++;
 			if (edge_id >= n->max_connections_out)
 			{
-				INFO("Edge (%d) >= neuron connections (%d)\n",
-					edge_id, n->max_connections_out);
+				INFO("Line %d: Edge (%d) >= neuron connections (%d)\n",
+					line_number, edge_id,
+					n->max_connections_out);
 				exit(1);
 			}
 			con = &(n->connections_out[edge_id]);

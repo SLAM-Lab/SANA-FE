@@ -195,7 +195,7 @@ def run_spiking_experiment(mapping, max_size=30):
             if copy_network:
                 neuron_counts *= 2
             spiking_writer.writerow({"neuron_counts": neuron_counts,
-                                      "time": results["time"],
+                                      "time": results["sim_time"],
                                       "energy": results["energy"],
                                       "mapping": mapping})
 

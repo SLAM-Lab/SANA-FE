@@ -28,8 +28,7 @@ arch = sim.Architecture()
 # Load the convolutional kernel weights, thresholds and input biases from file.
 #  If using the Docker container, this file is included in the image.
 #  Otherwise, this file is also hosted on Google Drive and can be downloaded
-#  prior to running this script using the command:
-#     wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1WkbJZFasTe-v8vTYXrUaz_1e-p_xHMEj'
+#  prior to running this script
 try:
     snn = np.load(os.path.join(PROJECT_DIR, "tutorial", "dvs_challenge.npz"))
 except FileNotFoundError as exc:
@@ -47,10 +46,10 @@ Or go directly to the drive at: https://drive.google.com/drive/folders/1GzjXAFou
 # Convert the DVS gesture categorization model to SANA-FE's SNN format
 biases = snn["inputs"]
 thresholds = snn["thresholds"]
-layer0 = sim.create_layer(network, 1024, threshold=thresholds[0], biases=biases)
+layer0 = sim.create_layer(network, 1024, threshold=thresholds[0], # 1024 neurons
+                          biases=biases)
 layer1 = sim.create_conv_layer(network, layer0, (32, 32, 1),  # 3600 neurons
-                               snn["conv1"], stride=2, threshold=thresholds[1],
-                               )
+                               snn["conv1"], stride=2, threshold=thresholds[1])
 layer2 = sim.create_conv_layer(network, layer1, (15, 15, 16),  # 5408 neurons
                                snn["conv2"], stride=1, threshold=thresholds[2])
 layer3 = sim.create_conv_layer(network, layer2, (13, 13, 32),  # 7744 neurons
@@ -76,7 +75,22 @@ network.save(NETWORK_PATH, save_mappings=True)
 
 # Run the network you just generated on Loihi
 # Comment out this line if you want to stop the simulations running
-results = sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS, out_dir="tutorial")
+results = sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS,
+                  out_dir=os.path.join(PROJECT_DIR, "tutorial"),
+                  perf_trace=True)
 
-energy_delay_product = results["energy"] * results["time"]
+# Sanity check the simulation ran correctly
+if results["timesteps"] != 1000:
+    print("Error: You must run the simulation")
+    raise RuntimeError
+
+expected_firing_neurons = 367770
+if results["total_neurons_fired"] != expected_firing_neurons:
+    print(f"Error: The total number of neurons spiking was "
+          f"{results['total_neurons_fired']}, "
+          f"should be {expected_firing_neurons}")
+    print("Somehow you may have changed the functional behavior of the SNN")
+    raise RuntimeError
+
+energy_delay_product = results["energy"] * results["sim_time"]
 print(f"Energy-Delay product: {energy_delay_product}")

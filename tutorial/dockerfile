@@ -9,7 +9,7 @@ RUN cd /home/build_tutorial/sana-fe && make
 RUN wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1WkbJZFasTe-v8vTYXrUaz_1e-p_xHMEj' -O /home/build_tutorial/dvs_challenge.npz
 
 FROM node:18-alpine AS sanafe
-RUN apk add vim emacs
+RUN apk add vim diffutils
 RUN apk add bash python3 py3-pip py3-yaml py3-numpy
 RUN mkdir /tutorial
 
@@ -22,5 +22,13 @@ COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/loihi.yaml /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/snn.net /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/dvs_challenge.py /home/
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/TUTORIAL.md /home/
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/run.log /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/run_results /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/arch.log /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/arch_results /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/snn.log /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/snn_results /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/challenge.log /
+
 RUN chmod 755 /setup_tutorial.sh
 ENTRYPOINT exec /bin/bash -c "/setup_tutorial.sh & trap : TERM INT; sleep infinity & wait"

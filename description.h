@@ -25,9 +25,9 @@ struct simulation;
 #include <stdio.h>
 
 int description_parse_file(FILE *fp, struct network *net, struct architecture *arch);
-int description_read_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch);
+int description_read_line(char *line, char fields[][MAX_FIELD_LEN], struct network *net, struct architecture *arch, const int line_number);
 int description_read_arch_entry(char fields[][MAX_FIELD_LEN], const int field_count, struct architecture *arch);
-int description_read_network_entry(char fields[][MAX_FIELD_LEN], const int field_count, struct architecture *arch, struct network *net);
+int description_read_network_entry(char fields[][MAX_FIELD_LEN], const int field_count, struct architecture *arch, struct network *net, const int line_number);
 int description_parse_command(char fields[][MAX_FIELD_LEN], const int field_count, struct network *net, struct architecture *arch, struct simulation *sim);
 
 #endif

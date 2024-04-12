@@ -30,8 +30,8 @@ LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
 SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
 SIM_ENERGY_DATA_FILENAME = "sim_gesture_32x32_energy.csv"
 
-#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
-NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
+NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
+#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
 DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
@@ -42,15 +42,16 @@ LOIHI_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, LOIHI_ENERGY_DATA_FILENAME)
 SIM_TIME_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_TIME_DATA_FILENAME)
 SIM_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_ENERGY_DATA_FILENAME)
 
+
 def parse_stats(stats):
     print("Parsing statistics")
     total = stats.sum()
     pd.set_option('display.max_rows', None)
     analysis = {}
-    analysis["times"] = stats.loc[:, "time"]
     analysis["hops"] = stats.loc[:, "hops"]
     analysis["fired"] = stats.loc[:, "fired"]
     analysis["packets"] = stats.loc[:, "packets"]
+    analysis["times"] = stats.loc[:, "sim_time"]
     analysis["total_energy"] = sum(stats.loc[:, "total_energy"])
 
     return analysis
@@ -90,8 +91,9 @@ def parse_loihi_spiketrains(total_timesteps):
 
     return spiketrain
 
+
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -134,9 +136,10 @@ if __name__ == "__main__":
             open(SIM_ENERGY_DATA_PATH, "w")
         elif experiment == "time":
             open(SIM_TIME_DATA_PATH, "w")
-        open("hops.csv", "w")
+        #open("hops.csv", "w")
 
-        for inputs in range(0, frames):
+        for inputs in range(1, frames):
+        #for inputs in range(50, frames):
         #for inputs in range(0, 1):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
@@ -161,8 +164,8 @@ if __name__ == "__main__":
             energies = np.append(energies, analysis["total_energy"] / timesteps)
             hops = np.append(hops, analysis["hops"])
 
-            with open("hops.csv", "a") as hops_file:
-                np.savetxt("hops.csv", hops, delimiter=",")
+            #with open("hops.csv", "a") as hops_file:
+            #    np.savetxt("hops.csv", hops, delimiter=",")
             if experiment == "time":
                 with open(SIM_TIME_DATA_PATH, "a") as time_file:
                     np.savetxt(SIM_TIME_DATA_PATH, times, delimiter=",")
@@ -188,9 +191,9 @@ if __name__ == "__main__":
         if experiment == "time":
             plt.rcParams.update({'font.size': 6, 'lines.markersize': 4})
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
-            hops = np.loadtxt("hops.csv", delimiter=",")
+            #hops = np.loadtxt("hops.csv", delimiter=",")
             loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
-            hops_data = pd.read_csv("hops.csv")
+            #hops_data = pd.read_csv("hops.csv")
             event_based_data = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "noc", "dvs", "event_based_latencies.csv"))
 
             #loihi_times = np.array(loihi_data.loc[:, "spiking"] / 1.0e6)
@@ -202,8 +205,8 @@ if __name__ == "__main__":
             #  timestep-1)
             times = np.delete(times,
                             list(range(timesteps, timesteps*frames, timesteps)))
-            hops = np.delete(hops,
-                            list(range(timesteps, timesteps*frames, timesteps)))
+            #hops = np.delete(hops,
+            #                list(range(timesteps, timesteps*frames, timesteps)))
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps, timesteps*frames, timesteps)))
 
