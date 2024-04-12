@@ -128,7 +128,7 @@ int network_create_neuron(Neuron &n, const std::list<Attribute> &attr)
 	//  network for dt seconds. This relates to the LIF time constant.
 	if (n.is_init)
 	{
-		INFO("Error: Trying to redefine neuron %d.\n", n.id);
+		INFO("Error: Trying to define same neuron twice %d.\n", n.id);
 		return NETWORK_INVALID_NID;
 	}
 

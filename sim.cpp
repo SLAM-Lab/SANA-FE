@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
-#include <omp.h>
+//#include <omp.h>
 #include <vector>
 #include <list>
 #include <memory>

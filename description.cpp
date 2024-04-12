@@ -303,9 +303,11 @@ int description_read_network_entry(
 			neuron_id);
 		if (dest_neuron_id >= dest_group->neurons.size())
 		{
-			INFO("Error: Neuron (%lu) >= "
-				"group neurons (%lu).\n",
-				dest_neuron_id,
+			INFO("Error: Trying to access neuron "
+				"(%d.%lu) but group %d only "
+				"allocates %lu neurons.\n",
+				dest_group->id, dest_neuron_id,
+				dest_group->id,
 				dest_group->neurons.size());
 			return RET_FAIL;
 		}
@@ -346,9 +348,11 @@ int description_read_network_entry(
 		{
 			if (neuron_id >= group.neurons.size())
 			{
-				INFO("Error: Neuron (%lu) >= "
-				     "group neurons (%lu).\n",
-					neuron_id, group.neurons.size());
+                               INFO("Error: Trying to access neuron "
+                                       "(%d.%lu) but group %d only "
+                                       "allocates %lu neuron(s).\n",
+					group.id, neuron_id, group.id,
+					group.neurons.size());
 				return RET_FAIL;
 			}
 			n = &(group.neurons[neuron_id]);

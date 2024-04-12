@@ -30,7 +30,19 @@ arch = sim.Architecture()
 #  Otherwise, this file is also hosted on Google Drive and can be downloaded
 #  prior to running this script using the command:
 #     wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1WkbJZFasTe-v8vTYXrUaz_1e-p_xHMEj'
-snn = np.load(os.path.join(PROJECT_DIR, "tutorial", "dvs_challenge.npz"))
+try:
+    snn = np.load(os.path.join(PROJECT_DIR, "tutorial", "dvs_challenge.npz"))
+except FileNotFoundError as exc:
+    print(exc)
+    print("""
+To run this challenge, you need to download the network kernel weights: dvs_challenge.npz, to the tutorial directory.
+These weights are hosted online on a shared Google Drive. To download the file with a in Linux run the command:
+
+wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1WkbJZFasTe-v8vTYXrUaz_1e-p_xHMEj' -O tutorial/dvs_challenge.npz
+
+Or go directly to the drive at: https://drive.google.com/drive/folders/1GzjXAFouakm3b6GcFIHsw67H8t6l3BtY?usp=drive_link
+          """)
+    exit()
 
 # Convert the DVS gesture categorization model to SANA-FE's SNN format
 biases = snn["inputs"]
@@ -63,5 +75,8 @@ sim.map_neuron_group_to_cores(layer5, arch, 1)
 network.save(NETWORK_PATH, save_mappings=True)
 
 # Run the network you just generated on Loihi
-# Comment out this line to stop simulation runs
-sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS, out_dir="tutorial")
+# Comment out this line if you want to stop the simulations running
+results = sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS, out_dir="tutorial")
+
+energy_delay_product = results["energy"] * results["time"]
+print(f"Energy-Delay product: {energy_delay_product}")
