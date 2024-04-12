@@ -1624,20 +1624,22 @@ void sim_reset_measurements(Network &net, Architecture &arch)
 
 void sim_perf_write_header(FILE *fp)
 {
-	fprintf(fp, "time,");
+	fprintf(fp, "timestep,");
 	fprintf(fp, "fired,");
 	fprintf(fp, "packets,");
 	fprintf(fp, "hops,");
+	fprintf(fp, "sim_time,");
 	fprintf(fp, "total_energy,");
 	fprintf(fp, "\n");
 }
 
 void sim_perf_log_timestep(const Timestep &ts, FILE *fp)
 {
-	fprintf(fp, "%le,", ts.sim_time);
+	fprintf(fp, "%ld,", ts.timestep);
 	fprintf(fp, "%ld,", ts.total_neurons_fired);
 	fprintf(fp, "%ld,", ts.packets_sent);
 	fprintf(fp, "%ld,", ts.total_hops);
+	fprintf(fp, "%le,", ts.sim_time);
 	fprintf(fp, "%le,", ts.energy);
 	fprintf(fp, "\n");
 }
@@ -1647,7 +1649,7 @@ void sim_write_summary(FILE *fp, const Simulation &sim)
 	// Write the simulation summary to file
 	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
 	fprintf(fp, "energy: %e\n", sim.total_energy);
-	fprintf(fp, "time: %e\n", sim.total_sim_time);
+	fprintf(fp, "sim_time: %e\n", sim.total_sim_time);
 	fprintf(fp, "total_spikes: %ld\n", sim.total_spikes);
 	fprintf(fp, "total_packets: %ld\n", sim.total_messages_sent);
 	fprintf(fp, "total_neurons_fired: %ld\n", sim.total_neurons_fired);
@@ -1658,7 +1660,7 @@ void sim_write_summary(FILE *fp, const Simulation &sim)
 void sim_spike_trace_write_header(const Simulation &sim)
 {
 	assert(sim.spike_trace_fp != NULL);
-	fprintf(sim.spike_trace_fp, "gid.nid,timestep\n");
+	fprintf(sim.spike_trace_fp, "neuron,timestep\n");
 
 	return;
 }
@@ -1667,6 +1669,7 @@ void sim_potential_trace_write_header(const Simulation &sim, const Network &net)
 {
 	// Write csv header for probe outputs - record which neurons have been
 	//  probed
+	fprintf(sim->potential_trace_fp, "timestep,");
 	for (auto &group: net.groups)
 	{
 		for (auto n: group.neurons)
@@ -1674,7 +1677,7 @@ void sim_potential_trace_write_header(const Simulation &sim, const Network &net)
 			if (sim.potential_trace_fp && sim.log_potential &&
 				n.log_potential)
 			{
-				fprintf(sim.potential_trace_fp, "%d.%d,",
+				fprintf(sim.potential_trace_fp, "neuron %d.%d,",
 					group.id, n.id);
 			}
 		}
@@ -1711,7 +1714,7 @@ void sim_trace_record_spikes(
 			{
 				fprintf(sim.spike_trace_fp, "%d.%d,%ld\n",
 					n.parent_group_id, n.id,
-					sim.timesteps);
+					sim.timesteps+1);
 			}
 		}
 	}
@@ -1727,6 +1730,7 @@ void sim_trace_record_potentials(
 	//  one time-step
 	int potential_probe_count = 0;
 
+	fprintf(sim->potential_trace_fp, "%ld,", sim->timesteps+1);
 	for (auto &group: net.groups)
 	{
 		for (auto &n: group.neurons)

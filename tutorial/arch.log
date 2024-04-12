@@ -1,0 +1,33 @@
+[main.c:46:main()] Initializing simulation.
+[main.c:200:main()] Reading network from file.
+[network.c:194:network_create_neuron_group()] Created neuron group gid:0 count:2 threshold:1.000000 neg threshold:-1.000000 pos reset:0.000000 reset mode:2 neg reset:0.000000 neg reset mode:0
+[network.c:194:network_create_neuron_group()] Created neuron group gid:1 count:1 threshold:2.000000 neg threshold:-1.000000 pos reset:0.000000 reset mode:2 neg reset:0.000000 neg reset mode:0
+[arch.c:552:arch_print_connection_map_summary()] ** Mapping summary **
+[arch.c:581:arch_print_connection_map_summary()] Total cores: 1
+[arch.c:582:arch_print_connection_map_summary()] Average in map count: 1.000000
+[arch.c:583:arch_print_connection_map_summary()] Average out map count: 1.000000
+[main.c:210:main()] Creating probe and perf data files.
+[main.c:228:main()] Running simulation.
+[main.c:235:main()] *** Time-step 100 ***
+[main.c:235:main()] *** Time-step 200 ***
+[main.c:235:main()] *** Time-step 300 ***
+[main.c:235:main()] *** Time-step 400 ***
+[main.c:235:main()] *** Time-step 500 ***
+[main.c:235:main()] *** Time-step 600 ***
+[main.c:235:main()] *** Time-step 700 ***
+[main.c:235:main()] *** Time-step 800 ***
+[main.c:235:main()] *** Time-step 900 ***
+[main.c:235:main()] *** Time-step 1000 ***
+[main.c:240:main()] ***** Run Summary *****
+git_version: 
+energy: 7.486000e-09
+sim_time: 7.486000e-06
+total_spikes: 166
+total_packets: 166
+total_neurons_fired: 166
+wall_time: 0.050051
+timesteps: 1000
+[main.c:250:main()] Average power consumption: 0.001000 W.
+[main.c:259:main()] Run finished.
+Command: /home/james/code/sana-fe/sim /home/james/code/sana-fe/arch.yaml.parsed tutorial/snn.net 1000
+sim finished

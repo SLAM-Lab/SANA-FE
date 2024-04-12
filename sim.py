@@ -430,7 +430,7 @@ def parse_file(input_filename, output_filename):
         arch_dict = yaml.safe_load(arch_file)
 
     if "architecture" not in arch_dict:
-        raise Exception("Error: no architecture defined")
+        raise Exception("Error: no architecture section defined")
 
     parse_arch(arch_dict["architecture"])
     arch_elements = _entry_list
@@ -563,6 +563,10 @@ def create_tile(tile, name):
     tile_id = _tiles
     _tiles += 1
 
+    if "attributes" not in tile:
+        raise Exception(f"attributes section not defined for tile {tile_id}. "
+                        "Did you mispell attributes?")
+
     tile = f"t {name}" + format_attributes(tile["attributes"])
     _entry_list.append(tile)
     # Track how many cores are in this tile
@@ -573,6 +577,10 @@ def create_tile(tile, name):
 
 def create_core(tile_id, name, core_dict):
     core_id = _cores_in_tile[tile_id]
+    if "attributes" not in core_dict:
+        raise Exception(f"attributes section not defined for core {tile_id}.{core_id}. "
+                        "Did you mispell attributes?")
+
     core = f"c {name} {tile_id}" + format_attributes(core_dict["attributes"])
     _entry_list.append(core)
     _cores_in_tile[tile_id] += 1
@@ -759,8 +767,12 @@ if __name__ == "__main__":
     parser.add_argument("-g", "--gui", help="Turn on gui traces", action="store_true")
 
     args = parser.parse_args()
-    run(args.architecture, args.snn, args.timesteps, spike_trace=args.spikes,
-        potential_trace=args.voltages, perf_trace=args.perf,
-        message_trace=args.messages, run_alive=args.run, gui=args.gui,
-        out_dir=args.out_dir)
-    print("sim finished")
+    try:
+        run(args.architecture, args.snn, args.timesteps,
+            spike_trace=args.spikes, potential_trace=args.voltages,
+            perf_trace=args.perf, message_trace=args.messages,
+            run_alive=args.run, gui=args.gui, out_dir=args.out_dir)
+    except RuntimeError as exc:
+        print(exc)
+    else:
+        print("sim finished")

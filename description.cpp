@@ -22,6 +22,7 @@ int description_parse_arch_file(
 	int ret = RET_OK;
 
 	line.reserve(DEFAULT_LINE_LEN);
+	int line_number = 1;
 	while (std::getline(fp, line) && (ret == RET_OK))
 	{
 		INFO("Parsing line: %s\n", line.c_str());
@@ -31,7 +32,8 @@ int description_parse_arch_file(
 			INFO("\tField:%s\n", f.c_str());
 		}
 
-		description_read_arch_entry(fields, arch);
+		description_read_arch_entry(fields, arch, line_number);
+		line_number++;
 	}
 	INFO("File parsed.\n");
 	return ret;
@@ -44,6 +46,7 @@ int description_parse_net_file(
 	int ret = RET_OK;
 
 	line.reserve(DEFAULT_LINE_LEN);
+	int line_number = 1;
 	while (std::getline(fp, line) && (ret == RET_OK))
 	{
 		INFO("Parsing line: %s\n", line.c_str());
@@ -53,7 +56,8 @@ int description_parse_net_file(
 		{
 			INFO("\tField:%s\n", f.c_str());
 		}
-		description_read_network_entry(fields, arch, net);
+		description_read_network_entry(fields, arch, net, line_number);
+		line_number++;
 	}
 
 	return ret;
@@ -79,7 +83,8 @@ std::vector<std::string> description_get_fields(const std::string &line)
 }
 
 int description_read_arch_entry(
-	const std::vector<std::string> &fields, Architecture &arch)
+	const std::vector<std::string> &fields, Architecture &arch,
+	const int line_number)
 {
 	int ret = RET_OK;
 
@@ -205,7 +210,7 @@ int description_read_arch_entry(
 
 int description_read_network_entry(
 	const std::vector<std::string> &fields, Architecture &arch,
-	Network &net)
+	Network &net, const int line_number)
 {
 	std::list<Attribute> attributes;
 	NeuronGroup *dest_group;
@@ -224,7 +229,7 @@ int description_read_network_entry(
 	if ((entry_type == '\0') || (entry_type == '\n') ||
 		(entry_type == '#') || (entry_type == '\r'))
 	{
-		TRACE1("Warning: No entry, skipping\n");
+		TRACE1("Warning: No entry, skipping line %d\n", line_number);
 		return RET_OK;
 	}
 
@@ -248,8 +253,8 @@ int description_read_network_entry(
 		ss >> neuron_count;
 		if (ss.fail())
 		{
-			INFO("Error: Couldn't parse count (%s)\n",
-				fields[1].c_str());
+			INFO("Error: Line %d: Couldn't parse count (%s)\n",
+				line_number, fields[1].c_str());
 			exit(1);
 		}
 	}
@@ -259,21 +264,23 @@ int description_read_network_entry(
 			&neuron_group_id, &neuron_id, &tile_id, &core_offset);
 		if (ret < 4)
 		{
-			INFO("Error couldn't parse mapping.\n");
+			INFO("Error: Line %d: Couldn't parse mapping. "
+			"(Format should be src_gid.src_nid@dst_gid.dst_nic)\n",
+				line_number);
 			exit(1);
 		}
 		if (tile_id >= arch.tiles.size())
 		{
-			INFO("Error: Tile (%lu) >= tile count (%lu)\n", tile_id,
-				arch.tiles.size());
+			INFO("Error: Line %d: Tile (%lu) >= tile count (%lu)\n",
+				line_number, tile_id, arch.tiles.size());
 			exit(1);
 		}
 		t = &(arch.tiles[tile_id]);
 
 		if (core_offset >= t->cores.size())
 		{
-			INFO("Error: Core (%lu) >= core count (%lu)\n",
-				core_offset, t->cores.size());
+			INFO("Error: Line %d: Core (%lu) >= core count (%lu)\n",
+				line_number, core_offset, t->cores.size());
 			exit(1);
 		}
 		c = &(t->cores[core_offset]);
@@ -288,13 +295,14 @@ int description_read_network_entry(
 			&dest_neuron_id);
 		if (ret < 4)
 		{
-			INFO("Error couldn't parse connection / edge.\n");
+			INFO("Error: Line %d: Couldn't parse connection / edge.\n",
+				line_number);
 			exit(1);
 		}
 		if (dest_group_id >= net.groups.size())
 		{
-			INFO("Error: Group (%lu) >= group count (%lu).\n",
-				dest_group_id, net.groups.size());
+			INFO("Error: Line %d: Group (%lu) >= group count (%lu).\n",
+				line_number, dest_group_id, net.groups.size());
 			return RET_FAIL;
 		}
 		dest_group = &(net.groups[dest_group_id]);
@@ -303,10 +311,10 @@ int description_read_network_entry(
 			neuron_id);
 		if (dest_neuron_id >= dest_group->neurons.size())
 		{
-			INFO("Error: Trying to access neuron "
+			INFO("Error: Line %d: Trying to access neuron "
 				"(%d.%lu) but group %d only "
 				"allocates %lu neurons.\n",
-				dest_group->id, dest_neuron_id,
+				line_number, dest_group->id, dest_neuron_id,
 				dest_group->id,
 				dest_group->neurons.size());
 			return RET_FAIL;
@@ -321,8 +329,8 @@ int description_read_network_entry(
 			&neuron_id);
 		if (ret < 2)
 		{
-			INFO("Error: Couldn't parse neuron (%s)\n",
-				fields[0].c_str());
+			INFO("Error: Line %d: Couldn't parse neuron (%s)\n",
+				line_number, fields[0].c_str());
 			exit(1);
 		}
 		group_set = true;
@@ -330,15 +338,16 @@ int description_read_network_entry(
 	}
 	else
 	{
-		INFO("Error: Invalid entry type (%s)", fields[0].c_str());
+		INFO("Error: Line %d: Invalid entry type (%s)",
+			line_number, fields[0].c_str());
 	}
 
 	if (group_set)
 	{
 		if (neuron_group_id >= net.groups.size())
 		{
-			INFO("Error: Group (%lu) >= group count (%lu).\n",
-				neuron_group_id, net.groups.size());
+			INFO("Error: Line %d: Group (%lu) >= group count (%lu).\n",
+				line_number, neuron_group_id, net.groups.size());
 			return RET_FAIL;
 		}
 		NeuronGroup &group = net.groups[neuron_group_id];
@@ -348,9 +357,10 @@ int description_read_network_entry(
 		{
 			if (neuron_id >= group.neurons.size())
 			{
-                               INFO("Error: Trying to access neuron "
+                               INFO("Error: Line %d: Trying to access neuron "
                                        "(%d.%lu) but group %d only "
                                        "allocates %lu neuron(s).\n",
+					line_number,
 					group.id, neuron_id, group.id,
 					group.neurons.size());
 				return RET_FAIL;
@@ -366,7 +376,8 @@ int description_read_network_entry(
 
 		if ((fields[i].length() < 3))
 		{
-			INFO("Error: Invalid field: %s\n", fields[i].c_str());
+			INFO("Error: Line %d: Invalid field: %s\n",
+				line_number, fields[i].c_str());
 			continue;
 		}
 
@@ -376,7 +387,8 @@ int description_read_network_entry(
 
 		if ((key.length() == 0) || (value_str.length() == 0))
 		{
-			INFO("Invalid attribute: %s\n", fields[i].c_str());
+			INFO("Error: Line %d: Invalid attribute: %s\n",
+				line_number, fields[i].c_str());
 			continue;
 		}
 

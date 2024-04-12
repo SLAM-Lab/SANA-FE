@@ -192,7 +192,7 @@ if __name__ == "__main__":
                     #  containing the network to run and the results measured
                     #  on Loihi
                     results = run_experiment(line["network"])
-                    time = results["time"] / TIMESTEPS
+                    time = results["sim_time"] / TIMESTEPS
                     energy = results["energy"] / TIMESTEPS
                     row = (line["N"], line["network"], energy, time)
                     with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
