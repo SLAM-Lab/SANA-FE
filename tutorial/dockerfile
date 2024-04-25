@@ -29,6 +29,9 @@ COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/arch_results /
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/snn.log /
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/snn_results /
 COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/challenge.log /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/solutions/arch_completed.yaml /
+COPY --from=make-sanafe /home/build_tutorial/sana-fe/tutorial/solutions/snn_completed.net /
+
 
 RUN chmod 755 /setup_tutorial.sh
 ENTRYPOINT exec /bin/bash -c "/setup_tutorial.sh & trap : TERM INT; sleep infinity & wait"

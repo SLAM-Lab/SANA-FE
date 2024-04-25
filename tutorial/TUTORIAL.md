@@ -143,9 +143,9 @@ To check your solutions, run the previous command again and check your results:
 
 Note that this part requires both the architecture and SNN to be correct.
 
-(If you get stuck, correct detailed run logs can be found under arch.log and
-snn.log. Also, solutions for both the architecture and net files can also be
-found at tutorial/solutions/)
+(If you get stuck, correct run logs can be found under `arch.log` and
+`snn.log`. Also, solutions for both the architecture and net files can also be
+found at `completed_arch.yaml` and `completed_snn.net`)
 
 Now that both an architecture and SNN have been defined, we can look at the
 outputs SANA-FE can generate for these files. We use -o to specify an output
