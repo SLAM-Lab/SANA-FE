@@ -105,9 +105,6 @@ void SanaFe::open_perf_trace(void)
 	// To be more portable, consider using the filesystem library in C++17
 	std::string perf_path = out_dir + std::string("/perf.csv");
 	sim->perf_fp = fopen(perf_path.c_str(), "w");
-	std::cout << perf_path << std::endl;
-	std::cout << out_dir << std::endl;
-	exit(1);
 	if (sim->perf_fp == NULL)
 	{
 		INFO("Error: Couldn't open perf file for writing.\n");
@@ -175,6 +172,7 @@ void SanaFe::set_out_dir(std::string dir)
 	{
 		out_dir = dir;
 	}
+	return;
 }
 
 void SanaFe::set_arch(const char *filename)
@@ -611,7 +609,7 @@ void sim_receive_messages(Timestep &ts, Architecture &arch)
 		{
 			INFO("Processing %lu message(s) for cid:%d.%d\n",
 				c.messages_in.size(), tile.id, c.offset);
-			for (auto &m: c.messages_in)
+			for (auto m: c.messages_in)
 			{
 				m->receive_delay = sim_pipeline_receive(
 					ts, arch, c, *m);
@@ -1618,6 +1616,8 @@ void sim_reset_measurements(Network &net, Architecture &arch)
 				c.axon_out_hw[k].packets_out = 0;
 			}
 
+			// Reset the message buffer
+			c.messages_in = std::vector<Message *>();
 		}
 	}
 }
@@ -1669,7 +1669,7 @@ void sim_potential_trace_write_header(const Simulation &sim, const Network &net)
 {
 	// Write csv header for probe outputs - record which neurons have been
 	//  probed
-	fprintf(sim->potential_trace_fp, "timestep,");
+	fprintf(sim.potential_trace_fp, "timestep,");
 	for (auto &group: net.groups)
 	{
 		for (auto n: group.neurons)
@@ -1730,7 +1730,7 @@ void sim_trace_record_potentials(
 	//  one time-step
 	int potential_probe_count = 0;
 
-	fprintf(sim->potential_trace_fp, "%ld,", sim->timesteps+1);
+	fprintf(sim.potential_trace_fp, "%ld,", sim.timesteps+1);
 	for (auto &group: net.groups)
 	{
 		for (auto &n: group.neurons)
