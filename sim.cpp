@@ -556,8 +556,7 @@ void sim_receive_messages(Timestep &ts, Architecture &arch)
 				const size_t src_tile_id =
 					m.src_neuron->core->parent_tile_id;
 				assert(src_tile_id < arch.tiles.size());
-				Tile &src_tile = arch.tiles[
-					m.src_neuron->core->parent_tile_id];
+				Tile &src_tile = arch.tiles[src_tile_id];
 				assert(m.dest_tile_id >= 0);
 				assert(static_cast<size_t>(m.dest_tile_id) <
 					arch.tiles.size());

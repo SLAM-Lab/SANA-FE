@@ -36,7 +36,6 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
     # Two layers, fully connected
     network = sim.Network(save_mappings=True)
-    loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     if spiking:  # always spike
         threshold = -1.0
@@ -49,12 +48,12 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     force_update = False
 
     # Create layers
-    layer_1 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
+    layer_1 = sim.create_layer(network, layer_neuron_count,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
                                reset=reset, neuron_model="loihi_lif",
                                synapse_model="loihi_dense_synapse")
-    layer_2 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
+    layer_2 = sim.create_layer(network, layer_neuron_count,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
                                reset=reset, neuron_model="loihi_lif",
@@ -74,7 +73,6 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
 def connected_layers(weights, spiking=True, mapping="l2_split",
                      copy_network=False):
     network = sim.Network(save_mappings=True)
-    loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     layer_neuron_count = len(weights)
     if spiking:  # always spike
@@ -105,7 +103,6 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
             layer_mapping.append((0, 3))
 
         layer_1 = sim.create_layer(network, layer_neuron_count,
-                                   loihi_compartments,
                                    log_spikes=False, log_potential=False,
                                    force_update=False, threshold=threshold,
                                    reset=0.0, leak=1.0, mappings=layer_mapping,
@@ -147,7 +144,7 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
             layer_mapping.append((1, i))
 
         layer_2 = sim.create_layer(network, layer_neuron_count,
-                                loihi_compartments, log_spikes=False,
+                                log_spikes=False,
                                 log_potential=False, force_update=False,
                                 threshold=threshold, reset=0.0, leak=1.0,
                                 mappings=layer_mapping,
