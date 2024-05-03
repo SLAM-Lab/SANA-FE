@@ -17,6 +17,7 @@
 #include <cstring>
 #include <vector>
 #include <map>
+#include <list>
 
 #include "network.hpp"
 #include "description.hpp"
@@ -55,15 +56,6 @@ enum synapse_models
 	SYNAPSE_CUBA,
 };
 
-enum neuron_reset_modes
-{
-	NEURON_NO_RESET,
-	NEURON_RESET_SOFT,
-	NEURON_RESET_HARD,
-	NEURON_RESET_SATURATE,
-	NEURON_RESET_MODE_COUNT,
-};
-
 enum arch_description_blocks
 {
 	ARCH_DESCRIPTION_TOP = -1,
@@ -87,7 +79,7 @@ struct Message
 	long int timestep;
 	int spikes, hops;
 	int src_x, dest_x, src_y, dest_y;
-	int dest_core_id, dest_tile_id, dest_axon_id;
+	int dest_tile_id, dest_core_offset, dest_axon_id;
 	bool dummy_message, in_noc;
 
 	Message();
@@ -183,7 +175,7 @@ struct Core
 	std::vector <SomaUnit> soma;
 	std::vector<AxonOutUnit> axon_out_hw;
 
-	MessagesIn messages_in;
+	std::vector<Message *> messages_in;
 	std::vector<AxonInModel> axons_in;
 	std::vector<Neuron *> neurons;
 	std::vector<Connection *> synapses;
@@ -191,7 +183,7 @@ struct Core
 
 	std::string name;
 	Message next_message;  // Since last spike
-	std::vector<Neuron *>::size_type max_neurons;
+	size_t max_neurons;
 	double energy, latency_after_last_message;
 	int parent_tile_id, id, offset, buffer_pos, soma_count, synapse_count;
 	int message_count;

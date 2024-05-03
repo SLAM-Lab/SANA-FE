@@ -62,7 +62,7 @@ Message::Message()
 	src_y = -1;
 	dest_x = -1;
 	dest_y = -1;
-	dest_core_id = -1;
+	dest_core_offset = -1;
 	dest_tile_id = -1;
 	dest_axon_id = -1;
 }

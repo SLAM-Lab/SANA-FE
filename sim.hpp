@@ -15,6 +15,7 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #include <memory>
+#include <list>
 #include "arch.hpp"
 #include "network.hpp"
 #include "stdio.h"
@@ -27,7 +28,7 @@ struct Timestep
 	long int total_neurons_fired, spikes;
 	double energy, sim_time;
 
-	Timestep(const int core_count, const long int ts);
+	Timestep(const long int ts, const int core_count);
 };
 
 struct NocInfo
@@ -147,14 +148,12 @@ void sim_process_neurons(Timestep &ts, Network &net, Architecture &arch);
 void sim_receive_messages(Timestep &sim, Architecture &arch);
 double sim_schedule_messages(std::vector<MessageFifo> &messages_sent, const Scheduler &scheduler);
 // TODO: reimplement
-int sim_input_spikes(Network &net);
 
 void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n);
 double sim_pipeline_receive(Timestep &ts, Architecture &arch, Core &c, Message &m);
 double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c, const int synapse_address, const bool synaptic_lookup);
 double sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n, const double charge);
 double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n, const double current_in);
-double sim_update_axon(Neuron &n);
 double sim_estimate_network_costs(Tile &src, Tile &dest);
 void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n);
 
@@ -184,6 +183,5 @@ MessageFifo *sim_pop_priority_queue(MessageFifo **priority_queue);
 
 void sim_message_fifo_push(struct MessageFifo &queue, Message &m);
 Message *sim_message_fifo_pop(struct MessageFifo &queue);
-
 
 #endif

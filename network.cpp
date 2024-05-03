@@ -8,6 +8,7 @@
 #include <cmath>
 #include <sstream>
 #include <list>
+#include <memory>
 
 #include "arch.hpp"
 #include "print.hpp"
@@ -16,21 +17,32 @@
 
 int total_connection_count = 0;
 
+Connection::Connection(const int connection_id)
+{
+	id = connection_id;
+	current = 0.0;
+	pre_neuron = nullptr;
+	post_neuron = nullptr;
+	weight = 0.0;
+	delay = 0.0;
+	synaptic_current_decay = 0.0;
+	synapse_hw = nullptr;
+}
+
 int network_create_neuron_group(Network &net, const int neuron_count,
 	const std::list<Attribute> &attr)
 {
-	int id, ret;
-	id = net.groups.size();
+	int ret;
+	const int id = net.groups.size();
 	INFO("Creating neuron group: %d with %d neurons\n", id, neuron_count);
-	NeuronGroup &group = net.groups[id];
-	group.neurons.reserve(neuron_count);
+	net.groups.push_back(NeuronGroup());
+	NeuronGroup &group = net.groups.back();
 
 	group.default_soma_hw_name = "";
 	group.default_synapse_hw_name = "";
-
-	group.default_log_potential = 0; // Disabled by default
-	group.default_log_spikes = 0;
-	group.default_force_update = 0;
+	group.default_log_potential = false;
+	group.default_log_spikes = false;
+	group.default_force_update = false;
 
 	for (auto a: attr)
 	{
@@ -73,7 +85,6 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 		Neuron n;
 		n.id = i;
 		n.parent_group_id = group.id;
-		n.connection_out_count = 0;
 		INFO("Default soma name:%s\n", group.default_soma_hw_name.c_str());
 		INFO("n id:%d\n", n.id);
 		n.soma_hw_name = group.default_soma_hw_name,
@@ -88,7 +99,7 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 		// By default, dendrite current resets every timestep
 
 		n.update_needed = 0;
-		n.neuron_status = IDLE;
+		n.neuron_status = sanafe::IDLE;
 		n.spike_count = 0;
 
 		// Initially the neuron is not mapped to anything
@@ -98,10 +109,9 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 		n.is_init = 0;
 
 		// Create Soma Class Instance
-		// TODO: problem with this is we now make the soma name
-		//  optional! Fix this
+		// TODO: figure plugin mechanism
 		//n.soma_model = plugin_get_soma(n.soma_hw_name);
-		n.model = new LoihiLifModel();
+		n.model = std::shared_ptr<SomaModel>(new LoihiLifModel);
 		n.model->set_attributes(attr);
 
 		group.neurons.push_back(n);
@@ -160,22 +170,22 @@ int network_create_neuron(Neuron &n, const std::list<Attribute> &attr)
 	// Set the initial update state, no spikes can arrive before the first
 	//  time-step but we can force the neuron to update, or bias it
 	n.update_needed = n.force_update; // || (fabs(n.bias) > 0.0));
-	n.neuron_status = IDLE;
+	n.neuron_status = sanafe::IDLE;
 
 	n.soma_last_updated = 0;
 	n.dendrite_last_updated = 0;
 
 	n.core = NULL;
-	assert(n.connections_out.size() = 0);
+	assert(n.connections_out.size() == 0);
 	n.connections_out.reserve(n.max_connections_out);
 
 	// Check if need to create Soma Class instance
 	if (n.model == nullptr)
 	{
 		// TODO: remove hack, make this user input
-		INFO("Soma hw name:%s", n.soma_hw_name.c_str());
+		INFO("Soma hw name: %s", n.soma_hw_name.c_str());
 		//n.soma_model = plugin_get_soma(n.soma_hw_name);
-		n.model = new LoihiLifModel();
+		n.model = std::shared_ptr<SomaModel>(new LoihiLifModel);
 		INFO("Creating new neuron %d\n", n.id);
 	}
 	n.model->set_attributes(attr);

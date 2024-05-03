@@ -9,8 +9,11 @@
 #include <dlfcn.h>
 
 #include "plugins.hpp"
+#include "models.hpp"
 #include "print.hpp"
 
+typedef SomaModel *_create_soma(void);
+typedef void _destroy_soma(SomaModel *model);
 std::map<std::string, _create_soma *> create_soma;
 std::map<std::string, _destroy_soma *> destroy_soma;
 

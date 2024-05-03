@@ -18,7 +18,9 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 #include "plugins.hpp"
+#include "models.hpp"
 
 enum ConnectionConfigFormat
 {
@@ -31,6 +33,7 @@ enum ConnectionConfigFormat
 	CONNECTION_FIELDS,
 };
 
+// Forward declarations
 struct Core;
 struct Neuron;
 struct NeuronGroup;
@@ -46,12 +49,13 @@ struct Connection
 	std::string synapse_hw_name;
 	double weight, current, synaptic_current_decay;
 	int id, delay, last_updated;
+
+	Connection(const int connection_id);
 };
 
 struct Neuron
 {
 	std::vector<Connection> connections_out;
-	// std::vector<Axon> maps_in;
 	std::vector<int> axon_out_addresses;
 
 	// Mapped hardware
@@ -60,18 +64,19 @@ struct Neuron
 	AxonOutUnit *axon_out_hw;
 	std::string soma_hw_name;
 
-	SomaModel *model;
+	std::shared_ptr<SomaModel> model;
 
 	// Track the timestep each hardware unit was last updated
-	int id, parent_group_id, is_init, fired, connection_out_count;
-	int max_connections_out, log_spikes, log_potential, update_needed;
+	int id, parent_group_id, is_init, fired;
+	int max_connections_out;
 	int force_update, spike_count;
 	int soma_last_updated, dendrite_last_updated;
 	int maps_in_count, maps_out_count;
+	bool log_spikes, log_potential, update_needed;
 
 	double dendritic_current_decay, processing_latency;
 	double current, charge;
-	NeuronStatus neuron_status;
+	sanafe::NeuronStatus neuron_status;
 	int forced_spikes;
 };
 
@@ -84,8 +89,8 @@ struct NeuronGroup
 	std::string default_synapse_hw_name;
 
 	int id;
-	int default_log_potential, default_log_spikes;
-	int default_max_connections_out, default_force_update;
+	int default_max_connections_out;
+	bool default_log_potential, default_log_spikes, default_force_update;
 };
 
 struct Network
@@ -99,7 +104,6 @@ struct Core;
 int network_create_neuron(Neuron &n, const std::list<Attribute> &attr);
 int network_create_neuron_group(Network &net, const int neuron_count, const std::list<Attribute> &attr);
 //Neuron *network_id_to_neuron_ptr(Network *const net, const NeuronId id);
-int network_parse_reset_mode(const std::string &str);
 int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::list<Attribute> &attr);
 void network_check_mapped(Network &net);
 

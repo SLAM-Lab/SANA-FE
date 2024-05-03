@@ -207,7 +207,7 @@ int description_read_network_entry(
 	Network &net)
 {
 	std::list<Attribute> attributes;
-	NeuronGroup *group, *dest_group;
+	NeuronGroup *dest_group;
 	Neuron *n, *dest;
 	Tile *t;
 	Core *c;
@@ -232,7 +232,6 @@ int description_read_network_entry(
 	}
 
 	neuron_count = 0;
-	group = nullptr;
 	n = nullptr;
 	c = nullptr;
 	dest_group = nullptr;
@@ -298,7 +297,7 @@ int description_read_network_entry(
 		}
 		dest_group = &(net.groups[dest_group_id]);
 
-		TRACE3("Parsed neuron gid:%lu nid:%lu\n", dest_group_id,
+		INFO("Parsed neuron gid:%lu nid:%lu\n", dest_group_id,
 			neuron_id);
 		if (dest_neuron_id >= dest_group->neurons.size())
 		{
@@ -334,19 +333,19 @@ int description_read_network_entry(
 				neuron_group_id, net.groups.size());
 			return RET_FAIL;
 		}
-		group = &(net.groups[neuron_group_id]);
-		TRACE3("Parsed neuron gid:%d nid:%d\n", neuron_group_id,
+		NeuronGroup &group = net.groups[neuron_group_id];
+		INFO("Parsed neuron gid:%lu nid:%lu\n", neuron_group_id,
 			neuron_id);
 		if (neuron_set)
 		{
-			if (neuron_id >= group->neurons.size())
+			if (neuron_id >= group.neurons.size())
 			{
 				INFO("Error: Neuron (%lu) >= "
 				     "group neurons (%lu).\n",
-					neuron_id, group->neurons.size());
+					neuron_id, group.neurons.size());
 				return RET_FAIL;
 			}
-			n = &(group->neurons[neuron_id]);
+			n = &(group.neurons[neuron_id]);
 		}
 	}
 
@@ -390,17 +389,9 @@ int description_read_network_entry(
 		break;
 	case 'e':
 	{
-		Connection con;
-		assert(n != NULL);
+		Connection con(n->connections_out.size());
+		assert(n != nullptr);
 		// Zero initialize all connections TODO: put in constructors
-		con.id = n->connections_out.size();
-		con.current = 0.0;
-		con.pre_neuron = NULL;
-		con.post_neuron = NULL;
-		con.weight = 0.0;
-		con.delay = 0.0;
-		con.synaptic_current_decay = 0.0;
-		con.synapse_hw = NULL;
 		n->connections_out.push_back(con);
 		ret = network_connect_neurons(
 			n->connections_out[n->connections_out.size()-1],
