@@ -17,18 +17,18 @@ int description_parse_arch_file(
 	std::fstream &fp, Architecture &arch)
 {
 	std::string line;
-	int ret = RET_OK;
-
-	line.reserve(DEFAULT_LINE_LEN);
+	line.reserve(128);
 	int line_number = 1;
-	while (std::getline(fp, line) && (ret == RET_OK))
+	while (std::getline(fp, line))
 	{
 		TRACE1("Parsing line: %s\n", line.c_str());
 		std::vector<std::string> fields = description_get_fields(line);
+#ifdef DEBUG
 		for (auto f: fields)
 		{
 			TRACE1("\tField:%s\n", f.c_str());
 		}
+#endif
 		if (fields.size() > 0)
 		{
 			description_read_arch_entry(fields, arch, line_number);
@@ -36,26 +36,27 @@ int description_parse_arch_file(
 		line_number++;
 	}
 	INFO("File parsed.\n");
-	return ret;
+	return RET_OK;
 }
 
 int description_parse_net_file(
 	std::fstream &fp, struct Network &net, Architecture &arch)
 {
 	std::string line;
-	int ret = RET_OK;
 
-	line.reserve(DEFAULT_LINE_LEN);
+	//line.reserve(DEFAULT_LINE_LEN);
 	int line_number = 1;
-	while (std::getline(fp, line) && (ret == RET_OK))
+	while (std::getline(fp, line))
 	{
 		TRACE1("Parsing line: %s\n", line.c_str());
 		std::vector<std::string> fields = description_get_fields(line);
 		TRACE1("%ld fields.\n", fields.size());
+#ifdef DEBUG
 		for (auto f: fields)
 		{
 			TRACE1("\tField:%s\n", f.c_str());
 		}
+#endif
 		if (fields.size() > 0)
 		{
 			description_read_network_entry(
@@ -64,7 +65,7 @@ int description_parse_net_file(
 		line_number++;
 	}
 
-	return ret;
+	return RET_OK;
 }
 
 std::vector<std::string> description_get_fields(const std::string &line)
@@ -73,20 +74,27 @@ std::vector<std::string> description_get_fields(const std::string &line)
 	//  whitespace and has the format <Attribute>=<value>
 	// Returns a vector of field strings
 	std::vector<std::string> fields;
+	std::string buffer;
+	buffer.reserve(128);
 
-	auto start = std::begin(line);
-	while (start != std::end(line))
+	for (auto pos = line.begin(); pos != line.end(); ++pos)
 	{
-		const std::string delimiters(" \t\r\n");
-		const auto end = std::find_first_of(start, std::end(line),
-			std::begin(delimiters), std::end(delimiters));
-
-		fields.emplace_back(start, end);
-		if (end == std::end(line))
+		if (((*pos) == ' ') || ((*pos) == '\t'))
 		{
-			break;
+			if (!buffer.empty())
+			{
+				fields.push_back(buffer);
+				buffer.clear();
+			}
 		}
-		start = std::next(end);
+		else
+		{
+			buffer.push_back(*pos);
+		}
+	}
+	if (!buffer.empty())
+	{
+		fields.push_back(buffer);
 	}
 
 	return fields;
@@ -224,6 +232,7 @@ int description_read_network_entry(
 	Network &net, const int line_number)
 {
 	std::vector<Attribute> attributes;
+	attributes.reserve(16);
 	NeuronGroup *dest_group;
 	Neuron *n, *dest;
 	Tile *t;
