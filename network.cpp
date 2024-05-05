@@ -85,8 +85,9 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 		Neuron n;
 		n.id = i;
 		n.parent_group_id = group.id;
-		INFO("Default soma name:%s\n", group.default_soma_hw_name.c_str());
-		INFO("n id:%d\n", n.id);
+		TRACE1("Default soma name:%s\n",
+			group.default_soma_hw_name.c_str());
+		TRACE1("nid:%d\n", n.id);
 		n.soma_hw_name = group.default_soma_hw_name,
 
 		// Initialize neuron using group attributes
@@ -183,10 +184,10 @@ int network_create_neuron(Neuron &n, const std::list<Attribute> &attr)
 	if (n.model == nullptr)
 	{
 		// TODO: remove hack, make this user input
-		INFO("Soma hw name: %s", n.soma_hw_name.c_str());
+		TRACE1("Soma hw name: %s", n.soma_hw_name.c_str());
 		//n.soma_model = plugin_get_soma(n.soma_hw_name);
 		n.model = std::shared_ptr<SomaModel>(new LoihiLifModel);
-		INFO("Creating new neuron %d\n", n.id);
+		TRACE1("Creating new neuron %d\n", n.id);
 	}
 	n.model->set_attributes(attr);
 
@@ -201,7 +202,7 @@ int network_connect_neurons(Connection &con,
 	Neuron &src, Neuron &dest,
 	const std::list<Attribute> &attr)
 {
-	INFO("dest id:%d.%d\n", dest.id, dest.parent_group_id);
+	TRACE1("dest id:%d.%d\n", dest.id, dest.parent_group_id);
 	// TODO: set based on group defaults
 	con.pre_neuron = &src;
 	con.post_neuron = &dest;
@@ -221,7 +222,7 @@ int network_connect_neurons(Connection &con,
 		}
 	}
 
-	INFO("\tAdded con %d.%d->%d.%d (w:%lf)\n",
+	TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n",
 		con.pre_neuron->parent_group_id,
 		con.pre_neuron->id,
 		con.post_neuron->parent_group_id,

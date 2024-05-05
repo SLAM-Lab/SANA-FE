@@ -561,7 +561,7 @@ void sim_process_neurons(Timestep &ts, Network &net, Architecture &arch)
 				assert(c.id >= 0);
 				assert(static_cast<size_t>(c.id) <
 					ts.messages.size());
-				INFO("c.id:%d message q size:%lu\n", c.id,
+				TRACE1("c.id:%d message q size:%lu\n", c.id,
 					ts.messages.size());
 				ts.messages[c.id].push_back(dummy_message);
 				sim_message_fifo_push(
@@ -607,7 +607,7 @@ void sim_receive_messages(Timestep &ts, Architecture &arch)
 	{
 		for (Core &c: tile.cores)
 		{
-			INFO("Processing %lu message(s) for cid:%d.%d\n",
+			TRACE1("Processing %lu message(s) for cid:%d.%d\n",
 				c.messages_in.size(), tile.id, c.offset);
 			for (auto m: c.messages_in)
 			{
@@ -1088,7 +1088,7 @@ void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 	Core &c = *(n.core);
 	n.processing_latency = 0.0;
 
-	INFO("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
+	TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
 
 	if (c.buffer_pos == BUFFER_SYNAPSE)
 	{
@@ -1345,7 +1345,7 @@ double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 {
 	struct SomaUnit *soma = n.soma_hw;
 
-	INFO("nid:%d updating, current_in:%lf\n", n.id, current_in);
+	TRACE1("nid:%d updating, current_in:%lf\n", n.id, current_in);
 	while (n.soma_last_updated <= ts.timestep)
 	{
 		n.neuron_status = n.model->update(current_in);
@@ -1354,7 +1354,7 @@ double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 
 	double latency = 0.0;
 
-	INFO("neuron status:%d\n", n.neuron_status);
+	TRACE1("neuron status:%d\n", n.neuron_status);
 	if (n.forced_spikes > 0)
 	{
 		n.neuron_status = sanafe::FIRED;
@@ -1364,7 +1364,7 @@ double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	// Check for spiking
 	if (n.neuron_status == sanafe::FIRED)
 	{
-		INFO("Neuron %d.%d fired\n", n.parent_group_id, n.id);
+		TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
 		ts.total_neurons_fired++;
 		sim_neuron_send_spike_message(ts, arch, n);
 	}
@@ -1386,7 +1386,7 @@ double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 
 void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n)
 {
-	INFO("nid:%d.%d sending spike message to %lu axons out\n",
+	TRACE1("nid:%d.%d sending spike message to %lu axons out\n",
 		n.parent_group_id, n.id, n.axon_out_addresses.size());
 	for (int address: n.axon_out_addresses)
 	{

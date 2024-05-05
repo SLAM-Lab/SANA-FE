@@ -630,6 +630,7 @@ def create_noc(noc_dict):
     return
 
 
+import subprocess
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
         run_dir=os.path.join(project_dir), perf_trace=False,
@@ -649,6 +650,32 @@ def run(arch_path, network_path, timesteps,
         print(f"Full Error: '{yaml_parse_exc}'")
         exit()
 
+    # Old code: replace this with the code below soon
+    args = []
+    if spike_trace:
+        args.append("-s",)
+    if potential_trace:
+        args.append("-v")
+    if perf_trace:
+        args.append("-p")
+    if message_trace:
+        args.append("-m")
+    if out_dir is not None:
+        args.append("-o")
+        args.append(f"{out_dir}")
+    command = [os.path.join(project_dir, "sim"),] + args + [parsed_filename,
+               network_path, f"{timesteps}"]
+
+    print("Command: {0}".format(" ".join(command)))
+    ret = subprocess.call(command)
+
+    if out_dir is None:
+        out_dir = ""
+    summary_file = os.path.join(out_dir, "run_summary.yaml")
+    with open(summary_file, "r") as run_summary:
+        results = yaml.safe_load(run_summary)
+
+    return results
 
     # Set some flags for the dynamic linking library
     # Important to do before importing the simcpp .so library!
@@ -757,9 +784,6 @@ if __name__ == "__main__":
     parser.add_argument("timesteps", help="Number of timesteps to simulate", type=int)
     parser.add_argument("-o", "--out_dir", help="Output directory", type=str, required=False)
     parser.add_argument("-s", "--spikes", help="Trace spikes", action="store_true")
-    parser.add_argument("-v", "--voltages", help="Trace neuron voltages", action="store_true")
-    parser.add_argument("-p", "--perf", help="Trace perf", action="store_true")
-    parser.add_argument("-m", "--messages", help="Trace messages", action="store_true")
     parser.add_argument("-v", "--voltages", help="Trace neuron voltages", action="store_true")
     parser.add_argument("-p", "--perf", help="Trace perf", action="store_true")
     parser.add_argument("-m", "--messages", help="Trace messages", action="store_true")

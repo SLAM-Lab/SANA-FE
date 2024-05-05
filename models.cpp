@@ -82,7 +82,7 @@ sanafe::NeuronStatus LoihiLifModel::update(const double current_in)
 {
 	// Calculate the change in potential since the last update e.g.
 	//  integate inputs and apply any potential leak
-	INFO("Updating potential, before:%f\n", potential);
+	TRACE1("Updating potential, before:%f\n", potential);
 	sanafe::NeuronStatus state = sanafe::IDLE;
 	potential *= leak_decay;
 
@@ -100,9 +100,9 @@ sanafe::NeuronStatus LoihiLifModel::update(const double current_in)
 	// Add the synaptic / dendrite current to the potential
 	//printf("n->bias:%lf n->potential before:%lf current_in:%lf\n", n->bias, n->potential, current_in);
 	potential += current_in + bias;
-	INFO("leak decay:%lf bias:%lf threshold:%lf potential after:%lf\n",
+	TRACE1("leak decay:%lf bias:%lf threshold:%lf potential after:%lf\n",
 		leak_decay, bias, threshold, potential);
-	INFO("Updating potential, after:%f\n", potential);
+	TRACE1("Updating potential, after:%f\n", potential);
 
 	// Update soma, if there are any received spikes, there is a non-zero
 	//  bias or we force the neuron to update every time-step
@@ -126,7 +126,7 @@ sanafe::NeuronStatus LoihiLifModel::update(const double current_in)
 			potential -= threshold;
 		}
 		state = sanafe::FIRED;
-		INFO("Neuron fired!\n");
+		TRACE1("Neuron fired!\n");
 	}
 	// Check against reverse threshold
 	if (potential < reverse_threshold)

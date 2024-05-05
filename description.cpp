@@ -1,15 +1,13 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-
 #include <iostream>
 #include <fstream>
-
 #include <string>
-#include <regex>
-
 #include <vector>
 #include <list>
+#include <sstream>
+#include <algorithm>
 
 #include "description.hpp"
 #include "arch.hpp"
@@ -25,14 +23,16 @@ int description_parse_arch_file(
 	int line_number = 1;
 	while (std::getline(fp, line) && (ret == RET_OK))
 	{
-		INFO("Parsing line: %s\n", line.c_str());
+		TRACE1("Parsing line: %s\n", line.c_str());
 		std::vector<std::string> fields = description_get_fields(line);
 		for (auto f: fields)
 		{
-			INFO("\tField:%s\n", f.c_str());
+			TRACE1("\tField:%s\n", f.c_str());
 		}
-
-		description_read_arch_entry(fields, arch, line_number);
+		if (fields.size() > 0)
+		{
+			description_read_arch_entry(fields, arch, line_number);
+		}
 		line_number++;
 	}
 	INFO("File parsed.\n");
@@ -49,14 +49,18 @@ int description_parse_net_file(
 	int line_number = 1;
 	while (std::getline(fp, line) && (ret == RET_OK))
 	{
-		INFO("Parsing line: %s\n", line.c_str());
+		TRACE1("Parsing line: %s\n", line.c_str());
 		std::vector<std::string> fields = description_get_fields(line);
-		INFO("%ld fields.\n", fields.size());
+		TRACE1("%ld fields.\n", fields.size());
 		for (auto f: fields)
 		{
-			INFO("\tField:%s\n", f.c_str());
+			TRACE1("\tField:%s\n", f.c_str());
 		}
-		description_read_network_entry(fields, arch, net, line_number);
+		if (fields.size() > 0)
+		{
+			description_read_network_entry(
+				fields, arch, net, line_number);
+		}
 		line_number++;
 	}
 
@@ -68,16 +72,22 @@ std::vector<std::string> description_get_fields(const std::string &line)
 	// Get all the fields from a line of text. Every field is separated by
 	//  whitespace and has the format <Attribute>=<value>
 	// Returns a vector of field strings
-	const auto field_delimiters = R"( |\t|\n)";
-	const std::regex re(field_delimiters);
+	std::vector<std::string> fields;
 
-	// Find the positions of any delimiters in the line
-	std::sregex_token_iterator it { line.begin(), line.end(), re, -1 };
-	// Use this list to find all seperate fields
-	std::vector<std::string> fields { it, {} };
-	// Finally, remove any empty fields
-	fields.erase(std::remove_if(fields.begin(), fields.end(),
-		[](std::string const &s) { return s.size() == 0; }));
+	auto start = std::begin(line);
+	while (start != std::end(line))
+	{
+		const std::string delimiters(" \t\r\n");
+		const auto end = std::find_first_of(start, std::end(line),
+			std::begin(delimiters), std::end(delimiters));
+
+		fields.emplace_back(start, end);
+		if (end == std::end(line))
+		{
+			break;
+		}
+		start = std::next(end);
+	}
 
 	return fields;
 }
@@ -88,12 +98,13 @@ int description_read_arch_entry(
 {
 	int ret = RET_OK;
 
-	std::list<Attribute> attributes;
+	std::vector<Attribute> attributes;
 	std::string name;
 	Tile *t;
 	Core *c;
 	int tile_id, core_offset, first_field;
 
+	assert(fields.size() > 0);
 	const char entry_type = fields[0][0];
 	// Sanity check input
 	if ((entry_type == '\0') || (entry_type == '\n') ||
@@ -142,7 +153,7 @@ int description_read_arch_entry(
 	for (std::vector<std::string>::size_type i = first_field;
 		i < fields.size(); i++)
 	{
-		INFO("Parsing field:%s\n", fields[i].c_str());
+		TRACE1("Parsing field:%s\n", fields[i].c_str());
 
 		if ((fields[i].length() < 3))
 		{
@@ -161,7 +172,7 @@ int description_read_arch_entry(
 		}
 
 		Attribute attr = { key, value_str };
-		INFO("Parsed attribute: %s:%s\n", attr.key.c_str(),
+		TRACE1("Parsed attribute: %s:%s\n", attr.key.c_str(),
 			attr.value_str.c_str());
 		attributes.push_back(attr);
 	}
@@ -224,6 +235,7 @@ int description_read_network_entry(
 	std::vector<Neuron>::size_type neuron_id, dest_neuron_id;
 	bool group_set, neuron_set;
 
+	assert(fields.size() > 0);
 	const char entry_type = fields[0][0];
 	// Sanity check input
 	if ((entry_type == '\0') || (entry_type == '\n') ||
@@ -307,7 +319,7 @@ int description_read_network_entry(
 		}
 		dest_group = &(net.groups[dest_group_id]);
 
-		INFO("Parsed neuron gid:%lu nid:%lu\n", dest_group_id,
+		TRACE1("Parsed neuron gid:%lu nid:%lu\n", dest_group_id,
 			neuron_id);
 		if (dest_neuron_id >= dest_group->neurons.size())
 		{
@@ -351,7 +363,7 @@ int description_read_network_entry(
 			return RET_FAIL;
 		}
 		NeuronGroup &group = net.groups[neuron_group_id];
-		INFO("Parsed neuron gid:%lu nid:%lu\n", neuron_group_id,
+		TRACE1("Parsed neuron gid:%lu nid:%lu\n", neuron_group_id,
 			neuron_id);
 		if (neuron_set)
 		{
@@ -372,7 +384,7 @@ int description_read_network_entry(
 	// Parse attributes from fields
 	for (std::vector<std::string>::size_type i = 2; i < fields.size(); i++)
 	{
-		INFO("Parsing field:%s\n", fields[i].c_str());
+		TRACE1("Parsing field:%s\n", fields[i].c_str());
 
 		if ((fields[i].length() < 3))
 		{
@@ -393,7 +405,7 @@ int description_read_network_entry(
 		}
 
 		Attribute attr = { key, value_str };
-		INFO("Parsed attribute: %s:%s\n", attr.key.c_str(),
+		TRACE1("Parsed attribute: %s:%s\n", attr.key.c_str(),
 			attr.value_str.c_str());
 		attributes.push_back(attr);
 	}

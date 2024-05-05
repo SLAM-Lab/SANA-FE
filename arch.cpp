@@ -67,7 +67,8 @@ Message::Message()
 	dest_axon_id = -1;
 }
 
-int arch_create_noc(struct Architecture &arch, const std::list<Attribute> &attr)
+int arch_create_noc(struct Architecture &arch,
+	const std::vector<Attribute> &attr)
 {
 	const int tile_count = arch.tiles.size();
 	if (tile_count <= 0)
@@ -106,7 +107,7 @@ int arch_create_noc(struct Architecture &arch, const std::list<Attribute> &attr)
 	return 0;
 }
 
-int arch_create_tile(Architecture &arch, const std::list<Attribute> &attr)
+int arch_create_tile(Architecture &arch, const std::vector<Attribute> &attr)
 
 {
 	Tile tile;
@@ -169,7 +170,7 @@ int arch_create_tile(Architecture &arch, const std::list<Attribute> &attr)
 }
 
 int arch_create_core(
-	Architecture &arch, Tile &tile, const std::list<Attribute> &attr)
+	Architecture &arch, Tile &tile, const std::vector<Attribute> &attr)
 {
 	const int core_offset = tile.cores.size();
 	Core c;
@@ -209,7 +210,7 @@ int arch_create_core(
 }
 
 void arch_create_axon_in(
-	Core &c, const std::string &name, const std::list<Attribute> &attr)
+	Core &c, const std::string &name, const std::vector<Attribute> &attr)
 {
 	struct AxonInUnit in;
 	in.energy = 0.0;
@@ -242,7 +243,7 @@ void arch_create_axon_in(
 }
 
 void arch_create_synapse(struct Core &c, const std::string &name,
-	const std::list<Attribute> &attr)
+	const std::vector<Attribute> &attr)
 {
 	SynapseUnit s;
 	s.name = name;
@@ -291,7 +292,7 @@ void arch_create_synapse(struct Core &c, const std::string &name,
 }
 
 void arch_create_soma(struct Core &c, const std::string &name,
-	const std::list<Attribute> &attr)
+	const std::vector<Attribute> &attr)
 {
 	SomaUnit s;
 	s.name = name;
@@ -358,7 +359,7 @@ void arch_create_soma(struct Core &c, const std::string &name,
 	return;
 }
 
-void arch_create_axon_out(struct Core &c, const std::list<Attribute> &attr)
+void arch_create_axon_out(struct Core &c, const std::vector<Attribute> &attr)
 {
 	AxonOutUnit out;
 	out.packets_out = 0;
@@ -454,17 +455,17 @@ void arch_map_neuron_connections(Neuron &pre_neuron)
 	assert(pre_neuron.core != nullptr);
 
 	// Figure out the unique set of cores that this neuron broadcasts to
-	INFO("Counting connections for neuron nid:%d\n", pre_neuron.id);
+	TRACE1("Counting connections for neuron nid:%d\n", pre_neuron.id);
 	std::set<Core *> cores_out;
 	for (Connection &curr_connection: pre_neuron.connections_out)
 	{
-		INFO("Looking at connection id: %d\n", curr_connection.id);
+		TRACE1("Looking at connection id: %d\n", curr_connection.id);
 		Core *dest_core = curr_connection.post_neuron->core;
 		cores_out.insert(dest_core);
-		INFO("Connected to dest core: %d\n", dest_core->id);
+		TRACE1("Connected to dest core: %d\n", dest_core->id);
 	}
 
-	INFO("Creating connections for neuron nid:%d to %lu core(s)\n",
+	TRACE1("Creating connections for neuron nid:%d to %lu core(s)\n",
 		pre_neuron.id, cores_out.size());
 	for (Core *dest_core: cores_out)
 	{
@@ -480,10 +481,10 @@ void arch_map_neuron_connections(Neuron &pre_neuron)
 		// Add every connection to the axon. Also link to the map in the
 		//  post synaptic core / neuron
 		Core &post_core = *(curr_connection.post_neuron->core);
-		INFO("Adding connection:%d\n", curr_connection.id);
+		TRACE1("Adding connection:%d\n", curr_connection.id);
 		arch_add_connection_to_axon(curr_connection, post_core);
 	}
-	INFO("Finished mapping connections to hardware for nid:%d.%d.\n",
+	TRACE1("Finished mapping connections to hardware for nid:%d.%d.\n",
 		pre_neuron.parent_group_id, pre_neuron.id);
 
 	return;
@@ -554,7 +555,7 @@ void arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 	const int new_axon_in_address = post_core.axons_in.size() - 1;
 
 	// Add the axon at the sending, pre-synaptic core
-	INFO("axon in address:%d for core:%d.%d\n",
+	TRACE1("axon in address:%d for core:%d.%d\n",
 		new_axon_in_address, post_core.parent_tile_id, post_core.id);
 	AxonOutModel out;
 	out.dest_axon_id = new_axon_in_address;
@@ -566,7 +567,7 @@ void arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 
 	// Then add the output axon to the sending pre-synaptic neuron
 	pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
-	INFO("nid:%d.%d cid:%d.%d added one output axon address %d.\n",
+	TRACE1("nid:%d.%d cid:%d.%d added one output axon address %d.\n",
 		pre_neuron.parent_group_id, pre_neuron.id,
 		pre_core.parent_tile_id, pre_core.offset,
 		new_axon_out_address);
