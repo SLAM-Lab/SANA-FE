@@ -30,7 +30,7 @@ Connection::Connection(const int connection_id)
 }
 
 int network_create_neuron_group(Network &net, const int neuron_count,
-	const std::list<Attribute> &attr)
+	const std::vector<Attribute> &attr)
 {
 	int ret;
 	const int id = net.groups.size();
@@ -118,12 +118,12 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 		group.neurons.push_back(n);
 	}
 
-	INFO("Created neuron group gid:%d", group.id);
+	INFO("Created neuron group gid:%d\n", group.id);
 
 	return id;
 }
 
-int network_create_neuron(Neuron &n, const std::list<Attribute> &attr)
+int network_create_neuron(Neuron &n, const std::vector<Attribute> &attr)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
@@ -200,7 +200,7 @@ int network_create_neuron(Neuron &n, const std::list<Attribute> &attr)
 
 int network_connect_neurons(Connection &con,
 	Neuron &src, Neuron &dest,
-	const std::list<Attribute> &attr)
+	const std::vector<Attribute> &attr)
 {
 	TRACE1("dest id:%d.%d\n", dest.id, dest.parent_group_id);
 	// TODO: set based on group defaults

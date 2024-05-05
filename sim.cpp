@@ -52,7 +52,7 @@ int SanaFe::update_neuron(
 		return -1;
 	}
 
-	std::list<Attribute> attr;
+	std::vector<Attribute> attr;
 	for (auto s: kwargs)
 	{
 		std::string key = s.substr(0, s.find('=')).c_str();

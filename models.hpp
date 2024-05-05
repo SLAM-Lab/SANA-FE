@@ -1,7 +1,7 @@
 #ifndef MODELS_HEADER_INCLUDED_
 #define MODELS_HEADER_INCLUDED_
 
-#include <list>
+#include <vector>
 struct Attribute;
 
 #define MAX_NOISE_FILE_ENTRY 128
@@ -25,7 +25,7 @@ public:
 	SomaModel(){}
 	virtual ~SomaModel(){}
 	virtual sanafe::NeuronStatus update(const double current_in) = 0;
-	virtual void set_attributes(const std::list<Attribute> &attr) = 0;
+	virtual void set_attributes(const std::vector<Attribute> &attr) = 0;
 	virtual double get_potential(){ return 0.0; }
 };
 
@@ -34,7 +34,7 @@ class LoihiLifModel: public SomaModel
 public:
         LoihiLifModel();
 	~LoihiLifModel();
-	void set_attributes(const std::list<Attribute> &attr);
+	void set_attributes(const std::vector<Attribute> &attr);
 	sanafe::NeuronStatus update(const double current_in);
 	double get_potential() { return potential; }
 private:

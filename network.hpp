@@ -101,10 +101,10 @@ struct Network
 struct Architecture;
 struct Core;
 
-int network_create_neuron(Neuron &n, const std::list<Attribute> &attr);
-int network_create_neuron_group(Network &net, const int neuron_count, const std::list<Attribute> &attr);
+int network_create_neuron(Neuron &n, const std::vector<Attribute> &attr);
+int network_create_neuron_group(Network &net, const int neuron_count, const std::vector<Attribute> &attr);
 //Neuron *network_id_to_neuron_ptr(Network *const net, const NeuronId id);
-int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::list<Attribute> &attr);
+int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::vector<Attribute> &attr);
 void network_check_mapped(Network &net);
 
 

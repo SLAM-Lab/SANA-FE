@@ -1,4 +1,4 @@
-#include <list>
+#include <vector>
 #include <cmath>
 #include <cassert>
 #include <sstream>
@@ -33,7 +33,7 @@ LoihiLifModel::~LoihiLifModel()
 	return;
 }
 
-void LoihiLifModel::set_attributes(const std::list<Attribute> &attr)
+void LoihiLifModel::set_attributes(const std::vector<Attribute> &attr)
 {
 	for (auto a: attr)
 	{

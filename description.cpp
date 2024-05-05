@@ -223,7 +223,7 @@ int description_read_network_entry(
 	const std::vector<std::string> &fields, Architecture &arch,
 	Network &net, const int line_number)
 {
-	std::list<Attribute> attributes;
+	std::vector<Attribute> attributes;
 	NeuronGroup *dest_group;
 	Neuron *n, *dest;
 	Tile *t;
