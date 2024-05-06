@@ -88,7 +88,7 @@ void SanaFe::run_timesteps(int timesteps)
 	}
 
 	const int heartbeat = 100;
-	for (long int timestep = 0; timestep < timesteps; timestep++)
+	for (long int timestep = 1; timestep <= timesteps; timestep++)
 	{
 		if ((timestep % heartbeat) == 0)
 		{
@@ -1128,6 +1128,7 @@ void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 	else if (c.buffer_pos == BUFFER_SOMA)
 	{
 		n.processing_latency = sim_update_soma(ts, arch, n, n.charge);
+		n.charge = 0.0;
 	}
 	else if (c.buffer_pos == BUFFER_AXON_OUT)
 	{
@@ -1283,8 +1284,8 @@ double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	Connection &con = *(c.synapses[synapse_address]);
 	Neuron &post_neuron = *(con.post_neuron);
 
-	TRACE1("Updating synapses for (cid:%d)\n", axon->pre_neuron->id);
-	while (con.last_updated <= ts.timestep)
+	TRACE1("Updating synapses for (cid:%d)\n", c.id);
+	while (con.last_updated < ts.timestep)
 	{
 		TRACE1("Updating synaptic current (last updated:%ld, ts:%ld)\n",
 			con.last_updated, ts.timestep);
@@ -1300,11 +1301,7 @@ double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 			con.current = 0.0;
 		}
 
-		TRACE2("(nid:%d->nid:%d) con->current:%lf\n",
-			con.pre_neuron->id,
-			con.post_neuron->id, con->current);
 		con.last_updated++;
-
 	}
 
 	if (synaptic_lookup)
@@ -1319,6 +1316,12 @@ double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 			post_neuron->id, con.current);
 		latency += con.synapse_hw->latency_spike_op;
 	}
+
+	TRACE1("(nid:%d.%d->nid:%d.%d) con->current:%lf\n",
+		con.pre_neuron->parent_group_id, con.pre_neuron->id,
+		con.post_neuron->parent_group_id, con.post_neuron->id,
+		con.current);
+
 	if (c.buffer_pos != BUFFER_DENDRITE)
 	{
 		latency += sim_update_dendrite(
@@ -1369,7 +1372,7 @@ double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	struct SomaUnit *soma = n.soma_hw;
 
 	TRACE1("nid:%d updating, current_in:%lf\n", n.id, current_in);
-	while (n.soma_last_updated <= ts.timestep)
+	while (n.soma_last_updated < ts.timestep)
 	{
 		n.neuron_status = n.model->update(current_in);
 		n.soma_last_updated++;
