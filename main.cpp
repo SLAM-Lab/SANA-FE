@@ -91,19 +91,19 @@ int main(int argc, char *argv[])
 
 	if (sim.sim->log_perf)
 	{
-		sim.open_perf_trace();
+		sim.set_perf_trace(true);
 	}
 	if (sim.sim->log_spikes)
 	{
-		sim.open_spike_trace();
+		sim.set_spike_trace(true);
 	}
 	if (sim.sim->log_potential)
 	{
-		sim.open_potential_trace();
+		sim.set_potential_trace(true);
 	}
 	if (sim.sim->log_messages)
 	{
-		sim.open_message_trace();
+		sim.set_message_trace(true);
 	}
 
 	// Read in program args, sanity check and parse inputs
@@ -126,15 +126,7 @@ int main(int argc, char *argv[])
 
 	// Step simulation
 	INFO("Running simulation.\n");
-	for (long timestep = 1; timestep <= timesteps; timestep++)
-	{
-		if ((timestep % 100) == 0)
-		{
-			// Print heart-beat every hundred timesteps
-			INFO("*** Time-step %ld ***\n", timestep);
-		}
-		sim.run_timesteps();
-	}
+	sim.run_timesteps(timesteps);
 
 	INFO("***** Run Summary *****\n");
 	sim.sim_summary();

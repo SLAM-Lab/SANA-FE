@@ -7,7 +7,8 @@
 #include <vector>
 #include <list>
 #include <sstream>
-#include <algorithm>
+#include <string_view>
+#include <charconv>
 
 #include "description.hpp"
 #include "arch.hpp"
@@ -16,13 +17,16 @@
 int description_parse_arch_file(
 	std::fstream &fp, Architecture &arch)
 {
+	std::vector<std::string_view> fields;
+	fields.reserve(32);
 	std::string line;
-	line.reserve(128);
+	line.reserve(DEFAULT_LINE_LEN);
 	int line_number = 1;
+
 	while (std::getline(fp, line))
 	{
 		TRACE1("Parsing line: %s\n", line.c_str());
-		std::vector<std::string> fields = description_get_fields(line);
+		description_get_fields(fields, line);
 #ifdef DEBUG
 		for (auto f: fields)
 		{
@@ -42,14 +46,16 @@ int description_parse_arch_file(
 int description_parse_net_file(
 	std::fstream &fp, struct Network &net, Architecture &arch)
 {
+	std::vector<std::string_view> fields;
+	fields.reserve(32);
 	std::string line;
-
-	//line.reserve(DEFAULT_LINE_LEN);
+	line.reserve(DEFAULT_LINE_LEN);
 	int line_number = 1;
 	while (std::getline(fp, line))
 	{
 		TRACE1("Parsing line: %s\n", line.c_str());
-		std::vector<std::string> fields = description_get_fields(line);
+		description_get_fields(fields, line);
+
 		TRACE1("%ld fields.\n", fields.size());
 #ifdef DEBUG
 		for (auto f: fields)
@@ -68,40 +74,52 @@ int description_parse_net_file(
 	return RET_OK;
 }
 
-std::vector<std::string> description_get_fields(const std::string &line)
+void description_get_fields(
+	std::vector<std::string_view> &fields, const std::string &line)
 {
 	// Get all the fields from a line of text. Every field is separated by
 	//  whitespace and has the format <Attribute>=<value>
 	// Returns a vector of field strings
-	std::vector<std::string> fields;
-	std::string buffer;
-	buffer.reserve(128);
+	const char *delim = " \t\r\n";
 
-	for (auto pos = line.begin(); pos != line.end(); ++pos)
+	fields.clear();
+	std::string_view line_buffer(line);
+	auto field_start = line_buffer.find_first_not_of(delim);
+ 	while (field_start != std::string_view::npos)
 	{
-		if (((*pos) == ' ') || ((*pos) == '\t'))
+		auto field_end = line_buffer.find_first_of(delim, field_start);
+
+		const std::string_view new_field = line_buffer.substr(
+			field_start, field_end - field_start);
+		if (field_end != field_start)
 		{
-			if (!buffer.empty())
-			{
-				fields.push_back(buffer);
-				buffer.clear();
-			}
+			fields.push_back(new_field);
 		}
-		else
-		{
-			buffer.push_back(*pos);
-		}
-	}
-	if (!buffer.empty())
-	{
-		fields.push_back(buffer);
+		field_start = line_buffer.find_first_not_of(delim, field_end);
 	}
 
-	return fields;
+	return;
+}
+
+size_t field_to_int(const string_view &field)
+{
+	size_t val = 0;
+	auto [ptr, error_code] = std::from_chars(field.data(),
+		field.data() + field.size(),
+		val);
+	if (error_code != std::errc())
+	{
+		std::string error_str =
+			"Error: Couldn't parse integer val for field:" +
+			std::string(field);
+		throw std::runtime_error(std::string(error_str));
+	}
+
+	return val;
 }
 
 int description_read_arch_entry(
-	const std::vector<std::string> &fields, Architecture &arch,
+	const std::vector<std::string_view> &fields, Architecture &arch,
 	const int line_number)
 {
 	int ret = RET_OK;
@@ -132,27 +150,14 @@ int description_read_arch_entry(
 	}
 	if (entry_type != '@' && entry_type != 't')
 	{
-		ret = sscanf(fields[2].c_str(), "%d", &tile_id);
-		if (ret < 1)
-		{
-			INFO("Error: Couldn't parse tile ID (%s)\n",
-				fields[2].c_str());
-			exit(1);
-		}
+		tile_id = field_to_int(fields[2]);
 		t = &(arch.tiles[tile_id]);
 		first_field++;
 	}
 	if ((entry_type != '@') && (entry_type != 't') && (entry_type != 'c'))
 	{
-		ret = sscanf(fields[3].c_str(), "%d", &core_offset);
-		if (ret < 1)
-		{
-			INFO("Error: Couldn't parse core ID (%s)\n",
-				fields[3].c_str());
-			exit(1);
-		}
-
-		assert(t != NULL);
+		core_offset = field_to_int(fields[3]);
+		assert(t != nullptr);
 		c = &(t->cores[core_offset]);
 		first_field++;
 	}
@@ -161,21 +166,23 @@ int description_read_arch_entry(
 	for (std::vector<std::string>::size_type i = first_field;
 		i < fields.size(); i++)
 	{
-		TRACE1("Parsing field:%s\n", fields[i].c_str());
+		TRACE1("Parsing field:%s\n", std::string(fields[i]).c_str());
 
 		if ((fields[i].length() < 3))
 		{
-			INFO("Error: Invalid field: %s\n", fields[i].c_str());
+			INFO("Error: Invalid field: %s\n",
+				std::string(fields[i]).c_str());
 			continue;
 		}
 
 		int pos = fields[i].find_first_of('=');
-		std::string key = fields[i].substr(0, pos);
-		std::string value_str = fields[i].substr(pos+1);
+		std::string key = std::string(fields[i].substr(0, pos));
+		std::string value_str = std::string(fields[i].substr(pos+1));
 
 		if ((key.length() == 0) || (value_str.length() == 0))
 		{
-			INFO("Invalid attribute: %s\n", fields[i].c_str());
+			INFO("Invalid attribute: %s\n",
+				std::string(fields[i]).c_str());
 			continue;
 		}
 
@@ -227,8 +234,102 @@ int description_read_arch_entry(
 	return ret;
 }
 
+void parse_neuron_field(
+	const std::string_view &neuron_field,
+	std::vector<NeuronGroup>::size_type &group_id,
+	std::vector<Neuron>::size_type &neuron_id)
+{
+	const auto pos = neuron_field.find('.');
+	if (pos == std::string_view::npos)
+	{
+		throw std::runtime_error("Invalid neuron format");
+	}
+
+	const auto group_str = neuron_field.substr(0, pos);
+	group_id = field_to_int(group_str);
+	const auto neuron_str = neuron_field.substr(pos + 1,
+		neuron_field.size());
+	neuron_id = field_to_int(neuron_str);
+
+	return;
+}
+
+void parse_core_field(
+	const std::string_view &core_field,
+	std::vector<NeuronGroup>::size_type &tile_id,
+	std::vector<Neuron>::size_type &core_offset)
+{
+	const auto pos = core_field.find('.');
+	if (pos == std::string_view::npos)
+	{
+		throw std::runtime_error("Invalid neuron format");
+	}
+
+	const auto tile_str = core_field.substr(0, pos);
+	tile_id = field_to_int(tile_str);
+	const auto core_str = core_field.substr(pos + 1,
+		core_field.size());
+	core_offset = field_to_int(core_str);
+
+	return;
+}
+
+void parse_edge_field(
+	const std::string_view &edge_field,
+	std::vector<NeuronGroup>::size_type &group_id,
+	std::vector<Neuron>::size_type &neuron_id,
+	std::vector<NeuronGroup>::size_type &dest_group_id,
+	std::vector<Neuron>::size_type &dest_neuron_id)
+{
+	const auto pos = edge_field.find("->");
+	if (pos == std::string_view::npos)
+	{
+		throw std::runtime_error("Invalid edge format");
+	}
+	else if ((pos + 1) >= edge_field.size())
+	{
+		throw std::runtime_error("Invalid edge format");
+	}
+
+	const auto src_neuron_address = edge_field.substr(0, pos);
+	parse_neuron_field(src_neuron_address, group_id, neuron_id);
+
+	const auto dest_neuron_address = edge_field.substr(
+		pos+2, edge_field.size());
+	parse_neuron_field(dest_neuron_address, dest_group_id, dest_neuron_id);
+
+	return;
+}
+
+void parse_mapping_field(
+	const std::string_view &mapping_field,
+	std::vector<NeuronGroup>::size_type &group_id,
+	std::vector<Neuron>::size_type &neuron_id,
+	std::vector<Tile>::size_type &tile_id,
+	std::vector<Core>::size_type &core_offset)
+{
+	const auto pos = mapping_field.find("@");
+	if (pos == std::string_view::npos)
+	{
+		throw std::runtime_error("Invalid mapping format");
+	}
+	else if (pos >= mapping_field.size())
+	{
+		throw std::runtime_error("Invalid mapping format");
+	}
+
+	const auto neuron_address = mapping_field.substr(0, pos);
+	parse_neuron_field(neuron_address, group_id, neuron_id);
+
+	const auto core_address = mapping_field.substr(
+		pos+1, mapping_field.size());
+	parse_neuron_field(core_address, tile_id, core_offset);
+
+	return;
+}
+
 int description_read_network_entry(
-	const std::vector<std::string> &fields, Architecture &arch,
+	const std::vector<std::string_view> &fields, Architecture &arch,
 	Network &net, const int line_number)
 {
 	std::vector<Attribute> attributes;
@@ -270,26 +371,23 @@ int description_read_network_entry(
 
 	if (entry_type == 'g')
 	{
-		std::istringstream ss(fields[1]);
-		ss >> neuron_count;
-		if (ss.fail())
-		{
-			INFO("Error: Line %d: Couldn't parse count (%s)\n",
-				line_number, fields[1].c_str());
-			exit(1);
-		}
+		neuron_count = field_to_int(fields[1]);
 	}
 	else if (entry_type == '&')
 	{
-		ret = sscanf(fields[1].c_str(), "%lu.%lu@%lu.%lu",
-			&neuron_group_id, &neuron_id, &tile_id, &core_offset);
-		if (ret < 4)
+		parse_mapping_field(fields[1],
+			neuron_group_id, neuron_id, tile_id, core_offset);
+		/*
+		if (!success)
 		{
-			INFO("Error: Line %d: Couldn't parse mapping. "
-			"(Format should be src_gid.src_nid@dst_gid.dst_nic)\n",
-				line_number);
-			exit(1);
+			std::ostringstream error_str;
+			error_str << "Error: Line ";
+			error_str << line_number;
+			error_str << "Couldn't parse mapping. (Format should ";
+			error_str << "be src_gid.src_nid@dst_gid.dst_nic)";
+			throw std::runtime_error(error_str.str());
 		}
+		*/
 		if (tile_id >= arch.tiles.size())
 		{
 			INFO("Error: Line %d: Tile (%lu) >= tile count (%lu)\n",
@@ -311,15 +409,16 @@ int description_read_network_entry(
 	else if (entry_type == 'e')
 	{
 		// Edge on SNN graph (e.g., connection between neurons)
-		ret = sscanf(fields[1].c_str(), "%lu.%lu->%lu.%lu",
-			&neuron_group_id, &neuron_id, &dest_group_id,
-			&dest_neuron_id);
-		if (ret < 4)
+		parse_edge_field(fields[1], neuron_group_id, neuron_id,
+			dest_group_id, dest_neuron_id);
+		/*
+		if (!success)
 		{
 			INFO("Error: Line %d: Couldn't parse connection / edge.\n",
 				line_number);
 			exit(1);
 		}
+		*/
 		if (dest_group_id >= net.groups.size())
 		{
 			INFO("Error: Line %d: Group (%lu) >= group count (%lu).\n",
@@ -346,21 +445,24 @@ int description_read_network_entry(
 	}
 	else if (entry_type == 'n') // parse neuron
 	{
-		ret = sscanf(fields[1].c_str(), "%lu.%lu", &neuron_group_id,
-			&neuron_id);
-		if (ret < 2)
+		//ret = sscanf(std::string(fields[1]).c_str(), "%lu.%lu", &neuron_group_id,
+		//	&neuron_id);
+		parse_neuron_field(fields[1], neuron_group_id, neuron_id);
+		/*
+		if (!success)
 		{
 			INFO("Error: Line %d: Couldn't parse neuron (%s)\n",
-				line_number, fields[0].c_str());
+				line_number, std::string(fields[0]).c_str());
 			exit(1);
 		}
+		*/
 		group_set = true;
 		neuron_set = true;
 	}
 	else
 	{
 		INFO("Error: Line %d: Invalid entry type (%s)",
-			line_number, fields[0].c_str());
+			line_number, std::string(fields[0]).c_str());
 	}
 
 	if (group_set)
@@ -391,25 +493,25 @@ int description_read_network_entry(
 	}
 
 	// Parse attributes from fields
-	for (std::vector<std::string>::size_type i = 2; i < fields.size(); i++)
+	for (size_t i = 2; i < fields.size(); i++)
 	{
 		TRACE1("Parsing field:%s\n", fields[i].c_str());
 
 		if ((fields[i].length() < 3))
 		{
 			INFO("Error: Line %d: Invalid field: %s\n",
-				line_number, fields[i].c_str());
+				line_number, std::string(fields[i]).c_str());
 			continue;
 		}
 
-		int pos = fields[i].find_first_of('=');
-		std::string key = fields[i].substr(0, pos);
-		std::string value_str = fields[i].substr(pos+1);
+		const auto pos = fields[i].find_first_of('=');
+		std::string key = std::string(fields[i].substr(0, pos));
+		std::string value_str = std::string(fields[i].substr(pos+1));
 
 		if ((key.length() == 0) || (value_str.length() == 0))
 		{
 			INFO("Error: Line %d: Invalid attribute: %s\n",
-				line_number, fields[i].c_str());
+				line_number, std::string(fields[i]).c_str());
 			continue;
 		}
 
@@ -428,21 +530,21 @@ int description_read_network_entry(
 			net, neuron_count, attributes);
 		break;
 	case 'n': // Add neuron
-		ret = network_create_neuron(*n, attributes);
+		ret = network_create_neuron(net, *n, attributes);
 		break;
 	case 'e':
 	{
-		Connection con(n->connections_out.size());
 		assert(n != nullptr);
 		// Zero initialize all connections TODO: put in constructors
-		n->connections_out.push_back(con);
+		n->connections_out.push_back(
+			Connection(n->connections_out.size()));
 		ret = network_connect_neurons(
 			n->connections_out[n->connections_out.size()-1],
 			*n, *dest, attributes);
 		break;
 	}
 	case '&': // Map neuron to hardware
-		ret = arch_map_neuron(*n, *c);
+		ret = arch_map_neuron(net, *n, *c);
 		break;
 	default:
 		break;

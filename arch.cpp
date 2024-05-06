@@ -456,6 +456,7 @@ void arch_map_neuron_connections(Neuron &pre_neuron)
 
 	// Figure out the unique set of cores that this neuron broadcasts to
 	TRACE1("Counting connections for neuron nid:%d\n", pre_neuron.id);
+	std::vector<bool> core_inserted();
 	std::set<Core *> cores_out;
 	for (Connection &curr_connection: pre_neuron.connections_out)
 	{
@@ -490,10 +491,10 @@ void arch_map_neuron_connections(Neuron &pre_neuron)
 	return;
 }
 
-int arch_map_neuron(Neuron &n, Core &c)
+int arch_map_neuron(Network &net, Neuron &n, Core &c)
 {
 	// Map the neuron to hardware units
-	assert(n.core == NULL);
+	assert(n.core == nullptr);
 
 	n.core = &c;
 	TRACE1("Mapping neuron %d to core %d\n", n.id, c->id);
@@ -534,6 +535,14 @@ int arch_map_neuron(Neuron &n, Core &c)
 
 	// TODO: support multiple axon outputs
 	n.axon_out_hw = &(c.axon_out_hw[0]);
+
+	// Pass all the model specific arguments
+	//n.soma_model = plugin_get_soma(n.soma_hw_name);
+	n.model = std::shared_ptr<SomaModel>(
+		new LoihiLifModel(n.parent_group_id, n.id));
+	const NeuronGroup &group = net.groups[n.parent_group_id];
+	n.model->set_attributes(group.default_attributes);
+	n.model->set_attributes(n.attributes);
 
 	return RET_OK;
 }
@@ -599,10 +608,11 @@ void arch_add_connection_to_axon(Connection &con, Core &post_core)
 	{
 		bool mapped = false;
 		// Search for the specified synapse hardware
-		for (auto &synapse_hw: post_core.synapse)
+		for (const auto &s: post_core.synapse)
 		{
-			if (con.synapse_hw_name == synapse_hw.name)
+			if (con.synapse_hw_name == s.name)
 			{
+				synapse_hw = s;
 				mapped = true;
 				break;
 			}

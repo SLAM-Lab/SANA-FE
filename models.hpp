@@ -22,17 +22,19 @@ namespace sanafe
 class SomaModel
 {
 public:
-	SomaModel(){}
-	virtual ~SomaModel(){}
+	SomaModel(const int gid, const int nid) : group_id(gid), neuron_id(nid) {}
+	virtual ~SomaModel() {}
 	virtual sanafe::NeuronStatus update(const double current_in) = 0;
 	virtual void set_attributes(const std::vector<Attribute> &attr) = 0;
 	virtual double get_potential(){ return 0.0; }
+private:
+	const int group_id, neuron_id;
 };
 
 class LoihiLifModel: public SomaModel
 {
 public:
-        LoihiLifModel();
+        LoihiLifModel(const int gid, const int nid);
 	~LoihiLifModel();
 	void set_attributes(const std::vector<Attribute> &attr);
 	sanafe::NeuronStatus update(const double current_in);

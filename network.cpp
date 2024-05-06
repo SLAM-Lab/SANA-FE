@@ -15,8 +15,6 @@
 #include "network.hpp"
 #include "models.hpp"
 
-int total_connection_count = 0;
-
 Connection::Connection(const int connection_id)
 {
 	id = connection_id;
@@ -33,11 +31,12 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 	const std::vector<Attribute> &attr)
 {
 	int ret;
-	const int id = net.groups.size();
-	INFO("Creating neuron group: %d with %d neurons\n", id, neuron_count);
+	const auto id = net.groups.size();
+	INFO("Creating neuron group: %lu with %d neurons\n", id, neuron_count);
 	net.groups.push_back(NeuronGroup());
 	NeuronGroup &group = net.groups.back();
 
+	group.id = id;
 	group.default_soma_hw_name = "";
 	group.default_synapse_hw_name = "";
 	group.default_log_potential = false;
@@ -78,6 +77,7 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 			exit(1);
 		}
 	}
+	group.neurons.reserve(neuron_count);
 
 	// Initialize all neurons in this group
 	for (int i = 0; i < neuron_count; i++)
@@ -96,9 +96,6 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 		n.force_update = group.default_force_update;
 		n.max_connections_out = group.default_max_connections_out;
 
-		n.fired = 0;
-		// By default, dendrite current resets every timestep
-
 		n.update_needed = 0;
 		n.neuron_status = sanafe::IDLE;
 		n.spike_count = 0;
@@ -109,21 +106,17 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 		n.axon_out_hw = nullptr;
 		n.is_init = 0;
 
-		// Create Soma Class Instance
-		// TODO: figure plugin mechanism
-		//n.soma_model = plugin_get_soma(n.soma_hw_name);
-		n.model = std::shared_ptr<SomaModel>(new LoihiLifModel);
-		n.model->set_attributes(attr);
-
 		group.neurons.push_back(n);
 	}
+	group.default_attributes = attr;
 
 	INFO("Created neuron group gid:%d\n", group.id);
 
 	return id;
 }
 
-int network_create_neuron(Neuron &n, const std::vector<Attribute> &attr)
+int network_create_neuron(
+	Network &net, Neuron &n, const std::vector<Attribute> &attr)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
@@ -143,7 +136,8 @@ int network_create_neuron(Neuron &n, const std::vector<Attribute> &attr)
 		{
 			n.soma_hw_name = a.value_str;
 		}
-		else if (a.key == "connections_out")
+		else if ((a.key == "default_connections_out") ||
+			(a.key == "connections_out"))
 		{
 			ss >> n.max_connections_out;
 		}
@@ -176,12 +170,13 @@ int network_create_neuron(Neuron &n, const std::vector<Attribute> &attr)
 	n.soma_last_updated = 0;
 	n.dendrite_last_updated = 0;
 
-	n.core = NULL;
+	n.core = nullptr;
 	assert(n.connections_out.size() == 0);
 	n.connections_out.reserve(n.max_connections_out);
 
 	// Check if need to create Soma Class instance
-	if (n.model == nullptr)
+	/*
+	if ((n.model == nullptr) && )
 	{
 		// TODO: remove hack, make this user input
 		TRACE1("Soma hw name: %s", n.soma_hw_name.c_str());
@@ -189,12 +184,17 @@ int network_create_neuron(Neuron &n, const std::vector<Attribute> &attr)
 		n.model = std::shared_ptr<SomaModel>(new LoihiLifModel);
 		TRACE1("Creating new neuron %d\n", n.id);
 	}
+	const NeuronGroup &group = net.groups[n.parent_group_id];
+	n.model->set_attributes(group.default_attributes);
 	n.model->set_attributes(attr);
+	*/
 
 	TRACE1("Created neuron: gid:%d nid:%d force:%d soma:%s\n",
 		n.parent_group_id, n.id, n.force_update,
 		n.soma_hw_name.c_str());
 	n.is_init = 1;
+
+	n.attributes = attr;
 	return n.id;
 }
 

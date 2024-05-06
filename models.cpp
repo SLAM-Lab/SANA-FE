@@ -9,13 +9,10 @@
 #include "print.hpp"
 
 // **** Soma models ****
-LoihiLifModel::LoihiLifModel()
+LoihiLifModel::LoihiLifModel(const int gid, const int nid): SomaModel(gid, nid)
 {
 	potential = 0.0;
 	soma_last_updated = 0;
-	// Default is no leak (potential decay), i.e., the potential for the
-	//  next timestep is 100% of the previous timestep's
-	leak_decay = 1.0;
 	bias = 0.0;
 	threshold = 0.0;
 	reverse_threshold = 0.0;
@@ -23,7 +20,9 @@ LoihiLifModel::LoihiLifModel()
 	reverse_reset = 0.0;
 	reset_mode = sanafe::NEURON_RESET_HARD;
 	reverse_reset_mode = sanafe::NEURON_NO_RESET;
-	force_update = 0;
+	// Default is no leak (potential decay), i.e., the potential for the
+	//  next timestep is 100% of the previous timestep's
+	leak_decay = 1.0;
 
 	return;
 }
@@ -38,44 +37,50 @@ void LoihiLifModel::set_attributes(const std::vector<Attribute> &attr)
 	for (auto a: attr)
 	{
 		std::istringstream ss(a.value_str);
-		if (a.key == "threshold")
+		if ((a.key == "default_threshold") || (a.key == "threshold"))
 		{
 			ss >> threshold;
 		}
-		else if (a.key == "reverse_threshold")
+		else if ((a.key == "default_reverse_threshold") ||
+			(a.key == "reverse_threshold"))
 		{
 			ss >> reverse_threshold;
 		}
-		else if (a.key == "reset")
+		else if ((a.key == "default_reset") || (a.key == "reset"))
 		{
 			ss >> reset;
 		}
-		else if (a.key == "reverse_reset")
+		else if ((a.key == "default_reverse_reset") ||
+			(a.key == "reverse_reset"))
 		{
 			ss >> reverse_reset;
 		}
-		else if (a.key == "reset_mode")
+		else if ((a.key == "default_reset_mode") ||
+			(a.key == "reset_mode"))
 		{
 			reset_mode = model_parse_reset_mode(a.value_str);
 		}
-		else if (a.key =="reverse_reset_mode")
+		else if ((a.key == "default_reverse_reset_mode") ||
+			(a.key =="reverse_reset_mode"))
 		{
 			reverse_reset_mode =
 				model_parse_reset_mode(a.value_str);
 		}
-		else if (a.key =="leak_decay")
+		else if ((a.key == "default_leak_decay") ||
+			(a.key =="leak_decay"))
 		{
 			ss >> leak_decay;
 		}
-		else if (a.key =="bias")
+		else if ((a.key == "default_bias") || (a.key =="bias"))
 		{
 			ss >> bias;
 		}
-		else if (a.key == "force_update")
+		else if ((a.key == "default_force_update") ||
+			(a.key == "force_update"))
 		{
 			ss >> force_update;
 		}
-        }
+	}
 }
 
 sanafe::NeuronStatus LoihiLifModel::update(const double current_in)

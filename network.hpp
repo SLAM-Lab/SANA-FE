@@ -57,6 +57,7 @@ struct Neuron
 {
 	std::vector<Connection> connections_out;
 	std::vector<int> axon_out_addresses;
+	std::vector<Attribute> attributes;
 
 	// Mapped hardware
 	Core *core, *post_synaptic_cores;
@@ -87,6 +88,7 @@ struct NeuronGroup
 	std::vector<Neuron> neurons;
 	std::string default_soma_hw_name;
 	std::string default_synapse_hw_name;
+	std::vector<Attribute> default_attributes;
 
 	int id;
 	int default_max_connections_out;
@@ -101,7 +103,7 @@ struct Network
 struct Architecture;
 struct Core;
 
-int network_create_neuron(Neuron &n, const std::vector<Attribute> &attr);
+int network_create_neuron(Network &net, Neuron &n, const std::vector<Attribute> &attr);
 int network_create_neuron_group(Network &net, const int neuron_count, const std::vector<Attribute> &attr);
 //Neuron *network_id_to_neuron_ptr(Network *const net, const NeuronId id);
 int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::vector<Attribute> &attr);

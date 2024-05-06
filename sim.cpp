@@ -28,6 +28,7 @@ void SanaFe::init()
 	net = Network();
 	INFO("Initializing simulation.\n");
 	sim = sim_init_sim();
+	out_dir = ".";
 }
 
 int SanaFe::update_neuron(
@@ -69,8 +70,32 @@ int SanaFe::update_neuron(
 void SanaFe::run_timesteps(int timesteps)
 {
 	store_data_init(&run_data, *sim, timesteps);
-	for (int i = 0; i < timesteps; ++i)
+	if (sim->log_potential)
 	{
+		open_potential_trace();
+	}
+	if (sim->log_spikes)
+	{
+		open_spike_trace();
+	}
+	if (sim->log_messages)
+	{
+		open_message_trace();
+	}
+	if (sim->log_perf)
+	{
+		open_perf_trace();
+	}
+
+	const int heartbeat = 100;
+	for (long int timestep = 0; timestep < timesteps; timestep++)
+	{
+		if ((timestep % heartbeat) == 0)
+		{
+			// Print heart-beat every hundred timesteps
+			INFO("*** Time-step %ld ***\n", timestep);
+		}
+
 		sim->timesteps++;
 		run(*sim, net, *arch);
 	}
@@ -133,6 +158,8 @@ void SanaFe::open_potential_trace(void)
 	sim->log_potential = 1;
 
 	std::string potential_path = out_dir + "/potential.csv";
+	INFO("open potential trace");
+	std::cout << potential_path << std::endl;
 	sim->potential_trace_fp = fopen(potential_path.c_str(), "w");
 	if (sim->potential_trace_fp == NULL)
 	{
@@ -211,12 +238,6 @@ void SanaFe::set_net(const char *filename)
 	}
 	network_check_mapped(net);
 	arch_create_axons(*arch);
-
-	// Change Potential logging with new headers from net.
-	if (sim->log_potential)
-	{
-		open_potential_trace();
-	}
 }
 
 double SanaFe::get_power()
@@ -266,15 +287,15 @@ vector<vector<int>> SanaFe::run_summary()
 	print_run_data(stdout, &run_data);
 
 	// Could write intermediate run data here
-	// sim->stats_fp = fopen("run_summary.yaml", "w");
-	// if (sim->stats_fp != NULL)
-	// {
-	// 	print_run_data(sim->stats_fp, &run_data);
-	// }
+	 sim->stats_fp = fopen("run_summary.yaml", "w");
+	 if (sim->stats_fp != NULL)
+	 {
+	 	print_run_data(sim->stats_fp, &run_data);
+	 }
 
 	// Return 2D vector of spiking tiles, auto clears
 	// vector after return.
-	Vector_Cleanup_Class help_class(arch);
+	//Vector_Cleanup_Class help_class(arch);
 	return arch->spike_vector;
 }
 
@@ -334,11 +355,11 @@ Simulation::Simulation()
 	log_spikes = 0;
 	log_messages = 0;
 
-	potential_trace_fp = NULL;
-	spike_trace_fp = NULL;
-	perf_fp = NULL;
-	message_trace_fp = NULL;
-	stats_fp = NULL;
+	potential_trace_fp = nullptr;
+	spike_trace_fp = nullptr;
+	perf_fp = nullptr;
+	message_trace_fp = nullptr;
+	stats_fp = nullptr;
 }
 
 void run(Simulation &sim, Network &net, Architecture &arch)
@@ -353,7 +374,9 @@ void run(Simulation &sim, Network &net, Architecture &arch)
 	// Measure the wall-clock time taken to run the simulation
 	//  on the host machine
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
 	sim_timestep(ts, net, arch);
+
 	// Calculate elapsed time
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
@@ -1669,22 +1692,23 @@ void sim_potential_trace_write_header(const Simulation &sim, const Network &net)
 {
 	// Write csv header for probe outputs - record which neurons have been
 	//  probed
-	fprintf(sim.potential_trace_fp, "timestep,");
-	for (auto &group: net.groups)
+	if (sim.potential_trace_fp != nullptr)
 	{
-		for (auto n: group.neurons)
+		fprintf(sim.potential_trace_fp, "timestep,");
+		for (auto &group: net.groups)
 		{
-			if (sim.potential_trace_fp && sim.log_potential &&
-				n.log_potential)
+			for (auto n: group.neurons)
 			{
-				fprintf(sim.potential_trace_fp, "neuron %d.%d,",
-					group.id, n.id);
+				if (sim.potential_trace_fp &&
+					sim.log_potential &&
+					n.log_potential)
+				{
+					fprintf(sim.potential_trace_fp,
+						"neuron %d.%d,",
+						group.id, n.id);
+				}
 			}
 		}
-	}
-
-	if (sim.potential_trace_fp)
-	{
 		fputc('\n', sim.potential_trace_fp);
 	}
 
@@ -1710,11 +1734,11 @@ void sim_trace_record_spikes(
 	{
 		for (auto &n: group.neurons)
 		{
-			if (n.log_spikes && n.fired)
+			if (n.log_spikes && (n.neuron_status == sanafe::FIRED))
 			{
 				fprintf(sim.spike_trace_fp, "%d.%d,%ld\n",
 					n.parent_group_id, n.id,
-					sim.timesteps+1);
+					sim.timesteps);
 			}
 		}
 	}
@@ -1723,22 +1747,22 @@ void sim_trace_record_spikes(
 }
 
 // TODO: should potential be a required value in the soma?
-void sim_trace_record_potentials(
-	const Simulation &sim, const Network &net)
+void sim_trace_record_potentials(const Simulation &sim, const Network &net)
 {
 	// Each line of this csv file is the potential of all probed neurons for
 	//  one time-step
 	int potential_probe_count = 0;
 
-	fprintf(sim.potential_trace_fp, "%ld,", sim.timesteps+1);
+	INFO("Recording potential for timestep: %ld\n", sim.timesteps);
+	fprintf(sim.potential_trace_fp, "%ld,", sim.timesteps);
 	for (auto &group: net.groups)
 	{
 		for (auto &n: group.neurons)
 		{
 			if (sim.potential_trace_fp && n.log_potential)
 			{
-				//fprintf(sim.potential_trace_fp, "%lf,",
-				//	n.model->get_potential());
+				fprintf(sim.potential_trace_fp, "%lf,",
+					n.model->get_potential());
 				potential_probe_count++;
 			}
 		}
@@ -1776,41 +1800,6 @@ void sim_trace_record_message(const Simulation &sim, const Message &m)
 	fprintf(sim.message_trace_fp, "%le\n", m.processed_timestamp);
 
 	return;
-}
-
-int sim_poisson_input(const double firing_probability)
-{
-	// Simulate a single external input (as one neuron) for a timestep
-	//  Return 1 if the input fires, 0 otherwise
-	double rand_uniform;
-	int input_fired;
-
-	rand_uniform = (double) rand() / RAND_MAX;
-	input_fired = rand_uniform < firing_probability;
-
-	return input_fired;
-}
-
-int sim_rate_input(const double firing_rate, double *current)
-{
-	int input_fired;
-
-	// Note: rate-based input (without randomization) is equivalent to a
-	//  neuron with a fixed bias.
-	TRACE2("rate input:%lf\n", firing_rate);
-	*current += firing_rate;
-	if (*current > 255.0)
-	{
-		*current = 0;
-		input_fired = 1;
-	}
-	else
-	{
-		input_fired = 0;
-	}
-
-	TRACE2("input fired value:%d\n", input_fired);
-	return input_fired;
 }
 
 /*
@@ -1889,5 +1878,43 @@ double sim_calculate_time(const Architecture *const arch)
 	}
 
 	return 0.0;
+}
+*/
+
+
+/*
+int sim_poisson_input(const double firing_probability)
+{
+	// Simulate a single external input (as one neuron) for a timestep
+	//  Return 1 if the input fires, 0 otherwise
+	double rand_uniform;
+	int input_fired;
+
+	rand_uniform = (double) rand() / RAND_MAX;
+	input_fired = rand_uniform < firing_probability;
+
+	return input_fired;
+}
+
+int sim_rate_input(const double firing_rate, double *current)
+{
+	int input_fired;
+
+	// Note: rate-based input (without randomization) is equivalent to a
+	//  neuron with a fixed bias.
+	TRACE2("rate input:%lf\n", firing_rate);
+	*current += firing_rate;
+	if (*current > 255.0)
+	{
+		*current = 0;
+		input_fired = 1;
+	}
+	else
+	{
+		input_fired = 0;
+	}
+
+	TRACE2("input fired value:%d\n", input_fired);
+	return input_fired;
 }
 */
