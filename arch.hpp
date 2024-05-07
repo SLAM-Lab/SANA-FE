@@ -20,9 +20,6 @@
 #include <list>
 
 #include "network.hpp"
-#include "description.hpp"
-
-using namespace std;
 
 // Hard define maximum defined h/w sizes
 // TODO: better dynamically define or allocate these numbers, so that we can
@@ -40,6 +37,9 @@ using namespace std;
 #define ARCH_MAX_Y (4*2)
 
 #define ARCH_INVALID_ID -1
+
+namespace sanafe
+{
 enum buffer_positions
 {
 	BUFFER_AXON_IN = 0,	// Buffer incoming packets
@@ -220,8 +220,6 @@ public:
 	int get_core_count();
 };
 
-#include "description.hpp"
-
 void free_spike_vector(Architecture* arch);
 void arch_free(Architecture *const arch);
 int arch_create_noc(Architecture &arch, const std::vector<Attribute> &attr);
@@ -241,5 +239,6 @@ void arch_add_connection_to_axon(Connection &con, Core &post_core);
 int arch_parse_neuron_model(const std::string &model_str);
 int arch_parse_synapse_model(const std::string &model_str);
 void arch_init_message(Message &m);
+}
 
 #endif

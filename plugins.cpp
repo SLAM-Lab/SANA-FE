@@ -12,6 +12,8 @@
 #include "models.hpp"
 #include "print.hpp"
 
+using namespace sanafe;
+
 typedef SomaModel *_create_soma(void);
 typedef void _destroy_soma(SomaModel *model);
 std::map<std::string, _create_soma *> create_soma;

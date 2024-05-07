@@ -15,6 +15,8 @@
 #include "network.hpp"
 #include "models.hpp"
 
+using namespace sanafe;
+
 Connection::Connection(const int connection_id)
 {
 	id = connection_id;
@@ -27,7 +29,7 @@ Connection::Connection(const int connection_id)
 	synapse_hw = nullptr;
 }
 
-int network_create_neuron_group(Network &net, const int neuron_count,
+int sanafe::network_create_neuron_group(Network &net, const int neuron_count,
 	const std::vector<Attribute> &attr)
 {
 	int ret;
@@ -115,7 +117,7 @@ int network_create_neuron_group(Network &net, const int neuron_count,
 	return id;
 }
 
-int network_create_neuron(
+int sanafe::network_create_neuron(
 	Network &net, Neuron &n, const std::vector<Attribute> &attr)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
@@ -123,7 +125,7 @@ int network_create_neuron(
 	if (n.is_init)
 	{
 		INFO("Error: Trying to define same neuron twice %d.\n", n.id);
-		return NETWORK_INVALID_NID;
+		return -1;
 	}
 
 	/*** Set attributes ***/
@@ -198,7 +200,7 @@ int network_create_neuron(
 	return n.id;
 }
 
-int network_connect_neurons(Connection &con,
+int sanafe::network_connect_neurons(Connection &con,
 	Neuron &src, Neuron &dest,
 	const std::vector<Attribute> &attr)
 {
@@ -230,7 +232,7 @@ int network_connect_neurons(Connection &con,
 	return RET_OK;
 }
 
-void network_check_mapped(Network &net)
+void sanafe::network_check_mapped(Network &net)
 {
 	// Check that all network neurons are mapped to a physical core
 	//  If a neuron is not, print an error message and stop the simulation

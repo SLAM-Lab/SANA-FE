@@ -12,10 +12,12 @@
 #include "print.hpp"
 #include "sim.hpp"
 
+using namespace sanafe;
+
 int main(int argc, char *argv[])
 {
-	SanaFe sim;
-	int timesteps, ret;
+	long int timesteps;
+	int ret;
 
 	// Assume that if we don't get to the point where we write this with
 	//  a valid value, something went wrong and we errored out
@@ -23,14 +25,19 @@ int main(int argc, char *argv[])
 
 	if (argc < 1)
 	{
-		INFO("Error: No program arguments.\n");
-		sim.clean_up(RET_FAIL);
+		throw std::invalid_argument("Error: No program arguments.");
 	}
 	// First arg is always program name, skip
 	argc--;
 	argv++;
 
 	// Parse optional args
+	std::string output_dir(".");
+	bool record_spikes, record_potentials, record_perf, record_messages;
+	record_spikes = false;
+	record_potentials = false;
+	record_perf = false;
+	record_messages = false;
 	while (argc > 2)
 	{
 		if (argv[0][0] == '-')
@@ -48,21 +55,20 @@ int main(int argc, char *argv[])
 				argv++;
 				std::string out_dir(argv[0]);
 				// TODO: fix this for C++
-				INFO("Writing output to %s\n", out_dir.c_str());
-				sim.set_out_dir(out_dir);
+				INFO("Writing output to %s\n", out_dir.c_str());;
 				break;
 			}
-			case 'p':
-				sim.set_perf_trace(true);
-				break;
 			case 's':
-				sim.set_spike_trace(true);
+				record_spikes = true;
 				break;
 			case 'v':
-				sim.set_potential_trace(true);
+				record_potentials = true;
+				break;
+			case 'p':
+				record_perf = true;
 				break;
 			case 'm':
-				sim.set_message_trace(true);
+				record_messages = true;
 				break;
 			default:
 				INFO("Error: Flag %c not recognized.\n",
@@ -85,51 +91,35 @@ int main(int argc, char *argv[])
 				"-o <output directory>"
 				"<arch description> <network description> "
 							"<timesteps>\n");
-		sim.clean_up(RET_FAIL);
 		return 0;
 	}
-
-	if (sim.sim->log_perf)
-	{
-		sim.set_perf_trace(true);
-	}
-	if (sim.sim->log_spikes)
-	{
-		sim.set_spike_trace(true);
-	}
-	if (sim.sim->log_potential)
-	{
-		sim.set_potential_trace(true);
-	}
-	if (sim.sim->log_messages)
-	{
-		sim.set_message_trace(true);
-	}
+	Simulation sim(output_dir, record_spikes, record_potentials,
+		record_perf, record_messages);
 
 	// Read in program args, sanity check and parse inputs
-	sim.set_arch(argv[ARCH_FILENAME]);
-	sim.set_net(argv[NETWORK_FILENAME]);
+	sim.read_arch_file(argv[ARCH_FILENAME]);
+	sim.read_net_file(argv[NETWORK_FILENAME]);
 
 	timesteps = 0;
-	ret = sscanf(argv[TIMESTEPS], "%d", &timesteps);
+	ret = sscanf(argv[TIMESTEPS], "%ld", &timesteps);
 	if (ret < 1)
 	{
 		INFO("Error: Time-steps must be integer > 0 (%s).\n",
 							argv[TIMESTEPS]);
-		sim.clean_up(RET_FAIL);
+		return 1;
 	}
 	else if (timesteps <= 0)
 	{
-		INFO("Error: Time-steps must be > 0 (%d)\n", timesteps);
-		sim.clean_up(RET_FAIL);
+		INFO("Error: Time-steps must be > 0 (%ld)\n", timesteps);
+		return 1;
 	}
 
 	// Step simulation
 	INFO("Running simulation.\n");
-	sim.run_timesteps(timesteps);
+	sim.run(timesteps);
 
 	INFO("***** Run Summary *****\n");
-	sim.sim_summary();
+	sim.get_run_summary(output_dir);
 	double average_power = sim.get_power();
 	INFO("Average power consumption: %f W.\n", average_power);
 	INFO("Run finished.\n");
@@ -191,7 +181,7 @@ void run(struct simulation *sim, struct network *net, Architecture *arch)
 }
 */
 
-struct timespec calculate_elapsed_time(struct timespec ts_start,
+struct timespec sanafe::calculate_elapsed_time(struct timespec ts_start,
 							struct timespec ts_end)
 {
 	// Calculate elapsed wall-clock time between ts_start and ts_end

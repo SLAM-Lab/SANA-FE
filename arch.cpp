@@ -16,7 +16,9 @@
 #include "print.hpp"
 #include "arch.hpp"
 #include "network.hpp"
-#include "description.hpp"
+//#include "description.hpp"
+
+using namespace sanafe;
 
 Architecture::Architecture()
 {
@@ -67,7 +69,7 @@ Message::Message()
 	dest_axon_id = -1;
 }
 
-int arch_create_noc(struct Architecture &arch,
+int sanafe::arch_create_noc(struct Architecture &arch,
 	const std::vector<Attribute> &attr)
 {
 	const int tile_count = arch.tiles.size();
@@ -107,7 +109,8 @@ int arch_create_noc(struct Architecture &arch,
 	return 0;
 }
 
-int arch_create_tile(Architecture &arch, const std::vector<Attribute> &attr)
+int sanafe::arch_create_tile(
+	Architecture &arch, const std::vector<Attribute> &attr)
 
 {
 	Tile tile;
@@ -169,7 +172,7 @@ int arch_create_tile(Architecture &arch, const std::vector<Attribute> &attr)
 	return tile.id;
 }
 
-int arch_create_core(
+int sanafe::arch_create_core(
 	Architecture &arch, Tile &tile, const std::vector<Attribute> &attr)
 {
 	const int core_offset = tile.cores.size();
@@ -209,7 +212,7 @@ int arch_create_core(
 	return c.id;
 }
 
-void arch_create_axon_in(
+void sanafe::arch_create_axon_in(
 	Core &c, const std::string &name, const std::vector<Attribute> &attr)
 {
 	struct AxonInUnit in;
@@ -242,7 +245,7 @@ void arch_create_axon_in(
 	return;
 }
 
-void arch_create_synapse(struct Core &c, const std::string &name,
+void sanafe::arch_create_synapse(struct Core &c, const std::string &name,
 	const std::vector<Attribute> &attr)
 {
 	SynapseUnit s;
@@ -291,7 +294,7 @@ void arch_create_synapse(struct Core &c, const std::string &name,
 	return;
 }
 
-void arch_create_soma(struct Core &c, const std::string &name,
+void sanafe::arch_create_soma(struct Core &c, const std::string &name,
 	const std::vector<Attribute> &attr)
 {
 	SomaUnit s;
@@ -359,7 +362,8 @@ void arch_create_soma(struct Core &c, const std::string &name,
 	return;
 }
 
-void arch_create_axon_out(struct Core &c, const std::vector<Attribute> &attr)
+void sanafe::arch_create_axon_out(
+	struct Core &c, const std::vector<Attribute> &attr)
 {
 	AxonOutUnit out;
 	out.packets_out = 0;
@@ -390,7 +394,7 @@ void arch_create_axon_out(struct Core &c, const std::vector<Attribute> &attr)
 	return;
 }
 
-void arch_create_axons(struct Architecture &arch)
+void sanafe::arch_create_axons(struct Architecture &arch)
 {
 	TRACE1("Creating all connection maps.\n");
 	for (auto &tile: arch.tiles)
@@ -408,7 +412,7 @@ void arch_create_axons(struct Architecture &arch)
 	arch_print_axon_summary(arch);
 }
 
-void arch_print_axon_summary(struct Architecture &arch)
+void sanafe::arch_print_axon_summary(struct Architecture &arch)
 {
 	int in_count, out_count, core_used;
 	in_count = 0;
@@ -449,7 +453,7 @@ void arch_print_axon_summary(struct Architecture &arch)
 	return;
 }
 
-void arch_map_neuron_connections(Neuron &pre_neuron)
+void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 {
 	// Setup the connections between neurons and map them to hardware
 	assert(pre_neuron.core != nullptr);
@@ -491,7 +495,7 @@ void arch_map_neuron_connections(Neuron &pre_neuron)
 	return;
 }
 
-int arch_map_neuron(Network &net, Neuron &n, Core &c)
+int sanafe::arch_map_neuron(Network &net, Neuron &n, Core &c)
 {
 	// Map the neuron to hardware units
 	assert(n.core == nullptr);
@@ -547,7 +551,7 @@ int arch_map_neuron(Network &net, Neuron &n, Core &c)
 	return RET_OK;
 }
 
-void arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
+void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 {
 	// Create a new input axon at a receiving (destination) core
 	//  Then create the output axon at the sending core. Finally
@@ -584,7 +588,7 @@ void arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 	return;
 }
 
-void arch_add_connection_to_axon(Connection &con, Core &post_core)
+void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
 {
 	// Add a given connection to the axon in the post-synaptic
 	//  (destination) core
@@ -628,7 +632,7 @@ void arch_add_connection_to_axon(Connection &con, Core &post_core)
 	return;
 }
 
-int arch_parse_synapse_model(const std::string &model_str)
+int sanafe::arch_parse_synapse_model(const std::string &model_str)
 {
 	int model;
 

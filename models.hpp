@@ -2,7 +2,7 @@
 #define MODELS_HEADER_INCLUDED_
 
 #include <vector>
-struct Attribute;
+#include "description.hpp"
 
 #define MAX_NOISE_FILE_ENTRY 128
 
@@ -17,14 +17,13 @@ namespace sanafe
 		NEURON_RESET_SATURATE,
 		NEURON_RESET_MODE_COUNT,
 	};
-}
 
 class SomaModel
 {
 public:
 	SomaModel(const int gid, const int nid) : group_id(gid), neuron_id(nid) {}
 	virtual ~SomaModel() {}
-	virtual sanafe::NeuronStatus update(const double current_in) = 0;
+	virtual NeuronStatus update(const double current_in) = 0;
 	virtual void set_attributes(const std::vector<Attribute> &attr) = 0;
 	virtual double get_potential(){ return 0.0; }
 private:
@@ -37,7 +36,7 @@ public:
         LoihiLifModel(const int gid, const int nid);
 	~LoihiLifModel();
 	void set_attributes(const std::vector<Attribute> &attr);
-	sanafe::NeuronStatus update(const double current_in);
+	NeuronStatus update(const double current_in);
 	double get_potential() { return potential; }
 private:
 	int soma_last_updated, reset_mode, reverse_reset_mode;
@@ -47,6 +46,7 @@ private:
         double reset, reverse_reset, leak_bias;
 };
 
-sanafe::NeuronResetModes model_parse_reset_mode(const std::string &str);
+NeuronResetModes model_parse_reset_mode(const std::string &str);
+}
 
 #endif

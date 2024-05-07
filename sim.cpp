@@ -1,4 +1,4 @@
-// Copyright (c) 2023 - The University of Texas at Austin
+// Copyright (c) 2024 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -11,32 +11,68 @@
 #include <vector>
 #include <list>
 #include <memory>
+#include <unordered_map>
 
 #include "print.hpp"
 #include "sim.hpp"
 #include "network.hpp"
 #include "arch.hpp"
 
-SanaFe::SanaFe()
-{
-	init();
-}
+using namespace sanafe;
 
-void SanaFe::init()
+Simulation::Simulation(const std::string &output_dir,
+	const bool record_spikes=false, const bool record_potentials=false,
+	const bool record_perf=false, const bool record_messages=false):
+	arch(), net(), out_dir(output_dir)
 {
-	arch = new Architecture();
-	net = Network();
 	INFO("Initializing simulation.\n");
-	sim = sim_init_sim();
-	out_dir = ".";
+	total_energy = 0.0;   // Joules
+	total_sim_time = 0.0; // Seconds
+	wall_time = 0.0; // Seconds
+	total_timesteps = 0;
+	total_spikes = 0;
+	total_messages_sent = 0;
+	total_neurons_fired = 0;
+
+	// All logging disabled by default
+	spike_trace_enabled = record_spikes;
+	potential_trace_enabled = record_potentials;
+	perf_trace_enabled = record_perf;
+	message_trace_enabled = record_messages;
+
+	if (spike_trace_enabled)
+	{
+		spike_trace = sim_trace_open_spike_trace(out_dir);
+	}
+	if (potential_trace_enabled)
+	{
+		potential_trace = sim_trace_open_potential_trace(out_dir, net);
+	}
+	if (perf_trace_enabled)
+	{
+		perf_trace = sim_trace_open_perf_trace(out_dir);
+	}
+	if (message_trace_enabled)
+	{
+		message_trace = sim_trace_open_message_trace(out_dir);
+	}
 }
 
-int SanaFe::update_neuron(
-	std::vector<NeuronGroup>::size_type group_id,
-	std::vector<Neuron>::size_type n_id,
-	std::vector<string> kwargs, int count)
+Simulation::~Simulation()
 {
-	for (string item: kwargs)
+	// Close any open trace files
+	spike_trace.close();
+	potential_trace.close();
+	perf_trace.close();
+	message_trace.close();
+}
+
+int Simulation::update_neuron(
+	const std::vector<NeuronGroup>::size_type group_id,
+	const std::vector<Neuron>::size_type n_id,
+	const std::vector<std::string> kwargs, const int count)
+{
+	for (std::string item: kwargs)
 	{
 		INFO("Kwarg: %s\n", item.c_str());
 	}
@@ -54,7 +90,7 @@ int SanaFe::update_neuron(
 	}
 
 	std::vector<Attribute> attr;
-	for (auto s: kwargs)
+	for (auto &s: kwargs)
 	{
 		std::string key = s.substr(0, s.find('=')).c_str();
 		std::string value_str = s.substr(s.find('=')+1).c_str();
@@ -67,26 +103,8 @@ int SanaFe::update_neuron(
 	return 0;
 }
 
-void SanaFe::run_timesteps(int timesteps)
+void Simulation::run(const int timesteps)
 {
-	store_data_init(&run_data, *sim, timesteps);
-	if (sim->log_potential)
-	{
-		open_potential_trace();
-	}
-	if (sim->log_spikes)
-	{
-		open_spike_trace();
-	}
-	if (sim->log_messages)
-	{
-		open_message_trace();
-	}
-	if (sim->log_perf)
-	{
-		open_perf_trace();
-	}
-
 	const int heartbeat = 100;
 	for (long int timestep = 1; timestep <= timesteps; timestep++)
 	{
@@ -95,165 +113,109 @@ void SanaFe::run_timesteps(int timesteps)
 			// Print heart-beat every hundred timesteps
 			INFO("*** Time-step %ld ***\n", timestep);
 		}
-
-		sim->timesteps++;
-		run(*sim, net, *arch);
+		step();
+		total_timesteps++;
 	}
-	store_data(&run_data, *sim);
 }
 
-void SanaFe::set_spike_trace(const bool enable)
+void Simulation::step()
 {
-	sim->log_spikes = enable;
-}
+	// TODO: remove the need to pass the network struct, only the arch
+	//  should be needed (since it links back to the net anyway)
+	// Run neuromorphic hardware simulation for one timestep
+	//  Measure the CPU time it takes and accumulate the stats
+	struct Timestep ts = Timestep(total_timesteps, arch.get_core_count());
+	struct timespec ts_start, ts_end, ts_elapsed;
 
-void SanaFe::set_potential_trace(const bool enable)
-{
-	sim->log_potential = enable;
-}
+	// Measure the wall-clock time taken to run the simulation
+	//  on the host machine
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-void SanaFe::set_perf_trace(const bool enable)
-{
-	sim->log_perf = enable;
-}
+	sim_timestep(ts, arch, net);
 
-void SanaFe::set_message_trace(const bool enable)
-{
-	sim->log_messages = enable;
-}
+	// Calculate elapsed time
+	clock_gettime(CLOCK_MONOTONIC, &ts_end);
+	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
-void SanaFe::open_perf_trace(void)
-{
-	sim->log_perf = 1;
-
-	// TODO: warning, this is specific to Linux
-	// To be more portable, consider using the filesystem library in C++17
-	std::string perf_path = out_dir + std::string("/perf.csv");
-	sim->perf_fp = fopen(perf_path.c_str(), "w");
-	if (sim->perf_fp == NULL)
+	total_energy += ts.energy;
+	total_sim_time += ts.sim_time;
+	total_spikes += ts.spike_count;
+	total_neurons_fired += ts.total_neurons_fired;
+	total_messages_sent += ts.packets_sent;
+	if (spike_trace_enabled)
 	{
-		INFO("Error: Couldn't open perf file for writing.\n");
-		clean_up(RET_FAIL);
+		sim_trace_record_spikes(spike_trace, total_timesteps, net);
 	}
-	sim_perf_write_header(sim->perf_fp);
-
+	if (potential_trace_enabled)
+	{
+		sim_trace_record_potentials(
+			potential_trace, total_timesteps, net);
+	}
+	if (perf_trace_enabled)
+	{
+		sim_trace_perf_log_timestep(perf_trace, ts);
+	}
+	if (message_trace_enabled)
+	{
+		for (auto &q: ts.messages)
+		{
+			for (auto it = q.begin(); it != q.end(); ++it)
+			{
+				Message &m = *it;
+				if (!m.dummy_message)
+				{
+					// Ignore dummy messages (without a
+					//  destination). These are inserted to
+					//  account for processing that doesn't
+					//  result in a spike being sent
+					sim_trace_record_message(
+						message_trace, m);
+				}
+			}
+		}
+	}
+	total_timesteps = ts.timestep;
+	wall_time += (double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
+	TRACE1("Time-step took: %fs.\n",
+		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
 }
 
-void SanaFe::open_spike_trace(void)
+void Simulation::read_net_file(const std::string &filename)
 {
-	sim->log_spikes = 1;
-
-	std::string spike_path = out_dir + std::string("/spike.csv");
-	sim->spike_trace_fp = fopen(spike_path.c_str(), "w");
-	if (sim->spike_trace_fp == NULL)
-	{
-		INFO("Error: Couldn't open trace file for writing.\n");
-		clean_up(RET_FAIL);
-	}
-	sim_spike_trace_write_header(*sim);
-}
-
-void SanaFe::open_potential_trace(void)
-{
-	sim->log_potential = 1;
-
-	std::string potential_path = out_dir + "/potential.csv";
-	INFO("open potential trace");
-	std::cout << potential_path << std::endl;
-	sim->potential_trace_fp = fopen(potential_path.c_str(), "w");
-	if (sim->potential_trace_fp == NULL)
-	{
-		INFO("Error: Couldn't open trace file for writing.\n");
-		clean_up(RET_FAIL);
-	}
-	sim_potential_trace_write_header(*sim, net);
-}
-
-void SanaFe::open_message_trace(void)
-{
-	sim->log_messages = 1;
-
-	std::string message_path = out_dir + "/messages.csv";
-	sim->message_trace_fp = fopen(message_path.c_str(), "w");
-	if (sim->message_trace_fp == NULL)
-	{
-		INFO("Error: Couldn't open trace file for writing.\n");
-		clean_up(RET_FAIL);
-	}
-	sim_message_trace_write_header(*sim);
-}
-
-void SanaFe::set_gui_flag(bool flag)
-{
-	sim->gui_on = flag;
-	arch->spike_vector_on = flag;
-}
-
-void SanaFe::set_out_dir(std::string dir)
-{
-	if (dir.length() == 0)
-	{
-		out_dir = ".";
-	}
-	else
-	{
-		out_dir = dir;
-	}
-	return;
-}
-
-void SanaFe::set_arch(const char *filename)
-{
-	//FILE* arch_fp = fopen(filename, "r");
-	std::fstream arch_fp;
-	arch_fp.open(filename);
-	if (arch_fp.fail())
-	{
-		INFO("Error: Architecture file %s failed to open.\n", filename);
-		clean_up(RET_FAIL);
-	}
-	int ret = description_parse_arch_file(arch_fp, *arch);
-	arch_fp.close();
-	if (ret == RET_FAIL)
-	{
-		clean_up(RET_FAIL);
-	}
-}
-
-void SanaFe::set_net(const char *filename)
-{
-	std::fstream network_fp;
+	std::ifstream network_fp;
 	network_fp.open(filename);
 	if (network_fp.fail())
 	{
-		INFO("Network data (%s) failed to open.\n", filename);
-		clean_up(RET_FAIL);
+		throw std::runtime_error("Error: Network file failed to open.");
 	}
 	INFO("Reading network from file.\n");
-	int ret = description_parse_net_file(network_fp, net, *arch);
+	int ret = description_parse_net_file(network_fp, net, arch);
 	network_fp.close();
 	if (ret == RET_FAIL)
 	{
-		clean_up(RET_FAIL);
+		throw std::invalid_argument("Error: Invalid network file.");
 	}
 	network_check_mapped(net);
-	arch_create_axons(*arch);
+	arch_create_axons(arch);
 }
 
-double SanaFe::get_power()
+double Simulation::get_power()
 {
-	if (sim->total_sim_time > 0.0)
+	if (total_sim_time > 0.0)
 	{
-		return sim->total_energy / sim->total_sim_time;
+		return total_energy / total_sim_time;
 	}
 	else
 	{
-		return 0.0;
+		return 0.0; // Watts
 	}
 }
 
-vector<int> SanaFe::get_status(const vector<NeuronGroup>::size_type gid){
-	vector<int> statuses = vector<int>();
+/*
+std::vector<int> Simulation::get_status(
+	const std::vector<NeuronGroup>::size_type gid)
+{
+	std::vector<int> statuses = vector<int>();
 
 	if (gid >= net.groups.size())
 	{
@@ -270,194 +232,146 @@ vector<int> SanaFe::get_status(const vector<NeuronGroup>::size_type gid){
 
 	return statuses;
 }
+*/
 
-void SanaFe::sim_summary()
+void Simulation::read_arch_file(const std::string &filename)
 {
-	sim_write_summary(stdout, *sim);
-
-	sim->stats_fp = fopen("run_summary.yaml", "w");
-	if (sim->stats_fp != NULL)
+	std::ifstream arch_fp(filename);
+	if (arch_fp.fail())
 	{
-		sim_write_summary(sim->stats_fp, *sim);
+		throw std::invalid_argument(
+			"Error: Architecture file failed to open.");
 	}
-}
-
-vector<vector<int>> SanaFe::run_summary()
-{
-	print_run_data(stdout, &run_data);
-
-	// Could write intermediate run data here
-	 sim->stats_fp = fopen("run_summary.yaml", "w");
-	 if (sim->stats_fp != NULL)
-	 {
-	 	print_run_data(sim->stats_fp, &run_data);
-	 }
-
-	// Return 2D vector of spiking tiles, auto clears
-	// vector after return.
-	//Vector_Cleanup_Class help_class(arch);
-	return arch->spike_vector;
-}
-
-void SanaFe::clean_up(int ret)
-{
-	// Free any larger structures here
-	//arch_free(arch);
-
-	// Close any open files here
-	if (sim->potential_trace_fp != NULL)
-	{
-		fclose(sim->potential_trace_fp);
-	}
-	if (sim->spike_trace_fp != NULL)
-	{
-		fclose(sim->spike_trace_fp);
-	}
-	if (sim->message_trace_fp != NULL)
-	{
-		fclose(sim->message_trace_fp);
-	}
-	if (sim->perf_fp != NULL)
-	{
-		fclose(sim->perf_fp);
-	}
-	if (sim->stats_fp != NULL)
-	{
-		fclose(sim->stats_fp);
-	}
-
-	// Free the simulation structure only after we close all files
-	//free(sim);
-
+	int ret = description_parse_arch_file(arch_fp, arch);
+	arch_fp.close();
 	if (ret == RET_FAIL)
 	{
-		exit(1);
+		throw std::invalid_argument(
+			"Error: Invalid architecture file.");
+	}
+}
+
+std::unordered_map<std::string, std::string>
+	Simulation::get_run_summary(const std::string &out_dir)
+{
+	// Create the summary using the unordered map container
+	std::unordered_map<std::string, std::string> run_data;
+	run_data.insert(std::make_pair<std::string, std::string>(
+		"git_version", GIT_COMMIT));
+	//run_data.insert("energy", std::to_string(total_energy));
+	//run_data.insert("sim_time", std::to_string(total_sim_time));
+	//run_data.insert("total_spikes", std::to_string(total_spikes));
+	//run_data.insert("total_messages_sent", std::to_string(total_spikes));
+	//run_data.insert("wall_time", std::to_string(wall_time));
+	//run_data.insert("total_neurons_fired", std::to_string(total_neurons_fired));
+
+	// TODO: split these into different routines?
+	// Output the summary to the console
+	sim_output_map_yaml(std::cout, run_data);
+
+	// Ouptut the same file to a file
+	const std::string summary_path =
+		out_dir + std::string("/run_summary.yaml");
+	std::ofstream summary_file(summary_path);
+	if (summary_file.is_open())
+	{
+		sim_output_map_yaml(summary_file, run_data);
 	}
 	else
 	{
-		exit(0);
+		INFO("Summary file %s couldn't open.\n", summary_path.c_str());
 	}
+
+	return run_data;
 }
 
-Simulation::Simulation()
+void sanafe::sim_output_map_yaml(std::ostream &out,
+	const std::unordered_map<std::string, std::string> &run_data)
 {
-	total_energy = 0.0;   // Joules
-	total_sim_time = 0.0; // Seconds
-	wall_time = 0.0;	   // Seconds
-	timesteps = 0;
-	total_spikes = 0;
-	total_messages_sent = 0;
-	total_neurons_fired = 0;
-
-	// All logging disabled by default
-	log_perf = 0;
-	log_potential = 0;
-	log_spikes = 0;
-	log_messages = 0;
-
-	potential_trace_fp = nullptr;
-	spike_trace_fp = nullptr;
-	perf_fp = nullptr;
-	message_trace_fp = nullptr;
-	stats_fp = nullptr;
-}
-
-void run(Simulation &sim, Network &net, Architecture &arch)
-{
-	// TODO: remove the need to pass the network struct, only the arch
-	//  should be needed (since it links back to the net anyway)
-	// Run neuromorphic hardware simulation for one timestep
-	//  Measure the CPU time it takes and accumulate the stats
-	struct Timestep ts = Timestep(sim.timesteps, arch.get_core_count());
-	struct timespec ts_start, ts_end, ts_elapsed;
-
-	// Measure the wall-clock time taken to run the simulation
-	//  on the host machine
-	clock_gettime(CLOCK_MONOTONIC, &ts_start);
-
-	sim_timestep(ts, net, arch);
-
-	// Calculate elapsed time
-	clock_gettime(CLOCK_MONOTONIC, &ts_end);
-	ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
-
-	sim.total_energy += ts.energy;
-	sim.total_sim_time += ts.sim_time;
-	sim.total_spikes += ts.spike_count;
-	sim.total_neurons_fired += ts.total_neurons_fired;
-	sim.total_messages_sent += ts.packets_sent;
-	if (sim.log_spikes)
+	for (const auto &d: run_data)
 	{
-		sim_trace_record_spikes(sim, net);
+		out << d.first << ": " << d.second << std::endl;
 	}
-	if (sim.log_potential)
-	{
-		sim_trace_record_potentials(sim, net);
-	}
-	if (sim.log_perf)
-	{
-		sim_perf_log_timestep(ts, sim.perf_fp);
-	}
-	if (sim.log_messages)
-	{
-		for (auto &q: ts.messages)
-		{
-			for (auto it = q.begin(); it != q.end(); ++it)
-			{
-				Message &m = *it;
-				if (!m.dummy_message)
-				{
-					// Ignore dummy messages (without a
-					//  destination). These are inserted to
-					//  account for processing that doesn't
-					//  result in a spike being sent
-					sim_trace_record_message(sim, m);
-				}
-			}
-		}
-	}
-	sim.timesteps = ts.timestep;
-	sim.wall_time += (double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
-	TRACE1("Time-step took: %fs.\n",
-		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
-
+	return;
 }
 
-void store_data_init(run_ts_data *data, Simulation &sim, int timesteps)
+/*
+void print_run_data(FILE *fp, const run_ts_data &data)
 {
-	data->energy = sim.total_energy;
-	data->time = sim.total_sim_time;
-	data->spikes = sim.total_spikes;
-	data->packets = sim.total_messages_sent;
-	data->neurons = sim.total_neurons_fired;
-	data->wall_time = sim.wall_time;
-	data->timestep_start = sim.timesteps;
-	data->timesteps = timesteps;
+	fprintf(fp, "energy: %e\n", data.energy);
+	fprintf(fp, "time: %e\n", data.time);
+	fprintf(fp, "total_spikes: %ld\n", data.spikes);
+	fprintf(fp, "total_packets: %ld\n", data.packets);
+	fprintf(fp, "total_neurons_fired: %ld\n", data.neurons);
+	fprintf(fp, "wall_time: %lf\n", data.wall_time);
+	fprintf(fp, "executed from: %ld to %ld timesteps\n", data.timestep_start,
+	data.timestep_start + data.timesteps);
 }
+*/
 
-void store_data(run_ts_data *data, Simulation &sim)
+std::ofstream sanafe::sim_trace_open_spike_trace(const std::string &out_dir)
 {
-	data->energy = sim.total_energy - data->energy;
-	data->time = sim.total_sim_time - data->time;
-	data->spikes = sim.total_spikes - data->spikes;
-	data->packets = sim.total_messages_sent - data->packets;
-	data->neurons = sim.total_neurons_fired - data->neurons;
-	data->wall_time = sim.wall_time - data->wall_time;
+	// TODO: warning, this is specific to Linux
+	// To be more portable, consider using the filesystem library in C++17
+	const std::string spike_path = out_dir + std::string("/spike.csv");
+	std::ofstream spike_file(spike_path);
+
+	if (!spike_file.is_open())
+	{
+		throw std::runtime_error(
+			"Error: Couldn't open trace file for writing.");
+	}
+	sim_trace_write_spike_header(spike_file);
+	return spike_file;
 }
 
-void print_run_data(FILE *fp, run_ts_data* data)
+std::ofstream sanafe::sim_trace_open_potential_trace(const std::string &out_dir,
+	const Network &net)
 {
-	fprintf(fp, "energy: %e\n", data->energy);
-	fprintf(fp, "time: %e\n", data->time);
-	fprintf(fp, "total_spikes: %ld\n", data->spikes);
-	fprintf(fp, "total_packets: %ld\n", data->packets);
-	fprintf(fp, "total_neurons_fired: %ld\n", data->neurons);
-	fprintf(fp, "wall_time: %lf\n", data->wall_time);
-	fprintf(fp, "executed from: %ld to %ld timesteps\n", data->timestep_start,
-	data->timestep_start+data->timesteps);
+	// TODO: warning, this is specific to Linux
+	// To be more portable, consider using the filesystem library in C++17
+	const std::string potential_path = out_dir + "/potential.csv";
+	std::ofstream potential_file(potential_path);
+
+	if (!potential_file.is_open())
+	{
+		throw std::runtime_error(
+			"Error: Couldn't open trace file for writing.");
+	}
+	sim_trace_write_potential_header(potential_file, net);
+	return potential_file;
 }
 
-void sim_init_fifo(MessageFifo &f)
+std::ofstream sanafe::sim_trace_open_perf_trace(const std::string &out_dir)
+{
+	// TODO: warning, this is specific to Linux
+	// To be more portable, consider using the filesystem library in C++17
+	const std::string perf_path = out_dir + std::string("/perf.csv");
+	std::ofstream perf_file(perf_path);
+	if (!perf_file.is_open())
+	{
+		throw std::runtime_error(
+			"Error: Couldn't open trace file for writing.");
+	}
+	sim_trace_write_perf_header(perf_file);
+
+	return perf_file;
+}
+
+std::ofstream sanafe::sim_trace_open_message_trace(const std::string &out_dir)
+{
+	const std::string message_path = out_dir + "/messages.csv";
+	std::ofstream message_file(message_path);
+	if (!message_file.is_open())
+	{
+		throw std::runtime_error(
+			"Error: Couldn't open trace file for writing.");
+	}
+	sim_trace_write_message_header(message_file);
+	return message_file;
+}
+
+void sanafe::sim_init_fifo(MessageFifo &f)
 {
 	f.count = 0;
 	f.head = NULL;
@@ -465,7 +379,7 @@ void sim_init_fifo(MessageFifo &f)
 	f.next = NULL;
 }
 
-void sim_timestep(Timestep &ts, Network &net, Architecture &arch)
+void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 {
 	Scheduler s;
 
@@ -473,8 +387,6 @@ void sim_timestep(Timestep &ts, Network &net, Architecture &arch)
 	ts = Timestep(ts.timestep, arch.get_core_count());
 	sim_reset_measurements(net, arch);
 
-	// TODO: reimplement user input spikes again
-	//sim_input_spikes(net);
 	sim_process_neurons(ts, net, arch);
 	sim_receive_messages(ts, arch);
 
@@ -485,9 +397,6 @@ void sim_timestep(Timestep &ts, Network &net, Architecture &arch)
 	ts.sim_time = sim_schedule_messages(ts.message_queues, s);
 	// Performance statistics for this time step
 	ts.energy = sim_calculate_energy(arch);
-
-	// Setup spike vector
-	std::vector<int> spike_tile_vec(ARCH_MAX_TILES);
 
 	for (auto &t: arch.tiles)
 	{
@@ -514,25 +423,10 @@ void sim_timestep(Timestep &ts, Network &net, Architecture &arch)
 				ts.packets_sent += c.axon_out_hw[k].packets_out;
 			}
 		}
-		if (arch.spike_vector_on)
-		{
-			spike_tile_vec[t.id] = tile_spike_count;
-		}
-	}
-	if (arch.spike_vector_on)
-	{
-		arch.spike_vector.push_back(spike_tile_vec);
 	}
 
-	TRACE1("Spikes sent: %ld\n", sim.total_spikes);
+	TRACE1("Spikes sent: %ld\n", ts.spike_count);
 	return;
-}
-
-std::unique_ptr<Simulation> sim_init_sim(void)
-{
-	std::unique_ptr<Simulation> sim(new Simulation);
-
-	return sim;
 }
 
 Timestep::Timestep(const long int ts, const int core_count)
@@ -553,7 +447,7 @@ Timestep::Timestep(const long int ts, const int core_count)
 	packets_sent = 0L;
 }
 
-void sim_process_neurons(Timestep &ts, Network &net, Architecture &arch)
+void sanafe::sim_process_neurons(Timestep &ts, Network &net, Architecture &arch)
 {
 // #pragma omp parallel for
 	for (auto &t: arch.tiles)
@@ -595,7 +489,7 @@ void sim_process_neurons(Timestep &ts, Network &net, Architecture &arch)
 	}
 }
 
-void sim_receive_messages(Timestep &ts, Architecture &arch)
+void sanafe::sim_receive_messages(Timestep &ts, Architecture &arch)
 {
 	// Assign outgoing spike messages to their respective destination
 	//  cores, and calculate network costs
@@ -641,7 +535,7 @@ void sim_receive_messages(Timestep &ts, Architecture &arch)
 	}
 }
 
-double sim_estimate_network_costs(Tile &src, Tile &dest)
+double sanafe::sim_estimate_network_costs(Tile &src, Tile &dest)
 {
 	double network_latency;
 	long int x_hops, y_hops;
@@ -683,7 +577,7 @@ double sim_estimate_network_costs(Tile &src, Tile &dest)
 	return network_latency;
 }
 
-Message *sim_message_fifo_pop(struct MessageFifo *queue)
+Message *sanafe::sim_message_fifo_pop(MessageFifo *queue)
 {
 	Message *m;
 
@@ -708,7 +602,7 @@ Message *sim_message_fifo_pop(struct MessageFifo *queue)
 	return m;
 }
 
-void sim_message_fifo_push(struct MessageFifo &queue, Message &m)
+void sanafe::sim_message_fifo_push(MessageFifo &queue, Message &m)
 {
 	assert(queue.count >= 0);
 
@@ -725,7 +619,7 @@ void sim_message_fifo_push(struct MessageFifo &queue, Message &m)
 	queue.count++;
 }
 
-void sim_update_noc_message_counts(
+void sanafe::sim_update_noc_message_counts(
 	const Message &m, NocInfo &noc, const int message_in)
 {
 	assert(m.src_neuron != nullptr);
@@ -851,7 +745,7 @@ void sim_update_noc_message_counts(
 	return;
 }
 
-double sim_calculate_messages_along_route(Message &m, NocInfo &noc)
+double sanafe::sim_calculate_messages_along_route(Message &m, NocInfo &noc)
 {
 	double flow_density;
 	int x_increment, y_increment;
@@ -939,7 +833,7 @@ double sim_calculate_messages_along_route(Message &m, NocInfo &noc)
 	return flow_density;
 }
 
-void sim_update_noc(const double t, NocInfo &noc)
+void sanafe::sim_update_noc(const double t, NocInfo &noc)
 {
 	for (int i = 0; i < ARCH_MAX_CORES; i++)
 	{
@@ -967,7 +861,7 @@ void sim_update_noc(const double t, NocInfo &noc)
 	return;
 }
 
-double sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
+double sanafe::sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
 				const Scheduler &scheduler)
 {
 	struct MessageFifo *priority_queue;
@@ -1101,7 +995,7 @@ double sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
 	return last_timestamp;
 }
 
-void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
+void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 {
 	if (!n.is_init)
 	{
@@ -1145,7 +1039,7 @@ void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 	n.spike_count = 0;
 }
 
-double sim_pipeline_receive(Timestep &ts, Architecture &arch,
+double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
 	Core &c, Message &m)
 {
 	// We receive a spike and process up to the time-step buffer
@@ -1168,7 +1062,7 @@ double sim_pipeline_receive(Timestep &ts, Architecture &arch,
 	return message_processing_latency;
 }
 
-struct MessageFifo *sim_init_timing_priority(
+struct MessageFifo *sanafe::sim_init_timing_priority(
 	std::vector<MessageFifo> &message_queues)
 {
 	struct MessageFifo *priority_queue;
@@ -1201,7 +1095,7 @@ struct MessageFifo *sim_init_timing_priority(
 	return priority_queue;
 }
 
-MessageFifo *sim_pop_priority_queue(MessageFifo **priority_queue)
+MessageFifo *sanafe::sim_pop_priority_queue(MessageFifo **priority_queue)
 {
 	struct MessageFifo *curr;
 
@@ -1214,7 +1108,7 @@ MessageFifo *sim_pop_priority_queue(MessageFifo **priority_queue)
 	return curr;
 }
 
-void sim_insert_priority_queue(MessageFifo **priority_queue,
+void sanafe::sim_insert_priority_queue(MessageFifo **priority_queue,
 	MessageFifo &core_message_fifo)
 {
 	MessageFifo *next;
@@ -1273,7 +1167,7 @@ void sim_insert_priority_queue(MessageFifo **priority_queue,
 	return;
 }
 
-double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
+double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	const int synapse_address, const bool synaptic_lookup)
 {
 	// Update all synapses to different neurons in one core. If a synaptic
@@ -1331,7 +1225,7 @@ double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	return latency;
 }
 
-double sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
+double sanafe::sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
 	const double charge)
 {
 	// TODO: Support dendritic operations, combining the current in
@@ -1366,7 +1260,7 @@ double sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
 	return latency;
 }
 
-double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
+double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	const double current_in)
 {
 	struct SomaUnit *soma = n.soma_hw;
@@ -1410,7 +1304,8 @@ double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	return latency;
 }
 
-void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n)
+void sanafe::sim_neuron_send_spike_message(
+	Timestep &ts, Architecture &arch, Neuron &n)
 {
 	TRACE1("nid:%d.%d sending spike message to %lu axons out\n",
 		n.parent_group_id, n.id, n.axon_out_addresses.size());
@@ -1460,7 +1355,7 @@ void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n)
 	return;
 }
 
-double sim_generate_noise(Neuron *n)
+double sanafe::sim_generate_noise(Neuron *n)
 {
 	assert(n != NULL);
 	struct SomaUnit &soma_hw = *(n->soma_hw);
@@ -1504,7 +1399,7 @@ double sim_generate_noise(Neuron *n)
 	return (double) noise_val;
 }
 
-double sim_calculate_energy(const Architecture &arch)
+double sanafe::sim_calculate_energy(const Architecture &arch)
 {
 	// Returns the total energy across the design, for this timestep
 	double network_energy, synapse_energy, soma_energy, axon_out_energy;
@@ -1568,7 +1463,7 @@ double sim_calculate_energy(const Architecture &arch)
 	return total_energy;
 }
 
-void sim_reset_measurements(Network &net, Architecture &arch)
+void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
 {
 	for (auto &group: net.groups)
 	{
@@ -1648,90 +1543,74 @@ void sim_reset_measurements(Network &net, Architecture &arch)
 	}
 }
 
-void sim_perf_write_header(FILE *fp)
+void sanafe::sim_trace_write_spike_header(std::ofstream &spike_trace_file)
 {
-	fprintf(fp, "timestep,");
-	fprintf(fp, "fired,");
-	fprintf(fp, "packets,");
-	fprintf(fp, "hops,");
-	fprintf(fp, "sim_time,");
-	fprintf(fp, "total_energy,");
-	fprintf(fp, "\n");
-}
-
-void sim_perf_log_timestep(const Timestep &ts, FILE *fp)
-{
-	fprintf(fp, "%ld,", ts.timestep);
-	fprintf(fp, "%ld,", ts.total_neurons_fired);
-	fprintf(fp, "%ld,", ts.packets_sent);
-	fprintf(fp, "%ld,", ts.total_hops);
-	fprintf(fp, "%le,", ts.sim_time);
-	fprintf(fp, "%le,", ts.energy);
-	fprintf(fp, "\n");
-}
-
-void sim_write_summary(FILE *fp, const Simulation &sim)
-{
-	// Write the simulation summary to file
-	fprintf(fp, "git_version: %s\n", GIT_COMMIT);
-	fprintf(fp, "energy: %e\n", sim.total_energy);
-	fprintf(fp, "sim_time: %e\n", sim.total_sim_time);
-	fprintf(fp, "total_spikes: %ld\n", sim.total_spikes);
-	fprintf(fp, "total_packets: %ld\n", sim.total_messages_sent);
-	fprintf(fp, "total_neurons_fired: %ld\n", sim.total_neurons_fired);
-	fprintf(fp, "wall_time: %lf\n", sim.wall_time);
-	fprintf(fp, "timesteps: %ld\n", sim.timesteps);
-}
-
-void sim_spike_trace_write_header(const Simulation &sim)
-{
-	assert(sim.spike_trace_fp != NULL);
-	fprintf(sim.spike_trace_fp, "neuron,timestep\n");
+	assert(spike_trace_file.is_open());
+	spike_trace_file << "neuron,timestep" << std::endl;
 
 	return;
 }
 
-void sim_potential_trace_write_header(const Simulation &sim, const Network &net)
+void sanafe::sim_trace_write_potential_header(
+	std::ofstream &potential_trace_file, const Network &net)
 {
 	// Write csv header for probe outputs - record which neurons have been
 	//  probed
-	if (sim.potential_trace_fp != nullptr)
+	assert(potential_trace_file.is_open());
+	potential_trace_file << "timestep,";
+	for (auto &group: net.groups)
 	{
-		fprintf(sim.potential_trace_fp, "timestep,");
-		for (auto &group: net.groups)
+		for (auto &n: group.neurons)
 		{
-			for (auto n: group.neurons)
+			if (n.log_potential)
 			{
-				if (sim.potential_trace_fp &&
-					sim.log_potential &&
-					n.log_potential)
-				{
-					fprintf(sim.potential_trace_fp,
-						"neuron %d.%d,",
-						group.id, n.id);
-				}
+				potential_trace_file << "neuron " << group.id;
+				potential_trace_file << "." << n.id;
 			}
 		}
-		fputc('\n', sim.potential_trace_fp);
 	}
+	potential_trace_file << std::endl;
 
 	return;
 }
 
-void sim_message_trace_write_header(const Simulation &sim)
+void sanafe::sim_trace_write_perf_header(std::ofstream &perf_trace_file)
 {
-	assert(sim.message_trace_fp);
-	fprintf(sim.message_trace_fp, "timestep,src_neuron,");
-	fprintf(sim.message_trace_fp, "src_hw,dest_hw,hops,spikes,");
-	fprintf(sim.message_trace_fp, "generation_latency,network_latency,");
-	fprintf(sim.message_trace_fp, "processing_latency,blocking_latency\n");
+	assert(perf_trace_file.is_open());
+	perf_trace_file << "timestep,";
+	perf_trace_file << "fired,";
+	perf_trace_file << "packets,";
+	perf_trace_file << "hops,";
+	perf_trace_file << "sim_time,";
+	perf_trace_file << "total_energy,";
+	perf_trace_file << std::endl;
+
+	return;
 }
 
-void sim_trace_record_spikes(
-	const Simulation &sim, const Network &net)
+void sanafe::sim_trace_write_message_header(std::ofstream &message_trace_file)
+{
+	assert(message_trace_file.is_open());
+	message_trace_file << "timestep,";
+	message_trace_file << "src_neuron,";
+	message_trace_file << "src_hw,";
+	message_trace_file << "dest_hw,";
+	message_trace_file << "hops,";
+	message_trace_file << "spikes,";
+	message_trace_file << "generation_latency,";
+	message_trace_file << "network_latency,";
+	message_trace_file << "processing_latency,";
+	message_trace_file << "blocking_latency";
+	message_trace_file << std::endl;
+
+	return;
+}
+
+void sanafe::sim_trace_record_spikes(
+	std::ofstream &out, const long int timestep, const Network &net)
 {
 	// A trace of all spikes that are generated
-	assert(sim.spike_trace_fp != NULL);
+	assert(out.is_open());
 
 	for (auto &group: net.groups)
 	{
@@ -1739,9 +1618,9 @@ void sim_trace_record_spikes(
 		{
 			if (n.log_spikes && (n.neuron_status == sanafe::FIRED))
 			{
-				fprintf(sim.spike_trace_fp, "%d.%d,%ld\n",
-					n.parent_group_id, n.id,
-					sim.timesteps);
+				out << n.parent_group_id << "." << n.id << ",";
+				out << timestep;
+				out << std::endl;
 			}
 		}
 	}
@@ -1750,57 +1629,72 @@ void sim_trace_record_spikes(
 }
 
 // TODO: should potential be a required value in the soma?
-void sim_trace_record_potentials(const Simulation &sim, const Network &net)
+void sanafe::sim_trace_record_potentials(
+	std::ofstream &out, const int timestep, const Network &net)
 {
 	// Each line of this csv file is the potential of all probed neurons for
 	//  one time-step
-	int potential_probe_count = 0;
+	assert(out.is_open());
+	INFO("Recording potential for timestep: %d\n", timestep);
+	out << timestep << ",";
 
-	INFO("Recording potential for timestep: %ld\n", sim.timesteps);
-	fprintf(sim.potential_trace_fp, "%ld,", sim.timesteps);
+	long int potential_probe_count = 0;
 	for (auto &group: net.groups)
 	{
 		for (auto &n: group.neurons)
 		{
-			if (sim.potential_trace_fp && n.log_potential)
+			if (n.log_potential)
 			{
-				fprintf(sim.potential_trace_fp, "%lf,",
-					n.model->get_potential());
+				out << n.model->get_potential() << ",";
 				potential_probe_count++;
 			}
 		}
 	}
 
 	// Each timestep takes up a line in the respective csv file
-	if (sim.potential_trace_fp && (potential_probe_count > 0))
+	if (potential_probe_count > 0)
 	{
-		fputc('\n', sim.potential_trace_fp);
+		out << std::endl;
 	}
 
 	return;
 }
 
-void sim_trace_record_message(const Simulation &sim, const Message &m)
+void sanafe::sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts)
 {
-	fprintf(sim.message_trace_fp, "%ld,", m.timestep);
-	assert(m.src_neuron != nullptr);
-	fprintf(sim.message_trace_fp, "%d.%d,", m.src_neuron->parent_group_id,
-		m.src_neuron->id);
-	assert(m.src_neuron->core != nullptr);
-	fprintf(sim.message_trace_fp, "%d.%d,",
-		m.src_neuron->core->parent_tile_id,
-		m.src_neuron->core->id);
+	out << ts.timestep << ",";
+	//fprintf(fp, "%ld,", ts.total_neurons_fired);
+	//fprintf(fp, "%ld,", ts.packets_sent);
+	//fprintf(fp, "%ld,", ts.total_hops);
+	//fprintf(fp, "%le,", ts.sim_time);
+	//fprintf(fp, "%le,", ts.energy);
+	out << std::endl;
+}
 
-	fprintf(sim.message_trace_fp, "%d.%d,", m.dest_tile_id,
-		m.dest_core_offset);
-	fprintf(sim.message_trace_fp, "%d,", m.hops);
-	fprintf(sim.message_trace_fp, "%d,", m.spikes);
-	fprintf(sim.message_trace_fp, "%le,", m.generation_delay);
-	fprintf(sim.message_trace_fp, "%le,", m.network_delay);
-	fprintf(sim.message_trace_fp, "%le,", m.receive_delay);
-	fprintf(sim.message_trace_fp, "%le,", m.blocked_latency);
-	fprintf(sim.message_trace_fp, "%le,", m.sent_timestamp);
-	fprintf(sim.message_trace_fp, "%le\n", m.processed_timestamp);
+void sanafe::sim_trace_record_message(std::ofstream &out, const Message &m)
+{
+	assert(out.is_open());
+
+	out << m.timestep << ",";
+	assert(m.src_neuron != nullptr);
+	out << m.src_neuron->parent_group_id << ".";
+	out << m.src_neuron->id << ",";
+
+	assert(m.src_neuron->core != nullptr);
+	out << m.src_neuron->core->parent_tile_id << ".";
+	out << m.src_neuron->core->offset << ",";
+	out << m.dest_tile_id << "." << m.dest_core_offset << ",";
+
+	out << m.hops << ",";
+	out << m.spikes << ",";
+	out << m.generation_delay << ",";
+	out << m.network_delay << ",";
+	out << m.receive_delay << ",";
+	out << m.blocked_latency << ",";
+	out << m.hops << ",";
+	out << m.hops << ",";
+
+	out << std::endl;
 
 	return;
 }

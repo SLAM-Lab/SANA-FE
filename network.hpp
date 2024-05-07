@@ -11,17 +11,14 @@
 #ifndef NETWORK_HEADER_INCLUDED_
 #define NETWORK_HEADER_INCLUDED_
 
-#define NETWORK_MAX_NEURON_GROUPS 1024
-#define NETWORK_INVALID_NID -1
-#define MAX_FIELDs 128
-#define MAX_FIELD_LEN 64
-
 #include <cstdint>
 #include <list>
 #include <memory>
 #include "plugins.hpp"
 #include "models.hpp"
 
+namespace sanafe
+{
 enum ConnectionConfigFormat
 {
 	// This is the structure of the CSV format for specifying synaptic
@@ -77,7 +74,7 @@ struct Neuron
 
 	double dendritic_current_decay, processing_latency;
 	double current, charge;
-	sanafe::NeuronStatus neuron_status;
+	NeuronStatus neuron_status;
 	int forced_spikes;
 };
 
@@ -100,15 +97,11 @@ struct Network
 	std::vector<NeuronGroup> groups;
 };
 
-struct Architecture;
-struct Core;
-
 int network_create_neuron(Network &net, Neuron &n, const std::vector<Attribute> &attr);
 int network_create_neuron_group(Network &net, const int neuron_count, const std::vector<Attribute> &attr);
 //Neuron *network_id_to_neuron_ptr(Network *const net, const NeuronId id);
 int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::vector<Attribute> &attr);
 void network_check_mapped(Network &net);
-
-
+}
 
 #endif

@@ -10,12 +10,15 @@
 #include <string_view>
 #include <charconv>
 
-#include "description.hpp"
 #include "arch.hpp"
+#include "network.hpp"
+#include "description.hpp"
 #include "print.hpp"
 
-int description_parse_arch_file(
-	std::fstream &fp, Architecture &arch)
+using namespace sanafe;
+
+int sanafe::description_parse_arch_file(
+	std::ifstream &fp, Architecture &arch)
 {
 	std::vector<std::string_view> fields;
 	fields.reserve(32);
@@ -43,8 +46,8 @@ int description_parse_arch_file(
 	return RET_OK;
 }
 
-int description_parse_net_file(
-	std::fstream &fp, struct Network &net, Architecture &arch)
+int sanafe::description_parse_net_file(
+	std::ifstream &fp, struct Network &net, Architecture &arch)
 {
 	std::vector<std::string_view> fields;
 	fields.reserve(32);
@@ -74,7 +77,7 @@ int description_parse_net_file(
 	return RET_OK;
 }
 
-void description_get_fields(
+void sanafe::description_get_fields(
 	std::vector<std::string_view> &fields, const std::string &line)
 {
 	// Get all the fields from a line of text. Every field is separated by
@@ -101,7 +104,7 @@ void description_get_fields(
 	return;
 }
 
-size_t field_to_int(const string_view &field)
+size_t sanafe::field_to_int(const std::string_view &field)
 {
 	size_t val = 0;
 	auto [ptr, error_code] = std::from_chars(field.data(),
@@ -118,7 +121,7 @@ size_t field_to_int(const string_view &field)
 	return val;
 }
 
-int description_read_arch_entry(
+int sanafe::description_read_arch_entry(
 	const std::vector<std::string_view> &fields, Architecture &arch,
 	const int line_number)
 {
@@ -234,7 +237,7 @@ int description_read_arch_entry(
 	return ret;
 }
 
-void parse_neuron_field(
+void sanafe::parse_neuron_field(
 	const std::string_view &neuron_field,
 	std::vector<NeuronGroup>::size_type &group_id,
 	std::vector<Neuron>::size_type &neuron_id)
@@ -254,7 +257,7 @@ void parse_neuron_field(
 	return;
 }
 
-void parse_core_field(
+void sanafe::parse_core_field(
 	const std::string_view &core_field,
 	std::vector<NeuronGroup>::size_type &tile_id,
 	std::vector<Neuron>::size_type &core_offset)
@@ -274,7 +277,7 @@ void parse_core_field(
 	return;
 }
 
-void parse_edge_field(
+void sanafe::parse_edge_field(
 	const std::string_view &edge_field,
 	std::vector<NeuronGroup>::size_type &group_id,
 	std::vector<Neuron>::size_type &neuron_id,
@@ -301,7 +304,7 @@ void parse_edge_field(
 	return;
 }
 
-void parse_mapping_field(
+void sanafe::parse_mapping_field(
 	const std::string_view &mapping_field,
 	std::vector<NeuronGroup>::size_type &group_id,
 	std::vector<Neuron>::size_type &neuron_id,
@@ -328,7 +331,7 @@ void parse_mapping_field(
 	return;
 }
 
-int description_read_network_entry(
+int sanafe::description_read_network_entry(
 	const std::vector<std::string_view> &fields, Architecture &arch,
 	Network &net, const int line_number)
 {

@@ -4,9 +4,11 @@
 #include <sstream>
 
 #include "plugins.hpp"
-#include "models.hpp"
 #include "description.hpp"
 #include "print.hpp"
+#include "models.hpp"
+
+using namespace sanafe;
 
 // **** Soma models ****
 LoihiLifModel::LoihiLifModel(const int gid, const int nid): SomaModel(gid, nid)
@@ -153,7 +155,7 @@ sanafe::NeuronStatus LoihiLifModel::update(const double current_in)
 }
 
 
-sanafe::NeuronResetModes model_parse_reset_mode(const std::string &str)
+sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 {
 	sanafe::NeuronResetModes reset_mode;
 
