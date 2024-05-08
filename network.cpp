@@ -20,13 +20,15 @@ using namespace sanafe;
 Connection::Connection(const int connection_id)
 {
 	id = connection_id;
-	current = 0.0;
 	pre_neuron = nullptr;
 	post_neuron = nullptr;
+	synapse_hw = nullptr;
+	last_updated = 0;
+
+	current = 0.0;
 	weight = 0.0;
 	delay = 0.0;
 	synaptic_current_decay = 0.0;
-	synapse_hw = nullptr;
 }
 
 sanafe::NeuronGroup::NeuronGroup(const size_t group_id, const int neuron_count)

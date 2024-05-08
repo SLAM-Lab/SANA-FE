@@ -106,6 +106,9 @@ struct AxonInUnit
 	double energy, time;
 	double energy_spike_message, latency_spike_message;
 	int parent_tile_id;
+
+	AxonInUnit(const std::string &axon_in_name);
+
 };
 
 struct SynapseUnit
@@ -116,6 +119,8 @@ struct SynapseUnit
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
 	double latency_spike_op, latency_memory_access;
+
+	SynapseUnit(const std::string &synapse_name);
 };
 
 struct DendriteUnit
@@ -135,6 +140,8 @@ struct SomaUnit
 	double energy_spiking, latency_spiking;
 	int leak_towards_zero, reset_mode, reverse_reset_mode;
 	int noise_type;
+
+	SomaUnit(const std::string &soma_name);
 };
 
 struct AxonOutUnit
@@ -146,12 +153,13 @@ struct AxonOutUnit
 	double energy, time;
 	double energy_access, latency_access;
 	int parent_tile_id;
+
+	AxonOutUnit(const std::string &axon_out_name);
 };
 
 struct AxonInModel
 {
 	// List of all neuron connections to send spike to
-	AxonInUnit *axon_in_unit;
 	std::vector<int> synapse_addresses;
 
 	Message *message;
@@ -162,13 +170,13 @@ struct AxonInModel
 struct AxonOutModel
 {
 	// List of all neuron connections to send spike to
-	AxonOutUnit *axon_out_unit;
 	int dest_axon_id, dest_tile_id, dest_core_offset;
 	int src_neuron_id;
 };
 
-struct Core
+class Core
 {
+public:
 	std::vector<AxonInUnit> axon_in_hw;
 	std::vector<SynapseUnit> synapse;
 	std::vector<DendriteUnit> dendrite;
@@ -185,12 +193,19 @@ struct Core
 	Message next_message;  // Since last spike
 	size_t max_neurons;
 	double energy, latency_after_last_message;
-	int parent_tile_id, id, offset, buffer_pos, soma_count, synapse_count;
+	int id, offset, parent_tile_id, buffer_pos;
 	int message_count;
+
+	Core(const int core_id, const int tile_id, const int offset);
+	AxonInUnit &create_axon_in(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+	SynapseUnit &create_synapse(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+	SomaUnit &create_soma(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+	AxonOutUnit &create_axon_out(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 };
 
-struct Tile
+class Tile
 {
+public:
 	std::vector<Core> cores;
 	std::string name;
 	double energy;
@@ -202,6 +217,8 @@ struct Tile
 	long int east_hops, west_hops, north_hops, south_hops;
 	int id, x, y;
 	int width; // For now just support 2 dimensions
+
+	Tile(const int tile_id);
 };
 
 class Architecture
@@ -210,19 +227,16 @@ public:
 	std::vector<Tile> tiles;
 	std::string name;
 	int noc_width, noc_height, noc_buffer_size;
-	bool noc_init;
 
 	Architecture();
 	int get_core_count();
-};
+	int set_noc_attr(const std::unordered_map<std::string, std::string> &attr);
+	Tile &create_tile(const std::unordered_map<std::string, std::string> &attr);
+	Core &create_core(const size_t tile_id, const std::unordered_map<std::string, std::string> &attr);
 
-int arch_create_noc(Architecture &arch, const std::unordered_map<std::string, std::string> &attr);
-int arch_create_tile(Architecture &arch, const std::unordered_map<std::string, std::string> &attr);
-int arch_create_core(Architecture &arch, Tile &t, const std::unordered_map<std::string, std::string> &attr);
-void arch_create_axon_in(Core &c, const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-void arch_create_synapse(Core &c, const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-void arch_create_soma(Core &c, const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-void arch_create_axon_out(Core &c, const std::unordered_map<std::string, std::string> &attr);
+private:
+	bool noc_init;
+};
 void arch_create_axons(Architecture &arch);
 void arch_print_axon_summary(Architecture &arch);
 int arch_map_neuron(Network &net, Neuron &n, Core &c);

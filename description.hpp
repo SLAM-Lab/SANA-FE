@@ -24,7 +24,7 @@ struct Network;
 struct NeuronGroup;
 struct Neuron;
 struct Tile;
-struct Core;
+class Core;
 
 int description_parse_arch_file(std::ifstream &fp, Architecture &arch);
 int description_parse_net_file(std::ifstream &fp, Network &net, Architecture &arch);

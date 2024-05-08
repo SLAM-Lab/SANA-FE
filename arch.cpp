@@ -21,7 +21,7 @@
 
 using namespace sanafe;
 
-Architecture::Architecture()
+sanafe::Architecture::Architecture()
 {
 	noc_buffer_size = 0;
 	noc_init = false;
@@ -29,7 +29,7 @@ Architecture::Architecture()
 	return;
 }
 
-int Architecture::get_core_count()
+int sanafe::Architecture::get_core_count()
 {
 	int core_count = 0;
 	for (auto &tile: tiles)
@@ -40,7 +40,50 @@ int Architecture::get_core_count()
 	return core_count;
 }
 
-Message::Message()
+int sanafe::Architecture::set_noc_attr(
+	const std::unordered_map<std::string, std::string> &attr)
+{
+	const size_t tile_count = tiles.size();
+	if (tile_count == 0)
+	{
+		// The NoC interconnect is defined after tiles are all defined
+		//  This is because we link the tiles together in the NoC mesh
+		INFO("Error: NoC must be defined after tiles.\n");
+		throw std::runtime_error(
+			"Error: NoC must be defined after tiles");
+	}
+
+	// Default values
+	noc_width = 1;
+	noc_height = 1;
+	noc_buffer_size = 0;
+
+	for (auto a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "width")
+		{
+			ss >> noc_width;
+		}
+		else if (key == "height")
+		{
+			ss >> noc_height;
+		}
+		else if (key == "link_buffer_size")
+		{
+			ss >> noc_buffer_size;
+		}
+	}
+	assert((noc_height * noc_width) <= ARCH_MAX_TILES);
+	noc_init = true;
+	TRACE1("NoC created, mesh, width:%d height:%d.\n", noc_width,
+		noc_height);
+	return 0;
+}
+
+sanafe::Message::Message()
 {
 	// Initialize message variables. Mark most fields as invalid either
 	//  using NaN or -Inf values where possible.
@@ -68,60 +111,36 @@ Message::Message()
 	dest_axon_id = -1;
 }
 
-int sanafe::arch_create_noc(struct Architecture &arch,
-	const std::unordered_map<std::string, std::string> &attr)
+sanafe::Tile::Tile(const int tile_id)
 {
-	const int tile_count = arch.tiles.size();
-	if (tile_count <= 0)
-	{
-		// The NoC interconnect is built after tiles are all defined
-		//  This is because we link the tiles together in the NoC mesh
-		INFO("Error: NoC must be built after tiles defined.\n");
-		exit(1);
-	}
-
-	// Default values
-	arch.noc_width = 1;
-	arch.noc_height = 1;
-	arch.noc_buffer_size = 0;
-
-	for (auto a: attr)
-	{
-		const std::string &key = a.first;
-		const std::string &value_str = a.second;
-		std::istringstream ss(value_str);
-		if (key == "width")
-		{
-			ss >> arch.noc_width;
-		}
-		else if (key == "height")
-		{
-			ss >> arch.noc_height;
-		}
-		else if (key == "link_buffer_size")
-		{
-			ss >> arch.noc_buffer_size;
-		}
-	}
-	assert((arch.noc_height * arch.noc_width) <= ARCH_MAX_TILES);
-	arch.noc_init = 1;
-	TRACE1("NoC created, mesh, width:%d height:%d.\n", arch.noc_width,
-		arch.noc_height);
-	return 0;
+	id = tile_id;
+	energy = 0.0;
+	x = 0;
+	y = 0;
+	hops = 0L;
+	messages_received = 0L;
+	total_neurons_fired = 0L;
+	east_hops = 0L;
+	west_hops = 0L;
+	north_hops = 0L;
+	south_hops = 0L;
 }
 
-int sanafe::arch_create_tile(
-	Architecture &arch,
+sanafe::Core::Core(const int core_id, const int tile_id, const int core_offset)
+{
+	id = core_id;
+	parent_tile_id = tile_id;
+	offset = core_offset;
+	energy = 0.0;
+	latency_after_last_message = 0.0;
+}
+
+sanafe::Tile &sanafe::Architecture::create_tile(
 	const std::unordered_map<std::string, std::string> &attr)
 
 {
-	Tile tile;
-	const int tile_count = arch.tiles.size();
-
-	tile.id = tile_count;
-	tile.energy = 0.0;
-	tile.x = 0;
-	tile.y = 0;
+	tiles.push_back(Tile(tiles.size()));
+	Tile &tile = tiles.back();
 
 	// Set attributes
 	tile.energy_east_hop = 0.0;
@@ -132,7 +151,6 @@ int sanafe::arch_create_tile(
 	tile.latency_west_hop = 0.0;
 	tile.energy_south_hop = 0.0;
 	tile.latency_south_hop = 0.0;
-
 	for (auto a: attr)
 	{
 		const std::string &key = a.first;
@@ -172,23 +190,58 @@ int sanafe::arch_create_tile(
 		}
 	}
 
-	arch.tiles.push_back(tile);
-	return tile.id;
+	return tile;
 }
 
-int sanafe::arch_create_core(
-	Architecture &arch, Tile &tile,
+sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name):
+	name(axon_in_name)
+{
+	return;
+}
+
+sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name):
+	name(synapse_name)
+{
+	energy = 0.0;
+	time = 0.0;
+	return;
+}
+
+sanafe::SomaUnit::SomaUnit(const std::string &soma_name):
+	name(soma_name)
+{
+	neuron_updates = 0;
+	neurons_fired = 0;
+	neuron_count = 0;
+	energy = 0.0;
+	time = 0.0;
+	return;
+}
+
+sanafe::AxonOutUnit::AxonOutUnit(const std::string &axon_out_name):
+	name(axon_out_name)
+{
+	energy = 0.0;
+	time = 0.0;
+	return;
+}
+
+sanafe::Core &sanafe::Architecture::create_core(
+	const size_t tile_id,
 	const std::unordered_map<std::string, std::string> &attr)
 {
+	if (tile_id > tiles.size())
+	{
+		throw std::invalid_argument("Error: Tile ID > total tiles");
+	}
+	Tile &tile = tiles[tile_id];
 	const int core_offset = tile.cores.size();
-	Core c;
-	c.offset = core_offset;
-	c.id = arch.get_core_count();
-	c.parent_tile_id = tile.id;
-	c.max_neurons = 1024;
+	tile.cores.push_back(Core(get_core_count(), tile.id, core_offset));
+	Core &c = tile.cores.back();
 
 	// *** Set attributes ***
 	c.buffer_pos = BUFFER_SOMA;
+	c.max_neurons = 1024;
 	for (auto a: attr)
 	{
 		const std::string &key = a.first;
@@ -208,25 +261,23 @@ int sanafe::arch_create_core(
 	}
 
 	// Initialize core state
-	c.soma_count = 0;
-	c.synapse_count = 0;
 	c.energy = 0.0;
-
 	c.next_message = Message();
-	tile.cores.push_back(c);
 
 	TRACE1("Core created id:%d.%d (tile:%d).\n", c.parent_tile_id, .id);
-	return c.id;
+	return c;
 }
 
-void sanafe::arch_create_axon_in(
-	Core &c, const std::string &name,
+sanafe::AxonInUnit &sanafe::Core::create_axon_in(
+	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	struct AxonInUnit in;
+	axon_in_hw.push_back(AxonInUnit(name));
+	struct AxonInUnit &in = axon_in_hw.back();
+
 	in.energy = 0.0;
 	in.time = 0.0;
-	in.parent_tile_id = c.parent_tile_id;
+	in.parent_tile_id = parent_tile_id;
 
 	in.energy_spike_message = 0.0;
 	in.latency_spike_message = 0.0;
@@ -245,19 +296,17 @@ void sanafe::arch_create_axon_in(
 		}
 	}
 
-	c.axon_in_hw.push_back(in);
 	TRACE2("Axon input created (c:%d.%d)\n", c.t->id, c.id);
 
-	return;
+	return in;
 }
 
-void sanafe::arch_create_synapse(struct Core &c, const std::string &name,
+sanafe::SynapseUnit &sanafe::Core::create_synapse(
+	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	SynapseUnit s;
-	s.name = name;
-	s.energy = 0.0;
-	s.time = 0.0;
+	synapse.push_back(SynapseUnit(name));
+	SynapseUnit &s = synapse.back();
 
 	/**** Set attributes ****/
 	s.energy_memory_access = 0.0;
@@ -292,23 +341,18 @@ void sanafe::arch_create_synapse(struct Core &c, const std::string &name,
 			ss >> s.latency_spike_op;
 		}
 	}
-	c.synapse.push_back(s);
 
 	TRACE1("Synapse processor created (c:%d.%d)\n", c.parent_tile_id, c.id);
 
-	return;
+	return s;
 }
 
-void sanafe::arch_create_soma(struct Core &c, const std::string &name,
+sanafe::SomaUnit &sanafe::Core::create_soma(
+	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	SomaUnit s;
-	s.name = name;
-	s.neuron_updates = 0;
-	s.neurons_fired = 0;
-	s.neuron_count = 0;
-	s.energy = 0.0;
-	s.time = 0.0;
+	soma.push_back(SomaUnit(name));
+	SomaUnit &s = soma.back();
 
 	/*** Set attributes ***/
 	s.energy_access_neuron = 0.0;
@@ -362,21 +406,23 @@ void sanafe::arch_create_soma(struct Core &c, const std::string &name,
 			}
 		}
 	}
-	c.soma.push_back(s);
 
 	TRACE1("Soma processor created (c:%d.%d)\n", c.parent_tile_id,
 		c.offset);
-	return;
+	return s;
 }
 
-void sanafe::arch_create_axon_out(
-	struct Core &c,
+sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
+	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	AxonOutUnit out;
+	axon_out_hw.push_back(AxonOutUnit(name));
+	AxonOutUnit &out = axon_out_hw.back();
+
 	out.packets_out = 0;
 	out.energy = 0.0;
 	out.time = 0.0;
+	out.parent_tile_id = parent_tile_id;
 
 	/*** Set attributes ***/
 	out.energy_access = 0.0;
@@ -397,14 +443,12 @@ void sanafe::arch_create_axon_out(
 	}
 
 	// Track the tile the axon interfaces with
-	out.parent_tile_id = c.parent_tile_id;
-	c.axon_out_hw.push_back(out);
 	TRACE1("Axon output created (c:%d.%d)\n", c.parent_tile_id, c.offset);
 
-	return;
+	return out;
 }
 
-void sanafe::arch_create_axons(struct Architecture &arch)
+void sanafe::arch_create_axons(Architecture &arch)
 {
 	TRACE1("Creating all connection maps.\n");
 	for (auto &tile: arch.tiles)
@@ -422,7 +466,7 @@ void sanafe::arch_create_axons(struct Architecture &arch)
 	arch_print_axon_summary(arch);
 }
 
-void sanafe::arch_print_axon_summary(struct Architecture &arch)
+void sanafe::arch_print_axon_summary(Architecture &arch)
 {
 	int in_count, out_count, core_used;
 	in_count = 0;

@@ -193,28 +193,28 @@ void sanafe::description_read_arch_entry(
 	switch (entry_type)
 	{
 	case '@':
-		arch_create_noc(arch, attributes);
+		arch.set_noc_attr(attributes);
 		break;
 	case 't':
-		arch_create_tile(arch, attributes);
+		arch.create_tile(attributes);
 		break;
 	case 'c':
-		arch_create_core(arch, *t, attributes);
+		arch.create_core(tile_id, attributes);
 		break;
 	case 'i':
-		arch_create_axon_in(*c, name.c_str(), attributes);
+		c->create_axon_in(name, attributes);
 		break;
 	case 's':
-		arch_create_synapse(*c, name.c_str(), attributes);
+		c->create_synapse(name, attributes);
 		break;
 	case 'd':
 		// TODO: support dendritic ops
 		break;
 	case '+':
-		arch_create_soma(*c, name.c_str(), attributes);
+		c->create_soma(name, attributes);
 		break;
 	case 'o':
-		arch_create_axon_out(*c, attributes);
+		c->create_axon_out(name, attributes);
 		break;
 	default:
 		INFO("Warning: unrecognized unit (%c) - skipping.\n",

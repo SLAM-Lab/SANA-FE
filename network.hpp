@@ -83,8 +83,9 @@ struct Neuron
 	Connection &connect_to_neuron(Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
 };
 
-struct NeuronGroup
+class NeuronGroup
 {
+public:
 	// A neuron group is a collection of neurons that share common
 	//  parameters. All neurons must be based on the same neuron model.
 	std::vector<Neuron> neurons;
@@ -100,8 +101,9 @@ struct NeuronGroup
 	Neuron &define_neuron(const size_t id, const std::unordered_map<std::string, std::string> &attr);
 };
 
-struct Network
+class Network
 {
+public:
 	std::vector<NeuronGroup> groups;
 
 	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
