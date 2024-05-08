@@ -498,11 +498,7 @@ void sanafe::description_read_network_entry(
 	{
 		assert(n != nullptr);
 		// Zero initialize all connections
-		n->connections_out.push_back(
-			Connection(n->connections_out.size()));
-		network_connect_neurons(
-			n->connections_out[n->connections_out.size()-1],
-			*n, *dest, attributes);
+		n->connect_to_neuron(*dest, attributes);
 		break;
 	}
 	case '&': // Map neuron to hardware

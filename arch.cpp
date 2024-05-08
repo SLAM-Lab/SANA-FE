@@ -235,11 +235,7 @@ void sanafe::arch_create_axon_in(
 		const std::string &key = curr.first;
 		const std::string &value_str = curr.second;
 		std::istringstream ss(value_str);
-		if (key == "name")
-		{
-			in.name = value_str;
-		}
-		else if (key == "energy_message")
+		if (key == "energy_message")
 		{
 			ss >> in.energy_spike_message;
 		}
@@ -269,16 +265,13 @@ void sanafe::arch_create_synapse(struct Core &c, const std::string &name,
 	s.energy_spike_op = 0.0;
 	s.latency_spike_op = 0.0;
 	s.weight_bits = 8;
+	s.name = name;
 	for (auto curr: attr)
 	{
 		const std::string &key = curr.first;
 		const std::string &value_str = curr.second;
 		std::istringstream ss(value_str);
-		if (key == "name")
-		{
-			s.name = value_str;
-		}
-		else if (key == "model")
+		if (key == "model")
 		{
 			s.model = arch_parse_synapse_model(value_str);
 		}

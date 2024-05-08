@@ -201,16 +201,14 @@ Neuron &sanafe::NeuronGroup::define_neuron(
 	return n;
 }
 
-int sanafe::network_connect_neurons(Connection &con,
-	Neuron &src, Neuron &dest,
+Connection &sanafe::Neuron::connect_to_neuron(
+	Neuron &dest,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	TRACE1("dest id:%d.%d\n", dest.id, dest.parent_group_id);
-	// TODO: set based on group defaults
-	con.pre_neuron = &src;
+	connections_out.push_back(Connection(connections_out.size()));
+	Connection &con = connections_out.back();
+	con.pre_neuron = this;
 	con.post_neuron = &dest;
-	con.weight = 1.0;
-	con.last_updated = 0;
 
 	for (auto a: attr)
 	{
@@ -232,7 +230,7 @@ int sanafe::network_connect_neurons(Connection &con,
 		con.pre_neuron->id,
 		con.post_neuron->parent_group_id,
 		con.post_neuron->id, con.weight);
-	return RET_OK;
+	return con;
 }
 
 void sanafe::network_check_mapped(Network &net)

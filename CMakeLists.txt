@@ -31,7 +31,7 @@ include_directories(${PYTHON_INCLUDE_DIRS})
 
 # PyBind specific
 
-if(PYTHON_BUILD_ENABLED)
+#if(PYTHON_BUILD_ENABLED)
 find_package(pybind11 CONFIG)
 pybind11_add_module(
     sanafecpp
@@ -42,7 +42,7 @@ target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
 target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
 target_link_libraries(sanafecpp PUBLIC)
-endif()
+#endif()
 
 find_package(OpenMP REQUIRED)
 add_executable(sim main.cpp)
@@ -51,11 +51,11 @@ target_sources(
     PRIVATE ${SOURCE_FILES}
 )
 
-if(PYTHON_BUILD_ENABLED)
+#if(PYTHON_BUILD_ENABLED)
 target_link_libraries(sim PRIVATE ${PYTHON_LIBRARIES})
 target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sim PRIVATE pybind11::pybind11)
-endif()
+#endif()
 #end of PyBind specific
 
 target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})

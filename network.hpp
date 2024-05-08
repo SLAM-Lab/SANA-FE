@@ -80,6 +80,7 @@ struct Neuron
 
 	Neuron(const size_t neuron_id);
 	void set_attributes(const std::unordered_map<std::string, std::string> &attr);
+	Connection &connect_to_neuron(Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
 };
 
 struct NeuronGroup
@@ -106,7 +107,6 @@ struct Network
 	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
 };
 
-int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
 void network_check_mapped(Network &net);
 }
 

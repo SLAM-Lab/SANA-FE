@@ -216,8 +216,6 @@ public:
 	int get_core_count();
 };
 
-void free_spike_vector(Architecture* arch);
-void arch_free(Architecture *const arch);
 int arch_create_noc(Architecture &arch, const std::unordered_map<std::string, std::string> &attr);
 int arch_create_tile(Architecture &arch, const std::unordered_map<std::string, std::string> &attr);
 int arch_create_core(Architecture &arch, Tile &t, const std::unordered_map<std::string, std::string> &attr);
@@ -226,15 +224,12 @@ void arch_create_synapse(Core &c, const std::string &name, const std::unordered_
 void arch_create_soma(Core &c, const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 void arch_create_axon_out(Core &c, const std::unordered_map<std::string, std::string> &attr);
 void arch_create_axons(Architecture &arch);
-void arch_create_core_axon(Core &core);
 void arch_print_axon_summary(Architecture &arch);
 int arch_map_neuron(Network &net, Neuron &n, Core &c);
 void arch_map_neuron_connections(Neuron &n);
 void arch_allocate_axon(Neuron &pre_neuron, Core &post_core);
 void arch_add_connection_to_axon(Connection &con, Core &post_core);
-int arch_parse_neuron_model(const std::string &model_str);
 int arch_parse_synapse_model(const std::string &model_str);
-void arch_init_message(Message &m);
 }
 
 #endif

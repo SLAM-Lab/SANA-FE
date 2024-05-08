@@ -1725,56 +1725,6 @@ timespec sanafe::calculate_elapsed_time(const timespec &ts_start,
 }
 
 /*
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
-
-#define PYBIND11_DETAILED_ERROR_MESSAGES
-
-// TODO: to dict and repr functions for RunData
-
-PYBIND11_MODULE(sanafecpp, m)
-{
-	m.doc() = R"pbdoc(
-        SANA-FE CPP Kernel Module
-        --------------------------------
-
-        .. currentmodule:: sanafecpp
-
-        .. autosummary::
-           :toctree: _generate
-
-		   SANA_FE
-	)pbdoc";
-	pybind11::class_<RunData>(m, "RunData")
-		.def(pybind11::init<int, int>(),
-			pybind11::arg("start"),
-			pybind11::arg("steps"))
-		.def_readwrite("timestep_start", &RunData::timestep_start)
-		.def_readwrite("timesteps_executed", &RunData::timesteps_executed)
-		.def_readwrite("energy", &RunData::energy)
-		.def_readwrite("sim_time", &RunData::sim_time)
-		.def_readwrite("wall_time", &RunData::wall_time)
-		.def_readwrite("spikes", &RunData::spikes)
-		.def_readwrite("packets_sent", &RunData::packets_sent)
-		.def_readwrite("neurons_fired", &RunData::neurons_fired);
-
-	pybind11::class_<Simulation>(m, "Simulation")
-		.def(pybind11::init<std::string, bool, bool, bool, bool>(),
-			pybind11::arg("output_dir")=".",
-			pybind11::arg("record_spikes")=false,
-			pybind11::arg("record_potentials")=false,
-			pybind11::arg("record_perf")=false,
-			pybind11::arg("record_messages")=false)
-		.def("run", &Simulation::run, pybind11::arg("timesteps")=1,
-			pybind11::arg("heartbeat")=100)
-		.def("read_arch_file", &Simulation::read_arch_file)
-		.def("read_net_file", &Simulation::read_net_file)
-		.def("get_power", &Simulation::get_power)
-		.def("get_run_summary", &Simulation::get_run_summary);
-}
-*/
-
-/*
 double sim_calculate_time(const Architecture *const arch)
 {
 	Core *c = n->core;
