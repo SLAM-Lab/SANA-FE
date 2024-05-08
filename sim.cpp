@@ -304,11 +304,12 @@ void sanafe::sim_format_run_summary(std::ostream &out,
 	const RunData &run_data)
 {
 	out << "build_git_version: '" << GIT_COMMIT << "'" << std::endl;
-	out << "energy: " << run_data.energy << std::endl;
-	out << "sim_time: " << run_data.sim_time << std::endl;
+	out << "energy: " << std::scientific << run_data.energy << std::endl;
+	out << "sim_time: " << std::scientific << run_data.sim_time;
+	out << std::endl;
 	out << "total_spikes: " << run_data.spikes << std::endl;
 	out << "total_messages_sent: " << run_data.packets_sent << std::endl;
-	out << "wall_time: " << run_data.wall_time << std::endl;
+	out << "wall_time: " << std::fixed << run_data.wall_time << std::endl;
 	out << "total_neurons_fired: " << run_data.neurons_fired << std::endl;
 
 	return;
@@ -319,7 +320,7 @@ std::ofstream sanafe::sim_trace_open_spike_trace(
 {
 	// TODO: warning, this is specific to Linux
 	// To be more portable, consider using the filesystem library in C++17
-	const std::filesystem::path spike_path = out_dir / "spike.csv";
+	const std::filesystem::path spike_path = out_dir / "spikes.csv";
 	std::ofstream spike_file(spike_path);
 
 	if (!spike_file.is_open())

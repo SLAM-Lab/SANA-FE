@@ -29,62 +29,82 @@ Connection::Connection(const int connection_id)
 	synapse_hw = nullptr;
 }
 
-int sanafe::network_create_neuron_group(Network &net, const int neuron_count,
-	const std::vector<Attribute> &attr)
+sanafe::NeuronGroup::NeuronGroup(const size_t group_id, const int neuron_count)
 {
-	int ret;
-	const auto id = net.groups.size();
-	INFO("Creating neuron group: %lu with %d neurons\n", id, neuron_count);
-	net.groups.push_back(NeuronGroup());
-	NeuronGroup &group = net.groups.back();
+	INFO("Creating neuron group: %lu with %d neurons\n",
+		group_id, neuron_count);
+	id = group_id;
+	default_max_connections_out = 0;
+	default_soma_hw_name = "";
+	default_synapse_hw_name = "";
+	default_log_potential = false;
+	default_log_spikes = false;
+	default_force_update = false;
 
-	group.id = id;
-	group.default_soma_hw_name = "";
-	group.default_synapse_hw_name = "";
-	group.default_log_potential = false;
-	group.default_log_spikes = false;
-	group.default_force_update = false;
+	// Reserve space for the neurons to go
+	neurons.reserve(neuron_count);
+}
+
+sanafe::Neuron::Neuron(const size_t neuron_id)
+{
+	id = id;
+	log_spikes = false;
+	log_potential = false;
+	neuron_status = sanafe::IDLE;
+	spike_count = 0;
+	max_connections_out = 0;
+
+	// Initially the neuron is not mapped to anything
+	core = nullptr;
+	soma_hw = nullptr;
+	axon_out_hw = nullptr;
+
+	soma_last_updated = 0;
+	dendrite_last_updated = 0;
+	core = nullptr;
+	is_init = false;
+}
+
+NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
+	const std::unordered_map<std::string, std::string> &attr)
+{
+	const auto id = groups.size();
+
+	groups.push_back(NeuronGroup(id, neuron_count));
+	NeuronGroup &group = groups.back();
 
 	for (auto a: attr)
 	{
-		ret = 1;
-		std::istringstream ss(a.value_str);
-		if (a.key == "soma_hw_name")
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "soma_hw_name")
 		{
-			group.default_soma_hw_name = a.value_str;
-			ret = 1;
+			group.default_soma_hw_name = value_str;
 		}
-		else if (a.key == "synapse_hw_name")
+		else if (key == "synapse_hw_name")
 		{
-			group.default_synapse_hw_name = a.value_str;
-			ret = 1;
+			group.default_synapse_hw_name = value_str;
 		}
-		else if (a.key =="log_v")
+		else if (key =="log_v")
 		{
 			ss >> group.default_log_potential;
 		}
-		else if (a.key =="log_spikes")
+		else if (key =="log_spikes")
 		{
 			ss >> group.default_log_spikes;
 		}
-		else if (a.key =="force_update")
+		else if (key =="force_update")
 		{
 			ss >> group.default_force_update;
 		}
-
-		if (ret < 1)
-		{
-			INFO("Invalid attribute (%s:%s)\n", a.key.c_str(),
-				a.value_str.c_str());
-			exit(1);
-		}
 	}
-	group.neurons.reserve(neuron_count);
 
 	// Initialize all neurons in this group
+	group.default_attributes = attr;
 	for (int i = 0; i < neuron_count; i++)
 	{
-		Neuron n;
+		Neuron n(i);
 		n.id = i;
 		n.parent_group_id = group.id;
 		TRACE1("Default soma name:%s\n",
@@ -95,114 +115,95 @@ int sanafe::network_create_neuron_group(Network &net, const int neuron_count,
 		// Initialize neuron using group attributes
 		n.log_spikes = group.default_log_spikes;
 		n.log_potential = group.default_log_potential;
-		n.force_update = group.default_force_update;
 		n.max_connections_out = group.default_max_connections_out;
-
-		n.update_needed = 0;
-		n.neuron_status = sanafe::IDLE;
-		n.spike_count = 0;
-
-		// Initially the neuron is not mapped to anything
-		n.core = nullptr;
-		n.soma_hw = nullptr;
-		n.axon_out_hw = nullptr;
-		n.is_init = 0;
-
+		n.set_attributes(group.default_attributes);
 		group.neurons.push_back(n);
 	}
-	group.default_attributes = attr;
 
 	INFO("Created neuron group gid:%d\n", group.id);
 
-	return id;
+	return group;
 }
 
-int sanafe::network_create_neuron(
-	Network &net, Neuron &n, const std::vector<Attribute> &attr)
+void sanafe::Neuron::set_attributes(
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
-	if (n.is_init)
-	{
-		INFO("Error: Trying to define same neuron twice %d.\n", n.id);
-		return -1;
-	}
-
 	/*** Set attributes ***/
 	for (auto a: attr)
 	{
-		int ret = 1;
-
-		std::istringstream ss(a.value_str);
-		if (a.key == "hw_name")
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "hw_name")
 		{
-			n.soma_hw_name = a.value_str;
+			soma_hw_name = value_str;
 		}
-		else if ((a.key == "default_connections_out") ||
-			(a.key == "connections_out"))
+		else if ((key == "default_connections_out") ||
+			(key == "connections_out"))
 		{
-			ss >> n.max_connections_out;
+			ss >> max_connections_out;
 		}
-		else if (a.key == "log_spikes")
+		else if (key == "log_spikes")
 		{
-			ss >> n.log_spikes;
+			ss >> log_spikes;
 		}
-		else if (a.key == "log_v")
+		else if (key == "log_v")
 		{
-			ss >> n.log_potential;
+			ss >> log_potential;
 		}
 		else
 		{
-		 	TRACE1("Attribute %s not supported.\n", a->key);
-		}
-
-		if (ret < 1)
-		{
-			INFO("Invalid attribute (%s:%s)\n", a.key.c_str(),
-				a.value_str.c_str());
-			exit(1);
+		 	TRACE1("Attribute %s not supported.\n", key.str());
 		}
 	}
 
-	// Set the initial update state, no spikes can arrive before the first
-	//  time-step but we can force the neuron to update, or bias it
-	n.update_needed = n.force_update; // || (fabs(n.bias) > 0.0));
-	n.neuron_status = sanafe::IDLE;
-
-	n.soma_last_updated = 0;
-	n.dendrite_last_updated = 0;
-
-	n.core = nullptr;
-	assert(n.connections_out.size() == 0);
-	n.connections_out.reserve(n.max_connections_out);
+	assert(connections_out.size() == 0);
+	connections_out.reserve(max_connections_out);
 
 	// Check if need to create Soma Class instance
-	/*
-	if ((n.model == nullptr) && )
+	if (core != nullptr)
 	{
 		// TODO: remove hack, make this user input
 		TRACE1("Soma hw name: %s", n.soma_hw_name.c_str());
 		//n.soma_model = plugin_get_soma(n.soma_hw_name);
-		n.model = std::shared_ptr<SomaModel>(new LoihiLifModel);
+		model = std::shared_ptr<SomaModel>(
+			new LoihiLifModel(parent_group_id, id));
 		TRACE1("Creating new neuron %d\n", n.id);
 	}
-	const NeuronGroup &group = net.groups[n.parent_group_id];
-	n.model->set_attributes(group.default_attributes);
-	n.model->set_attributes(attr);
-	*/
+	if (model != nullptr)
+	{
+		model->set_attributes(attr);
+	}
+	attributes = attr;
+	TRACE1("Created neuron: gid:%d nid:%d soma:%s\n",
+		parent_group_id, id, soma_hw_name.c_str());
+}
 
-	TRACE1("Created neuron: gid:%d nid:%d force:%d soma:%s\n",
-		n.parent_group_id, n.id, n.force_update,
-		n.soma_hw_name.c_str());
-	n.is_init = 1;
-
-	n.attributes = attr;
-	return n.id;
+Neuron &sanafe::NeuronGroup::define_neuron(
+	const size_t neuron_id,
+	const std::unordered_map<std::string, std::string> &attr)
+{
+	if (neuron_id >= neurons.size())
+	{
+		throw std::invalid_argument("Invalid neuron id");
+	}
+	Neuron &n = neurons[neuron_id];
+	if (n.is_init)
+	{
+		INFO("Error: Trying to define same neuron twice %d.\n", id);
+		throw std::invalid_argument(
+			"Error: Trying to redefine same neuron twice");
+	}
+	n.set_attributes(attr);
+	n.is_init = true;
+	return n;
 }
 
 int sanafe::network_connect_neurons(Connection &con,
 	Neuron &src, Neuron &dest,
-	const std::vector<Attribute> &attr)
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	TRACE1("dest id:%d.%d\n", dest.id, dest.parent_group_id);
 	// TODO: set based on group defaults
@@ -213,14 +214,16 @@ int sanafe::network_connect_neurons(Connection &con,
 
 	for (auto a: attr)
 	{
-		std::istringstream ss(a.value_str);
-		if ((a.key[0] == 'w') || (a.key == "weight"))
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if ((key[0] == 'w') || (key == "weight"))
 		{
 			ss >> con.weight;
 		}
-		else if (a.key == "hw_name")
+		else if (key == "hw_name")
 		{
-			con.synapse_hw_name = a.value_str;
+			con.synapse_hw_name = value_str;
 		}
 	}
 

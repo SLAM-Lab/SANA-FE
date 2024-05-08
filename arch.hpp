@@ -16,7 +16,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <list>
 
 #include "network.hpp"
@@ -212,23 +212,19 @@ public:
 	int noc_width, noc_height, noc_buffer_size;
 	bool noc_init;
 
-	// TODO: get rid of these
-	bool spike_vector_on;
-	std::vector<std::vector<int>> spike_vector;
-
 	Architecture();
 	int get_core_count();
 };
 
 void free_spike_vector(Architecture* arch);
 void arch_free(Architecture *const arch);
-int arch_create_noc(Architecture &arch, const std::vector<Attribute> &attr);
-int arch_create_tile(Architecture &arch, const std::vector<Attribute> &attr);
-int arch_create_core(Architecture &arch, Tile &t, const std::vector<Attribute> &attr);
-void arch_create_axon_in(Core &c, const std::string &name, const std::vector<Attribute> &attr);
-void arch_create_synapse(Core &c, const std::string &name, const std::vector<Attribute> &attr);
-void arch_create_soma(Core &c, const std::string &name, const std::vector<Attribute> &attr);
-void arch_create_axon_out(Core &c, const std::vector<Attribute> &attr);
+int arch_create_noc(Architecture &arch, const std::unordered_map<std::string, std::string> &attr);
+int arch_create_tile(Architecture &arch, const std::unordered_map<std::string, std::string> &attr);
+int arch_create_core(Architecture &arch, Tile &t, const std::unordered_map<std::string, std::string> &attr);
+void arch_create_axon_in(Core &c, const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+void arch_create_synapse(Core &c, const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+void arch_create_soma(Core &c, const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+void arch_create_axon_out(Core &c, const std::unordered_map<std::string, std::string> &attr);
 void arch_create_axons(Architecture &arch);
 void arch_create_core_axon(Core &core);
 void arch_print_axon_summary(Architecture &arch);

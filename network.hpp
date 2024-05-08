@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <unordered_map>
 #include "plugins.hpp"
 #include "models.hpp"
 
@@ -54,7 +55,7 @@ struct Neuron
 {
 	std::vector<Connection> connections_out;
 	std::vector<int> axon_out_addresses;
-	std::vector<Attribute> attributes;
+	std::unordered_map<std::string, std::string> attributes;
 
 	// Mapped hardware
 	Core *core, *post_synaptic_cores;
@@ -65,17 +66,20 @@ struct Neuron
 	std::shared_ptr<SomaModel> model;
 
 	// Track the timestep each hardware unit was last updated
-	int id, parent_group_id, is_init, fired;
-	int max_connections_out;
-	int force_update, spike_count;
+	bool is_init, fired, force_update, log_spikes, log_potential;
+	bool update_needed;
+	int id, parent_group_id;
+	int spike_count;
 	int soma_last_updated, dendrite_last_updated;
-	int maps_in_count, maps_out_count;
-	bool log_spikes, log_potential, update_needed;
+	int max_connections_out, maps_in_count, maps_out_count;
 
 	double dendritic_current_decay, processing_latency;
 	double current, charge;
 	NeuronStatus neuron_status;
 	int forced_spikes;
+
+	Neuron(const size_t neuron_id);
+	void set_attributes(const std::unordered_map<std::string, std::string> &attr);
 };
 
 struct NeuronGroup
@@ -85,22 +89,24 @@ struct NeuronGroup
 	std::vector<Neuron> neurons;
 	std::string default_soma_hw_name;
 	std::string default_synapse_hw_name;
-	std::vector<Attribute> default_attributes;
+	std::unordered_map<std::string, std::string> default_attributes;
 
 	int id;
 	int default_max_connections_out;
 	bool default_log_potential, default_log_spikes, default_force_update;
+
+	NeuronGroup(const size_t group_id, const int neuron_count);
+	Neuron &define_neuron(const size_t id, const std::unordered_map<std::string, std::string> &attr);
 };
 
 struct Network
 {
 	std::vector<NeuronGroup> groups;
+
+	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
 };
 
-int network_create_neuron(Network &net, Neuron &n, const std::vector<Attribute> &attr);
-int network_create_neuron_group(Network &net, const int neuron_count, const std::vector<Attribute> &attr);
-//Neuron *network_id_to_neuron_ptr(Network *const net, const NeuronId id);
-int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::vector<Attribute> &attr);
+int network_connect_neurons(Connection &con, Neuron &src, Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
 void network_check_mapped(Network &net);
 }
 

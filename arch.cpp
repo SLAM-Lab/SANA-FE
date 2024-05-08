@@ -12,6 +12,7 @@
 #include <set>
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 
 #include "print.hpp"
 #include "arch.hpp"
@@ -25,8 +26,6 @@ Architecture::Architecture()
 	noc_buffer_size = 0;
 	noc_init = false;
 
-	// TODO: remove these
-	spike_vector_on = false;
 	return;
 }
 
@@ -70,7 +69,7 @@ Message::Message()
 }
 
 int sanafe::arch_create_noc(struct Architecture &arch,
-	const std::vector<Attribute> &attr)
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	const int tile_count = arch.tiles.size();
 	if (tile_count <= 0)
@@ -88,16 +87,18 @@ int sanafe::arch_create_noc(struct Architecture &arch,
 
 	for (auto a: attr)
 	{
-		std::istringstream ss(a.value_str);
-		if (a.key == "width")
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "width")
 		{
 			ss >> arch.noc_width;
 		}
-		else if (a.key == "height")
+		else if (key == "height")
 		{
 			ss >> arch.noc_height;
 		}
-		else if (a.key == "link_buffer_size")
+		else if (key == "link_buffer_size")
 		{
 			ss >> arch.noc_buffer_size;
 		}
@@ -110,7 +111,8 @@ int sanafe::arch_create_noc(struct Architecture &arch,
 }
 
 int sanafe::arch_create_tile(
-	Architecture &arch, const std::vector<Attribute> &attr)
+	Architecture &arch,
+	const std::unordered_map<std::string, std::string> &attr)
 
 {
 	Tile tile;
@@ -133,36 +135,38 @@ int sanafe::arch_create_tile(
 
 	for (auto a: attr)
 	{
-		std::istringstream ss(a.value_str);
-		if (a.key == "energy_east")
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "energy_east")
 		{
 			ss >> tile.energy_east_hop;
 		}
-		else if (a.key == "latency_east")
+		else if (key == "latency_east")
 		{
 			ss >> tile.latency_east_hop;
 		}
-		else if (a.key == "energy_west")
+		else if (key == "energy_west")
 		{
 			ss >> tile.energy_west_hop;
 		}
-		else if (a.key == "latency_west")
+		else if (key == "latency_west")
 		{
 			ss >> tile.latency_west_hop;
 		}
-		else if (a.key == "energy_north")
+		else if (key == "energy_north")
 		{
 			ss >> tile.energy_north_hop;
 		}
-		else if (a.key == "latency_north")
+		else if (key == "latency_north")
 		{
 			ss >> tile.latency_north_hop;
 		}
-		else if (a.key == "energy_south")
+		else if (key == "energy_south")
 		{
 			ss >> tile.energy_south_hop;
 		}
-		else if (a.key == "latency_south")
+		else if (key == "latency_south")
 		{
 			ss >> tile.latency_south_hop;
 		}
@@ -173,7 +177,8 @@ int sanafe::arch_create_tile(
 }
 
 int sanafe::arch_create_core(
-	Architecture &arch, Tile &tile, const std::vector<Attribute> &attr)
+	Architecture &arch, Tile &tile,
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	const int core_offset = tile.cores.size();
 	Core c;
@@ -186,16 +191,18 @@ int sanafe::arch_create_core(
 	c.buffer_pos = BUFFER_SOMA;
 	for (auto a: attr)
 	{
-		if (a.key == "buffer_before")
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		if (key == "buffer_before")
 		{
-			if (a.value_str == "soma")
+			if (value_str == "soma")
 			{
 				c.buffer_pos = BUFFER_SOMA;
 			}
 		}
-		else if (a.key == "max_neurons")
+		else if (key == "max_neurons")
 		{
-			std::istringstream ss(a.value_str);
+			std::istringstream ss(value_str);
 			ss >> c.max_neurons;
 		}
 	}
@@ -213,7 +220,8 @@ int sanafe::arch_create_core(
 }
 
 void sanafe::arch_create_axon_in(
-	Core &c, const std::string &name, const std::vector<Attribute> &attr)
+	Core &c, const std::string &name,
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	struct AxonInUnit in;
 	in.energy = 0.0;
@@ -224,29 +232,31 @@ void sanafe::arch_create_axon_in(
 	in.latency_spike_message = 0.0;
 	for (auto curr: attr)
 	{
-		std::istringstream ss(curr.value_str);
-		if (curr.key == "name")
+		const std::string &key = curr.first;
+		const std::string &value_str = curr.second;
+		std::istringstream ss(value_str);
+		if (key == "name")
 		{
-			in.name = curr.value_str;
+			in.name = value_str;
 		}
-		else if (curr.key == "energy_message")
+		else if (key == "energy_message")
 		{
 			ss >> in.energy_spike_message;
 		}
-		else if (curr.key == "latency_message")
+		else if (key == "latency_message")
 		{
 			ss >> in.latency_spike_message;
 		}
 	}
 
 	c.axon_in_hw.push_back(in);
-	TRACE2("Axon input created (c:%d.%d)\n", c->t->id, c->id);
+	TRACE2("Axon input created (c:%d.%d)\n", c.t->id, c.id);
 
 	return;
 }
 
 void sanafe::arch_create_synapse(struct Core &c, const std::string &name,
-	const std::vector<Attribute> &attr)
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	SynapseUnit s;
 	s.name = name;
@@ -261,28 +271,30 @@ void sanafe::arch_create_synapse(struct Core &c, const std::string &name,
 	s.weight_bits = 8;
 	for (auto curr: attr)
 	{
-		std::istringstream ss(curr.value_str);
-		if (curr.key == "name")
+		const std::string &key = curr.first;
+		const std::string &value_str = curr.second;
+		std::istringstream ss(value_str);
+		if (key == "name")
 		{
-			s.name = curr.value_str;
+			s.name = value_str;
 		}
-		else if (curr.key == "model")
+		else if (key == "model")
 		{
-			s.model = arch_parse_synapse_model(curr.value_str);
+			s.model = arch_parse_synapse_model(value_str);
 		}
-		else if (curr.key == "energy_memory")
+		else if (key == "energy_memory")
 		{
 			ss >> s.energy_memory_access;
 		}
-		else if (curr.key == "latency_memory")
+		else if (key == "latency_memory")
 		{
 			ss >> s.latency_memory_access;
 		}
-		else if (curr.key == "energy_spike")
+		else if (key == "energy_spike")
 		{
 			ss >> s.energy_spike_op;
 		}
-		else if (curr.key == "latency_spike")
+		else if (key == "latency_spike")
 		{
 			ss >> s.latency_spike_op;
 		}
@@ -295,7 +307,7 @@ void sanafe::arch_create_synapse(struct Core &c, const std::string &name,
 }
 
 void sanafe::arch_create_soma(struct Core &c, const std::string &name,
-	const std::vector<Attribute> &attr)
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	SomaUnit s;
 	s.name = name;
@@ -317,40 +329,42 @@ void sanafe::arch_create_soma(struct Core &c, const std::string &name,
 
 	for (auto a: attr)
 	{
-		std::istringstream ss(a.value_str);
-		if (a.key == "energy_update_neuron")
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "energy_update_neuron")
 		{
 			ss >> s.energy_update_neuron;
 		}
-		else if (a.key == "latency_update_neuron")
+		else if (key == "latency_update_neuron")
 		{
 			ss >> s.latency_update_neuron;
 		}
-		else if (a.key == "energy_access_neuron")
+		else if (key == "energy_access_neuron")
 		{
 			ss >> s.energy_access_neuron;
 		}
-		else if (a.key == "latency_access_neuron")
+		else if (key == "latency_access_neuron")
 		{
 			ss >> s.latency_access_neuron;
 		}
-		else if (a.key == "energy_spike_out")
+		else if (key == "energy_spike_out")
 		{
 			ss >> s.energy_spiking;
 		}
-		else if (a.key == "latency_spike_out")
+		else if (key == "latency_spike_out")
 		{
 			ss >> s.latency_spiking;
 		}
-		else if (a.key == "noise")
+		else if (key == "noise")
 		{
 			s.noise_type = NOISE_FILE_STREAM;
-			s.noise_stream = fopen(a.value_str.c_str(), "r");
-			TRACE1("Opening noise str: %s\n", a.value_str.c_str());
+			s.noise_stream = fopen(value_str.c_str(), "r");
+			TRACE1("Opening noise str: %s\n", value_str.c_str());
 			if (s.noise_stream == NULL)
 			{
 				INFO("Error: Failed to open noise stream: %s.\n",
-					a.value_str.c_str());
+					value_str.c_str());
 				exit(1);
 			}
 		}
@@ -363,7 +377,8 @@ void sanafe::arch_create_soma(struct Core &c, const std::string &name,
 }
 
 void sanafe::arch_create_axon_out(
-	struct Core &c, const std::vector<Attribute> &attr)
+	struct Core &c,
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	AxonOutUnit out;
 	out.packets_out = 0;
@@ -375,12 +390,14 @@ void sanafe::arch_create_axon_out(
 	out.latency_access = 0.0;
 	for (auto curr: attr)
 	{
-		std::istringstream ss(curr.value_str);
-		if (curr.key == "energy")
+		const std::string &key = curr.first;
+		const std::string &value_str = curr.second;
+		std::istringstream ss(value_str);
+		if (key == "energy")
 		{
 			ss >> out.energy_access;
 		}
-		else if (curr.key == "latency")
+		else if (key == "latency")
 		{
 			ss >> out.latency_access;
 		}

@@ -54,11 +54,6 @@ class Network:
         self.groups.append(group)
         return group
 
-    def create_input(self):
-        input_id = len(self.inputs)
-        input_node = Input(input_id)
-        self.inputs.append(input_node)
-        return input_node
 
     def save(self, filename, group_idx=None, save_mappings=None):
         if group_idx is None:
@@ -189,24 +184,6 @@ class NeuronGroup:
                         log_potential=log_potential, force_update=force_update)
         self.neurons.append(neuron)
         return neuron
-
-
-class Input:
-    def __init__(self, input_id):
-        self.id = input_id
-        self.connections = []
-
-    def add_connection(self, dest, weight):
-        self.connections.append((dest, weight))
-
-    def __str__(self):
-        line = "< {0}".format(self.id)
-        for connection in self.connections:
-            dest_neuron, weight = connection
-            line += " {0} {1} {2}".format(
-                dest_neuron.group_id, dest_neuron.id, weight)
-        line += '\n'
-        return line
 
 
 class Neuron:
@@ -499,6 +476,7 @@ def parse_tile(tile_dict):
 
     return
 
+
 def parse_core(core_dict, tile_id):
     core_name = core_dict["name"]
     core_name = core_name.replace(" ", "_")
@@ -556,6 +534,9 @@ _cores_in_tile = []
 _entry_list = []
 
 
+## TODO: move these functions into the C++ kernel, this should be responsible
+##  for loading and saving this raw format. The Python script should build
+##  objects using the PyBind11 interface
 def format_attributes(attributes):
     line = ""
     if attributes is None:
@@ -640,9 +621,9 @@ def create_noc(noc_dict):
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
-        run_dir=os.path.join(project_dir), perf_trace=False,
-        spike_trace=False, potential_trace=False, message_trace=False,
-        out_dir=None, run_alive=False, gui=False):
+        run_dir=os.path.join(project_dir),
+        perf_trace=False, spike_trace=False,
+        potential_trace=False, message_trace=False, out_dir=None):
     parsed_filename = os.path.join(run_dir,
                                    os.path.basename(arch_path) + ".parsed")
     try:
@@ -730,7 +711,8 @@ if __name__ == "__main__":
 
     return results
     """
-
+    # Capstone code for live demo - figure out how to integrate or split into
+    #  a new script
     """
     # Code implemented during capstone project. Remove for now
     if run_alive:

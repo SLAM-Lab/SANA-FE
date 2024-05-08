@@ -13,6 +13,7 @@ using namespace sanafe;
 // **** Soma models ****
 LoihiLifModel::LoihiLifModel(const int gid, const int nid): SomaModel(gid, nid)
 {
+	force_update = false;
 	potential = 0.0;
 	soma_last_updated = 0;
 	bias = 0.0;
@@ -34,51 +35,54 @@ LoihiLifModel::~LoihiLifModel()
 	return;
 }
 
-void LoihiLifModel::set_attributes(const std::vector<Attribute> &attr)
+void LoihiLifModel::set_attributes(
+	const std::unordered_map<std::string, std::string> &attr)
 {
 	for (auto a: attr)
 	{
-		std::istringstream ss(a.value_str);
-		if ((a.key == "default_threshold") || (a.key == "threshold"))
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if ((key == "default_threshold") || (key == "threshold"))
 		{
 			ss >> threshold;
 		}
-		else if ((a.key == "default_reverse_threshold") ||
-			(a.key == "reverse_threshold"))
+		else if ((key == "default_reverse_threshold") ||
+			(key == "reverse_threshold"))
 		{
 			ss >> reverse_threshold;
 		}
-		else if ((a.key == "default_reset") || (a.key == "reset"))
+		else if ((key == "default_reset") || (key == "reset"))
 		{
 			ss >> reset;
 		}
-		else if ((a.key == "default_reverse_reset") ||
-			(a.key == "reverse_reset"))
+		else if ((key == "default_reverse_reset") ||
+			(key == "reverse_reset"))
 		{
 			ss >> reverse_reset;
 		}
-		else if ((a.key == "default_reset_mode") ||
-			(a.key == "reset_mode"))
+		else if ((key == "default_reset_mode") ||
+			(key == "reset_mode"))
 		{
-			reset_mode = model_parse_reset_mode(a.value_str);
+			reset_mode = model_parse_reset_mode(value_str);
 		}
-		else if ((a.key == "default_reverse_reset_mode") ||
-			(a.key =="reverse_reset_mode"))
+		else if ((key == "default_reverse_reset_mode") ||
+			(key =="reverse_reset_mode"))
 		{
 			reverse_reset_mode =
-				model_parse_reset_mode(a.value_str);
+				model_parse_reset_mode(value_str);
 		}
-		else if ((a.key == "default_leak_decay") ||
-			(a.key =="leak_decay"))
+		else if ((key == "default_leak_decay") ||
+			(key =="leak_decay"))
 		{
 			ss >> leak_decay;
 		}
-		else if ((a.key == "default_bias") || (a.key =="bias"))
+		else if ((key == "default_bias") || (key =="bias"))
 		{
 			ss >> bias;
 		}
-		else if ((a.key == "default_force_update") ||
-			(a.key == "force_update"))
+		else if ((key == "default_force_update") ||
+			(key == "force_update"))
 		{
 			ss >> force_update;
 		}
