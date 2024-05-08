@@ -11,7 +11,8 @@
 #include <vector>
 #include <list>
 #include <memory>
-#include <unordered_map>
+#include <sstream>
+#include <filesystem>
 
 #include "print.hpp"
 #include "sim.hpp"
@@ -20,7 +21,8 @@
 
 using namespace sanafe;
 
-Simulation::Simulation(const std::string &output_dir,
+Simulation::Simulation(
+	const std::string &output_dir=".",
 	const bool record_spikes=false, const bool record_potentials=false,
 	const bool record_perf=false, const bool record_messages=false):
 	arch(), net(), out_dir(output_dir)
@@ -28,7 +30,7 @@ Simulation::Simulation(const std::string &output_dir,
 	INFO("Initializing simulation.\n");
 	total_energy = 0.0;   // Joules
 	total_sim_time = 0.0; // Seconds
-	wall_time = 0.0; // Seconds
+	wall_time = 0.0;      // Seconds
 	total_timesteps = 0;
 	total_spikes = 0;
 	total_messages_sent = 0;
@@ -39,23 +41,6 @@ Simulation::Simulation(const std::string &output_dir,
 	potential_trace_enabled = record_potentials;
 	perf_trace_enabled = record_perf;
 	message_trace_enabled = record_messages;
-
-	if (spike_trace_enabled)
-	{
-		spike_trace = sim_trace_open_spike_trace(out_dir);
-	}
-	if (potential_trace_enabled)
-	{
-		potential_trace = sim_trace_open_potential_trace(out_dir, net);
-	}
-	if (perf_trace_enabled)
-	{
-		perf_trace = sim_trace_open_perf_trace(out_dir);
-	}
-	if (message_trace_enabled)
-	{
-		message_trace = sim_trace_open_message_trace(out_dir);
-	}
 }
 
 Simulation::~Simulation()
@@ -67,6 +52,7 @@ Simulation::~Simulation()
 	message_trace.close();
 }
 
+/*
 int Simulation::update_neuron(
 	const std::vector<NeuronGroup>::size_type group_id,
 	const std::vector<Neuron>::size_type n_id,
@@ -102,10 +88,48 @@ int Simulation::update_neuron(
 	net.groups[group_id].neurons[n_id].model->set_attributes(attr);
 	return 0;
 }
+*/
 
-void Simulation::run(const int timesteps)
+RunData::RunData(const long int start, const long int steps)
 {
-	const int heartbeat = 100;
+	timestep_start = start;
+	timesteps_executed = steps;
+	energy = 0.0;
+	sim_time = 0.0;
+	spikes = 0L;
+	packets_sent = 0L;
+	neurons_fired = 0L;
+	return;
+}
+
+RunData Simulation::run(const long int timesteps, const long int heartbeat)
+{
+	RunData rd((total_timesteps+1), timesteps);
+	if (total_timesteps <= 0)
+	{
+		// If no timesteps have been simulated, open the trace files
+		//  and simulate.
+		// TODO: consider moving this back and initializing the
+		//  simulation with a reference to an arch and network
+		if (spike_trace_enabled)
+		{
+			spike_trace = sim_trace_open_spike_trace(out_dir);
+		}
+		if (potential_trace_enabled)
+		{
+			potential_trace = sim_trace_open_potential_trace(
+				out_dir, net);
+		}
+		if (perf_trace_enabled)
+		{
+			perf_trace = sim_trace_open_perf_trace(out_dir);
+		}
+		if (message_trace_enabled)
+		{
+			message_trace = sim_trace_open_message_trace(out_dir);
+		}
+	}
+
 	for (long int timestep = 1; timestep <= timesteps; timestep++)
 	{
 		if ((timestep % heartbeat) == 0)
@@ -113,17 +137,25 @@ void Simulation::run(const int timesteps)
 			// Print heart-beat every hundred timesteps
 			INFO("*** Time-step %ld ***\n", timestep);
 		}
-		step();
-		total_timesteps++;
+		const Timestep ts = step();
+		rd.energy += ts.energy;
+		rd.sim_time += ts.sim_time;
+		rd.spikes += ts.spikes;
+		rd.packets_sent += ts.packets_sent;
+		rd.neurons_fired += ts.neurons_fired;
+		rd.wall_time = wall_time;
 	}
+
+	return rd;
 }
 
-void Simulation::step()
+Timestep Simulation::step()
 {
 	// TODO: remove the need to pass the network struct, only the arch
 	//  should be needed (since it links back to the net anyway)
 	// Run neuromorphic hardware simulation for one timestep
 	//  Measure the CPU time it takes and accumulate the stats
+	total_timesteps++;
 	struct Timestep ts = Timestep(total_timesteps, arch.get_core_count());
 	struct timespec ts_start, ts_end, ts_elapsed;
 
@@ -140,7 +172,7 @@ void Simulation::step()
 	total_energy += ts.energy;
 	total_sim_time += ts.sim_time;
 	total_spikes += ts.spike_count;
-	total_neurons_fired += ts.total_neurons_fired;
+	total_neurons_fired += ts.neurons_fired;
 	total_messages_sent += ts.packets_sent;
 	if (spike_trace_enabled)
 	{
@@ -174,10 +206,11 @@ void Simulation::step()
 			}
 		}
 	}
-	total_timesteps = ts.timestep;
-	wall_time += (double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9);
-	TRACE1("Time-step took: %fs.\n",
-		(double) ts_elapsed.tv_sec+(ts_elapsed.tv_nsec/1.0e9));
+	wall_time += (double) ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / 1.0e9);
+	TRACE1("Time-step took: %fs.\n", static_cast<double>(
+			ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / 1.0e9)));
+
+	return ts;
 }
 
 void Simulation::read_net_file(const std::string &filename)
@@ -199,41 +232,6 @@ void Simulation::read_net_file(const std::string &filename)
 	arch_create_axons(arch);
 }
 
-double Simulation::get_power()
-{
-	if (total_sim_time > 0.0)
-	{
-		return total_energy / total_sim_time;
-	}
-	else
-	{
-		return 0.0; // Watts
-	}
-}
-
-/*
-std::vector<int> Simulation::get_status(
-	const std::vector<NeuronGroup>::size_type gid)
-{
-	std::vector<int> statuses = vector<int>();
-
-	if (gid >= net.groups.size())
-	{
-		INFO("Error: Got gid of %lu with only %lu groups in net.\n",
-			gid, net.groups.size());
-		return statuses;
-	}
-
-	for (std::vector<Neuron>::size_type i = 0;
-		i < net.groups[gid].neurons.size(); i++)
-	{
-		statuses.push_back(net.groups[gid].neurons[i].neuron_status);
-	}
-
-	return statuses;
-}
-*/
-
 void Simulation::read_arch_file(const std::string &filename)
 {
 	std::ifstream arch_fp(filename);
@@ -251,69 +249,77 @@ void Simulation::read_arch_file(const std::string &filename)
 	}
 }
 
-std::unordered_map<std::string, std::string>
-	Simulation::get_run_summary(const std::string &out_dir)
+double Simulation::get_power()
 {
-	// Create the summary using the unordered map container
-	std::unordered_map<std::string, std::string> run_data;
-	run_data.insert(std::make_pair<std::string, std::string>(
-		"git_version", GIT_COMMIT));
-	//run_data.insert("energy", std::to_string(total_energy));
-	//run_data.insert("sim_time", std::to_string(total_sim_time));
-	//run_data.insert("total_spikes", std::to_string(total_spikes));
-	//run_data.insert("total_messages_sent", std::to_string(total_spikes));
-	//run_data.insert("wall_time", std::to_string(wall_time));
-	//run_data.insert("total_neurons_fired", std::to_string(total_neurons_fired));
+	double power; // Watts
+	if (total_sim_time > 0.0)
+	{
+		power = total_energy / total_sim_time;
+	}
+	else
+	{
+		// Avoid divide by 0
+		power = 0.0;
+	}
 
-	// TODO: split these into different routines?
-	// Output the summary to the console
-	sim_output_map_yaml(std::cout, run_data);
+	return power;
+}
 
-	// Ouptut the same file to a file
-	const std::string summary_path =
-		out_dir + std::string("/run_summary.yaml");
+RunData Simulation::get_run_summary()
+{
+	// Store the summary data in a string to string mapping
+	RunData run_data(0, total_timesteps);
+
+	run_data.energy = total_energy;
+	run_data.sim_time = total_sim_time;
+	run_data.spikes = total_spikes;
+	run_data.packets_sent = total_messages_sent;
+	run_data.wall_time = wall_time;
+	run_data.neurons_fired = total_neurons_fired;
+
+	return run_data;
+}
+
+void sanafe::sim_output_run_summary(
+	const std::filesystem::path &out_dir, const RunData &run_data)
+{
+	// Summarize and output the run data using a YAML format to the console
+	sim_format_run_summary(std::cout, run_data);
+
+	// Output the same YAML-formatted summary to the given output file
+	const std::filesystem::path summary_filename("run_summary.yaml");
+	const std::filesystem::path summary_path = out_dir / summary_filename;
 	std::ofstream summary_file(summary_path);
 	if (summary_file.is_open())
 	{
-		sim_output_map_yaml(summary_file, run_data);
+		sim_format_run_summary(summary_file, run_data);
 	}
 	else
 	{
 		INFO("Summary file %s couldn't open.\n", summary_path.c_str());
 	}
-
-	return run_data;
 }
 
-void sanafe::sim_output_map_yaml(std::ostream &out,
-	const std::unordered_map<std::string, std::string> &run_data)
+void sanafe::sim_format_run_summary(std::ostream &out,
+	const RunData &run_data)
 {
-	for (const auto &d: run_data)
-	{
-		out << d.first << ": " << d.second << std::endl;
-	}
+	out << "build_git_version: '" << GIT_COMMIT << "'" << std::endl;
+	out << "energy: " << run_data.energy << std::endl;
+	out << "sim_time: " << run_data.sim_time << std::endl;
+	out << "total_spikes: " << run_data.spikes << std::endl;
+	out << "total_messages_sent: " << run_data.packets_sent << std::endl;
+	out << "wall_time: " << run_data.wall_time << std::endl;
+	out << "total_neurons_fired: " << run_data.neurons_fired << std::endl;
+
 	return;
 }
 
-/*
-void print_run_data(FILE *fp, const run_ts_data &data)
-{
-	fprintf(fp, "energy: %e\n", data.energy);
-	fprintf(fp, "time: %e\n", data.time);
-	fprintf(fp, "total_spikes: %ld\n", data.spikes);
-	fprintf(fp, "total_packets: %ld\n", data.packets);
-	fprintf(fp, "total_neurons_fired: %ld\n", data.neurons);
-	fprintf(fp, "wall_time: %lf\n", data.wall_time);
-	fprintf(fp, "executed from: %ld to %ld timesteps\n", data.timestep_start,
-	data.timestep_start + data.timesteps);
-}
-*/
-
-std::ofstream sanafe::sim_trace_open_spike_trace(const std::string &out_dir)
+std::ofstream sanafe::sim_trace_open_spike_trace(
+	const std::filesystem::path &out_dir)
 {
 	// TODO: warning, this is specific to Linux
 	// To be more portable, consider using the filesystem library in C++17
-	const std::string spike_path = out_dir + std::string("/spike.csv");
+	const std::filesystem::path spike_path = out_dir / "spike.csv";
 	std::ofstream spike_file(spike_path);
 
 	if (!spike_file.is_open())
@@ -325,12 +331,12 @@ std::ofstream sanafe::sim_trace_open_spike_trace(const std::string &out_dir)
 	return spike_file;
 }
 
-std::ofstream sanafe::sim_trace_open_potential_trace(const std::string &out_dir,
-	const Network &net)
+std::ofstream sanafe::sim_trace_open_potential_trace(
+	const std::filesystem::path &out_dir, const Network &net)
 {
 	// TODO: warning, this is specific to Linux
 	// To be more portable, consider using the filesystem library in C++17
-	const std::string potential_path = out_dir + "/potential.csv";
+	const std::filesystem::path potential_path = out_dir / "potential.csv";
 	std::ofstream potential_file(potential_path);
 
 	if (!potential_file.is_open())
@@ -342,11 +348,12 @@ std::ofstream sanafe::sim_trace_open_potential_trace(const std::string &out_dir,
 	return potential_file;
 }
 
-std::ofstream sanafe::sim_trace_open_perf_trace(const std::string &out_dir)
+std::ofstream sanafe::sim_trace_open_perf_trace(
+	const std::filesystem::path &out_dir)
 {
 	// TODO: warning, this is specific to Linux
 	// To be more portable, consider using the filesystem library in C++17
-	const std::string perf_path = out_dir + std::string("/perf.csv");
+	const std::filesystem::path perf_path = out_dir / "perf.csv";
 	std::ofstream perf_file(perf_path);
 	if (!perf_file.is_open())
 	{
@@ -358,9 +365,10 @@ std::ofstream sanafe::sim_trace_open_perf_trace(const std::string &out_dir)
 	return perf_file;
 }
 
-std::ofstream sanafe::sim_trace_open_message_trace(const std::string &out_dir)
+std::ofstream sanafe::sim_trace_open_message_trace(
+	const std::filesystem::path &out_dir)
 {
-	const std::string message_path = out_dir + "/messages.csv";
+	const std::filesystem::path message_path = out_dir / "/messages.csv";
 	std::ofstream message_file(message_path);
 	if (!message_file.is_open())
 	{
@@ -414,8 +422,7 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 			for (std::vector<SomaUnit>::size_type k = 0;
 				k < c.soma.size(); k++)
 			{
-				ts.total_neurons_fired +=
-					c.soma[k].neurons_fired;
+				ts.neurons_fired += c.soma[k].neurons_fired;
 			}
 			for (std::vector<AxonOutUnit>::size_type k = 0;
 				k < c.axon_out_hw.size(); k++)
@@ -439,7 +446,7 @@ Timestep::Timestep(const long int ts, const int core_count)
 	{
 		sim_init_fifo(q);
 	}
-	total_neurons_fired = 0L;
+	neurons_fired = 0L;
 	spikes = 0L;
 	total_hops = 0L;
 	energy = 0.0;
@@ -1285,7 +1292,7 @@ double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	if (n.neuron_status == sanafe::FIRED)
 	{
 		TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
-		ts.total_neurons_fired++;
+		ts.neurons_fired++;
 		sim_neuron_send_spike_message(ts, arch, n);
 	}
 
@@ -1565,7 +1572,7 @@ void sanafe::sim_trace_write_potential_header(
 			if (n.log_potential)
 			{
 				potential_trace_file << "neuron " << group.id;
-				potential_trace_file << "." << n.id;
+				potential_trace_file << "." << n.id << ",";
 			}
 		}
 	}
@@ -1635,7 +1642,7 @@ void sanafe::sim_trace_record_potentials(
 	// Each line of this csv file is the potential of all probed neurons for
 	//  one time-step
 	assert(out.is_open());
-	INFO("Recording potential for timestep: %d\n", timestep);
+	TRACE1("Recording potential for timestep: %d\n", timestep);
 	out << timestep << ",";
 
 	long int potential_probe_count = 0;
@@ -1663,11 +1670,11 @@ void sanafe::sim_trace_record_potentials(
 void sanafe::sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts)
 {
 	out << ts.timestep << ",";
-	//fprintf(fp, "%ld,", ts.total_neurons_fired);
-	//fprintf(fp, "%ld,", ts.packets_sent);
-	//fprintf(fp, "%ld,", ts.total_hops);
-	//fprintf(fp, "%le,", ts.sim_time);
-	//fprintf(fp, "%le,", ts.energy);
+	out << ts.neurons_fired << ",";
+	out << ts.packets_sent << ",";
+	out << ts.total_hops << ",";
+	out << std::scientific << ts.sim_time << ",";
+	out << std::scientific << ts.energy << ",";
 	out << std::endl;
 }
 
@@ -1699,38 +1706,70 @@ void sanafe::sim_trace_record_message(std::ofstream &out, const Message &m)
 	return;
 }
 
+timespec sanafe::calculate_elapsed_time(const timespec &ts_start,
+	const timespec &ts_end)
+{
+	// Calculate elapsed wall-clock time between ts_start and ts_end
+	timespec ts_elapsed;
+
+	ts_elapsed.tv_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
+	ts_elapsed.tv_sec = ts_end.tv_sec - ts_start.tv_sec;
+	if (ts_end.tv_nsec < ts_start.tv_nsec)
+	{
+		ts_elapsed.tv_sec--;
+		ts_elapsed.tv_nsec += 1000000000UL;
+	}
+
+	return ts_elapsed;
+}
+
 /*
-PYBIND11_MODULE(sanafe, m)
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
+
+#define PYBIND11_DETAILED_ERROR_MESSAGES
+
+// TODO: to dict and repr functions for RunData
+
+PYBIND11_MODULE(sanafecpp, m)
 {
 	m.doc() = R"pbdoc(
-        SANA-FE CPP Module with Pybind11
+        SANA-FE CPP Kernel Module
         --------------------------------
 
-        .. currentmodule:: simcpp
+        .. currentmodule:: sanafecpp
 
         .. autosummary::
            :toctree: _generate
 
 		   SANA_FE
 	)pbdoc";
-	pybind11::class_<SanaFe>(m, "SanaFe")
-		.def(pybind11::init())
-		.def("init", &SanaFe::init)
-        .def("update_neuron", &SanaFe::update_neuron)
-        .def("run_timesteps", &SanaFe::run_timesteps, pybind11::arg("timesteps")=1)
-		.def("set_perf_trace", &SanaFe::set_perf_trace, pybind11::arg("enable")=true)
-		.def("set_spike_trace", &SanaFe::set_spike_trace, pybind11::arg("enable")=true)
-		.def("set_potential_trace", &SanaFe::set_potential_trace, pybind11::arg("enable")=true)
-		.def("set_message_trace", &SanaFe::set_message_trace, pybind11::arg("enable")=true)
-		.def("set_out_dir", &SanaFe::set_out_dir)
-		.def("set_gui_flag", &SanaFe::set_gui_flag, pybind11::arg("flag")=true)
-		.def("set_arch", &SanaFe::set_arch)
-		.def("set_net", &SanaFe::set_net)
-		.def("get_power", &SanaFe::get_power)
-		.def("get_status", &SanaFe::get_status)
-		.def("sim_summary", &SanaFe::sim_summary)
-		.def("run_summary", &SanaFe::run_summary)
-		.def("clean_up", &SanaFe::clean_up, pybind11::arg("ret") = 0);
+	pybind11::class_<RunData>(m, "RunData")
+		.def(pybind11::init<int, int>(),
+			pybind11::arg("start"),
+			pybind11::arg("steps"))
+		.def_readwrite("timestep_start", &RunData::timestep_start)
+		.def_readwrite("timesteps_executed", &RunData::timesteps_executed)
+		.def_readwrite("energy", &RunData::energy)
+		.def_readwrite("sim_time", &RunData::sim_time)
+		.def_readwrite("wall_time", &RunData::wall_time)
+		.def_readwrite("spikes", &RunData::spikes)
+		.def_readwrite("packets_sent", &RunData::packets_sent)
+		.def_readwrite("neurons_fired", &RunData::neurons_fired);
+
+	pybind11::class_<Simulation>(m, "Simulation")
+		.def(pybind11::init<std::string, bool, bool, bool, bool>(),
+			pybind11::arg("output_dir")=".",
+			pybind11::arg("record_spikes")=false,
+			pybind11::arg("record_potentials")=false,
+			pybind11::arg("record_perf")=false,
+			pybind11::arg("record_messages")=false)
+		.def("run", &Simulation::run, pybind11::arg("timesteps")=1,
+			pybind11::arg("heartbeat")=100)
+		.def("read_arch_file", &Simulation::read_arch_file)
+		.def("read_net_file", &Simulation::read_net_file)
+		.def("get_power", &Simulation::get_power)
+		.def("get_run_summary", &Simulation::get_run_summary);
 }
 */
 

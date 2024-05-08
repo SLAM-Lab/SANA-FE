@@ -26,29 +26,37 @@ execute_process(
 
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
-#find_package(pybind11 CONFIG)
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-#pybind11_add_module(
-#    sanafe
-#	${SOURCE_FILES}
-#)
-#target_link_libraries(sanafe PRIVATE ${PYTHON_LIBRARIES})
-#target_link_libraries(sanafe PRIVATE pybind11::pybind11)
-#target_link_libraries(sanafe PRIVATE OpenMP::OpenMP_CXX)
-#target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
-#target_link_libraries(sanafe PUBLIC)
+# PyBind specific
+
+if(PYTHON_BUILD_ENABLED)
+find_package(pybind11 CONFIG)
+pybind11_add_module(
+    sanafecpp
+	${SOURCE_FILES}
+)
+target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
+target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
+target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
+target_link_libraries(sanafecpp PUBLIC)
+endif()
 
 find_package(OpenMP REQUIRED)
-
 add_executable(sim main.cpp)
 target_sources(
     sim
     PRIVATE ${SOURCE_FILES}
 )
 
+if(PYTHON_BUILD_ENABLED)
 target_link_libraries(sim PRIVATE ${PYTHON_LIBRARIES})
-#target_link_libraries(sim PRIVATE pybind11::pybind11)
 target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(sim PRIVATE pybind11::pybind11)
+endif()
+#end of PyBind specific
+
 target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})
+

@@ -10,6 +10,14 @@ import sys
 import os
 import yaml
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+sys.path.insert(0, os.path.join(PROJECT_DIR))
+# Set some flags for the dynamic linking library
+# Important to do before importing the simcpp .so library!
+sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
+import sanafecpp
+
 ### SNN utility functions ###
 class Architecture:
     def __init__(self, arch=None):
@@ -630,7 +638,6 @@ def create_noc(noc_dict):
     return
 
 
-import subprocess
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
         run_dir=os.path.join(project_dir), perf_trace=False,
@@ -650,7 +657,53 @@ def run(arch_path, network_path, timesteps,
         print(f"Full Error: '{yaml_parse_exc}'")
         exit()
 
+    # Parse inputs and run simulation
+    sim = sanafecpp.Simulation(out_dir, spike_trace, potential_trace,
+                               perf_trace, message_trace)
+    sim.read_arch_file(parsed_filename)
+    sim.read_net_file(network_path)
+
+    sim.run(timesteps=timesteps, heartbeat=100)
+    results = sim.get_run_summary()
+    return results
+
+
+if __name__ == "__main__":
+    # Run SANA-FE from the command-line
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="python sim.py",
+        description="Simulating Advanced Neuromorphic Architectures for Fast Exploration"
+    )
+    parser = argparse.ArgumentParser(
+        prog="python sim.py",
+        description="Simulating Advanced Neuromorphic Architectures for Fast Exploration"
+    )
+    parser.add_argument("architecture", help="Architecture description (YAML) file path", type=str)
+    parser.add_argument("snn", help="Spiking Neural Network description file path", type=str)
+    parser.add_argument("timesteps", help="Number of timesteps to simulate", type=int)
+    parser.add_argument("-o", "--out_dir", help="Output directory", type=str, required=False)
+    parser.add_argument("-s", "--spikes", help="Trace spikes", action="store_true")
+    parser.add_argument("-v", "--voltages", help="Trace neuron voltages", action="store_true")
+    parser.add_argument("-p", "--perf", help="Trace perf", action="store_true")
+    parser.add_argument("-m", "--messages", help="Trace messages", action="store_true")
+
+    args = parser.parse_args()
+    try:
+        run(args.architecture, args.snn, args.timesteps,
+            spike_trace=args.spikes, potential_trace=args.voltages,
+            perf_trace=args.perf, message_trace=args.messages,
+            run_alive=args.run, gui=args.gui, out_dir=args.out_dir)
+    except RuntimeError as exc:
+        print(exc)
+    else:
+        print("sim finished")
+
+
     # Old code: replace this with the code below soon
+    """
+    import subprocess
     args = []
     if spike_trace:
         args.append("-s",)
@@ -676,37 +729,15 @@ def run(arch_path, network_path, timesteps,
         results = yaml.safe_load(run_summary)
 
     return results
+    """
 
-    # Set some flags for the dynamic linking library
-    # Important to do before importing the simcpp .so library!
-    sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
-    import sanafe as sim
-
-    # Parse inputs and run simulation
-    sana_fe = sim.sana_fe()
-    if out_dir:
-        sana_fe.set_out_dir(out_dir)
-    if spike_trace:
-        sana_fe.open_spike_trace()
-    if potential_trace:
-        sana_fe.open_potential_trace()
-    if perf_trace:
-        sana_fe.open_perf_trace()
-    if message_trace:
-        sana_fe.open_message_trace()
-    if gui:
-        sana_fe.set_gui_flag()
-
-    sana_fe.set_arch(parsed_filename)
-    sana_fe.set_net(network_path)
-
+    """
+    # Code implemented during capstone project. Remove for now
     if run_alive:
         while True:
             if timesteps > 0:
-                print('-----------Inter Run Summary-----------')
-                sana_fe.run_timesteps(timesteps)
-                sana_fe.run_summary()
-                print('---------------------------------------')
+                sim.run(timesteps, heartbeat=100)
+                sim.get_run_summary()
             print("Enter timesteps to run: ", end="")
             user_in = input()
 
@@ -728,7 +759,7 @@ def run(arch_path, network_path, timesteps,
                 user_in = user_in[6:]
                 kwargs = user_in.split(" ")
                 # print(group_id, n_id, kwargs, len(kwargs))
-                sana_fe.update_neuron(group_id, n_id, kwargs, len(kwargs))
+                #sim.update_neuron(group_id, n_id, kwargs, len(kwargs))
 
                 timesteps = 0
                 continue
@@ -739,7 +770,7 @@ def run(arch_path, network_path, timesteps,
                     print(f"Error: Expected int. Got \"{user_in[2]}\".")
                     exit(1)
 
-                print(sana_fe.get_status(group_id))
+                #print(sim.get_status(group_id))
 
                 timesteps = 0
                 continue
@@ -753,50 +784,5 @@ def run(arch_path, network_path, timesteps,
         if timesteps < 1:
             print(f"Error: Given {timesteps} timesteps, require int > 1.")
             exit(1)
-        sana_fe.run_timesteps(timesteps)
-
-    print('-----------Total Run Summary-----------')
-    sana_fe.sim_summary()
-
-    if out_dir is None:
-        out_dir = ""
-    summary_file = os.path.join(out_dir, "run_summary.yaml")
-    with open(summary_file, "r") as run_summary:
-        results = yaml.safe_load(run_summary)
-
-    return results
-
-
-if __name__ == "__main__":
-    # Run SANA-FE from the command-line
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        prog="python sim.py",
-        description="Simulating Advanced Neuromorphic Architectures for Fast Exploration"
-    )
-    parser = argparse.ArgumentParser(
-        prog="python sim.py",
-        description="Simulating Advanced Neuromorphic Architectures for Fast Exploration"
-    )
-    parser.add_argument("architecture", help="Architecture description (YAML) file path", type=str)
-    parser.add_argument("snn", help="Spiking Neural Network description file path", type=str)
-    parser.add_argument("timesteps", help="Number of timesteps to simulate", type=int)
-    parser.add_argument("-o", "--out_dir", help="Output directory", type=str, required=False)
-    parser.add_argument("-s", "--spikes", help="Trace spikes", action="store_true")
-    parser.add_argument("-v", "--voltages", help="Trace neuron voltages", action="store_true")
-    parser.add_argument("-p", "--perf", help="Trace perf", action="store_true")
-    parser.add_argument("-m", "--messages", help="Trace messages", action="store_true")
-    parser.add_argument("-r", "--run", help="Keep simulation alive", action="store_true")
-    parser.add_argument("-g", "--gui", help="Turn on gui traces", action="store_true")
-
-    args = parser.parse_args()
-    try:
-        run(args.architecture, args.snn, args.timesteps,
-            spike_trace=args.spikes, potential_trace=args.voltages,
-            perf_trace=args.perf, message_trace=args.messages,
-            run_alive=args.run, gui=args.gui, out_dir=args.out_dir)
-    except RuntimeError as exc:
-        print(exc)
-    else:
-        print("sim finished")
+        sim.run_timesteps(timesteps)
+    """

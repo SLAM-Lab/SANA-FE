@@ -16,26 +16,27 @@
 
 #include <memory>
 #include <list>
-#include <unordered_map>
+#include <filesystem>
 #include "arch.hpp"
 #include "network.hpp"
 #include "stdio.h"
 
 namespace sanafe
 {
+struct Timestep;
+struct RunData;
+
 class Simulation
 {
 public:
 	Simulation(const std::string &output_dir, const bool record_spikes, const bool record_potentials, const bool record_perf, const bool record_messages);
 	~Simulation();
-	void run(const int timesteps=1);
-	void step();
+	RunData run(const long int timesteps=1, const long int heartbeat=100);
 	void read_arch_file(const std::string &filename);
 	void read_net_file(const std::string &filename);
-	int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
+	//int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
 	double get_power();
-	//std::vector<int> get_group_status(const std::vector<NeuronGroup>::size_type gid);
-	std::unordered_map<std::string, std::string> get_run_summary(const std::string &out_dir);
+	RunData get_run_summary();
 
 private:
 	Architecture arch;
@@ -48,23 +49,17 @@ private:
 	bool perf_trace_enabled, message_trace_enabled;
 	FILE *stats_fp;
 	std::ofstream spike_trace, potential_trace, message_trace, perf_trace;
+
+	Timestep step();
 };
 
-enum ProgramArgs
+struct RunData
 {
-	ARCH_FILENAME,
-	NETWORK_FILENAME,
-	TIMESTEPS,
-	PROGRAM_NARGS,
-};
+	long int timestep_start, timesteps_executed;
+	double energy, sim_time, wall_time;
+	long int spikes, packets_sent, neurons_fired;
 
-struct RunSummaryData
-{
-	double energy;
-	double time;
-	double wall_time;
-	long int spikes, packets, neurons;
-	long int timestep_start, timesteps;
+	RunData(const long int start, const long int steps);
 };
 
 struct Timestep
@@ -72,10 +67,18 @@ struct Timestep
 	std::vector<std::list<Message> > messages;
 	std::vector<MessageFifo> message_queues;
 	long int timestep, spike_count, total_hops, packets_sent;
-	long int total_neurons_fired, spikes;
+	long int neurons_fired, spikes;
 	double energy, sim_time;
 
 	Timestep(const long int ts, const int core_count);
+};
+
+enum ProgramArgs
+{
+	ARCH_FILENAME = 0,
+	NETWORK_FILENAME,
+	TIMESTEPS,
+	PROGRAM_NARGS,
 };
 
 struct NocInfo
@@ -101,31 +104,7 @@ enum Direction
 	WEST
 };
 
-
-//#include "pybind11/pybind11.h"
-//#include "pybind11/stl.h"
-
-#define PYBIND11_DETAILED_ERROR_MESSAGES
-
-class Vector_Cleanup_Class
-{
-public:
-	Architecture* arch;
-	Vector_Cleanup_Class(){}
-	Vector_Cleanup_Class(Architecture* arch)
-	{
-		this->arch = arch;
-	}
-	~Vector_Cleanup_Class()
-	{
-		//arch->spike_vector.clear();
-	}
-};
-
-struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
-void store_data_init(RunSummaryData &data, Simulation &sim, int timesteps);
-void store_data(RunSummaryData &data, Simulation &sim);
-void print_run_data(FILE *fp, RunSummaryData &data);
+void print_run_data(FILE *fp, RunData &data);
 
 std::unique_ptr<Simulation> sim_init_sim(void);
 void sim_init_timestep(Timestep &ts, Architecture &arch);
@@ -156,10 +135,10 @@ double sim_calculate_energy(const Architecture &arch);
 double sim_calculate_time(const Architecture &arch);
 long int sim_calculate_packets(const Architecture &arch);
 
-std::ofstream sim_trace_open_perf_trace(const std::string &out_dir);
-std::ofstream sim_trace_open_spike_trace(const std::string &out_dir);
-std::ofstream sim_trace_open_potential_trace(const std::string &out_dir, const Network &net);
-std::ofstream sim_trace_open_message_trace(const std::string &out_dir);
+std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
+std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
+std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir, const Network &net);
+std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
 void sim_trace_write_spike_header(std::ofstream &spike_trace_file);
 void sim_trace_write_potential_header(std::ofstream &potential_trace_file, const Network &net);
 void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
@@ -169,8 +148,8 @@ void sim_trace_record_potentials(std::ofstream &potential_trace_file, const int 
 void sim_trace_record_message(std::ofstream &perf_trace_file, const Message &m);
 void sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts);
 
-
-void sim_output_map_yaml(std::ostream &out, const std::unordered_map<std::string, std::string> &run_data);
+void sim_output_run_summary(const std::filesystem::path &output_file, const RunData &run_data);
+void sim_format_run_summary(std::ostream &out, const RunData &run_data);
 
 void sim_write_summary(FILE *fp, const Simulation &stats);
 
@@ -186,7 +165,7 @@ void sim_message_fifo_push(MessageFifo &queue, Message &m);
 Message *sim_message_fifo_pop(MessageFifo *queue);
 
 double sim_generate_noise(Neuron *n);
-
+timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end);
 
 }
 
