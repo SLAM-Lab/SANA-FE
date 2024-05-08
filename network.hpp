@@ -58,6 +58,7 @@ struct Neuron
 	std::unordered_map<std::string, std::string> attributes;
 
 	// Mapped hardware
+	Network *parent_net;
 	Core *core, *post_synaptic_cores;
 	SomaUnit *soma_hw;
 	AxonOutUnit *axon_out_hw;
@@ -105,8 +106,10 @@ class Network
 {
 public:
 	std::vector<NeuronGroup> groups;
-
+	Network() {};
 	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
+private:
+	Network(const Network &copy);
 };
 
 void network_check_mapped(Network &net);

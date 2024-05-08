@@ -118,7 +118,7 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 		n.log_spikes = group.default_log_spikes;
 		n.log_potential = group.default_log_potential;
 		n.max_connections_out = group.default_max_connections_out;
-		n.set_attributes(group.default_attributes);
+		n.parent_net = this;
 		group.neurons.push_back(n);
 	}
 
@@ -142,8 +142,7 @@ void sanafe::Neuron::set_attributes(
 		{
 			soma_hw_name = value_str;
 		}
-		else if ((key == "default_connections_out") ||
-			(key == "connections_out"))
+		else if (key == "connections_out")
 		{
 			ss >> max_connections_out;
 		}
@@ -179,6 +178,7 @@ void sanafe::Neuron::set_attributes(
 		model->set_attributes(attr);
 	}
 	attributes = attr;
+
 	TRACE1("Created neuron: gid:%d nid:%d soma:%s\n",
 		parent_group_id, id, soma_hw_name.c_str());
 }

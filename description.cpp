@@ -502,7 +502,7 @@ void sanafe::description_read_network_entry(
 		break;
 	}
 	case '&': // Map neuron to hardware
-		arch_map_neuron(net, *n, *c);
+		c->map_neuron(*n);
 		break;
 	default:
 		break;

@@ -43,46 +43,40 @@ void LoihiLifModel::set_attributes(
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
 		std::istringstream ss(value_str);
-		if ((key == "default_threshold") || (key == "threshold"))
+		if (key == "threshold")
 		{
 			ss >> threshold;
 		}
-		else if ((key == "default_reverse_threshold") ||
-			(key == "reverse_threshold"))
+		else if (key == "reverse_threshold")
 		{
 			ss >> reverse_threshold;
 		}
-		else if ((key == "default_reset") || (key == "reset"))
+		else if (key == "reset")
 		{
 			ss >> reset;
 		}
-		else if ((key == "default_reverse_reset") ||
-			(key == "reverse_reset"))
+		else if (key == "reverse_reset")
 		{
 			ss >> reverse_reset;
 		}
-		else if ((key == "default_reset_mode") ||
-			(key == "reset_mode"))
+		else if (key == "reset_mode")
 		{
 			reset_mode = model_parse_reset_mode(value_str);
 		}
-		else if ((key == "default_reverse_reset_mode") ||
-			(key =="reverse_reset_mode"))
+		else if (key =="reverse_reset_mode")
 		{
 			reverse_reset_mode =
 				model_parse_reset_mode(value_str);
 		}
-		else if ((key == "default_leak_decay") ||
-			(key =="leak_decay"))
+		else if (key =="leak_decay")
 		{
 			ss >> leak_decay;
 		}
-		else if ((key == "default_bias") || (key =="bias"))
+		else if (key =="bias")
 		{
 			ss >> bias;
 		}
-		else if ((key == "default_force_update") ||
-			(key == "force_update"))
+		else if (key == "force_update")
 		{
 			ss >> force_update;
 		}

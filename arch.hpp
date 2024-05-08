@@ -201,6 +201,7 @@ public:
 	SynapseUnit &create_synapse(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	SomaUnit &create_soma(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	AxonOutUnit &create_axon_out(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+	void map_neuron(Neuron &n);
 };
 
 class Tile
@@ -236,10 +237,11 @@ public:
 
 private:
 	bool noc_init;
+	Architecture(const Architecture &copy);
 };
+
 void arch_create_axons(Architecture &arch);
 void arch_print_axon_summary(Architecture &arch);
-int arch_map_neuron(Network &net, Neuron &n, Core &c);
 void arch_map_neuron_connections(Neuron &n);
 void arch_allocate_axon(Neuron &pre_neuron, Core &post_core);
 void arch_add_connection_to_axon(Connection &con, Core &post_core);

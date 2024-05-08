@@ -549,31 +549,37 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 	return;
 }
 
-int sanafe::arch_map_neuron(Network &net, Neuron &n, Core &c)
+void sanafe::Core::map_neuron(Neuron &n)
 {
 	// Map the neuron to hardware units
-	assert(n.core == nullptr);
+	if (n.core != nullptr)
+	{
+		throw std::runtime_error(
+			"Error: Neuron already mapped, dynamic remapping not "
+			"supported.");
+	}
 
-	n.core = &c;
-	TRACE1("Mapping neuron %d to core %d\n", n.id, c->id);
-	c.neurons.push_back(&n);
+	n.core = this;
+	TRACE1("Mapping neuron %d to core %d\n", n.id, id);
+	neurons.push_back(&n);
 
-	if (c.neurons.size() > c.max_neurons)
+	if (neurons.size() > max_neurons)
 	{
 		INFO("Error: Exceeded maximum neurons per core (%lu)",
-			c.max_neurons);
-		exit(1);
+			max_neurons);
+		throw std::runtime_error(
+			"Error: Exceeded maximum neurons per core.");
 	}
 
 	// Map neuron model to soma hardware unit in this core. Search through
 	//  all neuron models implemented by this core and return the one that
 	//  matches. If no soma hardware is specified, default to the first
 	//  one defined
-	n.soma_hw = &(c.soma[0]);
+	n.soma_hw = &(soma[0]);
 	if (n.soma_hw_name.length() > 0)
 	{
 		bool soma_found = false;
-		for (auto &soma_hw: c.soma)
+		for (auto &soma_hw: soma)
 		{
 			if (n.soma_hw_name == soma_hw.name)
 			{
@@ -586,23 +592,30 @@ int sanafe::arch_map_neuron(Network &net, Neuron &n, Core &c)
 			INFO("Error: Could not map neuron nid:%d (hw:%s) "
 				"to any soma h/w.\n", n.id,
 				n.soma_hw_name.c_str());
-			exit(1);
+			throw std::runtime_error(
+				"Error: Could not map neuron to soma h/w");
 		}
 	}
 	n.soma_hw->neuron_count++;
 
 	// TODO: support multiple axon outputs
-	n.axon_out_hw = &(c.axon_out_hw[0]);
+	n.axon_out_hw = &(axon_out_hw[0]);
 
 	// Pass all the model specific arguments
-	//n.soma_model = plugin_get_soma(n.soma_hw_name);
-	n.model = std::shared_ptr<SomaModel>(
-		new LoihiLifModel(n.parent_group_id, n.id));
-	const NeuronGroup &group = net.groups[n.parent_group_id];
-	n.model->set_attributes(group.default_attributes);
-	n.model->set_attributes(n.attributes);
+	if (n.model == nullptr)
+	{
+		//n.soma_model = plugin_get_soma(n.soma_hw_name);
+		n.model = std::shared_ptr<SomaModel>(
+			new LoihiLifModel(n.parent_group_id, n.id));
+		const NeuronGroup &group = n.parent_net->groups[
+			n.parent_group_id];
+		// First set the group's default attribute values, and then
+		//  any defined by the neuron
+		n.model->set_attributes(group.default_attributes);
+		n.model->set_attributes(n.attributes);
+	}
 
-	return RET_OK;
+	return;
 }
 
 void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
