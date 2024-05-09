@@ -1,4 +1,4 @@
-// Copyright (c) 2023 - The University of Texas at Austin
+// Copyright (c) 2024 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -17,7 +17,6 @@
 #include "print.hpp"
 #include "arch.hpp"
 #include "network.hpp"
-//#include "description.hpp"
 
 using namespace sanafe;
 
@@ -368,7 +367,7 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	INFO("cid:%d creating soma sid:%lu\n", id, soma.size());
+	TRACE1("cid:%d creating soma sid:%lu\n", id, soma.size());
 	soma.push_back(SomaUnit(name));
 	SomaUnit &s = soma.back();
 
@@ -569,6 +568,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 
 void sanafe::Core::map_neuron(Neuron &n)
 {
+	TRACE1("Mapping nid:%d to core: %d\n", n.id, id);
 	// Map the neuron to hardware units
 	if (n.core != nullptr)
 	{
@@ -599,8 +599,6 @@ void sanafe::Core::map_neuron(Neuron &n)
 		throw std::runtime_error("Error: No soma units defined");
 	}
 	n.soma_hw = &(soma[0]);
-	INFO("nid:%d soma_ptr:%p\n", n.id, (void *) n.soma_hw);
-	INFO("soma_hw_name:%s", n.soma_hw->name.c_str());
 	if (n.soma_hw_name.length() > 0)
 	{
 		bool soma_found = false;

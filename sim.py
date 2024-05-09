@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023 - The University of Texas at Austin
+Copyright (c) 2024 - The University of Texas at Austin
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
@@ -19,13 +19,71 @@ sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
 import sanafecpp
 
 ### SNN utility functions ###
-# TODO: figure if we can do this inside the c++
-def Attributes(attributes):
-    str_attributes = attributes.copy()
-    for key, value in str_attributes:
-        str_attributes[key] = str(value)
+def load_from_net_file(filename, arch, heartbeat=1):
+    neurons_loaded = 0
+    edges_loaded = 0
+    mappings_loaded = 0
 
-    return str_attributes
+    net = sanafecpp.Network()
+    with open(filename, 'r') as network_file:
+        for line in network_file:
+            fields = line.split()
+            if not fields:
+                continue
+            if fields[0] == 'g':
+                neuron_count = int(fields[1])
+                group_attributes = dict([f.split('=') for f in fields[2:]])
+                group = net.create_neuron_group(neuron_count,
+                                                group_attributes)
+                print("Loaded group")
+            elif fields[0] == 'n':
+                group_id = int(fields[1].split('.')[0])
+                neuron_id = int(fields[1].split('.')[1])
+                neuron_attributes = dict([f.split('=') for f in fields[2:]])
+                group = net.groups[group_id]
+                group.define_neuron(neuron_id, neuron_attributes)
+                neurons_loaded += 1
+                if (neurons_loaded % heartbeat) == 0:
+                    print(f"Loaded {neurons_loaded} neurons")
+
+            elif fields[0] == 'e':
+                edge_info = fields[1]
+                src_address = edge_info.split("->")[0]
+                dest_address = edge_info.split("->")[1]
+
+                src_gid = int(src_address.split(".")[0])
+                src_nid = int(src_address.split(".")[1])
+                src = net.groups[src_gid].neurons[src_nid]
+
+                dest_gid = int(dest_address.split(".")[0])
+                dest_nid = int(dest_address.split(".")[1])
+                dest = net.groups[dest_gid].neurons[dest_nid]
+
+                edge_attributes = dict([f.split('=') for f in fields[2:]])
+                src.connect_to_neuron(dest, edge_attributes)
+                edges_loaded += 1
+                if (edges_loaded % heartbeat) == 0:
+                    print(f"Loaded {edges_loaded} edges")
+
+            elif fields[0] == '&':
+                mapping_info = fields[1]
+                neuron_address = mapping_info.split("@")[0]
+                core_address = mapping_info.split("@")[1]
+
+                group_id = int(neuron_address.split(".")[0])
+                neuron_id = int(neuron_address.split(".")[1])
+                neuron = net.groups[group_id].neurons[neuron_id]
+
+                tile_id = int(core_address.split(".")[0])
+                core_offset = int(core_address.split(".")[1])
+                core = arch.tiles[tile_id].cores[core_offset]
+
+                core.map_neuron(neuron)
+                mappings_loaded += 1
+                if (mappings_loaded % heartbeat) == 0:
+                    print(f"Loaded {mappings_loaded} mappings")
+
+    return net
 
 """
 class Architecture:
@@ -58,44 +116,6 @@ class Network:
         #        for neuron in group.neurons:
         #            neuron._save_mappings = save_mappings
         #            network_file.write(str(neuron))
-
-    def load_from_net_file(self, filename):
-        raise Exception("Not implemented yet")
-        with open(filename, 'r') as network_file:
-            for line in network_file:
-                fields = line.split()
-                if fields and fields[0] == 'g':
-                    neuron_count = int(fields[1])
-                    group = self.create_group(neuron_count, {})
-                elif fields and fields[0] == 'n':
-                    pass
-                elif fields and fields[0] == 'e':
-                    edge_info = fields[1]
-                    src_address = edge_info.split("->")[0]
-                    dest_address = edge_info.split("->")[1]
-
-                    src_gid = int(src_address.split(".")[0])
-                    src_nid = int(src_address.split(".")[1])
-                    src = self.groups[src_gid].neurons[src_nid]
-
-                    dest_gid = int(dest_address.split(".")[0])
-                    dest_nid = int(dest_address.split(".")[1])
-                    dest = self.groups[dest_gid].neurons[dest_nid]
-
-                    weight = None
-                    for f in fields:
-                        if "w=" in f or "weight=" in f:
-                            weight = float(f.split("=")[1])
-                    src.add_connection(dest, weight)
-                elif fields and fields[0] == '&':
-                    # TODO: for now ignore the mappings, the whole reason I'm
-                    #  trying this code is to explore different mappings
-                    pass
-
-        for g in self.groups:
-            for n in g.neurons:
-                print(n)
-        return
 
 class NeuronGroup:
     def __init__(self, neuron_count, attributes):
@@ -288,30 +308,14 @@ def create_conv_layer(network, input_layer, input_shape, filters,
     return output_layer
 
 
-def create_layer(network, layer_neuron_count,
-                 log_spikes=False, log_potential=False, force_update=False,
-                 threshold=1.0, reset=0.0, leak=1.0,
-                 connections_out=None, reverse_threshold=None,
-                 reverse_reset_mode=None, soma_hw_name=None,
-                 synapse_hw_name=None, biases=None):
+def create_layer(net, layer_neuron_count, layer_attributes):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
-    layer_group = network.create_group(threshold, reset, leak, log_spikes,
-                                       log_potential, force_update,
-                                       connections_out=connections_out,
-                                       reverse_threshold=reverse_threshold,
-                                       reverse_reset_mode=reverse_reset_mode,
-                                       soma_hw_name=soma_hw_name,
-                                       synapse_hw_name=synapse_hw_name)
+    layer_group = net.create_group(layer_neuron_count, layer_attributes)
 
     for i in range(0, layer_neuron_count):
-        if (i % 1000) == 0:
-            print(f"Creating neuron {i}")
-        layer_group.create_neuron()
-
-    if biases is not None:
-        assert(len(biases) == layer_neuron_count)
-        for bias, neuron in zip(biases, layer_group.neurons):
-            neuron.add_bias(bias)
+        if (i % 10000) == 0:
+            print(f"Defining neuron {i}")
+        layer_group.define_neuron(i)
 
     return layer_group
 
@@ -554,8 +558,9 @@ def run(arch_path, network_path, timesteps,
         exit()
 
     print("Loading network\n")
-    net = sanafecpp.Network()
-    net.load_net_file(network_path, arch)
+    net = load_from_net_file(network_path, arch)
+    #net = sanafecpp.Network()
+    #net.load_net_file(network_path, arch)
     # Parse inputs and run simulation
 
     if out_dir is None:

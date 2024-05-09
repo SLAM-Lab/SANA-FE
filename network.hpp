@@ -1,4 +1,4 @@
-// Copyright (c) 2023 - The University of Texas at Austin
+// Copyright (c) 2024 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -83,7 +83,7 @@ struct Neuron
 	Neuron(const size_t neuron_id);
 	int get_id() { return id; }
 	void set_attributes(const std::unordered_map<std::string, std::string> &attr);
-	Connection &connect_to_neuron(Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
+	void connect_to_neuron(Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
 };
 
 class NeuronGroup

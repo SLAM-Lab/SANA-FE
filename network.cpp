@@ -1,4 +1,4 @@
-// Copyright (c) 2023 - The University of Texas at Austin
+// Copyright (c) 2024 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -223,7 +223,7 @@ Neuron &sanafe::NeuronGroup::define_neuron(
 	return n;
 }
 
-Connection &sanafe::Neuron::connect_to_neuron(
+void sanafe::Neuron::connect_to_neuron(
 	Neuron &dest,
 	const std::unordered_map<std::string, std::string> &attr)
 {
@@ -252,7 +252,7 @@ Connection &sanafe::Neuron::connect_to_neuron(
 		con.pre_neuron->id,
 		con.post_neuron->parent_group_id,
 		con.post_neuron->id, con.weight);
-	return con;
+	return;
 }
 
 void sanafe::network_check_mapped(Network &net)
