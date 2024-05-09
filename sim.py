@@ -19,7 +19,10 @@ sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
 import sanafecpp
 
 ### SNN utility functions ###
-def load_from_net_file(filename, arch, heartbeat=1):
+# TODO: this code basically just duplicates code in the kernel. Move this to
+#  a separate script (i.e., it's useful for me but not for other users).
+#  The kernel code is needed for the kernel to be standalone
+def load_from_net_file(filename, arch, heartbeat=100):
     neurons_loaded = 0
     edges_loaded = 0
     mappings_loaded = 0
@@ -84,6 +87,7 @@ def load_from_net_file(filename, arch, heartbeat=1):
                     print(f"Loaded {mappings_loaded} mappings")
 
     return net
+# END OF DUPLICATED CODE
 
 """
 class Architecture:

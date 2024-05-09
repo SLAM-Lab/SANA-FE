@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
-//#include <omp.h>
+#include <omp.h>
 #include <vector>
 #include <list>
 #include <memory>
@@ -423,7 +423,7 @@ Timestep::Timestep(const long int ts, const int core_count)
 
 void sanafe::sim_process_neurons(Timestep &ts, Network &net, Architecture &arch)
 {
-// #pragma omp parallel for
+#pragma omp parallel for schedule(dynamic)
 	for (auto &t: arch.tiles)
 	{
 		for (auto &c: t.cores)
@@ -493,7 +493,7 @@ void sanafe::sim_receive_messages(Timestep &ts, Architecture &arch)
 	}
 
 	// Now process all messages at receiving cores
-//#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic)
 	for (Tile &tile: arch.tiles)
 	{
 		for (Core &c: tile.cores)
@@ -1237,7 +1237,7 @@ double sanafe::sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
 double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	const double current_in)
 {
-	struct SomaUnit *soma = n.soma_hw;
+	SomaUnit *const soma = n.soma_hw;
 
 	TRACE1("nid:%d updating, current_in:%lf\n", n.id, current_in);
 	while (n.soma_last_updated < ts.timestep)
@@ -1259,7 +1259,7 @@ double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	if (n.neuron_status == sanafe::FIRED)
 	{
 		TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
-		ts.neurons_fired++;
+		soma->neurons_fired++;
 		sim_neuron_send_spike_message(ts, arch, n);
 	}
 
