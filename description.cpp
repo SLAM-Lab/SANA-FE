@@ -496,7 +496,7 @@ void sanafe::description_read_network_entry(
 		net.create_neuron_group(neuron_count, attributes);
 		break;
 	case 'n': // Add neuron
-		group->define_neuron(neuron_id, attributes);
+		n->set_attributes(attributes);
 		break;
 	case 'e':
 	{

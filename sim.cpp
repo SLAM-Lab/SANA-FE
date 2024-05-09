@@ -971,11 +971,6 @@ double sanafe::sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
 
 void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 {
-	if (!n.is_init)
-	{
-		return;
-	}
-
 	Core &c = *(n.core);
 	n.processing_latency = 0.0;
 

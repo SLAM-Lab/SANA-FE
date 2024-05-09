@@ -9,6 +9,7 @@
 #include <sstream>
 #include <list>
 #include <memory>
+#include <unordered_map>
 
 #include "arch.hpp"
 #include "print.hpp"
@@ -64,7 +65,6 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
 	soma_last_updated = 0;
 	dendrite_last_updated = 0;
 	core = nullptr;
-	is_init = false;
 }
 
 NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
@@ -197,31 +197,39 @@ void sanafe::Neuron::set_attributes(
 	{
 		model->set_attributes(attr);
 	}
-	attributes = attr;
+	attributes.insert(attr.begin(), attr.end());
 
 	TRACE1("Created neuron: gid:%d nid:%d soma:%s\n",
 		parent_group_id, id, soma_hw_name.c_str());
 }
 
-Neuron &sanafe::NeuronGroup::define_neuron(
-	const size_t neuron_id,
+void sanafe::NeuronGroup::set_attribute_multiple(
+	const std::string &attr, const std::vector<std::string> &values)
+{
+	if (values.size() != neurons.size())
+	{
+		INFO("Error: Attribute values must be defined for all neurons "
+			"(%lu!=%lu).\n", attr.size(), neurons.size());
+	}
+	size_t nid = 0;
+	std::unordered_map<std::string, std::string> map;
+	for (const std::string &v: values)
+	{
+		auto &n = neurons[nid];
+		map[attr] = v;
+		n.set_attributes(map);
+		nid++;
+	}
+}
+
+void sanafe::NeuronGroup::connect_neurons(
+	const NeuronGroup &dest_group,
+	const std::vector<size_t> dest_neurons,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	if (neuron_id >= neurons.size())
-	{
-		throw std::invalid_argument("Invalid neuron id");
-	}
-	Neuron &n = neurons[neuron_id];
-	if (n.is_init)
-	{
-		INFO("Error: Trying to define same neuron twice %d.\n", id);
-		throw std::invalid_argument(
-			"Error: Trying to redefine same neuron twice");
-	}
-	n.set_attributes(attr);
-	n.is_init = true;
-	return n;
+	return;
 }
+
 
 void sanafe::Neuron::connect_to_neuron(
 	Neuron &dest,

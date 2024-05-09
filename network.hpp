@@ -68,7 +68,7 @@ struct Neuron
 	std::shared_ptr<SomaModel> model;
 
 	// Track the timestep each hardware unit was last updated
-	bool is_init, fired, force_update, log_spikes, log_potential;
+	bool fired, force_update, log_spikes, log_potential;
 	bool update_needed;
 	int id, parent_group_id;
 	int spike_count;
@@ -103,6 +103,9 @@ public:
 	int get_id() { return id; }
 	NeuronGroup(const size_t group_id, const int neuron_count);
 	Neuron &define_neuron(const size_t id, const std::unordered_map<std::string, std::string> &attr);
+	void set_attribute_multiple(const std::string &attr, const std::vector<std::string> &values);
+	void connect_neurons(const NeuronGroup &dest_group, const std::vector<size_t> dest_neurons, const std::unordered_map<std::string, std::string> &attr);
+	void connect_neurons(const NeuronGroup &dest_group, const std::vector<size_t> dest_neurons, const std::unordered_map<std::string, std::vector<std::string> > &attr);
 };
 
 class Network
