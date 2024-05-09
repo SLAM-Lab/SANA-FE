@@ -127,6 +127,26 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 	return group;
 }
 
+void sanafe::Network::load_net_file(
+	const std::string &filename, Architecture &arch)
+{
+	std::ifstream network_fp;
+	network_fp.open(filename);
+	if (network_fp.fail())
+	{
+		throw std::runtime_error("Error: Network file failed to open.");
+	}
+	INFO("Reading network from file.\n");
+	int ret = description_parse_net_file(network_fp, *this, arch);
+	network_fp.close();
+	if (ret == RET_FAIL)
+	{
+		throw std::invalid_argument("Error: Invalid network file.");
+	}
+	network_check_mapped(*this);
+	arch_create_axons(arch);
+}
+
 void sanafe::Neuron::set_attributes(
 	const std::unordered_map<std::string, std::string> &attr)
 {

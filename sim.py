@@ -19,41 +19,30 @@ sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
 import sanafecpp
 
 ### SNN utility functions ###
+# TODO: figure if we can do this inside the c++
+def Attributes(attributes):
+    str_attributes = attributes.copy()
+    for key, value in str_attributes:
+        str_attributes[key] = str(value)
+
+    return str_attributes
+
+"""
 class Architecture:
     def __init__(self, arch=None):
-        self._arch_dict = arch
-        # TODO: parameterize
-        self.max_compartments = 1024
-        total_cores = 128
-
-        self.core_to_address = []
-        for core in range(0, total_cores):
-            tile, offset = (core // 4), (core % 4)
-            self.core_to_address.append((tile, offset))
-            self.compartments = [self.max_compartments] * total_cores
+        self._arch = sanafecpp.Architecture()
 
 
 class Network:
     def __init__(self, save_mappings=False):
-        self.inputs = []
-        self.groups = []
-        # TODO: parameterize
+        self._net = sanafecpp.Network()
         self._save_mappings = save_mappings
 
-    def create_group(self, threshold, reset, leak, log_spikes=False,
-                     log_potential=False, force_update=False,
-                     connections_out=None, reverse_threshold=None,
-                     reverse_reset_mode=None, soma_hw_name=None,
-                     synapse_hw_name=None):
-        group_id = len(self.groups)
-        group = NeuronGroup(group_id, threshold, reset, leak, log_spikes,
-                            log_potential, force_update, connections_out,
-                            reverse_threshold, reverse_reset_mode,
-                            soma_hw_name=soma_hw_name,
-                            synapse_hw_name=synapse_hw_name)
-        self.groups.append(group)
+    def create_neuron_group(self, neuron_count, attributes):
+        attributes =_attribute_values_to_str(attributes)
+        group = NeuronGroup(self._net.create_neuron_group(
+            neuron_count, attributes))
         return group
-
 
     def save(self, filename, group_idx=None, save_mappings=None):
         if group_idx is None:
@@ -61,35 +50,25 @@ class Network:
         if save_mappings is None:
             save_mappings = self._save_mappings
 
-        with open(filename, 'w') as network_file:
-            for group in self.groups[group_idx]:
-                network_file.write(str(group))
+        #with open(filename, 'w') as network_file:
+        #    for group in self.groups[group_idx]:
+        #        network_file.write(str(group))
+        #
+        #    for group in self.groups[group_idx]:
+        #        for neuron in group.neurons:
+        #            neuron._save_mappings = save_mappings
+        #            network_file.write(str(neuron))
 
-            for group in self.groups[group_idx]:
-                for neuron in group.neurons:
-                    neuron._save_mappings = save_mappings
-                    network_file.write(str(neuron))
-
-            for input_node in self.inputs:
-                network_file.write(str(input_node))
-
-    def load(self, filename):
+    def load_from_net_file(self, filename):
+        raise Exception("Not implemented yet")
         with open(filename, 'r') as network_file:
             for line in network_file:
                 fields = line.split()
                 if fields and fields[0] == 'g':
-                    # TODO: support other fields to be loaded
                     neuron_count = int(fields[1])
-                    group = self.create_group(0.0, 0.0, 0)
-                    for _ in range(0, neuron_count):
-                        group.create_neuron()
-
+                    group = self.create_group(neuron_count, {})
                 elif fields and fields[0] == 'n':
                     pass
-                    #neuron_address = fields[1]
-                    #gid = int(neuron_address.split('.')[0])
-                    #group = self.groups[gid]
-                    #group.create_neuron()
                 elif fields and fields[0] == 'e':
                     edge_info = fields[1]
                     src_address = edge_info.split("->")[0]
@@ -113,39 +92,18 @@ class Network:
                     #  trying this code is to explore different mappings
                     pass
 
-        """
         for g in self.groups:
             for n in g.neurons:
                 print(n)
-        """
         return
 
-
 class NeuronGroup:
-    def __init__(self, group_id, threshold, reset, leak, log_spikes=None,
-                 log_potential=None, force_update=None, connections_out=None,
-                 reverse_reset=None, reverse_reset_mode=None,
-                 soma_hw_name=None, synapse_hw_name=None):
-        # TODO: support all features here
-        self.id = group_id
-        self.neurons = []
-        self.threshold = threshold
-        self.reset = reset
-        self.reset_mode = None
-        self.reverse_reset = reverse_reset
-        self.reverse_reset_mode = reverse_reset_mode
-        self.reverse_threshold = None
-        self.leak_decay = leak
-        self.connections_out = connections_out
-        self.log_spikes = log_spikes
-        self.log_potential = log_potential
-        self.force_update = force_update
-        self.soma_hw_name = soma_hw_name
-        self.synapse_hw_name = synapse_hw_name
+    def __init__(self, neuron_count, attributes):
+        attributes =_attribute_values_to_str(attributes)
+        self._neuron_group = sanafecpp.NeuronGroup(neuron_count, attributes)
+        return
 
     def __str__(self):
-        neuron_count = len(self.neurons)
-
         group_str = f"g {neuron_count}"
         if self.threshold is not None:
             group_str += f" threshold={self.threshold}"
@@ -175,36 +133,18 @@ class NeuronGroup:
             group_str += f" synapse_hw_name={self.synapse_hw_name}"
 
         group_str += "\n"
-        return group_str
+        return ""
 
-    def create_neuron(self, log_spikes=None, log_potential=None,
-                      force_update=None):
-        neuron_id = len(self.neurons)
-        neuron = Neuron(self, neuron_id, log_spikes=log_spikes,
-                        log_potential=log_potential, force_update=force_update)
-        self.neurons.append(neuron)
-        return neuron
+    def define_neuron(self, neuron_id, attributes):
+        attributes =_attribute_values_to_str(attributes)
+        return self._neuron_group.define_neuron(neuron_id, attributes)
 
 
 class Neuron:
-    def __init__(self, group, neuron_id, log_spikes=None,
-                 log_potential=None, force_update=None):
-        self.group = group
-        self.id = neuron_id
-        self.log_spikes = log_spikes
-        self.log_potential = log_potential
-        self.force_update = force_update
-        self.connections = []
-        self.tile = None
-        self.core = None
-        self.bias = None
+    def __init__(self, neuron_id):
+        self._neuron = sanafecpp.Neuron(neuron_id)
         self._save_mappings = False
-
-    def add_connection(self, dest, weight):
-        self.connections.append((dest, weight))
-
-    def add_bias(self, bias):
-        self.bias = bias
+        return
 
     def __str__(self, map_neuron=True):
         neuron_str = f"n {self.group.id}.{self.id}"
@@ -235,27 +175,8 @@ class Neuron:
         if self._save_mappings:
             neuron_str += "& {0}.{1}@{2}.{3}\n".format(self.group.id, self.id,
                                                     self.tile, self.core)
-        return neuron_str
-
-
-def map_neuron_to_compartment(arch, core=None):
-    if core is not None:
-        assert(core < len(arch.compartments) and arch.compartments[core] > 0)
-        arch.compartments[core] -= 1
-        return core
-
-    for curr, _ in enumerate(arch.compartments):
-        if arch.compartments[curr] > 0:
-            arch.compartments[curr] -= 1
-            return core
-
-    # No free compartments left
-    return None, None
-
-
-def map_neuron_group_to_cores(neuron_group, arch, core_count):
-    return map_neurons_to_cores(neuron_group.neurons, arch, core_count)
-
+        return ""
+"""
 
 def map_neurons_to_cores(neurons, arch, core_count):
     """Map neurons to one or more cores"""
@@ -282,8 +203,7 @@ def map_neurons_to_cores(neurons, arch, core_count):
         # For the last core, map all remaining neurons
         for _ in range(0, mapping[core]):
             n = neurons[curr_neuron]
-            mapped_core = map_neuron_to_compartment(arch,
-                                                    core=core)
+            mapped_core = core.map_neuron(n)
             n.tile, n.core = arch.core_to_address[mapped_core]
             curr_neuron += 1
 
@@ -291,28 +211,15 @@ def map_neurons_to_cores(neurons, arch, core_count):
     return mapping
 
 
-def create_connected_layer(network, prev_layer, input_shape, weights,
-                           log_spikes=False, log_potential=False,
-                           force_update=False, threshold=1.0, reset=0.0,
-                           leak=1.0, reverse_threshold=None,
-                           reverse_reset_mode=None, soma_hw_name=None,
-                           synapse_hw_name=None):
+def create_connected_layer(network, prev_layer, input_shape, weights, attributes):
     layer_neuron_count = weights.shape[1]
-    layer = create_layer(network, layer_neuron_count,
-                         log_spikes=log_spikes, log_potential=log_potential,
-                         force_update=force_update,
-                         threshold=threshold, reset=reset, leak=leak,
-                         connections_out=None,
-                         reverse_threshold=reverse_threshold,
-                         reverse_reset_mode=reverse_reset_mode,
-                         soma_hw_name=soma_hw_name,
-                         synapse_hw_name=synapse_hw_name)
+    layer = create_layer(network, layer_neuron_count, attributes)
 
     for src in prev_layer.neurons:
         for dest in layer.neurons:
             # Take the ID of the neuron in the 2nd layer
             weight = weights[src.id, dest.id]
-            src.add_connection(dest, weight)
+            src.connect_to_neuron(dest, {"w": weight})
 
     return layer
 
@@ -410,47 +317,37 @@ def create_layer(network, layer_neuron_count,
 
 
 ### Architecture description parsing ###
-def parse_file(input_filename, output_filename):
-    with open(input_filename, "r") as arch_file:
+def load_arch_from_yaml(yaml_filename):
+    arch = sanafecpp.Architecture()
+    with open(yaml_filename, "r") as arch_file:
         arch_dict = yaml.safe_load(arch_file)
 
     if "architecture" not in arch_dict:
         raise Exception("Error: no architecture section defined")
 
-    parse_arch(arch_dict["architecture"])
-    arch_elements = _entry_list
+    parse_arch(arch, arch_dict["architecture"])
 
-    with open(output_filename, "w") as list_file:
-        for line in arch_elements:
-            list_file.write(line + '\n')
-    return
+    return arch
 
 
-def parse_arch(arch):
-    global _tiles
-    global _cores_in_tile
-    global _entry_list
-
-    _tiles = 0
-    _cores_in_tile = []
-    _entry_list = []
-
-    arch_name = arch["name"]
+def parse_arch(arch, arch_dict):
+    arch_name = arch_dict["name"]
     if "[" in arch_name:
         raise Exception("Error: multiple architectures not supported")
 
-    if "tile" not in arch:
+    if "tile" not in arch_dict:
         raise Exception("Error: No tiles defined, must be at least one tile")
 
-    tiles = arch["tile"]
-    for tile in tiles:
-        parse_tile(tile)
+    tiles = arch_dict["tile"]
+    for tile_dict in tiles:
+        parse_tile(arch, tile_dict)
 
-    create_noc(arch)
+    print(arch_dict)
+    arch.set_noc_attributes(arch_dict["attributes"])
     return
 
 
-def parse_tile(tile_dict):
+def parse_tile(arch, tile_dict):
     tile_name = tile_dict["name"]
     tile_name = tile_name.replace(" ", "_")
     tile_name = tile_name.replace("\t", "_")
@@ -463,7 +360,7 @@ def parse_tile(tile_dict):
 
     for instance in range(range_min, range_max+1):
         tile_name = tile_name.split("[")[0] + "[{0}]".format(instance)
-        tile_id = create_tile(tile_dict, tile_name)
+        tile = arch.create_tile(tile_dict["attributes"])
 
         # Add any elements local to this h/w structure. They have access to any
         #  elements in the parent structures
@@ -472,12 +369,12 @@ def parse_tile(tile_dict):
                             "must be at least one core")
         cores = tile_dict["core"]
         for _, core_dict in enumerate(cores):
-            parse_core(core_dict, tile_id)
+            parse_core(arch, tile.get_id(), core_dict)
 
     return
 
 
-def parse_core(core_dict, tile_id):
+def parse_core(arch, tile_id, core_dict):
     core_name = core_dict["name"]
     core_name = core_name.replace(" ", "_")
     core_name = core_name.replace("\t", "_")
@@ -492,20 +389,47 @@ def parse_core(core_dict, tile_id):
     elements = ("axon_in", "synapse", "dendrite", "soma", "axon_out")
     for el in elements:
         if el not in core_dict:
-            raise Exception("Error: {0} not defined in core {1}".format(
-                el, core_name))
+            raise Exception(f"Error: {el} not defined in core {core_name}")
 
+    tile = arch.tiles[tile_id]
     for instance in range(range_min, range_max+1):
         core_name = core_name.split("[")[0] + "[{0}]".format(instance)
-        core_id = create_core(tile_id, core_name, core_dict)
-        create_axon_in(tile_id, core_id, core_dict["axon_in"][0])
-
+        core_attributes = core_dict.get("attributes", {})
+        if core_attributes is None:
+            core_attributes = {}
+        core = arch.create_core(tile.get_id(), core_attributes)
+        for axon_in in core_dict["axon_in"]:
+            axon_in_attributes = axon_in.get("attributes", {})
+            if axon_in_attributes is None:
+                axon_in_attributes = {}
+            core.create_axon_in(axon_in["name"], axon_in_attributes)
         for synapse in core_dict["synapse"]:
-            create_synapse(tile_id, core_id, synapse)
-        create_dendrite(tile_id, core_id, core_dict["dendrite"][0])
+            synapse_attributes = synapse.get("attributes", {})
+            if synapse_attributes is None:
+                synapse_attributes = {}
+            core.create_synapse(synapse["name"], synapse_attributes)
+
+        #create_dendrite(core, core_dict["dendrite"][0])
+
         for soma in core_dict["soma"]:
-            create_soma(tile_id, core_id, soma)
-        create_axon_out(tile_id, core_id, core_dict["axon_out"][0])
+            soma_attributes = soma.get("attributes", {})
+            if soma_attributes is None:
+                soma_attributes = {}
+            core.create_soma(soma["name"],
+                             soma_attributes.get("attributes", {}))
+            #print(f"tile_id:{tile_id}")
+            #print(f"core_id:{core.get_offset()}")
+            #print(arch.tiles[tile_id].cores[core.get_offset()].soma)
+            #print(core.soma)
+            #print(id(core))
+            #print(id(arch.tiles[tile_id].cores[core.get_offset()]))
+            #exit(1)
+        for axon_out in core_dict["axon_out"]:
+            axon_out_attributes = soma.get("attributes", {})
+            if axon_out_attributes is None:
+                axon_out_attributes = {}
+            core.create_axon_out(axon_out["name"], axon_out_attributes)
+    return
 
 
 def parse_range(range_str):
@@ -529,11 +453,6 @@ def get_instances(element_dict):
     return instances
 
 
-_tiles = 0
-_cores_in_tile = []
-_entry_list = []
-
-
 ## TODO: move these functions into the C++ kernel, this should be responsible
 ##  for loading and saving this raw format. The Python script should build
 ##  objects using the PyBind11 interface
@@ -546,7 +465,7 @@ def format_attributes(attributes):
         line += (f" {key}={attributes[key]}")
     return line
 
-
+"""
 def create_tile(tile, name):
     global _tiles
     tile_id = _tiles
@@ -566,9 +485,7 @@ def create_tile(tile, name):
 
 def create_core(tile_id, name, core_dict):
     core_id = _cores_in_tile[tile_id]
-    if "attributes" not in core_dict:
-        raise Exception(f"attributes section not defined for core {tile_id}.{core_id}. "
-                        "Did you mispell attributes?")
+
 
     core = f"c {name} {tile_id}" + format_attributes(core_dict["attributes"])
     _entry_list.append(core)
@@ -617,17 +534,15 @@ def create_noc(noc_dict):
         raise Exception("Error: NoC not defined for architecture (please add this under attributes)")
     _entry_list.append("@" + format_attributes(noc_dict["attributes"]))
     return
-
+"""
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
-        run_dir=os.path.join(project_dir),
         perf_trace=False, spike_trace=False,
         potential_trace=False, message_trace=False, out_dir=None):
-    parsed_filename = os.path.join(run_dir,
-                                   os.path.basename(arch_path) + ".parsed")
+    print("Loading architecture\n")
     try:
-        parse_file(arch_path, parsed_filename)
+        arch = load_arch_from_yaml(arch_path)
     except yaml.parser.ParserError as yaml_parse_exc:
         print("Error: Invalid YAML file given.")
         if "expected '<document start>'" in str(yaml_parse_exc):
@@ -638,14 +553,25 @@ def run(arch_path, network_path, timesteps,
         print(f"Full Error: '{yaml_parse_exc}'")
         exit()
 
+    print("Loading network\n")
+    net = sanafecpp.Network()
+    net.load_net_file(network_path, arch)
     # Parse inputs and run simulation
-    sim = sanafecpp.Simulation(out_dir, spike_trace, potential_trace,
-                               perf_trace, message_trace)
-    sim.read_arch_file(parsed_filename)
-    sim.read_net_file(network_path)
+
+    if out_dir is None:
+        out_dir = "."
+
+    print("Creating simulation")
+    sim = sanafecpp.Simulation(arch, net, output_dir=out_dir,
+                               record_spikes=spike_trace,
+                               record_potentials=potential_trace,
+                               record_perf=perf_trace,
+                               record_messages=message_trace)
 
     sim.run(timesteps=timesteps, heartbeat=100)
     results = sim.get_run_summary()
+    print(f"Neurons fired: {results.neurons_fired}")
+
     return results
 
 
@@ -675,7 +601,7 @@ if __name__ == "__main__":
         run(args.architecture, args.snn, args.timesteps,
             spike_trace=args.spikes, potential_trace=args.voltages,
             perf_trace=args.perf, message_trace=args.messages,
-            run_alive=args.run, gui=args.gui, out_dir=args.out_dir)
+            out_dir=args.out_dir)
     except RuntimeError as exc:
         print(exc)
     else:

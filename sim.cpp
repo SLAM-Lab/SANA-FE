@@ -22,10 +22,12 @@
 using namespace sanafe;
 
 Simulation::Simulation(
+	Architecture &a,
+	Network &n,
 	const std::string &output_dir=".",
 	const bool record_spikes=false, const bool record_potentials=false,
 	const bool record_perf=false, const bool record_messages=false):
-	arch(), net(), out_dir(output_dir)
+	arch(a), net(n), out_dir(output_dir)
 {
 	INFO("Initializing simulation.\n");
 	total_energy = 0.0;   // Joules
@@ -211,42 +213,6 @@ Timestep Simulation::step()
 			ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / 1.0e9)));
 
 	return ts;
-}
-
-void Simulation::read_net_file(const std::string &filename)
-{
-	std::ifstream network_fp;
-	network_fp.open(filename);
-	if (network_fp.fail())
-	{
-		throw std::runtime_error("Error: Network file failed to open.");
-	}
-	INFO("Reading network from file.\n");
-	int ret = description_parse_net_file(network_fp, net, arch);
-	network_fp.close();
-	if (ret == RET_FAIL)
-	{
-		throw std::invalid_argument("Error: Invalid network file.");
-	}
-	network_check_mapped(net);
-	arch_create_axons(arch);
-}
-
-void Simulation::read_arch_file(const std::string &filename)
-{
-	std::ifstream arch_fp(filename);
-	if (arch_fp.fail())
-	{
-		throw std::invalid_argument(
-			"Error: Architecture file failed to open.");
-	}
-	int ret = description_parse_arch_file(arch_fp, arch);
-	arch_fp.close();
-	if (ret == RET_FAIL)
-	{
-		throw std::invalid_argument(
-			"Error: Invalid architecture file.");
-	}
 }
 
 double Simulation::get_power()
@@ -1368,7 +1334,6 @@ double sanafe::sim_generate_noise(Neuron *n)
 	assert(n != NULL);
 	struct SomaUnit &soma_hw = *(n->soma_hw);
 	int noise_val = 0;
-	int ret;
 
 	if (soma_hw.noise_type == NOISE_FILE_STREAM)
 	{
@@ -1377,6 +1342,7 @@ double sanafe::sim_generate_noise(Neuron *n)
 		//  replicate h/w without knowing how the stream is generated.
 		//  We can record the random sequence and replicate it here
 		char noise_str[MAX_NOISE_FILE_ENTRY];
+		char *str = &(noise_str[0]);
 		// If we get to the end of the stream, by default reset it.
 		//  However, it is unlikely the stream will be correct at this
 		//  point
@@ -1386,12 +1352,17 @@ double sanafe::sim_generate_noise(Neuron *n)
 			     "Random values are unlikely to be correct.\n");
 			fseek(soma_hw.noise_stream, 0, SEEK_SET);
 		}
-		fgets(noise_str, MAX_NOISE_FILE_ENTRY, soma_hw.noise_stream);
-		ret = sscanf(noise_str, "%d", &noise_val);
-		TRACE2("noise val:%d\n", noise_val);
-		if (ret < 1)
+		char *result = fgets(
+			str, MAX_NOISE_FILE_ENTRY, soma_hw.noise_stream);
+		if (result != NULL)
 		{
-			INFO("Error: invalid noise stream entry.\n");
+			const int ret = sscanf(noise_str, "%d", &noise_val);
+			TRACE2("noise val:%d\n", noise_val);
+
+			if (ret < 1)
+			{
+				INFO("Error: invalid noise stream entry.\n");
+			}
 		}
 	}
 

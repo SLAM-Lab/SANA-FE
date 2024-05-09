@@ -18,13 +18,16 @@
 
 using namespace sanafe;
 
+const int default_line_len = 4096;
+const int default_fields = 32;
+
 int sanafe::description_parse_arch_file(
 	std::ifstream &fp, Architecture &arch)
 {
 	std::vector<std::string_view> fields;
-	fields.reserve(32);
+	fields.reserve(default_fields);
 	std::string line;
-	line.reserve(DEFAULT_LINE_LEN);
+	line.reserve(default_line_len);
 	int line_number = 1;
 
 	while (std::getline(fp, line))
@@ -51,9 +54,9 @@ int sanafe::description_parse_net_file(
 	std::ifstream &fp, struct Network &net, Architecture &arch)
 {
 	std::vector<std::string_view> fields;
-	fields.reserve(32);
+	fields.reserve(default_fields);
 	std::string line;
-	line.reserve(DEFAULT_LINE_LEN);
+	line.reserve(default_line_len);
 	int line_number = 1;
 	while (std::getline(fp, line))
 	{
@@ -145,6 +148,7 @@ void sanafe::description_read_arch_entry(
 	t = NULL;
 	c = NULL;
 	first_field = 1;
+	tile_id = -1;
 	if (entry_type != '@')
 	{
 		name = fields[1];
@@ -193,7 +197,7 @@ void sanafe::description_read_arch_entry(
 	switch (entry_type)
 	{
 	case '@':
-		arch.set_noc_attr(attributes);
+		arch.set_noc_attributes(attributes);
 		break;
 	case 't':
 		arch.create_tile(attributes);

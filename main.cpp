@@ -96,12 +96,15 @@ int main(int argc, char *argv[])
 							"<timesteps>\n");
 		return 0;
 	}
-	Simulation sim(output_dir, record_spikes, record_potentials,
-		record_perf, record_messages);
 
 	// Read in program args, sanity check and parse inputs
-	sim.read_arch_file(argv[ARCH_FILENAME]);
-	sim.read_net_file(argv[NETWORK_FILENAME]);
+	Architecture arch;
+	arch.load_arch_file(argv[ARCH_FILENAME]);
+	Network net;
+	net.load_net_file(argv[NETWORK_FILENAME], arch);
+	Simulation sim(
+		arch, net, output_dir, record_spikes, record_potentials,
+		record_perf, record_messages);
 
 	timesteps = 0;
 	ret = sscanf(argv[TIMESTEPS], "%ld", &timesteps);

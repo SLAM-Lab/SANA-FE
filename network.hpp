@@ -32,9 +32,10 @@ enum ConnectionConfigFormat
 };
 
 // Forward declarations
-struct Core;
+class Core;
 struct Neuron;
 struct NeuronGroup;
+class Architecture;
 struct SomaUnit;
 struct SomaModel;
 struct SynapseUnit;
@@ -80,6 +81,7 @@ struct Neuron
 	int forced_spikes;
 
 	Neuron(const size_t neuron_id);
+	int get_id() { return id; }
 	void set_attributes(const std::unordered_map<std::string, std::string> &attr);
 	Connection &connect_to_neuron(Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
 };
@@ -98,6 +100,7 @@ public:
 	int default_max_connections_out;
 	bool default_log_potential, default_log_spikes, default_force_update;
 
+	int get_id() { return id; }
 	NeuronGroup(const size_t group_id, const int neuron_count);
 	Neuron &define_neuron(const size_t id, const std::unordered_map<std::string, std::string> &attr);
 };
@@ -108,7 +111,15 @@ public:
 	std::vector<NeuronGroup> groups;
 	Network() {};
 	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
+	void load_net_file(const std::string &filename, Architecture &arch);
 private:
+	// Do *NOT* allow Network objects to be copied
+	//  This is because Neuron objects link back to their parent Network
+	//  (and need to be aware of the parent Group). Linking to parent
+	//  objects allows us to efficiently store Attributes for neurons i.e.,
+	//  by avoiding duplication of shared attributes.
+	//  If the Network was moved or copied, all parent links would be
+	//  invalidated.
 	Network(const Network &copy);
 };
 

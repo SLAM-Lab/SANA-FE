@@ -29,18 +29,16 @@ struct RunData;
 class Simulation
 {
 public:
-	Simulation(const std::string &output_dir, const bool record_spikes, const bool record_potentials, const bool record_perf, const bool record_messages);
+	Simulation(Architecture &arch, Network &net, const std::string &output_dir, const bool record_spikes, const bool record_potentials, const bool record_perf, const bool record_messages);
 	~Simulation();
 	RunData run(const long int timesteps=1, const long int heartbeat=100);
-	void read_arch_file(const std::string &filename);
-	void read_net_file(const std::string &filename);
 	//int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
 	double get_power();
 	RunData get_run_summary();
 
 private:
-	Architecture arch;
-	Network net;
+	Architecture &arch;
+	Network &net;
 	std::string out_dir;
 	long int total_neurons_fired, total_timesteps, total_spikes;
 	long int total_messages_sent;
@@ -51,6 +49,7 @@ private:
 	std::ofstream spike_trace, potential_trace, message_trace, perf_trace;
 
 	Timestep step();
+	Simulation(const Simulation &copy);
 };
 
 struct RunData

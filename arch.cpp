@@ -40,7 +40,7 @@ int sanafe::Architecture::get_core_count()
 	return core_count;
 }
 
-int sanafe::Architecture::set_noc_attr(
+int sanafe::Architecture::set_noc_attributes(
 	const std::unordered_map<std::string, std::string> &attr)
 {
 	const size_t tile_count = tiles.size();
@@ -193,6 +193,23 @@ sanafe::Tile &sanafe::Architecture::create_tile(
 	return tile;
 }
 
+void Architecture::load_arch_file(const std::string &filename)
+{
+	std::ifstream arch_fp(filename);
+	if (arch_fp.fail())
+	{
+		throw std::invalid_argument(
+			"Error: Architecture file failed to open.");
+	}
+	int ret = description_parse_arch_file(arch_fp, *this);
+	arch_fp.close();
+	if (ret == RET_FAIL)
+	{
+		throw std::invalid_argument(
+			"Error: Invalid architecture file.");
+	}
+}
+
 sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name):
 	name(axon_in_name)
 {
@@ -264,7 +281,7 @@ sanafe::Core &sanafe::Architecture::create_core(
 	c.energy = 0.0;
 	c.next_message = Message();
 
-	TRACE1("Core created id:%d.%d (tile:%d).\n", c.parent_tile_id, .id);
+	TRACE1("Core created id:%d.%d (tile:%d).\n", c.parent_tile_id, c.id);
 	return c;
 }
 
@@ -351,6 +368,7 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
+	INFO("cid:%d creating soma sid:%lu\n", id, soma.size());
 	soma.push_back(SomaUnit(name));
 	SomaUnit &s = soma.back();
 
@@ -575,7 +593,14 @@ void sanafe::Core::map_neuron(Neuron &n)
 	//  all neuron models implemented by this core and return the one that
 	//  matches. If no soma hardware is specified, default to the first
 	//  one defined
+	if (soma.size() == 0)
+	{
+		INFO("Error: No soma units defined for cid:%d\n", id);
+		throw std::runtime_error("Error: No soma units defined");
+	}
 	n.soma_hw = &(soma[0]);
+	INFO("nid:%d soma_ptr:%p\n", n.id, (void *) n.soma_hw);
+	INFO("soma_hw_name:%s", n.soma_hw->name.c_str());
 	if (n.soma_hw_name.length() > 0)
 	{
 		bool soma_found = false;
@@ -599,6 +624,11 @@ void sanafe::Core::map_neuron(Neuron &n)
 	n.soma_hw->neuron_count++;
 
 	// TODO: support multiple axon outputs
+	if (axon_out_hw.size() == 0)
+	{
+		INFO("Error: No axon out units defined for cid:%d\n", id);
+		throw std::runtime_error("Error: No axon out units defined");
+	}
 	n.axon_out_hw = &(axon_out_hw[0]);
 
 	// Pass all the model specific arguments

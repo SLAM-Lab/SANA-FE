@@ -1,8 +1,6 @@
 #ifndef DESCRIPTION_HEADER_INCLUDED_
 #define DESCRIPTION_HEADER_INCLUDED_
 
-#define DEFAULT_LINE_LEN  (4096)
-
 #include <iostream>
 #include <fstream>
 #include <vector>

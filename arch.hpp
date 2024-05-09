@@ -202,6 +202,8 @@ public:
 	SomaUnit &create_soma(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	AxonOutUnit &create_axon_out(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	void map_neuron(Neuron &n);
+	int get_id() { return id; }
+	int get_offset() { return offset; }
 };
 
 class Tile
@@ -220,6 +222,7 @@ public:
 	int width; // For now just support 2 dimensions
 
 	Tile(const int tile_id);
+	int get_id() { return id; }
 };
 
 class Architecture
@@ -231,12 +234,18 @@ public:
 
 	Architecture();
 	int get_core_count();
-	int set_noc_attr(const std::unordered_map<std::string, std::string> &attr);
+	int set_noc_attributes(const std::unordered_map<std::string, std::string> &attr);
 	Tile &create_tile(const std::unordered_map<std::string, std::string> &attr);
 	Core &create_core(const size_t tile_id, const std::unordered_map<std::string, std::string> &attr);
+	void load_arch_file(const std::string &filename);
 
 private:
 	bool noc_init;
+	// Do *NOT* allow Architecture objects to be copied
+	//  This is because the Architecture has a lot of allocated state
+	//  from models that are (dynamically) instantiated by the plugin
+	//  mechanism. It is simpler to not allow this state to be copied than
+	//  to try to deal with that.
 	Architecture(const Architecture &copy);
 };
 
