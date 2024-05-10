@@ -15,6 +15,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <filesystem>
 #include <functional> // For std::reference_wrapper
 #include "plugins.hpp"
 #include "models.hpp"
@@ -51,10 +52,12 @@ struct Connection
 	int id, delay, last_updated;
 
 	Connection(const int connection_id);
+	std::string description() const;
 };
 
-struct Neuron
+class Neuron
 {
+public:
 	std::vector<Connection> connections_out;
 	std::vector<int> axon_out_addresses;
 	std::unordered_map<std::string, std::string> attributes;
@@ -85,6 +88,8 @@ struct Neuron
 	int get_id() { return id; }
 	void set_attributes(const std::unordered_map<std::string, std::string> &attr);
 	void connect_to_neuron(Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
+	std::string info() const;
+	std::string description(const bool write_mapping=true) const;
 };
 
 class NeuronGroup
@@ -105,6 +110,8 @@ public:
 	NeuronGroup(const size_t group_id, const int neuron_count);
 	void set_attribute_multiple(const std::string &attr, const std::vector<std::string> &values);
 	void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::unordered_map<std::string, std::vector<std::string> > &attr_lists);
+	std::string info() const;
+	std::string description() const;
 };
 
 class Network
@@ -114,7 +121,10 @@ public:
 	std::vector<std::reference_wrapper<NeuronGroup> > groups_vec;
 	Network() {};
 	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
-	void load_net_file(const std::string &filename, Architecture &arch);
+	void load_net(const std::string &filename, Architecture &arch);
+	std::string info() const;
+	void save_net(const std::filesystem::path &path, const bool save_mapping=true) const;
+
 private:
 	// Do *NOT* allow Network objects to be copied
 	//  This is because Neuron objects link back to their parent Network
@@ -124,9 +134,10 @@ private:
 	//  If the Network was moved or copied, all parent links would be
 	//  invalidated.
 	Network(const Network &copy);
+	void check_mapped() const;
 };
 
-void network_check_mapped(Network &net);
+std::string network_format_attributes(const std::unordered_map<std::string, std::string> &attr);
 }
 
 #endif

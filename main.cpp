@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 	Architecture arch;
 	arch.load_arch_file(argv[ARCH_FILENAME]);
 	Network net;
-	net.load_net_file(argv[NETWORK_FILENAME], arch);
+	net.load_net(argv[NETWORK_FILENAME], arch);
 	Simulation sim(
 		arch, net, output_dir, record_spikes, record_potentials,
 		record_perf, record_messages);

@@ -104,26 +104,28 @@ def map_neurons_to_cores(neurons, arch, core_count):
     return mapping
 
 
-def create_connected_layer(network, prev_layer, input_shape, weights, attributes):
+def create_connected_layer(net, prev_layer, weights, attributes):
+    import numpy as np
     layer_neuron_count = weights.shape[1]
-    layer = create_layer(network, layer_neuron_count, attributes)
+    print(f"Creating new layer with {layer_neuron_count} neurons")
+    layer = net.create_neuron_group(layer_neuron_count, attributes)
 
-    for src in prev_layer.neurons:
-        for dest in layer.neurons:
-            # Take the ID of the neuron in the 2nd layer
-            weight = weights[src.id, dest.id]
-            src.connect_to_neuron(dest, {"w": weight})
+    connections = np.empty((layer_neuron_count * len(prev_layer.neurons)),
+                           dtype=object)
+    flattened_weights = weights.flatten()
+    i = 0
+    for src in range(0, len(prev_layer.neurons)):
+        for dest in range(0, len(layer.neurons)):
+            connections[i] = (src, dest)
+            i += 1
 
+    print("Connecting new layer with prev layer")
+    prev_layer.connect_neurons(layer, connections, {"w": flattened_weights})
     return layer
 
 
-def create_conv_layer(network, input_layer, input_shape, filters,
-                      stride=1, pad=0, log_spikes=False, log_potential=False,
-                      force_update=False, threshold=1.0, reset=0.0,
-                      leak=1.0, reverse_threshold=None,
-                      reverse_reset_mode=None, soma_hw_name=None,
-                      synapse_hw_name=None):
-
+def create_conv_layer(net, input_layer, input_shape, filters,
+                      stride=1, pad=0, layer_attributes={}):
     # Calculate dimensions of this layer
     input_width = input_shape[0]
     input_height = input_shape[1]
@@ -141,18 +143,12 @@ def create_conv_layer(network, input_layer, input_shape, filters,
     assert(kernel_channels == input_channels)
 
     layer_neuron_count = output_channels * output_width * output_height
-    output_layer = create_layer(network, layer_neuron_count,
-                                log_spikes=log_spikes,
-                                log_potential=log_potential,
-                                force_update=force_update,
-                                threshold=threshold, reset=reset, leak=leak,
-                                connections_out=None,
-                                reverse_threshold=reverse_threshold,
-                                reverse_reset_mode=reverse_reset_mode,
-                                soma_hw_name=soma_hw_name,
-                                synapse_hw_name=synapse_hw_name)
+    output_layer = net.create_neuron_group(layer_neuron_count,
+                                           layer_attributes)
 
     # Create the convolutional connections
+    connections = []
+    weights = []
     for c_out in range(0, output_channels):
         for y_out in range(0, output_height):
             for x_out in range(0, output_width):
@@ -176,21 +172,12 @@ def create_conv_layer(network, input_layer, input_shape, filters,
                             src = input_layer.neurons[src_idx]
 
                             weight = filters[y_kernel, x_kernel, c_in, c_out]
-                            src.add_connection(dest, weight)
+                            connections.append((src.get_id(), dest.get_id()),)
+                            weights.append(weight)
+
+    input_layer.connect_neurons(output_layer, connections, {"w": weights})
 
     return output_layer
-
-
-def create_layer(net, layer_neuron_count, layer_attributes):
-    print("Creating layer with {0} neurons".format(layer_neuron_count))
-    layer_group = net.create_group(layer_neuron_count, layer_attributes)
-
-    for i in range(0, layer_neuron_count):
-        if (i % 10000) == 0:
-            print(f"Defining neuron {i}")
-        layer_group.define_neuron(i)
-
-    return layer_group
 
 
 ### Architecture description parsing ###
@@ -486,91 +473,3 @@ if __name__ == "__main__":
         print(exc)
     else:
         print("sim finished")
-
-
-    # Old code: replace this with the code below soon
-    """
-    import subprocess
-    args = []
-    if spike_trace:
-        args.append("-s",)
-    if potential_trace:
-        args.append("-v")
-    if perf_trace:
-        args.append("-p")
-    if message_trace:
-        args.append("-m")
-    if out_dir is not None:
-        args.append("-o")
-        args.append(f"{out_dir}")
-    command = [os.path.join(project_dir, "sim"),] + args + [parsed_filename,
-               network_path, f"{timesteps}"]
-
-    print("Command: {0}".format(" ".join(command)))
-    ret = subprocess.call(command)
-
-    if out_dir is None:
-        out_dir = ""
-    summary_file = os.path.join(out_dir, "run_summary.yaml")
-    with open(summary_file, "r") as run_summary:
-        results = yaml.safe_load(run_summary)
-
-    return results
-    """
-    # Capstone code for live demo - figure out how to integrate or split into
-    #  a new script
-    """
-    # Code implemented during capstone project. Remove for now
-    if run_alive:
-        while True:
-            if timesteps > 0:
-                sim.run(timesteps, heartbeat=100)
-                sim.get_run_summary()
-            print("Enter timesteps to run: ", end="")
-            user_in = input()
-
-            if user_in == "q" or user_in == "quit":
-                break
-            if user_in.startswith("u"):
-                try:
-                    group_id = int(user_in[2])
-                except ValueError:
-                    print(f"Error: Expected int. Got \"{user_in[2]}\".")
-                    exit(1)
-
-                try:
-                    n_id = int(user_in[4])
-                except ValueError:
-                    print(f"Error: Expected int. Got \"{user_in[4]}\".")
-                    exit(1)
-
-                user_in = user_in[6:]
-                kwargs = user_in.split(" ")
-                # print(group_id, n_id, kwargs, len(kwargs))
-                #sim.update_neuron(group_id, n_id, kwargs, len(kwargs))
-
-                timesteps = 0
-                continue
-            if user_in.startswith("s"):
-                try:
-                    group_id = int(user_in[2])
-                except ValueError:
-                    print(f"Error: Expected int. Got \"{user_in[2]}\".")
-                    exit(1)
-
-                #print(sim.get_status(group_id))
-
-                timesteps = 0
-                continue
-
-            try:
-                timesteps = int(user_in)
-            except ValueError:
-                print(f"Error: Expected int. Got {user_in}.")
-                exit(1)
-    else:
-        if timesteps < 1:
-            print(f"Error: Given {timesteps} timesteps, require int > 1.")
-            exit(1)
-        sim.run_timesteps(timesteps)
-    """
