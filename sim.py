@@ -19,74 +19,7 @@ sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
 import sanafecpp
 
 ### SNN utility functions ###
-# TODO: this code basically just duplicates code in the kernel. Move this to
-#  a separate script (i.e., it's useful for me but not for other users).
-#  The kernel code is needed for the kernel to be standalone
-def load_from_net_file(filename, arch, heartbeat=100):
-    neurons_loaded = 0
-    edges_loaded = 0
-    mappings_loaded = 0
 
-    net = sanafecpp.Network()
-    with open(filename, 'r') as network_file:
-        for line in network_file:
-            fields = line.split()
-            if not fields:
-                continue
-            if fields[0] == 'g':
-                neuron_count = int(fields[1])
-                group_attributes = dict([f.split('=') for f in fields[2:]])
-                group = net.create_neuron_group(neuron_count,
-                                                group_attributes)
-                print("Loaded group")
-            elif fields[0] == 'n':
-                group_id = int(fields[1].split('.')[0])
-                neuron_id = int(fields[1].split('.')[1])
-                neuron_attributes = dict([f.split('=') for f in fields[2:]])
-                group = net.groups[group_id]
-                group.define_neuron(neuron_id, neuron_attributes)
-                neurons_loaded += 1
-                if (neurons_loaded % heartbeat) == 0:
-                    print(f"Loaded {neurons_loaded} neurons")
-
-            elif fields[0] == 'e':
-                edge_info = fields[1]
-                src_address = edge_info.split("->")[0]
-                dest_address = edge_info.split("->")[1]
-
-                src_gid = int(src_address.split(".")[0])
-                src_nid = int(src_address.split(".")[1])
-                src = net.groups[src_gid].neurons[src_nid]
-
-                dest_gid = int(dest_address.split(".")[0])
-                dest_nid = int(dest_address.split(".")[1])
-                dest = net.groups[dest_gid].neurons[dest_nid]
-
-                edge_attributes = dict([f.split('=') for f in fields[2:]])
-                src.connect_to_neuron(dest, edge_attributes)
-                edges_loaded += 1
-                if (edges_loaded % heartbeat) == 0:
-                    print(f"Loaded {edges_loaded} edges")
-
-            elif fields[0] == '&':
-                mapping_info = fields[1]
-                neuron_address = mapping_info.split("@")[0]
-                core_address = mapping_info.split("@")[1]
-
-                group_id = int(neuron_address.split(".")[0])
-                neuron_id = int(neuron_address.split(".")[1])
-                neuron = net.groups[group_id].neurons[neuron_id]
-
-                tile_id = int(core_address.split(".")[0])
-                core_offset = int(core_address.split(".")[1])
-                core = arch.tiles[tile_id].cores[core_offset]
-
-                core.map_neuron(neuron)
-                mappings_loaded += 1
-                if (mappings_loaded % heartbeat) == 0:
-                    print(f"Loaded {mappings_loaded} mappings")
-
-    return net
 # END OF DUPLICATED CODE
 
 """
@@ -112,49 +45,11 @@ class Network:
         if save_mappings is None:
             save_mappings = self._save_mappings
 
-        #with open(filename, 'w') as network_file:
-        #    for group in self.groups[group_idx]:
-        #        network_file.write(str(group))
-        #
-        #    for group in self.groups[group_idx]:
-        #        for neuron in group.neurons:
-        #            neuron._save_mappings = save_mappings
-        #            network_file.write(str(neuron))
-
 class NeuronGroup:
     def __init__(self, neuron_count, attributes):
         attributes =_attribute_values_to_str(attributes)
         self._neuron_group = sanafecpp.NeuronGroup(neuron_count, attributes)
         return
-
-    def __str__(self):
-        group_str = f"g {neuron_count}"
-        if self.threshold is not None:
-            group_str += f" threshold={self.threshold}"
-        if self.reset is not None:
-            group_str += f" reset={self.reset}"
-        if self.reverse_threshold is not None:
-            group_str += f" reverse_threshold={self.reverse_threshold}"
-        if self.reverse_reset is not None:
-            group_str += f" reverse_reset={self.reverse_reset}"
-        if self.leak_decay is not None:
-            group_str += f" leak_decay={self.leak_decay}"
-        if self.reset_mode is not None:
-            group_str += f" reset_mode={self.reset_mode}"
-        if self.reverse_reset_mode is not None:
-            group_str += f" reverse_reset_mode={self.reverse_reset_mode}"
-        if self.log_spikes is not None:
-            group_str += f" log_spikes={int(self.log_spikes)}"
-        if self.log_potential is not None:
-            group_str += f" log_v={int(self.log_potential)}"
-        if self.force_update is not None:
-            group_str += f" force_update={int(self.force_update)}"
-        if self.connections_out is not None:
-            group_str += f" connections_out={self.connections_out}"
-        if self.soma_hw_name is not None:
-            group_str += f" soma_hw_name={self.soma_hw_name}"
-        if self.synapse_hw_name is not None:
-            group_str += f" synapse_hw_name={self.synapse_hw_name}"
 
         group_str += "\n"
         return ""
@@ -169,32 +64,6 @@ class Neuron:
         self._neuron = sanafecpp.Neuron(neuron_id)
         self._save_mappings = False
         return
-
-    def __str__(self, map_neuron=True):
-        neuron_str = f"n {self.group.id}.{self.id}"
-        if self.bias is not None:
-            neuron_str += f" bias={self.bias}"
-        if self.log_spikes is not None:
-            self.log_spikes = int(self.log_spikes)
-            neuron_str += f" log_spikes={int(self.log_spikes)}"
-        if self.log_potential is not None:
-            neuron_str += f" log_v={int(self.log_potential)}"
-        if self.force_update is not None:
-            neuron_str += f" force_update={int(self.force_update)}"
-        if (self.group.connections_out is None or (self.connections and
-            (len(self.connections) > self.group.connections_out))):
-           neuron_str += f" connections_out={len(self.connections)}"
-        neuron_str += "\n"
-
-        for connection in self.connections:
-            dest_neuron, weight = connection
-            neuron_str += f"e {self.group.id}.{self.id}->"
-            neuron_str += f"{dest_neuron.group.id}.{dest_neuron.id}"
-            if isinstance(weight, float):
-                neuron_str += f" w={weight:.5e}"
-            else:
-                neuron_str += f" w={weight}"
-            neuron_str += "\n"
 
         if self._save_mappings:
             neuron_str += "& {0}.{1}@{2}.{3}\n".format(self.group.id, self.id,
@@ -423,8 +292,8 @@ def parse_core(arch, tile_id, core_dict):
             soma_attributes = soma.get("attributes", {})
             if soma_attributes is None:
                 soma_attributes = {}
-            core.create_soma(soma["name"],
-                             soma_attributes.get("attributes", {}))
+            print(f"soma:{soma_attributes}")
+            core.create_soma(soma["name"], soma_attributes)
             #print(f"tile_id:{tile_id}")
             #print(f"core_id:{core.get_offset()}")
             #print(arch.tiles[tile_id].cores[core.get_offset()].soma)
@@ -545,12 +414,14 @@ def create_noc(noc_dict):
 """
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
-def run(arch_path, network_path, timesteps,
+def run_kernel(arch_path, network_path, timesteps,
         perf_trace=False, spike_trace=False,
         potential_trace=False, message_trace=False, out_dir=None):
     print("Loading architecture\n")
     try:
         arch = load_arch_from_yaml(arch_path)
+        #arch = sanafecpp.Architecture()
+        #arch.load_arch_file("runs/example.yaml.parsed")
     except yaml.parser.ParserError as yaml_parse_exc:
         print("Error: Invalid YAML file given.")
         if "expected '<document start>'" in str(yaml_parse_exc):
@@ -562,9 +433,9 @@ def run(arch_path, network_path, timesteps,
         exit()
 
     print("Loading network\n")
-    net = load_from_net_file(network_path, arch)
-    #net = sanafecpp.Network()
-    #net.load_net_file(network_path, arch)
+    #net = load_from_net_file(network_path, arch)
+    net = sanafecpp.Network()
+    net.load_net_file(network_path, arch)
     # Parse inputs and run simulation
 
     if out_dir is None:
@@ -579,7 +450,7 @@ def run(arch_path, network_path, timesteps,
 
     sim.run(timesteps=timesteps, heartbeat=100)
     results = sim.get_run_summary()
-    print(f"Neurons fired: {results.neurons_fired}")
+    print(f"Results: {results}")
 
     return results
 
@@ -607,10 +478,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     try:
-        run(args.architecture, args.snn, args.timesteps,
-            spike_trace=args.spikes, potential_trace=args.voltages,
-            perf_trace=args.perf, message_trace=args.messages,
-            out_dir=args.out_dir)
+        run_kernel(args.architecture, args.snn, args.timesteps,
+                   spike_trace=args.spikes, potential_trace=args.voltages,
+                   perf_trace=args.perf, message_trace=args.messages,
+                   out_dir=args.out_dir)
     except RuntimeError as exc:
         print(exc)
     else:

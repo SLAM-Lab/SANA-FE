@@ -2,7 +2,7 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
-// network.h - (spiking) neural network functionality. Spiking neural
+// network.hpp - (spiking) neural network functionality. Spiking neural
 //  networks are represented as groups of neurons. A neuron group might have a
 //  bunch of neurons all with the same properties (and common hardware).
 //  Each neuron has its own state and a set of connections to other neurons.

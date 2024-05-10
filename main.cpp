@@ -2,14 +2,14 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
-// main.c - Command line interface
+// main.cpp - Command line interface
 // Performance simulation of neuromorphic architectures
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <string>
-#include <filesystem>
+#include <filesystem> // For std::filesystem::path
 
 #include "print.hpp"
 #include "sim.hpp"

@@ -2,7 +2,7 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
-// arch.h: Create a neuromorphic design based on a set of commands
+// arch.hpp: Create a neuromorphic design based on a set of commands
 //  In this simulator an architecture is a represented as a set of different
 //  hardware blocks. The design (chip) is a set of tiles, connected by NoC
 //  interconnect. Within each tile is one or more cores. Each core contains

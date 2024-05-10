@@ -2,7 +2,7 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
-// arch.c
+// arch.cpp
 #include <cctype>
 #include <cstdlib>
 #include <cassert>
@@ -262,7 +262,7 @@ sanafe::Core &sanafe::Architecture::create_core(
 	// *** Set attributes ***
 	c.buffer_pos = BUFFER_SOMA;
 	c.max_neurons = 1024;
-	for (auto a: attr)
+	for (const auto &a: attr)
 	{
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
@@ -301,7 +301,7 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(
 
 	in.energy_spike_message = 0.0;
 	in.latency_spike_message = 0.0;
-	for (auto curr: attr)
+	for (const auto &curr: attr)
 	{
 		const std::string &key = curr.first;
 		const std::string &value_str = curr.second;
@@ -335,7 +335,7 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
 	s.latency_spike_op = 0.0;
 	s.weight_bits = 8;
 	s.name = name;
-	for (auto curr: attr)
+	for (const auto &curr: attr)
 	{
 		const std::string &key = curr.first;
 		const std::string &value_str = curr.second;
@@ -371,7 +371,8 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	TRACE1("cid:%d creating soma sid:%lu\n", id, soma.size());
+	INFO("cid:%d creating soma sid:%lu with %lu attributes\n",
+		id, soma.size(), attr.size());
 	soma.push_back(SomaUnit(name));
 	SomaUnit &s = soma.back();
 
@@ -385,11 +386,13 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 	s.leak_towards_zero = 1;
 	s.noise_type = NOISE_NONE;
 
-	for (auto a: attr)
+	for (const auto &a: attr)
 	{
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
 		std::istringstream ss(value_str);
+		INFO("Soma attribute k:%s v%s\n", key.c_str(),
+			value_str.c_str());
 		if (key == "energy_update_neuron")
 		{
 			ss >> s.energy_update_neuron;
@@ -448,7 +451,7 @@ sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
 	/*** Set attributes ***/
 	out.energy_access = 0.0;
 	out.latency_access = 0.0;
-	for (auto curr: attr)
+	for (const auto &curr: attr)
 	{
 		const std::string &key = curr.first;
 		const std::string &value_str = curr.second;
