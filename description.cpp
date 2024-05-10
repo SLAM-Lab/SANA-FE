@@ -131,8 +131,8 @@ void sanafe::description_read_arch_entry(
 {
 	std::unordered_map<std::string, std::string> attributes;
 	std::string name;
-	Tile *t;
-	Core *c;
+	Tile *tile_ptr;
+	Core *core_ptr;
 	int tile_id, core_offset, first_field;
 
 	assert(fields.size() > 0);
@@ -145,8 +145,8 @@ void sanafe::description_read_arch_entry(
 		return;
 	}
 
-	t = NULL;
-	c = NULL;
+	tile_ptr = nullptr;
+	core_ptr = nullptr;
 	first_field = 1;
 	tile_id = -1;
 	if (entry_type != '@')
@@ -157,14 +157,16 @@ void sanafe::description_read_arch_entry(
 	if (entry_type != '@' && entry_type != 't')
 	{
 		tile_id = field_to_int(fields[2]);
-		t = &(arch.tiles[tile_id]);
+		Tile &t = arch.tiles_vec[tile_id];
+		tile_ptr = &t;
 		first_field++;
 	}
 	if ((entry_type != '@') && (entry_type != 't') && (entry_type != 'c'))
 	{
 		core_offset = field_to_int(fields[3]);
-		assert(t != nullptr);
-		c = &(t->cores[core_offset]);
+		assert(tile_ptr != nullptr);
+		Core &c = tile_ptr->cores_vec[core_offset];
+		core_ptr = &c;
 		first_field++;
 	}
 
@@ -206,19 +208,19 @@ void sanafe::description_read_arch_entry(
 		arch.create_core(tile_id, attributes);
 		break;
 	case 'i':
-		c->create_axon_in(name, attributes);
+		core_ptr->create_axon_in(name, attributes);
 		break;
 	case 's':
-		c->create_synapse(name, attributes);
+		core_ptr->create_synapse(name, attributes);
 		break;
 	case 'd':
 		// TODO: support dendritic ops
 		break;
 	case '+':
-		c->create_soma(name, attributes);
+		core_ptr->create_soma(name, attributes);
 		break;
 	case 'o':
-		c->create_axon_out(name, attributes);
+		core_ptr->create_axon_out(name, attributes);
 		break;
 	default:
 		INFO("Warning: unrecognized unit (%c) - skipping.\n",
@@ -329,15 +331,13 @@ void sanafe::description_read_network_entry(
 {
 	std::unordered_map<std::string, std::string> attributes;
 	attributes.reserve(16);
-	NeuronGroup *group, *dest_group;
-	Neuron *n, *dest;
-	Tile *t;
-	Core *c;
+	NeuronGroup *group_ptr, *dest_group_ptr;
+	Neuron *neuron_ptr, *dest_ptr;
+	Tile *tile_ptr;
+	Core *core_ptr;
+	size_t tile_id, core_offset, neuron_group_id, dest_group_id;
+	size_t neuron_id, dest_neuron_id;
 	int neuron_count;
-	std::vector<Tile>::size_type tile_id;
-	std::vector<Core>::size_type core_offset;
-	std::vector<NeuronGroup>::size_type neuron_group_id, dest_group_id;
-	std::vector<Neuron>::size_type neuron_id, dest_neuron_id;
 	bool group_set, neuron_set;
 
 	assert(fields.size() > 0);
@@ -356,11 +356,11 @@ void sanafe::description_read_network_entry(
 	}
 
 	neuron_count = 0;
-	n = nullptr;
-	group = nullptr;
-	c = nullptr;
-	dest_group = nullptr;
-	dest = nullptr;
+	neuron_ptr = nullptr;
+	group_ptr = nullptr;
+	core_ptr = nullptr;
+	dest_group_ptr = nullptr;
+	dest_ptr = nullptr;
 
 	group_set = false;
 	neuron_set = false;
@@ -373,21 +373,24 @@ void sanafe::description_read_network_entry(
 	{
 		parse_mapping_field(fields[1],
 			neuron_group_id, neuron_id, tile_id, core_offset);
-		if (tile_id >= arch.tiles.size())
+		if (tile_id >= arch.tiles_vec.size())
 		{
 			INFO("Error: Line %d: Tile (%lu) >= tile count (%lu)\n",
 				line_number, tile_id, arch.tiles.size());
 			exit(1);
 		}
-		t = &(arch.tiles[tile_id]);
+		Tile &tile = arch.tiles_vec[tile_id];
+		tile_ptr = &tile;
 
-		if (core_offset >= t->cores.size())
+		if (core_offset >= tile_ptr->cores_vec.size())
 		{
 			INFO("Error: Line %d: Core (%lu) >= core count (%lu)\n",
-				line_number, core_offset, t->cores.size());
+				line_number, core_offset,
+				tile_ptr->cores_vec.size());
 			exit(1);
 		}
-		c = &(t->cores[core_offset]);
+		Core &core = tile_ptr->cores_vec[core_offset];
+		core_ptr = &core;
 		group_set = true;
 		neuron_set = true;
 	}
@@ -402,21 +405,22 @@ void sanafe::description_read_network_entry(
 				line_number, dest_group_id, net.groups.size());
 			throw std::invalid_argument("Invalid group id");
 		}
-		dest_group = &(net.groups[dest_group_id]);
+		NeuronGroup &dest_group = net.groups_vec[dest_group_id];
+		dest_group_ptr = &dest_group;
 
 		TRACE1("Parsed neuron gid:%lu nid:%lu\n", dest_group_id,
 			neuron_id);
-		if (dest_neuron_id >= dest_group->neurons.size())
+		if (dest_neuron_id >= dest_group_ptr->neurons.size())
 		{
 			INFO("Error: Line %d: Trying to access neuron "
 				"(%d.%lu) but group %d only "
 				"allocates %lu neurons.\n",
-				line_number, dest_group->id, dest_neuron_id,
-				dest_group->id,
-				dest_group->neurons.size());
+				line_number, dest_group_ptr->id, dest_neuron_id,
+				dest_group_ptr->id,
+				dest_group_ptr->neurons.size());
 			throw std::invalid_argument("Invalid nid");
 		}
-		dest = &(dest_group->neurons[dest_neuron_id]);
+		dest_ptr = &(dest_group_ptr->neurons[dest_neuron_id]);
 		group_set = true;
 		neuron_set = true;
 	}
@@ -441,24 +445,25 @@ void sanafe::description_read_network_entry(
 				line_number, neuron_group_id, net.groups.size());
 			throw std::invalid_argument("Invalid group id");
 		}
-		group = &(net.groups[neuron_group_id]);
+		NeuronGroup &group = net.groups_vec[neuron_group_id];
+		group_ptr = &group;
 		TRACE1("Parsed neuron gid:%lu nid:%lu\n", neuron_group_id,
 			neuron_id);
 		if (neuron_set)
 		{
-			if (neuron_id >= group->neurons.size())
+			if (neuron_id >= group_ptr->neurons.size())
 			{
                                INFO("Error: Line %d: Trying to access neuron "
                                        "(%d.%lu) but group %d only "
                                        "allocates %lu neuron(s).\n",
 					line_number,
-					group->id, neuron_id, group->id,
-					group->neurons.size());
+					group_ptr->id, neuron_id, group_ptr->id,
+					group_ptr->neurons.size());
 				throw std::invalid_argument(
 					"Invalid neuron id");
 
 			}
-			n = &(group->neurons[neuron_id]);
+			neuron_ptr = &(group_ptr->neurons[neuron_id]);
 		}
 	}
 
@@ -496,17 +501,17 @@ void sanafe::description_read_network_entry(
 		net.create_neuron_group(neuron_count, attributes);
 		break;
 	case 'n': // Add neuron
-		n->set_attributes(attributes);
+		neuron_ptr->set_attributes(attributes);
 		break;
 	case 'e':
 	{
-		assert(n != nullptr);
+		assert(neuron_ptr != nullptr);
 		// Zero initialize all connections
-		n->connect_to_neuron(*dest, attributes);
+		neuron_ptr->connect_to_neuron(*dest_ptr, attributes);
 		break;
 	}
 	case '&': // Map neuron to hardware
-		c->map_neuron(*n);
+		core_ptr->map_neuron(*neuron_ptr);
 		break;
 	default:
 		break;

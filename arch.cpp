@@ -13,6 +13,7 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <functional> // For std::reference_wrapper
 
 #include "print.hpp"
 #include "arch.hpp"
@@ -31,7 +32,7 @@ sanafe::Architecture::Architecture()
 int sanafe::Architecture::get_core_count()
 {
 	int core_count = 0;
-	for (auto &tile: tiles)
+	for (Tile &tile: tiles)
 	{
 		core_count += tile.cores.size();
 	}
@@ -140,6 +141,7 @@ sanafe::Tile &sanafe::Architecture::create_tile(
 {
 	tiles.push_back(Tile(tiles.size()));
 	Tile &tile = tiles.back();
+	tiles_vec.push_back(tile);
 
 	// Set attributes
 	tile.energy_east_hop = 0.0;
@@ -250,10 +252,12 @@ sanafe::Core &sanafe::Architecture::create_core(
 	{
 		throw std::invalid_argument("Error: Tile ID > total tiles");
 	}
-	Tile &tile = tiles[tile_id];
+	Tile &tile = tiles_vec[tile_id];
 	const int core_offset = tile.cores.size();
 	tile.cores.push_back(Core(get_core_count(), tile.id, core_offset));
 	Core &c = tile.cores.back();
+	cores_vec.push_back(c);
+	tile.cores_vec.push_back(c);
 
 	// *** Set attributes ***
 	c.buffer_pos = BUFFER_SOMA;
@@ -468,9 +472,9 @@ sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
 void sanafe::arch_create_axons(Architecture &arch)
 {
 	TRACE1("Creating all connection maps.\n");
-	for (auto &tile: arch.tiles)
+	for (Tile &tile: arch.tiles)
 	{
-		for (auto &c: tile.cores)
+		for (Core &c: tile.cores)
 		{
 			for (auto n_ptr: c.neurons)
 			{
@@ -490,10 +494,10 @@ void sanafe::arch_print_axon_summary(Architecture &arch)
 	out_count = 0;
 
 	INFO("** Mapping summary **\n");
-	for (auto &tile: arch.tiles)
+	for (Tile &tile: arch.tiles)
 	{
 		// For debug only, print the axon maps
-		for (auto &c: tile.cores)
+		for (Core &c: tile.cores)
 		{
 			core_used = 0;
 			for (std::vector<Neuron *>::size_type k = 0;
@@ -635,7 +639,7 @@ void sanafe::Core::map_neuron(Neuron &n)
 		//n.soma_model = plugin_get_soma(n.soma_hw_name);
 		n.model = std::shared_ptr<SomaModel>(
 			new LoihiLifModel(n.parent_group_id, n.id));
-		const NeuronGroup &group = n.parent_net->groups[
+		const NeuronGroup &group = n.parent_net->groups_vec[
 			n.parent_group_id];
 		// First set the group's default attribute values, and then
 		//  any defined by the neuron

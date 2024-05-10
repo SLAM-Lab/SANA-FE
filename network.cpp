@@ -10,6 +10,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <functional> // For std::reference_wrapper
 
 #include "arch.hpp"
 #include "print.hpp"
@@ -70,10 +71,11 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
 NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	const auto id = groups.size();
+	const auto id = groups_vec.size();
 
 	groups.push_back(NeuronGroup(id, neuron_count));
 	NeuronGroup &group = groups.back();
+	groups_vec.push_back(group);
 
 	for (auto a: attr)
 	{
@@ -222,14 +224,53 @@ void sanafe::NeuronGroup::set_attribute_multiple(
 	}
 }
 
-void sanafe::NeuronGroup::connect_neurons(
-	const NeuronGroup &dest_group,
-	const std::vector<size_t> dest_neurons,
-	const std::unordered_map<std::string, std::string> &attr)
+void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
+	const std::vector<std::pair<int, int> > &src_dest_id_pairs,
+	const std::unordered_map<std::string, std::vector<std::string> >
+		&attr_lists)
 {
-	return;
-}
+	int edge_id = 0;
+	for (auto [src_id, dest_id]: src_dest_id_pairs)
+	{
+		TRACE2("Connecting neurons, neurons.size=%lu\n", neurons.size());
+		if ((src_id < 0) ||
+			(static_cast<size_t>(src_id) >= neurons.size()))
+		{
+			INFO("src_id:%d out of range (0 <= id <= %lu).\n",
+				src_id, neurons.size());
+			throw std::invalid_argument(
+				"Error: src id is out of range.");
+		}
+		if ((dest_id < 0) ||
+			(static_cast<size_t>(dest_id) >=
+			dest_group.neurons.size()))
+		{
+			INFO("dest_id:%d out of range (0 <= id <= %lu).\n",
+				dest_id, dest_group.neurons.size());
+			throw std::invalid_argument(
+				"Error: dest nid is out of range.");
+		}
 
+		// Create attributes map for this neuron
+		std::unordered_map<std::string, std::string> attr;
+		for (auto &[key, value_list]: attr_lists)
+		{
+			if (value_list.size() != src_dest_id_pairs.size())
+			{
+				INFO("Error: Length of attribute list != number of defined edges. (%lu!=%lu).\n",
+					value_list.size(), src_dest_id_pairs.size());
+				throw std::invalid_argument(
+					"Error: Length of attribute list != number of defined edges.");
+			}
+			attr[key] = value_list[src_id];
+		}
+
+		Neuron &src = neurons[src_id];
+		Neuron &dest = dest_group.neurons[dest_id];
+		src.connect_to_neuron(dest, attr);
+		edge_id++;
+	}
+}
 
 void sanafe::Neuron::connect_to_neuron(
 	Neuron &dest,

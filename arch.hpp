@@ -18,6 +18,7 @@
 #include <vector>
 #include <unordered_map>
 #include <list>
+#include <functional> // For std::reference_wrapper
 
 #include "network.hpp"
 
@@ -209,7 +210,12 @@ public:
 class Tile
 {
 public:
-	std::vector<Core> cores;
+	// Use a list of Cores that can be dynamically allocated and appended
+	//  to without reallocation
+	std::list<Core> cores;
+	// Vector of references into the Core object data, giving us random
+	//  access into a list, giving us the best of both worlds
+	std::vector<std::reference_wrapper<Core> > cores_vec;
 	std::string name;
 	double energy;
 	double energy_east_hop, latency_east_hop;
@@ -228,7 +234,9 @@ public:
 class Architecture
 {
 public:
-	std::vector<Tile> tiles;
+	std::vector<std::reference_wrapper<Core> > cores_vec;
+	std::vector<std::reference_wrapper<Tile> > tiles_vec;
+	std::list<Tile> tiles;
 	std::string name;
 	int noc_width, noc_height, noc_buffer_size;
 

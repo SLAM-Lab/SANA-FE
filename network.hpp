@@ -15,6 +15,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <functional> // For std::reference_wrapper
 #include "plugins.hpp"
 #include "models.hpp"
 
@@ -102,16 +103,15 @@ public:
 
 	int get_id() { return id; }
 	NeuronGroup(const size_t group_id, const int neuron_count);
-	Neuron &define_neuron(const size_t id, const std::unordered_map<std::string, std::string> &attr);
 	void set_attribute_multiple(const std::string &attr, const std::vector<std::string> &values);
-	void connect_neurons(const NeuronGroup &dest_group, const std::vector<size_t> dest_neurons, const std::unordered_map<std::string, std::string> &attr);
-	void connect_neurons(const NeuronGroup &dest_group, const std::vector<size_t> dest_neurons, const std::unordered_map<std::string, std::vector<std::string> > &attr);
+	void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::unordered_map<std::string, std::vector<std::string> > &attr_lists);
 };
 
 class Network
 {
 public:
-	std::vector<NeuronGroup> groups;
+	std::list<NeuronGroup> groups;
+	std::vector<std::reference_wrapper<NeuronGroup> > groups_vec;
 	Network() {};
 	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
 	void load_net_file(const std::string &filename, Architecture &arch);
