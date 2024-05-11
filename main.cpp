@@ -99,9 +99,9 @@ int main(int argc, char *argv[])
 
 	// Read in program args, sanity check and parse inputs
 	Architecture arch;
-	arch.load_arch_file(argv[ARCH_FILENAME]);
+	arch.load_arch_description(argv[ARCH_FILENAME]);
 	Network net;
-	net.load_net(argv[NETWORK_FILENAME], arch);
+	net.load_net_description(argv[NETWORK_FILENAME], arch);
 	Simulation sim(
 		arch, net, output_dir, record_spikes, record_potentials,
 		record_perf, record_messages);

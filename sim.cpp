@@ -54,44 +54,6 @@ Simulation::~Simulation()
 	message_trace.close();
 }
 
-/*
-int Simulation::update_neuron(
-	const std::vector<NeuronGroup>::size_type group_id,
-	const std::vector<Neuron>::size_type n_id,
-	const std::vector<std::string> kwargs, const int count)
-{
-	for (std::string item: kwargs)
-	{
-		INFO("Kwarg: %s\n", item.c_str());
-	}
-	if (count < 1)
-	{
-		return -1;
-	}
-	if (group_id >= net.groups.size())
-	{
-		return -1;
-	}
-	if (n_id >= net.groups[group_id].neurons.size())
-	{
-		return -1;
-	}
-
-	std::vector<Attribute> attr;
-	for (auto &s: kwargs)
-	{
-		std::string key = s.substr(0, s.find('=')).c_str();
-		std::string value_str = s.substr(s.find('=')+1).c_str();
-		Attribute a = { key, value_str };
-		attr.push_back(a);
-		INFO("neuron: %lu.%lu updated with key: %s and val: %s\n",
-			group_id, n_id, key.c_str(), value_str.c_str());
-	}
-	net.groups[group_id].neurons[n_id].model->set_attributes(attr);
-	return 0;
-}
-*/
-
 RunData::RunData(const long int start, const long int steps)
 {
 	timestep_start = start;
@@ -1684,6 +1646,44 @@ timespec sanafe::calculate_elapsed_time(const timespec &ts_start,
 
 	return ts_elapsed;
 }
+
+/*
+int Simulation::update_neuron(
+	const std::vector<NeuronGroup>::size_type group_id,
+	const std::vector<Neuron>::size_type n_id,
+	const std::vector<std::string> kwargs, const int count)
+{
+	for (std::string item: kwargs)
+	{
+		INFO("Kwarg: %s\n", item.c_str());
+	}
+	if (count < 1)
+	{
+		return -1;
+	}
+	if (group_id >= net.groups.size())
+	{
+		return -1;
+	}
+	if (n_id >= net.groups[group_id].neurons.size())
+	{
+		return -1;
+	}
+
+	std::vector<Attribute> attr;
+	for (auto &s: kwargs)
+	{
+		std::string key = s.substr(0, s.find('=')).c_str();
+		std::string value_str = s.substr(s.find('=')+1).c_str();
+		Attribute a = { key, value_str };
+		attr.push_back(a);
+		INFO("neuron: %lu.%lu updated with key: %s and val: %s\n",
+			group_id, n_id, key.c_str(), value_str.c_str());
+	}
+	net.groups[group_id].neurons[n_id].model->set_attributes(attr);
+	return 0;
+}
+*/
 
 /*
 double sim_calculate_time(const Architecture *const arch)

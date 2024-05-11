@@ -38,10 +38,15 @@ std::string sanafe::Connection::description() const
 {
 	assert(pre_neuron != nullptr);
 	assert(post_neuron != nullptr);
+
+	std::unordered_map<std::string, std::string> attributes;
+	attributes["w"] = weight;
+
 	std::ostringstream ss;
 	ss << pre_neuron->parent_group_id << '.' << pre_neuron->id;
 	ss << "->";
 	ss << post_neuron->parent_group_id << '.' << post_neuron->id;
+	ss << print_format_attributes(attributes);
 	ss << std::endl;
 	return ss.str();
 }
@@ -86,7 +91,7 @@ std::string sanafe::Neuron::info() const
 	std::ostringstream ss;
 	ss << "sanafe::Neuron(nid=" << parent_group_id << '.' << id;
 	ss << " connections_out=" << connections_out.size();
-	ss << " attributes={" << network_format_attributes(attributes) << "})";
+	ss << " attributes={" << print_format_attributes(attributes) << "})";
 	return ss.str();
 }
 
@@ -94,7 +99,7 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 {
 	std::ostringstream ss;
 	ss << "n " << parent_group_id << '.' << id;
-	ss << network_format_attributes(attributes) << std::endl;
+	ss << print_format_attributes(attributes) << std::endl;
 	if (write_mapping && (core != nullptr))
 	{
 		ss << "& " << parent_group_id << '.' << id;
@@ -103,8 +108,6 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 	}
 	return ss.str();
 }
-
-
 
 NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 	const std::unordered_map<std::string, std::string> &attr)
@@ -175,7 +178,7 @@ std::string sanafe::NeuronGroup::description() const
 {
 	std::ostringstream ss;
 	ss << "g " << neurons.size();
-	ss << network_format_attributes(default_attributes) << std::endl;
+	ss << print_format_attributes(default_attributes) << std::endl;
 	return ss.str();
 }
 
@@ -184,7 +187,7 @@ std::string sanafe::NeuronGroup::info() const
 	std::ostringstream ss;
 	ss << "sanafe::NeuronGroup(gid=" << id;
 	ss << " neurons=" << neurons.size();
-	ss << " attributes={" << network_format_attributes(default_attributes);
+	ss << " attributes={" << print_format_attributes(default_attributes);
 	ss << "})";
 	return ss.str();
 }
@@ -344,7 +347,7 @@ void sanafe::Neuron::connect_to_neuron(
 	return;
 }
 
-void sanafe::Network::load_net(
+void sanafe::Network::load_net_description(
 	const std::string &filename, Architecture &arch)
 {
 	std::ifstream network_fp;
@@ -364,7 +367,7 @@ void sanafe::Network::load_net(
 	arch_create_axons(arch);
 }
 
-void sanafe::Network::save_net(
+void sanafe::Network::save_net_description(
 	const std::filesystem::path &path, const bool save_mapping) const
 {
 	std::ofstream out(path);
@@ -426,23 +429,6 @@ void sanafe::Network::check_mapped() const
 		}
 	}
 }
-
-std::string sanafe::network_format_attributes(
-	const std::unordered_map<std::string, std::string> &attr)
-{
-	std::string attr_str;
-
-	for (const auto &a: attr)
-	{
-		const std::string &key = a.first;
-		const std::string &value_str = a.second;
-
-		attr_str += ' ' + key + '=' + value_str;
-	}
-	return attr_str;
-}
-
-
 
 /*
 int network_create_inputs(Network *const net, const int input_count,

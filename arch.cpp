@@ -8,16 +8,17 @@
 #include <cassert>
 #include <cmath>
 
+#include <filesystem> // For std::filesystem::path
+#include <functional> // For std::reference_wrapper
+#include <iostream>
 #include <list>
 #include <set>
-#include <iostream>
 #include <sstream>
 #include <unordered_map>
-#include <functional> // For std::reference_wrapper
 
-#include "print.hpp"
 #include "arch.hpp"
 #include "network.hpp"
+#include "print.hpp"
 
 using namespace sanafe;
 
@@ -83,6 +84,28 @@ int sanafe::Architecture::set_noc_attributes(
 	return 0;
 }
 
+std::string sanafe::Architecture::info()
+{
+	std::ostringstream ss;
+	ss << "sanafe::Architecture(tiles=" << tiles.size();
+	ss << ", cores=" << cores_vec.size() << ")";
+
+	return ss.str();
+}
+
+std::string sanafe::Architecture::description() const
+{
+	std::unordered_map<std::string, std::string> attributes;
+	attributes["link_buffer_size"] = noc_buffer_size;
+	attributes["topology"] = "mesh";
+	attributes["width"] = noc_width;
+	attributes["height"] = noc_height;
+
+	std::ostringstream ss;
+	ss << '@' << print_format_attributes(attributes);
+	return ss.str();
+}
+
 sanafe::Message::Message()
 {
 	// Initialize message variables. Mark most fields as invalid either
@@ -124,6 +147,32 @@ sanafe::Tile::Tile(const int tile_id)
 	west_hops = 0L;
 	north_hops = 0L;
 	south_hops = 0L;
+}
+
+std::string sanafe::Tile::info() const
+{
+	std::ostringstream ss;
+	ss << "sanafe::Tile(tile=" << id << " cores=";
+	ss << cores_vec.size() << ")";
+
+	return ss.str();
+}
+
+std::string sanafe::Tile::description() const
+{
+	std::unordered_map<std::string, std::string> attributes;
+	attributes["energy_east"] = energy_east_hop;
+	attributes["energy_west"] = energy_west_hop;
+	attributes["energy_north"] = energy_north_hop;
+	attributes["energy_south"] = energy_south_hop;
+	attributes["latency_east"] = energy_east_hop;
+	attributes["latency_west"] = energy_west_hop;
+	attributes["latency_north"] = energy_north_hop;
+	attributes["latency_south"] = energy_south_hop;
+
+	std::ostringstream ss;
+	ss << "t " << name << print_format_attributes(attributes);
+	return ss.str();
 }
 
 sanafe::Core::Core(const int core_id, const int tile_id, const int core_offset)
@@ -194,7 +243,7 @@ sanafe::Tile &sanafe::Architecture::create_tile(
 	return tile;
 }
 
-void Architecture::load_arch_file(const std::string &filename)
+void Architecture::load_arch_description(const std::filesystem::path &filename)
 {
 	std::ifstream arch_fp(filename);
 	if (arch_fp.fail())
@@ -288,6 +337,74 @@ sanafe::Core &sanafe::Architecture::create_core(
 	return c;
 }
 
+std::string sanafe::Core::info() const
+{
+	std::unordered_map<std::string, std::string> attributes;
+	std::ostringstream ss;
+	ss << "sanafe::Core(name= " << name << " tile=" << parent_tile_id << ")";
+	return ss.str();
+}
+
+std::string sanafe::Core::description() const
+{
+	std::ostringstream ss;
+	ss << "c " << name << ' ' << id;
+	return ss.str();
+}
+
+std::string sanafe::AxonInUnit::description() const
+{
+	std::ostringstream ss;
+	ss << "i " << name << ' ' << parent_tile_id << ' ' << parent_core_id;
+	return ss.str();
+}
+
+std::string sanafe::SynapseUnit::description() const
+{
+	std::unordered_map<std::string, std::string> attributes;
+	attributes["energy_spike"] = energy_spike_op;
+	attributes["latency_spike"] = latency_spike_op;
+	attributes["model"] = model;
+	std::ostringstream ss;
+	ss << "s " << name << ' ' << parent_tile_id << ' ' << parent_core_id;
+	ss << print_format_attributes(attributes);
+	return ss.str();
+}
+
+std::string sanafe::DendriteUnit::description() const
+{
+	std::ostringstream ss;
+	ss << "d " << name << ' ' << parent_tile_id << ' ' << parent_core_id;
+	return ss.str();
+}
+
+std::string sanafe::SomaUnit::description() const
+{
+	std::unordered_map<std::string, std::string> attributes;
+	attributes["model"] = "leaky_integrate_fire";
+	attributes["energy_access_neuron"] = energy_access_neuron;
+	attributes["latency_access_neuron"] = latency_access_neuron;
+	attributes["energy_update_neuron"] = energy_update_neuron;
+	attributes["latency_update_neuron"] = latency_update_neuron;
+	attributes["energy_spike_out"] = energy_access_neuron;
+	attributes["latency_spike_out"] = latency_access_neuron;
+	std::ostringstream ss;
+	ss << "+ " << name << ' ' << parent_tile_id << ' ' << parent_core_id;
+	ss << print_format_attributes(attributes);
+	return ss.str();
+}
+
+std::string sanafe::AxonOutUnit::description() const
+{
+	std::unordered_map<std::string, std::string> attributes;
+	attributes["energy"] = energy_access;
+	attributes["latency"] = latency_access;
+	std::ostringstream ss;
+	ss << "o " << name << ' ' << parent_tile_id << ' ' << parent_core_id;
+	ss << print_format_attributes(attributes);
+	return ss.str();
+}
+
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(
 	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
@@ -298,6 +415,7 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(
 	in.energy = 0.0;
 	in.time = 0.0;
 	in.parent_tile_id = parent_tile_id;
+	in.parent_core_id = id;
 
 	in.energy_spike_message = 0.0;
 	in.latency_spike_message = 0.0;
@@ -327,6 +445,8 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
 {
 	synapse.push_back(SynapseUnit(name));
 	SynapseUnit &s = synapse.back();
+	s.parent_tile_id = parent_tile_id;
+	s.parent_core_id = id;
 
 	/**** Set attributes ****/
 	s.energy_memory_access = 0.0;
@@ -371,10 +491,12 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 	const std::string &name,
 	const std::unordered_map<std::string, std::string> &attr)
 {
-	INFO("cid:%d creating soma sid:%lu with %lu attributes\n",
+	TRACE1("cid:%d creating soma sid:%lu with %lu attributes\n",
 		id, soma.size(), attr.size());
 	soma.push_back(SomaUnit(name));
 	SomaUnit &s = soma.back();
+	s.parent_tile_id = parent_tile_id;
+	s.parent_core_id = id;
 
 	/*** Set attributes ***/
 	s.energy_access_neuron = 0.0;
@@ -391,7 +513,7 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
 		std::istringstream ss(value_str);
-		INFO("Soma attribute k:%s v%s\n", key.c_str(),
+		TRACE2("Soma attribute k:%s v%s\n", key.c_str(),
 			value_str.c_str());
 		if (key == "energy_update_neuron")
 		{
@@ -442,6 +564,8 @@ sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
 {
 	axon_out_hw.push_back(AxonOutUnit(name));
 	AxonOutUnit &out = axon_out_hw.back();
+	out.parent_tile_id = parent_tile_id;
+	out.parent_core_id = id;
 
 	out.packets_out = 0;
 	out.energy = 0.0;
@@ -750,4 +874,43 @@ int sanafe::arch_parse_synapse_model(const std::string &model_str)
 	}
 
 	return model;
+}
+
+void sanafe::Architecture::save_arch_description(
+	const std::filesystem::path &path)
+{
+	std::ofstream out(path);
+	if (!out.is_open())
+	{
+		INFO("Error: Couldn't open arch file to save to: %s\n",
+			path.c_str());
+		throw std::invalid_argument(
+			"Error: Couldn't open arch file to save to.");
+	}
+
+	for (const Tile &tile: tiles_vec)
+	{
+		out << tile.description();
+		for (const Core &core: cores_vec)
+		{
+			out << core.description();
+			for (const AxonInUnit &in: core.axon_in_hw)
+			{
+				out << in.description();
+			}
+			for (const SynapseUnit &s: core.synapse)
+			{
+				out << s.description();
+			}
+			for (const SomaUnit &s: core.soma)
+			{
+				out << s.description();
+			}
+			// TODO: dendrites
+			for (const AxonOutUnit &o: core.axon_out_hw)
+			{
+				out << o.description();
+			}
+		}
+	}
 }

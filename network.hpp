@@ -121,9 +121,9 @@ public:
 	std::vector<std::reference_wrapper<NeuronGroup> > groups_vec;
 	Network() {};
 	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
-	void load_net(const std::string &filename, Architecture &arch);
+	void load_net_description(const std::string &filename, Architecture &arch);
 	std::string info() const;
-	void save_net(const std::filesystem::path &path, const bool save_mapping=true) const;
+	void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
 
 private:
 	// Do *NOT* allow Network objects to be copied

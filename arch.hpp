@@ -106,10 +106,10 @@ struct AxonInUnit
 	long int spike_messages_in;
 	double energy, time;
 	double energy_spike_message, latency_spike_message;
-	int parent_tile_id;
+	int parent_tile_id, parent_core_id;
 
 	AxonInUnit(const std::string &axon_in_name);
-
+	std::string description() const;
 };
 
 struct SynapseUnit
@@ -120,14 +120,18 @@ struct SynapseUnit
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
 	double latency_spike_op, latency_memory_access;
+	int parent_tile_id, parent_core_id;
 
 	SynapseUnit(const std::string &synapse_name);
+	std::string description() const;
 };
 
 struct DendriteUnit
 {
 	std::string name;
 	double energy, time;
+	int parent_tile_id, parent_core_id;
+	std::string description() const;
 };
 
 struct SomaUnit
@@ -140,9 +144,10 @@ struct SomaUnit
 	double energy_access_neuron, latency_access_neuron;
 	double energy_spiking, latency_spiking;
 	int leak_towards_zero, reset_mode, reverse_reset_mode;
-	int noise_type;
+	int noise_type, parent_tile_id, parent_core_id;
 
 	SomaUnit(const std::string &soma_name);
+	std::string description() const;
 };
 
 struct AxonOutUnit
@@ -153,9 +158,10 @@ struct AxonOutUnit
 	long int packets_out;
 	double energy, time;
 	double energy_access, latency_access;
-	int parent_tile_id;
+	int parent_tile_id, parent_core_id;
 
 	AxonOutUnit(const std::string &axon_out_name);
+	std::string description() const;
 };
 
 struct AxonInModel
@@ -205,6 +211,8 @@ public:
 	void map_neuron(Neuron &n);
 	int get_id() { return id; }
 	int get_offset() { return offset; }
+	std::string info() const;
+	std::string description() const;
 };
 
 class Tile
@@ -229,6 +237,8 @@ public:
 
 	Tile(const int tile_id);
 	int get_id() { return id; }
+	std::string info() const;
+	std::string description() const;
 };
 
 class Architecture
@@ -245,7 +255,10 @@ public:
 	int set_noc_attributes(const std::unordered_map<std::string, std::string> &attr);
 	Tile &create_tile(const std::unordered_map<std::string, std::string> &attr);
 	Core &create_core(const size_t tile_id, const std::unordered_map<std::string, std::string> &attr);
-	void load_arch_file(const std::string &filename);
+	void load_arch_description(const std::filesystem::path &filename);
+	std::string info();
+	std::string description() const;
+	void save_arch_description(const std::filesystem::path &path);
 
 private:
 	bool noc_init;
