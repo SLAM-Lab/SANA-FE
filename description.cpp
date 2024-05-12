@@ -202,10 +202,10 @@ void sanafe::description_read_arch_entry(
 		arch.set_noc_attributes(attributes);
 		break;
 	case 't':
-		arch.create_tile(attributes);
+		arch.create_tile(name, attributes);
 		break;
 	case 'c':
-		arch.create_core(tile_id, attributes);
+		arch.create_core(name, tile_id, attributes);
 		break;
 	case 'i':
 		core_ptr->create_axon_in(name, attributes);
@@ -214,7 +214,7 @@ void sanafe::description_read_arch_entry(
 		core_ptr->create_synapse(name, attributes);
 		break;
 	case 'd':
-		// TODO: support dendritic ops
+		core_ptr->create_dendrite(name, attributes);
 		break;
 	case '+':
 		core_ptr->create_soma(name, attributes);

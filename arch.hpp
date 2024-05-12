@@ -106,7 +106,7 @@ struct AxonInUnit
 	long int spike_messages_in;
 	double energy, time;
 	double energy_spike_message, latency_spike_message;
-	int parent_tile_id, parent_core_id;
+	int parent_tile_id, parent_core_offset;
 
 	AxonInUnit(const std::string &axon_in_name);
 	std::string description() const;
@@ -120,7 +120,7 @@ struct SynapseUnit
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
 	double latency_spike_op, latency_memory_access;
-	int parent_tile_id, parent_core_id;
+	int parent_tile_id, parent_core_offset;
 
 	SynapseUnit(const std::string &synapse_name);
 	std::string description() const;
@@ -130,8 +130,9 @@ struct DendriteUnit
 {
 	std::string name;
 	double energy, time;
-	int parent_tile_id, parent_core_id;
+	int parent_tile_id, parent_core_offset;
 	std::string description() const;
+	DendriteUnit(const std::string &dendrite_name);
 };
 
 struct SomaUnit
@@ -144,7 +145,7 @@ struct SomaUnit
 	double energy_access_neuron, latency_access_neuron;
 	double energy_spiking, latency_spiking;
 	int leak_towards_zero, reset_mode, reverse_reset_mode;
-	int noise_type, parent_tile_id, parent_core_id;
+	int noise_type, parent_tile_id, parent_core_offset;
 
 	SomaUnit(const std::string &soma_name);
 	std::string description() const;
@@ -158,7 +159,7 @@ struct AxonOutUnit
 	long int packets_out;
 	double energy, time;
 	double energy_access, latency_access;
-	int parent_tile_id, parent_core_id;
+	int parent_tile_id, parent_core_offset;
 
 	AxonOutUnit(const std::string &axon_out_name);
 	std::string description() const;
@@ -203,9 +204,10 @@ public:
 	int id, offset, parent_tile_id, buffer_pos;
 	int message_count;
 
-	Core(const int core_id, const int tile_id, const int offset);
+	Core(const std::string &name, const int core_id, const int tile_id, const int offset);
 	AxonInUnit &create_axon_in(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	SynapseUnit &create_synapse(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+	DendriteUnit &create_dendrite(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	SomaUnit &create_soma(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	AxonOutUnit &create_axon_out(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
 	void map_neuron(Neuron &n);
@@ -235,7 +237,7 @@ public:
 	int id, x, y;
 	int width; // For now just support 2 dimensions
 
-	Tile(const int tile_id);
+	Tile(const std::string &name, const int tile_id);
 	int get_id() { return id; }
 	std::string info() const;
 	std::string description() const;
@@ -253,8 +255,8 @@ public:
 	Architecture();
 	int get_core_count();
 	int set_noc_attributes(const std::unordered_map<std::string, std::string> &attr);
-	Tile &create_tile(const std::unordered_map<std::string, std::string> &attr);
-	Core &create_core(const size_t tile_id, const std::unordered_map<std::string, std::string> &attr);
+	Tile &create_tile(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+	Core &create_core(const std::string &name, const size_t tile_id, const std::unordered_map<std::string, std::string> &attr);
 	void load_arch_description(const std::filesystem::path &filename);
 	std::string info();
 	std::string description() const;

@@ -47,7 +47,6 @@ std::string sanafe::Connection::description() const
 	ss << "->";
 	ss << post_neuron->parent_group_id << '.' << post_neuron->id;
 	ss << print_format_attributes(attributes);
-	ss << std::endl;
 	return ss.str();
 }
 
@@ -104,7 +103,6 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 	{
 		ss << "& " << parent_group_id << '.' << id;
 		ss << '@' << core->parent_tile_id << '.' << core->id;
-		ss << std::endl;
 	}
 	return ss.str();
 }
@@ -178,7 +176,7 @@ std::string sanafe::NeuronGroup::description() const
 {
 	std::ostringstream ss;
 	ss << "g " << neurons.size();
-	ss << print_format_attributes(default_attributes) << std::endl;
+	ss << print_format_attributes(default_attributes);
 	return ss.str();
 }
 
@@ -382,7 +380,7 @@ void sanafe::Network::save_net_description(
 	// Save all groups first
 	for (const NeuronGroup &group: groups_vec)
 	{
-		out << group.description();
+		out << group.description() << std::endl;
 	}
 
 	// Now save all neurons and connections
@@ -395,7 +393,7 @@ void sanafe::Network::save_net_description(
 			// Save all edges for this neuron
 			for (const Connection &con: n.connections_out)
 			{
-				out << con.description();
+				out << con.description() << std::endl;
 			}
 		}
 	}
