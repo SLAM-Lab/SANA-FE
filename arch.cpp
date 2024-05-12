@@ -105,7 +105,7 @@ std::string sanafe::Architecture::description() const
 	attributes["height"] = print_int(noc_height);
 
 	std::ostringstream ss;
-	ss << '@' << print_format_attributes(attributes);
+	ss << '@' << print_format_attributes(attributes) << std::endl;
 	return ss.str();
 }
 
@@ -174,7 +174,7 @@ std::string sanafe::Tile::description() const
 	attributes["latency_south"] = print_float(energy_south_hop);
 
 	std::ostringstream ss;
-	ss << "t " << name << print_format_attributes(attributes);
+	ss << "t " << name << print_format_attributes(attributes) << std::endl;
 	return ss.str();
 }
 
@@ -362,7 +362,7 @@ std::string sanafe::Core::info() const
 std::string sanafe::Core::description() const
 {
 	std::ostringstream ss;
-	ss << "c " << name << ' ' << parent_tile_id;
+	ss << "c " << name << ' ' << parent_tile_id << std::endl;
 	return ss.str();
 }
 
@@ -373,7 +373,7 @@ std::string sanafe::AxonInUnit::description() const
 	attributes["latency_message"] = print_float(latency_spike_message);
 	std::ostringstream ss;
 	ss << "i " << name << ' ' << parent_tile_id;
-	ss << ' ' << parent_core_offset;
+	ss << ' ' << parent_core_offset << std::endl;
 	return ss.str();
 }
 
@@ -385,7 +385,7 @@ std::string sanafe::SynapseUnit::description() const
 	attributes["model"] = print_int(model);
 	std::ostringstream ss;
 	ss << "s " << name << ' ' << parent_tile_id << ' ' << parent_core_offset;
-	ss << print_format_attributes(attributes);
+	ss << print_format_attributes(attributes) << std::endl;
 	return ss.str();
 }
 
@@ -393,7 +393,7 @@ std::string sanafe::DendriteUnit::description() const
 {
 	std::ostringstream ss;
 	ss << "d " << name << ' ' << parent_tile_id;
-	ss << ' ' << parent_core_offset;
+	ss << ' ' << parent_core_offset << std::endl;
 	return ss.str();
 }
 
@@ -412,7 +412,7 @@ std::string sanafe::SomaUnit::description() const
 	std::ostringstream ss;
 	ss << "+ " << name << ' ' << parent_tile_id;
 	ss << ' ' << parent_core_offset;
-	ss << print_format_attributes(attributes);
+	ss << print_format_attributes(attributes) << std::endl;
 	return ss.str();
 }
 
@@ -424,7 +424,7 @@ std::string sanafe::AxonOutUnit::description() const
 	std::ostringstream ss;
 	ss << "o " << name << ' ' << parent_tile_id;
 	ss << ' ' << parent_core_offset;
-	ss << print_format_attributes(attributes);
+	ss << print_format_attributes(attributes) << std::endl;
 	return ss.str();
 }
 
@@ -934,31 +934,31 @@ void sanafe::Architecture::save_arch_description(
 
 	for (const Tile &tile: tiles_vec)
 	{
-		out << tile.description() << std::endl;
+		out << tile.description();
 		for (const Core &core: tile.cores)
 		{
-			out << core.description() << std::endl;
+			out << core.description();
 			for (const AxonInUnit &in: core.axon_in_hw)
 			{
-				out << in.description() << std::endl;
+				out << in.description();
 			}
 			for (const SynapseUnit &s: core.synapse)
 			{
-				out << s.description() << std::endl;
+				out << s.description();
 			}
 			for (const DendriteUnit &d: core.dendrite)
 			{
-				out << d.description() << std::endl;
+				out << d.description();
 			}
 			for (const SomaUnit &s: core.soma)
 			{
-				out << s.description() << std::endl;
+				out << s.description();
 			}
 			for (const AxonOutUnit &o: core.axon_out_hw)
 			{
-				out << o.description() << std::endl;
+				out << o.description();
 			}
 		}
 	}
-	out << description() << std::endl;
+	out << description();
 }

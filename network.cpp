@@ -40,13 +40,13 @@ std::string sanafe::Connection::description() const
 	assert(post_neuron != nullptr);
 
 	std::map<std::string, std::string> attributes;
-	attributes["w"] = weight;
+	attributes["w"] = print_float(weight);
 
 	std::ostringstream ss;
 	ss << pre_neuron->parent_group_id << '.' << pre_neuron->id;
 	ss << "->";
 	ss << post_neuron->parent_group_id << '.' << post_neuron->id;
-	ss << print_format_attributes(attributes);
+	ss << print_format_attributes(attributes) << std::endl;;
 	return ss.str();
 }
 
@@ -98,11 +98,13 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 {
 	std::ostringstream ss;
 	ss << "n " << parent_group_id << '.' << id;
-	ss << print_format_attributes(attributes) << std::endl;
+	ss << print_format_attributes(attributes);
+	ss << std::endl;
 	if (write_mapping && (core != nullptr))
 	{
 		ss << "& " << parent_group_id << '.' << id;
 		ss << '@' << core->parent_tile_id << '.' << core->id;
+		ss << std::endl;
 	}
 	return ss.str();
 }
@@ -176,7 +178,7 @@ std::string sanafe::NeuronGroup::description() const
 {
 	std::ostringstream ss;
 	ss << "g " << neurons.size();
-	ss << print_format_attributes(default_attributes);
+	ss << print_format_attributes(default_attributes) << std::endl;
 	return ss.str();
 }
 
@@ -380,7 +382,7 @@ void sanafe::Network::save_net_description(
 	// Save all groups first
 	for (const NeuronGroup &group: groups_vec)
 	{
-		out << group.description() << std::endl;
+		out << group.description();
 	}
 
 	// Now save all neurons and connections
@@ -393,7 +395,7 @@ void sanafe::Network::save_net_description(
 			// Save all edges for this neuron
 			for (const Connection &con: n.connections_out)
 			{
-				out << con.description() << std::endl;
+				out << con.description();
 			}
 		}
 	}
