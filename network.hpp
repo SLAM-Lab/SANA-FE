@@ -13,8 +13,8 @@
 
 #include <cstdint>
 #include <list>
+#include <map>
 #include <memory>
-#include <unordered_map>
 #include <filesystem>
 #include <functional> // For std::reference_wrapper
 #include "plugins.hpp"
@@ -60,7 +60,7 @@ class Neuron
 public:
 	std::vector<Connection> connections_out;
 	std::vector<int> axon_out_addresses;
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 
 	// Mapped hardware
 	Network *parent_net;
@@ -86,8 +86,8 @@ public:
 
 	Neuron(const size_t neuron_id);
 	int get_id() { return id; }
-	void set_attributes(const std::unordered_map<std::string, std::string> &attr);
-	void connect_to_neuron(Neuron &dest, const std::unordered_map<std::string, std::string> &attr);
+	void set_attributes(const std::map<std::string, std::string> &attr);
+	void connect_to_neuron(Neuron &dest, const std::map<std::string, std::string> &attr);
 	std::string info() const;
 	std::string description(const bool write_mapping=true) const;
 };
@@ -100,7 +100,7 @@ public:
 	std::vector<Neuron> neurons;
 	std::string default_soma_hw_name;
 	std::string default_synapse_hw_name;
-	std::unordered_map<std::string, std::string> default_attributes;
+	std::map<std::string, std::string> default_attributes;
 
 	int id;
 	int default_max_connections_out;
@@ -109,7 +109,7 @@ public:
 	int get_id() { return id; }
 	NeuronGroup(const size_t group_id, const int neuron_count);
 	void set_attribute_multiple(const std::string &attr, const std::vector<std::string> &values);
-	void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::unordered_map<std::string, std::vector<std::string> > &attr_lists);
+	void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::string> > &attr_lists);
 	std::string info() const;
 	std::string description() const;
 };
@@ -120,7 +120,7 @@ public:
 	std::list<NeuronGroup> groups;
 	std::vector<std::reference_wrapper<NeuronGroup> > groups_vec;
 	Network() {};
-	NeuronGroup &create_neuron_group(const int neuron_count, const std::unordered_map<std::string, std::string> &attr);
+	NeuronGroup &create_neuron_group(const int neuron_count, const std::map<std::string, std::string> &attr);
 	void load_net_description(const std::string &filename, Architecture &arch);
 	std::string info() const;
 	void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
@@ -137,7 +137,7 @@ private:
 	void check_mapped() const;
 };
 
-std::string network_format_attributes(const std::unordered_map<std::string, std::string> &attr);
+std::string network_format_attributes(const std::map<std::string, std::string> &attr);
 }
 
 #endif

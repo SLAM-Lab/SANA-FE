@@ -9,7 +9,7 @@
 #include <sstream>
 #include <string_view>
 #include <charconv>
-#include <unordered_map>
+#include <map>
 
 #include "arch.hpp"
 #include "network.hpp"
@@ -129,7 +129,7 @@ void sanafe::description_read_arch_entry(
 	const std::vector<std::string_view> &fields, Architecture &arch,
 	const int line_number)
 {
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	std::string name;
 	Tile *tile_ptr;
 	Core *core_ptr;
@@ -329,8 +329,7 @@ void sanafe::description_read_network_entry(
 	const std::vector<std::string_view> &fields, Architecture &arch,
 	Network &net, const int line_number)
 {
-	std::unordered_map<std::string, std::string> attributes;
-	attributes.reserve(16);
+	std::map<std::string, std::string> attributes;
 	NeuronGroup *group_ptr, *dest_group_ptr;
 	Neuron *neuron_ptr, *dest_ptr;
 	Tile *tile_ptr;

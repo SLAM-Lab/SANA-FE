@@ -36,7 +36,7 @@ LoihiLifModel::~LoihiLifModel()
 }
 
 void LoihiLifModel::set_attributes(
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	for (auto a: attr)
 	{

@@ -16,7 +16,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <list>
 #include <functional> // For std::reference_wrapper
 
@@ -205,11 +205,11 @@ public:
 	int message_count;
 
 	Core(const std::string &name, const int core_id, const int tile_id, const int offset);
-	AxonInUnit &create_axon_in(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-	SynapseUnit &create_synapse(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-	DendriteUnit &create_dendrite(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-	SomaUnit &create_soma(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-	AxonOutUnit &create_axon_out(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
+	AxonInUnit &create_axon_in(const std::string &name, const std::map<std::string, std::string> &attr);
+	SynapseUnit &create_synapse(const std::string &name, const std::map<std::string, std::string> &attr);
+	DendriteUnit &create_dendrite(const std::string &name, const std::map<std::string, std::string> &attr);
+	SomaUnit &create_soma(const std::string &name, const std::map<std::string, std::string> &attr);
+	AxonOutUnit &create_axon_out(const std::string &name, const std::map<std::string, std::string> &attr);
 	void map_neuron(Neuron &n);
 	int get_id() { return id; }
 	int get_offset() { return offset; }
@@ -254,9 +254,9 @@ public:
 
 	Architecture();
 	int get_core_count();
-	int set_noc_attributes(const std::unordered_map<std::string, std::string> &attr);
-	Tile &create_tile(const std::string &name, const std::unordered_map<std::string, std::string> &attr);
-	Core &create_core(const std::string &name, const size_t tile_id, const std::unordered_map<std::string, std::string> &attr);
+	int set_noc_attributes(const std::map<std::string, std::string> &attr);
+	Tile &create_tile(const std::string &name, const std::map<std::string, std::string> &attr);
+	Core &create_core(const std::string &name, const size_t tile_id, const std::map<std::string, std::string> &attr);
 	void load_arch_description(const std::filesystem::path &filename);
 	std::string info();
 	std::string description() const;

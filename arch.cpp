@@ -12,9 +12,9 @@
 #include <functional> // For std::reference_wrapper
 #include <iostream>
 #include <list>
+#include <map>
 #include <set>
 #include <sstream>
-#include <unordered_map>
 
 #include "arch.hpp"
 #include "network.hpp"
@@ -42,7 +42,7 @@ int sanafe::Architecture::get_core_count()
 }
 
 int sanafe::Architecture::set_noc_attributes(
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	const size_t tile_count = tiles.size();
 	if (tile_count == 0)
@@ -98,7 +98,7 @@ std::string sanafe::Architecture::description() const
 	// TODO: change to just a regular map - this way attributes will be
 	//  sorted and printed alphabetically. This will make for more
 	//  consistent and deterministic behavior
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	attributes["link_buffer_size"] = print_int(noc_buffer_size);
 	attributes["topology"] = "mesh";
 	attributes["width"] = print_int(noc_width);
@@ -163,7 +163,7 @@ std::string sanafe::Tile::info() const
 
 std::string sanafe::Tile::description() const
 {
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	attributes["energy_east"] = print_float(energy_east_hop);
 	attributes["energy_west"] = print_float(energy_west_hop);
 	attributes["energy_north"] = print_float(energy_north_hop);
@@ -191,7 +191,7 @@ sanafe::Core::Core(
 
 sanafe::Tile &sanafe::Architecture::create_tile(
 	const std::string &name,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 
 {
 	tiles.push_back(Tile(name, tiles.size()));
@@ -308,7 +308,7 @@ sanafe::AxonOutUnit::AxonOutUnit(const std::string &axon_out_name):
 sanafe::Core &sanafe::Architecture::create_core(
 	const std::string &name,
 	const size_t tile_id,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	if (tile_id > tiles.size())
 	{
@@ -353,7 +353,7 @@ sanafe::Core &sanafe::Architecture::create_core(
 
 std::string sanafe::Core::info() const
 {
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	std::ostringstream ss;
 	ss << "sanafe::Core(name= " << name << " tile=" << parent_tile_id << ")";
 	return ss.str();
@@ -368,7 +368,7 @@ std::string sanafe::Core::description() const
 
 std::string sanafe::AxonInUnit::description() const
 {
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	attributes["energy_message"] = print_float(energy_spike_message);
 	attributes["latency_message"] = print_float(latency_spike_message);
 	std::ostringstream ss;
@@ -379,7 +379,7 @@ std::string sanafe::AxonInUnit::description() const
 
 std::string sanafe::SynapseUnit::description() const
 {
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	attributes["energy_spike"] = print_float(energy_spike_op);
 	attributes["latency_spike"] = print_float(latency_spike_op);
 	attributes["model"] = print_int(model);
@@ -399,7 +399,7 @@ std::string sanafe::DendriteUnit::description() const
 
 std::string sanafe::SomaUnit::description() const
 {
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	attributes["model"] = "leaky_integrate_fire";
 	attributes["energy_access_neuron"] = print_float(energy_access_neuron);
 	attributes["latency_access_neuron"] =
@@ -418,7 +418,7 @@ std::string sanafe::SomaUnit::description() const
 
 std::string sanafe::AxonOutUnit::description() const
 {
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	attributes["energy"] = print_float(energy_access);
 	attributes["latency"] = print_float(latency_access);
 	std::ostringstream ss;
@@ -430,7 +430,7 @@ std::string sanafe::AxonOutUnit::description() const
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(
 	const std::string &name,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	axon_in_hw.push_back(AxonInUnit(name));
 	struct AxonInUnit &in = axon_in_hw.back();
@@ -464,7 +464,7 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(
 
 sanafe::SynapseUnit &sanafe::Core::create_synapse(
 	const std::string &name,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	synapse.push_back(SynapseUnit(name));
 	SynapseUnit &s = synapse.back();
@@ -513,7 +513,7 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
 
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(
 	const std::string &name,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	dendrite.push_back(DendriteUnit(name));
 	DendriteUnit &d = dendrite.back();
@@ -529,7 +529,7 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(
 
 sanafe::SomaUnit &sanafe::Core::create_soma(
 	const std::string &name,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	TRACE1("cid:%d creating soma sid:%lu with %lu attributes\n",
 		id, soma.size(), attr.size());
@@ -600,7 +600,7 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 
 sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
 	const std::string &name,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	axon_out_hw.push_back(AxonOutUnit(name));
 	AxonOutUnit &out = axon_out_hw.back();

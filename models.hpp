@@ -6,8 +6,8 @@
 #ifndef MODELS_HEADER_INCLUDED_
 #define MODELS_HEADER_INCLUDED_
 
+#include <map>
 #include <vector>
-#include <unordered_map>
 #include "description.hpp"
 
 #define MAX_NOISE_FILE_ENTRY 128
@@ -30,10 +30,12 @@ public:
 	SomaModel(const int gid, const int nid) : group_id(gid), neuron_id(nid) {}
 	virtual ~SomaModel() {}
 	virtual NeuronStatus update(const double current_in) = 0;
-	virtual void set_attributes(const std::unordered_map<std::string, std::string> &attr) = 0;
-	virtual double get_potential(){ return 0.0; }
-private:
+	virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
+	virtual double get_potential() { return 0.0; }
+protected:
 	const int group_id, neuron_id;
+	// TODO: this might be useful context
+	//const int mapped_tile_id, mapped_core_id, mapped_core_offset;
 };
 
 class LoihiLifModel: public SomaModel
@@ -41,7 +43,7 @@ class LoihiLifModel: public SomaModel
 public:
         LoihiLifModel(const int gid, const int nid);
 	~LoihiLifModel();
-	void set_attributes(const std::unordered_map<std::string, std::string> &attr);
+	void set_attributes(const std::map<std::string, std::string> &attr);
 	NeuronStatus update(const double current_in);
 	double get_potential() { return potential; }
 private:

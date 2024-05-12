@@ -6,12 +6,12 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
-#include <sstream>
 #include <list>
+#include <map>
 #include <memory>
-#include <unordered_map>
 #include <functional> // For std::reference_wrapper
 #include <filesystem> // For std::filesystem::path
+#include <sstream>
 
 #include "arch.hpp"
 #include "print.hpp"
@@ -39,7 +39,7 @@ std::string sanafe::Connection::description() const
 	assert(pre_neuron != nullptr);
 	assert(post_neuron != nullptr);
 
-	std::unordered_map<std::string, std::string> attributes;
+	std::map<std::string, std::string> attributes;
 	attributes["w"] = weight;
 
 	std::ostringstream ss;
@@ -108,7 +108,7 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 }
 
 NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	const auto id = groups_vec.size();
 
@@ -191,7 +191,7 @@ std::string sanafe::NeuronGroup::info() const
 }
 
 void sanafe::Neuron::set_attributes(
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	// Each hardware timestep corresponds to a simulation of the spiking
 	//  network for dt seconds. This relates to the LIF time constant.
@@ -255,7 +255,7 @@ void sanafe::NeuronGroup::set_attribute_multiple(
 			"(%lu!=%lu).\n", attr.size(), neurons.size());
 	}
 	size_t nid = 0;
-	std::unordered_map<std::string, std::string> map;
+	std::map<std::string, std::string> map;
 	for (const std::string &v: values)
 	{
 		auto &n = neurons[nid];
@@ -267,7 +267,7 @@ void sanafe::NeuronGroup::set_attribute_multiple(
 
 void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
 	const std::vector<std::pair<int, int> > &src_dest_id_pairs,
-	const std::unordered_map<std::string, std::vector<std::string> >
+	const std::map<std::string, std::vector<std::string> >
 		&attr_lists)
 {
 	int edge_id = 0;
@@ -293,7 +293,7 @@ void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
 		}
 
 		// Create attributes map for this neuron
-		std::unordered_map<std::string, std::string> attr;
+		std::map<std::string, std::string> attr;
 		for (auto &[key, value_list]: attr_lists)
 		{
 			if (value_list.size() != src_dest_id_pairs.size())
@@ -315,7 +315,7 @@ void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
 
 void sanafe::Neuron::connect_to_neuron(
 	Neuron &dest,
-	const std::unordered_map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &attr)
 {
 	connections_out.push_back(Connection(connections_out.size()));
 	Connection &con = connections_out.back();

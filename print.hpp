@@ -6,16 +6,15 @@
 #ifndef PRINT_HEADER_INCLUDED_
 #define PRINT_HEADER_INCLUDED_
 
+#include <map>
 #include <string>
-#include <unordered_map>
 #include "stdio.h"
 
 namespace sanafe
 {
-std::string print_format_attributes(const std::unordered_map<std::string, std::string> &attr);
+std::string print_format_attributes(const std::map<std::string, std::string> &attr);
 std::string print_float(const double val);
 std::string print_int(const long int val);
-
 }
 
 // DEBUG and TRACE print with source annotations, TRACE is only enabled for
