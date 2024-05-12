@@ -70,6 +70,16 @@ class Neuron:
                                                     self.tile, self.core)
         return ""
 """
+def map_neuron_group(neuron_group, arch, mappings):
+    assert(len(neuron_group.neurons) == len(mappings))
+    for n, m in zip(neuron_group.neurons, mappings):
+        tile_id, core_offset = m
+        # Look and find the tile and core objects
+        core = arch.tiles[tile_id].cores[core_offset]
+        core.map_neuron(n)
+        #print(f"Mapping n:{n.get_id()} to "
+        #      f"core {tile_id}.{core_offset}")
+
 
 def map_neurons_to_cores(neurons, arch, core_count):
     """Map neurons to one or more cores"""
@@ -180,8 +190,13 @@ def create_conv_layer(net, input_layer, input_shape, filters,
     return output_layer
 
 
-### Architecture description parsing ###
-def load_arch_from_yaml(yaml_filename):
+def load_net(net_filename):
+    net = sanafecpp.Network()
+    net.load_net_description(net_filename)
+    return net
+
+
+def load_arch(yaml_filename):
     arch = sanafecpp.Architecture()
     with open(yaml_filename, "r") as arch_file:
         arch_dict = yaml.safe_load(arch_file)
@@ -189,12 +204,13 @@ def load_arch_from_yaml(yaml_filename):
     if "architecture" not in arch_dict:
         raise Exception("Error: no architecture section defined")
 
-    parse_arch(arch, arch_dict["architecture"])
+    parse_arch_yaml(arch, arch_dict["architecture"])
 
     return arch
 
 
-def parse_arch(arch, arch_dict):
+### Architecture description parsing ###
+def parse_arch_yaml(arch, arch_dict):
     arch_name = arch_dict["name"]
     if "[" in arch_name:
         raise Exception("Error: multiple architectures not supported")
@@ -204,14 +220,13 @@ def parse_arch(arch, arch_dict):
 
     tiles = arch_dict["tile"]
     for tile_dict in tiles:
-        parse_tile(arch, tile_dict)
+        parse_tile_yaml(arch, tile_dict)
 
-    print(arch_dict)
     arch.set_noc_attributes(arch_dict["attributes"])
     return
 
 
-def parse_tile(arch, tile_dict):
+def parse_tile_yaml(arch, tile_dict):
     tile_name = tile_dict["name"]
     tile_name = tile_name.replace(" ", "_")
     tile_name = tile_name.replace("\t", "_")
@@ -224,7 +239,7 @@ def parse_tile(arch, tile_dict):
 
     for instance in range(range_min, range_max+1):
         tile_name = tile_name.split("[")[0] + "[{0}]".format(instance)
-        tile = arch.create_tile(tile_dict["attributes"])
+        tile = arch.create_tile(tile_name, tile_dict["attributes"])
 
         # Add any elements local to this h/w structure. They have access to any
         #  elements in the parent structures
@@ -233,12 +248,12 @@ def parse_tile(arch, tile_dict):
                             "must be at least one core")
         cores = tile_dict["core"]
         for _, core_dict in enumerate(cores):
-            parse_core(arch, tile.get_id(), core_dict)
+            parse_core_yaml(arch, tile.get_id(), core_dict)
 
     return
 
 
-def parse_core(arch, tile_id, core_dict):
+def parse_core_yaml(arch, tile_id, core_dict):
     core_name = core_dict["name"]
     core_name = core_name.replace(" ", "_")
     core_name = core_name.replace("\t", "_")
@@ -261,7 +276,7 @@ def parse_core(arch, tile_id, core_dict):
         core_attributes = core_dict.get("attributes", {})
         if core_attributes is None:
             core_attributes = {}
-        core = arch.create_core(tile.get_id(), core_attributes)
+        core = arch.create_core(core_name, tile.get_id(), core_attributes)
         for axon_in in core_dict["axon_in"]:
             axon_in_attributes = axon_in.get("attributes", {})
             if axon_in_attributes is None:
@@ -272,22 +287,16 @@ def parse_core(arch, tile_id, core_dict):
             if synapse_attributes is None:
                 synapse_attributes = {}
             core.create_synapse(synapse["name"], synapse_attributes)
-
-        #create_dendrite(core, core_dict["dendrite"][0])
-
+        for dendrite in core_dict["dendrite"]:
+            dendrite_attributes = dendrite.get("attributes", {})
+            if dendrite_attributes is None:
+                dendrite_attributes = {}
+            core.create_synapse(dendrite["name"], dendrite_attributes)
         for soma in core_dict["soma"]:
             soma_attributes = soma.get("attributes", {})
             if soma_attributes is None:
                 soma_attributes = {}
-            print(f"soma:{soma_attributes}")
             core.create_soma(soma["name"], soma_attributes)
-            #print(f"tile_id:{tile_id}")
-            #print(f"core_id:{core.get_offset()}")
-            #print(arch.tiles[tile_id].cores[core.get_offset()].soma)
-            #print(core.soma)
-            #print(id(core))
-            #print(id(arch.tiles[tile_id].cores[core.get_offset()]))
-            #exit(1)
         for axon_out in core_dict["axon_out"]:
             axon_out_attributes = soma.get("attributes", {})
             if axon_out_attributes is None:

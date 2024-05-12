@@ -43,6 +43,10 @@ Simulation::Simulation(
 	potential_trace_enabled = record_potentials;
 	perf_trace_enabled = record_perf;
 	message_trace_enabled = record_messages;
+
+	// Do final mapping stages and sanity check
+	arch_create_axons(arch);
+	net.check_mapped();
 }
 
 Simulation::~Simulation()

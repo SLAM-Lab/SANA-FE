@@ -4,10 +4,10 @@ This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
 
-Calibrating SANA-FE against real-world hardware
+Biologically-inspired power benchmark for neuromorphic hardware
 
-Use several partitions of a small benchmark to calibrate
-the simulator.
+Implements several partitions of a small power benchmark taken from
+[Parker, 2021].
 """
 import matplotlib
 matplotlib.use('Agg')
@@ -24,56 +24,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 
 sys.path.insert(0, PROJECT_DIR)
-import sim
+import sim as sf
+import sanafecpp as kernel
 
 MAX_TILES = 32
 MAX_CORES = 4
 MAX_COMPARTMENTS = 1024
 ARCH_FILENAME = "arch/loihi.yaml"
 
-import random
-def fully_connected(layer_neuron_count, spiking=True, force_update=False,
-                    connection_probability=1.0):
-    # Two layers, fully connected
-    network = sim.Network(save_mappings=True)
-
-    if spiking:  # always spike
-        threshold = -1.0
-    else:  # never spike
-        threshold = 2*layer_neuron_count
-
-    reset = 0
-    log_spikes = False
-    log_potential = False
-    force_update = False
-
-    # Create layers
-    layer_1 = sim.create_layer(network, layer_neuron_count,
-                               log_spikes=False, log_potential=False,
-                               force_update=False, threshold=threshold,
-                               reset=reset, neuron_model="loihi_lif",
-                               synapse_model="loihi_dense_synapse")
-    layer_2 = sim.create_layer(network, layer_neuron_count,
-                               log_spikes=False, log_potential=False,
-                               force_update=False, threshold=threshold,
-                               reset=reset, neuron_model="loihi_lif",
-                               synapse_model="loihi_dense_synapse")
-
-    # Create connections
-    weight = 1.0
-    for src in layer_1.neurons:
-        for dest in layer_2.neurons:
-            if random.random() < connection_probability:
-                # Same weight for all connections
-                src.add_connection(dest, weight)
-
-    return network
-
-
-def connected_layers(weights, spiking=True, mapping="l2_split",
+def connected_layers(arch, weights, spiking=True, mapping="l2_split",
                      copy_network=False):
-    network = sim.Network(save_mappings=True)
 
+    net = kernel.Network()
     layer_neuron_count = len(weights)
     if spiking:  # always spike
         threshold = -1.0
@@ -94,20 +56,26 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
             print("Error: mapping not supported")
             exit(1)
 
-        layer_mapping = [(0, i) for _ in range(0, neurons_per_core[0])]
+        layer1_mapping = [(0, i) for _ in range(0, neurons_per_core[0])]
         for _ in range(0, neurons_per_core[1]):
-            layer_mapping.append((0, 1))
+            layer1_mapping.append((0, 1))
         for _ in range(0, neurons_per_core[2]):
-            layer_mapping.append((0, 2))
+            layer1_mapping.append((0, 2))
         for _ in range(0, neurons_per_core[3]):
-            layer_mapping.append((0, 3))
+            layer1_mapping.append((0, 3))
 
-        layer_1 = sim.create_layer(network, layer_neuron_count,
-                                   log_spikes=False, log_potential=False,
-                                   force_update=False, threshold=threshold,
-                                   reset=0.0, leak=1.0, mappings=layer_mapping,
-                                   soma_hw_name="loihi_lif",
-                                   synapse_hw_name="loihi_dense_synapse")
+        layer1_attributes = {
+            "log_spikes": 1,
+            "log_potential": 1,
+            "force_update": 1,
+            "threshold": threshold,
+            "reset": 0.0,
+            "leak_decay": 0.0,
+            "soma_hw_name": "loihi_lif",
+            "synapse_hw_name": "loihi_dense_synapse",
+        }
+        layer_1 = net.create_neuron_group(layer_neuron_count,
+                                          layer1_attributes)
 
         neurons_per_core = [0, 0, 0, 0, 0]
         if mapping == "luke":
@@ -133,35 +101,46 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
         elif mapping == "split_2_diff_tiles":
             neurons_per_core[4] = layer_neuron_count
 
-        layer_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
+        layer2_mapping = [(0, 0) for _ in range(0, neurons_per_core[0])]
         for _ in range(0, neurons_per_core[1]):
-            layer_mapping.append((0, 1))
+            layer2_mapping.append((0, 1))
         for _ in range(0, neurons_per_core[2]):
-            layer_mapping.append((0, 2))
+            layer2_mapping.append((0, 2))
         for _ in range(0, neurons_per_core[3]):
-            layer_mapping.append((0, 3))
+            layer2_mapping.append((0, 3))
         for _ in range(0, neurons_per_core[4]):
-            layer_mapping.append((1, i))
+            layer2_mapping.append((1, i))
 
-        layer_2 = sim.create_layer(network, layer_neuron_count,
-                                log_spikes=False,
-                                log_potential=False, force_update=False,
-                                threshold=threshold, reset=0.0, leak=1.0,
-                                mappings=layer_mapping,
-                                soma_hw_name="loihi_lif",
-                                synapse_hw_name="loihi_dense_synapse")
+        layer2_attributes = {
+            "log_spikes": 1,
+            "log_potential": 1,
+            "force_update": 0,
+            "threshold": threshold,
+            "soma_hw_name": "loihi_lif",
+            "synapse_hw_name": "loihi_dense_synapse",
+            # Add bias to force neuron to fire
+            "bias": 1.0,
+        }
+        layer_2 = net.create_neuron_group(layer_neuron_count,
+                                          layer2_attributes)
 
         for src in layer_1.neurons:
-            # Add bias to force neuron to fire
-            src.add_bias(1.0)
             for dest in layer_2.neurons:
                 # Take the ID of the neuron in the 2nd layer
-                weight = float(weights[src.id][dest.id]) / 256
+                weight = float(weights[src.get_id()][dest.get_id()]) / 256
                 if abs(weight) >= (1.0 / 256):
                     # Zero weights are pruned i.e. removed
-                    src.add_connection(dest, weight)
+                    src.connect_to_neuron(dest, { "weight": weight } )
 
-    return network
+        # TODO: we have to map the neurons after defining them and their
+        #  connections. Add flags in the kernel to make sure this happens.
+        #  Currently when we save the net file this won't be adhered to.. do
+        #  we need to fix the save_net code or allow us to add connections
+        #  after mapping to cores
+        sf.map_neuron_group(layer_1, arch, layer1_mapping)
+        sf.map_neuron_group(layer_2, arch, layer2_mapping)
+
+    return net
 
 
 def run_spiking_experiment(mapping, max_size=30):
@@ -173,14 +152,16 @@ def run_spiking_experiment(mapping, max_size=30):
         # Sweep across range of network sizes
         layer_neurons = i*i
         copy_network = (True if mapping == "split_2_diff_tiles" else False)
-        snn = connected_layers(weights[i-1].transpose(), spiking=True,
+        arch = sf.load_arch(ARCH_FILENAME)
+
+        snn = connected_layers(arch, weights[i-1].transpose(), spiking=True,
                                mapping=mapping, copy_network=copy_network)
         network_filename = f"runs/calibration/snn/connected_layers_N{layer_neurons}_map_{mapping}.net"
-        snn.save(network_filename)
+        snn.save_net_description(network_filename)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
-        results = sim.run(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"),
-                          network_filename, timesteps)
+        sim = kernel.Simulation(arch, snn)
+        results = sim.run(timesteps)
 
         with open(os.path.join(PROJECT_DIR, "runs",
                                "calibration", "sim_spiking.csv"),
@@ -195,6 +176,7 @@ def run_spiking_experiment(mapping, max_size=30):
                                       "time": results["sim_time"],
                                       "energy": results["energy"],
                                       "mapping": mapping})
+            print(f"Run results:{results}")
 
     return
 

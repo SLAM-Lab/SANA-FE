@@ -363,8 +363,6 @@ void sanafe::Network::load_net_description(
 	{
 		throw std::invalid_argument("Error: Invalid network file.");
 	}
-	check_mapped();
-	arch_create_axons(arch);
 }
 
 void sanafe::Network::save_net_description(

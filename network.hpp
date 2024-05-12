@@ -124,6 +124,7 @@ public:
 	void load_net_description(const std::string &filename, Architecture &arch);
 	std::string info() const;
 	void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
+	void check_mapped() const;
 
 private:
 	// Do *NOT* allow Network objects to be copied
@@ -134,10 +135,7 @@ private:
 	//  If the Network was moved or copied, all parent links would be
 	//  invalidated.
 	Network(const Network &copy);
-	void check_mapped() const;
 };
-
-std::string network_format_attributes(const std::map<std::string, std::string> &attr);
 }
 
 #endif
