@@ -72,7 +72,7 @@ public:
 	std::shared_ptr<SomaModel> model;
 
 	// Track the timestep each hardware unit was last updated
-	bool fired, force_update, log_spikes, log_potential;
+	bool force_update, log_spikes, log_potential;
 	bool update_needed;
 	int id, parent_group_id;
 	int spike_count;

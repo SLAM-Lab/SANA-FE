@@ -108,7 +108,7 @@ RunData Simulation::run(const long int timesteps, const long int heartbeat)
 		const Timestep ts = step();
 		rd.energy += ts.energy;
 		rd.sim_time += ts.sim_time;
-		rd.spikes += ts.spikes;
+		rd.spikes += ts.spike_count;
 		rd.packets_sent += ts.packets_sent;
 		rd.neurons_fired += ts.neurons_fired;
 		rd.wall_time = wall_time;
@@ -380,7 +380,6 @@ Timestep::Timestep(const long int ts, const int core_count)
 		sim_init_fifo(q);
 	}
 	neurons_fired = 0L;
-	spikes = 0L;
 	total_hops = 0L;
 	energy = 0.0;
 	sim_time = 0.0;
@@ -795,8 +794,8 @@ void sanafe::sim_update_noc(const double t, NocInfo &noc)
 	return;
 }
 
-double sanafe::sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
-				const Scheduler &scheduler)
+double sanafe::sim_schedule_messages(
+	std::vector<MessageFifo> &messages_sent, const Scheduler &scheduler)
 {
 	struct MessageFifo *priority_queue;
 	NocInfo noc;
@@ -853,6 +852,11 @@ double sanafe::sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
 		//  from a src neuron to a dest neuron
 		if (!m->dummy_message)
 		{
+			INFO("Processing message for nid:%d.%d\n",
+				m->src_neuron->parent_group_id,
+				m->src_neuron->id);
+			INFO("Send delay:%e\n", m->generation_delay);
+			INFO("Receive delay:%e\n", m->receive_delay);
 			const int dest_core = m->dest_core_offset;
 			// Figure out if we are able to send a message into the
 			//  network i.e., is the route to the dest core
@@ -901,7 +905,7 @@ double sanafe::sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
 
 		// Get the next message for this core
 		next_message = q->tail;
-		if (next_message != NULL)
+		if (next_message != nullptr)
 		{
 			// If applicable, schedule this next message immediately
 			//  after the current message finishes sending
@@ -917,7 +921,7 @@ double sanafe::sim_schedule_messages(std::vector<MessageFifo> &messages_sent,
 				c->id);
 		}
 
-		if (priority_queue != NULL)
+		if (priority_queue != nullptr)
 		{
 			TRACE2("\t(cid:%d.%d) time:%e\n",
 				(*priority_queue)->t->id,
@@ -955,7 +959,7 @@ void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 	}
 	else if (c.buffer_pos == BUFFER_AXON_OUT)
 	{
-		if (n.fired)
+		if (n.neuron_status == sanafe::FIRED)
 		{
 			n.processing_latency = n.soma_hw->latency_spiking;
 			sim_neuron_send_spike_message(ts, arch, n);
@@ -982,8 +986,8 @@ double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
 		AxonInModel &a = c.axons_in[m.dest_axon_id];
 		for (int s: a.synapse_addresses)
 		{
-			const int synaptic_lookup = 1;
-			message_processing_latency = sim_update_synapse(
+			const int synaptic_lookup = true;
+			message_processing_latency += sim_update_synapse(
 				ts, arch, c, s, synaptic_lookup);
 		}
 	}
@@ -1216,6 +1220,7 @@ double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 		SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
 		soma->neurons_fired++;
 		sim_neuron_send_spike_message(ts, arch, n);
+		latency += n.soma_hw->latency_spiking;
 	}
 
 	// Update soma, if there are any received spikes, there is a non-zero
@@ -1409,7 +1414,7 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
 			n.update_needed |=
 				(n.force_update || (n.neuron_status >= 1));
 			n.processing_latency = 0.0;
-			n.fired = 0;
+			n.neuron_status = sanafe::IDLE;
 		}
 	}
 
