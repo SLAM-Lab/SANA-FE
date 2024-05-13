@@ -51,7 +51,7 @@ int sanafe::description_parse_arch_file(
 }
 
 int sanafe::description_parse_net_file(
-	std::ifstream &fp, struct Network &net, Architecture &arch)
+	std::ifstream &fp, class Network &net, Architecture &arch)
 {
 	std::vector<std::string_view> fields;
 	fields.reserve(default_fields);

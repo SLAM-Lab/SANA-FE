@@ -35,11 +35,11 @@ enum ConnectionConfigFormat
 
 // Forward declarations
 class Core;
-struct Neuron;
-struct NeuronGroup;
+class Neuron;
+class NeuronGroup;
 class Architecture;
 struct SomaUnit;
-struct SomaModel;
+class SomaModel;
 struct SynapseUnit;
 struct AxonOutUnit;
 

@@ -50,9 +50,9 @@ public:
 private:
 	bool force_update;
 	int soma_last_updated, reset_mode, reverse_reset_mode;
-        int noise_type;
+        //int noise_type;
 	double potential, leak_decay, bias, threshold, reverse_threshold;
-        double reset, reverse_reset, leak_bias;
+        double reset, reverse_reset;
 };
 
 NeuronResetModes model_parse_reset_mode(const std::string &str);

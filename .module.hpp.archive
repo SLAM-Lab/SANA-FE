@@ -33,7 +33,7 @@ class sana_fe
 {
 public:
 	struct simulation *sim;
-	struct network net;
+	class Network net;
 	struct architecture *arch;
 	int timesteps;
 	FILE *input_fp;
@@ -73,7 +73,7 @@ public:
 	}
 };
 
-void run(struct simulation *sim, struct network *net, struct architecture *arch);
+void run(struct simulation *sim, class Network *net, struct architecture *arch);
 struct timespec calculate_elapsed_time(struct timespec ts_start, struct timespec ts_end);
 void store_data_init(run_ts_data* data, simulation* sim, int timesteps);
 void store_data(run_ts_data* data, simulation* sim);

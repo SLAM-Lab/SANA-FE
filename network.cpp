@@ -68,7 +68,7 @@ sanafe::NeuronGroup::NeuronGroup(const size_t group_id, const int neuron_count)
 
 sanafe::Neuron::Neuron(const size_t neuron_id)
 {
-	id = id;
+	id = neuron_id;
 	log_spikes = false;
 	log_potential = false;
 	neuron_status = sanafe::IDLE;
@@ -82,7 +82,6 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
 
 	soma_last_updated = 0;
 	dendrite_last_updated = 0;
-	core = nullptr;
 }
 
 std::string sanafe::Neuron::info() const
@@ -496,9 +495,9 @@ int network_create_input_node(struct input *const in, const int connection_count
 
 /*
 Neuron *network_id_to_neuron_ptr(
-	Network *const net, const struct neuron_id id)
+	Network *const net, const class Neuron_id id)
 {
-	struct neuron_group *group;
+	class Neuron_group *group;
 	Neuron *neuron;
 
 	if (id.group < net->neuron_group_count)

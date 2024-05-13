@@ -18,10 +18,10 @@ enum DescriptionRet
 // Forward struct declarations
 class Simulation;
 class Architecture;
-struct Network;
-struct NeuronGroup;
-struct Neuron;
-struct Tile;
+class Network;
+class NeuronGroup;
+class Neuron;
+class Tile;
 class Core;
 
 int description_parse_arch_file(std::ifstream &fp, Architecture &arch);

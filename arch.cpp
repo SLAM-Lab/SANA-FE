@@ -709,7 +709,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 
 	// Figure out the unique set of cores that this neuron broadcasts to
 	TRACE1("Counting connections for neuron nid:%d\n", pre_neuron.id);
-	std::vector<bool> core_inserted();
+	std::vector<bool> core_inserted;
 	std::set<Core *> cores_out;
 	for (Connection &curr_connection: pre_neuron.connections_out)
 	{

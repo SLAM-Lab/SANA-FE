@@ -5,7 +5,7 @@ struct description_block
 	char name[MAX_FIELD_LEN];
 	struct attributes attributes[ARCH_MAX_ATTRIBUTES];
 	struct architecture *arch;
-	struct tile *t;
+	class Tile *t;
 	struct core *c;
 	struct description_block *child, *parent, *next_sibling;
 	int type, instances, indent, attribute_count;

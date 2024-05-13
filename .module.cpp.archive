@@ -276,7 +276,7 @@ void sana_fe::clean_up(int ret)
 	}
 }
 
-void run(struct simulation *sim, struct network *net, struct architecture *arch)
+void run(struct simulation *sim, class Network *net, struct architecture *arch)
 {
 	// TODO: remove the need to pass the network struct, only the arch
 	//  should be needed (since it links back to the net anyway)

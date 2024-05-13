@@ -388,8 +388,9 @@ Timestep::Timestep(const long int ts, const int core_count)
 void sanafe::sim_process_neurons(Timestep &ts, Network &net, Architecture &arch)
 {
 #pragma omp parallel for schedule(dynamic)
-	for (Core &c: arch.cores_vec)
+	for (size_t i = 0; i < arch.cores_vec.size(); i++)
 	{
+		Core &c = arch.cores_vec[i];
 		for (std::vector<Neuron>::size_type k = 0;
 			k < c.neurons.size(); k++)
 		{
@@ -454,11 +455,12 @@ void sanafe::sim_receive_messages(Timestep &ts, Architecture &arch)
 	}
 
 	// Now process all messages at receiving cores
-//#pragma omp parallel for schedule(dynamic)
-	for (Core &c: arch.cores_vec)
+#pragma omp parallel for schedule(dynamic)
+	for (size_t i = 0; i < arch.cores_vec.size(); i++)
 	{
-		//INFO("Processing %lu message(s) for cid:%d\n",
-		//	c.messages_in.size(), c.id);
+		Core &c = arch.cores_vec[i];
+		TRACE1("Processing %lu message(s) for cid:%d\n",
+			c.messages_in.size(), c.id);
 		for (auto m: c.messages_in)
 		{
 			m->receive_delay += sim_pipeline_receive(
