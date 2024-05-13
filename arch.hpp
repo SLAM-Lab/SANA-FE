@@ -80,7 +80,8 @@ struct Message
 	long int timestep;
 	int spikes, hops;
 	int src_x, dest_x, src_y, dest_y;
-	int dest_tile_id, dest_core_offset, dest_axon_id;
+	int dest_tile_id, dest_core_id, dest_core_offset;
+	int dest_axon_hw, dest_axon_id;
 	bool dummy_message, in_noc;
 
 	Message();

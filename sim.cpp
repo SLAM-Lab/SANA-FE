@@ -7,13 +7,14 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
-#include <omp.h>
+#include <optional>
 #include <vector>
 #include <list>
 #include <memory>
 #include <sstream>
 #include <filesystem>
 
+#include <omp.h>
 #include "print.hpp"
 #include "sim.hpp"
 #include "network.hpp"
@@ -162,15 +163,12 @@ Timestep Simulation::step()
 			for (auto it = q.begin(); it != q.end(); ++it)
 			{
 				Message &m = *it;
-				if (!m.dummy_message)
-				{
-					// Ignore dummy messages (without a
-					//  destination). These are inserted to
-					//  account for processing that doesn't
-					//  result in a spike being sent
-					sim_trace_record_message(
-						message_trace, m);
-				}
+				// Ignore dummy messages (without a
+				//  destination). These are inserted to
+				//  account for processing that doesn't
+				//  result in a spike being sent
+				sim_trace_record_message(
+					message_trace, m);
 			}
 		}
 	}
@@ -301,7 +299,7 @@ std::ofstream sanafe::sim_trace_open_perf_trace(
 std::ofstream sanafe::sim_trace_open_message_trace(
 	const std::filesystem::path &out_dir)
 {
-	const std::filesystem::path message_path = out_dir / "/messages.csv";
+	const std::filesystem::path message_path = out_dir / "messages.csv";
 	std::ofstream message_file(message_path);
 	if (!message_file.is_open())
 	{
@@ -339,10 +337,11 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 	// Performance statistics for this time step
 	ts.energy = sim_calculate_energy(arch);
 
-	for (auto &t: arch.tiles)
+	for (auto &tile: arch.tiles)
 	{
 		int tile_spike_count = 0;
-		for (auto &c: t.cores)
+		ts.total_hops += tile.hops;
+		for (auto &c: tile.cores)
 		{
 			for (std::vector<SynapseUnit>::size_type k = 0;
 				k < c.synapse.size(); k++)
@@ -455,14 +454,14 @@ void sanafe::sim_receive_messages(Timestep &ts, Architecture &arch)
 	}
 
 	// Now process all messages at receiving cores
-#pragma omp parallel for schedule(dynamic)
+//#pragma omp parallel for schedule(dynamic)
 	for (Core &c: arch.cores_vec)
 	{
-		SIM_TRACE1("Processing %lu message(s) for cid:%d.%d\n",
-			c.messages_in.size(), tile.id, c.offset);
+		//INFO("Processing %lu message(s) for cid:%d\n",
+		//	c.messages_in.size(), c.id);
 		for (auto m: c.messages_in)
 		{
-			m->receive_delay = sim_pipeline_receive(
+			m->receive_delay += sim_pipeline_receive(
 				ts, arch, c, *m);
 		}
 	}
@@ -781,7 +780,7 @@ void sanafe::sim_update_noc(const double t, NocInfo &noc)
 			{
 				// Mark the message as not in the NoC, moving it
 				//  from the network to the receiving core
-				m->in_noc = 0;
+				m->in_noc = false;
 				sim_message_fifo_pop(q);
 				// Go along the message path and decrement tile
 				//  message counters
@@ -852,12 +851,12 @@ double sanafe::sim_schedule_messages(
 		//  from a src neuron to a dest neuron
 		if (!m->dummy_message)
 		{
-			INFO("Processing message for nid:%d.%d\n",
+			SIM_TRACE1("Processing message for nid:%d.%d\n",
 				m->src_neuron->parent_group_id,
 				m->src_neuron->id);
-			INFO("Send delay:%e\n", m->generation_delay);
-			INFO("Receive delay:%e\n", m->receive_delay);
-			const int dest_core = m->dest_core_offset;
+			SIM_TRACE1("Send delay:%e\n", m->generation_delay);
+			SIM_TRACE1("Receive delay:%e\n", m->receive_delay);
+			const int dest_core = m->dest_core_id;
 			// Figure out if we are able to send a message into the
 			//  network i.e., is the route to the dest core
 			//  saturated and likely to block? Sum along the route
@@ -876,7 +875,7 @@ double sanafe::sim_schedule_messages(
 			// Now, push the message into the right receiving queue
 			//  Calculate the network delay and when the message
 			//  is received
-			m->in_noc = 1;
+			m->in_noc = true;
 			sim_message_fifo_push(
 				noc.messages_received[dest_core], *m);
 
@@ -968,7 +967,6 @@ void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 	SIM_TRACE1("Updating neuron %d.%d.\n", n.parent_group_id, n.id);
 
 	c.next_message.generation_delay += n.processing_latency;
-	n.update_needed = 0;
 	n.spike_count = 0;
 }
 
@@ -984,6 +982,14 @@ double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
 		assert(m.dest_axon_id >= 0);
 		assert(static_cast<size_t>(m.dest_axon_id) < c.axons_in.size());
 		AxonInModel &a = c.axons_in[m.dest_axon_id];
+
+		assert(m.dest_axon_hw >= 0);
+		assert(static_cast<size_t>(m.dest_axon_hw) <
+			c.axon_in_hw.size());
+
+		AxonInUnit &hw = c.axon_in_hw[m.dest_axon_hw];
+		message_processing_latency += hw.latency_spike_message;
+		hw.spike_messages_in++;
 		for (int s: a.synapse_addresses)
 		{
 			const int synaptic_lookup = true;
@@ -1134,7 +1140,6 @@ double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	if (synaptic_lookup)
 	{
 		con.current += con.weight;
-		post_neuron.update_needed = 1;
 		post_neuron.spike_count++;
 
 		assert(con.synapse_hw != NULL);
@@ -1199,41 +1204,41 @@ double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 	SomaUnit *const soma = n.soma_hw;
 
 	SIM_TRACE1("nid:%d updating, current_in:%lf\n", n.id, current_in);
+	double latency = 0.0;
 	while (n.soma_last_updated < ts.timestep)
 	{
-		n.neuron_status = n.model->update(current_in);
+		std::optional<double> soma_current = std::nullopt;
+		if ((n.spike_count > 0) || (std::fabs(current_in) > 0.0))
+		{
+			soma_current = current_in;
+		}
+		n.neuron_status = n.model->update(soma_current);
+		if (n.forced_spikes > 0)
+		{
+			n.neuron_status = sanafe::FIRED;
+			n.forced_spikes--;
+		}
+
+		latency += n.soma_hw->latency_access_neuron;
+		if ((n.neuron_status == sanafe::UPDATED) ||
+			(n.neuron_status == sanafe::FIRED))
+		{
+			latency += n.soma_hw->latency_update_neuron;
+			soma->neuron_updates++;
+			if (n.neuron_status == sanafe::FIRED)
+			{
+				SIM_TRACE1("Neuron %d.%d fired\n",
+					n.parent_group_id, n.id);
+				sim_neuron_send_spike_message(ts, arch, n);
+				latency += n.soma_hw->latency_spiking;
+				soma->neurons_fired++;
+			}
+		}
+
 		n.soma_last_updated++;
 	}
 
-	double latency = 0.0;
-
 	SIM_TRACE1("neuron status:%d\n", n.neuron_status);
-	if (n.forced_spikes > 0)
-	{
-		n.neuron_status = sanafe::FIRED;
-		n.forced_spikes--;
-	}
-
-	// Check for spiking
-	if (n.neuron_status == sanafe::FIRED)
-	{
-		SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
-		soma->neurons_fired++;
-		sim_neuron_send_spike_message(ts, arch, n);
-		latency += n.soma_hw->latency_spiking;
-	}
-
-	// Update soma, if there are any received spikes, there is a non-zero
-	//  bias or we force the neuron to update every time-step
-	if ((n.neuron_status == sanafe::UPDATED) ||
-		(n.neuron_status == sanafe::FIRED) ||
-		(n.force_update))
-	{
-		latency += n.soma_hw->latency_update_neuron;
-		soma->neuron_updates++;
-	}
-
-	latency += n.soma_hw->latency_access_neuron;
 
 	return latency;
 }
@@ -1266,17 +1271,26 @@ void sanafe::sim_neuron_send_spike_message(
 		m.spikes = dest_axon.synapse_addresses.size();
 		m.dummy_message = false;
 		m.dest_tile_id = dest_tile.id;
+		m.dest_core_id = dest_core.id;
 		m.dest_core_offset = dest_core.offset;
+
 		m.src_x = src_tile.x;
 		m.dest_x = dest_tile.x;
 		m.src_y = src_tile.y;
 		m.dest_y = dest_tile.y;
 
+		// TODO: support multiple axon output units
+		//  I would need to figure how we map a synapse to a specific
+		//  axon out
+		m.dest_axon_hw = 0;
+
 		// Add axon access cost to message latency and energy
 		AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
-		m.generation_delay =
+		m.generation_delay +=
 			src_core.next_message.generation_delay +
 			axon_out_hw.latency_access;
+		m.network_delay = 0.0;
+		m.receive_delay = 0.0;
 		axon_out_hw.packets_out++;
 
 		ts.messages[core_id].push_back(m);
@@ -1353,12 +1367,13 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 
 	for (auto &t: arch.tiles)
 	{
-		double total_hop_energy = t.east_hops * t.energy_east_hop;
-
-		total_hop_energy += t.west_hops * t.energy_west_hop;
-		total_hop_energy += t.south_hops * t.energy_south_hop;
-		total_hop_energy +=  t.north_hops * t.energy_north_hop;
+		double total_hop_energy = (t.east_hops * t.energy_east_hop);
+		total_hop_energy += (t.west_hops * t.energy_west_hop);
+		total_hop_energy += (t.south_hops * t.energy_south_hop);
+		total_hop_energy +=  (t.north_hops * t.energy_north_hop);
 		network_energy += total_hop_energy;
+		TRACE1("east:%ld west:%ld north:%ld south:%ld\n",
+			t.east_hops, t.west_hops, t.north_hops, t.south_hops);
 
 		for (auto &c: t.cores)
 		{
@@ -1368,6 +1383,10 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 				axon_in_energy +=
 					c.axon_in_hw[k].spike_messages_in *
 					c.axon_in_hw[k].energy_spike_message;
+				TRACE1("spikes in: %ld, energy:%e\n",
+					c.axon_in_hw[k].spike_messages_in,
+					c.axon_in_hw[k].energy_spike_message);
+
 			}
 			for (std::vector<SynapseUnit>::size_type k = 0;
 				k < c.synapse.size(); k++)
@@ -1375,17 +1394,23 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 				synapse_energy +=
 					c.synapse[k].spikes_processed *
 					c.synapse[k].energy_spike_op;
+				TRACE1("synapse processed: %ld, energy:%e\n",
+					c.synapse[k].spikes_processed,
+					c.synapse[k].energy_spike_op);
 			}
 			for (std::vector<SomaUnit>::size_type k = 0;
 				k < c.soma.size(); k++)
 			{
-
 				soma_energy += c.soma[k].neuron_count *
 					c.soma[k].energy_access_neuron;
 				soma_energy += c.soma[k].neuron_updates *
 					c.soma[k].energy_update_neuron;
 				soma_energy += c.soma[k].neurons_fired *
 					c.soma[k].energy_spiking;
+				TRACE1("neurons:%ld updates:%ld, spiking:%ld\n",
+					c.soma[k].neuron_count,
+					c.soma[k].neuron_updates,
+					c.soma[k].neurons_fired);
 			}
 			for (std::vector<AxonOutUnit>::size_type k = 0;
 				k < c.axon_out_hw.size(); k++)
@@ -1393,12 +1418,22 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 				axon_out_energy +=
 					c.axon_out_hw[k].packets_out *
 					c.axon_out_hw[k].energy_access;
+				TRACE1("packets: %ld, energy:%e\n",
+					c.axon_out_hw[k].packets_out,
+					c.axon_out_hw[k].energy_access);
 			}
 		}
 	}
 
 	total_energy = axon_in_energy + synapse_energy + soma_energy +
 		axon_out_energy + network_energy;
+
+	TRACE1("axon_in_energy:%e\n", axon_in_energy);
+	TRACE1("synapse_energy:%e\n", synapse_energy);
+	TRACE1("soma_energy:%e\n", soma_energy);
+	TRACE1("axon_out_energy:%e\n", axon_out_energy);
+	TRACE1("network_energy:%e\n", network_energy);
+	TRACE1("total:%e\n", total_energy);
 
 	return total_energy;
 }
@@ -1409,10 +1444,6 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
 	{
 		for (auto &n: group.neurons)
 		{
-			// Neurons can be manually forced to update, for example
-			//  if they have a constant input bias
-			n.update_needed |=
-				(n.force_update || (n.neuron_status >= 1));
 			n.processing_latency = 0.0;
 			n.neuron_status = sanafe::IDLE;
 		}
@@ -1623,7 +1654,15 @@ void sanafe::sim_trace_record_message(std::ofstream &out, const Message &m)
 	assert(m.src_neuron->core != nullptr);
 	out << m.src_neuron->core->parent_tile_id << ".";
 	out << m.src_neuron->core->offset << ",";
-	out << m.dest_tile_id << "." << m.dest_core_offset << ",";
+
+	if (m.dummy_message)
+	{
+		out << "x.x,";
+	}
+	else
+	{
+		out << m.dest_tile_id << "." << m.dest_core_offset << ",";
+	}
 
 	out << m.hops << ",";
 	out << m.spikes << ",";
@@ -1631,8 +1670,6 @@ void sanafe::sim_trace_record_message(std::ofstream &out, const Message &m)
 	out << m.network_delay << ",";
 	out << m.receive_delay << ",";
 	out << m.blocked_latency << ",";
-	out << m.hops << ",";
-	out << m.hops << ",";
 
 	out << std::endl;
 

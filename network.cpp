@@ -165,6 +165,7 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 		n.log_spikes = group.default_log_spikes;
 		n.log_potential = group.default_log_potential;
 		n.max_connections_out = group.default_max_connections_out;
+		n.default_synapse_hw_name = group.default_synapse_hw_name;
 		n.parent_net = this;
 		group.neurons.push_back(n);
 	}
@@ -206,6 +207,10 @@ void sanafe::Neuron::set_attributes(
 		if (key == "hw_name")
 		{
 			soma_hw_name = value_str;
+		}
+		else if (key == "synapse_hw_name")
+		{
+			default_synapse_hw_name = value_str;
 		}
 		else if (key == "connections_out")
 		{
@@ -323,6 +328,7 @@ void sanafe::Neuron::connect_to_neuron(
 	Connection &con = connections_out.back();
 	con.pre_neuron = this;
 	con.post_neuron = &dest;
+	con.synapse_hw_name = default_synapse_hw_name;
 
 	for (auto a: attr)
 	{

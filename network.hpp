@@ -67,11 +67,10 @@ public:
 	Core *core, *post_synaptic_cores;
 	SomaUnit *soma_hw;
 	AxonOutUnit *axon_out_hw;
-	std::string soma_hw_name;
+	std::string soma_hw_name, default_synapse_hw_name;
 
 	std::shared_ptr<SomaModel> model;
 
-	// Track the timestep each hardware unit was last updated
 	bool force_update, log_spikes, log_potential;
 	bool update_needed;
 	int id, parent_group_id;

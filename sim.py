@@ -190,9 +190,9 @@ def create_conv_layer(net, input_layer, input_shape, filters,
     return output_layer
 
 
-def load_net(net_filename):
+def load_net(net_filename, arch):
     net = sanafecpp.Network()
-    net.load_net_description(net_filename)
+    net.load_net_description(net_filename, arch)
     return net
 
 

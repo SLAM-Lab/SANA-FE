@@ -77,7 +77,14 @@ int sanafe::Architecture::set_noc_attributes(
 			ss >> noc_buffer_size;
 		}
 	}
-	assert((noc_height * noc_width) <= ARCH_MAX_TILES);
+
+	// Set the x and y coordinates of the NoC tiles
+	for (Tile &tile: tiles)
+	{
+		tile.x = tile.id / noc_height;
+		tile.y = tile.id % noc_height;
+	}
+
 	noc_init = true;
 	TRACE1("NoC created, mesh, width:%d height:%d.\n", noc_width,
 		noc_height);
@@ -873,16 +880,16 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
 	const std::vector<SynapseUnit>::size_type default_hw_id = 0;
 	// Default to the first defined hardware unit (there must be at least
 	// one hardware unit defined)
-	SynapseUnit &synapse_hw = post_core.synapse[default_hw_id];
+	con.synapse_hw = &(post_core.synapse[default_hw_id]);
 	if (con.synapse_hw_name.length() > 0)
 	{
 		bool mapped = false;
 		// Search for the specified synapse hardware
-		for (const auto &s: post_core.synapse)
+		for (auto &s: post_core.synapse)
 		{
 			if (con.synapse_hw_name == s.name)
 			{
-				synapse_hw = s;
+				con.synapse_hw = &s;
 				mapped = true;
 				break;
 			}
@@ -893,7 +900,6 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
 			exit(1);
 		}
 	}
-	con.synapse_hw = &synapse_hw;
 
 	return;
 }

@@ -144,7 +144,8 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
 
 
 def run_spiking_experiment(mapping, max_size=30):
-    with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
+    with open(os.path.join(PROJECT_DIR, "runs", "sandia_data",
+                           "weights_loihi.pkl"), "rb") as weights_file:
         weights = pickle.load(weights_file)
 
     timesteps = 1
@@ -156,7 +157,8 @@ def run_spiking_experiment(mapping, max_size=30):
 
         snn = connected_layers(arch, weights[i-1].transpose(), spiking=True,
                                mapping=mapping, copy_network=copy_network)
-        network_filename = f"runs/calibration/snn/connected_layers_N{layer_neurons}_map_{mapping}.net"
+        network_filename = os.path.join(PROJECT_DIR, "runs", "power", "snn",
+                                        f"connected_layers_N{layer_neurons}_map_{mapping}.net")
         snn.save_net_description(network_filename)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
@@ -164,7 +166,7 @@ def run_spiking_experiment(mapping, max_size=30):
         results = sim.run(timesteps)
 
         with open(os.path.join(PROJECT_DIR, "runs",
-                               "calibration", "sim_spiking.csv"),
+                               "power", "sim_spiking.csv"),
                   "a") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                             ("neuron_counts", "energy", "time",
@@ -192,14 +194,16 @@ if __name__ == "__main__":
 
     # This experiment looks at two fully connected layers, spiking
     if run_experiments:
-        with open(f"runs/calibration/sim_spiking.csv", "w") as spiking_csv:
+        with open(os.path.join("runs", "power",
+                               "sim_spiking.csv"), "w") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                        ("neuron_counts", "energy", "time",
                                         "mapping"))
             spiking_writer.writeheader()
         for mapping in mappings:
             run_spiking_experiment(mapping, max_size=30)
-        with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
+        with open(os.path.join("runs", "sandia_data",
+                               "weights_loihi.pkl"), "rb") as weights_file:
             weights = pickle.load(weights_file)
 
         neuron_counts = []
@@ -215,10 +219,12 @@ if __name__ == "__main__":
         loihi_energy_spikes = []
 
         spiking_energy = []
-        with open("runs/calibration/sim_spiking.csv", "r") as spiking_csv:
+        with open(os.path.join("runs", "power",
+                               "sim_spiking.csv"), "r") as spiking_csv:
             df = pd.read_csv(spiking_csv)
 
-        with open("runs/sandia_data/loihi_spiking.csv", "r") as spiking_csv:
+        with open(os.path.join("runs", "sandia_data",
+                               "loihi_spiking.csv"), "r") as spiking_csv:
             spiking_reader = csv.DictReader(spiking_csv)
             for row in spiking_reader:
                 for mapping in mappings:
@@ -251,8 +257,8 @@ if __name__ == "__main__":
         plt.legend(("Measured", "Simulated"), fontsize=6)
         plt.tight_layout(pad=0.3)
         ax_pos = ax.get_position()
-        plt.savefig("runs/calibration/calibration_time_core.pdf")
-        plt.savefig("runs/calibration/calibration_time_core.png")
+        plt.savefig(os.path.join("runs", "power", "power_time_core.pdf"))
+        plt.savefig(os.path.join("runs", "power", "power_time_core.png"))
 
         energy_error = 100 * np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:])
         print(energy_error)
@@ -277,8 +283,8 @@ if __name__ == "__main__":
         plt.legend(("Measured", "Simulated"), fontsize=6)
         plt.tight_layout(pad=0.1)
         #ax.set_position(ax_pos)
-        plt.savefig("runs/calibration/calibration_energy.pdf")
-        plt.savefig("runs/calibration/calibration_energy.png")
+        plt.savefig(os.path.join("runs", "power", "power_energy.pdf"))
+        plt.savefig(os.path.join("runs", "power", "power_energy.png"))
 
         plt.rcParams.update({'font.size': 6, 'lines.markersize': 3,})
         ## Plot the effect of cores blocking
@@ -302,8 +308,8 @@ if __name__ == "__main__":
         plt.minorticks_on()
         plt.legend(("Measured", "Simulated"), fontsize=6)
         plt.tight_layout(pad=0.3)
-        plt.savefig("runs/calibration/calibration_time_partition_2.pdf")
-        plt.savefig("runs/calibration/calibration_time_partition_2.png")
+        plt.savefig(os.path.join("runs", "power", "power_time_partition_2.pdf"))
+        plt.savefig(os.path.join("runs", "power", "power_time_partition_2.png"))
 
         # Plot the effect of network tiles blocking
         spiking_frame = df.loc[(df["mapping"] == "split_4")]
@@ -321,8 +327,8 @@ if __name__ == "__main__":
         plt.legend(("Measured", "Simulated"),
                     fontsize=6)
         plt.tight_layout(pad=0.3)
-        plt.savefig("runs/calibration/calibration_time_partition_3.pdf")
-        plt.savefig("runs/calibration/calibration_time_partition_3.png")
+        plt.savefig(os.path.join("runs", "power", "power_time_partition_3.pdf"))
+        plt.savefig(os.path.join("runs", "power", "power_time_partition_3.png"))
 
         spiking_frame = df.loc[(df["mapping"] == "luke")]
         plt.figure(figsize=(1.5, 1.5))
@@ -337,8 +343,8 @@ if __name__ == "__main__":
         plt.minorticks_on()
         plt.legend(("Measured", "Simulated"), fontsize=6)
         plt.tight_layout(pad=0.3)
-        plt.savefig("runs/calibration/calibration_time_partition_luke.pdf")
-        plt.savefig("runs/calibration/calibration_time_partition_luke.png")
+        plt.savefig(os.path.join("runs", "power", "power_time_partition_luke.pdf"))
+        plt.savefig(os.path.join("runs", "power", "power_time_partition_luke.png"))
 
         # Combine onto one plot
         plt.figure(figsize=(1.6, 1.6))
@@ -364,5 +370,5 @@ if __name__ == "__main__":
         plt.legend(("Default", "3 Cores", "4 Cores"),
                     fontsize=6)
         plt.tight_layout(pad=0.1)
-        plt.savefig("runs/calibration/calibration_time.pdf")
-        plt.savefig("runs/calibration/calibration_time.png")
+        plt.savefig(os.path.join("runs", "power", "power_time.pdf"))
+        plt.savefig(os.path.join("runs", "power", "power_time.png"))

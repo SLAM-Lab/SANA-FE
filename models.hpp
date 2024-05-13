@@ -7,6 +7,7 @@
 #define MODELS_HEADER_INCLUDED_
 
 #include <map>
+#include <optional>
 #include <vector>
 #include "description.hpp"
 
@@ -29,7 +30,7 @@ class SomaModel
 public:
 	SomaModel(const int gid, const int nid) : group_id(gid), neuron_id(nid) {}
 	virtual ~SomaModel() {}
-	virtual NeuronStatus update(const double current_in) = 0;
+	virtual NeuronStatus update(const std::optional<double> current_in) = 0;
 	virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
 	virtual double get_potential() { return 0.0; }
 protected:
@@ -44,7 +45,7 @@ public:
         LoihiLifModel(const int gid, const int nid);
 	~LoihiLifModel();
 	void set_attributes(const std::map<std::string, std::string> &attr);
-	NeuronStatus update(const double current_in);
+	NeuronStatus update(const std::optional<double> current_in);
 	double get_potential() { return potential; }
 private:
 	bool force_update;

@@ -21,7 +21,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 
 sys.path.insert(0, PROJECT_DIR)
-import sim
+import sanafecpp as kernel
+import sim as sf
 
 ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net"
@@ -136,9 +137,9 @@ if __name__ == "__main__":
             open(SIM_ENERGY_DATA_PATH, "w")
         elif experiment == "time":
             open(SIM_TIME_DATA_PATH, "w")
-        #open("hops.csv", "w")
 
-        for inputs in range(1, frames):
+        for inputs in range(0, frames):
+        #for inputs in range(1, 2):
         #for inputs in range(50, frames):
         #for inputs in range(0, 1):
             print(f"Running for input: {inputs}")
@@ -154,8 +155,10 @@ if __name__ == "__main__":
 
             # Use a pre-generated network for a realistic use case i.e.
             #  dvs-gesture
-            sim.run(ARCH_PATH, GENERATED_NETWORK_PATH, timesteps,
-                    perf_trace=True)
+            arch = sf.load_arch(ARCH_PATH)
+            net = sf.load_net(GENERATED_NETWORK_PATH, arch)
+            sim = kernel.Simulation(arch, net, record_perf=True)
+            sim.run(timesteps)
             # Parse the detailed perf statistics
             print("Reading performance data")
             stats = pd.read_csv(os.path.join(PROJECT_DIR, "perf.csv"))

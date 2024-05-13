@@ -1,6 +1,7 @@
 #include <vector>
 #include <cmath>
 #include <cassert>
+#include <optional>
 #include <sstream>
 
 #include "plugins.hpp"
@@ -83,14 +84,23 @@ void LoihiLifModel::set_attributes(
 	}
 }
 
-sanafe::NeuronStatus LoihiLifModel::update(const double current_in)
+sanafe::NeuronStatus LoihiLifModel::update(
+	const std::optional<double> current_in)
 {
 	// Calculate the change in potential since the last update e.g.
 	//  integate inputs and apply any potential leak
 	TRACE1("Updating potential, before:%f\n", potential);
 	sanafe::NeuronStatus state = sanafe::IDLE;
-	potential *= leak_decay;
+	// Update soma, if there are any received spikes, there is a non-zero
+	//  bias or we force the neuron to update every time-step
+	if ((std::fabs(potential) > 0.0) || current_in.has_value() ||
+		(std::fabs(bias) > 0.0) || force_update)
+	{
+		// Neuron is turned on and potential write
+		state = sanafe::UPDATED;
+	}
 
+	potential *= leak_decay;
 	// Add randomized noise to potential if enabled
 	/*
 	if (noise_type == NOISE_FILE_STREAM)
@@ -103,20 +113,16 @@ sanafe::NeuronStatus LoihiLifModel::update(const double current_in)
 	}
 	*/
 	// Add the synaptic / dendrite current to the potential
-	//printf("n->bias:%lf n->potential before:%lf current_in:%lf\n", n->bias, n->potential, current_in);
-	potential += current_in + bias;
+	TRACE1("bias:%lf potential before:%lf current_in:%lf\n",
+		bias, potential, current_in.value());
+	potential += bias;
+	if (current_in.has_value())
+	{
+		potential += current_in.value();
+	}
 	TRACE1("leak decay:%lf bias:%lf threshold:%lf potential after:%lf\n",
 		leak_decay, bias, threshold, potential);
 	TRACE1("Updating potential, after:%f\n", potential);
-
-	// Update soma, if there are any received spikes, there is a non-zero
-	//  bias or we force the neuron to update every time-step
-	if ((fabs(potential) > 0.0) || (current_in != 0) ||
-		(fabs(bias) > 0.0) || force_update)
-	{
-		// Neuron is turned on and potential write
-		state = sanafe::UPDATED;
-	}
 
 	// Check against threshold potential (for spiking)
 	if (((bias != 0.0) && (potential > threshold)) ||
@@ -131,7 +137,7 @@ sanafe::NeuronStatus LoihiLifModel::update(const double current_in)
 			potential -= threshold;
 		}
 		state = sanafe::FIRED;
-		TRACE1("Neuron fired!\n");
+		TRACE1("Neuron fired\n");
 	}
 	// Check against reverse threshold
 	if (potential < reverse_threshold)

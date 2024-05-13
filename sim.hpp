@@ -63,7 +63,7 @@ struct RunData
 
 struct Timestep
 {
-	std::vector<std::list<Message> > messages;
+	std::vector<std::list<Message>> messages;
 	std::vector<MessageFifo> message_queues;
 	long int timestep, spike_count, total_hops, packets_sent;
 	long int neurons_fired;
