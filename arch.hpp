@@ -37,7 +37,7 @@
 #define ARCH_MAX_X (8*4)
 #define ARCH_MAX_Y (4*2)
 
-#define ARCH_INVALID_ID -1
+#define ARCH_INVALID_ID (-1)
 
 namespace sanafe
 {
@@ -109,7 +109,7 @@ struct AxonInUnit
 	double energy_spike_message, latency_spike_message;
 	int parent_tile_id, parent_core_offset;
 
-	AxonInUnit(const std::string &axon_in_name);
+	explicit AxonInUnit(const std::string &axon_in_name);
 	std::string description() const;
 };
 
@@ -123,7 +123,7 @@ struct SynapseUnit
 	double latency_spike_op, latency_memory_access;
 	int parent_tile_id, parent_core_offset;
 
-	SynapseUnit(const std::string &synapse_name);
+	explicit SynapseUnit(const std::string &synapse_name);
 	std::string description() const;
 };
 
@@ -133,7 +133,7 @@ struct DendriteUnit
 	double energy, time;
 	int parent_tile_id, parent_core_offset;
 	std::string description() const;
-	DendriteUnit(const std::string &dendrite_name);
+	explicit DendriteUnit(const std::string &dendrite_name);
 };
 
 struct SomaUnit
@@ -148,7 +148,7 @@ struct SomaUnit
 	int leak_towards_zero, reset_mode, reverse_reset_mode;
 	int noise_type, parent_tile_id, parent_core_offset;
 
-	SomaUnit(const std::string &soma_name);
+	explicit SomaUnit(const std::string &soma_name);
 	std::string description() const;
 };
 
@@ -162,7 +162,7 @@ struct AxonOutUnit
 	double energy_access, latency_access;
 	int parent_tile_id, parent_core_offset;
 
-	AxonOutUnit(const std::string &axon_out_name);
+	explicit AxonOutUnit(const std::string &axon_out_name);
 	std::string description() const;
 };
 

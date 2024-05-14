@@ -16,10 +16,10 @@
 
 #include <memory>
 #include <list>
+#include <cstdio>
 #include <filesystem>
 #include "arch.hpp"
 #include "network.hpp"
-#include "stdio.h"
 
 namespace sanafe
 {
@@ -109,7 +109,7 @@ std::unique_ptr<Simulation> sim_init_sim(void);
 void sim_init_timestep(Timestep &ts, Architecture &arch);
 void sim_timestep(Timestep &ts, Architecture &arch, Network &net);
 
-void sim_process_neurons(Timestep &ts, Network &net, Architecture &arch);
+void sim_process_neurons(Timestep &ts, Architecture &arch);
 void sim_receive_messages(Timestep &sim, Architecture &arch);
 double sim_schedule_messages(std::vector<MessageFifo> &messages_sent, const Scheduler &scheduler);
 void sim_update_noc_message_counts(const Message &m, NocInfo &noc, const int message_in);

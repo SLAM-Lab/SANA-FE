@@ -14,16 +14,9 @@
 #include "print.hpp"
 #include "sim.hpp"
 
-using namespace sanafe;
-
 int main(int argc, char *argv[])
 {
 	long int timesteps;
-	int ret;
-
-	// Assume that if we don't get to the point where we write this with
-	//  a valid value, something went wrong and we errored out
-	ret = RET_FAIL;
 
 	if (argc < 1)
 	{
@@ -87,7 +80,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (argc < PROGRAM_NARGS)
+	if (argc < sanafe::PROGRAM_NARGS)
 	{
 		INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
 				"-v<potential trace> -m <message trace>] "
@@ -98,20 +91,20 @@ int main(int argc, char *argv[])
 	}
 
 	// Read in program args, sanity check and parse inputs
-	Architecture arch;
-	arch.load_arch_description(argv[ARCH_FILENAME]);
-	Network net;
-	net.load_net_description(argv[NETWORK_FILENAME], arch);
-	Simulation sim(
+	sanafe::Architecture arch;
+	arch.load_arch_description(argv[sanafe::ARCH_FILENAME]);
+	sanafe::Network net;
+	net.load_net_description(argv[sanafe::NETWORK_FILENAME], arch);
+	sanafe::Simulation sim(
 		arch, net, output_dir, record_spikes, record_potentials,
 		record_perf, record_messages);
 
 	timesteps = 0;
-	ret = sscanf(argv[TIMESTEPS], "%ld", &timesteps);
+	int ret = sscanf(argv[sanafe::TIMESTEPS], "%ld", &timesteps);
 	if (ret < 1)
 	{
 		INFO("Error: Time-steps must be integer > 0 (%s).\n",
-							argv[TIMESTEPS]);
+						argv[sanafe::TIMESTEPS]);
 		return 1;
 	}
 	else if (timesteps <= 0)

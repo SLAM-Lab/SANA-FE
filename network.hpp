@@ -51,7 +51,7 @@ struct Connection
 	double weight, current, synaptic_current_decay;
 	int id, delay, last_updated;
 
-	Connection(const int connection_id);
+	explicit Connection(const int connection_id);
 	std::string description() const;
 };
 
@@ -83,7 +83,7 @@ public:
 	NeuronStatus neuron_status;
 	int forced_spikes;
 
-	Neuron(const size_t neuron_id);
+	explicit Neuron(const size_t neuron_id);
 	int get_id() { return id; }
 	void set_attributes(const std::map<std::string, std::string> &attr);
 	void connect_to_neuron(Neuron &dest, const std::map<std::string, std::string> &attr);

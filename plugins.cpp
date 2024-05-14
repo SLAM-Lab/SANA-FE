@@ -12,10 +12,8 @@
 #include "models.hpp"
 #include "print.hpp"
 
-using namespace sanafe;
-
-typedef SomaModel *_create_soma(void);
-typedef void _destroy_soma(SomaModel *model);
+typedef sanafe::SomaModel *_create_soma(void);
+typedef void _destroy_soma(sanafe::SomaModel *model);
 std::map<std::string, _create_soma *> create_soma;
 std::map<std::string, _destroy_soma *> destroy_soma;
 
@@ -61,7 +59,7 @@ void plugin_init_soma(const std::string &name)
 	INFO("Loaded plugin symbols for %s.\n", name.c_str());
 }
 
-SomaModel *plugin_get_soma(const std::string &name)
+sanafe::SomaModel *plugin_get_soma(const std::string &name)
 {
 	INFO("Getting soma:%s\n", name.c_str());
 

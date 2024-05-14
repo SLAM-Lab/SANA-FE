@@ -11,6 +11,7 @@
 #include <filesystem> // For std::filesystem::path
 #include <functional> // For std::reference_wrapper
 #include <iostream>
+#include <limits>
 #include <list>
 #include <map>
 #include <set>
@@ -19,8 +20,6 @@
 #include "arch.hpp"
 #include "network.hpp"
 #include "print.hpp"
-
-using namespace sanafe;
 
 sanafe::Architecture::Architecture()
 {
@@ -59,7 +58,7 @@ int sanafe::Architecture::set_noc_attributes(
 	noc_height = 1;
 	noc_buffer_size = 0;
 
-	for (auto a: attr)
+	for (const auto &a: attr)
 	{
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
@@ -121,6 +120,7 @@ sanafe::Message::Message()
 	// Initialize message variables. Mark most fields as invalid either
 	//  using NaN or -Inf values where possible.
 	src_neuron = nullptr;
+	next = nullptr;
 
 	dummy_message = false;
 	generation_delay = 0.0;
@@ -129,19 +129,21 @@ sanafe::Message::Message()
 	blocked_latency = 0.0;
 	hops = -1;
 	spikes = -1;
-	sent_timestamp = -INFINITY;
-	received_timestamp = -INFINITY;
-	processed_timestamp = -INFINITY;
+	sent_timestamp = - std::numeric_limits<double>::infinity();
+	received_timestamp = - std::numeric_limits<double>::infinity();
+	processed_timestamp = - std::numeric_limits<double>::infinity();
 	timestep = -1;
-	next = nullptr;
+	in_noc = false;
 
 	src_x = -1;
 	src_y = -1;
 	dest_x = -1;
 	dest_y = -1;
 	dest_core_offset = -1;
+	dest_core_id = -1;
 	dest_tile_id = -1;
 	dest_axon_id = -1;
+	dest_axon_hw = -1;
 }
 
 sanafe::Tile::Tile(const std::string &name, const int tile_id) : name(name)
@@ -214,7 +216,7 @@ sanafe::Tile &sanafe::Architecture::create_tile(
 	tile.latency_west_hop = 0.0;
 	tile.energy_south_hop = 0.0;
 	tile.latency_south_hop = 0.0;
-	for (auto a: attr)
+	for (const auto &a: attr)
 	{
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
@@ -256,7 +258,8 @@ sanafe::Tile &sanafe::Architecture::create_tile(
 	return tile;
 }
 
-void Architecture::load_arch_description(const std::filesystem::path &filename)
+void sanafe::Architecture::load_arch_description(
+	const std::filesystem::path &filename)
 {
 	std::ifstream arch_fp(filename);
 	if (arch_fp.fail())
@@ -266,7 +269,7 @@ void Architecture::load_arch_description(const std::filesystem::path &filename)
 	}
 	int ret = description_parse_arch_file(arch_fp, *this);
 	arch_fp.close();
-	if (ret == RET_FAIL)
+	if (ret == sanafe::RET_FAIL)
 	{
 		throw std::invalid_argument(
 			"Error: Invalid architecture file.");
@@ -588,6 +591,7 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 		}
 		else if (key == "noise")
 		{
+			/*
 			s.noise_type = NOISE_FILE_STREAM;
 			s.noise_stream = fopen(value_str.c_str(), "r");
 			TRACE1("Opening noise str: %s\n", value_str.c_str());
@@ -597,6 +601,7 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 					value_str.c_str());
 				exit(1);
 			}
+			*/
 		}
 	}
 
@@ -838,7 +843,7 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 	in.active_synapses = 0;
 	in.last_updated = -1;
 	post_core.axons_in.push_back(in);
-	const int new_axon_in_address = post_core.axons_in.size() - 1;
+	const size_t new_axon_in_address = post_core.axons_in.size() - 1;
 
 	// Add the axon at the sending, pre-synaptic core
 	TRACE1("axon in address:%d for core:%d.%d\n",
@@ -849,7 +854,7 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 	out.dest_tile_id = post_core.parent_tile_id;
 	out.src_neuron_id = pre_neuron.id;
 	pre_core.axons_out.push_back(out);
-	const int new_axon_out_address = pre_core.axons_out.size() - 1;
+	const size_t new_axon_out_address = pre_core.axons_out.size() - 1;
 
 	// Then add the output axon to the sending pre-synaptic neuron
 	pre_neuron.axon_out_addresses.push_back(new_axon_out_address);

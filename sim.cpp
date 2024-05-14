@@ -20,9 +20,7 @@
 #include "network.hpp"
 #include "arch.hpp"
 
-using namespace sanafe;
-
-Simulation::Simulation(
+sanafe::Simulation::Simulation(
 	Architecture &a,
 	Network &n,
 	const std::string &output_dir=".",
@@ -50,7 +48,7 @@ Simulation::Simulation(
 	net.check_mapped();
 }
 
-Simulation::~Simulation()
+sanafe::Simulation::~Simulation()
 {
 	// Close any open trace files
 	spike_trace.close();
@@ -59,7 +57,7 @@ Simulation::~Simulation()
 	message_trace.close();
 }
 
-RunData::RunData(const long int start, const long int steps)
+sanafe::RunData::RunData(const long int start, const long int steps)
 {
 	timestep_start = start;
 	timesteps_executed = steps;
@@ -71,7 +69,8 @@ RunData::RunData(const long int start, const long int steps)
 	return;
 }
 
-RunData Simulation::run(const long int timesteps, const long int heartbeat)
+sanafe::RunData sanafe::Simulation::run(
+	const long int timesteps, const long int heartbeat)
 {
 	RunData rd((total_timesteps+1), timesteps);
 	if (total_timesteps <= 0)
@@ -118,7 +117,7 @@ RunData Simulation::run(const long int timesteps, const long int heartbeat)
 	return rd;
 }
 
-Timestep Simulation::step()
+sanafe::Timestep sanafe::Simulation::step()
 {
 	// TODO: remove the need to pass the network struct, only the arch
 	//  should be needed (since it links back to the net anyway)
@@ -179,7 +178,7 @@ Timestep Simulation::step()
 	return ts;
 }
 
-double Simulation::get_power()
+double sanafe::Simulation::get_power()
 {
 	double power; // Watts
 	if (total_sim_time > 0.0)
@@ -195,7 +194,7 @@ double Simulation::get_power()
 	return power;
 }
 
-RunData Simulation::get_run_summary()
+sanafe::RunData sanafe::Simulation::get_run_summary()
 {
 	// Store the summary data in a string to string mapping
 	RunData run_data(0, total_timesteps);
@@ -326,7 +325,7 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 	ts = Timestep(ts.timestep, arch.get_core_count());
 	sim_reset_measurements(net, arch);
 
-	sim_process_neurons(ts, net, arch);
+	sim_process_neurons(ts, arch);
 	sim_receive_messages(ts, arch);
 
 	s.noc_width = arch.noc_width;
@@ -368,7 +367,7 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 	return;
 }
 
-Timestep::Timestep(const long int ts, const int core_count)
+sanafe::Timestep::Timestep(const long int ts, const int core_count)
 {
 	timestep = ts;
 	spike_count = 0L;
@@ -385,7 +384,7 @@ Timestep::Timestep(const long int ts, const int core_count)
 	packets_sent = 0L;
 }
 
-void sanafe::sim_process_neurons(Timestep &ts, Network &net, Architecture &arch)
+void sanafe::sim_process_neurons(Timestep &ts, Architecture &arch)
 {
 #pragma omp parallel for schedule(dynamic)
 	for (size_t i = 0; i < arch.cores_vec.size(); i++)
@@ -511,7 +510,7 @@ double sanafe::sim_estimate_network_costs(Tile &src, Tile &dest)
 	return network_latency;
 }
 
-Message *sanafe::sim_message_fifo_pop(MessageFifo *queue)
+sanafe::Message *sanafe::sim_message_fifo_pop(MessageFifo *queue)
 {
 	Message *m;
 
@@ -656,7 +655,7 @@ void sanafe::sim_update_noc_message_counts(
 		// Message entering NoC
 		noc.mean_in_flight_receive_delay +=
 			(m.receive_delay - noc.mean_in_flight_receive_delay) /
-				(noc.messages_in_noc + 1);
+				(static_cast<double>(noc.messages_in_noc) + 1);
 		noc.messages_in_noc++;
 	}
 	else
@@ -666,7 +665,7 @@ void sanafe::sim_update_noc_message_counts(
 		{
 			noc.mean_in_flight_receive_delay +=
 			(noc.mean_in_flight_receive_delay - m.receive_delay) /
-				(noc.messages_in_noc - 1);
+				(static_cast<double>(noc.messages_in_noc) - 1);
 		}
 		else
 		{
@@ -1003,7 +1002,7 @@ double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
 	return message_processing_latency;
 }
 
-struct MessageFifo *sanafe::sim_init_timing_priority(
+struct sanafe::MessageFifo *sanafe::sim_init_timing_priority(
 	std::vector<MessageFifo> &message_queues)
 {
 	struct MessageFifo *priority_queue;
@@ -1036,7 +1035,8 @@ struct MessageFifo *sanafe::sim_init_timing_priority(
 	return priority_queue;
 }
 
-MessageFifo *sanafe::sim_pop_priority_queue(MessageFifo **priority_queue)
+sanafe::MessageFifo *sanafe::sim_pop_priority_queue(
+	MessageFifo **priority_queue)
 {
 	struct MessageFifo *curr;
 
@@ -1050,7 +1050,7 @@ MessageFifo *sanafe::sim_pop_priority_queue(MessageFifo **priority_queue)
 }
 
 void sanafe::sim_insert_priority_queue(MessageFifo **priority_queue,
-	MessageFifo &core_message_fifo)
+	sanafe::MessageFifo &core_message_fifo)
 {
 	MessageFifo *next;
 
@@ -1369,10 +1369,14 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 
 	for (auto &t: arch.tiles)
 	{
-		double total_hop_energy = (t.east_hops * t.energy_east_hop);
-		total_hop_energy += (t.west_hops * t.energy_west_hop);
-		total_hop_energy += (t.south_hops * t.energy_south_hop);
-		total_hop_energy +=  (t.north_hops * t.energy_north_hop);
+		double total_hop_energy =
+			(static_cast<double>(t.east_hops) * t.energy_east_hop);
+		total_hop_energy +=
+			(static_cast<double>(t.west_hops) * t.energy_west_hop);
+		total_hop_energy +=
+			(static_cast<double>(t.south_hops)*t.energy_south_hop);
+		total_hop_energy +=
+			(static_cast<double>(t.north_hops)*t.energy_north_hop);
 		network_energy += total_hop_energy;
 		TRACE1("east:%ld west:%ld north:%ld south:%ld\n",
 			t.east_hops, t.west_hops, t.north_hops, t.south_hops);
@@ -1403,11 +1407,14 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 			for (std::vector<SomaUnit>::size_type k = 0;
 				k < c.soma.size(); k++)
 			{
-				soma_energy += c.soma[k].neuron_count *
+				soma_energy += static_cast<double>(
+					c.soma[k].neuron_count) *
 					c.soma[k].energy_access_neuron;
-				soma_energy += c.soma[k].neuron_updates *
+				soma_energy += static_cast<double>(
+					c.soma[k].neuron_updates) *
 					c.soma[k].energy_update_neuron;
-				soma_energy += c.soma[k].neurons_fired *
+				soma_energy += static_cast<double>(
+					c.soma[k].neurons_fired) *
 					c.soma[k].energy_spiking;
 				TRACE1("neurons:%ld updates:%ld, spiking:%ld\n",
 					c.soma[k].neuron_count,
@@ -1417,8 +1424,8 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 			for (std::vector<AxonOutUnit>::size_type k = 0;
 				k < c.axon_out_hw.size(); k++)
 			{
-				axon_out_energy +=
-					c.axon_out_hw[k].packets_out *
+				axon_out_energy += static_cast<double>(
+					c.axon_out_hw[k].packets_out) *
 					c.axon_out_hw[k].energy_access;
 				TRACE1("packets: %ld, energy:%e\n",
 					c.axon_out_hw[k].packets_out,

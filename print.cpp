@@ -18,7 +18,10 @@ std::string sanafe::print_format_attributes(
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
 
-		attr_str += ' ' + key + '=' + value_str;
+		attr_str += " ";
+		attr_str += key;
+		attr_str += "=";
+		attr_str += value_str;
 	}
 	return attr_str;
 }

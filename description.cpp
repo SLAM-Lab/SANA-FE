@@ -16,8 +16,6 @@
 #include "description.hpp"
 #include "print.hpp"
 
-using namespace sanafe;
-
 const int default_line_len = 4096;
 const int default_fields = 32;
 
@@ -177,8 +175,8 @@ void sanafe::description_read_arch_entry(
 
 		if ((fields[i].length() < 3))
 		{
-			INFO("Error: Invalid field: %s\n",
-				std::string(fields[i]).c_str());
+			INFO("Error: Line: %d Invalid field: %s\n",
+				line_number, std::string(fields[i]).c_str());
 			continue;
 		}
 
@@ -280,10 +278,6 @@ void sanafe::parse_edge_field(
 {
 	const auto pos = edge_field.find("->");
 	if (pos == std::string_view::npos)
-	{
-		throw std::runtime_error("Invalid edge format");
-	}
-	else if ((pos + 1) >= edge_field.size())
 	{
 		throw std::runtime_error("Invalid edge format");
 	}
