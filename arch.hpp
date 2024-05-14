@@ -73,7 +73,6 @@ enum arch_description_blocks
 struct Message
 {
 	Neuron *src_neuron;
-	Message *next;
 	double generation_delay, network_delay, receive_delay;
 	double blocked_latency;
 	double sent_timestamp, received_timestamp, processed_timestamp;
@@ -85,13 +84,6 @@ struct Message
 	bool dummy_message, in_noc;
 
 	Message();
-};
-
-struct MessageFifo
-{
-	int count;
-	Message *head, *tail;
-	struct MessageFifo *next;  // For priority queue of core fifos
 };
 
 enum NoiseType
@@ -251,7 +243,7 @@ public:
 	std::vector<std::reference_wrapper<Tile> > tiles_vec;
 	std::list<Tile> tiles;
 	std::string name;
-	int noc_width, noc_height, noc_buffer_size;
+	int noc_width, noc_height, noc_buffer_size, max_cores_per_tile;
 
 	Architecture();
 	int get_core_count();

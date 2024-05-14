@@ -25,6 +25,7 @@ sanafe::Architecture::Architecture()
 {
 	noc_buffer_size = 0;
 	noc_init = false;
+	max_cores_per_tile = 0U;
 
 	return;
 }
@@ -120,7 +121,6 @@ sanafe::Message::Message()
 	// Initialize message variables. Mark most fields as invalid either
 	//  using NaN or -Inf values where possible.
 	src_neuron = nullptr;
-	next = nullptr;
 
 	dummy_message = false;
 	generation_delay = 0.0;
@@ -357,6 +357,8 @@ sanafe::Core &sanafe::Architecture::create_core(
 	c.energy = 0.0;
 	c.next_message = Message();
 
+	max_cores_per_tile = std::max<size_t>(
+		max_cores_per_tile, tile.cores.size());
 	TRACE1("Core created id:%d.%d (tile:%d).\n", c.parent_tile_id, c.id);
 	return c;
 }

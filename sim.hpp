@@ -14,10 +14,12 @@
 #define RAND_SEED 0xbeef // For srand()
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-#include <memory>
-#include <list>
 #include <cstdio>
 #include <filesystem>
+#include <list>
+#include <memory>
+#include <queue>
+
 #include "arch.hpp"
 #include "network.hpp"
 
@@ -25,6 +27,8 @@ namespace sanafe
 {
 struct Timestep;
 struct RunData;
+struct Scheduler;
+struct NocInfo;
 
 class Simulation
 {
@@ -64,7 +68,6 @@ struct RunData
 struct Timestep
 {
 	std::vector<std::list<Message>> messages;
-	std::vector<MessageFifo> message_queues;
 	long int timestep, spike_count, total_hops, packets_sent;
 	long int neurons_fired;
 	double energy, sim_time;
@@ -80,43 +83,9 @@ enum ProgramArgs
 	PROGRAM_NARGS,
 };
 
-struct NocInfo
-{
-	MessageFifo messages_received[ARCH_MAX_CORES];
-	int noc_width, noc_height;
-	double noc_messages_in[ARCH_MAX_X][ARCH_MAX_Y][4+ARCH_MAX_CORES_PER_TILE];
-	double core_finished_receiving[ARCH_MAX_CORES];
-	double mean_in_flight_receive_delay;
-	long int messages_in_noc;
-};
-
-struct Scheduler
-{
-	int noc_width, noc_height, buffer_size;
-};
-
-enum Direction
-{
-	NORTH = 0,
-	EAST,
-	SOUTH,
-	WEST
-};
-
-void print_run_data(FILE *fp, RunData &data);
-
-std::unique_ptr<Simulation> sim_init_sim(void);
-void sim_init_timestep(Timestep &ts, Architecture &arch);
 void sim_timestep(Timestep &ts, Architecture &arch, Network &net);
-
 void sim_process_neurons(Timestep &ts, Architecture &arch);
 void sim_receive_messages(Timestep &sim, Architecture &arch);
-double sim_schedule_messages(std::vector<MessageFifo> &messages_sent, const Scheduler &scheduler);
-void sim_update_noc_message_counts(const Message &m, NocInfo &noc, const int message_in);
-double sim_calculate_messages_along_route(Message &m, NocInfo &noc);
-void sim_update_noc(const double t, NocInfo &noc);
-
-// TODO: reimplement
 
 void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n);
 double sim_pipeline_receive(Timestep &ts, Architecture &arch, Core &c, Message &m);
@@ -126,13 +95,8 @@ double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n, const double
 double sim_estimate_network_costs(Tile &src, Tile &dest);
 void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n);
 
-double sim_update_soma_lif(Timestep &ts, Neuron &n, const double current_in);
-double sim_update_soma_truenorth(Timestep &ts, Neuron &n, const double current_in);
-
 void sim_reset_measurements(Network &net, Architecture &arch);
 double sim_calculate_energy(const Architecture &arch);
-double sim_calculate_time(const Architecture &arch);
-long int sim_calculate_packets(const Architecture &arch);
 
 std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
 std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
@@ -150,21 +114,11 @@ void sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts);
 void sim_output_run_summary(const std::filesystem::path &output_file, const RunData &run_data);
 void sim_format_run_summary(std::ostream &out, const RunData &run_data);
 
-void sim_write_summary(FILE *fp, const Simulation &stats);
-
-int sim_poisson_input(const double firing_probability);
-int sim_rate_input(const double firing_rate, double *spike_val);
-
-MessageFifo *sim_init_timing_priority(std::vector<MessageFifo> &message_queues);
-void sim_insert_priority_queue(MessageFifo **priority_queue, MessageFifo &c);
-MessageFifo *sim_pop_priority_queue(MessageFifo **priority_queue);
-
-void sim_init_fifo(MessageFifo &f);
-void sim_message_fifo_push(MessageFifo &queue, Message &m);
-Message *sim_message_fifo_pop(MessageFifo *queue);
-
 double sim_generate_noise(Neuron *n);
 timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end);
+
+//int sim_poisson_input(const double firing_probability);
+//int sim_rate_input(const double firing_rate, double *spike_val);
 
 }
 

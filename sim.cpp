@@ -15,10 +15,11 @@
 #include <filesystem>
 
 #include <omp.h>
-#include "print.hpp"
-#include "sim.hpp"
-#include "network.hpp"
 #include "arch.hpp"
+#include "print.hpp"
+#include "network.hpp"
+#include "schedule.hpp"
+#include "sim.hpp"
 
 sanafe::Simulation::Simulation(
 	Architecture &a,
@@ -157,17 +158,15 @@ sanafe::Timestep sanafe::Simulation::step()
 	}
 	if (message_trace_enabled)
 	{
-		for (auto &q: ts.messages)
+		for (const auto &q: ts.messages)
 		{
-			for (auto it = q.begin(); it != q.end(); ++it)
+			for (const auto &m: q)
 			{
-				Message &m = *it;
 				// Ignore dummy messages (without a
 				//  destination). These are inserted to
 				//  account for processing that doesn't
 				//  result in a spike being sent
-				sim_trace_record_message(
-					message_trace, m);
+				sim_trace_record_message(message_trace, m);
 			}
 		}
 	}
@@ -176,6 +175,75 @@ sanafe::Timestep sanafe::Simulation::step()
 			ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / 1.0e9)));
 
 	return ts;
+}
+
+void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
+{
+	Core &c = *(n.core);
+	n.processing_latency = 0.0;
+
+	SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
+
+	if (c.buffer_pos == BUFFER_SYNAPSE)
+	{
+		INFO("Error: Not implemented\n");
+		exit(1);
+	}
+	else if (c.buffer_pos == BUFFER_DENDRITE)
+	{
+		// Go through all synapses connected to this neuron and update
+		//  all synaptic currents into the dendrite
+		INFO("Error: Not implemented\n");
+		exit(1);
+	}
+	else if (c.buffer_pos == BUFFER_SOMA)
+	{
+		n.processing_latency = sim_update_soma(ts, arch, n, n.charge);
+		n.charge = 0.0;
+	}
+	else if (c.buffer_pos == BUFFER_AXON_OUT)
+	{
+		if (n.neuron_status == sanafe::FIRED)
+		{
+			n.processing_latency = n.soma_hw->latency_spiking;
+			sim_neuron_send_spike_message(ts, arch, n);
+		}
+	}
+	SIM_TRACE1("Updating neuron %d.%d.\n", n.parent_group_id, n.id);
+
+	c.next_message.generation_delay += n.processing_latency;
+	n.spike_count = 0;
+}
+
+double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
+	Core &c, Message &m)
+{
+	// We receive a spike and process up to the time-step buffer
+	double message_processing_latency = 0.0;
+
+	SIM_TRACE1("Receiving messages for cid:%d\n", c.id);
+	if (c.buffer_pos >= BUFFER_SYNAPSE)
+	{
+		assert(m.dest_axon_id >= 0);
+		assert(static_cast<size_t>(m.dest_axon_id) < c.axons_in.size());
+		AxonInModel &a = c.axons_in[m.dest_axon_id];
+
+		assert(m.dest_axon_hw >= 0);
+		assert(static_cast<size_t>(m.dest_axon_hw) <
+			c.axon_in_hw.size());
+
+		AxonInUnit &hw = c.axon_in_hw[m.dest_axon_hw];
+		message_processing_latency += hw.latency_spike_message;
+		hw.spike_messages_in++;
+		for (int s: a.synapse_addresses)
+		{
+			const int synaptic_lookup = true;
+			message_processing_latency += sim_update_synapse(
+				ts, arch, c, s, synaptic_lookup);
+		}
+	}
+
+	return message_processing_latency;
 }
 
 double sanafe::Simulation::get_power()
@@ -309,17 +377,9 @@ std::ofstream sanafe::sim_trace_open_message_trace(
 	return message_file;
 }
 
-void sanafe::sim_init_fifo(MessageFifo &f)
-{
-	f.count = 0;
-	f.head = NULL;
-	f.tail = NULL;
-	f.next = NULL;
-}
-
 void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 {
-	Scheduler s;
+	Scheduler scheduler;
 
 	// Start the next time-step
 	ts = Timestep(ts.timestep, arch.get_core_count());
@@ -328,11 +388,13 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 	sim_process_neurons(ts, arch);
 	sim_receive_messages(ts, arch);
 
-	s.noc_width = arch.noc_width;
-	s.noc_height = arch.noc_height;
-	s.buffer_size = arch.noc_buffer_size;
+	scheduler.noc_width = arch.noc_width;
+	scheduler.noc_height = arch.noc_height;
+	scheduler.buffer_size = arch.noc_buffer_size;
+	scheduler.core_count = arch.get_core_count();
+	scheduler.max_cores_per_tile = arch.max_cores_per_tile;
 
-	ts.sim_time = sim_schedule_messages(ts.message_queues, s);
+	ts.sim_time = schedule_messages(ts.messages, scheduler);
 	// Performance statistics for this time step
 	ts.energy = sim_calculate_energy(arch);
 
@@ -371,12 +433,7 @@ sanafe::Timestep::Timestep(const long int ts, const int core_count)
 {
 	timestep = ts;
 	spike_count = 0L;
-	message_queues = std::vector<MessageFifo>(core_count);
-	messages = std::vector<std::list<Message> >(core_count);
-	for (auto &q: message_queues)
-	{
-		sim_init_fifo(q);
-	}
+	messages = std::vector<std::list<Message>>(core_count);
 	neurons_fired = 0L;
 	total_hops = 0L;
 	energy = 0.0;
@@ -410,14 +467,8 @@ void sanafe::sim_process_neurons(Timestep &ts, Architecture &arch)
 			dummy_message.network_delay = 0.0;
 			dummy_message.hops = 0;
 			dummy_message.timestep = ts.timestep;
-
 			assert(c.id >= 0);
-			assert(static_cast<size_t>(c.id) < ts.messages.size());
-			SIM_TRACE1("c.id:%d message q size:%lu\n", c.id,
-				ts.messages.size());
 			ts.messages[c.id].push_back(dummy_message);
-			sim_message_fifo_push(ts.message_queues[c.id],
-				ts.messages[c.id].back());
 		}
 	}
 }
@@ -428,7 +479,7 @@ void sanafe::sim_receive_messages(Timestep &ts, Architecture &arch)
 	//  cores, and calculate network costs
 	for (auto &q: ts.messages)
 	{
-		for (Message &m: q)
+		for (auto &m: q)
 		{
 			if (!m.dummy_message)
 			{
@@ -508,604 +559,6 @@ double sanafe::sim_estimate_network_costs(Tile &src, Tile &dest)
 	SIM_TRACE1("xhops:%ld yhops%ld total hops:%ld latency:%e\n",
 		x_hops, y_hops, x_hops + y_hops, network_latency);
 	return network_latency;
-}
-
-sanafe::Message *sanafe::sim_message_fifo_pop(MessageFifo *queue)
-{
-	Message *m;
-
-	assert(queue->count >= 0);
-	if (queue->count == 0)
-	{
-		m = NULL;
-	}
-	else
-	{
-		assert(queue->tail != NULL);
-		assert(queue->head != NULL);
-		queue->count--;
-		m = queue->tail;
-		queue->tail = queue->tail->next;
-		if (queue->count <= 0)
-		{
-			queue->head = NULL;
-		}
-	}
-
-	return m;
-}
-
-void sanafe::sim_message_fifo_push(MessageFifo &queue, Message &m)
-{
-	assert(queue.count >= 0);
-
-	m.next = NULL;
-	if (queue.count == 0)
-	{
-		queue.tail = &m;
-	}
-	else
-	{
-		queue.head->next = &m;
-	}
-	queue.head = &m;
-	queue.count++;
-}
-
-void sanafe::sim_update_noc_message_counts(
-	const Message &m, NocInfo &noc, const int message_in)
-{
-	assert(m.src_neuron != nullptr);
-
-	// Go along x path, then y path (dimension order routing), and increment
-	//  or decrement counter depending on the operation
-	int x_increment, y_increment;
-	// Adjust by dividing by the total number of links along the path, also
-	//  including the output link at the sending core and input link at the
-	//  receiving core, i.e. the hops plus 2. The total sum of the densities
-	//  along the path should equal one for the message
-	double adjust = (1.0 / (2.0 + m.hops));
-
-	if (!message_in)
-	{
-		adjust *= -1.0;
-	}
-
-	if (m.src_x < m.dest_x)
-	{
-		x_increment = 1;
-	}
-	else
-	{
-		x_increment = -1;
-	}
-	if (m.src_y < m.dest_y)
-	{
-		y_increment = 1;
-	}
-	else
-	{
-		y_increment = -1;
-	}
-	int prev_direction =
-		4 + (m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
-	for (int x = m.src_x; x != m.dest_x; x += x_increment)
-	{
-		int direction;
-		if (x_increment > 0)
-		{
-			direction = EAST;
-		}
-		else
-		{
-			direction = WEST;
-		}
-		if (x == m.src_x)
-		{
-			int link = 4 + (m.src_neuron->core->id %
-				ARCH_MAX_CORES_PER_TILE);
-			noc.noc_messages_in[x][m.src_y][link] += adjust;
-		}
-		else
-		{
-			noc.noc_messages_in[x][m.src_y][direction] += adjust;
-		}
-		prev_direction = direction;
-	}
-	for (int y = m.src_y; y != m.dest_y; y += y_increment)
-	{
-		int direction;
-		if (y_increment > 0)
-		{
-			direction = NORTH;
-		}
-		else
-		{
-			direction = SOUTH;
-		}
-		if ((m.src_x == m.dest_x) && (y == m.src_y))
-		{
-			int link = 4 + (m.src_neuron->core->id %
-				ARCH_MAX_CORES_PER_TILE);
-			noc.noc_messages_in[m.dest_x][y][link] += adjust;
-		}
-		else
-		{
-			noc.noc_messages_in[m.dest_x][y][prev_direction] +=
-				adjust;
-		}
-
-		prev_direction = direction;
-	}
-
-	if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
-	{
-		int link = 4 +
-			(m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
-		noc.noc_messages_in[m.dest_x][m.dest_y][link] += adjust;
-	}
-	else
-	{
-		noc.noc_messages_in[m.dest_x][m.dest_y][prev_direction] += adjust;
-	}
-
-	// Update rolling averages and message counters
-	if (message_in)
-	{
-		// Message entering NoC
-		noc.mean_in_flight_receive_delay +=
-			(m.receive_delay - noc.mean_in_flight_receive_delay) /
-				(static_cast<double>(noc.messages_in_noc) + 1);
-		noc.messages_in_noc++;
-	}
-	else
-	{
-		// Message leaving the NoC
-		if ((noc.messages_in_noc) > 1)
-		{
-			noc.mean_in_flight_receive_delay +=
-			(noc.mean_in_flight_receive_delay - m.receive_delay) /
-				(static_cast<double>(noc.messages_in_noc) - 1);
-		}
-		else
-		{
-			noc.mean_in_flight_receive_delay = 0.0;
-		}
-
-		noc.messages_in_noc--;
-	}
-
-	return;
-}
-
-double sanafe::sim_calculate_messages_along_route(Message &m, NocInfo &noc)
-{
-	double flow_density;
-	int x_increment, y_increment;
-	int direction;
-
-	flow_density = 0.0;
-	if (m.src_x < m.dest_x)
-	{
-		x_increment = 1;
-	}
-	else
-	{
-		x_increment = -1;
-	}
-	if (m.src_y < m.dest_y)
-	{
-		y_increment = 1;
-	}
-	else
-	{
-		y_increment = -1;
-	}
-	int prev_direction = 4 + (m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
-	for (int x = m.src_x; x != m.dest_x; x += x_increment)
-	{
-		int direction = 0;
-		if (x_increment > 0)
-		{
-			direction = EAST;
-		}
-		else
-		{
-			direction = WEST;
-		}
-		if (x == m.src_x)
-		{
-			flow_density += noc.noc_messages_in[x][m.src_y][
-				4+m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE];
-		}
-		else
-		{
-			flow_density +=
-				noc.noc_messages_in[x][m.src_y][direction];
-		}
-		prev_direction = direction;
-	}
-
-	for (int y = m.src_y; y != m.dest_y; y += y_increment)
-	{
-		if (y_increment > 0)
-		{
-			direction = NORTH;
-		}
-		else
-		{
-			direction = SOUTH;
-		}
-		if (m.src_x == m.dest_x && y == m.src_y)
-		{
-			flow_density +=
-				noc.noc_messages_in[m.dest_x][y][
-				4+m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE];
-		}
-		else
-		{
-			flow_density +=
-				noc.noc_messages_in[m.dest_x][y][prev_direction];
-		}
-		prev_direction = direction;
-	}
-	// Handle the last tile
-	if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
-	{
-		flow_density +=
-			noc.noc_messages_in[m.dest_x][m.dest_y][
-				4+m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE];
-	}
-	else
-	{
-		flow_density +=
-			noc.noc_messages_in[m.dest_x][m.dest_y][prev_direction];
-	}
-
-	assert(flow_density >= -0.1);
-	return flow_density;
-}
-
-void sanafe::sim_update_noc(const double t, NocInfo &noc)
-{
-	for (int i = 0; i < ARCH_MAX_CORES; i++)
-	{
-		struct MessageFifo *q;
-		Message *m;
-
-		q = &(noc.messages_received[i]);
-		m = q->tail;
-		while (m != NULL)
-		{
-			if (m->in_noc && (t >= m->received_timestamp))
-			{
-				// Mark the message as not in the NoC, moving it
-				//  from the network to the receiving core
-				m->in_noc = false;
-				sim_message_fifo_pop(q);
-				// Go along the message path and decrement tile
-				//  message counters
-				sim_update_noc_message_counts(*m, noc, 0);
-			}
-			m = m->next;
-		}
-	}
-
-	return;
-}
-
-double sanafe::sim_schedule_messages(
-	std::vector<MessageFifo> &messages_sent, const Scheduler &scheduler)
-{
-	struct MessageFifo *priority_queue;
-	NocInfo noc;
-	double last_timestamp;
-
-	noc.noc_width = scheduler.noc_width;
-	noc.noc_height = scheduler.noc_height;
-
-	noc.messages_in_noc = 0;
-	noc.mean_in_flight_receive_delay = 0.0;
-	for (int x = 0; x < noc.noc_width; x++)
-	{
-		for (int y = 0; y < noc.noc_height; y++)
-		{
-			for (int k = 0; k < (4 + ARCH_MAX_CORES_PER_TILE); k++)
-			{
-				noc.noc_messages_in[x][y][k] = 0.0;
-			}
-		}
-	}
-	for (int i = 0; i < ARCH_MAX_CORES; i++)
-	{
-		sim_init_fifo(noc.messages_received[i]);
-		noc.core_finished_receiving[i] = 0.0;
-	}
-
-	priority_queue = sim_init_timing_priority(messages_sent);
-	last_timestamp = 0.0;
-	SIM_TRACE1("Scheduling global order of messages.\n");
-
-	// Each core has a queue of received messages. A structure tracks how
-	//  many in-flight messages are in the NoC and occupy each tile. We
-	//  track the number of messages passing through each tile at
-	//  the point of sending, and the average processing delay of
-	//  all of those messages. When a message is added or removed from the
-	//  NoC we update the average counts.
-	while (priority_queue != NULL)
-	{
-		// Queue isn't empty
-		struct MessageFifo *q;
-		Message *next_message, *m;
-
-		// Get the core's queue with the earliest simulation time
-		q = sim_pop_priority_queue(&priority_queue);
-		m = sim_message_fifo_pop(q);
-		last_timestamp = fmax(last_timestamp, m->sent_timestamp);
-
-		// Update the Network-on-Chip state
-		sim_update_noc(m->sent_timestamp, noc);
-
-		// Messages without a destination (neuron) are dummy messages.
-		//  Dummy messages account for processing time that does not
-		//  result in any spike messages. Otherwise, messages are sent
-		//  from a src neuron to a dest neuron
-		if (!m->dummy_message)
-		{
-			SIM_TRACE1("Processing message for nid:%d.%d\n",
-				m->src_neuron->parent_group_id,
-				m->src_neuron->id);
-			SIM_TRACE1("Send delay:%e\n", m->generation_delay);
-			SIM_TRACE1("Receive delay:%e\n", m->receive_delay);
-			const int dest_core = m->dest_core_id;
-			// Figure out if we are able to send a message into the
-			//  network i.e., is the route to the dest core
-			//  saturated and likely to block? Sum along the route
-			//  and see the density of messages along all links.
-			double messages_along_route =
-				sim_calculate_messages_along_route(*m, noc);
-
-			int path_capacity = (m->hops+1) * scheduler.buffer_size;
-			if (messages_along_route > path_capacity)
-			{
-				m->sent_timestamp +=
-					(messages_along_route - path_capacity) *
-					noc.mean_in_flight_receive_delay;
-			}
-
-			// Now, push the message into the right receiving queue
-			//  Calculate the network delay and when the message
-			//  is received
-			m->in_noc = true;
-			sim_message_fifo_push(
-				noc.messages_received[dest_core], *m);
-
-			// Update the rolling average for message
-			//  receiving times in-flight in the network
-			sim_update_noc_message_counts(*m, noc, 1);
-
-			double network_delay = messages_along_route *
-				noc.mean_in_flight_receive_delay / (m->hops+1.0);
-			SIM_TRACE1("Path capacity:%d messages:%lf delay:%e\n",
-				path_capacity, messages_along_route, network_delay);
-
-			double earliest_received_time = m->sent_timestamp + fmax(
-				m->network_delay, network_delay);
-			m->received_timestamp = fmax(
-				noc.core_finished_receiving[dest_core],
-				earliest_received_time);
-			noc.core_finished_receiving[dest_core] = fmax(
-				(noc.core_finished_receiving[dest_core] + m->receive_delay),
-				(earliest_received_time + m->receive_delay));
-			m->processed_timestamp =
-				noc.core_finished_receiving[dest_core];
-			last_timestamp = fmax(
-				last_timestamp, m->processed_timestamp);
-		}
-
-		// Get the next message for this core
-		next_message = q->tail;
-		if (next_message != nullptr)
-		{
-			// If applicable, schedule this next message immediately
-			//  after the current message finishes sending
-			next_message->sent_timestamp = m->sent_timestamp +
-				next_message->generation_delay;
-			last_timestamp = fmax(last_timestamp,
-				next_message->sent_timestamp);
-			sim_insert_priority_queue(&priority_queue, *q);
-		}
-		else
-		{
-			TRACE2("\t(cid:%d.%d) finished simulating\n", c->t->id,
-				c->id);
-		}
-
-		if (priority_queue != nullptr)
-		{
-			TRACE2("\t(cid:%d.%d) time:%e\n",
-				(*priority_queue)->t->id,
-				(*priority_queue)->id, (*priority_queue)->time);
-		}
-	}
-	SIM_TRACE1("Neurons fired: %ld\n", ts.total_neurons_fired);
-
-	return last_timestamp;
-}
-
-void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
-{
-	Core &c = *(n.core);
-	n.processing_latency = 0.0;
-
-	SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
-
-	if (c.buffer_pos == BUFFER_SYNAPSE)
-	{
-		INFO("Error: Not implemented\n");
-		exit(1);
-	}
-	else if (c.buffer_pos == BUFFER_DENDRITE)
-	{
-		// Go through all synapses connected to this neuron and update
-		//  all synaptic currents into the dendrite
-		INFO("Error: Not implemented\n");
-		exit(1);
-	}
-	else if (c.buffer_pos == BUFFER_SOMA)
-	{
-		n.processing_latency = sim_update_soma(ts, arch, n, n.charge);
-		n.charge = 0.0;
-	}
-	else if (c.buffer_pos == BUFFER_AXON_OUT)
-	{
-		if (n.neuron_status == sanafe::FIRED)
-		{
-			n.processing_latency = n.soma_hw->latency_spiking;
-			sim_neuron_send_spike_message(ts, arch, n);
-		}
-	}
-	SIM_TRACE1("Updating neuron %d.%d.\n", n.parent_group_id, n.id);
-
-	c.next_message.generation_delay += n.processing_latency;
-	n.spike_count = 0;
-}
-
-double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
-	Core &c, Message &m)
-{
-	// We receive a spike and process up to the time-step buffer
-	double message_processing_latency = 0.0;
-
-	SIM_TRACE1("Receiving messages for cid:%d\n", c.id);
-	if (c.buffer_pos >= BUFFER_SYNAPSE)
-	{
-		assert(m.dest_axon_id >= 0);
-		assert(static_cast<size_t>(m.dest_axon_id) < c.axons_in.size());
-		AxonInModel &a = c.axons_in[m.dest_axon_id];
-
-		assert(m.dest_axon_hw >= 0);
-		assert(static_cast<size_t>(m.dest_axon_hw) <
-			c.axon_in_hw.size());
-
-		AxonInUnit &hw = c.axon_in_hw[m.dest_axon_hw];
-		message_processing_latency += hw.latency_spike_message;
-		hw.spike_messages_in++;
-		for (int s: a.synapse_addresses)
-		{
-			const int synaptic_lookup = true;
-			message_processing_latency += sim_update_synapse(
-				ts, arch, c, s, synaptic_lookup);
-		}
-	}
-
-	return message_processing_latency;
-}
-
-struct sanafe::MessageFifo *sanafe::sim_init_timing_priority(
-	std::vector<MessageFifo> &message_queues)
-{
-	struct MessageFifo *priority_queue;
-	priority_queue = NULL;
-
-	SIM_TRACE1("Initializing priority queue.\n");
-	for (auto &q: message_queues)
-	{
-		if (q.count > 0) // messages
-		{
-			Message *m = q.tail;
-			assert(m != NULL);
-			m->sent_timestamp = m->generation_delay;
-			sim_insert_priority_queue(&priority_queue, q);
-		}
-		else
-		{
-			SIM_TRACE1("No messages for core %d\n", i);
-		}
-	}
-
-#ifdef DEBUG2
-	int i = 0;
-	for (Core *curr = priority_queue; curr != NULL; curr = curr->next)
-	{
-		// TODO
-	}
-#endif
-
-	return priority_queue;
-}
-
-sanafe::MessageFifo *sanafe::sim_pop_priority_queue(
-	MessageFifo **priority_queue)
-{
-	struct MessageFifo *curr;
-
-	// Pop the first element from the priority queue
-	curr = *priority_queue;
-	*priority_queue = (*priority_queue)->next;
-
-	// For safety, remove current element from queue and unlink
-	curr->next = NULL;
-	return curr;
-}
-
-void sanafe::sim_insert_priority_queue(MessageFifo **priority_queue,
-	sanafe::MessageFifo &core_message_fifo)
-{
-	MessageFifo *next;
-
-	// TODO: implement heap-based priority queue rather than list-based.
-	//  Will achieve O(lg N) insertion time rather than O(N)
-
-	assert(priority_queue != NULL);
-
-	//INFO("Inserting into priority queue.\n");
-	if (core_message_fifo.tail == NULL)
-	{
-		INFO("error?\n");
-	}
-	if (((*priority_queue) == NULL) ||
-		(core_message_fifo.tail->sent_timestamp <=
-		(*priority_queue)->tail->sent_timestamp))
-	{
-		// Queue is empty or this is the earliest time (highest
-		//  priority), make this core the head of the queue
-		core_message_fifo.next = (*priority_queue);
-		*priority_queue = &core_message_fifo;
-	}
-	else
-	{
-		MessageFifo *curr = *priority_queue;
-		next = curr->next;
-
-		// Reinsert core into the correct place in the priority list
-		while (next != NULL)
-		{
-			if (core_message_fifo.tail->sent_timestamp <
-				next->tail->sent_timestamp)
-			{
-				break;
-			}
-			curr = next;
-			next = curr->next;
-		}
-		curr->next = &core_message_fifo;
-		core_message_fifo.next = next;
-	}
-
-#ifdef DEBUG
-	TRACE3("*** Priority queue ***\n");
-	for (Core *tmp = *priority_queue; tmp != NULL;
-		tmp = tmp->next_timing)
-	{
-		// TRACE3
-		TRACE3("tmp->time:%e (id:%d)\n", tmp->time, tmp->id);
-		assert((tmp->next_timing == NULL) ||
-			tmp->time <= tmp->next_timing->time);
-	}
-#endif
-
-	return;
 }
 
 double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
@@ -1253,7 +706,6 @@ void sanafe::sim_neuron_send_spike_message(
 	for (int address: n.axon_out_addresses)
 	{
 		Core &src_core = *(n.core);
-		const int core_id = src_core.id;
 		const Tile &src_tile = arch.tiles_vec[src_core.parent_tile_id];
 		AxonOutModel &src_axon = src_core.axons_out[address];
 		const int dest_address = src_axon.dest_axon_id;
@@ -1295,10 +747,7 @@ void sanafe::sim_neuron_send_spike_message(
 		m.receive_delay = 0.0;
 		axon_out_hw.packets_out++;
 
-		ts.messages[core_id].push_back(m);
-		sim_message_fifo_push(ts.message_queues[core_id],
-			ts.messages[core_id].back());
-
+		ts.messages[src_core.id].push_back(m);
 		// Reset the next message in this core
 		src_core.next_message = Message();
 	}

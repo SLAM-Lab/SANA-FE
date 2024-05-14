@@ -1,0 +1,524 @@
+
+#include <cassert>
+#include <cmath>
+#include <iterator>
+#include <functional> // For std::reference_wrapper
+#include <vector>
+#include "arch.hpp"
+#include "print.hpp"
+#include "sim.hpp" // For sim_message_fifo
+#include "schedule.hpp"
+
+sanafe::NocInfo::NocInfo(const int width, const int height,
+	const int total_cores, const size_t cores_per_tile) :
+	noc_width(width), noc_height(height), core_count(total_cores),
+	max_cores_per_tile(cores_per_tile)
+{
+	messages_in_noc = 0UL;
+	mean_in_flight_receive_delay = 0.0;
+	return;
+}
+
+double sanafe::schedule_messages(
+	std::vector<std::list<Message>> &messages,
+	const Scheduler &scheduler)
+{
+	MessagePriorityQueue priority;
+	NocInfo noc(scheduler.noc_width, scheduler.noc_height,
+		scheduler.core_count, scheduler.max_cores_per_tile);
+	double last_timestamp;
+	const int total_links = noc.noc_height * noc.noc_width *
+		(sanafe::ndirections + noc.max_cores_per_tile);
+	noc.message_density = std::vector<double>(total_links);
+
+	std::vector<MessageFifo> messages_sent_per_core(noc.core_count);
+	for (size_t core = 0; core < messages.size(); core++)
+	{
+		auto &q = messages[core];
+		for (Message &m: q)
+		{
+			messages_sent_per_core[core].push_back(m);
+		}
+	}
+
+	noc.messages_received = std::vector<MessageFifo>(noc.core_count);
+	noc.core_finished_receiving = std::vector<double>(noc.core_count);
+
+	priority = schedule_init_timing_priority(messages_sent_per_core);
+	last_timestamp = 0.0;
+	SIM_TRACE1("Scheduling global order of messages.\n");
+
+	// Each core has a queue of received messages. A structure tracks how
+	//  many in-flight messages are in the NoC and occupy each tile. We
+	//  track the number of messages passing through each tile at
+	//  the point of sending, and the average processing delay of
+	//  all of those messages. When a message is added or removed from the
+	//  NoC we update the average counts.
+	while (priority.size() > 0)
+	{
+		// Get the core's queue with the earliest simulation time
+		Message &m = priority.top();
+		priority.pop();
+		last_timestamp = fmax(last_timestamp, m.sent_timestamp);
+
+		// Update the Network-on-Chip state
+		schedule_update_noc(m.sent_timestamp, noc);
+
+		// Messages without a destination (neuron) are dummy messages.
+		//  Dummy messages account for processing time that does not
+		//  result in any spike messages. Otherwise, messages are sent
+		//  from a src neuron to a dest neuron
+		if (!m.dummy_message)
+		{
+			TRACE1("Processing message for nid:%d.%d\n",
+				m.src_neuron->parent_group_id,
+				m.src_neuron->id);
+			TRACE1("Send delay:%e\n", m.generation_delay);
+			TRACE1("Receive delay:%e\n", m.receive_delay);
+			const int dest_core = m.dest_core_id;
+			// Figure out if we are able to send a message into the
+			//  network i.e., is the route to the dest core
+			//  saturated and likely to block? Sum along the route
+			//  and see the density of messages along all links.
+			const double messages_along_route =
+				schedule_calculate_messages_along_route(m, noc);
+
+			const int path_capacity =
+				(m.hops+1) * scheduler.buffer_size;
+			if (messages_along_route > path_capacity)
+			{
+				m.sent_timestamp +=
+					(messages_along_route - path_capacity) *
+					noc.mean_in_flight_receive_delay;
+			}
+
+			// Now, push the message into the right receiving queue
+			//  Calculate the network delay and when the message
+			//  is received
+			m.in_noc = true;
+			noc.messages_received[dest_core].push_back(m);
+
+			// Update the rolling average for message
+			//  receiving times in-flight in the network
+			schedule_update_noc_message_counts(m, noc, true);
+
+			double network_delay = messages_along_route *
+				noc.mean_in_flight_receive_delay / (m.hops+1.0);
+			TRACE1("Path capacity:%d messages:%lf delay:%e\n",
+				path_capacity, messages_along_route,
+				network_delay);
+
+			double earliest_received_time = m.sent_timestamp + fmax(
+				m.network_delay, network_delay);
+			m.received_timestamp = fmax(
+				noc.core_finished_receiving[dest_core],
+				earliest_received_time);
+			noc.core_finished_receiving[dest_core] = fmax(
+				(noc.core_finished_receiving[dest_core] +
+				m.receive_delay),
+				(earliest_received_time + m.receive_delay));
+			m.processed_timestamp =
+				noc.core_finished_receiving[dest_core];
+			last_timestamp = fmax(
+				last_timestamp, m.processed_timestamp);
+		}
+
+		// Get the next message for this core
+		const size_t src_core = m.src_neuron->core->id;
+		if (messages_sent_per_core[src_core].size() > 0)
+		{
+			auto &q = messages_sent_per_core[src_core];
+			Message &next_message = q.front();
+			// If applicable, schedule this next message immediately
+			//  after the current message finishes sending
+			next_message.sent_timestamp = m.sent_timestamp +
+				next_message.generation_delay;
+			last_timestamp = fmax(last_timestamp,
+				next_message.sent_timestamp);
+			priority.push(next_message);
+			q.pop_front();
+		}
+		else
+		{
+			TRACE1("\tCore finished simulating\n");
+		}
+
+#ifdef DEBUG
+		auto view = priority;
+		INFO("***\n");
+		while (view.size())
+		{
+			Message &m = view.top();
+			INFO("m:%e\n", m.sent_timestamp);
+			view.pop();
+		}
+		INFO("***\n");
+#endif
+
+		TRACE1("Priority size:%lu\n", priority.size());
+	}
+	TRACE1("Scheduler finished.\n");
+
+	return last_timestamp;
+}
+
+void sanafe::schedule_update_noc_message_counts(
+	const Message &m, NocInfo &noc, const bool message_in)
+{
+	assert(m.src_neuron != nullptr);
+
+	// Go along x path, then y path (dimension order routing), and increment
+	//  or decrement counter depending on the operation
+	int x_increment, y_increment;
+	// Adjust by dividing by the total number of links along the path, also
+	//  including the output link at the sending core and input link at the
+	//  receiving core, i.e. the hops plus 2. The total sum of the densities
+	//  along the path should equal one for the message
+	double adjust = (1.0 / (2.0 + m.hops));
+
+	if (!message_in)
+	{
+		adjust *= -1.0;
+	}
+
+	if (m.src_x < m.dest_x)
+	{
+		x_increment = 1;
+	}
+	else
+	{
+		x_increment = -1;
+	}
+	if (m.src_y < m.dest_y)
+	{
+		y_increment = 1;
+	}
+	else
+	{
+		y_increment = -1;
+	}
+	assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
+	int prev_direction =
+		4 + (m.src_neuron->core->offset);
+	for (int x = m.src_x; x != m.dest_x; x += x_increment)
+	{
+		int direction;
+		if (x_increment > 0)
+		{
+			direction = sanafe::east;
+		}
+		else
+		{
+			direction = sanafe::west;
+		}
+		if (x == m.src_x)
+		{
+			assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
+			const int link = 4 + (m.src_neuron->core->offset);
+			noc.message_density[
+				noc.idx(x, m.src_y, link)] += adjust;
+		}
+		else
+		{
+			noc.message_density[noc.idx(x, m.src_y, direction)] +=
+				adjust;
+		}
+		prev_direction = direction;
+	}
+	for (int y = m.src_y; y != m.dest_y; y += y_increment)
+	{
+		int direction;
+		if (y_increment > 0)
+		{
+			direction = sanafe::north;
+		}
+		else
+		{
+			direction = sanafe::south;
+		}
+		if ((m.src_x == m.dest_x) && (y == m.src_y))
+		{
+			const int link = 4 + m.src_neuron->core->offset;
+			noc.message_density[
+				noc.idx(m.dest_x, y, link)] += adjust;
+		}
+		else
+		{
+			noc.message_density[
+				noc.idx(m.dest_x, y, prev_direction)] += adjust;
+		}
+
+		prev_direction = direction;
+	}
+
+	if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
+	{
+		assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
+		int link = 4 + (m.src_neuron->core->offset);
+		noc.message_density[
+			noc.idx(m.dest_x, m.dest_y, link)] += adjust;
+	}
+	else
+	{
+		noc.message_density[
+			noc.idx(m.dest_x, m.dest_y, prev_direction)] += adjust;
+	}
+
+	// Update rolling averages and message counters
+	if (message_in)
+	{
+		// Message entering NoC
+		noc.mean_in_flight_receive_delay +=
+			(m.receive_delay - noc.mean_in_flight_receive_delay) /
+				(static_cast<double>(noc.messages_in_noc) + 1);
+		noc.messages_in_noc++;
+	}
+	else
+	{
+		// Message leaving the NoC
+		if ((noc.messages_in_noc) > 1)
+		{
+			noc.mean_in_flight_receive_delay +=
+			(noc.mean_in_flight_receive_delay - m.receive_delay) /
+				(static_cast<double>(noc.messages_in_noc) - 1);
+		}
+		else
+		{
+			noc.mean_in_flight_receive_delay = 0.0;
+		}
+
+		noc.messages_in_noc--;
+	}
+
+	return;
+}
+
+double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
+{
+	double flow_density;
+	int x_increment, y_increment;
+	int direction;
+
+	flow_density = 0.0;
+	if (m.src_x < m.dest_x)
+	{
+		x_increment = 1;
+	}
+	else
+	{
+		x_increment = -1;
+	}
+	if (m.src_y < m.dest_y)
+	{
+		y_increment = 1;
+	}
+	else
+	{
+		y_increment = -1;
+	}
+	int prev_direction = 4 + (m.src_neuron->core->offset);
+	for (int x = m.src_x; x != m.dest_x; x += x_increment)
+	{
+		int direction = 0;
+		if (x_increment > 0)
+		{
+			direction = sanafe::east;
+		}
+		else
+		{
+			direction = sanafe::west;
+		}
+		if (x == m.src_x)
+		{
+			flow_density += noc.message_density[
+				noc.idx(x, m.src_y,
+					4 + m.src_neuron->core->offset)];
+		}
+		else
+		{
+			flow_density += noc.message_density[
+				noc.idx(x, m.src_y, direction)];
+		}
+		prev_direction = direction;
+	}
+
+	for (int y = m.src_y; y != m.dest_y; y += y_increment)
+	{
+		if (y_increment > 0)
+		{
+			direction = sanafe::north;
+		}
+		else
+		{
+			direction = sanafe::south;
+		}
+		if (m.src_x == m.dest_x && y == m.src_y)
+		{
+			flow_density += noc.message_density[
+				noc.idx(m.dest_x, y,
+					4 + m.src_neuron->core->offset)];
+		}
+		else
+		{
+			flow_density += noc.message_density[
+				noc.idx(m.dest_x, y, prev_direction)];
+		}
+		prev_direction = direction;
+	}
+	// Handle the last tile
+	if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
+	{
+		flow_density += noc.message_density[
+			noc.idx(m.dest_x, m.dest_y,
+				4 + m.src_neuron->core->offset)];
+	}
+	else
+	{
+		flow_density += noc.message_density[
+			noc.idx(m.dest_x, m.dest_y, prev_direction)];
+	}
+
+	assert(flow_density >= -0.1);
+	return flow_density;
+}
+
+void sanafe::schedule_update_noc(const double t, NocInfo &noc)
+{
+	for (auto &q: noc.messages_received)
+	{
+		auto it = q.begin();
+		while(it != q.end())
+		{
+			Message &m = (*it);
+			bool remove_message = false;
+			auto curr = it;
+			if (m.in_noc && (t >= m.received_timestamp))
+			{
+				// Mark the message as not in the NoC, moving it
+				//  from the network to the receiving core
+				m.in_noc = false;
+				// Go along the message path and decrement tile
+				//  message counters
+				schedule_update_noc_message_counts(
+					m, noc, false);
+				remove_message = true;
+			}
+			std::advance(it, 1);
+			if (remove_message)
+			{
+				q.erase(curr);
+			}
+		}
+	}
+
+	return;
+}
+
+sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
+	std::vector<MessageFifo> &message_queues_per_core)
+{
+	MessagePriorityQueue priority;
+
+	TRACE1("Initializing priority queue.\n");
+	for (auto &q: message_queues_per_core)
+	{
+		if (q.size() > 0) // messages
+		{
+			Message &m = q.front();
+			q.pop_front();
+			m.sent_timestamp = m.generation_delay;
+			priority.push(m);
+		}
+		else
+		{
+			TRACE1("No messages for core %d\n", i);
+		}
+	}
+
+#ifdef DEBUG2
+	int i = 0;
+	for (Core *curr = priority_queue; curr != NULL; curr = curr->next)
+	{
+		// TODO
+	}
+#endif
+
+	return priority;
+}
+
+/*
+sanafe::MessageFifo *sanafe::sim_pop_priority_queue(
+	MessageFifo **priority_queue)
+{
+	struct MessageFifo *curr;
+
+	// Pop the first element from the priority queue
+	curr = *priority_queue;
+	*priority_queue = (*priority_queue)->next;
+
+	// For safety, remove current element from queue and unlink
+	curr->next = NULL;
+	return curr;
+}
+*/
+
+/*
+void sanafe::sim_insert_priority_queue(MessageFifo **priority_queue,
+	sanafe::MessageFifo &core_message_fifo)
+{
+	MessageFifo *next;
+
+	// TODO: implement heap-based priority queue rather than list-based.
+	//  Will achieve O(lg N) insertion time rather than O(N)
+
+	assert(priority_queue.size() > 0);
+
+	//INFO("Inserting into priority queue.\n");
+	if (core_message_fifo.tail == NULL)
+	{
+		INFO("error?\n");
+	}
+	if (((*priority_queue) == NULL) ||
+		(core_message_fifo.tail->sent_timestamp <=
+		(*priority_queue)->tail->sent_timestamp))
+	{
+		// Queue is empty or this is the earliest time (highest
+		//  priority), make this core the head of the queue
+		core_message_fifo.next = (*priority_queue);
+		*priority_queue = &core_message_fifo;
+	}
+	else
+	{
+		MessageFifo *curr = *priority_queue;
+		next = curr->next;
+
+		// Reinsert core into the correct place in the priority list
+		while (next != NULL)
+		{
+			if (core_message_fifo.tail->sent_timestamp <
+				next->tail->sent_timestamp)
+			{
+				break;
+			}
+			curr = next;
+			next = curr->next;
+		}
+		curr->next = &core_message_fifo;
+		core_message_fifo.next = next;
+	}
+
+#ifdef DEBUG
+	TRACE3("*** Priority queue ***\n");
+	for (Core *tmp = *priority_queue; tmp != NULL;
+		tmp = tmp->next_timing)
+	{
+		// TRACE3
+		TRACE3("tmp->time:%e (id:%d)\n", tmp->time, tmp->id);
+		assert((tmp->next_timing == NULL) ||
+			tmp->time <= tmp->next_timing->time);
+	}
+#endif
+
+	return;
+}
+*/
