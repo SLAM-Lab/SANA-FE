@@ -1,4 +1,16 @@
 
+// Copyright (c) 2024 - The University of Texas at Austin
+//  This work was produced under contract #2317831 to National Technology and
+//  Engineering Solutions of Sandia, LLC which is under contract
+//  No. DE-NA0003525 with the U.S. Department of Energy.
+// schedule.hpp: Schedule global order of messages on a neuromorphic chip
+//  The schedule then determines on-chip timing and predicts run-time.
+//  The scheduler maintains a priority queue of messages and accounts for
+//  message generation delays, receiving delays and network delays. Generation
+//  and receive delays are calculated earlier in sim.cpp. To calculate
+//  network delays accurately, keep track of predicted NoC state by counting
+//  the numbers of messages that are travelling through routes / flows at
+//  different times
 #include <cassert>
 #include <cmath>
 #include <iterator>
@@ -23,6 +35,10 @@ double sanafe::schedule_messages(
 	std::vector<std::list<Message>> &messages,
 	const Scheduler &scheduler)
 {
+	// Schedule the global order of messages. Takes a vector containing
+	//  a list of messages per core, and scheduler parameters (mostly
+	//  NoC configuration parameters). Returns the timestamp of the last
+	//  scheduled event, i.e., the total time-step delay
 	MessagePriorityQueue priority;
 	NocInfo noc(scheduler.noc_width, scheduler.noc_height,
 		scheduler.core_count, scheduler.max_cores_per_tile);
@@ -165,15 +181,18 @@ double sanafe::schedule_messages(
 void sanafe::schedule_update_noc_message_counts(
 	const Message &m, NocInfo &noc, const bool message_in)
 {
+	// Update the tracked state of the NoC, accounting for a single message
+	//  either entering or leaving the NoC (message_in)
 	assert(m.src_neuron != nullptr);
 
 	// Go along x path, then y path (dimension order routing), and increment
-	//  or decrement counter depending on the operation
+	//  or decrement counter depending on whether a message is coming in or
+	//  out
 	int x_increment, y_increment;
 	// Adjust by dividing by the total number of links along the path, also
 	//  including the output link at the sending core and input link at the
-	//  receiving core, i.e. the hops plus 2. The total sum of the densities
-	//  along the path should equal one for the message
+	//  receiving core, i.e. the hops plus 2. The total sum of the added
+	//  densities along the path should equal one for one new message.
 	double adjust = (1.0 / (2.0 + m.hops));
 
 	if (!message_in)
@@ -199,7 +218,7 @@ void sanafe::schedule_update_noc_message_counts(
 	}
 	assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
 	int prev_direction =
-		4 + (m.src_neuron->core->offset);
+		sanafe::ndirections + (m.src_neuron->core->offset);
 	for (int x = m.src_x; x != m.dest_x; x += x_increment)
 	{
 		int direction;
@@ -213,8 +232,10 @@ void sanafe::schedule_update_noc_message_counts(
 		}
 		if (x == m.src_x)
 		{
-			assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
-			const int link = 4 + (m.src_neuron->core->offset);
+			assert(m.src_neuron->core->offset ==
+				m.src_neuron->core->offset);
+			const int link = sanafe::ndirections +
+				(m.src_neuron->core->offset);
 			noc.message_density[
 				noc.idx(x, m.src_y, link)] += adjust;
 		}
@@ -238,7 +259,8 @@ void sanafe::schedule_update_noc_message_counts(
 		}
 		if ((m.src_x == m.dest_x) && (y == m.src_y))
 		{
-			const int link = 4 + m.src_neuron->core->offset;
+			const int link = sanafe::ndirections +
+				m.src_neuron->core->offset;
 			noc.message_density[
 				noc.idx(m.dest_x, y, link)] += adjust;
 		}
@@ -254,7 +276,7 @@ void sanafe::schedule_update_noc_message_counts(
 	if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
 	{
 		assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
-		int link = 4 + (m.src_neuron->core->offset);
+		int link = sanafe::ndirections + (m.src_neuron->core->offset);
 		noc.message_density[
 			noc.idx(m.dest_x, m.dest_y, link)] += adjust;
 	}
@@ -264,7 +286,7 @@ void sanafe::schedule_update_noc_message_counts(
 			noc.idx(m.dest_x, m.dest_y, prev_direction)] += adjust;
 	}
 
-	// Update rolling averages and message counters
+	// Update rolling averages and message counts
 	if (message_in)
 	{
 		// Message entering NoC
@@ -295,6 +317,8 @@ void sanafe::schedule_update_noc_message_counts(
 
 double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
 {
+	// Calculate the total flow density along a spike message route.
+	//  Sum the densities for all links the message will travel
 	double flow_density;
 	int x_increment, y_increment;
 	int direction;
@@ -316,7 +340,7 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
 	{
 		y_increment = -1;
 	}
-	int prev_direction = 4 + (m.src_neuron->core->offset);
+	int prev_direction = sanafe::ndirections + (m.src_neuron->core->offset);
 	for (int x = m.src_x; x != m.dest_x; x += x_increment)
 	{
 		int direction = 0;
@@ -330,9 +354,10 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
 		}
 		if (x == m.src_x)
 		{
+			const int link = sanafe::ndirections +
+				m.src_neuron->core->offset;
 			flow_density += noc.message_density[
-				noc.idx(x, m.src_y,
-					4 + m.src_neuron->core->offset)];
+				noc.idx(x, m.src_y, link)];
 		}
 		else
 		{
@@ -354,9 +379,10 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
 		}
 		if (m.src_x == m.dest_x && y == m.src_y)
 		{
+			const int link = sanafe::ndirections +
+				m.src_neuron->core->offset;
 			flow_density += noc.message_density[
-				noc.idx(m.dest_x, y,
-					4 + m.src_neuron->core->offset)];
+				noc.idx(m.dest_x, y, link)];
 		}
 		else
 		{
@@ -365,12 +391,13 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
 		}
 		prev_direction = direction;
 	}
-	// Handle the last tile
+	// Handle the last (destination) tile
 	if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
 	{
+		const int link =
+			sanafe::ndirections + m.src_neuron->core->offset;
 		flow_density += noc.message_density[
-			noc.idx(m.dest_x, m.dest_y,
-				4 + m.src_neuron->core->offset)];
+			noc.idx(m.dest_x, m.dest_y, link)];
 	}
 	else
 	{
@@ -384,8 +411,12 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
 
 void sanafe::schedule_update_noc(const double t, NocInfo &noc)
 {
+	// Update the tracked state of the NoC at a given time, t
 	for (auto &q: noc.messages_received)
 	{
+		// Go through all messages in the NoC and check to see if that
+		//  message has been fully received by time t. If so, remove it
+		//  from the NoC.
 		auto it = q.begin();
 		while(it != q.end())
 		{
@@ -394,11 +425,9 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
 			auto curr = it;
 			if (m.in_noc && (t >= m.received_timestamp))
 			{
-				// Mark the message as not in the NoC, moving it
-				//  from the network to the receiving core
 				m.in_noc = false;
 				// Go along the message path and decrement tile
-				//  message counters
+				//  message counters for all links traversed
 				schedule_update_noc_message_counts(
 					m, noc, false);
 				remove_message = true;
@@ -417,11 +446,14 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
 sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
 	std::vector<MessageFifo> &message_queues_per_core)
 {
+	// Create the priority queue of messages
 	MessagePriorityQueue priority;
 
 	TRACE1("Initializing priority queue.\n");
 	for (auto &q: message_queues_per_core)
 	{
+		// For each per-core queue, get the first message for that core
+		//  and add it to the corresponding priority queue
 		if (q.size() > 0) // messages
 		{
 			Message &m = q.front();
@@ -445,80 +477,3 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
 
 	return priority;
 }
-
-/*
-sanafe::MessageFifo *sanafe::sim_pop_priority_queue(
-	MessageFifo **priority_queue)
-{
-	struct MessageFifo *curr;
-
-	// Pop the first element from the priority queue
-	curr = *priority_queue;
-	*priority_queue = (*priority_queue)->next;
-
-	// For safety, remove current element from queue and unlink
-	curr->next = NULL;
-	return curr;
-}
-*/
-
-/*
-void sanafe::sim_insert_priority_queue(MessageFifo **priority_queue,
-	sanafe::MessageFifo &core_message_fifo)
-{
-	MessageFifo *next;
-
-	// TODO: implement heap-based priority queue rather than list-based.
-	//  Will achieve O(lg N) insertion time rather than O(N)
-
-	assert(priority_queue.size() > 0);
-
-	//INFO("Inserting into priority queue.\n");
-	if (core_message_fifo.tail == NULL)
-	{
-		INFO("error?\n");
-	}
-	if (((*priority_queue) == NULL) ||
-		(core_message_fifo.tail->sent_timestamp <=
-		(*priority_queue)->tail->sent_timestamp))
-	{
-		// Queue is empty or this is the earliest time (highest
-		//  priority), make this core the head of the queue
-		core_message_fifo.next = (*priority_queue);
-		*priority_queue = &core_message_fifo;
-	}
-	else
-	{
-		MessageFifo *curr = *priority_queue;
-		next = curr->next;
-
-		// Reinsert core into the correct place in the priority list
-		while (next != NULL)
-		{
-			if (core_message_fifo.tail->sent_timestamp <
-				next->tail->sent_timestamp)
-			{
-				break;
-			}
-			curr = next;
-			next = curr->next;
-		}
-		curr->next = &core_message_fifo;
-		core_message_fifo.next = next;
-	}
-
-#ifdef DEBUG
-	TRACE3("*** Priority queue ***\n");
-	for (Core *tmp = *priority_queue; tmp != NULL;
-		tmp = tmp->next_timing)
-	{
-		// TRACE3
-		TRACE3("tmp->time:%e (id:%d)\n", tmp->time, tmp->id);
-		assert((tmp->next_timing == NULL) ||
-			tmp->time <= tmp->next_timing->time);
-	}
-#endif
-
-	return;
-}
-*/
