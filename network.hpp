@@ -101,6 +101,7 @@ public:
 	std::string default_synapse_hw_name;
 	std::map<std::string, std::string> default_attributes;
 
+	std::filesystem::path default_soma_plugin;
 	int id;
 	int default_max_connections_out;
 	bool default_log_potential, default_log_spikes, default_force_update;
@@ -135,6 +136,7 @@ private:
 	//  invalidated.
 	Network(const Network &copy);
 };
+
 }
 
 #endif

@@ -7,6 +7,7 @@
 #define MODELS_HEADER_INCLUDED_
 
 #include <map>
+#include <memory> // For shared_ptr<T>
 #include <optional>
 #include <vector>
 #include "description.hpp"
@@ -56,6 +57,8 @@ private:
 };
 
 NeuronResetModes model_parse_reset_mode(const std::string &str);
+std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const int group_id, const int id);
+
 }
 
 #endif

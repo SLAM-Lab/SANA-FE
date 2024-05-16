@@ -216,7 +216,7 @@ void sanafe::schedule_update_noc_message_counts(
 	{
 		y_increment = -1;
 	}
-	assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
+	assert(m.src_neuron->core->offset == m.src_neuron->core->offset);
 	int prev_direction =
 		sanafe::ndirections + (m.src_neuron->core->offset);
 	for (int x = m.src_x; x != m.dest_x; x += x_increment)
@@ -275,8 +275,10 @@ void sanafe::schedule_update_noc_message_counts(
 
 	if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
 	{
-		assert(m.src_neuron->core->offset == m.src_neuron->core->id % ARCH_MAX_CORES_PER_TILE);
-		int link = sanafe::ndirections + (m.src_neuron->core->offset);
+		assert(m.src_neuron->core->offset ==
+			m.src_neuron->core->offset);
+		const int link = sanafe::ndirections +
+			(m.src_neuron->core->offset);
 		noc.message_density[
 			noc.idx(m.dest_x, m.dest_y, link)] += adjust;
 	}

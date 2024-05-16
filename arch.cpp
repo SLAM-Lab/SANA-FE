@@ -605,6 +605,14 @@ sanafe::SomaUnit &sanafe::Core::create_soma(
 			}
 			*/
 		}
+		else if (key == "model")
+		{
+			s.model = value_str;
+		}
+		else if (key == "plugin_lib")
+		{
+			s.plugin_lib = std::filesystem::path(value_str);
+		}
 	}
 
 	TRACE1("Soma processor created (c:%d.%d)\n", c.parent_tile_id,
@@ -817,11 +825,28 @@ void sanafe::Core::map_neuron(Neuron &n)
 	// Pass all the model specific arguments
 	if (n.model == nullptr)
 	{
-		//n.soma_model = plugin_get_soma(n.soma_hw_name);
-		n.model = std::shared_ptr<SomaModel>(
-			new LoihiLifModel(n.parent_group_id, n.id));
+		// Setup the soma model
+		TRACE1("Soma hw name: %s", soma_hw_name.c_str());
+		assert(n.soma_hw != nullptr);
+		if (n.soma_hw->plugin_lib.empty())
+		{
+			// Use built in models
+			INFO("Creating soma built-in model %s.\n",
+				n.soma_hw->model.c_str());
+			n.model = sanafe::model_get_soma(
+				n.soma_hw->model, n.parent_group_id, n.id);
+		}
+		else
+		{
+			INFO("Creating soma from plugin %s.\n",
+				n.soma_hw->plugin_lib.c_str());
+			n.model = plugin_get_soma(
+				n.soma_hw->model, n.parent_group_id, n.id,
+				n.soma_hw->plugin_lib);
+		}
 		const NeuronGroup &group = n.parent_net->groups_vec[
 			n.parent_group_id];
+		assert(n.model != nullptr);
 		// First set the group's default attribute values, and then
 		//  any defined by the neuron
 		n.model->set_attributes(group.default_attributes);

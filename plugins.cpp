@@ -3,31 +3,34 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 //  plugins.cpp
-#include <string>
+#include <filesystem>
 #include <iostream>
 #include <map>
+#include <string>
+
 #include <dlfcn.h>
 
-#include "plugins.hpp"
 #include "models.hpp"
+#include "plugins.hpp"
 #include "print.hpp"
 
-typedef sanafe::SomaModel *_create_soma(void);
-typedef void _destroy_soma(sanafe::SomaModel *model);
-std::map<std::string, _create_soma *> create_soma;
-std::map<std::string, _destroy_soma *> destroy_soma;
+typedef sanafe::SomaModel *_create_soma(const int gid, const int nid);
+//typedef void _destroy_soma(std::shared_ptr<sanafe::SomaModel> model);
+std::map<std::string, _create_soma *> plugin_create_soma;
+//std::map<std::string, _destroy_soma *> destroy_soma;
 
-void plugin_init_soma(const std::string &name)
+void sanafe::plugin_init_soma(
+	const std::string &model_name, const std::filesystem::path &plugin_path)
 {
-	const std::string lib_path = "./plugins/" + name + ".so";
-	const std::string create = "create_" + name;
-	const std::string destroy = "destroy_" + name;
+	const std::string create = "create_" + model_name;
+	//const std::string destroy = "destroy_" + model_name;
 
 	// Load the soma library
-	void *soma = dlopen(lib_path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-	if (!soma)
+	INFO("Loading soma plugin:%s\n", plugin_path.c_str());
+	void *soma = dlopen(plugin_path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+	if (soma == nullptr)
 	{
-		INFO("Error: Couldn't load library %s\n", lib_path.c_str());
+		INFO("Error: Couldn't load library %s\n", plugin_path.c_str());
 		exit(1);
 	}
 
@@ -35,8 +38,9 @@ void plugin_init_soma(const std::string &name)
 	dlerror();
 
 	// Function to create an instance of the Soma class
-	_create_soma *create_func = (_create_soma *) dlsym(soma,create.c_str());
-	create_soma[name] = create_func;
+	INFO("Loading function: %s\n", create.c_str());
+	_create_soma *create_func = (_create_soma *) dlsym(soma, create.c_str());
+	plugin_create_soma[model_name] = create_func;
 	const char *dlsym_error = dlerror();
 	if (dlsym_error)
 	{
@@ -46,27 +50,41 @@ void plugin_init_soma(const std::string &name)
 	}
 
 	// Function to destroy an instance of the Soma class
-	destroy_soma[name] =
-		(_destroy_soma *) dlsym(soma, destroy.c_str());
+	//destroy_soma[model_name] =
+	//	(_destroy_soma *) dlsym(soma, destroy.c_str());
 
-	dlsym_error = dlerror();
-	if (dlsym_error)
-	{
-		INFO("Error: Couldn't load symbol %s: %s\n", destroy.c_str(),
-			dlsym_error);
-		exit(1);
-	}
-	INFO("Loaded plugin symbols for %s.\n", name.c_str());
+	//dlsym_error = dlerror();
+	//if (dlsym_error)
+	//{
+	//	INFO("Error: Couldn't load symbol %s: %s\n", destroy.c_str(),
+	//		dlsym_error);
+	//	exit(1);
+	//}
+	INFO("Loaded plugin symbols for %s.\n", model_name.c_str());
 }
 
-sanafe::SomaModel *plugin_get_soma(const std::string &name)
+std::shared_ptr<sanafe::SomaModel> sanafe::plugin_get_soma(
+	const std::string &model_name, const int gid, const int nid,
+	std::filesystem::path plugin_path)
 {
-	INFO("Getting soma:%s\n", name.c_str());
-
-	if (!create_soma.count(name))
+	if (plugin_path.empty())
 	{
-		plugin_init_soma(name);
+		// Use default path, which is in the plugin directory and
+		const std::string model_filename = model_name + ".so";
+		plugin_path =
+			std::filesystem::path(".") /
+			std::filesystem::path("plugins") /
+			model_filename;
+		INFO("No path given; setting path to default: %s\n",
+			plugin_path.c_str());
 	}
 
-	return create_soma[name]();
+	INFO("Getting soma:%s\n", model_name.c_str());
+	if (plugin_create_soma.count(model_name) == 0)
+	{
+		plugin_init_soma(model_name, plugin_path);
+	}
+
+	return std::shared_ptr<SomaModel>(
+		plugin_create_soma[model_name](gid, nid));
 }

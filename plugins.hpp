@@ -5,14 +5,15 @@
 // plugins.hpp
 #ifndef PLUGINS_HEADER_INCLUDED_
 #define PLUGINS_HEADER_INCLUDED_
+#include <filesystem>
 #include <string>
 
 namespace sanafe
 {
 class SomaModel;
 
-void plugin_init_soma(char* name);
-SomaModel *plugin_get_soma(const std::string &name);
+void plugin_init_soma(const std::string &model_name, const std::filesystem::path &plugin_path);
+std::shared_ptr<SomaModel> plugin_get_soma(const std::string &model_name, const int gid, const int nid, std::filesystem::path plugin_path="");
 }
 
 #endif

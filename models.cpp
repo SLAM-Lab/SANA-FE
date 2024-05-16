@@ -9,10 +9,9 @@
 #include "print.hpp"
 #include "models.hpp"
 
-using namespace sanafe;
-
 // **** Soma models ****
-LoihiLifModel::LoihiLifModel(const int gid, const int nid): SomaModel(gid, nid)
+sanafe::LoihiLifModel::LoihiLifModel(
+	const int gid, const int nid): sanafe::SomaModel(gid, nid)
 {
 	force_update = false;
 	potential = 0.0;
@@ -31,12 +30,12 @@ LoihiLifModel::LoihiLifModel(const int gid, const int nid): SomaModel(gid, nid)
 	return;
 }
 
-LoihiLifModel::~LoihiLifModel()
+sanafe::LoihiLifModel::~LoihiLifModel()
 {
 	return;
 }
 
-void LoihiLifModel::set_attributes(
+void sanafe::LoihiLifModel::set_attributes(
 	const std::map<std::string, std::string> &attr)
 {
 	for (auto a: attr)
@@ -84,7 +83,7 @@ void LoihiLifModel::set_attributes(
 	}
 }
 
-sanafe::NeuronStatus LoihiLifModel::update(
+sanafe::NeuronStatus sanafe::LoihiLifModel::update(
 	const std::optional<double> current_in)
 {
 	// Calculate the change in potential since the last update e.g.
@@ -187,6 +186,26 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 	return reset_mode;
 }
 
+std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
+	const std::string &model_name, const int group_id, const int id)
+{
+	if (model_name == "leaky_integrate_fire")
+	{
+		return std::shared_ptr<SomaModel>(
+			new LoihiLifModel(group_id, id));
+	}
+	else if (model_name == "truenorth")
+	{
+		// TODO: reintegrate truenorth model
+		throw std::invalid_argument("not implemented yet.");
+	}
+	else
+	{
+		throw std::invalid_argument("Model not supported.");
+	}
+}
+
+// TODO: implement TrueNorth model as class like Loihi
 // double sim_update_soma_truenorth(
 // 	Timestep &ts, Neuron *n, const double current_in)
 // {

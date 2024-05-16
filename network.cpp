@@ -142,7 +142,7 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 		{
 			ss >> group.default_force_update;
 		}
-		else if (key =="connections_out")
+		else if (key == "connections_out")
 		{
 			ss >> group.default_max_connections_out;
 		}
@@ -231,17 +231,6 @@ void sanafe::Neuron::set_attributes(
 
 	assert(connections_out.size() == 0);
 	connections_out.reserve(max_connections_out);
-
-	// Check if need to create Soma Class instance
-	if (core != nullptr)
-	{
-		// TODO: remove hack, make this user input
-		TRACE1("Soma hw name: %s", n.soma_hw_name.c_str());
-		//n.soma_model = plugin_get_soma(n.soma_hw_name);
-		model = std::shared_ptr<SomaModel>(
-			new LoihiLifModel(parent_group_id, id));
-		TRACE1("Creating new neuron %d\n", n.id);
-	}
 	if (model != nullptr)
 	{
 		model->set_attributes(attr);

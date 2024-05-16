@@ -18,24 +18,10 @@
 #include <vector>
 #include <map>
 #include <list>
+#include <filesystem> // For std::filesystem::path
 #include <functional> // For std::reference_wrapper
 
 #include "network.hpp"
-
-// Hard define maximum defined h/w sizes
-// TODO: better dynamically define or allocate these numbers, so that we can
-//  support a range of architectures seamlessly. At the moment, a large amount
-//  of memory is needed if we want to support lots of large cores
-#define ARCH_MAX_TILES 32
-#define ARCH_MAX_CORES_PER_TILE 4
-#define ARCH_MAX_CORES 128
-//#define ARCH_MAX_X (64)
-//#define ARCH_MAX_Y (64)
-//#define ARCH_MAX_COMPARTMENTS 256
-
-// Loihi
-#define ARCH_MAX_X (8*4)
-#define ARCH_MAX_Y (4*2)
 
 #define ARCH_INVALID_ID (-1)
 
@@ -131,7 +117,8 @@ struct DendriteUnit
 struct SomaUnit
 {
 	FILE *noise_stream;
-	std::string name;
+	std::filesystem::path plugin_lib;
+	std::string name, model;
 	long int neuron_updates, neurons_fired, neuron_count;
 	double energy, time;
 	double energy_update_neuron, latency_update_neuron;
