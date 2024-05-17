@@ -43,6 +43,7 @@ enum synapse_models
 	SYNAPSE_CUBA,
 };
 
+/*
 enum arch_description_blocks
 {
 	ARCH_DESCRIPTION_TOP = -1,
@@ -55,6 +56,7 @@ enum arch_description_blocks
 	ARCH_DESCRIPTION_SOMA,
 	ARCH_DESCRIPTION_AXON_OUT,
 };
+*/
 
 struct Message
 {

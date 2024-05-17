@@ -4,12 +4,8 @@
 """
 isort:skip_file
 """
-from collections import deque
-from warnings import warn
-
 import os
 import sys
-import importlib
 
 # fmt: off
 from collections import deque
@@ -27,7 +23,7 @@ from ..utils.misc import CalculateSpikeTimes
 
 """
 keep this file structure-
-FUGU
+Fugu
 ├── backends
 │   ├── sanafe_backend.py
 │   │...
@@ -42,14 +38,13 @@ FUGU_DIR = os.path.dirname(BACKEND_DIR)
 FUGU_PROJECT_DIR = os.path.dirname(FUGU_DIR)
 PROJECT_DIR = os.path.dirname(FUGU_PROJECT_DIR)
 sys.path.append(PROJECT_DIR)
-sim = importlib.import_module('SANA-FE.snn')
+import sim as sanafe
+# Set some flags for the dynamic linking library
+# Important to do before importing the simcpp .so library!
+sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
+import sanafecpp
 
-NETWORK_FILENAME = "runs/random/random.net"
 ARCH_FILENAME = "arch/loihi.yaml"
-LOIHI_NEURONS_PER_CORE = 1024
-LOIHI_CORES = 128
-LOIHI_CORES_PER_TILE = 4
-LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
 
 class sanafe_Backend(Backend):
 
@@ -62,44 +57,47 @@ class sanafe_Backend(Backend):
         """
         Add Neurons
         """
-
         # Add input neurons, as identified by circuit information.
-        recordAll =  self.record == 'all'
+        record_all = (self.record == 'all')
         for node, vals in self.fugu_circuit.nodes.data():
             if vals.get('layer') != 'input': continue
             for list in vals['output_lists']:
                 for neuron in list:
-                    n = snn.InputNeuron(neuron, record=recordAll)
+                    n = snn.InputNeuron(neuron, record=record_all)
                     neuron_dict[neuron] = n
                     self.nn.add_neuron(n)
 
         # Add all other neurons.
         for neuron, props in self.fugu_graph.nodes.data():
             if neuron in neuron_dict: continue
-            Vinit   =       props.get('voltage',       0.0)
-            Vspike  =       props.get('threshold',     1.0)
-            Vreset  =       props.get('reset_voltage', 0.0)
-            Vretain = 1.0 - props.get('decay',         0.0)
-            Vbias   =       props.get('bias',          0.0)
-            P       =       props.get('p',             1.0)
-            if 'potential'        in props: Vinit   = props['potential']
+            voltage = props.get('voltage', 0.0)
+            threshold = props.get('threshold', 1.0)
+            reset_voltage = props.get('reset_voltage', 0.0)
+            leakage = 1.0 - props.get('decay', 0.0)
+            bias = props.get('bias', 0.0)
+            p = props.get('p', 1.0)
+            if 'potential' in props: Vinit   = props['potential']
             if 'leakage_constant' in props: Vretain = props['leakage_constant']
-            n = snn.LIFNeuron(neuron, voltage=Vinit, threshold=Vspike, reset_voltage=Vreset, leakage_constant=Vretain, bias=Vbias, p=P, record=recordAll)
+            n = snn.LIFNeuron(neuron, voltage=voltage, threshold=threshold,
+                              reset_voltage=reset_voltage,
+                              leakage_constant=leakage,
+                              bias=bias, p=p, record=record_all)
             neuron_dict[neuron] = n
             self.nn.add_neuron(n)
 
         # Tag output neurons based on circuit information.
-        if not recordAll:
+        if not record_all:
             for node, vals in self.fugu_circuit.nodes.data():
-                if vals.get('layer') != 'output': continue
-                for list in vals['output_lists']:
+                if vals.get("layer") != "output": continue
+                for list in vals["output_lists"]:
                     for neuron in list:
                         neuron_dict[neuron].record = True
 
         for n1, n2, props in self.fugu_graph.edges.data():
-            delay  = int(props.get('delay',  1))
-            weight =     props.get('weight', 1.0)
-            syn = snn.Synapse(neuron_dict[n1], neuron_dict[n2], delay=delay, weight=weight)
+            delay  = int(props.get("delay",  1))
+            weight = float(props.get("weight", 1.0))
+            syn = snn.Synapse(neuron_dict[n1], neuron_dict[n2], delay=delay,
+                              weight=weight)
             self.nn.add_synapse(syn)
 
         del neuron_dict
@@ -117,15 +115,15 @@ class sanafe_Backend(Backend):
         self.fugu_circuit = scaffold.circuit
         self.fugu_graph = scaffold.graph
         self.brick_to_number = scaffold.brick_to_number
-        if 'record' in compile_args:
+        if "record" in compile_args:
             self.record = compile_args['record']
         else:
             self.record = False
-        if 'ds_format' in compile_args:
+        if "ds_format" in compile_args:
             self.ds_format = compile_args['ds_format']
         else:
             self.ds_format = True
-        if 'debug_mode' in compile_args:
+        if "debug_mode" in compile_args:
             self.debug_mode = compile_args['debug_mode']
         else:
             self.debug_mode = False
@@ -134,49 +132,44 @@ class sanafe_Backend(Backend):
 
     def _find_node(name):
         return None
-    
-    def run(self, n_steps=10, return_potential=False):
-        "convert to SANA-FE Style and save to file"
-        network = sim.Network(save_mappings=True)
-        neurons_per_core = LOIHI_NEURONS_PER_CORE
-        compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
-                                           neurons_per_core)
 
-        id_dict = {} # GROUP NAME -> GROUP INDEX
-        nid_dict = [] # [GROUP INDEX] NEURON NAME -> SANAFE NEURON ID
-        nid_dict_idx = {} # NEURON NAME -> GROUP INDEX
+    def run(self, n_steps=10, return_potential=False, debug_mode=False):
+        "Convert to SANA-FE network and save to file"
+        arch = sim.load_arch_yaml(ARCH_FILENAME)
+        network = sanafecpp.Network(arch)
+
+        id_dict = {} # Group name -> gid
+        nid_dict = [] # [Group index] Neuron name -> SANA-FE nid
+        nid_dict_idx = {} # Neuron Name -> gid
         neurons = list(enumerate(sorted(self.scaffold.graph.nodes)))
 
-        #add the neurons that belong to that group
+        # Add the neurons that belong to the current group
         #TODO: optimize move out of this for loop
+        group = network.create_neuron_group(len(neurons))
         for j, neuron in neurons:
             neuron_properties = self.scaffold.graph.nodes[neuron]
-            t = neuron_properties['threshold']
-            l = neuron_properties['decay']
+            threshold = neuron_properties["threshold"]
+            decay = neuron_properties["decay"]
+            reset = neuron_properties.get("reset", 0.0)
 
             i = j
-            network.create_group(t,0,l) #TODO: threshold, reset, leak -> supposed to be neuron specific, make new group for each setting type?
-            sanafe_neuron = network.groups[i].create_neuron()
+            #TODO: threshold, reset, leak -> supposed to be neuron specific,
+            #  make new group for each setting type?
+            sanafe_neuron = group.define_neuron(j,
+                {"threshold": threshold, "reset": reset, "decay": decay})
             index = sanafe_neuron.id
             name = neuron
             toadd = {name: index}
             nid_dict_idx[name] = i
             #neurons.remove((j, neuron))
 
-            #mapping
-            tile, core = sim.map_neuron_to_compartment(compartments)
-            if tile != None and core != None:
-                sanafe_neuron.tile = tile
-                sanafe_neuron.core = core
-            else:
-                print("Insufficient Nodes!")
-                exit()
+            # Map neuron
+            sim.map_neuron_to_compartment(arch, neuron)
             nid_dict.append(toadd)
 
-        #map synapses
+        # Add synapses
         for i, synapse in enumerate(self.scaffold.graph.edges):
                 #print(str(synapse) + " | " + str(self.scaffold.graph.edges[synapse]))
-
                 group_idx_src = nid_dict_idx[synapse[0]]
                 neuron_idx_src = nid_dict[group_idx_src][synapse[0]]
 
@@ -184,17 +177,19 @@ class sanafe_Backend(Backend):
                 neuron_idx_dest = nid_dict[group_idx_dest][synapse[1]]
 
                 weight = self.scaffold.graph.edges[synapse]['weight']
-                network.groups[group_idx_src].neurons[neuron_idx_src].add_connection(network.groups[group_idx_dest].neurons[neuron_idx_dest], int(weight))
-        
-        #add synapses
+                network.groups[group_idx_src].neurons[neuron_idx_src].add_connection(
+                    network.groups[group_idx_dest].neurons[neuron_idx_dest],
+                    {"weight": weight})
+
         # print(id_dict)
         # print(nid_dict)
         # print(nid_dict_idx)
         # self.scaffold.summary(verbose = 1)
 
         #save
-        network.save(filename="converted.net")
-        pass
+        sim = sanafecpp.Simulation(arch, network)
+        sim.run(n_steps)
+        return
 
     def cleanup(self):
         """

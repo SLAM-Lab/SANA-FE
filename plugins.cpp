@@ -15,15 +15,12 @@
 #include "print.hpp"
 
 typedef sanafe::SomaModel *_create_soma(const int gid, const int nid);
-//typedef void _destroy_soma(std::shared_ptr<sanafe::SomaModel> model);
 std::map<std::string, _create_soma *> plugin_create_soma;
-//std::map<std::string, _destroy_soma *> destroy_soma;
 
 void sanafe::plugin_init_soma(
 	const std::string &model_name, const std::filesystem::path &plugin_path)
 {
 	const std::string create = "create_" + model_name;
-	//const std::string destroy = "destroy_" + model_name;
 
 	// Load the soma library
 	INFO("Loading soma plugin:%s\n", plugin_path.c_str());
@@ -49,17 +46,6 @@ void sanafe::plugin_init_soma(
 		exit(1);
 	}
 
-	// Function to destroy an instance of the Soma class
-	//destroy_soma[model_name] =
-	//	(_destroy_soma *) dlsym(soma, destroy.c_str());
-
-	//dlsym_error = dlerror();
-	//if (dlsym_error)
-	//{
-	//	INFO("Error: Couldn't load symbol %s: %s\n", destroy.c_str(),
-	//		dlsym_error);
-	//	exit(1);
-	//}
 	INFO("Loaded plugin symbols for %s.\n", model_name.c_str());
 }
 

@@ -14,62 +14,12 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 # Set some flags for the dynamic linking library
-# Important to do before importing the simcpp .so library!
+# Important to do before importing the sanafecpp .so library!
 sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
 import sanafecpp
 
+
 ### SNN utility functions ###
-
-# END OF DUPLICATED CODE
-
-"""
-class Architecture:
-    def __init__(self, arch=None):
-        self._arch = sanafecpp.Architecture()
-
-
-class Network:
-    def __init__(self, save_mappings=False):
-        self._net = sanafecpp.Network()
-        self._save_mappings = save_mappings
-
-    def create_neuron_group(self, neuron_count, attributes):
-        attributes =_attribute_values_to_str(attributes)
-        group = NeuronGroup(self._net.create_neuron_group(
-            neuron_count, attributes))
-        return group
-
-    def save(self, filename, group_idx=None, save_mappings=None):
-        if group_idx is None:
-            group_idx = slice(0, len(self.groups))
-        if save_mappings is None:
-            save_mappings = self._save_mappings
-
-class NeuronGroup:
-    def __init__(self, neuron_count, attributes):
-        attributes =_attribute_values_to_str(attributes)
-        self._neuron_group = sanafecpp.NeuronGroup(neuron_count, attributes)
-        return
-
-        group_str += "\n"
-        return ""
-
-    def define_neuron(self, neuron_id, attributes):
-        attributes =_attribute_values_to_str(attributes)
-        return self._neuron_group.define_neuron(neuron_id, attributes)
-
-
-class Neuron:
-    def __init__(self, neuron_id):
-        self._neuron = sanafecpp.Neuron(neuron_id)
-        self._save_mappings = False
-        return
-
-        if self._save_mappings:
-            neuron_str += "& {0}.{1}@{2}.{3}\n".format(self.group.id, self.id,
-                                                    self.tile, self.core)
-        return ""
-"""
 def map_neuron_group(neuron_group, arch, mappings):
     assert(len(neuron_group.neurons) == len(mappings))
     for n, m in zip(neuron_group.neurons, mappings):
@@ -82,7 +32,7 @@ def map_neuron_group(neuron_group, arch, mappings):
 
 
 def map_neurons_to_cores(neurons, arch, core_count):
-    """Map neurons to one or more cores"""
+    """Map neurons uniformly to a given number of cores"""
     neuron_count = len(neurons)
     neurons_per_core = neuron_count // core_count
     print(f"Mapping {neuron_count} neurons to {core_count} cores")
@@ -196,7 +146,7 @@ def load_net(net_filename, arch):
     return net
 
 
-def load_arch(yaml_filename):
+def load_arch_yaml(yaml_filename):
     arch = sanafecpp.Architecture()
     with open(yaml_filename, "r") as arch_file:
         arch_dict = yaml.safe_load(arch_file)
@@ -329,85 +279,15 @@ def get_instances(element_dict):
 ## TODO: move these functions into the C++ kernel, this should be responsible
 ##  for loading and saving this raw format. The Python script should build
 ##  objects using the PyBind11 interface
-def format_attributes(attributes):
-    line = ""
-    if attributes is None:
-        attributes = {}
+#def format_attributes(attributes):
+#    line = ""
+#    if attributes is None:
+#        attributes = {}
 
-    for key in attributes:
-        line += (f" {key}={attributes[key]}")
-    return line
+#    for key in attributes:
+#        line += (f" {key}={attributes[key]}")
+#    return line
 
-"""
-def create_tile(tile, name):
-    global _tiles
-    tile_id = _tiles
-    _tiles += 1
-
-    if "attributes" not in tile:
-        raise Exception(f"attributes section not defined for tile {tile_id}. "
-                        "Did you mispell attributes?")
-
-    tile = f"t {name}" + format_attributes(tile["attributes"])
-    _entry_list.append(tile)
-    # Track how many cores are in this tile
-    _cores_in_tile.append(0)
-
-    return tile_id
-
-
-def create_core(tile_id, name, core_dict):
-    core_id = _cores_in_tile[tile_id]
-
-
-    core = f"c {name} {tile_id}" + format_attributes(core_dict["attributes"])
-    _entry_list.append(core)
-    _cores_in_tile[tile_id] += 1
-
-    return core_id
-
-
-def create_synapse(tile_id, core_id, synapse_dict):
-    name = synapse_dict["name"]
-    synapse = f"s {name} {tile_id} {core_id}" + format_attributes(synapse_dict["attributes"])
-    _entry_list.append(synapse)
-    return
-
-
-def create_dendrite(tile_id, core_id, dendrite_dict):
-    name = dendrite_dict["name"]
-    dendrite = f"d {name} {tile_id} {core_id}" + format_attributes(dendrite_dict["attributes"])
-    _entry_list.append(dendrite)
-    return
-
-
-def create_soma(tile_id, core_id, soma_dict):
-    name = soma_dict["name"]
-    soma = (f"+ {name} {tile_id} {core_id}" + format_attributes(soma_dict["attributes"]))
-    _entry_list.append(soma)
-    return
-
-
-def create_axon_in(tile_id, core_id, axon_dict):
-    name = axon_dict["name"]
-    axon = f"i {name} {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
-    _entry_list.append(axon)
-    return
-
-
-def create_axon_out(tile_id, core_id, axon_dict):
-    name = axon_dict["name"]
-    axon = f"o {name} {tile_id} {core_id}" + format_attributes(axon_dict["attributes"])
-    _entry_list.append(axon)
-    return
-
-
-def create_noc(noc_dict):
-    if "attributes" not in noc_dict:
-        raise Exception("Error: NoC not defined for architecture (please add this under attributes)")
-    _entry_list.append("@" + format_attributes(noc_dict["attributes"]))
-    return
-"""
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run_kernel(arch_path, network_path, timesteps,
@@ -415,7 +295,7 @@ def run_kernel(arch_path, network_path, timesteps,
         potential_trace=False, message_trace=False, out_dir=None):
     print("Loading architecture\n")
     try:
-        arch = load_arch_from_yaml(arch_path)
+        arch = load_arch_yaml(arch_path)
         #arch = sanafecpp.Architecture()
         #arch.load_arch_file("runs/example.yaml.parsed")
     except yaml.parser.ParserError as yaml_parse_exc:

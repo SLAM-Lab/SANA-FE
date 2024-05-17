@@ -3,7 +3,8 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // hodgkin_huxley.cpp
-// Plugin implementation by Robin Sam of the Hodgkin-Huxley neuron model.
+// Plugin implementation of the Hodgkin-Huxley neuron model. Implemented by
+//  Robin Sam.
 // Model inspired by this paper: https://ieeexplore.ieee.org/document/9235538
 //  and this textbook: https://mrgreene09.github.io/computational-neuroscience-textbook
 #include <cstring>
