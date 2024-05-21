@@ -1396,6 +1396,7 @@ double sim_calculate_energy(const struct architecture *const arch)
 		total_hop_energy += t->south_hops * t->energy_south_hop;
 		total_hop_energy +=  t->north_hops * t->energy_north_hop;
 		network_energy += total_hop_energy;
+		TRACE1("east:%ld west:%ld north:%ld south:%ld\n", t->east_hops, t->west_hops, t->north_hops, t->south_hops);
 
 		for (int j = 0; j < t->core_count; j++)
 		{
@@ -1403,11 +1404,17 @@ double sim_calculate_energy(const struct architecture *const arch)
 
 			axon_in_energy += c->axon_in.spike_messages_in *
 				c->axon_in.energy_spike_message;
+			TRACE1("spikes in: %ld, energy:%e\n",
+					c->axon_in.spike_messages_in,
+					c->axon_in.energy_spike_message);
 			for (int k = 0; k < c->synapse_count; k++)
 			{
 				synapse_energy +=
 					c->synapse[k].spikes_processed *
 					c->synapse[k].energy_spike_op;
+				TRACE1("synapse processed: %ld, energy:%e\n",
+					c->synapse[k].spikes_processed,
+					c->synapse[k].energy_spike_op);
 			}
 			for (int k = 0; k < c->soma_count; k++)
 			{
@@ -1418,15 +1425,28 @@ double sim_calculate_energy(const struct architecture *const arch)
 					c->soma[k].energy_update_neuron;
 				soma_energy += c->soma[k].neurons_fired *
 					c->soma[k].energy_spiking;
+				TRACE1("neurons:%ld updates:%ld, spiking:%ld\n",
+					c->soma[k].neuron_count,
+					c->soma[k].neuron_updates,
+					c->soma[k].neurons_fired);
 			}
 
 			axon_out_energy += c->axon_out.packets_out *
 				c->axon_out.energy_access;
+			TRACE1("packets: %ld, energy:%e\n",
+					c->axon_out.packets_out,
+					c->axon_out.energy_access);
 		}
 	}
 
 	total_energy = axon_in_energy + synapse_energy + soma_energy +
 		axon_out_energy + network_energy;
+	TRACE1("axon_in_energy:%e\n", axon_in_energy);
+	TRACE1("synapse_energy:%e\n", synapse_energy);
+	TRACE1("soma_energy:%e\n", soma_energy);
+	TRACE1("axon_out_energy:%e\n", axon_out_energy);
+	TRACE1("network_energy:%e\n", network_energy);
+	TRACE1("total:%e\n", total_energy);
 
 	return total_energy;
 }

@@ -23,21 +23,21 @@
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
 // TrueNorth
-//#define ARCH_MAX_TILES 4096
-//#define ARCH_MAX_CORES_PER_TILE 1
-//#define ARCH_MAX_X (64)
-//#define ARCH_MAX_Y (64)
-//#define ARCH_MAX_COMPARTMENTS 256
+#define ARCH_MAX_TILES 4096
+#define ARCH_MAX_CORES_PER_TILE 1
+#define ARCH_MAX_X (64)
+#define ARCH_MAX_Y (64)
+#define ARCH_MAX_COMPARTMENTS 256
 
 // Loihi
-#define ARCH_MAX_TILES 256
-//#define ARCH_MAX_TILES 32
-#define ARCH_MAX_CORES_PER_TILE 4
-#define ARCH_MAX_X (8*4)
-#define ARCH_MAX_Y (4*2)
+//#define ARCH_MAX_TILES 256
+////#define ARCH_MAX_TILES 32
+//#define ARCH_MAX_CORES_PER_TILE 4
+//#define ARCH_MAX_X (8*4)
+//#define ARCH_MAX_Y (4*2)
 // Hard define maximum defined h/w sizes
 //#define ARCH_MAX_COMPARTMENTS 16384
-#define ARCH_MAX_COMPARTMENTS 1024
+//#define ARCH_MAX_COMPARTMENTS 1024
 #define ARCH_MAX_CONNECTION_MAP (ARCH_MAX_COMPARTMENTS*16)
 
 #define ARCH_MAX_UNITS 3

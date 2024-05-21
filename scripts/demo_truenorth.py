@@ -35,18 +35,20 @@ def run_sim(network_path, timesteps, plot_filename):
     sim.run(ARCH_PATH, network_path, timesteps, potential_trace=True,
             spike_trace=True)
 
-    potential_data = pd.read_csv("potential.trace")
-    spike_data = pd.read_csv("spikes.trace")
+    potential_data = pd.read_csv("potential.csv")
+    spike_data = pd.read_csv("spikes.csv")
 
     offset=200
-    potentials = potential_data.loc[offset:timesteps, "1.0"]
-
-    spikes_in = spike_data.loc[spike_data["gid.nid"] == 0.0]
-    spikes_out = spike_data.loc[spike_data["gid.nid"] == 1.0]
+    potentials = potential_data.loc[offset:timesteps, "neuron 1.0"]
+    spikes_in = spike_data.loc[spike_data["neuron"] == 0.0]
+    spikes_out = spike_data.loc[spike_data["neuron"] == 1.0]
 
     plt.rcParams.update({'font.size': 6, "lines.markersize": 2})
     plt.figure(figsize=(3.2, 1.5))
     plt.plot(np.arange(0, timesteps-offset), potentials)
+    linestyle = (0, (1, 2))
+    plt.plot(np.arange(0, timesteps-offset), potentials, linestyle=linestyle, color="black")
+    legend = plt.legend(("NeMo", "SANA-FE"), fontsize=6, handlelength=1)
     spike_idx = spikes_out.loc[:, "timestep"]
     height = max(potentials) + 2
     spike_vals = height * np.ones(spike_idx.shape)
@@ -57,6 +59,9 @@ def run_sim(network_path, timesteps, plot_filename):
     plt.xlabel("Simulation Ticks")
     plt.ylabel("Membrane Potential")
     #plt.ylim((0, 22))
+
+
+
     plt.tight_layout()
     # Need to save
     plt.savefig(plot_filename)

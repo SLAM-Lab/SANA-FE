@@ -113,10 +113,14 @@ if plot_results:
     #plt.bar(labels, np.array(energies) / energies[4], width=0.2)
     #plt.bar(labels, np.array(latencies) / latencies[4], width=0.2)
 
-    df.plot.bar(rot=30, figsize=(3.5, 1.8), color=("#ff7f0e", "#1f77b4"), secondary_y="Latencies", legend=False)
+    df.plot.bar(rot=30, figsize=(3.5, 1.8), color=("#ff7f0e", "#1f77b4"),
+                secondary_y="Latencies", legend=False)
     ax = plt.gca()
     plt.xlabel("Design Configuration")
     ax1, ax2 = plt.gcf().get_axes()
+    bars = ax1.patches
+    for bar in bars:
+        bar.set_hatch("///")
     ax1.minorticks_on()
     #ax1.set_ylim((0, 0.5))
     ax2.minorticks_on()
@@ -167,7 +171,8 @@ if plot_results:
     print(f"latencies={latencies}")
 
     plt.figure(figsize=(3.5, 2.0))
-    plt.bar(labels, np.array(energies) * 1.0e3, width=0.5)
+    plt.bar(labels, np.array(energies) * 1.0e3, width=0.5, hatch="///",
+            alpha=.99)
     plt.xlabel("Design Configuration")
     plt.xticks(rotation=30, ha="right")
     plt.ylabel("Total Energy (mJ)")
@@ -180,10 +185,14 @@ if plot_results:
     #plt.bar(labels, np.array(energies) / energies[4], width=0.2)
     #plt.bar(labels, np.array(latencies) / latencies[4], width=0.2)
 
-    df.plot.bar(rot=30, figsize=(3.5, 1.8), color=("#ff7f0e", "#1f77b4"), secondary_y="Latencies", legend=False)
+    df.plot.bar(rot=30, figsize=(3.5, 1.8), color=("#ff7f0e", "#1f77b4"),
+                secondary_y="Latencies", legend=False)
     ax = plt.gca()
     plt.xlabel("Design Configuration")
     ax1, ax2 = plt.gcf().get_axes()
+    bars = ax1.patches
+    for bar in bars:
+        bar.set_hatch("///")
     ax1.minorticks_on()
     ax1.set_ylim((0, 0.5))
     ax2.minorticks_on()

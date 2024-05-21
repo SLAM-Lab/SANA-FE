@@ -130,11 +130,24 @@ def run_sim_nemo(cores, timesteps, debug=True):
 def plot_results():
     df = pd.read_csv(CSV_RESULTS_FILENAME, index_col="cores")
     plt.rcParams.update({'font.size': 6, 'lines.markersize': 1})
-    df.plot.bar(rot=0, figsize=(3.5, 1.4), color=("#ff7f0e", "#1f77b4"))
+    times = np.array(df.values)
+    cores = np.array(df.index)
+    entries = len(cores)
+    #df.plot.bar(rot=0, figsize=(3.5, 1.4), color=("#ff7f0e", "#1f77b4"))
+
+    plt.figure(figsize=(3.5, 1.4))
+    plt.bar(np.arange(entries) - 0.1, TIMESTEPS / times[:, 1], width=0.2)
+    plt.bar(np.arange(entries) + 0.1, TIMESTEPS / times[:, 0], width=0.2,
+            hatch="///", alpha=.99)
+    plt.legend(("NeMo", "SANA-FE"))
+
     ax = plt.gca()
     plt.xlabel("TrueNorth Core Count")
-    plt.ylabel("Run-time (s)")
-    plt.yscale("log")
+    ax.set_xticks(np.arange(entries))
+    ax.set_xticklabels(cores)
+    #plt.ylabel("Run-time (s)")
+    plt.ylabel("Throughput (steps per s)")
+    #plt.yscale("log")
     #plt.minorticks_on()
     ax.tick_params(axis='y', which='minor', labelbottom=False)
     plt.tight_layout(pad=0.3)
