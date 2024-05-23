@@ -135,20 +135,37 @@ def plot_results():
     entries = len(cores)
     #df.plot.bar(rot=0, figsize=(3.5, 1.4), color=("#ff7f0e", "#1f77b4"))
 
-    plt.figure(figsize=(3.5, 1.4))
-    plt.bar(np.arange(entries) - 0.1, TIMESTEPS / times[:, 1], width=0.2)
-    plt.bar(np.arange(entries) + 0.1, TIMESTEPS / times[:, 0], width=0.2,
-            hatch="///", alpha=.99)
+    #fig = plt.figure(figsize=(3.5, 1.4))
+    fig = plt.figure(figsize=(3.7, 1.4))
+    nemo_throughput = TIMESTEPS / times[:, 1]
+    sanafe_throughput = TIMESTEPS / times[:, 0]
+    bar1 = plt.bar(np.arange(entries) - 0.15, nemo_throughput, width=0.3)
+    bar2 = plt.bar(np.arange(entries) + 0.15, sanafe_throughput, width=0.3,
+            alpha=.99)
     plt.legend(("NeMo", "SANA-FE"))
 
+    for i, rect in enumerate(bar1):
+        height = rect.get_height()
+        plt.text(rect.get_x() + rect.get_width() / 2.0, height, f"{nemo_throughput[i]:.1f}", ha="center", va="bottom")
+
+    for i, rect in enumerate(bar2):
+        height = rect.get_height()
+        plt.text(rect.get_x() + rect.get_width() / 2.0, height, f"{sanafe_throughput[i]:.1f}", ha="center", va="bottom")
+
     ax = plt.gca()
-    plt.xlabel("TrueNorth Core Count")
+    plt.xlabel("TrueNorth Core Count / Total Neurons")
     ax.set_xticks(np.arange(entries))
-    ax.set_xticklabels(cores)
+    neuron_counts = ("8k", "16k", "32k", "64k", "128k", "256k")
+    core_labels = []
+    for core, neuron in zip(cores, neuron_counts):
+        core_labels.append(f"{core}/{neuron}")
+    ax.set_xticklabels(core_labels)
+    #plt.xticks(rotation=30)
     #plt.ylabel("Run-time (s)")
     plt.ylabel("Throughput (steps per s)")
     #plt.yscale("log")
     #plt.minorticks_on()
+    plt.ylim((0, 25))
     ax.tick_params(axis='y', which='minor', labelbottom=False)
     plt.tight_layout(pad=0.3)
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.png"))

@@ -119,8 +119,6 @@ if plot_results:
     plt.xlabel("Design Configuration")
     ax1, ax2 = plt.gcf().get_axes()
     bars = ax1.patches
-    for bar in bars:
-        bar.set_hatch("///")
     ax1.minorticks_on()
     #ax1.set_ylim((0, 0.5))
     ax2.minorticks_on()
@@ -191,8 +189,6 @@ if plot_results:
     plt.xlabel("Design Configuration")
     ax1, ax2 = plt.gcf().get_axes()
     bars = ax1.patches
-    for bar in bars:
-        bar.set_hatch("///")
     ax1.minorticks_on()
     ax1.set_ylim((0, 0.5))
     ax2.minorticks_on()

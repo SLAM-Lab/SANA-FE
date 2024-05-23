@@ -138,7 +138,7 @@ if __name__ == "__main__":
             open(SIM_TIME_DATA_PATH, "w")
         #open("hops.csv", "w")
 
-        for inputs in range(1, frames):
+        for inputs in range(0, frames):
         #for inputs in range(50, frames):
         #for inputs in range(0, 1):
             print(f"Running for input: {inputs}")
@@ -200,6 +200,11 @@ if __name__ == "__main__":
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
             event_based_times = np.array(event_based_data.loc[:, :])
 
+            total_loihi_times = np.sum(loihi_times[0:128,:], axis=0)
+            print(f"Total Loihi: {total_loihi_times}")
+            print(f"Max Total Loihi: {np.max(total_loihi_times)}")
+            print(f"Min Total Loihi: {np.min(total_loihi_times)}")
+
             # There is a weird effect, that the first sample of all inputs > 1 is
             #  a 0 value. Just ignore the entries for both arrays (so we have
             #  timestep-1)
@@ -210,6 +215,14 @@ if __name__ == "__main__":
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps, timesteps*frames, timesteps)))
 
+            # For calculating per time-step MAPE
+            tmp = np.delete(times, list(range(0, (timesteps-1)*frames, timesteps-1)))
+            loihi_times_flattened = loihi_times[0:timesteps-2,:].transpose().flatten()
+            #print(times.shape)
+            #print(loihi_times.shape)
+            #mean_abs_percentage_error = np.mean(np.abs(
+            #    (tmp[0:((timesteps-2)*frames)] - loihi_times_flattened) / loihi_times_flattened))
+            #print(f"MAPE (per time-step): {mean_abs_percentage_error*100.0}%")
 
             total_times = np.zeros(frames)
             total_hops = np.zeros(frames)
@@ -223,6 +236,7 @@ if __name__ == "__main__":
             #"""
             plt.figure(figsize=(7, 8))
             plt.subplot(311)
+            #FRAMES = 100
             FRAMES = 1
             plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), times[0:(timesteps-1)*FRAMES], '-')
             plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), np.mean(loihi_times[0:(timesteps-1)*FRAMES], axis=1), '--')
@@ -269,7 +283,7 @@ if __name__ == "__main__":
             plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
             plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--")
             plt.plot(np.arange(1, timesteps-1), event_based_times[1:(timesteps-1)] * 1.0e6, ":k")
-            plt.legend(("Measured on Loihi", "SANA-FE predictions", "Event-based predictions"),
+            plt.legend(("Measured on Loihi", "SANA-FE predictions", "Event-based NoC model"),
                        fontsize=6)
             plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")

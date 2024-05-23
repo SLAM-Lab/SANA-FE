@@ -205,7 +205,7 @@ def run_spiking_experiment(mapping, max_size=30):
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
 #mappings = ("split_2_diff_tiles",)
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
 
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
@@ -275,12 +275,19 @@ if __name__ == "__main__":
         plt.savefig("runs/calibration/calibration_time_core.pdf")
         plt.savefig("runs/calibration/calibration_time_core.png")
 
-        energy_error = 100 * np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:])
-        print(energy_error)
-        energy_error = np.mean(np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:]))
-        latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:]) - spiking_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
+        print(f"Total Loihi time (default mapping): {np.array(loihi_times_spikes['luke'][6:])*1.0E5}")
+
+        energy_error = np.mean((np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:]))
+        latency_error = np.mean((np.array(loihi_times_spikes["luke"][6:]) - spiking_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
         print(f"Energy error %: {energy_error*100}")
         print(f"Latency error %: {latency_error*100}")
+
+        abs_energy_error = 100 * np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:])
+        print(energy_error)
+        abs_energy_error = np.mean(np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:]))
+        abs_latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:]) - spiking_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
+        print(f"Abs Energy error %: {abs_energy_error*100}")
+        print(f"Abs Latency error %: {abs_latency_error*100}")
 
         plt.figure(figsize=(1.6, 1.6))
         plt.plot(neuron_counts[6:], np.array(loihi_energy_spikes[6:]) * 1.0e6, "-")

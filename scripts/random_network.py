@@ -107,7 +107,7 @@ def onpick(event, df):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     if run_experiments:
         with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),
@@ -204,7 +204,10 @@ if __name__ == "__main__":
         plt.tight_layout(pad=0.1)
         plt.savefig(os.path.join(NETWORK_PATH, "random_latency.pdf"))
         plt.savefig(os.path.join(NETWORK_PATH, "random_latency.png"))
-        plt.show()
+        #plt.show()
+
+        print(f"Min total Loihi latency: {np.min(loihi_latency * 1E5)}")
+        print(f"Max total Loihi latency: {np.max(loihi_latency * 1E5)}")
 
         absolute_latency_error = np.abs(loihi_latency - sim_latency) / loihi_latency
         absolute_energy_error = np.abs(loihi_energy - sim_energy) / loihi_energy

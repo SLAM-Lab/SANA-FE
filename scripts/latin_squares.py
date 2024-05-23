@@ -173,7 +173,7 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiment = True
 
     if run_experiments:
@@ -259,5 +259,6 @@ if __name__ == "__main__":
         total_latency_error = (np.sum(loihi_latency) - np.sum(sim_latency)) / np.sum(loihi_latency)
         total_energy_error = (np.sum(loihi_energy) - np.sum(sim_energy)) / np.sum(loihi_energy)
 
+        print(f"loihi times: {loihi_latency * TIMESTEPS * 1.0E-6}")
         print(f"total latency error: {total_latency_error * 100.0}%")
         print(f"total energy error: {total_energy_error * 100.0}%")
