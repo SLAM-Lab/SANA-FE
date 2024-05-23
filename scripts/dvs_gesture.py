@@ -30,8 +30,8 @@ LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
 SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
 SIM_ENERGY_DATA_FILENAME = "sim_gesture_32x32_energy.csv"
 
-NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
-#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
+#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
+NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
 DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
@@ -108,10 +108,11 @@ if __name__ == "__main__":
     energies = np.array(())
     hops = np.array(())
     timesteps = 128
+    #timesteps = 100000
     frames = 100
     #frames = 1
 
-    loihi_spiketrains = parse_loihi_spiketrains(timesteps)
+    #loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
         neurons = ""
         groups = ""
@@ -138,9 +139,10 @@ if __name__ == "__main__":
             open(SIM_TIME_DATA_PATH, "w")
         #open("hops.csv", "w")
 
-        for inputs in range(0, frames):
+        #for inputs in range(0, frames):
         #for inputs in range(50, frames):
         #for inputs in range(0, 1):
+        for inputs in range(0, frames):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
             input_filename = os.path.join(NETWORK_DIR, f"inputs{inputs}.net")

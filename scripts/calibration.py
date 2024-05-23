@@ -19,6 +19,7 @@ import sys
 import os
 import numpy as np
 import pandas as pd
+import time
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
@@ -36,7 +37,6 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
                     connection_probability=1.0):
     # Two layers, fully connected
     network = sim.Network(save_mappings=True)
-    loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     if spiking:  # always spike
         threshold = -1.0
@@ -49,12 +49,12 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
     force_update = False
 
     # Create layers
-    layer_1 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
+    layer_1 = sim.create_layer(network, layer_neuron_count,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
                                reset=reset, neuron_model="loihi_lif",
                                synapse_model="loihi_dense_synapse")
-    layer_2 = sim.create_layer(network, layer_neuron_count, loihi_compartments,
+    layer_2 = sim.create_layer(network, layer_neuron_count,
                                log_spikes=False, log_potential=False,
                                force_update=False, threshold=threshold,
                                reset=reset, neuron_model="loihi_lif",
@@ -74,7 +74,7 @@ def fully_connected(layer_neuron_count, spiking=True, force_update=False,
 def connected_layers(weights, spiking=True, mapping="l2_split",
                      copy_network=False):
     network = sim.Network(save_mappings=True)
-    loihi_compartments = sim.init_compartments(32, 4, 1024)
+    #loihi_compartments = sim.init_compartments(32, 4, 1024)
 
     layer_neuron_count = len(weights)
     if spiking:  # always spike
@@ -105,7 +105,6 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
             layer_mapping.append((0, 3))
 
         layer_1 = sim.create_layer(network, layer_neuron_count,
-                                   loihi_compartments,
                                    log_spikes=False, log_potential=False,
                                    force_update=False, threshold=threshold,
                                    reset=0.0, leak=1.0, mappings=layer_mapping,
@@ -147,7 +146,7 @@ def connected_layers(weights, spiking=True, mapping="l2_split",
             layer_mapping.append((1, i))
 
         layer_2 = sim.create_layer(network, layer_neuron_count,
-                                loihi_compartments, log_spikes=False,
+                                log_spikes=False,
                                 log_potential=False, force_update=False,
                                 threshold=threshold, reset=0.0, leak=1.0,
                                 mappings=layer_mapping,
@@ -171,8 +170,10 @@ def run_spiking_experiment(mapping, max_size=30):
     with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
         weights = pickle.load(weights_file)
 
-    timesteps = 1
-    for i in range(1, max_size):
+    #timesteps = 1
+    timesteps = 1e5
+    #for i in range(1, max_size):
+    for i in range(max_size-1, max_size):
         # Sweep across range of network sizes
         layer_neurons = i*i
         copy_network = (True if mapping == "split_2_diff_tiles" else False)
@@ -182,8 +183,12 @@ def run_spiking_experiment(mapping, max_size=30):
         snn.save(network_filename)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
+        start_time = time.time() 
         results = sim.run(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"),
                           network_filename, timesteps)
+        run_time = time.time() - start_time
+        print(f"Run_time: {run_time}")
+        print(f"Throughput: {timesteps/run_time}", flush=True)
 
         with open(os.path.join(PROJECT_DIR, "runs",
                                "calibration", "sim_spiking.csv"),

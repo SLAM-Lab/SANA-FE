@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-//#include <omp.h>
+#include <omp.h>
 
 #include "print.h"
 #include "sim.h"
@@ -132,7 +132,7 @@ void sim_init_timestep(struct timestep *const ts)
 void sim_process_neurons(struct timestep *const ts, struct network *net,
 	struct architecture *arch)
 {
-//#pragma omp parallel for
+#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
@@ -181,7 +181,7 @@ void sim_process_neurons(struct timestep *const ts, struct network *net,
 void sim_receive_messages(struct timestep *const ts,
 	struct architecture *arch)
 {
-//#pragma omp parallel for
+#pragma omp parallel for
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);

@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 import os
 import networkx as nx
+import time
 
 # SANA-FE libraries
 import sys
@@ -120,8 +121,12 @@ def plot_results(N, network_path):
 
     # Now execute the network using SANA-FE and extract the spike timings
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
+    start_time = time.time()
     sim.run(arch_path, network_path, TIMESTEPS,
             spike_trace=True, potential_trace=True)
+    run_time = time.time() - start_time
+    print(f"Run_time: {run_time}", flush=True)
+    print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
 
     # Use spiking data to create the grid solution produced by the Loihi run
     with open(os.path.join(PROJECT_DIR, "spikes.trace")) as spikes:
@@ -166,8 +171,12 @@ def plot_results(N, network_path):
 def run_experiment(network_filename):
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     network_path = os.path.join(PROJECT_DIR, network_filename)
+    start_time = time.time()
     results = sim.run(arch_path, network_path, TIMESTEPS,
                       spike_trace=False, potential_trace=False)
+    run_time = time.time() - start_time
+    print(f"Run_time: {run_time}", flush=True)
+    print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
 
     return results
 
@@ -192,9 +201,9 @@ if __name__ == "__main__":
                     #  containing the network to run and the results measured
                     #  on Loihi
                     results = run_experiment(line["network"])
-                    time = results["sim_time"] / TIMESTEPS
+                    sim_time = results["sim_time"] / TIMESTEPS
                     energy = results["energy"] / TIMESTEPS
-                    row = (line["N"], line["network"], energy, time)
+                    row = (line["N"], line["network"], energy, sim_time)
                     with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
                               "a") as csv_file:
                         writer = csv.writer(csv_file)

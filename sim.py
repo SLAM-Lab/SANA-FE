@@ -401,7 +401,7 @@ def create_layer(network, layer_neuron_count,
                  threshold=1.0, reset=0.0, leak=1.0,
                  connections_out=None, reverse_threshold=None,
                  reverse_reset_mode=None, soma_hw_name=None,
-                 synapse_hw_name=None, biases=None):
+                 synapse_hw_name=None, biases=None, mappings=None):
     print("Creating layer with {0} neurons".format(layer_neuron_count))
     layer_group = network.create_group(threshold, reset, leak, log_spikes,
                                        log_potential, force_update,
@@ -414,7 +414,9 @@ def create_layer(network, layer_neuron_count,
     for i in range(0, layer_neuron_count):
         if (i % 1000) == 0:
             print(f"Creating neuron {i}")
-        layer_group.create_neuron()
+        neuron = layer_group.create_neuron()
+        if mappings is not None:
+            neuron.tile, neuron.core = mappings[i]
 
     if biases is not None:
         assert(len(biases) == layer_neuron_count)

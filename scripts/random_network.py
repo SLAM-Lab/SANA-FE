@@ -20,6 +20,7 @@ import csv
 import yaml
 import sys
 import os
+import time
 
 # SANA-FE libraries
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +32,8 @@ import sim
 random.seed(1)
 
 #EXPERIMENT = "tiny"
-EXPERIMENT = "full"
+#EXPERIMENT = "full"
+EXPERIMENT = "extremes"
 # Global experiment parameters
 NETWORK_PATH = os.path.join("runs", "random", EXPERIMENT)
 NETWORK_FILENAME = os.path.join(NETWORK_PATH, "random.net")
@@ -39,7 +41,8 @@ ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
-TIMESTEPS = 100
+#TIMESTEPS = 100
+TIMESTEPS = 100000
 
 def create_random_network(cores, neurons_per_core, messages_per_neuron,
                           spikes_per_message):
@@ -89,7 +92,12 @@ def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_me
     run_command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
                    "{0}".format(timesteps))
     print("sana-fe command: {0}".format(" ".join(run_command)))
+    
+    start_time = time.time() 
     subprocess.call(run_command)
+    run_time = time.time() - start_time
+    print(f"Run_time: {run_time}")
+    print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
 
     with open("run_summary.yaml", "r") as summary_file:
         summary = yaml.safe_load(summary_file)
@@ -122,8 +130,13 @@ if __name__ == "__main__":
                 writer.writeheader()
 
             for line in reader:
+                start_time = time.time() 
                 results = sim.run(ARCH_FILENAME, line["network"], TIMESTEPS,
                                   perf_trace=True)
+                run_time = time.time() - start_time
+                print(f"Run_time: {run_time}")
+                print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
+
                 print(results)
                 df = pd.read_csv("perf.csv")
                 line["total_spikes"] = df.loc[2, "fired"]
