@@ -12,11 +12,13 @@
 #define NETWORK_HEADER_INCLUDED_
 
 #include <cstdint>
+#include <filesystem>
+#include <functional> // For std::reference_wrapper
 #include <list>
 #include <map>
 #include <memory>
-#include <filesystem>
-#include <functional> // For std::reference_wrapper
+#include <optional>
+
 #include "plugins.hpp"
 #include "models.hpp"
 
@@ -34,85 +36,22 @@ enum ConnectionConfigFormat
 };
 
 // Forward declarations
-class Core;
-class Neuron;
-class NeuronGroup;
+// Architecture
 class Architecture;
-struct SomaUnit;
-class SomaModel;
+class Core;
 struct SynapseUnit;
+struct DendriteUnit;
+struct SomaUnit;
 struct AxonOutUnit;
-
-struct Connection
-{
-	Neuron *post_neuron, *pre_neuron;
-	SynapseUnit *synapse_hw;
-	std::string synapse_hw_name;
-	double weight, current, synaptic_current_decay;
-	int id, delay, last_updated;
-
-	explicit Connection(const int connection_id);
-	std::string description() const;
-};
-
-class Neuron
-{
-public:
-	std::vector<Connection> connections_out;
-	std::vector<int> axon_out_addresses;
-	std::map<std::string, std::string> attributes;
-
-	// Mapped hardware
-	Network *parent_net;
-	Core *core, *post_synaptic_cores;
-	SomaUnit *soma_hw;
-	AxonOutUnit *axon_out_hw;
-	std::string soma_hw_name, default_synapse_hw_name;
-
-	std::shared_ptr<SomaModel> model;
-
-	bool force_update, log_spikes, log_potential;
-	bool update_needed;
-	int id, parent_group_id;
-	int spike_count;
-	int soma_last_updated, dendrite_last_updated;
-	int max_connections_out, maps_in_count, maps_out_count;
-
-	double dendritic_current_decay, processing_latency;
-	double current, charge;
-	NeuronStatus neuron_status;
-	int forced_spikes;
-
-	explicit Neuron(const size_t neuron_id);
-	int get_id() { return id; }
-	void set_attributes(const std::map<std::string, std::string> &attr);
-	void connect_to_neuron(Neuron &dest, const std::map<std::string, std::string> &attr);
-	std::string info() const;
-	std::string description(const bool write_mapping=true) const;
-};
-
-class NeuronGroup
-{
-public:
-	// A neuron group is a collection of neurons that share common
-	//  parameters. All neurons must be based on the same neuron model.
-	std::vector<Neuron> neurons;
-	std::string default_soma_hw_name;
-	std::string default_synapse_hw_name;
-	std::map<std::string, std::string> default_attributes;
-
-	std::filesystem::path default_soma_plugin;
-	int id;
-	int default_max_connections_out;
-	bool default_log_potential, default_log_spikes, default_force_update;
-
-	int get_id() { return id; }
-	NeuronGroup(const size_t group_id, const int neuron_count);
-	void set_attribute_multiple(const std::string &attr, const std::vector<std::string> &values);
-	void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::string> > &attr_lists);
-	std::string info() const;
-	std::string description() const;
-};
+// Network
+class NeuronGroup;
+class Neuron;
+struct Connection;
+struct Compartment;
+struct Branch;
+// Models
+class SomaModel;
+class DendriteModel;
 
 class Network
 {
@@ -137,6 +76,99 @@ private:
 	Network(const Network &copy);
 };
 
-}
+class NeuronGroup
+{
+public:
+	// A neuron group is a collection of neurons that share common
+	//  parameters. All neurons must be based on the same neuron model.
+	std::vector<Neuron> neurons;
+	std::string default_soma_hw_name;
+	std::string default_synapse_hw_name;
+	std::map<std::string, std::string> default_attributes;
+
+	std::filesystem::path default_soma_plugin;
+	int id;
+	int default_max_connections_out, default_max_compartments;
+	bool default_log_potential, default_log_spikes, default_force_update;
+
+	int get_id() { return id; }
+	NeuronGroup(const size_t group_id, const int neuron_count);
+	void set_attribute_multiple(const std::string &attr, const std::vector<std::string> &values);
+	void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::string> > &attr_lists);
+	std::string info() const;
+	std::string description() const;
+};
+
+class Neuron
+{
+public:
+	std::vector<Connection> connections_out;
+	std::vector<Compartment> dendrite_compartments;
+	std::vector<Branch> dendrite_branches;
+	std::vector<int> axon_out_addresses;
+	std::map<std::string, std::string> attributes;
+
+	// Mapped hardware
+	Network *parent_net;
+	Core *core, *post_synaptic_cores;
+	DendriteUnit *dendrite_hw;
+	SomaUnit *soma_hw;
+	AxonOutUnit *axon_out_hw;
+	std::string soma_hw_name, default_synapse_hw_name;
+	std::string dendrite_hw_name, default_dendrite_hw_name;
+
+	std::shared_ptr<SomaModel> soma_model;
+	std::shared_ptr<DendriteModel> dendrite_model;
+
+	bool force_update, log_spikes, log_potential;
+	bool update_needed;
+	int id, parent_group_id;
+	int spike_count;
+	int soma_last_updated, dendrite_last_updated;
+	int max_connections_out, max_compartments;
+	int maps_in_count, maps_out_count;
+
+	double dendritic_current_decay, processing_latency;
+	double current, charge;
+	NeuronStatus neuron_status;
+	int forced_spikes;
+
+	explicit Neuron(const size_t neuron_id);
+	int get_id() { return id; }
+	void set_attributes(const std::map<std::string, std::string> &attr);
+	void connect_to_neuron(Neuron &dest, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr);
+	void create_compartment(const std::map<std::string, std::string> &attr);
+	void create_branch(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr);
+	std::string info() const;
+	std::string description(const bool write_mapping=true) const;
+};
+
+struct Connection
+{
+	Neuron *post_neuron, *pre_neuron;
+	SynapseUnit *synapse_hw;
+	std::string synapse_hw_name;
+	double weight, current, synaptic_current_decay;
+	int id, delay, last_updated;
+
+	explicit Connection(const int connection_id);
+	std::string description() const;
+};
+
+struct Compartment
+{
+	size_t id, parent_neuron_id;
+	std::map<std::string, std::string> attributes;
+	Compartment(const size_t compartment_id) : id(compartment_id) {}
+};
+
+struct Branch
+{
+	size_t id, src_compartment_id, dest_compartment_id;
+	std::map<std::string, std::string> attributes;
+	Branch(const size_t branch_id) : id(branch_id) {}
+};
+
+} // namespace
 
 #endif

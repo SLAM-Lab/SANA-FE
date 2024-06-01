@@ -293,6 +293,10 @@ sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name):
 sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name):
 	name(dendrite_name)
 {
+	energy = 0.0;
+	time = 0.0;
+	energy_access = 0.0;
+	latency_access = 0.0;
 	return;
 }
 
@@ -385,7 +389,8 @@ std::string sanafe::AxonInUnit::description() const
 	attributes["latency_message"] = print_float(latency_spike_message);
 	std::ostringstream ss;
 	ss << "i " << name << ' ' << parent_tile_id;
-	ss << ' ' << parent_core_offset << std::endl;
+	ss << ' ' << parent_core_offset;
+	ss << print_format_attributes(attributes) << std::endl;
 	return ss.str();
 }
 
@@ -394,7 +399,7 @@ std::string sanafe::SynapseUnit::description() const
 	std::map<std::string, std::string> attributes;
 	attributes["energy_spike"] = print_float(energy_spike_op);
 	attributes["latency_spike"] = print_float(latency_spike_op);
-	attributes["model"] = print_int(model);
+	attributes["model"] = model;
 	std::ostringstream ss;
 	ss << "s " << name << ' ' << parent_tile_id << ' ' << parent_core_offset;
 	ss << print_format_attributes(attributes) << std::endl;
@@ -403,16 +408,21 @@ std::string sanafe::SynapseUnit::description() const
 
 std::string sanafe::DendriteUnit::description() const
 {
+	std::map<std::string, std::string> attributes;
+	attributes["model"] = model;
+	attributes["energy"] = print_float(energy_access);
+	attributes["latency"] = print_float(latency_access);
 	std::ostringstream ss;
 	ss << "d " << name << ' ' << parent_tile_id;
-	ss << ' ' << parent_core_offset << std::endl;
+	ss << ' ' << parent_core_offset;
+	ss << print_format_attributes(attributes) << std::endl;
 	return ss.str();
 }
 
 std::string sanafe::SomaUnit::description() const
 {
 	std::map<std::string, std::string> attributes;
-	attributes["model"] = "leaky_integrate_fire";
+	attributes["model"] = model;
 	attributes["energy_access_neuron"] = print_float(energy_access_neuron);
 	attributes["latency_access_neuron"] =
 		print_float(latency_access_neuron);
@@ -497,7 +507,7 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
 		std::istringstream ss(value_str);
 		if (key == "model")
 		{
-			s.model = arch_parse_synapse_model(value_str);
+			s.model = value_str;
 		}
 		else if (key == "energy_memory")
 		{
@@ -533,6 +543,24 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(
 	d.parent_core_offset = offset;
 
 	/**** Set attributes ****/
+	for (const auto &a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "model")
+		{
+			d.model = value_str;
+		}
+		else if (key == "energy")
+		{
+			ss >> d.energy_access;
+		}
+		else if (key == "latency")
+		{
+			ss >> d.latency_access;
+		}
+	}
 	TRACE1("Dendrite processor created (c:%d.%d)\n",
 		c.parent_tile_id, c.offset);
 
@@ -782,10 +810,37 @@ void sanafe::Core::map_neuron(Neuron &n)
 			"Error: Exceeded maximum neurons per core.");
 	}
 
-	// Map neuron model to soma hardware unit in this core. Search through
-	//  all neuron models implemented by this core and return the one that
-	//  matches. If no soma hardware is specified, default to the first
-	//  one defined
+	// Map neuron model to dendrite and soma hardware units in this core.
+	//  Search through all models implemented by this core and return the
+	//  one that matches. If no dendrite / soma hardware is specified,
+	//  default to the first one defined
+	if (dendrite.size() == 0)
+	{
+		INFO("Error: No dendrite units defined for cid:%d\n", id);
+		throw std::runtime_error("Error: No dendrite units defined");
+	}
+	n.dendrite_hw = &(dendrite[0]);
+	if (n.dendrite_hw_name.length() > 0)
+	{
+		bool dendrite_found = false;
+		for (auto &dendrite_hw: dendrite)
+		{
+			if (n.dendrite_hw_name == dendrite_hw.name)
+			{
+				n.dendrite_hw = &dendrite_hw;
+				dendrite_found = true;
+			}
+		}
+		if (!dendrite_found)
+		{
+			INFO("Error: Could not map neuron nid:%d (hw:%s) "
+				"to any dendrite h/w.\n", n.id,
+				n.dendrite_hw_name.c_str());
+			throw std::runtime_error(
+				"Error: Could not map neuron to dendrite h/w");
+		}
+	}
+
 	if (soma.size() == 0)
 	{
 		INFO("Error: No soma units defined for cid:%d\n", id);
@@ -823,7 +878,7 @@ void sanafe::Core::map_neuron(Neuron &n)
 	n.axon_out_hw = &(axon_out_hw[0]);
 
 	// Pass all the model specific arguments
-	if (n.model == nullptr)
+	if (n.soma_model == nullptr)
 	{
 		// Setup the soma model
 		TRACE1("Soma hw name: %s", soma_hw_name.c_str());
@@ -833,24 +888,66 @@ void sanafe::Core::map_neuron(Neuron &n)
 			// Use built in models
 			INFO("Creating soma built-in model %s.\n",
 				n.soma_hw->model.c_str());
-			n.model = sanafe::model_get_soma(
+			n.soma_model = sanafe::model_get_soma(
 				n.soma_hw->model, n.parent_group_id, n.id);
 		}
 		else
 		{
 			INFO("Creating soma from plugin %s.\n",
 				n.soma_hw->plugin_lib.c_str());
-			n.model = plugin_get_soma(
+			n.soma_model = plugin_get_soma(
 				n.soma_hw->model, n.parent_group_id, n.id,
 				n.soma_hw->plugin_lib);
 		}
 		const NeuronGroup &group = n.parent_net->groups_vec[
 			n.parent_group_id];
-		assert(n.model != nullptr);
+		assert(n.soma_model != nullptr);
 		// First set the group's default attribute values, and then
 		//  any defined by the neuron
-		n.model->set_attributes(group.default_attributes);
-		n.model->set_attributes(n.attributes);
+		n.soma_model->set_attributes(group.default_attributes);
+		n.soma_model->set_attributes(n.attributes);
+	}
+
+	if (n.dendrite_model == nullptr)
+	{
+		// Setup the soma model
+		TRACE1("Dendrite hw name: %s", dendrite_hw_name.c_str());
+		if (n.dendrite_hw->plugin_lib.empty())
+		{
+			// Use built in models
+			INFO("Creating dendrite built-in model %s.\n",
+				n.dendrite_hw->model.c_str());
+			n.dendrite_model = sanafe::model_get_dendrite(
+				n.dendrite_hw->model);
+		}
+		else
+		{
+			INFO("Creating dendrite from plugin %s.\n",
+				n.dendrite_hw->plugin_lib.c_str());
+			n.dendrite_model = sanafe::plugin_get_dendrite(
+				n.dendrite_hw->model,
+				n.dendrite_hw->plugin_lib);
+		}
+		const NeuronGroup &group = n.parent_net->groups_vec[
+			n.parent_group_id];
+		assert(n.dendrite_model != nullptr);
+		// Global attributes for all compartments in the dendrite
+		n.dendrite_model->set_attributes(group.default_attributes);
+		n.dendrite_model->set_attributes(n.attributes);
+		// Set compartment specific attributes
+		for (auto &compartment: n.dendrite_compartments)
+		{
+			n.dendrite_model->set_attributes(
+				compartment.id, compartment.attributes);
+		}
+		// Set branch specific attributes
+		for (auto &branch: n.dendrite_branches)
+		{
+			n.dendrite_model->set_attributes(
+				branch.src_compartment_id,
+				branch.dest_compartment_id,
+				branch.attributes);
+		}
 	}
 
 	return;
@@ -934,24 +1031,6 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
 	}
 
 	return;
-}
-
-int sanafe::arch_parse_synapse_model(const std::string &model_str)
-{
-	int model;
-
-	if (model_str == "current_based")
-	{
-		model = SYNAPSE_CUBA;
-	}
-	else
-	{
-		INFO("Error: No synapse model specified (%s)\n",
-			model_str.c_str());
-		exit(1);
-	}
-
-	return model;
 }
 
 void sanafe::Architecture::save_arch_description(

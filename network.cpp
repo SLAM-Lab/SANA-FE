@@ -6,11 +6,12 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
+#include <functional> // For std::reference_wrapper
+#include <filesystem> // For std::filesystem::path
 #include <list>
 #include <map>
 #include <memory>
-#include <functional> // For std::reference_wrapper
-#include <filesystem> // For std::filesystem::path
+#include <optional>
 #include <sstream>
 
 #include "arch.hpp"
@@ -56,6 +57,7 @@ sanafe::NeuronGroup::NeuronGroup(const size_t group_id, const int neuron_count)
 		group_id, neuron_count);
 	id = group_id;
 	default_max_connections_out = 0;
+	default_max_compartments = 0;
 	default_soma_hw_name = "";
 	default_synapse_hw_name = "";
 	default_log_potential = false;
@@ -74,6 +76,7 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
 	neuron_status = sanafe::IDLE;
 	spike_count = 0;
 	max_connections_out = 0;
+	max_compartments = 1;
 
 	// Initially the neuron is not mapped to anything
 	core = nullptr;
@@ -146,14 +149,17 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 		{
 			ss >> group.default_max_connections_out;
 		}
+		else if (key == "max_compartments")
+		{
+			ss >> group.default_max_compartments;
+		}
 	}
 
 	// Initialize all neurons in this group
 	group.default_attributes = attr;
-	for (int i = 0; i < neuron_count; i++)
+	for (int id = 0; id < neuron_count; id++)
 	{
-		Neuron n(i);
-		n.id = i;
+		Neuron n(id);
 		n.parent_group_id = group.id;
 		TRACE1("Default soma name:%s\n",
 			group.default_soma_hw_name.c_str());
@@ -164,6 +170,7 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 		n.log_spikes = group.default_log_spikes;
 		n.log_potential = group.default_log_potential;
 		n.max_connections_out = group.default_max_connections_out;
+		n.max_compartments = group.default_max_compartments;
 		n.default_synapse_hw_name = group.default_synapse_hw_name;
 		n.parent_net = this;
 		group.neurons.push_back(n);
@@ -172,6 +179,36 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 	INFO("Created neuron group gid:%d\n", group.id);
 
 	return group;
+}
+
+void sanafe::Neuron::create_compartment(
+	const std::map<std::string, std::string> &attr)
+{
+	const size_t compartment_id = dendrite_compartments.size();
+	dendrite_compartments.push_back(Compartment(compartment_id));
+	Compartment &comp = dendrite_compartments.back();
+
+	comp.parent_neuron_id = id;
+	comp.attributes = attr;
+
+	return;
+}
+
+void sanafe::Neuron::create_branch(
+	const size_t src_compartment_id,
+	const size_t dest_compartment_id,
+	const std::map<std::string, std::string> &attr)
+{
+	INFO("src:%lu dest:%lu", src_compartment_id, dest_compartment_id);
+	const size_t branch_id = dendrite_branches.size();
+	dendrite_branches.push_back(Branch(branch_id));
+
+	Branch &branch = dendrite_branches.back();
+	branch.src_compartment_id = src_compartment_id;
+	branch.dest_compartment_id = dest_compartment_id;
+	branch.attributes = attributes;
+
+	return;
 }
 
 std::string sanafe::NeuronGroup::description() const
@@ -223,17 +260,26 @@ void sanafe::Neuron::set_attributes(
 		{
 			ss >> log_potential;
 		}
+		else if (key == "compartments")
+		{
+			ss >> max_compartments;
+		}
 		else
 		{
-		 	TRACE1("Attribute %s not supported.\n", key.str());
+			TRACE1("Attribute %s not supported.\n", key.str());
 		}
 	}
 
 	assert(connections_out.size() == 0);
 	connections_out.reserve(max_connections_out);
-	if (model != nullptr)
+	dendrite_compartments.reserve(max_compartments);
+	if (soma_model != nullptr)
 	{
-		model->set_attributes(attr);
+		soma_model->set_attributes(attr);
+	}
+	if (dendrite_model != nullptr)
+	{
+		dendrite_model->set_attributes(attr);
 	}
 	attributes.insert(attr.begin(), attr.end());
 
@@ -262,8 +308,7 @@ void sanafe::NeuronGroup::set_attribute_multiple(
 
 void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
 	const std::vector<std::pair<int, int> > &src_dest_id_pairs,
-	const std::map<std::string, std::vector<std::string> >
-		&attr_lists)
+	const std::map<std::string, std::vector<std::string> > &attr_lists)
 {
 	int edge_id = 0;
 	for (auto [src_id, dest_id]: src_dest_id_pairs)
@@ -293,23 +338,27 @@ void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
 		{
 			if (value_list.size() != src_dest_id_pairs.size())
 			{
-				INFO("Error: Length of attribute list != number of defined edges. (%lu!=%lu).\n",
+				INFO("Error: Length of attribute list != "
+					"number of defined edges. (%lu!=%lu).\n",
 					value_list.size(), src_dest_id_pairs.size());
 				throw std::invalid_argument(
-					"Error: Length of attribute list != number of defined edges.");
+					"Error: Length of attribute list != "
+					"number of defined edges.");
 			}
 			attr[key] = value_list[src_id];
 		}
 
 		Neuron &src = neurons[src_id];
 		Neuron &dest = dest_group.neurons[dest_id];
-		src.connect_to_neuron(dest, attr);
+		// TODO: support dendrite compartment as an optional argument
+		const size_t dest_compartment_id = 0;
+		src.connect_to_neuron(dest, dest_compartment_id, attr);
 		edge_id++;
 	}
 }
 
 void sanafe::Neuron::connect_to_neuron(
-	Neuron &dest,
+	Neuron &dest, const size_t dest_compartment_id,
 	const std::map<std::string, std::string> &attr)
 {
 	connections_out.push_back(Connection(connections_out.size()));

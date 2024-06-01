@@ -9,13 +9,49 @@
 #include "print.hpp"
 #include "models.hpp"
 
+// *** Dendrite models ***
+sanafe::SingleCompartmentModel::SingleCompartmentModel()
+{
+	accumulated_charge = 0.0;
+	leak_decay = 0.0;
+}
+
+void sanafe::SingleCompartmentModel::input(
+	const double current_in, const int compartment)
+{
+	accumulated_charge += leak_decay;
+	return;
+}
+
+double sanafe::SingleCompartmentModel::update()
+{
+	const double curr_charge = accumulated_charge;
+	accumulated_charge *= leak_decay;
+	return curr_charge;
+}
+
+void sanafe::SingleCompartmentModel::set_attributes(
+	const std::map<std::string, std::string> &attr)
+{
+	for (const auto &a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+
+		if (key == "dendrite_leak_decay")
+		{
+			ss >> leak_decay;
+		}
+	}
+}
+
 // **** Soma models ****
 sanafe::LoihiLifModel::LoihiLifModel(
 	const int gid, const int nid): sanafe::SomaModel(gid, nid)
 {
 	force_update = false;
 	potential = 0.0;
-	soma_last_updated = 0;
 	bias = 0.0;
 	threshold = 0.0;
 	reverse_threshold = 0.0;
@@ -124,8 +160,7 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
 	TRACE1("Updating potential, after:%f\n", potential);
 
 	// Check against threshold potential (for spiking)
-	if (((bias != 0.0) && (potential > threshold)) ||
-		((bias == 0.0) && (potential >= threshold)))
+	if (potential > threshold)
 	{
 		if (reset_mode == sanafe::NEURON_RESET_HARD)
 		{
@@ -157,7 +192,6 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
 	return state;
 }
 
-
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 {
 	sanafe::NeuronResetModes reset_mode;
@@ -184,6 +218,20 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 	}
 
 	return reset_mode;
+}
+
+std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
+	const std::string &model_name)
+{
+	if (model_name == "single_compartment")
+	{
+		return std::shared_ptr<DendriteModel>(
+			new SingleCompartmentModel());
+	}
+	else
+	{
+		throw std::invalid_argument("Model not supported.");
+	}
 }
 
 std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(

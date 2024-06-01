@@ -14,8 +14,46 @@
 #include "plugins.hpp"
 #include "print.hpp"
 
+typedef sanafe::DendriteModel *_create_dendrite();
 typedef sanafe::SomaModel *_create_soma(const int gid, const int nid);
+
+std::map<std::string, _create_dendrite *> plugin_create_dendrite;
 std::map<std::string, _create_soma *> plugin_create_soma;
+
+
+
+void sanafe::plugin_init_dendrite (
+	const std::string &model_name, const std::filesystem::path &plugin_path)
+{
+	const std::string create = "create_" + model_name;
+
+	// Load the soma library
+	INFO("Loading soma plugin:%s\n", plugin_path.c_str());
+	void *dendrite = dlopen(plugin_path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+	if (dendrite == nullptr)
+	{
+		INFO("Error: Couldn't load library %s\n", plugin_path.c_str());
+		exit(1);
+	}
+
+	// Reset DLL errors
+	dlerror();
+
+	// Function to create an instance of the Soma class
+	INFO("Loading function: %s\n", create.c_str());
+	_create_dendrite *create_func = (_create_dendrite *) dlsym(
+		dendrite, create.c_str());
+	plugin_create_dendrite[model_name] = create_func;
+	const char *dlsym_error = dlerror();
+	if (dlsym_error)
+	{
+		INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
+			dlsym_error);
+		exit(1);
+	}
+
+	INFO("Loaded plugin symbols for %s.\n", model_name.c_str());
+}
 
 void sanafe::plugin_init_soma(
 	const std::string &model_name, const std::filesystem::path &plugin_path)
@@ -47,6 +85,32 @@ void sanafe::plugin_init_soma(
 	}
 
 	INFO("Loaded plugin symbols for %s.\n", model_name.c_str());
+}
+
+std::shared_ptr<sanafe::DendriteModel> sanafe::plugin_get_dendrite(
+	const std::string &model_name,
+	std::filesystem::path plugin_path)
+{
+	if (plugin_path.empty())
+	{
+		// Use default path, which is in the plugin directory and
+		const std::string model_filename = model_name + ".so";
+		plugin_path =
+			std::filesystem::path(".") /
+			std::filesystem::path("plugins") /
+			model_filename;
+		INFO("No path given; setting path to default: %s\n",
+			plugin_path.c_str());
+	}
+
+	INFO("Getting dendrite:%s\n", model_name.c_str());
+	if (plugin_create_dendrite.count(model_name) == 0)
+	{
+		plugin_init_dendrite(model_name, plugin_path);
+	}
+
+	return std::shared_ptr<DendriteModel>(
+		plugin_create_dendrite[model_name]());
 }
 
 std::shared_ptr<sanafe::SomaModel> sanafe::plugin_get_soma(

@@ -95,8 +95,8 @@ struct AxonInUnit
 
 struct SynapseUnit
 {
-	std::string name;
-	int model, weight_bits;
+	std::string name, model;
+	int weight_bits;
 	long int spikes_processed;
 	double energy, time;
 	double energy_spike_op, energy_memory_access;
@@ -109,11 +109,13 @@ struct SynapseUnit
 
 struct DendriteUnit
 {
-	std::string name;
+	std::filesystem::path plugin_lib;
+	std::string name, model;
 	double energy, time;
+	double energy_access, latency_access;
 	int parent_tile_id, parent_core_offset;
-	std::string description() const;
 	explicit DendriteUnit(const std::string &dendrite_name);
+	std::string description() const;
 };
 
 struct SomaUnit

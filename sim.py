@@ -241,7 +241,7 @@ def parse_core_yaml(arch, tile_id, core_dict):
             dendrite_attributes = dendrite.get("attributes", {})
             if dendrite_attributes is None:
                 dendrite_attributes = {}
-            core.create_synapse(dendrite["name"], dendrite_attributes)
+            core.create_dendrite(dendrite["name"], dendrite_attributes)
         for soma in core_dict["soma"]:
             soma_attributes = soma.get("attributes", {})
             if soma_attributes is None:

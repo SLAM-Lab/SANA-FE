@@ -635,6 +635,9 @@ double sanafe::sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
 		n.dendrite_last_updated++;
 		dendritic_current = n.charge;
 		TRACE2("nid:%d charge:%lf\n", n.id, n.charge);
+		// TODO: implement this. Probably needs a compartment and an
+		//  amount of current, both are optionally set?
+		n.dendrite_model->update();
 	}
 
 	// Update dendritic tap currents
@@ -667,7 +670,7 @@ double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
 		{
 			soma_current = current_in;
 		}
-		n.neuron_status = n.model->update(soma_current);
+		n.neuron_status = n.soma_model->update(soma_current);
 		if (n.forced_spikes > 0)
 		{
 			n.neuron_status = sanafe::FIRED;
@@ -753,8 +756,11 @@ void sanafe::sim_neuron_send_spike_message(
 	}
 
 	return;
+
 }
 
+// TODO: reimplement noise generation from file in C++
+/*
 double sanafe::sim_generate_noise(Neuron *n)
 {
 	assert(n != NULL);
@@ -767,7 +773,7 @@ double sanafe::sim_generate_noise(Neuron *n)
 		//  random values. This is useful if we want to exactly
 		//  replicate h/w without knowing how the stream is generated.
 		//  We can record the random sequence and replicate it here
-		char noise_str[MAX_NOISE_FILE_ENTRY];
+		std::string noise_str;
 		char *str = &(noise_str[0]);
 		// If we get to the end of the stream, by default reset it.
 		//  However, it is unlikely the stream will be correct at this
@@ -803,6 +809,7 @@ double sanafe::sim_generate_noise(Neuron *n)
 
 	return (double) noise_val;
 }
+*/
 
 double sanafe::sim_calculate_energy(const Architecture &arch)
 {
@@ -1074,7 +1081,7 @@ void sanafe::sim_trace_record_potentials(
 		{
 			if (n.log_potential)
 			{
-				out << n.model->get_potential() << ",";
+				out << n.soma_model->get_potential() << ",";
 				potential_probe_count++;
 			}
 		}

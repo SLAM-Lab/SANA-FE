@@ -12,19 +12,46 @@
 #include <vector>
 #include "description.hpp"
 
-#define MAX_NOISE_FILE_ENTRY 128
-
 namespace sanafe
 {
-	enum NeuronStatus { IDLE, UPDATED, FIRED};
-	enum NeuronResetModes
-	{
-		NEURON_NO_RESET,
-		NEURON_RESET_SOFT,
-		NEURON_RESET_HARD,
-		NEURON_RESET_SATURATE,
-		NEURON_RESET_MODE_COUNT,
-	};
+enum NeuronStatus { IDLE, UPDATED, FIRED};
+enum NeuronResetModes
+{
+	NEURON_NO_RESET,
+	NEURON_RESET_SOFT,
+	NEURON_RESET_HARD,
+	NEURON_RESET_SATURATE,
+	NEURON_RESET_MODE_COUNT,
+};
+
+class DendriteModel
+{
+public:
+	DendriteModel() {}
+	virtual ~DendriteModel() {}
+	// TODO: figure out how this model works... do we update each compartment?
+	virtual void input(const double current_in, const int compartment) = 0;
+	virtual double update() = 0;
+	// Set global dendritic attributes
+	virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
+	// Set per-compartment attributes
+	virtual void set_attributes(const size_t compartment_id, const std::map<std::string, std::string> &attr) {}
+	// Set per-branch attributes (between compartments)
+	virtual void set_attributes(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr) {}
+};
+
+class SingleCompartmentModel: public DendriteModel
+{
+public:
+	SingleCompartmentModel();
+	~SingleCompartmentModel() {}
+	virtual void input(const double current_in, const int compartment);
+	virtual double update();
+	virtual void set_attributes(const std::map<std::string, std::string> &attr);
+private:
+	double accumulated_charge, leak_decay;
+	int last_updated;
+};
 
 class SomaModel
 {
@@ -50,13 +77,14 @@ public:
 	double get_potential() { return potential; }
 private:
 	bool force_update;
-	int soma_last_updated, reset_mode, reverse_reset_mode;
+	int reset_mode, reverse_reset_mode;
         //int noise_type;
 	double potential, leak_decay, bias, threshold, reverse_threshold;
         double reset, reverse_reset;
 };
 
 NeuronResetModes model_parse_reset_mode(const std::string &str);
+std::shared_ptr<DendriteModel> model_get_dendrite(const std::string &model_name);
 std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const int group_id, const int id);
 
 }

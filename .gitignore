@@ -8,6 +8,9 @@ tutorial/dvs_challenge.net
 *.png
 *.npz
 *.parsed
+*.o
+*.so
+*.pdf
 perf.csv
 messages.csv
 potential.csv
@@ -23,4 +26,6 @@ simcpp.*
 _deps/
 build/
 CMakeFiles/
+reports/
+reports_html/
 Makefile
