@@ -148,6 +148,7 @@ struct Connection
 	SynapseUnit *synapse_hw;
 	std::string synapse_hw_name;
 	double weight, current, synaptic_current_decay;
+	size_t dest_compartment;
 	int id, delay, last_updated;
 
 	explicit Connection(const int connection_id);

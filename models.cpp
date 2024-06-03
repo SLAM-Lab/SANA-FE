@@ -16,11 +16,11 @@ sanafe::SingleCompartmentModel::SingleCompartmentModel()
 	leak_decay = 0.0;
 }
 
-void sanafe::SingleCompartmentModel::input(
+double sanafe::SingleCompartmentModel::input(
 	const double current_in, const int compartment)
 {
-	accumulated_charge += leak_decay;
-	return;
+	accumulated_charge += current_in;
+	return accumulated_charge;
 }
 
 double sanafe::SingleCompartmentModel::update()

@@ -29,7 +29,7 @@ public:
 	DendriteModel() {}
 	virtual ~DendriteModel() {}
 	// TODO: figure out how this model works... do we update each compartment?
-	virtual void input(const double current_in, const int compartment) = 0;
+	virtual double input(const double current_in, const int compartment) = 0;
 	virtual double update() = 0;
 	// Set global dendritic attributes
 	virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
@@ -44,7 +44,7 @@ class SingleCompartmentModel: public DendriteModel
 public:
 	SingleCompartmentModel();
 	~SingleCompartmentModel() {}
-	virtual void input(const double current_in, const int compartment);
+	virtual double input(const double current_in, const int compartment);
 	virtual double update();
 	virtual void set_attributes(const std::map<std::string, std::string> &attr);
 private:

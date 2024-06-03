@@ -200,7 +200,7 @@ void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 	}
 	else if (c.buffer_pos == BUFFER_SOMA)
 	{
-		n.processing_latency = sim_update_soma(ts, arch, n, n.charge);
+		n.processing_latency = sim_update_soma(ts, arch, n);
 		n.charge = 0.0;
 	}
 	else if (c.buffer_pos == BUFFER_AXON_OUT)
@@ -614,63 +614,50 @@ double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	if (c.buffer_pos != BUFFER_DENDRITE)
 	{
 		latency += sim_update_dendrite(
-			ts, arch, post_neuron, con.current);
+			ts, arch, post_neuron,
+			con.current, con.dest_compartment);
 	}
 
 	return latency;
 }
 
 double sanafe::sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
-	const double charge)
+	const double current, const int compartment)
 {
-	// TODO: Support dendritic operations, combining the current in
-	//  different neurons in some way, and writing the result to an output
-	double dendritic_current, latency;
+	double latency;
 	latency = 0.0;
 
-	dendritic_current = 0.0;
 	while (n.dendrite_last_updated <= ts.timestep)
 	{
 		TRACE3("Updating dendritic current (last_updated:%d, ts:%ld)\n",
 			n.dendrite_last_updated, sim->timesteps);
-		n.charge *= n.dendritic_current_decay;
-		n.dendrite_last_updated++;
-		dendritic_current = n.charge;
-		TRACE2("nid:%d charge:%lf\n", n.id, n.charge);
-		// TODO: implement this. Probably needs a compartment and an
-		//  amount of current, both are optionally set?
 		n.dendrite_model->update();
+		n.dendrite_last_updated++;
 	}
-
-	// Update dendritic tap currents
-	// TODO: implement multi-tap models
-	TRACE2("Charge:%lf\n", charge);
-	dendritic_current += charge;
-	n.charge += charge;
+	n.charge = n.dendrite_model->input(current, compartment);
 
 	// Finally, send dendritic current to the soma
 	TRACE2("nid:%d updating dendrite, charge:%lf\n", n.id, n.charge);
 	if (n.core->buffer_pos != BUFFER_SOMA)
 	{
-		latency += sim_update_soma(ts, arch, n, dendritic_current);
+		latency += sim_update_soma(ts, arch, n);
 	}
 
 	return latency;
 }
 
-double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n,
-	const double current_in)
+double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n)
 {
 	SomaUnit *const soma = n.soma_hw;
 
-	SIM_TRACE1("nid:%d updating, current_in:%lf\n", n.id, current_in);
+	SIM_TRACE1("nid:%d updating, current_in:%lf\n", n.id, n.charge);
 	double latency = 0.0;
 	while (n.soma_last_updated < ts.timestep)
 	{
 		std::optional<double> soma_current = std::nullopt;
-		if ((n.spike_count > 0) || (std::fabs(current_in) > 0.0))
+		if ((n.spike_count > 0) || (std::fabs(n.charge) > 0.0))
 		{
-			soma_current = current_in;
+			soma_current = n.charge;
 		}
 		n.neuron_status = n.soma_model->update(soma_current);
 		if (n.forced_spikes > 0)

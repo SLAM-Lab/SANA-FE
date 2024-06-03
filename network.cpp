@@ -8,6 +8,7 @@
 #include <cmath>
 #include <functional> // For std::reference_wrapper
 #include <filesystem> // For std::filesystem::path
+#include <fstream>
 #include <list>
 #include <map>
 #include <memory>
@@ -15,6 +16,7 @@
 #include <sstream>
 
 #include "arch.hpp"
+#include "description.hpp"
 #include "print.hpp"
 #include "network.hpp"
 #include "models.hpp"
@@ -27,6 +29,7 @@ sanafe::Connection::Connection(const int connection_id)
 	pre_neuron = nullptr;
 	post_neuron = nullptr;
 	synapse_hw = nullptr;
+	dest_compartment = 0UL;
 	last_updated = 0;
 
 	current = 0.0;
@@ -366,6 +369,7 @@ void sanafe::Neuron::connect_to_neuron(
 	con.pre_neuron = this;
 	con.post_neuron = &dest;
 	con.synapse_hw_name = default_synapse_hw_name;
+	con.dest_compartment = dest_compartment_id;
 
 	for (auto a: attr)
 	{

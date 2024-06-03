@@ -306,7 +306,7 @@ void sanafe::parse_edge_field(
 	// i.e. Branch:     e group.neuron:compartment->compartment <attributes>
 	//   Note that the destination compartment is optional (default=0)
 	// Split the source and destination neuron addresses
-	INFO("Parsing edge.\n");
+	TRACE1("Parsing edge.\n");
 	const auto pos = edge_field.find("->");
 	if (pos == std::string_view::npos)
 	{
@@ -336,7 +336,7 @@ void sanafe::parse_edge_field(
 		//  then assume we are specifying a connection between two
 		//  neurons. Optionally, the user can specify the destination
 		//  compartment.
-		INFO("parsing neuron to neuron connection.\n");
+		TRACE1("parsing neuron to neuron connection.\n");
 		dest_compartment_id = 0;
 		// Parse the destination group, neuron and compartment
 		//  identifiers from the substring after "->". Note that

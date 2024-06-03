@@ -890,14 +890,14 @@ void sanafe::Core::map_neuron(Neuron &n)
 		if (n.soma_hw->plugin_lib.empty())
 		{
 			// Use built in models
-			INFO("Creating soma built-in model %s.\n",
+			TRACE1("Creating soma built-in model %s.\n",
 				n.soma_hw->model.c_str());
 			n.soma_model = sanafe::model_get_soma(
 				n.soma_hw->model, n.parent_group_id, n.id);
 		}
 		else
 		{
-			INFO("Creating soma from plugin %s.\n",
+			TRACE1("Creating soma from plugin %s.\n",
 				n.soma_hw->plugin_lib.c_str());
 			n.soma_model = plugin_get_soma(
 				n.soma_hw->model, n.parent_group_id, n.id,
@@ -919,7 +919,7 @@ void sanafe::Core::map_neuron(Neuron &n)
 		if (n.dendrite_hw->plugin_lib.empty())
 		{
 			// Use built in models
-			INFO("Creating dendrite built-in model %s.\n",
+			TRACE1("Creating dendrite built-in model %s.\n",
 				n.dendrite_hw->model.c_str());
 			n.dendrite_model = sanafe::model_get_dendrite(
 				n.dendrite_hw->model);

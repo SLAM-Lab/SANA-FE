@@ -85,11 +85,7 @@ int main(int argc, char *argv[])
 
 	if (argc < sanafe::PROGRAM_NARGS)
 	{
-		INFO("Usage: ./sim [-p<log perf> -s<spike trace> "
-				"-v<potential trace> -m <message trace>] "
-				"-o <output directory>"
-				"<arch description> <network description> "
-							"<timesteps>\n");
+		INFO("Usage: ./sim [-psvmo] <arch description> <network description> <timesteps>\n");
 		return 0;
 	}
 
