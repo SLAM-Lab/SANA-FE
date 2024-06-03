@@ -137,8 +137,8 @@ public:
 	int get_id() { return id; }
 	void set_attributes(const std::map<std::string, std::string> &attr);
 	void connect_to_neuron(Neuron &dest, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr);
-	void create_compartment(const std::map<std::string, std::string> &attr);
-	void create_branch(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr);
+	void create_compartment(const std::map<std::string, std::string> &compartment_attr);
+	void create_branch(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &branch_attr);
 	std::string info() const;
 	std::string description(const bool write_mapping=true) const;
 };

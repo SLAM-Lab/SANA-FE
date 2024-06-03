@@ -91,6 +91,148 @@ void sanafe::SingleCompartmentModel::set_attributes(
 	}
 }
 
+sanafe::MultiTapModel::MultiTapModel()
+{
+	const int default_taps = 1;
+	tap_voltages = std::vector<double>(default_taps, 0.0);
+	next_voltages = std::vector<double>(default_taps, 0.0);
+	weights = std::vector<double>(default_taps*default_taps, 0.0);
+}
+
+double sanafe::MultiTapModel::input(
+	const double current_in, const int compartment)
+{
+	assert(compartment >= 0);
+	assert((size_t) compartment < tap_voltages.size());
+	tap_voltages[compartment] += current_in;
+	// Return current for most proximal tap (which is always the first tap)
+	return tap_voltages[0];
+}
+
+double sanafe::MultiTapModel::update()
+{
+	const size_t taps = tap_voltages.size();
+
+	// Avoid reallocating this temporary buffer every time
+	for (size_t t = 0; t < taps; t++)
+	{
+		next_voltages[t] = 0.0;
+	}
+	for (size_t src = 0; src < taps; src++)
+	{
+		for (size_t dest = 0; dest < taps; dest++)
+		{
+			const size_t taps = tap_voltages.size();
+			const size_t weight_idx = (src*taps) + dest;
+			next_voltages[dest] +=
+				tap_voltages[src] * weights[weight_idx];
+		}
+		TRACE1("Tap %lu potential:%lf\n", src, tap_voltages[src]);
+		//printf("%lf\t", tap_voltages[src]);
+	}
+	//printf("\n");
+	for (size_t t = 0; t < taps; t++)
+	{
+		tap_voltages[t] = next_voltages[t];
+	}
+
+	return tap_voltages[0];
+}
+
+void sanafe::MultiTapModel::set_attributes(
+	const std::map<std::string, std::string> &attr)
+{
+	for (const auto &a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+
+		if (key == "taps")
+		{
+			int taps;
+			ss >> taps;
+			if (taps <= 0)
+			{
+				throw(std::invalid_argument(
+					"Error: Invalid tap count."));
+			}
+			tap_voltages = std::vector<double>(taps, 0.0);
+			next_voltages = std::vector<double>(taps, 0.0);
+			weights = std::vector<double>(taps*taps, 0.0);
+		}
+	}
+}
+
+void sanafe::MultiTapModel::set_attributes(
+	const size_t compartment_id,
+	const std::map<std::string, std::string> &attr)
+{
+	const size_t taps = tap_voltages.size();
+	if (compartment_id >= taps)
+	{
+		throw std::invalid_argument(
+			"Error: Compartment out of range");
+	}
+	for (const auto &a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+
+		if (key == "time_constant")
+		{
+			double time_constant;
+			ss >> time_constant;
+			const size_t taps = tap_voltages.size();
+			const size_t idx =
+				(taps*compartment_id) + compartment_id;
+			weights[idx] = time_constant;
+		}
+	}
+}
+
+void sanafe::MultiTapModel::set_attributes(
+	const size_t src_compartment_id,
+	const size_t dest_compartment_id,
+	const std::map<std::string, std::string> &attr)
+{
+	const size_t taps = tap_voltages.size();
+	if (src_compartment_id >= taps)
+	{
+		throw std::invalid_argument(
+			"Error: src compartment out of range");
+	}
+	if (dest_compartment_id >= taps)
+	{
+		throw std::invalid_argument(
+			"Error: dest compartment out of range");
+	}
+
+	for (const auto &a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+
+		if (key == "space_constant")
+		{
+			double space_constant;
+			ss >> space_constant;
+			const size_t taps = tap_voltages.size();
+			const size_t idx =
+				(taps*src_compartment_id) + dest_compartment_id;
+			weights[idx] = space_constant;
+			// Update the src compartment, subtracting some of its
+			//  potential which is added to the destination
+			//  compartment. Formulate this for the matrix mul
+			const size_t src_identity =
+				(src_compartment_id*taps) + src_compartment_id;
+			weights[src_identity] -= space_constant;
+		}
+	}
+}
+
 // **** Soma models ****
 sanafe::LoihiLifModel::LoihiLifModel(
 	const int gid, const int nid): sanafe::SomaModel(gid, nid)
@@ -440,6 +582,11 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
 		return std::shared_ptr<DendriteModel>(
 			new SingleCompartmentModel());
 	}
+	else if (model_name == "taps")
+	{
+		return std::shared_ptr<DendriteModel>(
+			new MultiTapModel());
+	}
 	else
 	{
 		throw std::invalid_argument("Model not supported.");
@@ -456,8 +603,8 @@ std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
 	}
 	else if (model_name == "truenorth")
 	{
-		// TODO: reintegrate truenorth model
-		throw std::invalid_argument("not implemented yet.");
+		return std::shared_ptr<SomaModel>(
+			new TrueNorthModel(group_id, id));
 	}
 	else
 	{

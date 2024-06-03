@@ -75,7 +75,23 @@ public:
 	virtual void set_attributes(const std::map<std::string, std::string> &attr);
 private:
 	double accumulated_charge, leak_decay;
-	int last_updated;
+};
+
+class MultiTapModel: public DendriteModel
+{
+public:
+	MultiTapModel();
+	virtual double input(const double current_in, const int compartment);
+	virtual double update();
+	virtual void set_attributes(const std::map<std::string, std::string> &attr);
+	virtual void set_attributes(const size_t compartment_id, const std::map<std::string, std::string> &attr);
+	virtual void set_attributes(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr);
+private:
+	// Use a simple dense matrix representation of tap to tap weights,
+	//  assuming that the number of taps is (reasonably) small. For larger
+	//  tap counts, a model implementing a sparse per-branch representation
+	//  would be more space efficient
+	std::vector<double> tap_voltages, next_voltages, weights;
 };
 
 class SomaModel

@@ -240,7 +240,7 @@ void sanafe::parse_neuron_with_compartment_field(
 	const auto pos = neuron_field.find(':');
 	if (pos != std::string_view::npos)
 	{
-		const auto compartment_str = neuron_field.substr(pos);
+		const auto compartment_str = neuron_field.substr(pos+1);
 		compartment_id = field_to_int(compartment_str);
 	}
 	else

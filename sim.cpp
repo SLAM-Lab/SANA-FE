@@ -444,7 +444,7 @@ sanafe::Timestep::Timestep(const long int ts, const int core_count)
 
 void sanafe::sim_process_neurons(Timestep &ts, Architecture &arch)
 {
-#pragma omp parallel for schedule(dynamic)
+//#pragma omp parallel for schedule(dynamic)
 	for (size_t i = 0; i < arch.cores_vec.size(); i++)
 	{
 		Core &c = arch.cores_vec[i];
@@ -506,7 +506,7 @@ void sanafe::sim_receive_messages(Timestep &ts, Architecture &arch)
 	}
 
 	// Now process all messages at receiving cores
-#pragma omp parallel for schedule(dynamic)
+//#pragma omp parallel for schedule(dynamic)
 	for (size_t i = 0; i < arch.cores_vec.size(); i++)
 	{
 		Core &c = arch.cores_vec[i];
@@ -578,22 +578,10 @@ double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	{
 		SIM_TRACE1("Updating synaptic current (last updated:%ld, ts:%ld)\n",
 			con.last_updated, ts.timestep);
-		//con.current *= con.synaptic_current_decay;
-
-		// "Turn off" synapses that have basically no
-		//  synaptic current left to decay (based on
-		//  the weight resolution)
-		//min_synaptic_resolution = (1.0 /
-		//	con.synapse_hw->weight_bits);
-		//if (fabs(con.current) < min_synaptic_resolution)
-		//{
-		//	con.current = 0.0;
-		//}
 		current = con.synapse_model->update();
 		con.last_updated++;
 	}
 
-	//con.current += con.weight;
 	current = con.synapse_model->input(synapse_address);
 	post_neuron.spike_count++;
 	assert(con.synapse_hw != NULL);
@@ -624,8 +612,9 @@ double sanafe::sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
 
 	while (n.dendrite_last_updated <= ts.timestep)
 	{
-		TRACE3("Updating dendritic current (last_updated:%d, ts:%ld)\n",
-			n.dendrite_last_updated, sim->timesteps);
+		TRACE2("Updating nid:%d dendritic current "
+			"(last_updated:%d, ts:%ld)\n",
+			n.id, n.dendrite_last_updated, ts.timestep);
 		n.dendrite_model->update();
 		n.dendrite_last_updated++;
 	}
@@ -649,12 +638,12 @@ double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n)
 	double latency = 0.0;
 	while (n.soma_last_updated < ts.timestep)
 	{
-		std::optional<double> soma_current = std::nullopt;
+		std::optional<double> soma_current_in = std::nullopt;
 		if ((n.spike_count > 0) || (std::fabs(n.charge) > 0.0))
 		{
-			soma_current = n.charge;
+			soma_current_in = n.charge;
 		}
-		n.neuron_status = n.soma_model->update(soma_current);
+		n.neuron_status = n.soma_model->update(soma_current_in);
 		if (n.forced_spikes > 0)
 		{
 			n.neuron_status = sanafe::FIRED;

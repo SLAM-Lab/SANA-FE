@@ -73,6 +73,8 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
 	spike_count = 0;
 	max_connections_out = 0;
 	max_compartments = 1;
+	charge = 0.0;
+	forced_spikes = 0;
 
 	// Initially the neuron is not mapped to anything
 	core = nullptr;
@@ -178,14 +180,14 @@ NeuronGroup &sanafe::Network::create_neuron_group(const int neuron_count,
 }
 
 void sanafe::Neuron::create_compartment(
-	const std::map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &compartment_attr)
 {
 	const size_t compartment_id = dendrite_compartments.size();
 	dendrite_compartments.push_back(Compartment(compartment_id));
 	Compartment &comp = dendrite_compartments.back();
 
 	comp.parent_neuron_id = id;
-	comp.attributes = attr;
+	comp.attributes = compartment_attr;
 
 	return;
 }
@@ -193,7 +195,7 @@ void sanafe::Neuron::create_compartment(
 void sanafe::Neuron::create_branch(
 	const size_t src_compartment_id,
 	const size_t dest_compartment_id,
-	const std::map<std::string, std::string> &attr)
+	const std::map<std::string, std::string> &branch_attr)
 {
 	INFO("src:%lu dest:%lu", src_compartment_id, dest_compartment_id);
 	const size_t branch_id = dendrite_branches.size();
@@ -202,7 +204,7 @@ void sanafe::Neuron::create_branch(
 	Branch &branch = dendrite_branches.back();
 	branch.src_compartment_id = src_compartment_id;
 	branch.dest_compartment_id = dest_compartment_id;
-	branch.attributes = attributes;
+	branch.attributes = branch_attr;
 
 	return;
 }
