@@ -1,2 +1,2 @@
-# Import kernel under top-level
-import sanafecpp
+# Import kernel structs under top-level
+from sanafecpp import Architecture, Network, Simulation
