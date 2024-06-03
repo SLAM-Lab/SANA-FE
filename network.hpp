@@ -44,6 +44,7 @@ struct AxonOutUnit;
 class NeuronGroup;
 class Neuron;
 struct Connection;
+struct Synapse;
 struct Compartment;
 struct Branch;
 // Models
@@ -68,11 +69,11 @@ public:
 private:
 	// Do *NOT* allow Network objects to be copied
 	//  This is because Neuron objects link back to their parent Network
-	//  (and need to be aware of the parent Group). Linking to parent
+	//  (and need to be aware of the parent NeuronGroup). Linking to parent
 	//  objects allows us to efficiently store Attributes for neurons i.e.,
 	//  by avoiding duplication of shared attributes.
-	//  If the Network was moved or copied, all parent links would be
-	//  invalidated.
+	//  If the Network was moved or copied, all parent links in Neurons
+	//  would be invalid.
 	Network(const Network &copy);
 };
 
@@ -114,24 +115,22 @@ public:
 	DendriteUnit *dendrite_hw;
 	SomaUnit *soma_hw;
 	AxonOutUnit *axon_out_hw;
-	std::string soma_hw_name, default_synapse_hw_name;
-	std::string dendrite_hw_name, default_dendrite_hw_name;
+	std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
 
 	std::shared_ptr<SomaModel> soma_model;
 	std::shared_ptr<DendriteModel> dendrite_model;
 
 	bool force_update, log_spikes, log_potential;
-	bool update_needed;
-	int id, parent_group_id;
-	int spike_count;
+	int id, parent_group_id, forced_spikes, spike_count;
 	int soma_last_updated, dendrite_last_updated;
 	int max_connections_out, max_compartments;
 	int maps_in_count, maps_out_count;
-
-	double dendritic_current_decay, processing_latency;
-	double current, charge;
+	double processing_latency;
 	NeuronStatus neuron_status;
-	int forced_spikes;
+
+	// Input buffers that precede pipeline H/W units
+	double soma_input_charge;
+	std::vector<Synapse> dendrite_input_synapses;
 
 	explicit Neuron(const size_t neuron_id);
 	int get_id() { return id; }
@@ -155,6 +154,12 @@ struct Connection
 
 	explicit Connection(const int connection_id);
 	std::string description() const;
+};
+
+struct Synapse
+{
+	double current;
+	int dest_compartment;
 };
 
 struct Compartment

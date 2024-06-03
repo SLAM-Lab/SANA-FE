@@ -73,8 +73,10 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
 	spike_count = 0;
 	max_connections_out = 0;
 	max_compartments = 1;
-	charge = 0.0;
 	forced_spikes = 0;
+
+	soma_input_charge = 0.0;
+	dendrite_input_synapses.reserve(max_compartments);
 
 	// Initially the neuron is not mapped to anything
 	core = nullptr;
@@ -197,7 +199,7 @@ void sanafe::Neuron::create_branch(
 	const size_t dest_compartment_id,
 	const std::map<std::string, std::string> &branch_attr)
 {
-	INFO("src:%lu dest:%lu", src_compartment_id, dest_compartment_id);
+	//INFO("src:%lu dest:%lu", src_compartment_id, dest_compartment_id);
 	const size_t branch_id = dendrite_branches.size();
 	dendrite_branches.push_back(Branch(branch_id));
 
@@ -466,90 +468,3 @@ void sanafe::Network::check_mapped() const
 		}
 	}
 }
-
-/*
-int network_create_inputs(Network *const net, const int input_count,
-							const int input_type)
-{
-	assert(input_count > 0);
-	assert(net->external_inputs == NULL);
-
-	net->external_inputs =
-		(struct input *) malloc(sizeof(struct input) * input_count);
-	if (net->external_inputs == NULL)
-	{
-		INFO("Error: Couldn't allocate memory for network inputs.\n");
-		return -1;
-	}
-	net->external_input_count = input_count;
-
-	for (int i = 0; i < input_count; i++)
-	{
-		struct input *in = &(net->external_inputs[i]);
-
-		in->id = i;
-		in->connections = NULL;
-		in->spike_val = 0.0;
-		in->post_connection_count = 0;
-		in->type = input_type;
-	}
-
-	return 0;
-}
-
-int network_create_input_node(struct input *const in, const int connection_count)
-{
-	TRACE("Creating input node with %d connections.\n", connection_count);
-
-	assert(in->connections == NULL);
-	in->connections = (Connection *)
-		malloc(sizeof(Connection) * connection_count);
-	if (in->connections == NULL)
-	{
-		INFO("Error: Couldn't allocate connection memory.\n");
-		return NETWORK_INVALID_NID;
-	}
-
-	// Zero initialize all connections
-	in->post_connection_count = connection_count;
-	for (int i = 0; i < in->post_connection_count; i++)
-	{
-		Connection *con = &(in->connections[i]);
-		con->pre_neuron = NULL;
-		con->post_neuron = NULL;
-		con->weight = 0.0;
-		con->current = 0.0;
-		con->synaptic_current_decay = 0.0;
-		con->delay = 0.0;
-	}
-
-	return in->id;
-}
-*/
-
-/*
-Neuron *network_id_to_neuron_ptr(
-	Network *const net, const class Neuron_id id)
-{
-	class Neuron_group *group;
-	Neuron *neuron;
-
-	if (id.group < net->neuron_group_count)
-	{
-		INFO("ERROR: Group %d > max %d.\n", id.group,
-			net->neuron_group_count);
-		exit(1);
-	}
-
-	group = &(net->groups[id.group]);
-	if (id.neuron < group->neuron_count)
-	{
-		INFO("ERROR: Neuron %d > max %d.\n", id.neuron,
-			group->neuron_count);
-		exit(1);
-	}
-	neuron = &(group->neurons[id.neuron]);
-
-	return neuron;
-}
-*/

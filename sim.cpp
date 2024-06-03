@@ -7,13 +7,13 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
-#include <optional>
-#include <vector>
 #include <list>
 #include <memory>
+#include <optional>
 #include <sstream>
-#include <filesystem>
+#include <vector>
 
 #include <omp.h>
 #include "arch.hpp"
@@ -186,24 +186,20 @@ void sanafe::sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n)
 
 	SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
 
-	if (c.buffer_pos == BUFFER_SYNAPSE)
+	if (c.buffer_pos == BUFFER_BEFORE_SYNAPSE)
 	{
 		INFO("Error: Not implemented\n");
 		exit(1);
 	}
-	else if (c.buffer_pos == BUFFER_DENDRITE)
+	else if (c.buffer_pos == BUFFER_BEFORE_DENDRITE)
 	{
-		// Go through all synapses connected to this neuron and update
-		//  all synaptic currents into the dendrite
-		INFO("Error: Not implemented\n");
-		exit(1);
+		n.processing_latency = sim_update_dendrite(ts, arch, n);
 	}
-	else if (c.buffer_pos == BUFFER_SOMA)
+	else if (c.buffer_pos == BUFFER_BEFORE_SOMA)
 	{
 		n.processing_latency = sim_update_soma(ts, arch, n);
-		n.charge = 0.0;
 	}
-	else if (c.buffer_pos == BUFFER_AXON_OUT)
+	else if (c.buffer_pos == BUFFER_BEFORE_AXON_OUT)
 	{
 		if (n.neuron_status == sanafe::FIRED)
 		{
@@ -224,7 +220,7 @@ double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
 	double message_processing_latency = 0.0;
 
 	SIM_TRACE1("Receiving messages for cid:%d\n", c.id);
-	if (c.buffer_pos >= BUFFER_SYNAPSE)
+	if (c.buffer_pos >= BUFFER_BEFORE_SYNAPSE)
 	{
 		assert(m.dest_axon_id >= 0);
 		assert(static_cast<size_t>(m.dest_axon_id) < c.axons_in.size());
@@ -444,7 +440,7 @@ sanafe::Timestep::Timestep(const long int ts, const int core_count)
 
 void sanafe::sim_process_neurons(Timestep &ts, Architecture &arch)
 {
-//#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
 	for (size_t i = 0; i < arch.cores_vec.size(); i++)
 	{
 		Core &c = arch.cores_vec[i];
@@ -506,7 +502,7 @@ void sanafe::sim_receive_messages(Timestep &ts, Architecture &arch)
 	}
 
 	// Now process all messages at receiving cores
-//#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
 	for (size_t i = 0; i < arch.cores_vec.size(); i++)
 	{
 		Core &c = arch.cores_vec[i];
@@ -562,67 +558,76 @@ double sanafe::sim_estimate_network_costs(Tile &src, Tile &dest)
 	return network_latency;
 }
 
-double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
-	const int synapse_address)
+double sanafe::sim_update_synapse(
+	Timestep &ts, Architecture &arch, Core &c, const int synapse_address)
 {
 	// Update all synapses to different neurons in one core. If a synaptic
 	//  lookup, read and accumulate the synaptic weights. Otherwise, just
 	//  update filtered current and any other connection properties
-	double latency, current;
+	double latency;
 	latency = 0.0;
-	Connection &con = *(c.synapses[synapse_address]);
+	Connection &con = *(c.connections_in[synapse_address]);
 	Neuron &post_neuron = *(con.post_neuron);
 
+	assert(con.synapse_hw != NULL);
 	SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
+	Synapse synapse_data;
+	synapse_data.dest_compartment = con.dest_compartment;
 	while (con.last_updated < ts.timestep)
 	{
 		SIM_TRACE1("Updating synaptic current (last updated:%ld, ts:%ld)\n",
 			con.last_updated, ts.timestep);
-		current = con.synapse_model->update();
 		con.last_updated++;
+		synapse_data.current = con.synapse_model->update();
 	}
+	// Store the synapse in a buffer belonging to the post-synaptic neuron
+	synapse_data.current =
+		con.synapse_model->update(synapse_address, false);
 
-	current = con.synapse_model->input(synapse_address);
+	post_neuron.dendrite_input_synapses.push_back(synapse_data);
 	post_neuron.spike_count++;
-	assert(con.synapse_hw != NULL);
 	con.synapse_hw->spikes_processed++;
 	latency += con.synapse_hw->latency_spike_op;
 	TRACE2("Sending spike to nid:%d, current:%lf\n",
-		post_neuron->id, con.current);
+		post_neuron->id, syn.current);
 
 	SIM_TRACE1("(nid:%d.%d->nid:%d.%d) con->current:%lf\n",
 		con.pre_neuron->parent_group_id, con.pre_neuron->id,
 		con.post_neuron->parent_group_id, con.post_neuron->id,
 		con.current);
 
-	if (c.buffer_pos != BUFFER_DENDRITE)
+	if (c.buffer_pos != BUFFER_BEFORE_DENDRITE)
 	{
-		latency += sim_update_dendrite(
-			ts, arch, post_neuron, current, con.dest_compartment);
+		latency += sim_update_dendrite(ts, arch, post_neuron);
 	}
 
 	return latency;
 }
 
-double sanafe::sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n,
-	const double current, const int compartment)
+double sanafe::sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n)
 {
 	double latency;
 	latency = 0.0;
 
-	while (n.dendrite_last_updated <= ts.timestep)
+	while (n.dendrite_last_updated < ts.timestep)
 	{
 		TRACE2("Updating nid:%d dendritic current "
 			"(last_updated:%d, ts:%ld)\n",
 			n.id, n.dendrite_last_updated, ts.timestep);
-		n.dendrite_model->update();
+		n.soma_input_charge = n.dendrite_model->update();
 		n.dendrite_last_updated++;
 	}
-	n.charge = n.dendrite_model->input(current, compartment);
+	for (const auto &synapse: n.dendrite_input_synapses)
+	{
+		n.soma_input_charge = n.dendrite_model->update(
+			synapse.current, synapse.dest_compartment, false);
+	}
+	n.dendrite_input_synapses.clear();
 
 	// Finally, send dendritic current to the soma
-	TRACE2("nid:%d updating dendrite, charge:%lf\n", n.id, n.charge);
-	if (n.core->buffer_pos != BUFFER_SOMA)
+	TRACE2("nid:%d updating dendrite, soma_input_charge:%lf\n",
+		n.id, n.soma_input_charge);
+	if (n.core->buffer_pos != BUFFER_BEFORE_SOMA)
 	{
 		latency += sim_update_soma(ts, arch, n);
 	}
@@ -634,14 +639,16 @@ double sanafe::sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n)
 {
 	SomaUnit *const soma = n.soma_hw;
 
-	SIM_TRACE1("nid:%d updating, current_in:%lf\n", n.id, n.charge);
+	SIM_TRACE1("nid:%d updating, current_in:%lf\n", n.id, n.soma_input_charge);
 	double latency = 0.0;
 	while (n.soma_last_updated < ts.timestep)
 	{
 		std::optional<double> soma_current_in = std::nullopt;
-		if ((n.spike_count > 0) || (std::fabs(n.charge) > 0.0))
+		if ((n.spike_count > 0) ||
+			(std::fabs(n.soma_input_charge) > 0.0))
 		{
-			soma_current_in = n.charge;
+			soma_current_in = n.soma_input_charge;
+			n.soma_input_charge = 0.0;
 		}
 		n.neuron_status = n.soma_model->update(soma_current_in);
 		if (n.forced_spikes > 0)
@@ -1132,44 +1139,6 @@ timespec sanafe::calculate_elapsed_time(const timespec &ts_start,
 }
 
 /*
-int Simulation::update_neuron(
-	const std::vector<NeuronGroup>::size_type group_id,
-	const std::vector<Neuron>::size_type n_id,
-	const std::vector<std::string> kwargs, const int count)
-{
-	for (std::string item: kwargs)
-	{
-		INFO("Kwarg: %s\n", item.c_str());
-	}
-	if (count < 1)
-	{
-		return -1;
-	}
-	if (group_id >= net.groups.size())
-	{
-		return -1;
-	}
-	if (n_id >= net.groups[group_id].neurons.size())
-	{
-		return -1;
-	}
-
-	std::vector<Attribute> attr;
-	for (auto &s: kwargs)
-	{
-		std::string key = s.substr(0, s.find('=')).c_str();
-		std::string value_str = s.substr(s.find('=')+1).c_str();
-		Attribute a = { key, value_str };
-		attr.push_back(a);
-		INFO("neuron: %lu.%lu updated with key: %s and val: %s\n",
-			group_id, n_id, key.c_str(), value_str.c_str());
-	}
-	net.groups[group_id].neurons[n_id].model->set_attributes(attr);
-	return 0;
-}
-*/
-
-/*
 double sim_calculate_time(const Architecture *const arch)
 {
 	Core *c = n->core;
@@ -1212,7 +1181,6 @@ double sim_calculate_time(const Architecture *const arch)
 	return 0.0;
 }
 */
-
 
 /*
 int sim_poisson_input(const double firing_probability)

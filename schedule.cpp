@@ -16,13 +16,15 @@
 #include <iterator>
 #include <functional> // For std::reference_wrapper
 #include <vector>
+
 #include "arch.hpp"
 #include "network.hpp"
 #include "print.hpp"
 #include "sim.hpp" // For sim_message_fifo
 #include "schedule.hpp"
 
-sanafe::NocInfo::NocInfo(const int width, const int height,
+sanafe::NocInfo::NocInfo(
+	const int width, const int height,
 	const int total_cores, const size_t cores_per_tile) :
 	noc_width(width), noc_height(height), core_count(total_cores),
 	max_cores_per_tile(cores_per_tile)

@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
-
 #include <filesystem> // For std::filesystem::path
 #include <functional> // For std::reference_wrapper
 #include <fstream>
@@ -341,7 +340,7 @@ sanafe::Core &sanafe::Architecture::create_core(
 	tile.cores_vec.push_back(c);
 
 	// *** Set attributes ***
-	c.buffer_pos = BUFFER_SOMA;
+	c.buffer_pos = BUFFER_BEFORE_SOMA;
 	c.max_neurons = 1024;
 	for (const auto &a: attr)
 	{
@@ -351,7 +350,7 @@ sanafe::Core &sanafe::Architecture::create_core(
 		{
 			if (value_str == "soma")
 			{
-				c.buffer_pos = BUFFER_SOMA;
+				c.buffer_pos = BUFFER_BEFORE_SOMA;
 			}
 		}
 		else if (key == "max_neurons")
@@ -1046,9 +1045,9 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
 	TRACE3("Adding to connection to axon:%lu\n",
 		post_core.axons_out.size()-1);
 
-	post_core.synapses.push_back(&con);
+	post_core.connections_in.push_back(&con);
 	const std::vector<Connection *>::size_type synapse_address =
-		post_core.synapses.size() - 1;
+		post_core.connections_in.size() - 1;
 
 	// Access the most recently created axon in for the post-synaptic core
 	AxonInModel &last_added_target_axon = post_core.axons_in.back();

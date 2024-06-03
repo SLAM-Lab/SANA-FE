@@ -37,7 +37,6 @@ class Neuron;
 class Tile;
 class Core;
 
-
 class Simulation
 {
 public:
@@ -98,7 +97,7 @@ void sim_receive_messages(Timestep &sim, Architecture &arch);
 void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n);
 double sim_pipeline_receive(Timestep &ts, Architecture &arch, Core &c, Message &m);
 double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c, const int synapse_address);
-double sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n, const double charge, const int compartment=0);
+double sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n);
 double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n);
 double sim_estimate_network_costs(Tile &src, Tile &dest);
 void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n);

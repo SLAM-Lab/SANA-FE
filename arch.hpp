@@ -15,11 +15,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <vector>
-#include <map>
-#include <list>
 #include <filesystem> // For std::filesystem::path
 #include <functional> // For std::reference_wrapper
+#include <list>
+#include <map>
+#include <vector>
 
 #define ARCH_INVALID_ID (-1)
 
@@ -32,10 +32,10 @@ struct Connection;
 enum buffer_positions
 {
 	BUFFER_AXON_IN = 0,	// Buffer incoming packets
-	BUFFER_SYNAPSE,		// Buffer synaptic addresses
-	BUFFER_DENDRITE,	// Buffer synaptic current
-	BUFFER_SOMA,		// Buffer dendritic current
-	BUFFER_AXON_OUT,	// Buffer axon addresses i.e. spikes out
+	BUFFER_BEFORE_SYNAPSE,		// Buffer synaptic addresses
+	BUFFER_BEFORE_DENDRITE,	// Buffer synaptic current
+	BUFFER_BEFORE_SOMA,		// Buffer dendritic current
+	BUFFER_BEFORE_AXON_OUT,	// Buffer axon addresses i.e. spikes out
 	BUFFER_NETWORK,		// Buffer messages to the network
 	BUFFER_POSITIONS,
 };
@@ -161,7 +161,7 @@ public:
 	std::vector<Message *> messages_in;
 	std::vector<AxonInModel> axons_in;
 	std::vector<Neuron *> neurons;
-	std::vector<Connection *> synapses;
+	std::vector<Connection *> connections_in;
 	std::vector<AxonOutModel> axons_out;
 
 	std::string name;
