@@ -96,7 +96,7 @@ class LoihiLifModel: public SomaModel
 {
 public:
         LoihiLifModel(const int gid, const int nid);
-	~LoihiLifModel();
+	~LoihiLifModel() {}
 	void set_attributes(const std::map<std::string, std::string> &attr);
 	NeuronStatus update(const std::optional<double> current_in);
 	double get_potential() { return potential; }
@@ -105,6 +105,24 @@ private:
 	int reset_mode, reverse_reset_mode;
         //int noise_type;
 	double potential, leak_decay, bias, threshold, reverse_threshold;
+        double reset, reverse_reset;
+};
+
+class TrueNorthModel: public SomaModel
+{
+public:
+        TrueNorthModel(const int gid, const int nid);
+	~TrueNorthModel() {}
+	void set_attributes(const std::map<std::string, std::string> &attr);
+	NeuronStatus update(const std::optional<double> current_in);
+	double get_potential() { return potential; }
+private:
+	bool force_update;
+	unsigned int random_range_mask;
+	int reset_mode, reverse_reset_mode;
+	bool leak_towards_zero;
+        //int noise_type;
+	double potential, leak, bias, threshold, reverse_threshold;
         double reset, reverse_reset;
 };
 

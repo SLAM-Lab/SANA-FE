@@ -111,11 +111,6 @@ sanafe::LoihiLifModel::LoihiLifModel(
 	return;
 }
 
-sanafe::LoihiLifModel::~LoihiLifModel()
-{
-	return;
-}
-
 void sanafe::LoihiLifModel::set_attributes(
 	const std::map<std::string, std::string> &attr)
 {
@@ -237,6 +232,164 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
 	return state;
 }
 
+sanafe::TrueNorthModel::TrueNorthModel(const int gid, const int nid):
+	sanafe::SomaModel(gid, nid)
+{
+	force_update = false;
+	potential = 0.0;
+	bias = 0.0;
+	threshold = 0.0;
+	reverse_threshold = 0.0;
+	reset = 0.0;
+	reverse_reset = 0.0;
+	reset_mode = sanafe::NEURON_RESET_HARD;
+	reverse_reset_mode = sanafe::NEURON_NO_RESET;
+	leak_towards_zero = true;
+	random_range_mask = 0U;
+	// Default is no leak (potential decay), i.e., the potential for the
+	//  next timestep is 100% of the previous timestep's
+	leak = 0.0;
+}
+
+void sanafe::TrueNorthModel::set_attributes(
+	const std::map<std::string, std::string> &attr)
+{
+	for (auto a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+		if (key == "threshold")
+		{
+			ss >> threshold;
+		}
+		else if (key == "reverse_threshold")
+		{
+			ss >> reverse_threshold;
+		}
+		else if (key == "reset")
+		{
+			ss >> reset;
+		}
+		else if (key == "reverse_reset")
+		{
+			ss >> reverse_reset;
+		}
+		else if (key == "reset_mode")
+		{
+			reset_mode = model_parse_reset_mode(value_str);
+		}
+		else if (key =="reverse_reset_mode")
+		{
+			reverse_reset_mode =
+				model_parse_reset_mode(value_str);
+		}
+		else if (key =="leak")
+		{
+			ss >> leak;
+		}
+		else if (key =="bias")
+		{
+			ss >> bias;
+		}
+		else if (key == "force_update")
+		{
+			ss >> force_update;
+		}
+		else if (key == "leak_towards_zero")
+		{
+			ss >> leak_towards_zero;
+		}
+	}
+}
+
+sanafe::NeuronStatus sanafe::TrueNorthModel::update(const std::optional<double> current_in)
+{
+	bool randomize_threshold;
+	sanafe::NeuronStatus state = sanafe::IDLE;
+
+	if ((std::fabs(potential) > 0.0) || current_in.has_value() ||
+		(std::fabs(bias) > 0.0) || force_update)
+	{
+		// Neuron is turned on and potential write
+		state = sanafe::UPDATED;
+	}
+
+	// Apply leak
+	if (leak_towards_zero)
+	{
+		// TODO: what happens if we're above zero but by less
+		//  than the leak amount (for convergent), will we
+		//  oscillate between the two? Does it matter
+		if (potential > 0.0)
+		{
+			// TrueNorth uses additive leak
+			potential -= leak;
+		}
+		else if (potential < 0.0)
+		{
+			potential += leak;
+		}
+		// else equals zero, so no leak is applied
+	}
+	else
+	{
+		potential += leak;
+	}
+
+	potential += bias;
+	if (current_in.has_value())
+	{
+		potential += current_in.value();
+	}
+	// Apply thresholding and reset
+	double v = potential;
+	randomize_threshold = (random_range_mask != 0);
+	if (randomize_threshold)
+	{
+		unsigned int r = rand() & random_range_mask;
+		v += static_cast<double>(r);
+	}
+	TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, threshold,
+		reset_mode, reverse_threshold,
+		reverse_reset_mode);
+	if (v >= threshold)
+	{
+		if (reset_mode == NEURON_RESET_HARD)
+		{
+			potential = reset;
+		}
+		else if (reset_mode == NEURON_RESET_SOFT)
+		{
+			potential -= threshold;
+		}
+		else if (reset_mode == NEURON_RESET_SATURATE)
+		{
+			potential = threshold;
+		}
+		state = sanafe::FIRED;
+	}
+	else if (v <= reverse_threshold)
+	{
+		if (reverse_reset_mode == NEURON_RESET_HARD)
+		{
+			potential = reverse_reset;
+		}
+		else if (reverse_reset_mode == NEURON_RESET_SOFT)
+		{
+			potential += reverse_threshold;
+		}
+		else if (reverse_reset_mode == NEURON_RESET_SATURATE)
+		{
+			potential = reverse_threshold;
+		}
+		// No spike is generated
+	}
+	TRACE2("potential:%lf threshold %lf\n", potential, threshold);
+	return state;
+}
+
+
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 {
 	sanafe::NeuronResetModes reset_mode;
@@ -311,101 +464,3 @@ std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
 		throw std::invalid_argument("Model not supported.");
 	}
 }
-
-// TODO: implement TrueNorth model as class like Loihi
-// double sim_update_soma_truenorth(
-// 	Timestep &ts, Neuron *n, const double current_in)
-// {
-// 	struct SomaProcessor *soma = n->soma_hw;
-// 	double v, latency = 0.0;
-// 	int randomize_threshold;
-
-// 	// Apply leak
-// 	while (n->soma_last_updated <= ts->timestep)
-// 	{
-// 		// Linear leak
-// 		if (soma->leak_towards_zero)
-// 		{
-// 			// TODO: what happens if we're above zero but by less
-// 			//  than the leak amount (for convergent), will we
-// 			//  oscillate between the two? Does it matter
-// 			if (n->potential > 0.0)
-// 			{
-// 				n->potential -= n->leak_bias;
-// 			}
-// 			else if (n->potential < 0.0)
-// 			{
-// 				n->potential += n->leak_bias;
-// 			}
-// 			// else equals zero, so no leak is applied
-// 		}
-// 		else
-// 		{
-// 			n->potential += n->leak_decay;
-// 		}
-// 		n->soma_last_updated++;
-// 	}
-
-// 	// Add the synaptic currents, processed by the dendrite
-// 	n->potential += current_in + n->bias;
-// 	n->current = 0.0;
-// 	n->charge = 0.0;
-
-// 	// Apply thresholding and reset
-// 	v = n->potential;
-// 	randomize_threshold = (n->random_range_mask != 0);
-// 	if (randomize_threshold)
-// 	{
-// 		unsigned int r = rand() & n->random_range_mask;
-// 		v += (double) r;
-// 	}
-
-// 	TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, n->threshold,
-// 		n->group->reset_mode, n->reverse_threshold,
-// 		n->group->reverse_reset_mode);
-// 	if (v >= n->threshold)
-// 	{
-// 		struct SomaProcessor *soma = n->soma_hw;
-// 		int reset_mode = n->group->reset_mode;
-
-// 		if (reset_mode == NEURON_RESET_HARD)
-// 		{
-// 			n->potential = n->reset;
-// 		}
-// 		else if (reset_mode == NEURON_RESET_SOFT)
-// 		{
-// 			n->potential -= n->threshold;
-// 		}
-// 		else if (reset_mode == NEURON_RESET_SATURATE)
-// 		{
-// 			n->potential = n->threshold;
-// 		}
-// 		n->fired = 1;
-// 		soma->neurons_fired++;
-// 		latency += soma->latency_spiking;
-// 		if (n->core->buffer_pos != BUFFER_AXON_OUT)
-// 		{
-// 			sim_neuron_send_spike_message(ts, n);
-// 		}
-// 	}
-// 	else if (v <= n->reverse_threshold)
-// 	{
-// 		int reset_mode = n->group->reverse_reset_mode;
-// 		if (reset_mode == NEURON_RESET_HARD)
-// 		{
-// 			n->potential = n->reverse_reset;
-// 		}
-// 		else if (reset_mode == NEURON_RESET_SOFT)
-// 		{
-// 			n->potential += n->reverse_threshold;
-// 		}
-// 		else if (reset_mode == NEURON_RESET_SATURATE)
-// 		{
-// 			n->potential = n->reverse_threshold;
-// 		}
-// 		// No spike is generated
-// 	}
-// 	TRACE2("potential:%lf threshold %lf\n", n->potential, n->threshold);
-
-// 	return latency;
-// }
