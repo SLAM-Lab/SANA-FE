@@ -784,6 +784,51 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 		Core &post_core = *(curr_connection.post_neuron->core);
 		TRACE1("Adding connection:%d\n", curr_connection.id);
 		arch_add_connection_to_axon(curr_connection, post_core);
+
+		// Map to synapse hardware unit
+		curr_connection.synapse_hw = &(pre_neuron.core->synapse[0]);
+		if (curr_connection.synapse_hw_name.length() > 0)
+		{
+			bool synapse_found = false;
+			for (auto &synapse_hw: pre_neuron.core->synapse)
+			{
+				if (curr_connection.synapse_hw_name == synapse_hw.name)
+				{
+					curr_connection.synapse_hw = &synapse_hw;
+					synapse_found = true;
+				}
+			}
+			if (!synapse_found)
+			{
+				INFO("Error: Could not map connection (hw:%s) "
+					"to any dendrite h/w.\n",
+					curr_connection.synapse_hw_name.c_str());
+				throw std::runtime_error(
+					"Error: Could not map connection to synapse h/w");
+			}
+		}
+		// Create the synapse model
+		if (curr_connection.synapse_model == nullptr)
+		{
+			if (curr_connection.synapse_hw->plugin_lib.empty())
+			{
+				// Use built in models
+				TRACE1("Creating synapse built-in model %s.\n",
+					curr_connection.synapse_hw->model.c_str());
+				curr_connection.synapse_model = sanafe::model_get_synapse(
+					curr_connection.synapse_hw->model);
+			}
+			else
+			{
+				INFO("Creating synapse from plugin %s.\n",
+					curr_connection.synapse_hw->plugin_lib.c_str());
+				curr_connection.synapse_model = plugin_get_synapse(
+					curr_connection.synapse_hw->model,
+					curr_connection.synapse_hw->plugin_lib);
+			}
+		}
+		curr_connection.synapse_model->set_attributes(
+			curr_connection.attributes);
 	}
 	TRACE1("Finished mapping connections to hardware for nid:%d.%d.\n",
 		pre_neuron.parent_group_id, pre_neuron.id);

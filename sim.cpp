@@ -239,9 +239,8 @@ double sanafe::sim_pipeline_receive(Timestep &ts, Architecture &arch,
 		hw.spike_messages_in++;
 		for (int s: a.synapse_addresses)
 		{
-			const int synaptic_lookup = true;
 			message_processing_latency += sim_update_synapse(
-				ts, arch, c, s, synaptic_lookup);
+				ts, arch, c, s);
 		}
 	}
 
@@ -564,12 +563,12 @@ double sanafe::sim_estimate_network_costs(Tile &src, Tile &dest)
 }
 
 double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
-	const int synapse_address, const bool synaptic_lookup)
+	const int synapse_address)
 {
 	// Update all synapses to different neurons in one core. If a synaptic
 	//  lookup, read and accumulate the synaptic weights. Otherwise, just
 	//  update filtered current and any other connection properties
-	double latency, min_synaptic_resolution;
+	double latency, current;
 	latency = 0.0;
 	Connection &con = *(c.synapses[synapse_address]);
 	Neuron &post_neuron = *(con.post_neuron);
@@ -579,32 +578,29 @@ double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	{
 		SIM_TRACE1("Updating synaptic current (last updated:%ld, ts:%ld)\n",
 			con.last_updated, ts.timestep);
-		con.current *= con.synaptic_current_decay;
+		//con.current *= con.synaptic_current_decay;
 
 		// "Turn off" synapses that have basically no
 		//  synaptic current left to decay (based on
 		//  the weight resolution)
-		min_synaptic_resolution = (1.0 /
-			con.synapse_hw->weight_bits);
-		if (fabs(con.current) < min_synaptic_resolution)
-		{
-			con.current = 0.0;
-		}
-
+		//min_synaptic_resolution = (1.0 /
+		//	con.synapse_hw->weight_bits);
+		//if (fabs(con.current) < min_synaptic_resolution)
+		//{
+		//	con.current = 0.0;
+		//}
+		current = con.synapse_model->update();
 		con.last_updated++;
 	}
 
-	if (synaptic_lookup)
-	{
-		con.current += con.weight;
-		post_neuron.spike_count++;
-
-		assert(con.synapse_hw != NULL);
-		con.synapse_hw->spikes_processed++;
-		TRACE2("Sending spike to nid:%d, current:%lf\n",
-			post_neuron->id, con.current);
-		latency += con.synapse_hw->latency_spike_op;
-	}
+	//con.current += con.weight;
+	current = con.synapse_model->input(synapse_address);
+	post_neuron.spike_count++;
+	assert(con.synapse_hw != NULL);
+	con.synapse_hw->spikes_processed++;
+	latency += con.synapse_hw->latency_spike_op;
+	TRACE2("Sending spike to nid:%d, current:%lf\n",
+		post_neuron->id, con.current);
 
 	SIM_TRACE1("(nid:%d.%d->nid:%d.%d) con->current:%lf\n",
 		con.pre_neuron->parent_group_id, con.pre_neuron->id,
@@ -614,8 +610,7 @@ double sanafe::sim_update_synapse(Timestep &ts, Architecture &arch, Core &c,
 	if (c.buffer_pos != BUFFER_DENDRITE)
 	{
 		latency += sim_update_dendrite(
-			ts, arch, post_neuron,
-			con.current, con.dest_compartment);
+			ts, arch, post_neuron, current, con.dest_compartment);
 	}
 
 	return latency;

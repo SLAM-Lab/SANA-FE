@@ -31,20 +31,13 @@ sanafe::Connection::Connection(const int connection_id)
 	synapse_hw = nullptr;
 	dest_compartment = 0UL;
 	last_updated = 0;
-
-	current = 0.0;
-	weight = 0.0;
-	delay = 0.0;
-	synaptic_current_decay = 0.0;
+	delay = 0;
 }
 
 std::string sanafe::Connection::description() const
 {
 	assert(pre_neuron != nullptr);
 	assert(post_neuron != nullptr);
-
-	std::map<std::string, std::string> attributes;
-	attributes["w"] = print_float(weight);
 
 	std::ostringstream ss;
 	ss << pre_neuron->parent_group_id << '.' << pre_neuron->id;
@@ -376,15 +369,12 @@ void sanafe::Neuron::connect_to_neuron(
 		const std::string &key = a.first;
 		const std::string &value_str = a.second;
 		std::istringstream ss(value_str);
-		if ((key[0] == 'w') || (key == "weight"))
-		{
-			ss >> con.weight;
-		}
-		else if (key == "hw_name")
+		if (key == "hw_name")
 		{
 			con.synapse_hw_name = value_str;
 		}
 	}
+	con.attributes.insert(attr.begin(), attr.end());
 
 	TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n",
 		con.pre_neuron->parent_group_id,

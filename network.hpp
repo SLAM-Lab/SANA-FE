@@ -47,6 +47,7 @@ struct Connection;
 struct Compartment;
 struct Branch;
 // Models
+class SynapseModel;
 class SomaModel;
 class DendriteModel;
 
@@ -144,10 +145,11 @@ public:
 
 struct Connection
 {
+	std::map<std::string, std::string> attributes;
+	std::shared_ptr<SynapseModel> synapse_model;
 	Neuron *post_neuron, *pre_neuron;
 	SynapseUnit *synapse_hw;
 	std::string synapse_hw_name;
-	double weight, current, synaptic_current_decay;
 	size_t dest_compartment;
 	int id, delay, last_updated;
 
@@ -157,8 +159,8 @@ struct Connection
 
 struct Compartment
 {
-	size_t id, parent_neuron_id;
 	std::map<std::string, std::string> attributes;
+	size_t id, parent_neuron_id;
 	Compartment(const size_t compartment_id) : id(compartment_id) {}
 };
 

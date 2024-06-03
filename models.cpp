@@ -9,6 +9,51 @@
 #include "print.hpp"
 #include "models.hpp"
 
+// *** Synapse models ***
+sanafe::CurrentBasedSynapseModel::CurrentBasedSynapseModel()
+{
+	current = 0.0;
+	min_synaptic_resolution = 0.0;
+}
+
+double sanafe::CurrentBasedSynapseModel::update()
+{
+	const double curr_current = current;
+	current *= synaptic_current_decay;
+	if (fabs(current) < min_synaptic_resolution)
+	{
+		current = 0.0;
+	}
+	return curr_current;
+}
+
+double sanafe::CurrentBasedSynapseModel::input(const int synapse_address)
+{
+	current += weight;
+	return current;
+}
+
+void sanafe::CurrentBasedSynapseModel::set_attributes(
+	const std::map<std::string, std::string> &attr)
+{
+	weight = 0.0;
+	weight_bits = 8;
+	synaptic_current_decay = 0.0;
+	for (const auto &a: attr)
+	{
+		const std::string &key = a.first;
+		const std::string &value_str = a.second;
+		std::istringstream ss(value_str);
+
+		if ((key[0] == 'w') || (key == "weight"))
+		{
+			ss >> weight;
+		}
+	}
+
+	min_synaptic_resolution = (1.0 / weight_bits);
+}
+
 // *** Dendrite models ***
 sanafe::SingleCompartmentModel::SingleCompartmentModel()
 {
@@ -218,6 +263,20 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 	}
 
 	return reset_mode;
+}
+
+std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
+	const std::string &model_name)
+{
+	if (model_name == "cuba")
+	{
+		return std::shared_ptr<SynapseModel>(
+			new CurrentBasedSynapseModel());
+	}
+	else
+	{
+		throw std::invalid_argument("Synapse model not supported.");
+	}
 }
 
 std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(

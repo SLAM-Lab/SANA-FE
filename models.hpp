@@ -23,6 +23,18 @@ enum NeuronResetModes
 	NEURON_RESET_MODE_COUNT,
 };
 
+class SynapseModel
+{
+public:
+	SynapseModel() {}
+	virtual ~SynapseModel() {}
+	// TODO: figure out how this model works... do we update each compartment?
+	virtual double input(const int synapse_address) = 0;
+	virtual double update() = 0;
+	// Set synapse attributes
+	virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
+};
+
 class DendriteModel
 {
 public:
@@ -37,6 +49,20 @@ public:
 	virtual void set_attributes(const size_t compartment_id, const std::map<std::string, std::string> &attr) {}
 	// Set per-branch attributes (between compartments)
 	virtual void set_attributes(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr) {}
+};
+
+class CurrentBasedSynapseModel: public SynapseModel
+{
+public:
+	CurrentBasedSynapseModel();
+	~CurrentBasedSynapseModel() {}
+	virtual double input(const int synapse_address);
+	virtual double update();
+	virtual void set_attributes(const std::map<std::string, std::string> &attr);
+
+private:
+	double weight, min_synaptic_resolution, current, synaptic_current_decay;
+	int weight_bits;
 };
 
 class SingleCompartmentModel: public DendriteModel
@@ -83,6 +109,7 @@ private:
 };
 
 NeuronResetModes model_parse_reset_mode(const std::string &str);
+std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name);
 std::shared_ptr<DendriteModel> model_get_dendrite(const std::string &model_name);
 std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const int group_id, const int id);
 

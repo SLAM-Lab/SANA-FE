@@ -40,11 +40,6 @@ enum buffer_positions
 	BUFFER_POSITIONS,
 };
 
-enum synapse_models
-{
-	SYNAPSE_CUBA,
-};
-
 struct Message
 {
 	Neuron *src_neuron;
@@ -82,6 +77,7 @@ struct AxonInUnit
 
 struct SynapseUnit
 {
+	std::filesystem::path plugin_lib;
 	std::string name, model;
 	int weight_bits;
 	long int spikes_processed;
