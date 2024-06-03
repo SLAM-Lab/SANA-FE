@@ -29,7 +29,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 
 sys.path.insert(0, PROJECT_DIR)
-import sim
+import utils
 
 # Use a dumb seed to get consistent results
 random.seed(1)

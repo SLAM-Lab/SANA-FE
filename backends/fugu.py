@@ -38,7 +38,7 @@ FUGU_DIR = os.path.dirname(BACKEND_DIR)
 FUGU_PROJECT_DIR = os.path.dirname(FUGU_DIR)
 PROJECT_DIR = os.path.dirname(FUGU_PROJECT_DIR)
 sys.path.append(PROJECT_DIR)
-import sim as sanafe
+import utils as sanafe
 # Set some flags for the dynamic linking library
 # Important to do before importing the simcpp .so library!
 sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)

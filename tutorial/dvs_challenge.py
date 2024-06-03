@@ -20,7 +20,7 @@ ARCH_PATH = os.path.join(PROJECT_DIR, "tutorial", "loihi.yaml")
 TIMESTEPS = 1000
 
 sys.path.insert(0, PROJECT_DIR)
-import sim
+import utils
 
 network = sim.Network()
 arch = sim.Architecture()

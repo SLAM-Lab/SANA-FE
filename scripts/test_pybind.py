@@ -6,7 +6,7 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 import sanafecpp
-import sim
+import utils
 
 net = sanafecpp.Network()
 weights = np.ones((5000, 5000))

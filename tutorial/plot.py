@@ -23,7 +23,7 @@ ARCH_PATH = os.path.join(PROJECT_DIR, "tutorial", "solutions",
 TIMESTEPS = 10
 
 sys.path.insert(0, PROJECT_DIR)
-import sim
+import utils
 
 results = sim.run(ARCH_PATH, NETWORK_PATH, TIMESTEPS,
                   out_dir=os.path.join(PROJECT_DIR, "tutorial"),

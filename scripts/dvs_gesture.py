@@ -22,7 +22,7 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 
 sys.path.insert(0, PROJECT_DIR)
 import sanafecpp as kernel
-import sim as sf
+import utils as sf
 
 ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net"
