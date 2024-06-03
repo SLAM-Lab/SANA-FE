@@ -11,6 +11,9 @@
 #include <string>
 #include <filesystem> // For std::filesystem::path
 
+#include "arch.hpp"
+#include "network.hpp"
+#include "models.hpp"
 #include "print.hpp"
 #include "sim.hpp"
 

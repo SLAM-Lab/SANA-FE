@@ -17,6 +17,7 @@
 #include <functional> // For std::reference_wrapper
 #include <vector>
 #include "arch.hpp"
+#include "network.hpp"
 #include "print.hpp"
 #include "sim.hpp" // For sim_message_fifo
 #include "schedule.hpp"

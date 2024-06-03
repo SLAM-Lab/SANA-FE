@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <cmath>
+#include <iostream>
 #include <optional>
 #include <vector>
 #include <list>
@@ -16,8 +17,9 @@
 
 #include <omp.h>
 #include "arch.hpp"
-#include "print.hpp"
+#include "models.hpp"
 #include "network.hpp"
+#include "print.hpp"
 #include "schedule.hpp"
 #include "sim.hpp"
 

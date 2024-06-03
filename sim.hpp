@@ -19,9 +19,8 @@
 #include <list>
 #include <memory>
 #include <queue>
+#include <fstream>
 
-#include "arch.hpp"
-#include "network.hpp"
 
 namespace sanafe
 {
@@ -29,6 +28,15 @@ struct Timestep;
 struct RunData;
 struct Scheduler;
 struct NocInfo;
+
+class Architecture;
+class Network;
+struct Message;
+class Neuron;
+
+class Tile;
+class Core;
+
 
 class Simulation
 {
@@ -114,7 +122,7 @@ void sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts);
 void sim_output_run_summary(const std::filesystem::path &output_file, const RunData &run_data);
 void sim_format_run_summary(std::ostream &out, const RunData &run_data);
 
-double sim_generate_noise(Neuron *n);
+//double sim_generate_noise(Neuron *n);
 timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end);
 
 //int sim_poisson_input(const double firing_probability);

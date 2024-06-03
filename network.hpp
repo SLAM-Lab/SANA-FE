@@ -19,9 +19,6 @@
 #include <memory>
 #include <optional>
 
-#include "plugins.hpp"
-#include "models.hpp"
-
 namespace sanafe
 {
 enum ConnectionConfigFormat
@@ -52,6 +49,8 @@ struct Branch;
 // Models
 class SomaModel;
 class DendriteModel;
+
+enum NeuronStatus: int;
 
 class Network
 {

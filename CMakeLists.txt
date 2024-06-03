@@ -16,8 +16,9 @@ add_compile_options(
 )
     #-ldl -Wall -pedantic -Werror -g -fopenmp -Wno-stringop-truncation -Ofast
 
-file (GLOB SOURCE_FILES "*.cpp")
-file (GLOB HEADER_FILES "*.hpp")
+file (GLOB SOURCE_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.cpp")
+
+file (GLOB HEADER_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hpp")
 
 # Get the latest commit hash
 execute_process(
@@ -33,7 +34,7 @@ include_directories(${PYTHON_INCLUDE_DIRS})
 
 # PyBind specific
 
-#if(PYTHON_BUILD_ENABLED)
+if(PYTHON_BUILD_ENABLED)
 find_package(pybind11 CONFIG)
 pybind11_add_module(
     sanafecpp
@@ -44,20 +45,24 @@ target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
 target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
 target_link_libraries(sanafecpp PUBLIC)
-#endif()
+endif()
 
+#include(CMakePrintHelpers)
 find_package(OpenMP REQUIRED)
 add_executable(sim main.cpp)
+#cmake_print_variables(SOURCE_FILES)
+list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
+#cmake_print_variables(SOURCE_FILES)
 target_sources(
     sim
     PRIVATE ${SOURCE_FILES}
 )
 
-#if(PYTHON_BUILD_ENABLED)
+if(PYTHON_BUILD_ENABLED)
 target_link_libraries(sim PRIVATE ${PYTHON_LIBRARIES})
+endif()
 target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(sim PRIVATE pybind11::pybind11)
-#endif()
+#target_link_libraries(sim PRIVATE pybind11::pybind11)
 #end of PyBind specific
 
 target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})

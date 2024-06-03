@@ -21,12 +21,14 @@
 #include <filesystem> // For std::filesystem::path
 #include <functional> // For std::reference_wrapper
 
-#include "network.hpp"
-
 #define ARCH_INVALID_ID (-1)
 
 namespace sanafe
 {
+
+class Neuron;
+struct Connection;
+
 enum buffer_positions
 {
 	BUFFER_AXON_IN = 0,	// Buffer incoming packets
@@ -42,21 +44,6 @@ enum synapse_models
 {
 	SYNAPSE_CUBA,
 };
-
-/*
-enum arch_description_blocks
-{
-	ARCH_DESCRIPTION_TOP = -1,
-	ARCH_DESCRIPTION_ARCH,
-	ARCH_DESCRIPTION_TILE,
-	ARCH_DESCRIPTION_CORE,
-	ARCH_DESCRIPTION_AXON_IN,
-	ARCH_DESCRIPTION_SYNAPSE,
-	ARCH_DESCRIPTION_DENDRITE,
-	ARCH_DESCRIPTION_SOMA,
-	ARCH_DESCRIPTION_AXON_OUT,
-};
-*/
 
 struct Message
 {

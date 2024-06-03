@@ -10,6 +10,7 @@
 
 #include <filesystem> // For std::filesystem::path
 #include <functional> // For std::reference_wrapper
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <list>
@@ -18,7 +19,10 @@
 #include <sstream>
 
 #include "arch.hpp"
+#include "description.hpp"
 #include "network.hpp"
+#include "models.hpp"
+#include "plugins.hpp"
 #include "print.hpp"
 
 sanafe::Architecture::Architecture()

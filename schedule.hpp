@@ -10,8 +10,6 @@
 #include <queue>
 #include <vector>
 
-#include "arch.hpp"
-
 namespace sanafe
 {
 

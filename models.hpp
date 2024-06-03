@@ -10,11 +10,10 @@
 #include <memory> // For shared_ptr<T>
 #include <optional>
 #include <vector>
-#include "description.hpp"
 
 namespace sanafe
 {
-enum NeuronStatus { IDLE, UPDATED, FIRED};
+enum NeuronStatus: int { IDLE, UPDATED, FIRED};
 enum NeuronResetModes
 {
 	NEURON_NO_RESET,
