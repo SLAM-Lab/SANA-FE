@@ -17,7 +17,7 @@
 
 void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
 {
-//#pragma omp parallel for schedule(dynamic)
+    //#pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < arch.cores_vec.size(); i++)
     {
         Core &c = arch.cores_vec[i];
@@ -75,7 +75,7 @@ void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
     }
 
     // Now process all messages at receiving cores
-//#pragma omp parallel for schedule(dynamic)
+    //#pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < arch.cores_vec.size(); i++)
     {
         Core &c = arch.cores_vec[i];
@@ -149,7 +149,8 @@ double sanafe::pipeline_process_message(
         hw.spike_messages_in++;
         for (int s : a.synapse_addresses)
         {
-            message_processing_latency += pipeline_process_synapse(ts, arch, c, s);
+            message_processing_latency +=
+                    pipeline_process_synapse(ts, arch, c, s);
         }
     }
 
@@ -200,7 +201,8 @@ double sanafe::pipeline_process_synapse(
     return latency;
 }
 
-double sanafe::pipeline_process_dendrite(Timestep &ts, Architecture &arch, Neuron &n)
+double sanafe::pipeline_process_dendrite(
+        Timestep &ts, Architecture &arch, Neuron &n)
 {
     double latency;
     latency = 0.0;
@@ -231,7 +233,8 @@ double sanafe::pipeline_process_dendrite(Timestep &ts, Architecture &arch, Neuro
     return latency;
 }
 
-double sanafe::pipeline_process_soma(Timestep &ts, Architecture &arch, Neuron &n)
+double sanafe::pipeline_process_soma(
+        Timestep &ts, Architecture &arch, Neuron &n)
 {
     SomaUnit *const soma = n.soma_hw;
 
@@ -253,8 +256,7 @@ double sanafe::pipeline_process_soma(Timestep &ts, Architecture &arch, Neuron &n
         }
 
         latency += n.soma_hw->latency_access_neuron;
-        if ((n.status == sanafe::UPDATED) ||
-                (n.status == sanafe::FIRED))
+        if ((n.status == sanafe::UPDATED) || (n.status == sanafe::FIRED))
         {
             latency += n.soma_hw->latency_update_neuron;
             soma->neuron_updates++;
@@ -336,7 +338,6 @@ double sanafe::pipeline_process_axon_out(
 
     return n.axon_out_hw->latency_access;
 }
-
 
 std::list<sanafe::PipelinePosition> sanafe::pipeline_create_pipeline(
         const PipelinePosition first_unit, const PipelinePosition last_unit)

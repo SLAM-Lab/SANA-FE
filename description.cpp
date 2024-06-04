@@ -1,20 +1,20 @@
 #include <cassert>
+#include <charconv>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
 #include <fstream>
-#include <string>
-#include <vector>
+#include <iostream>
 #include <list>
+#include <map>
 #include <optional>
 #include <sstream>
+#include <string>
 #include <string_view>
-#include <charconv>
-#include <map>
+#include <vector>
 
 #include "arch.hpp"
-#include "network.hpp"
 #include "description.hpp"
+#include "network.hpp"
 #include "print.hpp"
 
 const int default_line_len = 4096;
@@ -186,7 +186,7 @@ void sanafe::description_read_arch_entry(
             INFO("Invalid attribute: %s\n", std::string(fields[i]).c_str());
             continue;
         }
-        attributes.insert({ key, value_str });
+        attributes.insert({key, value_str});
     }
 
     // Process the command and create the unit
@@ -516,7 +516,7 @@ void sanafe::description_read_network_entry(
             continue;
         }
 
-        attributes.insert({ key, value_str });
+        attributes.insert({key, value_str});
     }
 
     // Process the entry

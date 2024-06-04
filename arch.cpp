@@ -3,13 +3,13 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // arch.cpp
-#include <cctype>
-#include <cstdlib>
 #include <cassert>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem> // For std::filesystem::path
-#include <functional> // For std::reference_wrapper
 #include <fstream>
+#include <functional> // For std::reference_wrapper
 #include <iostream>
 #include <limits>
 #include <list>
@@ -19,8 +19,8 @@
 
 #include "arch.hpp"
 #include "description.hpp"
-#include "network.hpp"
 #include "models.hpp"
+#include "network.hpp"
 #include "pipeline.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
@@ -358,8 +358,8 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
     //  halves that operate in parallel: neuron processing and message
     //  processing. Create simple representations of each of the halves,
     //  used later to track the sequence of hardware updates in both cases
-    c.neuron_processing_units = pipeline_create_pipeline(
-            c.timestep_buffer_position, PIPELINE_END);
+    c.neuron_processing_units =
+            pipeline_create_pipeline(c.timestep_buffer_position, PIPELINE_END);
     c.message_processing_units = pipeline_create_pipeline(
             PIPELINE_AXON_IN_UNIT, c.timestep_buffer_position);
 
