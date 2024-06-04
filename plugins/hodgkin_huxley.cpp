@@ -101,7 +101,7 @@ public:
 
 	sanafe::NeuronStatus update(const std::optional<double> current_in)
 	{
-		sanafe::NeuronStatus neuron_status = sanafe::IDLE;
+		sanafe::NeuronStatus status = sanafe::IDLE;
 
 		// Calculate the change in potential since the last update e.g.
 		//  integate inputs and apply any potential leak
@@ -139,16 +139,16 @@ public:
 		{
 			// If voltage just crossed the 25 mV boundary, then
 			//  spike
-			neuron_status = sanafe::FIRED;
+			status = sanafe::FIRED;
 		}
 		else
 		{
-			neuron_status = sanafe::UPDATED;
+			status = sanafe::UPDATED;
 		}
 
 		INFO("Updating potential, after:%f\n", V);
 
-		return neuron_status;
+		return status;
 	}
 };
 

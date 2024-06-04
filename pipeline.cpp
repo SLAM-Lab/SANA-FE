@@ -17,7 +17,7 @@
 
 void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
 {
-#pragma omp parallel for schedule(dynamic)
+//#pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < arch.cores_vec.size(); i++)
     {
         Core &c = arch.cores_vec[i];
@@ -46,7 +46,6 @@ void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
     }
 }
 
-// TODO: replace ts with messages
 void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
 {
     // Assign outgoing spike messages to their respective destination
@@ -76,7 +75,7 @@ void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
     }
 
     // Now process all messages at receiving cores
-#pragma omp parallel for schedule(dynamic)
+//#pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < arch.cores_vec.size(); i++)
     {
         Core &c = arch.cores_vec[i];
@@ -89,38 +88,42 @@ void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
     }
 }
 
-void sanafe::pipeline_process_neuron(Timestep &ts, Architecture &arch,
-        Neuron &n)
+void sanafe::pipeline_process_neuron(
+        Timestep &ts, Architecture &arch, Neuron &n)
 {
-    Core &c = *(n.core);
     n.processing_latency = 0.0;
-
-    SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
-
-    if (c.buffer_pos == BUFFER_BEFORE_SYNAPSE)
+    // Model the pipeline sequentially processing a neuron. Start from the
+    //  time-step buffer position, which inputs into a hardware unit. Then, data
+    //  flows through the pipeline and possibly generates a set of spikes,
+    //  which are returned here before being sent.
+    for (const auto &next_hw_unit : n.core->neuron_processing_units)
     {
-        INFO("Error: Not implemented\n");
-        throw std::invalid_argument("Error: Buffer pos not implemented\n");
-    }
-    else if (c.buffer_pos == BUFFER_BEFORE_DENDRITE)
-    {
-        n.processing_latency = pipeline_update_dendrite(ts, arch, n);
-    }
-    else if (c.buffer_pos == BUFFER_BEFORE_SOMA)
-    {
-        n.processing_latency = pipeline_update_soma(ts, arch, n);
-    }
-    else if (c.buffer_pos == BUFFER_BEFORE_AXON_OUT)
-    {
-        if (n.neuron_status == sanafe::FIRED)
+        switch (next_hw_unit)
         {
-            n.processing_latency = n.soma_hw->latency_spiking;
-            pipeline_neuron_send_spike_messages(ts, arch, n);
+        case PIPELINE_AXON_IN_UNIT:
+            throw std::invalid_argument("Not supported");
+            break;
+        case PIPELINE_SYNAPSE_UNIT:
+            // TODO: not implemented
+            throw std::invalid_argument("Not supported");
+            break;
+        case PIPELINE_DENDRITE_UNIT:
+            n.processing_latency += pipeline_process_dendrite(ts, arch, n);
+            break;
+        case PIPELINE_SOMA_UNIT:
+            n.processing_latency += pipeline_process_soma(ts, arch, n);
+            break;
+        case PIPELINE_AXON_OUT_UNIT:
+            n.processing_latency += pipeline_process_axon_out(ts, arch, n);
+            break;
+        default:
+            break;
         }
     }
-    SIM_TRACE1("Updating neuron %d.%d.\n", n.parent_group_id, n.id);
 
-    c.next_message.generation_delay += n.processing_latency;
+    SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
+    //SIM_TRACE1("Updating neuron %d.%d.\n", n.parent_group_id, n.id);
+    n.core->next_message.generation_delay += n.processing_latency;
     n.spike_count = 0;
 }
 
@@ -131,7 +134,8 @@ double sanafe::pipeline_process_message(
     double message_processing_latency = 0.0;
 
     SIM_TRACE1("Receiving messages for cid:%d\n", c.id);
-    if (c.buffer_pos >= BUFFER_BEFORE_SYNAPSE)
+    // TODO: move this check before
+    if (c.timestep_buffer_position >= PIPELINE_SYNAPSE_UNIT)
     {
         assert(m.dest_axon_id >= 0);
         assert(static_cast<size_t>(m.dest_axon_id) < c.axons_in.size());
@@ -145,17 +149,142 @@ double sanafe::pipeline_process_message(
         hw.spike_messages_in++;
         for (int s : a.synapse_addresses)
         {
-            message_processing_latency += pipeline_update_synapse(ts, arch, c, s);
+            message_processing_latency += pipeline_process_synapse(ts, arch, c, s);
         }
     }
 
     return message_processing_latency;
 }
 
-void sanafe::pipeline_neuron_send_spike_messages(
+double sanafe::pipeline_process_synapse(
+        Timestep &ts, Architecture &arch, Core &c, const int synapse_address)
+{
+    // Update all synapses to different neurons in one core. If a synaptic
+    //  lookup, read and accumulate the synaptic weights. Otherwise, just
+    //  update filtered current and any other connection properties
+    double latency;
+    latency = 0.0;
+    Connection &con = *(c.connections_in[synapse_address]);
+    Neuron &post_neuron = *(con.post_neuron);
+
+    assert(con.synapse_hw != NULL);
+    SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
+    Synapse synapse_data;
+    synapse_data.dest_compartment = con.dest_compartment;
+    while (con.last_updated < ts.timestep)
+    {
+        SIM_TRACE1("Updating synaptic current (last updated:%ld, ts:%ld)\n",
+                con.last_updated, ts.timestep);
+        con.last_updated++;
+        synapse_data.current = con.synapse_model->update();
+    }
+    // Store the synapse in a buffer belonging to the post-synaptic neuron
+    synapse_data.current = con.synapse_model->update(synapse_address, false);
+
+    post_neuron.dendrite_input_synapses.push_back(synapse_data);
+    post_neuron.spike_count++;
+    con.synapse_hw->spikes_processed++;
+    latency += con.synapse_hw->latency_spike_op;
+    TRACE2("Sending spike to nid:%d, current:%lf\n", post_neuron->id,
+            syn.current);
+
+    SIM_TRACE1("(nid:%d.%d->nid:%d.%d) con->current:%lf\n",
+            con.pre_neuron->parent_group_id, con.pre_neuron->id,
+            con.post_neuron->parent_group_id, con.post_neuron->id, con.current);
+
+    if (c.timestep_buffer_position != PIPELINE_DENDRITE_UNIT)
+    {
+        latency += pipeline_process_dendrite(ts, arch, post_neuron);
+    }
+
+    return latency;
+}
+
+double sanafe::pipeline_process_dendrite(Timestep &ts, Architecture &arch, Neuron &n)
+{
+    double latency;
+    latency = 0.0;
+
+    while (n.dendrite_last_updated < ts.timestep)
+    {
+        TRACE2("Updating nid:%d dendritic current "
+               "(last_updated:%d, ts:%ld)\n",
+                n.id, n.dendrite_last_updated, ts.timestep);
+        n.soma_input_charge = n.dendrite_model->update();
+        n.dendrite_last_updated++;
+    }
+    for (const auto &synapse : n.dendrite_input_synapses)
+    {
+        n.soma_input_charge = n.dendrite_model->update(
+                synapse.current, synapse.dest_compartment, false);
+    }
+    n.dendrite_input_synapses.clear();
+
+    // Finally, send dendritic current to the soma
+    TRACE2("nid:%d updating dendrite, soma_input_charge:%lf\n", n.id,
+            n.soma_input_charge);
+    //if (n.core->buffer_pos != BUFFER_BEFORE_SOMA)
+    //{
+    //    //latency += pipeline_process_soma(ts, arch, n);
+    //}
+
+    return latency;
+}
+
+double sanafe::pipeline_process_soma(Timestep &ts, Architecture &arch, Neuron &n)
+{
+    SomaUnit *const soma = n.soma_hw;
+
+    SIM_TRACE1("nid:%d updating, current_in:%lf\n", n.id, n.soma_input_charge);
+    double latency = 0.0;
+    while (n.soma_last_updated < ts.timestep)
+    {
+        std::optional<double> soma_current_in = std::nullopt;
+        if ((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
+        {
+            soma_current_in = n.soma_input_charge;
+            n.soma_input_charge = 0.0;
+        }
+        n.status = n.soma_model->update(soma_current_in);
+        if (n.forced_spikes > 0)
+        {
+            n.status = sanafe::FIRED;
+            n.forced_spikes--;
+        }
+
+        latency += n.soma_hw->latency_access_neuron;
+        if ((n.status == sanafe::UPDATED) ||
+                (n.status == sanafe::FIRED))
+        {
+            latency += n.soma_hw->latency_update_neuron;
+            soma->neuron_updates++;
+
+            if (n.status == sanafe::FIRED)
+            {
+                latency += n.soma_hw->latency_spiking;
+                soma->neurons_fired++;
+                n.axon_out_input_fired = true;
+                SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
+            }
+        }
+
+        n.soma_last_updated++;
+    }
+
+    SIM_TRACE1("neuron status:%d\n", n.status);
+
+    return latency;
+}
+
+double sanafe::pipeline_process_axon_out(
         Timestep &ts, Architecture &arch, Neuron &n)
 {
-    SIM_TRACE1("nid:%d.%d sending spike message to %lu axons out\n",
+    if (!n.axon_out_input_fired)
+    {
+        return 0.0;
+    }
+
+    TRACE1("nid:%d.%d sending spike message to %lu axons out\n",
             n.parent_group_id, n.id, n.axon_out_addresses.size());
     for (int address : n.axon_out_addresses)
     {
@@ -203,125 +332,46 @@ void sanafe::pipeline_neuron_send_spike_messages(
         // Reset the next message in this core
         src_core.next_message = Message();
     }
+    n.axon_out_input_fired = false;
 
-    return;
+    return n.axon_out_hw->latency_access;
 }
 
-double sanafe::pipeline_update_synapse(
-        Timestep &ts, Architecture &arch, Core &c, const int synapse_address)
+
+std::list<sanafe::PipelinePosition> sanafe::pipeline_create_pipeline(
+        const PipelinePosition first_unit, const PipelinePosition last_unit)
 {
-    // Update all synapses to different neurons in one core. If a synaptic
-    //  lookup, read and accumulate the synaptic weights. Otherwise, just
-    //  update filtered current and any other connection properties
-    double latency;
-    latency = 0.0;
-    Connection &con = *(c.connections_in[synapse_address]);
-    Neuron &post_neuron = *(con.post_neuron);
-
-    assert(con.synapse_hw != NULL);
-    SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
-    Synapse synapse_data;
-    synapse_data.dest_compartment = con.dest_compartment;
-    while (con.last_updated < ts.timestep)
+    // Construct a simple representation of a spike-processing pipeline, given
+    //  the first and last pipeline H/W units. This is used to create the neuron
+    //  processing and message processing pipelines stored in each core.
+    //  Pipelines are used by the simulator to iterate over units and track
+    //  their activity
+    std::list<PipelinePosition> pipeline;
+    PipelinePosition pos = first_unit;
+    while ((pos != last_unit) && (pos != PIPELINE_END))
     {
-        SIM_TRACE1("Updating synaptic current (last updated:%ld, ts:%ld)\n",
-                con.last_updated, ts.timestep);
-        con.last_updated++;
-        synapse_data.current = con.synapse_model->update();
-    }
-    // Store the synapse in a buffer belonging to the post-synaptic neuron
-    synapse_data.current = con.synapse_model->update(synapse_address, false);
-
-    post_neuron.dendrite_input_synapses.push_back(synapse_data);
-    post_neuron.spike_count++;
-    con.synapse_hw->spikes_processed++;
-    latency += con.synapse_hw->latency_spike_op;
-    TRACE2("Sending spike to nid:%d, current:%lf\n", post_neuron->id,
-            syn.current);
-
-    SIM_TRACE1("(nid:%d.%d->nid:%d.%d) con->current:%lf\n",
-            con.pre_neuron->parent_group_id, con.pre_neuron->id,
-            con.post_neuron->parent_group_id, con.post_neuron->id, con.current);
-
-    if (c.buffer_pos != BUFFER_BEFORE_DENDRITE)
-    {
-        latency += pipeline_update_dendrite(ts, arch, post_neuron);
+        pipeline.push_back(pos);
+        pos = pipeline_next_unit(pos);
     }
 
-    return latency;
+    return pipeline;
 }
 
-double sanafe::pipeline_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n)
+sanafe::PipelinePosition sanafe::pipeline_next_unit(const PipelinePosition pos)
 {
-    double latency;
-    latency = 0.0;
-
-    while (n.dendrite_last_updated < ts.timestep)
+    switch (pos)
     {
-        TRACE2("Updating nid:%d dendritic current "
-               "(last_updated:%d, ts:%ld)\n",
-                n.id, n.dendrite_last_updated, ts.timestep);
-        n.soma_input_charge = n.dendrite_model->update();
-        n.dendrite_last_updated++;
+    case PIPELINE_AXON_IN_UNIT:
+        return PIPELINE_SYNAPSE_UNIT;
+    case PIPELINE_SYNAPSE_UNIT:
+        return PIPELINE_DENDRITE_UNIT;
+    case PIPELINE_DENDRITE_UNIT:
+        return PIPELINE_SOMA_UNIT;
+    case PIPELINE_SOMA_UNIT:
+        return PIPELINE_AXON_OUT_UNIT;
+    case PIPELINE_AXON_OUT_UNIT:
+        return PIPELINE_END;
+    default:
+        throw std::invalid_argument("Error: No valid pipeline unit next.");
     }
-    for (const auto &synapse : n.dendrite_input_synapses)
-    {
-        n.soma_input_charge = n.dendrite_model->update(
-                synapse.current, synapse.dest_compartment, false);
-    }
-    n.dendrite_input_synapses.clear();
-
-    // Finally, send dendritic current to the soma
-    TRACE2("nid:%d updating dendrite, soma_input_charge:%lf\n", n.id,
-            n.soma_input_charge);
-    if (n.core->buffer_pos != BUFFER_BEFORE_SOMA)
-    {
-        latency += pipeline_update_soma(ts, arch, n);
-    }
-
-    return latency;
-}
-
-double sanafe::pipeline_update_soma(Timestep &ts, Architecture &arch, Neuron &n)
-{
-    SomaUnit *const soma = n.soma_hw;
-
-    SIM_TRACE1("nid:%d updating, current_in:%lf\n", n.id, n.soma_input_charge);
-    double latency = 0.0;
-    while (n.soma_last_updated < ts.timestep)
-    {
-        std::optional<double> soma_current_in = std::nullopt;
-        if ((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
-        {
-            soma_current_in = n.soma_input_charge;
-            n.soma_input_charge = 0.0;
-        }
-        n.neuron_status = n.soma_model->update(soma_current_in);
-        if (n.forced_spikes > 0)
-        {
-            n.neuron_status = sanafe::FIRED;
-            n.forced_spikes--;
-        }
-
-        latency += n.soma_hw->latency_access_neuron;
-        if ((n.neuron_status == sanafe::UPDATED) ||
-                (n.neuron_status == sanafe::FIRED))
-        {
-            latency += n.soma_hw->latency_update_neuron;
-            soma->neuron_updates++;
-            if (n.neuron_status == sanafe::FIRED)
-            {
-                SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
-                pipeline_neuron_send_spike_messages(ts, arch, n);
-                latency += n.soma_hw->latency_spiking;
-                soma->neurons_fired++;
-            }
-        }
-
-        n.soma_last_updated++;
-    }
-
-    SIM_TRACE1("neuron status:%d\n", n.neuron_status);
-
-    return latency;
 }

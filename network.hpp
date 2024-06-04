@@ -126,11 +126,12 @@ public:
     int max_connections_out, max_compartments;
     int maps_in_count, maps_out_count;
     double processing_latency;
-    NeuronStatus neuron_status;
+    NeuronStatus status;
 
-    // Input buffers that precede pipeline H/W units
-    double soma_input_charge;
+    // Inputs to H/W units
     std::vector<Synapse> dendrite_input_synapses;
+    double soma_input_charge;
+    bool axon_out_input_fired;
 
     explicit Neuron(const size_t neuron_id);
     int get_id() { return id; }

@@ -21,6 +21,7 @@
 #include "description.hpp"
 #include "network.hpp"
 #include "models.hpp"
+#include "pipeline.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
 
@@ -333,7 +334,7 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
     tile.cores_vec.push_back(c);
 
     // *** Set attributes ***
-    c.buffer_pos = BUFFER_BEFORE_SOMA;
+    c.timestep_buffer_position = PIPELINE_SOMA_UNIT;
     c.max_neurons = 1024;
     for (const auto &a : attr)
     {
@@ -343,7 +344,7 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
         {
             if (value_str == "soma")
             {
-                c.buffer_pos = BUFFER_BEFORE_SOMA;
+                c.timestep_buffer_position = PIPELINE_SOMA_UNIT;
             }
         }
         else if (key == "max_neurons")
@@ -352,6 +353,15 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
             ss >> c.max_neurons;
         }
     }
+
+    // The custom spike processing pipeline in the core is split into two
+    //  halves that operate in parallel: neuron processing and message
+    //  processing. Create simple representations of each of the halves,
+    //  used later to track the sequence of hardware updates in both cases
+    c.neuron_processing_units = pipeline_create_pipeline(
+            c.timestep_buffer_position, PIPELINE_END);
+    c.message_processing_units = pipeline_create_pipeline(
+            PIPELINE_AXON_IN_UNIT, c.timestep_buffer_position);
 
     // Initialize core state
     c.energy = 0.0;

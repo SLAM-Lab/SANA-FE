@@ -556,7 +556,7 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
         for (auto &n : group.neurons)
         {
             n.processing_latency = 0.0;
-            n.neuron_status = sanafe::IDLE;
+            n.status = sanafe::IDLE;
         }
     }
 
@@ -697,7 +697,7 @@ void sanafe::sim_trace_record_spikes(
     {
         for (auto &n : group.neurons)
         {
-            if (n.log_spikes && (n.neuron_status == sanafe::FIRED))
+            if (n.log_spikes && (n.status == sanafe::FIRED))
             {
                 out << n.parent_group_id << "." << n.id << ",";
                 out << timestep;

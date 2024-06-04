@@ -203,7 +203,7 @@ vector<int> sana_fe::get_status(int gid){
 	}
 	for (int i = 0; i < net.groups[gid].neuron_count; ++i)
 	{
-		statuses.push_back(net.groups[gid].neurons[i].neuron_status);
+		statuses.push_back(net.groups[gid].neurons[i].status);
 	}
 	return statuses;
 }

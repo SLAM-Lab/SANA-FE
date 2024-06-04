@@ -70,14 +70,14 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
     id = neuron_id;
     log_spikes = false;
     log_potential = false;
-    neuron_status = sanafe::IDLE;
     spike_count = 0;
     max_connections_out = 0;
     max_compartments = 1;
     forced_spikes = 0;
 
-    soma_input_charge = 0.0;
     dendrite_input_synapses.reserve(max_compartments);
+    soma_input_charge = 0.0;
+    axon_out_input_fired = false;
 
     // Initially the neuron is not mapped to anything
     core = nullptr;

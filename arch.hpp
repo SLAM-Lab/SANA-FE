@@ -29,15 +29,15 @@ namespace sanafe
 class Neuron;
 struct Connection;
 
-enum buffer_positions
+enum PipelinePosition
 {
-    BUFFER_AXON_IN = 0,	// Buffer incoming packets
-    BUFFER_BEFORE_SYNAPSE,		// Buffer synaptic addresses
-    BUFFER_BEFORE_DENDRITE,	// Buffer synaptic current
-    BUFFER_BEFORE_SOMA,		// Buffer dendritic current
-    BUFFER_BEFORE_AXON_OUT,	// Buffer axon addresses i.e. spikes out
-    BUFFER_NETWORK,		// Buffer messages to the network
-    BUFFER_POSITIONS,
+    PIPELINE_AXON_IN_UNIT,
+    PIPELINE_SYNAPSE_UNIT,
+    PIPELINE_DENDRITE_UNIT,
+    PIPELINE_SOMA_UNIT,
+    PIPELINE_AXON_OUT_UNIT,
+    PIPELINE_END,
+ //   PIPELINE_POSITIONS,
 };
 
 struct Message
@@ -164,11 +164,14 @@ public:
     std::vector<Connection *> connections_in;
     std::vector<AxonOutModel> axons_out;
 
+    std::list<PipelinePosition> neuron_processing_units;
+    std::list<PipelinePosition> message_processing_units;
     std::string name;
     Message next_message;  // Since last spike
     size_t max_neurons;
     double energy, latency_after_last_message;
-    int id, offset, parent_tile_id, buffer_pos;
+    int id, offset, parent_tile_id;
+    PipelinePosition timestep_buffer_position;
     int message_count;
 
     Core(const std::string &name, const int core_id, const int tile_id, const int offset);
