@@ -90,17 +90,7 @@ enum ProgramArgs
 };
 
 void sim_timestep(Timestep &ts, Architecture &arch, Network &net);
-void sim_process_neurons(Timestep &ts, Architecture &arch);
-void sim_receive_messages(Timestep &sim, Architecture &arch);
-
-void sim_process_neuron(Timestep &ts, Architecture &arch, Neuron &n);
-double sim_pipeline_receive(Timestep &ts, Architecture &arch, Core &c, Message &m);
-double sim_update_synapse(Timestep &ts, Architecture &arch, Core &c, const int synapse_address);
-double sim_update_dendrite(Timestep &ts, Architecture &arch, Neuron &n);
-double sim_update_soma(Timestep &ts, Architecture &arch, Neuron &n);
 double sim_estimate_network_costs(Tile &src, Tile &dest);
-void sim_neuron_send_spike_message(Timestep &ts, Architecture &arch, Neuron &n);
-
 void sim_reset_measurements(Network &net, Architecture &arch);
 double sim_calculate_energy(const Architecture &arch);
 
