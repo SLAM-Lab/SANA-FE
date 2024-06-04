@@ -9,33 +9,33 @@
 #include "print.hpp"
 
 std::string sanafe::print_format_attributes(
-	const std::map<std::string, std::string> &attr)
+        const std::map<std::string, std::string> &attr)
 {
-	std::string attr_str;
+    std::string attr_str;
 
-	for (const auto &a: attr)
-	{
-		const std::string &key = a.first;
-		const std::string &value_str = a.second;
+    for (const auto &a : attr)
+    {
+        const std::string &key = a.first;
+        const std::string &value_str = a.second;
 
-		attr_str += " ";
-		attr_str += key;
-		attr_str += "=";
-		attr_str += value_str;
-	}
-	return attr_str;
+        attr_str += " ";
+        attr_str += key;
+        attr_str += "=";
+        attr_str += value_str;
+    }
+    return attr_str;
 }
 
 std::string sanafe::print_float(const double val)
 {
-	std::ostringstream ss;
-	ss << val;
-	return ss.str();
+    std::ostringstream ss;
+    ss << val;
+    return ss.str();
 }
 
 std::string sanafe::print_int(const long int val)
 {
-	std::ostringstream ss;
-	ss << val;
-	return ss.str();
+    std::ostringstream ss;
+    ss << val;
+    return ss.str();
 }

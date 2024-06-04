@@ -1,18 +1,18 @@
 #ifndef DESCRIPTION_HEADER_INCLUDED_
 #define DESCRIPTION_HEADER_INCLUDED_
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <string_view>
 #include <cstdio>
+#include <fstream>
+#include <iostream>
+#include <string_view>
+#include <vector>
 
 namespace sanafe
 {
 enum DescriptionRet
 {
-	RET_FAIL = -1,
-	RET_OK = 0, // Anything >= 0 means successfully parsed
+    RET_FAIL = -1,
+    RET_OK = 0, // Anything >= 0 means successfully parsed
 };
 
 // Forward struct declarations

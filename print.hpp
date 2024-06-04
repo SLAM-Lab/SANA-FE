@@ -6,9 +6,9 @@
 #ifndef PRINT_HEADER_INCLUDED_
 #define PRINT_HEADER_INCLUDED_
 
+#include <cstdio>
 #include <map>
 #include <string>
-#include <cstdio>
 
 namespace sanafe
 {

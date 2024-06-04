@@ -16,11 +16,10 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <list>
 #include <memory>
 #include <queue>
-#include <fstream>
-
 
 namespace sanafe
 {
@@ -40,54 +39,54 @@ class Core;
 class Simulation
 {
 public:
-	Simulation(Architecture &arch, Network &net, const std::string &output_dir, const bool record_spikes, const bool record_potentials, const bool record_perf, const bool record_messages);
-	~Simulation();
-	RunData run(const long int timesteps=1, const long int heartbeat=100);
-	//int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
-	double get_power();
-	RunData get_run_summary();
+    Simulation(Architecture &arch, Network &net, const std::string &output_dir, const bool record_spikes, const bool record_potentials, const bool record_perf, const bool record_messages);
+    ~Simulation();
+    RunData run(const long int timesteps=1, const long int heartbeat=100);
+    //int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
+    double get_power();
+    RunData get_run_summary();
 
 private:
-	Architecture &arch;
-	Network &net;
-	std::string out_dir;
-	long int total_neurons_fired, total_timesteps, total_spikes;
-	long int total_messages_sent;
-	double total_energy, total_sim_time, wall_time;
-	bool spike_trace_enabled, potential_trace_enabled;
-	bool perf_trace_enabled, message_trace_enabled;
-	FILE *stats_fp;
-	std::ofstream spike_trace, potential_trace, message_trace, perf_trace;
+    Architecture &arch;
+    Network &net;
+    std::string out_dir;
+    long int total_neurons_fired, total_timesteps, total_spikes;
+    long int total_messages_sent;
+    double total_energy, total_sim_time, wall_time;
+    bool spike_trace_enabled, potential_trace_enabled;
+    bool perf_trace_enabled, message_trace_enabled;
+    FILE *stats_fp;
+    std::ofstream spike_trace, potential_trace, message_trace, perf_trace;
 
-	Timestep step();
-	Simulation(const Simulation &copy);
+    Timestep step();
+    Simulation(const Simulation &copy);
 };
 
 struct RunData
 {
-	long int timestep_start, timesteps_executed;
-	double energy, sim_time, wall_time;
-	long int spikes, packets_sent, neurons_fired;
+    long int timestep_start, timesteps_executed;
+    double energy, sim_time, wall_time;
+    long int spikes, packets_sent, neurons_fired;
 
-	RunData(const long int start, const long int steps);
+    RunData(const long int start, const long int steps);
 };
 
 struct Timestep
 {
-	std::vector<std::list<Message>> messages;
-	long int timestep, spike_count, total_hops, packets_sent;
-	long int neurons_fired;
-	double energy, sim_time;
+    std::vector<std::list<Message>> messages;
+    long int timestep, spike_count, total_hops, packets_sent;
+    long int neurons_fired;
+    double energy, sim_time;
 
-	Timestep(const long int ts, const int core_count);
+    Timestep(const long int ts, const int core_count);
 };
 
 enum ProgramArgs
 {
-	ARCH_FILENAME = 0,
-	NETWORK_FILENAME,
-	TIMESTEPS,
-	PROGRAM_NARGS,
+    ARCH_FILENAME = 0,
+    NETWORK_FILENAME,
+    TIMESTEPS,
+    PROGRAM_NARGS,
 };
 
 void sim_timestep(Timestep &ts, Architecture &arch, Network &net);
