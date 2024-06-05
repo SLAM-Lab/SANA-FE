@@ -28,6 +28,21 @@ namespace sanafe
 
 class Neuron;
 struct Connection;
+struct Message;
+
+class Tile;
+class Core;
+struct AxonInUnit;
+struct SynapseUnit;
+struct DendriteUnit;
+struct SomaUnit;
+struct AxonOutUnit;
+
+struct AxonInModel;
+struct SynapseModel;
+struct DendriteModel;
+struct SomaModel;
+struct AxonOutModel;
 
 enum BufferPosition
 {
@@ -37,27 +52,113 @@ enum BufferPosition
     BUFFER_POSITIONS,
 };
 
+class Architecture
+{
+public:
+    std::vector<std::reference_wrapper<Core> > cores_vec;
+    std::vector<std::reference_wrapper<Tile> > tiles_vec;
+    std::list<Tile> tiles;
+    std::string name;
+    int noc_width, noc_height, noc_buffer_size, max_cores_per_tile;
+
+    Architecture();
+    int get_core_count();
+    int set_noc_attributes(const std::map<std::string, std::string> &attr);
+    Tile &create_tile(const std::string &name, const std::map<std::string, std::string> &attr);
+    Core &create_core(const std::string &name, const size_t tile_id, const std::map<std::string, std::string> &attr);
+    void load_arch_description(const std::filesystem::path &filename);
+    std::string info();
+    std::string description() const;
+    void save_arch_description(const std::filesystem::path &path);
+
+private:
+    bool noc_init;
+    // Do *NOT* allow Architecture objects to be copied
+    //  This is because the Architecture has a lot of allocated state
+    //  from models that are (dynamically) instantiated by the plugin
+    //  mechanism. It is simpler to not allow this state to be copied than
+    //  to try to deal with that.
+    Architecture(const Architecture &copy);
+};
+
 struct Message
 {
-    Neuron *src_neuron;
-    double generation_delay, network_delay, receive_delay;
-    double blocked_latency;
+    double generation_delay, network_delay, receive_delay, blocked_delay;
     double sent_timestamp, received_timestamp, processed_timestamp;
     long int timestep;
     int spikes, hops;
+    int src_neuron_id, src_neuron_group_id;
     int src_x, dest_x, src_y, dest_y;
+    int src_tile_id, src_core_id, src_core_offset;
     int dest_tile_id, dest_core_id, dest_core_offset;
     int dest_axon_hw, dest_axon_id;
-    bool dummy_message, in_noc;
+    bool placeholder, in_noc;
 
-    Message();
+    explicit Message(const Architecture &arch, const Neuron &n, const int timestep);
+    explicit Message(const Architecture &arch, const Neuron &n, const int timestep, const int axon_address);
 };
 
-enum NoiseType
+class Tile
 {
-    NOISE_NONE = -1,
-    NOISE_FILE_STREAM,
-    // TODO: implement different random noise generators
+public:
+    // Use a list of Cores that can be dynamically allocated and appended
+    //  to without reallocation
+    std::list<Core> cores;
+    // Vector of references into the Core object data, giving us random
+    //  access into a list, giving us the best of both worlds
+    std::vector<std::reference_wrapper<Core> > cores_vec;
+    std::string name;
+    double energy;
+    double energy_east_hop, latency_east_hop;
+    double energy_west_hop, latency_west_hop;
+    double energy_north_hop, latency_north_hop;
+    double energy_south_hop, latency_south_hop;
+    long int hops, messages_received, total_neurons_fired;
+    long int east_hops, west_hops, north_hops, south_hops;
+    int id, x, y;
+    int width; // For now just support 2 dimensions
+
+    Tile(const std::string &name, const int tile_id);
+    int get_id() { return id; }
+    std::string info() const;
+    std::string description() const;
+};
+
+class Core
+{
+public:
+    std::vector<AxonInUnit> axon_in_hw;
+    std::vector<SynapseUnit> synapse;
+    std::vector<DendriteUnit> dendrite;
+    std::vector <SomaUnit> soma;
+    std::vector<AxonOutUnit> axon_out_hw;
+
+    std::vector<Message *> messages_in;
+    std::vector<AxonInModel> axons_in;
+    std::vector<Neuron *> neurons;
+    std::vector<Connection *> connections_in;
+    std::vector<AxonOutModel> axons_out;
+
+    std::list<BufferPosition> neuron_processing_units;
+    std::list<BufferPosition> message_processing_units;
+    std::string name;
+    size_t max_neurons;
+    double energy, next_message_generation_delay;
+    int id, offset, parent_tile_id;
+    BufferPosition timestep_buffer_position;
+    int message_count;
+
+    Core(const std::string &name, const int core_id, const int tile_id, const int offset);
+    AxonInUnit &create_axon_in(const std::string &name, const std::map<std::string, std::string> &attr);
+    SynapseUnit &create_synapse(const std::string &name, const std::map<std::string, std::string> &attr);
+    DendriteUnit &create_dendrite(const std::string &name, const std::map<std::string, std::string> &attr);
+    SomaUnit &create_soma(const std::string &name, const std::map<std::string, std::string> &attr);
+    AxonOutUnit &create_axon_out(const std::string &name, const std::map<std::string, std::string> &attr);
+    void map_neuron(Neuron &n);
+    int get_id() { return id; }
+    int get_offset() { return offset; }
+    std::string info() const;
+    std::string description() const;
 };
 
 struct AxonInUnit
@@ -146,97 +247,11 @@ struct AxonOutModel
     int src_neuron_id;
 };
 
-class Core
+enum NoiseType
 {
-public:
-    std::vector<AxonInUnit> axon_in_hw;
-    std::vector<SynapseUnit> synapse;
-    std::vector<DendriteUnit> dendrite;
-    std::vector <SomaUnit> soma;
-    std::vector<AxonOutUnit> axon_out_hw;
-
-    std::vector<Message *> messages_in;
-    std::vector<AxonInModel> axons_in;
-    std::vector<Neuron *> neurons;
-    std::vector<Connection *> connections_in;
-    std::vector<AxonOutModel> axons_out;
-
-    std::list<BufferPosition> neuron_processing_units;
-    std::list<BufferPosition> message_processing_units;
-    std::string name;
-    Message next_message;  // Since last spike
-    size_t max_neurons;
-    double energy, latency_after_last_message;
-    int id, offset, parent_tile_id;
-    BufferPosition timestep_buffer_position;
-    int message_count;
-
-    Core(const std::string &name, const int core_id, const int tile_id, const int offset);
-    AxonInUnit &create_axon_in(const std::string &name, const std::map<std::string, std::string> &attr);
-    SynapseUnit &create_synapse(const std::string &name, const std::map<std::string, std::string> &attr);
-    DendriteUnit &create_dendrite(const std::string &name, const std::map<std::string, std::string> &attr);
-    SomaUnit &create_soma(const std::string &name, const std::map<std::string, std::string> &attr);
-    AxonOutUnit &create_axon_out(const std::string &name, const std::map<std::string, std::string> &attr);
-    void map_neuron(Neuron &n);
-    int get_id() { return id; }
-    int get_offset() { return offset; }
-    std::string info() const;
-    std::string description() const;
-};
-
-class Tile
-{
-public:
-    // Use a list of Cores that can be dynamically allocated and appended
-    //  to without reallocation
-    std::list<Core> cores;
-    // Vector of references into the Core object data, giving us random
-    //  access into a list, giving us the best of both worlds
-    std::vector<std::reference_wrapper<Core> > cores_vec;
-    std::string name;
-    double energy;
-    double energy_east_hop, latency_east_hop;
-    double energy_west_hop, latency_west_hop;
-    double energy_north_hop, latency_north_hop;
-    double energy_south_hop, latency_south_hop;
-    long int hops, messages_received, total_neurons_fired;
-    long int east_hops, west_hops, north_hops, south_hops;
-    int id, x, y;
-    int width; // For now just support 2 dimensions
-
-    Tile(const std::string &name, const int tile_id);
-    int get_id() { return id; }
-    std::string info() const;
-    std::string description() const;
-};
-
-class Architecture
-{
-public:
-    std::vector<std::reference_wrapper<Core> > cores_vec;
-    std::vector<std::reference_wrapper<Tile> > tiles_vec;
-    std::list<Tile> tiles;
-    std::string name;
-    int noc_width, noc_height, noc_buffer_size, max_cores_per_tile;
-
-    Architecture();
-    int get_core_count();
-    int set_noc_attributes(const std::map<std::string, std::string> &attr);
-    Tile &create_tile(const std::string &name, const std::map<std::string, std::string> &attr);
-    Core &create_core(const std::string &name, const size_t tile_id, const std::map<std::string, std::string> &attr);
-    void load_arch_description(const std::filesystem::path &filename);
-    std::string info();
-    std::string description() const;
-    void save_arch_description(const std::filesystem::path &path);
-
-private:
-    bool noc_init;
-    // Do *NOT* allow Architecture objects to be copied
-    //  This is because the Architecture has a lot of allocated state
-    //  from models that are (dynamically) instantiated by the plugin
-    //  mechanism. It is simpler to not allow this state to be copied than
-    //  to try to deal with that.
-    Architecture(const Architecture &copy);
+    NOISE_NONE = -1,
+    NOISE_FILE_STREAM,
+    // TODO: implement different random noise generators
 };
 
 void arch_create_axons(Architecture &arch);

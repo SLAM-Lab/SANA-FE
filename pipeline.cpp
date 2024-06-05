@@ -20,27 +20,19 @@ void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
 #pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < arch.cores_vec.size(); i++)
     {
-        Core &c = arch.cores_vec[i];
-        for (Neuron *n : c.neurons)
+        Core &core = arch.cores_vec[i];
+        for (Neuron *n : core.neurons)
         {
             pipeline_process_neuron(ts, arch, *n);
         }
 
-        if (c.neurons.size() > 0)
+        if (core.next_message_generation_delay != 0.0)
         {
-            // Add a dummy message to account for neuron
-            //  processing that does not result in any sent
-            //  messages. To do this, set the dest neuron
-            //  set as invalid with a 0 receiving latency)
-            Message dummy_message = c.next_message;
-            dummy_message.dummy_message = true;
-            dummy_message.src_neuron = c.neurons.back();
-            dummy_message.receive_delay = 0.0;
-            dummy_message.network_delay = 0.0;
-            dummy_message.hops = 0;
-            dummy_message.timestep = ts.timestep;
-            assert(c.id >= 0);
-            ts.messages[c.id].push_back(dummy_message);
+            // This message accounts for any remaining neuron processing
+            const Neuron &last_neuron = *(core.neurons.back());
+            Message placeholder(arch, last_neuron, ts.timestep);
+            placeholder.generation_delay = core.next_message_generation_delay;
+            ts.messages[core.id].push_back(placeholder);
         }
     }
 }
@@ -53,14 +45,13 @@ void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
     {
         for (auto &m : q)
         {
-            if (!m.dummy_message)
+            if (!m.placeholder)
             {
-                const size_t src_tile_id = m.src_neuron->core->parent_tile_id;
-                assert(src_tile_id < arch.tiles_vec.size());
-                assert(m.dest_tile_id >= 0);
+                assert(static_cast<size_t>(m.src_tile_id) <
+                        arch.tiles_vec.size());
                 assert(static_cast<size_t>(m.dest_tile_id) <
                         arch.tiles_vec.size());
-                Tile &src_tile = arch.tiles_vec[src_tile_id];
+                Tile &src_tile = arch.tiles_vec[m.src_tile_id];
                 Tile &dest_tile = arch.tiles_vec[m.dest_tile_id];
                 m.network_delay =
                         sim_estimate_network_costs(src_tile, dest_tile);
@@ -108,7 +99,7 @@ void sanafe::pipeline_process_neuron(
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
     }
 
-    n.core->next_message.generation_delay += neuron_processing_latency;
+    n.core->next_message_generation_delay += neuron_processing_latency;
     n.spike_count = 0;
 
     return;
@@ -243,14 +234,13 @@ double sanafe::pipeline_process_soma(
         {
             soma_processing_latency += n.soma_hw->latency_update_neuron;
             soma->neuron_updates++;
-
-            if (n.status == sanafe::FIRED)
-            {
-                soma_processing_latency += n.soma_hw->latency_spiking;
-                soma->neurons_fired++;
-                n.axon_out_input_fired = true;
-                SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
-            }
+        }
+        if (n.status == sanafe::FIRED)
+        {
+            soma_processing_latency += n.soma_hw->latency_spiking;
+            soma->neurons_fired++;
+            n.axon_out_input_spike = true;
+            SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
         }
 
         n.soma_last_updated++;
@@ -264,53 +254,26 @@ double sanafe::pipeline_process_soma(
 double sanafe::pipeline_process_axon_out(
         Timestep &ts, Architecture &arch, Neuron &n)
 {
-    if (!n.axon_out_input_fired)
+    if (!n.axon_out_input_spike)
     {
         return 0.0;
     }
 
     TRACE1("nid:%d.%d sending spike message to %lu axons out\n",
             n.parent_group_id, n.id, n.axon_out_addresses.size());
-    for (int address : n.axon_out_addresses)
+    for (int axon_address : n.axon_out_addresses)
     {
-        Core &src_core = *(n.core);
-        const Tile &src_tile = arch.tiles_vec[src_core.parent_tile_id];
-        AxonOutModel &src_axon = src_core.axons_out[address];
-
-        // Generate a spike message
-        Tile &dest_tile = arch.tiles_vec[src_axon.dest_tile_id];
-        Core &dest_core = dest_tile.cores_vec[src_axon.dest_core_offset];
-        AxonInModel &dest_axon = dest_core.axons_in[src_axon.dest_axon_id];
-
-        Message m;
-        m.timestep = ts.timestep;
-        m.src_neuron = &n;
-        m.dest_axon_id = src_axon.dest_axon_id;
-        m.spikes = dest_axon.synapse_addresses.size();
-        m.dummy_message = false;
-        m.dest_tile_id = dest_tile.id;
-        m.dest_core_id = dest_core.id;
-        m.dest_core_offset = dest_core.offset;
-        m.src_x = src_tile.x;
-        m.dest_x = dest_tile.x;
-        m.src_y = src_tile.y;
-        m.dest_y = dest_tile.y;
-        // TODO: support multiple axon output units, included in the synapse
-        m.dest_axon_hw = 0;
-
+        Message m(arch, n, ts.timestep, axon_address);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
-        m.generation_delay += src_core.next_message.generation_delay +
-                axon_out_hw.latency_access;
-        m.network_delay = 0.0;
-        m.receive_delay = 0.0;
-        axon_out_hw.packets_out++;
 
-        ts.messages[src_core.id].push_back(m);
-        // Reset the next message in this core
-        src_core.next_message = Message();
+        m.generation_delay = n.core->next_message_generation_delay;
+        n.core->next_message_generation_delay = 0.0;
+        m.generation_delay += axon_out_hw.latency_access;
+        ts.messages[n.core->id].push_back(m);
+        axon_out_hw.packets_out++;
     }
-    n.axon_out_input_fired = false;
+    n.axon_out_input_spike = false;
 
     return n.axon_out_hw->latency_access;
 }

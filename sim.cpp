@@ -574,7 +574,7 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
         {
             // Reset core
             c.energy = 0.0;
-            c.next_message = Message();
+            c.next_message_generation_delay = 0.0;
 
             for (std::vector<AxonInUnit>::size_type k = 0;
                     k < c.axon_in_hw.size(); k++)
@@ -752,17 +752,11 @@ void sanafe::sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts)
 void sanafe::sim_trace_record_message(std::ofstream &out, const Message &m)
 {
     assert(out.is_open());
-
     out << m.timestep << ",";
-    assert(m.src_neuron != nullptr);
-    out << m.src_neuron->parent_group_id << ".";
-    out << m.src_neuron->id << ",";
+    out << m.src_neuron_group_id << "." << m.src_neuron_id << ",";
+    out << m.src_tile_id << "." << m.src_core_offset << ",";
 
-    assert(m.src_neuron->core != nullptr);
-    out << m.src_neuron->core->parent_tile_id << ".";
-    out << m.src_neuron->core->offset << ",";
-
-    if (m.dummy_message)
+    if (m.placeholder)
     {
         out << "x.x,";
     }
@@ -776,7 +770,7 @@ void sanafe::sim_trace_record_message(std::ofstream &out, const Message &m)
     out << m.generation_delay << ",";
     out << m.network_delay << ",";
     out << m.receive_delay << ",";
-    out << m.blocked_latency << ",";
+    out << m.blocked_delay << ",";
 
     out << std::endl;
 

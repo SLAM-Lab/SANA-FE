@@ -77,7 +77,7 @@ sanafe::Neuron::Neuron(const size_t neuron_id)
 
     dendrite_input_synapses.reserve(max_compartments);
     soma_input_charge = 0.0;
-    axon_out_input_fired = false;
+    axon_out_input_spike = false;
 
     // Initially the neuron is not mapped to anything
     core = nullptr;

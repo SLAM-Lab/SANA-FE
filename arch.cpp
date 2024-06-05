@@ -118,34 +118,63 @@ std::string sanafe::Architecture::description() const
     return ss.str();
 }
 
-sanafe::Message::Message()
+sanafe::Message::Message(
+        const Architecture &arch, const Neuron &n, const int ts)
 {
-    // Initialize message variables. Mark most fields as invalid either
-    //  using NaN or -Inf values where possible.
-    src_neuron = nullptr;
+    // If no axon was given create a message with no destination. By
+    //  default, messages without destinations act as a placeholder for neuron
+    //  processing
+    const Core &src_core = *(n.core);
+    const Tile &src_tile = arch.tiles_vec[src_core.parent_tile_id];
 
-    dummy_message = false;
+    placeholder = true;
+    src_neuron_id = n.id;
+    src_neuron_group_id = n.parent_group_id;
+    src_x = src_tile.x;
+    src_y = src_tile.y;
+    src_tile_id = src_tile.id;
+    src_core_id = src_core.id;
+    src_core_offset = src_core.offset;
+    timestep = ts;
+
     generation_delay = 0.0;
-    network_delay = NAN;
-    receive_delay = NAN;
-    blocked_latency = 0.0;
-    hops = -1;
-    spikes = -1;
+    network_delay = 0.0;
+    receive_delay = 0.0;
+    blocked_delay = 0.0;
     sent_timestamp = -std::numeric_limits<double>::infinity();
     received_timestamp = -std::numeric_limits<double>::infinity();
     processed_timestamp = -std::numeric_limits<double>::infinity();
-    timestep = -1;
-    in_noc = false;
 
-    src_x = -1;
-    src_y = -1;
-    dest_x = -1;
-    dest_y = -1;
-    dest_core_offset = -1;
-    dest_core_id = -1;
-    dest_tile_id = -1;
-    dest_axon_id = -1;
-    dest_axon_hw = -1;
+    dest_x = 0;
+    dest_y = 0;
+    dest_core_offset = 0;
+    dest_core_id = 0;
+    dest_tile_id = 0;
+    dest_axon_id = 0;
+    dest_axon_hw = 0;
+    in_noc = false;
+}
+
+sanafe::Message::Message(const Architecture &arch, const Neuron &n,
+        const int ts, const int axon_address)
+        : Message(arch, n, ts)
+{
+    const Core &src_core = *(n.core);
+    const AxonOutModel &src_axon = src_core.axons_out[axon_address];
+    const Tile &dest_tile = arch.tiles_vec[src_axon.dest_tile_id];
+    const Core &dest_core = dest_tile.cores_vec[src_axon.dest_core_offset];
+    const AxonInModel &dest_axon = dest_core.axons_in[src_axon.dest_axon_id];
+
+    placeholder = false;
+    spikes = dest_axon.synapse_addresses.size();
+    dest_x = dest_tile.x;
+    dest_y = dest_tile.y;
+    dest_tile_id = dest_tile.id;
+    dest_core_id = dest_core.id;
+    dest_core_offset = dest_core.offset;
+    dest_axon_id = src_axon.dest_axon_id;
+    // TODO: support multiple axon output units, included in the synapse
+    dest_axon_hw = 0;
 }
 
 sanafe::Tile::Tile(const std::string &name, const int tile_id)
@@ -198,7 +227,7 @@ sanafe::Core::Core(const std::string &name, const int core_id,
     parent_tile_id = tile_id;
     offset = core_offset;
     energy = 0.0;
-    latency_after_last_message = 0.0;
+    next_message_generation_delay = 0.0;
 }
 
 sanafe::Tile &sanafe::Architecture::create_tile(
@@ -371,7 +400,7 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
 
     // Initialize core state
     c.energy = 0.0;
-    c.next_message = Message();
+    c.next_message_generation_delay = 0.0;
 
     max_cores_per_tile =
             std::max<size_t>(max_cores_per_tile, tile.cores.size());

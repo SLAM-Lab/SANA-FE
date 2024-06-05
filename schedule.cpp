@@ -87,7 +87,7 @@ double sanafe::schedule_messages(
         //  Dummy messages account for processing time that does not
         //  result in any spike messages. Otherwise, messages are sent
         //  from a src neuron to a dest neuron
-        if (!m.dummy_message)
+        if (!m.placeholder)
         {
             TRACE1("Processing message for nid:%d.%d\n",
                     m.src_neuron->parent_group_id, m.src_neuron->id);
@@ -135,7 +135,7 @@ double sanafe::schedule_messages(
         }
 
         // Get the next message for this core
-        const size_t src_core = m.src_neuron->core->id;
+        const size_t src_core = m.src_core_id;
         if (messages_sent_per_core[src_core].size() > 0)
         {
             auto &q = messages_sent_per_core[src_core];
@@ -177,8 +177,6 @@ void sanafe::schedule_update_noc_message_counts(
 {
     // Update the tracked state of the NoC, accounting for a single message
     //  either entering or leaving the NoC (message_in)
-    assert(m.src_neuron != nullptr);
-
     // Go along x path, then y path (dimension order routing), and increment
     //  or decrement counter depending on whether a message is coming in or
     //  out
@@ -210,8 +208,8 @@ void sanafe::schedule_update_noc_message_counts(
     {
         y_increment = -1;
     }
-    assert(m.src_neuron->core->offset == m.src_neuron->core->offset);
-    int prev_direction = sanafe::ndirections + (m.src_neuron->core->offset);
+    assert(m.src_core_offset == m.src_core_offset);
+    int prev_direction = sanafe::ndirections + (m.src_core_offset);
     for (int x = m.src_x; x != m.dest_x; x += x_increment)
     {
         int direction;
@@ -225,8 +223,8 @@ void sanafe::schedule_update_noc_message_counts(
         }
         if (x == m.src_x)
         {
-            assert(m.src_neuron->core->offset == m.src_neuron->core->offset);
-            const int link = sanafe::ndirections + (m.src_neuron->core->offset);
+            assert(m.src_core_offset == m.src_core_offset);
+            const int link = sanafe::ndirections + (m.src_core_offset);
             noc.message_density[noc.idx(x, m.src_y, link)] += adjust;
         }
         else
@@ -248,7 +246,7 @@ void sanafe::schedule_update_noc_message_counts(
         }
         if ((m.src_x == m.dest_x) && (y == m.src_y))
         {
-            const int link = sanafe::ndirections + m.src_neuron->core->offset;
+            const int link = sanafe::ndirections + m.src_core_offset;
             noc.message_density[noc.idx(m.dest_x, y, link)] += adjust;
         }
         else
@@ -261,8 +259,8 @@ void sanafe::schedule_update_noc_message_counts(
 
     if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
     {
-        assert(m.src_neuron->core->offset == m.src_neuron->core->offset);
-        const int link = sanafe::ndirections + (m.src_neuron->core->offset);
+        assert(m.src_core_offset == m.src_core_offset);
+        const int link = sanafe::ndirections + (m.src_core_offset);
         noc.message_density[noc.idx(m.dest_x, m.dest_y, link)] += adjust;
     }
     else
@@ -325,7 +323,7 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
     {
         y_increment = -1;
     }
-    int prev_direction = sanafe::ndirections + (m.src_neuron->core->offset);
+    int prev_direction = sanafe::ndirections + (m.src_core_offset);
     for (int x = m.src_x; x != m.dest_x; x += x_increment)
     {
         int direction = 0;
@@ -339,7 +337,7 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
         }
         if (x == m.src_x)
         {
-            const int link = sanafe::ndirections + m.src_neuron->core->offset;
+            const int link = sanafe::ndirections + m.src_core_offset;
             flow_density += noc.message_density[noc.idx(x, m.src_y, link)];
         }
         else
@@ -361,7 +359,7 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
         }
         if (m.src_x == m.dest_x && y == m.src_y)
         {
-            const int link = sanafe::ndirections + m.src_neuron->core->offset;
+            const int link = sanafe::ndirections + m.src_core_offset;
             flow_density += noc.message_density[noc.idx(m.dest_x, y, link)];
         }
         else
@@ -374,7 +372,7 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
     // Handle the last (destination) tile
     if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
     {
-        const int link = sanafe::ndirections + m.src_neuron->core->offset;
+        const int link = sanafe::ndirections + m.src_core_offset;
         flow_density += noc.message_density[noc.idx(m.dest_x, m.dest_y, link)];
     }
     else
