@@ -134,7 +134,7 @@ struct AxonOutUnit
 
 struct AxonInModel
 {
-    // List of all neuron connections to send spike to
+    // List of all neuron connections to send spikes to
     std::vector<int> synapse_addresses;
 
     Message *message;

@@ -127,30 +127,67 @@ void sanafe::pipeline_process_neuron(
     n.spike_count = 0;
 }
 
+// These two functions will look the same... there is no need for the complexity
+//  twice
 double sanafe::pipeline_process_message(
-        Timestep &ts, Architecture &arch, Core &c, Message &m)
+        Timestep &ts, Architecture &arch, Core &core, Message &m)
 {
     // We receive a spike and process up to the time-step buffer
     double message_processing_latency = 0.0;
 
     SIM_TRACE1("Receiving messages for cid:%d\n", c.id);
     // TODO: move this check before
-    if (c.timestep_buffer_position >= PIPELINE_SYNAPSE_UNIT)
+
+    AxonInModel &axon_model = core.axons_in[m.dest_axon_id];
+    for (const auto &next_hw_unit : core.message_processing_units)
     {
-        assert(m.dest_axon_id >= 0);
-        assert(static_cast<size_t>(m.dest_axon_id) < c.axons_in.size());
-        AxonInModel &a = c.axons_in[m.dest_axon_id];
-
-        assert(m.dest_axon_hw >= 0);
-        assert(static_cast<size_t>(m.dest_axon_hw) < c.axon_in_hw.size());
-
-        AxonInUnit &hw = c.axon_in_hw[m.dest_axon_hw];
-        message_processing_latency += hw.latency_spike_message;
-        hw.spike_messages_in++;
-        for (int s : a.synapse_addresses)
+        switch (next_hw_unit)
         {
-            message_processing_latency +=
-                    pipeline_process_synapse(ts, arch, c, s);
+        case PIPELINE_AXON_IN_UNIT:
+        {
+            assert(m.dest_axon_id >= 0);
+            assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
+
+            assert(m.dest_axon_hw >= 0);
+            assert(static_cast<size_t>(m.dest_axon_hw) < core.axon_in_hw.size());
+
+            AxonInUnit &hw = core.axon_in_hw[m.dest_axon_hw];
+            message_processing_latency += hw.latency_spike_message;
+            hw.spike_messages_in++;
+            break;
+        }
+        case PIPELINE_SYNAPSE_UNIT:
+        {
+            // This is where it gets tricky, and this is why I used recursion
+            //  simply iterating over the pipeline isn't enough. One synapse unit can
+            //  result in multiple calls to the soma unit... so does this require
+            //  more in depth thinking. We basically need to create a stack - manual
+            //  recursion, but explicit recursion. Should we push into a pipeline processing
+            //  stack instead. Is it just synapses that have this format?
+            //  So for messages, we need an additional stack maybe? only for message processing?
+            //  but if we buffer before the axon, we have the same problem...
+            for (const int synapse_address : axon_model.synapse_addresses)
+            {
+                Connection &con = *(core.connections_in[synapse_address]);
+                message_processing_latency +=
+                        pipeline_process_synapse(ts, arch, con, synapse_address);
+            }
+            break;
+        }
+        case PIPELINE_DENDRITE_UNIT:
+            // Where to get n from
+            throw std::invalid_argument("should be supported soon...");
+            //
+            //message_processing_latency += pipeline_process_dendrite(ts, arch, n);
+            break;
+        case PIPELINE_SOMA_UNIT:
+            throw std::invalid_argument("Not supported");
+            break;
+        case PIPELINE_AXON_OUT_UNIT:
+            throw std::invalid_argument("Not supported");
+            break;
+        default:
+            break;
         }
     }
 
@@ -158,14 +195,13 @@ double sanafe::pipeline_process_message(
 }
 
 double sanafe::pipeline_process_synapse(
-        Timestep &ts, Architecture &arch, Core &c, const int synapse_address)
+        Timestep &ts, Architecture &arch, Connection &con, const int synapse_address)
 {
     // Update all synapses to different neurons in one core. If a synaptic
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
     //  update filtered current and any other connection properties
     double latency;
     latency = 0.0;
-    Connection &con = *(c.connections_in[synapse_address]);
     Neuron &post_neuron = *(con.post_neuron);
 
     assert(con.synapse_hw != NULL);
@@ -192,11 +228,6 @@ double sanafe::pipeline_process_synapse(
     SIM_TRACE1("(nid:%d.%d->nid:%d.%d) con->current:%lf\n",
             con.pre_neuron->parent_group_id, con.pre_neuron->id,
             con.post_neuron->parent_group_id, con.post_neuron->id, con.current);
-
-    if (c.timestep_buffer_position != PIPELINE_DENDRITE_UNIT)
-    {
-        latency += pipeline_process_dendrite(ts, arch, post_neuron);
-    }
 
     return latency;
 }
