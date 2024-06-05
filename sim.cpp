@@ -15,8 +15,6 @@
 #include <sstream>
 #include <vector>
 
-//#include <omp.h>
-
 #include "arch.hpp"
 #include "models.hpp"
 #include "network.hpp"
@@ -555,7 +553,6 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
     {
         for (auto &n : group.neurons)
         {
-            n.processing_latency = 0.0;
             n.status = sanafe::IDLE;
         }
     }

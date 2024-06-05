@@ -125,7 +125,6 @@ public:
     int soma_last_updated, dendrite_last_updated;
     int max_connections_out, max_compartments;
     int maps_in_count, maps_out_count;
-    double processing_latency;
     NeuronStatus status;
 
     // Inputs to H/W units
@@ -160,7 +159,7 @@ struct Connection
 struct Synapse
 {
     double current;
-    int dest_compartment;
+    size_t dest_compartment;
 };
 
 struct Compartment

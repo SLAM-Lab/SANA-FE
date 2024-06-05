@@ -334,7 +334,7 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
     tile.cores_vec.push_back(c);
 
     // *** Set attributes ***
-    c.timestep_buffer_position = PIPELINE_SOMA_UNIT;
+    c.timestep_buffer_position = BUFFER_BEFORE_SOMA_UNIT;
     c.max_neurons = 1024;
     for (const auto &a : attr)
     {
@@ -342,9 +342,24 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
         const std::string &value_str = a.second;
         if (key == "buffer_before")
         {
-            if (value_str == "soma")
+            if (value_str == "dendrite")
             {
-                c.timestep_buffer_position = PIPELINE_SOMA_UNIT;
+                c.timestep_buffer_position = BUFFER_BEFORE_DENDRITE_UNIT;
+            }
+            else if (value_str == "soma")
+            {
+                c.timestep_buffer_position = BUFFER_BEFORE_SOMA_UNIT;
+            }
+            else if (value_str == "axon_out")
+            {
+                c.timestep_buffer_position = BUFFER_BEFORE_AXON_OUT_UNIT;
+            }
+            else
+            {
+                INFO("Error: Buffer position %s not supported",
+                        value_str.c_str());
+                throw std::invalid_argument(
+                        "Error: Buffer position not supported");
             }
         }
         else if (key == "max_neurons")
@@ -353,15 +368,6 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
             ss >> c.max_neurons;
         }
     }
-
-    // The custom spike processing pipeline in the core is split into two
-    //  halves that operate in parallel: neuron processing and message
-    //  processing. Create simple representations of each of the halves,
-    //  used later to track the sequence of hardware updates in both cases
-    c.neuron_processing_units =
-            pipeline_create_pipeline(c.timestep_buffer_position, PIPELINE_END);
-    c.message_processing_units = pipeline_create_pipeline(
-            PIPELINE_AXON_IN_UNIT, c.timestep_buffer_position);
 
     // Initialize core state
     c.energy = 0.0;
@@ -776,11 +782,11 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
         arch_add_connection_to_axon(curr_connection, post_core);
 
         // Map to synapse hardware unit
-        curr_connection.synapse_hw = &(pre_neuron.core->synapse[0]);
+        curr_connection.synapse_hw = &(post_core.synapse[0]);
         if (curr_connection.synapse_hw_name.length() > 0)
         {
             bool synapse_found = false;
-            for (auto &synapse_hw : pre_neuron.core->synapse)
+            for (auto &synapse_hw : post_core.synapse)
             {
                 if (curr_connection.synapse_hw_name == synapse_hw.name)
                 {
