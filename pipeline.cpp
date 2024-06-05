@@ -92,9 +92,7 @@ void sanafe::pipeline_process_neuron(
     {
         neuron_processing_latency += pipeline_process_soma(ts, arch, n);
     }
-    if ((n.core->timestep_buffer_position <= BUFFER_BEFORE_DENDRITE_UNIT) ||
-            (n.core->timestep_buffer_position == BUFFER_BEFORE_SOMA_UNIT) ||
-            (n.core->timestep_buffer_position <= BUFFER_BEFORE_AXON_OUT_UNIT))
+    if (n.core->timestep_buffer_position <= BUFFER_BEFORE_AXON_OUT_UNIT)
     {
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
     }
