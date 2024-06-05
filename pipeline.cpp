@@ -37,7 +37,7 @@ void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
     }
 }
 
-void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
+void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
 {
     // Assign outgoing spike messages to their respective destination
     //  cores, and calculate network costs
@@ -47,19 +47,7 @@ void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
         {
             if (!m.placeholder)
             {
-                assert(static_cast<size_t>(m.src_tile_id) <
-                        arch.tiles_vec.size());
-                assert(static_cast<size_t>(m.dest_tile_id) <
-                        arch.tiles_vec.size());
-                Tile &src_tile = arch.tiles_vec[m.src_tile_id];
-                Tile &dest_tile = arch.tiles_vec[m.dest_tile_id];
-                m.network_delay =
-                        sim_estimate_network_costs(src_tile, dest_tile);
-                m.hops = abs(src_tile.x - dest_tile.x) +
-                        abs(src_tile.y - dest_tile.y);
-
-                Core &core = dest_tile.cores_vec[m.dest_core_offset];
-                core.messages_in.push_back(&m);
+                pipeline_receive_message(arch, m);
             }
         }
     }
@@ -78,23 +66,35 @@ void sanafe::pipeline_receive_messages(Timestep &ts, Architecture &arch)
     }
 }
 
+void sanafe::pipeline_receive_message(Architecture &arch, Message &m)
+{
+    assert(static_cast<size_t>(m.src_tile_id) < arch.tiles_vec.size());
+    assert(static_cast<size_t>(m.dest_tile_id) < arch.tiles_vec.size());
+    Tile &src_tile = arch.tiles_vec[m.src_tile_id];
+    Tile &dest_tile = arch.tiles_vec[m.dest_tile_id];
+    m.network_delay = sim_estimate_network_costs(src_tile, dest_tile);
+    m.hops = abs(src_tile.x - dest_tile.x) + abs(src_tile.y - dest_tile.y);
+
+    Core &core = dest_tile.cores_vec[m.dest_core_offset];
+    core.messages_in.push_back(&m);
+}
+
 void sanafe::pipeline_process_neuron(
         Timestep &ts, Architecture &arch, Neuron &n)
 {
     SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
     double neuron_processing_latency = 0.0;
-    if (n.core->timestep_buffer_position == BUFFER_BEFORE_DENDRITE_UNIT)
+    if (n.core->timestep_buffer_position <= BUFFER_BEFORE_DENDRITE_UNIT)
     {
         neuron_processing_latency += pipeline_process_dendrite(ts, arch, n);
     }
-    if ((n.core->timestep_buffer_position == BUFFER_BEFORE_DENDRITE_UNIT) ||
-            (n.core->timestep_buffer_position == BUFFER_BEFORE_SOMA_UNIT))
+    if (n.core->timestep_buffer_position <= BUFFER_BEFORE_SOMA_UNIT)
     {
         neuron_processing_latency += pipeline_process_soma(ts, arch, n);
     }
-    if ((n.core->timestep_buffer_position == BUFFER_BEFORE_DENDRITE_UNIT) ||
+    if ((n.core->timestep_buffer_position <= BUFFER_BEFORE_DENDRITE_UNIT) ||
             (n.core->timestep_buffer_position == BUFFER_BEFORE_SOMA_UNIT) ||
-            (n.core->timestep_buffer_position == BUFFER_BEFORE_AXON_OUT_UNIT))
+            (n.core->timestep_buffer_position <= BUFFER_BEFORE_AXON_OUT_UNIT))
     {
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
     }

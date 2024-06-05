@@ -9,10 +9,10 @@ struct Architecture;
 struct Timestep;
 
 void pipeline_process_neurons(Timestep &ts, Architecture &arch);
-void pipeline_receive_messages(Timestep &ts, Architecture &arch);
-
+void pipeline_process_messages(Timestep &ts, Architecture &arch);
 
 void pipeline_process_neuron(Timestep &ts, Architecture &arch, Neuron &n);
+void pipeline_receive_message(Architecture &arch, Message &m);
 double pipeline_process_message(Timestep &ts, Architecture &arch, Core &c, Message &m);
 
 double pipeline_process_axon_in(Core &core, const Message &m);

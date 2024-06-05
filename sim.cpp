@@ -317,7 +317,7 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
     sim_reset_measurements(net, arch);
 
     pipeline_process_neurons(ts, arch);
-    pipeline_receive_messages(ts, arch);
+    pipeline_process_messages(ts, arch);
 
     scheduler.noc_width = arch.noc_width;
     scheduler.noc_height = arch.noc_height;
