@@ -70,7 +70,6 @@ double sanafe::SingleCompartmentModel::update(
     if (step)
     {
         accumulated_charge *= leak_decay;
-        //INFO("accumulated:%e\n", accumulated_charge);
     }
     if (synapse_in.has_value())
     {
@@ -112,28 +111,26 @@ double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
     if (step)
     {
         const size_t taps = tap_voltages.size();
-        // Avoid reallocating this temporary buffer every time
         for (size_t t = 0; t < taps; t++)
         {
-            next_voltages[t] = 0.0;
+            next_voltages[t] = tap_voltages[t] * time_constants[t];
         }
-        for (size_t dest_tap = 0; dest_tap < taps; dest_tap++)
+        for (size_t src_tap = 0; src_tap < taps; src_tap++)
         {
-            next_voltages[dest_tap] +=
-                    tap_voltages[dest_tap] * time_constants[dest_tap];
-            if (dest_tap > 0)
+            if (src_tap > 0)
             {
-                const double distal_current = tap_voltages[dest_tap - 1] *
-                        space_constants[dest_tap - 1];
-                next_voltages[dest_tap] += distal_current;
-                next_voltages[dest_tap - 1] -= distal_current;
+                const double proximal_current = tap_voltages[src_tap] *
+                        space_constants[src_tap - 1];
+                next_voltages[src_tap - 1] += proximal_current;
+                next_voltages[src_tap] -= proximal_current;
+                //INFO("t%ld proximal current:%lf ", src_tap, proximal_current);
             }
-            if (dest_tap < (taps - 1))
+            if (src_tap < (taps - 1))
             {
-                const double proximal_current = tap_voltages[dest_tap + 1] *
-                        space_constants[dest_tap + 1];
-                next_voltages[dest_tap] += proximal_current;
-                next_voltages[dest_tap + 1] -= proximal_current;
+                const double distal_current = tap_voltages[src_tap] *
+                        space_constants[src_tap];
+                next_voltages[src_tap + 1] += distal_current;
+                next_voltages[src_tap] -= distal_current;
             }
         }
         for (size_t t = 0; t < taps; t++)
@@ -146,9 +143,9 @@ double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
         const Synapse &syn = synapse_in.value();
         int compartment = 0;
         // TODO: when we have attributes preparsed this will be easier
-        if (syn.attributes.find("dest_compartment") != syn.attributes.end())
+        if (syn.attributes.find("tap") != syn.attributes.end())
         {
-            compartment = field_to_int(syn.attributes.find("dest_compartment")->second);
+            compartment = field_to_int(syn.attributes.find("tap")->second);
         }
         assert(compartment >= 0);
         assert((size_t) compartment < tap_voltages.size());
@@ -168,6 +165,7 @@ void sanafe::MultiTapModel1D::set_attributes(
         const std::string &value_str = a.second;
         std::istringstream ss(value_str);
 
+        /*
         if (key == "taps")
         {
             int taps;
@@ -181,82 +179,50 @@ void sanafe::MultiTapModel1D::set_attributes(
             time_constants = std::vector<double>(taps, 0.0);
             space_constants = std::vector<double>(taps-1, 0.0);
         }
-        if (key.find("time_constant"))
+        */
+        if (key.find("time_constant") != std::string::npos)
         {
-            // TODO: support list attribute
+            const size_t start_pos = key.find("[") + 1;
+            const size_t end_pos = key.find("]");
+            std::istringstream compartment_ss(
+                    key.substr(start_pos, end_pos - start_pos));
             // E.g., time_constant[0], time_constant[1]
+            size_t compartment;
+            compartment_ss >> compartment;
+            // TODO: hacky way to allow for any order of attributes to be
+            //  supported.  When this a list of values then it'll get easier
+            if ((compartment+1) > time_constants.size())
+            {
+                tap_voltages.resize(compartment+1);
+                next_voltages.resize(compartment+1);
+                time_constants.resize(compartment+1);
+                space_constants.resize(compartment+1);
+            }
+            ss >> time_constants[compartment];
         }
-        if (key.find("space_constant"))
+        if (key.find("space_constant") != std::string::npos)
         {
-            // E.g.,
+            // TODO: hacky way to allow for any order of attributes to be
+            //  supported.  When this a list of values then it'll get easier
+            const size_t start_pos = key.find("[") + 1;
+            const size_t end_pos = key.find("]");
+            INFO("start%ld end:%ld\n", start_pos, end_pos);
+            std::istringstream compartment_ss(
+                    key.substr(start_pos, end_pos - start_pos));
+            size_t compartment;
+            compartment_ss >> compartment;
+
+            if ((compartment+1) > space_constants.size())
+            {
+                tap_voltages.resize(compartment+2);
+                next_voltages.resize(compartment+2);
+                time_constants.resize(compartment+2);
+                space_constants.resize(compartment+1);
+            }
+            ss >> space_constants[compartment];
         }
     }
 }
-
-/*
-void sanafe::MultiTapModel::set_attributes(const size_t compartment_id,
-        const std::map<std::string, std::string> &attr)
-{
-    const size_t taps = tap_voltages.size();
-    if (compartment_id >= taps)
-    {
-        throw std::invalid_argument("Error: Compartment out of range");
-    }
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-
-        if (key == "time_constant")
-        {
-            double time_constant;
-            ss >> time_constant;
-            const size_t taps = tap_voltages.size();
-            const size_t idx = (taps * compartment_id) + compartment_id;
-            weights[idx] = time_constant;
-        }
-    }
-}
-
-void sanafe::MultiTapModel::set_attributes(const size_t src_compartment_id,
-        const size_t dest_compartment_id,
-        const std::map<std::string, std::string> &attr)
-{
-    const size_t taps = tap_voltages.size();
-    if (src_compartment_id >= taps)
-    {
-        throw std::invalid_argument("Error: src compartment out of range");
-    }
-    if (dest_compartment_id >= taps)
-    {
-        throw std::invalid_argument("Error: dest compartment out of range");
-    }
-
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-
-        if (key == "space_constant")
-        {
-            double space_constant;
-            ss >> space_constant;
-            const size_t taps = tap_voltages.size();
-            const size_t idx =
-                    (taps * src_compartment_id) + dest_compartment_id;
-            weights[idx] = space_constant;
-            // Update the src compartment, subtracting some of its
-            //  potential which is added to the destination
-            //  compartment. Formulate this for the matrix mul
-            const size_t src_identity =
-                    (src_compartment_id * taps) + src_compartment_id;
-            weights[src_identity] -= space_constant;
-        }
-    }
-}
-*/
 
 // **** Soma models ****
 sanafe::LoihiLifModel::LoihiLifModel(const int gid, const int nid)
