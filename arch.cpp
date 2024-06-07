@@ -1000,18 +1000,6 @@ void sanafe::Core::map_neuron(Neuron &n)
         // Global attributes for all compartments in the dendrite
         n.dendrite_model->set_attributes(group.default_attributes);
         n.dendrite_model->set_attributes(n.attributes);
-        // Set compartment specific attributes
-        for (auto &compartment : n.dendrite_compartments)
-        {
-            n.dendrite_model->set_attributes(
-                    compartment.id, compartment.attributes);
-        }
-        // Set branch specific attributes
-        for (auto &branch : n.dendrite_branches)
-        {
-            n.dendrite_model->set_attributes(branch.src_compartment_id,
-                    branch.dest_compartment_id, branch.attributes);
-        }
     }
 
     return;

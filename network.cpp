@@ -29,7 +29,6 @@ sanafe::Connection::Connection(const int connection_id)
     pre_neuron = nullptr;
     post_neuron = nullptr;
     synapse_hw = nullptr;
-    dest_compartment = 0UL;
     last_updated = 0;
     delay = 0;
 }
@@ -181,6 +180,7 @@ NeuronGroup &sanafe::Network::create_neuron_group(
     return group;
 }
 
+/*
 void sanafe::Neuron::create_compartment(
         const std::map<std::string, std::string> &compartment_attr)
 {
@@ -209,6 +209,7 @@ void sanafe::Neuron::create_branch(const size_t src_compartment_id,
 
     return;
 }
+*/
 
 std::string sanafe::NeuronGroup::description() const
 {
@@ -271,7 +272,6 @@ void sanafe::Neuron::set_attributes(
 
     assert(connections_out.size() == 0);
     connections_out.reserve(max_connections_out);
-    dendrite_compartments.reserve(max_compartments);
     if (soma_model != nullptr)
     {
         soma_model->set_attributes(attr);
@@ -346,15 +346,12 @@ void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
 
         Neuron &src = neurons[src_id];
         Neuron &dest = dest_group.neurons[dest_id];
-        // TODO: support dendrite compartment as an optional argument
-        const size_t dest_compartment_id = 0;
-        src.connect_to_neuron(dest, dest_compartment_id, attr);
+        src.connect_to_neuron(dest, attr);
         edge_id++;
     }
 }
 
 void sanafe::Neuron::connect_to_neuron(Neuron &dest,
-        const size_t dest_compartment_id,
         const std::map<std::string, std::string> &attr)
 {
     connections_out.push_back(Connection(connections_out.size()));
@@ -362,13 +359,11 @@ void sanafe::Neuron::connect_to_neuron(Neuron &dest,
     con.pre_neuron = this;
     con.post_neuron = &dest;
     con.synapse_hw_name = default_synapse_hw_name;
-    con.dest_compartment = dest_compartment_id;
 
     for (auto a : attr)
     {
         const std::string &key = a.first;
         const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
         if (key == "hw_name")
         {
             con.synapse_hw_name = value_str;

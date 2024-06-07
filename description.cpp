@@ -224,6 +224,7 @@ void sanafe::description_read_arch_entry(
     return;
 }
 
+/*
 void sanafe::parse_neuron_with_compartment_field(
         const std::string_view &neuron_field, size_t &group_id,
         size_t &neuron_id, std::optional<size_t> &compartment_id)
@@ -242,6 +243,7 @@ void sanafe::parse_neuron_with_compartment_field(
 
     return;
 }
+*/
 
 void sanafe::parse_neuron_field(const std::string_view &neuron_field,
         size_t &group_id, size_t &neuron_id)
@@ -278,9 +280,8 @@ void sanafe::parse_core_field(const std::string_view &core_field,
 }
 
 void sanafe::parse_edge_field(const std::string_view &edge_field,
-        size_t &group_id, size_t &neuron_id,
-        std::optional<size_t> &compartment_id, size_t &dest_group_id,
-        size_t &dest_neuron_id, std::optional<size_t> &dest_compartment_id)
+        size_t &group_id, size_t &neuron_id, size_t &dest_group_id,
+        size_t &dest_neuron_id)
 {
     // Edge description entries support two formats, to represent
     //  neuron-neuron connections and compartment-compartment branches
@@ -298,37 +299,12 @@ void sanafe::parse_edge_field(const std::string_view &edge_field,
     // Parse the source group, neuron and optional compartment identifiers
     //  from the source neuron substring (before the "->")
     const auto src_neuron_address = edge_field.substr(0, pos);
-    parse_neuron_with_compartment_field(
-            src_neuron_address, group_id, neuron_id, compartment_id);
-
-    if (compartment_id.has_value()) // Compartment-compartment branch
-    {
-        // If the source address (before the ->) is a compartment,
-        //  then assume we are specifying a branch between two
-        //  compartments in the same neuron
-        INFO("Parsing compartment to compartment branch.\n");
-        dest_group_id = group_id;
-        dest_neuron_id = neuron_id;
-        dest_compartment_id =
-                field_to_int(edge_field.substr(pos + 2, edge_field.size()));
-    }
-    else // Neuron-neuron connection
-    {
-        // If the source address (before the "->") is a neuron address,
-        //  then assume we are specifying a connection between two
-        //  neurons. Optionally, the user can specify the destination
-        //  compartment.
-        TRACE1("parsing neuron to neuron connection.\n");
-        dest_compartment_id = 0;
-        // Parse the destination group, neuron and compartment
-        //  identifiers from the substring after "->". Note that
-        //  the destination compartment is optional and so can be
-        //  ommitted. By default, the destination compartment id is 0.
-        const auto dest_neuron_address =
-                edge_field.substr(pos + 2, edge_field.size());
-        parse_neuron_with_compartment_field(dest_neuron_address, dest_group_id,
-                dest_neuron_id, dest_compartment_id);
-    }
+    parse_neuron_field(src_neuron_address, group_id, neuron_id);
+    // Parse the destination group, neuron and compartment
+    //  identifiers from the substring after "->"
+    const auto dest_neuron_address =
+            edge_field.substr(pos + 2, edge_field.size());
+    parse_neuron_field(dest_neuron_address, dest_group_id, dest_neuron_id);
 
     return;
 }
@@ -366,7 +342,6 @@ void sanafe::description_read_network_entry(
     Neuron *neuron_ptr, *dest_ptr;
     Tile *tile_ptr;
     Core *core_ptr;
-    std::optional<size_t> compartment_id, dest_compartment_id;
     size_t tile_id, core_offset, neuron_group_id, dest_group_id;
     size_t neuron_id, dest_neuron_id;
     int neuron_count;
@@ -428,8 +403,8 @@ void sanafe::description_read_network_entry(
     else if (entry_type == 'e')
     {
         // Edge on SNN graph (e.g., connection between neurons)
-        parse_edge_field(fields[1], neuron_group_id, neuron_id, compartment_id,
-                dest_group_id, dest_neuron_id, dest_compartment_id);
+        parse_edge_field(fields[1], neuron_group_id, neuron_id,
+                dest_group_id, dest_neuron_id);
         if (dest_group_id >= net.groups.size())
         {
             INFO("Error: Line %d: Group (%lu) >= group count (%lu).\n",
@@ -455,8 +430,7 @@ void sanafe::description_read_network_entry(
     }
     else if (entry_type == 'n') // parse neuron
     {
-        parse_neuron_with_compartment_field(
-                fields[1], neuron_group_id, neuron_id, compartment_id);
+        parse_neuron_field(fields[1], neuron_group_id, neuron_id);
         group_set = true;
         neuron_set = true;
     }
@@ -526,33 +500,12 @@ void sanafe::description_read_network_entry(
         net.create_neuron_group(neuron_count, attributes);
         break;
     case 'n': // Add neuron
-        if (compartment_id.has_value())
-        {
-            neuron_ptr->create_compartment(attributes);
-        }
-        else
-        {
-            neuron_ptr->set_attributes(attributes);
-        }
+        neuron_ptr->set_attributes(attributes);
         break;
     case 'e':
         assert(neuron_ptr != nullptr);
         // Zero initialize all connections
-        if (compartment_id.has_value())
-        {
-            if (!dest_compartment_id.has_value())
-            {
-                dest_compartment_id = 0;
-            }
-            // Dendrite to compartment connection
-            neuron_ptr->create_branch(compartment_id.value(),
-                    dest_compartment_id.value(), attributes);
-        }
-        else
-        {
-            neuron_ptr->connect_to_neuron(
-                    *dest_ptr, dest_compartment_id.value(), attributes);
-        }
+        neuron_ptr->connect_to_neuron(*dest_ptr, attributes);
         break;
     case '&': // Map neuron to hardware
         core_ptr->map_neuron(*neuron_ptr);

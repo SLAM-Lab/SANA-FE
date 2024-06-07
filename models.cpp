@@ -6,6 +6,7 @@
 
 #include "description.hpp"
 #include "models.hpp"
+#include "network.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
 
@@ -64,18 +65,17 @@ sanafe::SingleCompartmentModel::SingleCompartmentModel()
 }
 
 double sanafe::SingleCompartmentModel::update(
-        const std::optional<double> current_in, const int compartment,
-        const bool step)
+        const std::optional<Synapse> synapse_in, const bool step)
 {
     if (step)
     {
         accumulated_charge *= leak_decay;
         //INFO("accumulated:%e\n", accumulated_charge);
     }
-    if (current_in.has_value())
+    if (synapse_in.has_value())
     {
         // Integrate any input current
-        accumulated_charge += current_in.value();
+        accumulated_charge += synapse_in.value().current;
     }
 
     return accumulated_charge;
@@ -97,16 +97,17 @@ void sanafe::SingleCompartmentModel::set_attributes(
     }
 }
 
-sanafe::MultiTapModel::MultiTapModel()
+sanafe::MultiTapModel1D::MultiTapModel1D()
 {
     const int default_taps = 1;
     tap_voltages = std::vector<double>(default_taps, 0.0);
     next_voltages = std::vector<double>(default_taps, 0.0);
-    weights = std::vector<double>(default_taps * default_taps, 0.0);
+    space_constants = std::vector<double>(default_taps-1, 0.0);
+    time_constants = std::vector<double>(default_taps, 0.0);
 }
 
-double sanafe::MultiTapModel::update(const std::optional<double> current_in,
-        const int compartment, const bool step)
+double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
+        const bool step)
 {
     if (step)
     {
@@ -116,35 +117,49 @@ double sanafe::MultiTapModel::update(const std::optional<double> current_in,
         {
             next_voltages[t] = 0.0;
         }
-        for (size_t src = 0; src < taps; src++)
+        for (size_t dest_tap = 0; dest_tap < taps; dest_tap++)
         {
-            for (size_t dest = 0; dest < taps; dest++)
+            next_voltages[dest_tap] +=
+                    tap_voltages[dest_tap] * time_constants[dest_tap];
+            if (dest_tap > 0)
             {
-                const size_t taps = tap_voltages.size();
-                const size_t weight_idx = (src * taps) + dest;
-                next_voltages[dest] += tap_voltages[src] * weights[weight_idx];
+                const double distal_current = tap_voltages[dest_tap - 1] *
+                        space_constants[dest_tap - 1];
+                next_voltages[dest_tap] += distal_current;
+                next_voltages[dest_tap - 1] -= distal_current;
             }
-            INFO("Tap %lu potential:%lf\n", src, tap_voltages[src]);
-            //printf("%lf\t", tap_voltages[src]);
+            if (dest_tap < (taps - 1))
+            {
+                const double proximal_current = tap_voltages[dest_tap + 1] *
+                        space_constants[dest_tap + 1];
+                next_voltages[dest_tap] += proximal_current;
+                next_voltages[dest_tap + 1] -= proximal_current;
+            }
         }
-        //printf("\n");
         for (size_t t = 0; t < taps; t++)
         {
             tap_voltages[t] = next_voltages[t];
         }
     }
-    if (current_in.has_value())
+    if (synapse_in.has_value())
     {
+        const Synapse &syn = synapse_in.value();
+        int compartment = 0;
+        // TODO: when we have attributes preparsed this will be easier
+        if (syn.attributes.find("dest_compartment") != syn.attributes.end())
+        {
+            compartment = field_to_int(syn.attributes.find("dest_compartment")->second);
+        }
         assert(compartment >= 0);
         assert((size_t) compartment < tap_voltages.size());
-        tap_voltages[compartment] += current_in.value();
+        tap_voltages[compartment] += synapse_in.value().current;
     }
 
     // Return current for most proximal tap (which is always the first tap)
     return tap_voltages[0];
 }
 
-void sanafe::MultiTapModel::set_attributes(
+void sanafe::MultiTapModel1D::set_attributes(
         const std::map<std::string, std::string> &attr)
 {
     for (const auto &a : attr)
@@ -163,11 +178,22 @@ void sanafe::MultiTapModel::set_attributes(
             }
             tap_voltages = std::vector<double>(taps, 0.0);
             next_voltages = std::vector<double>(taps, 0.0);
-            weights = std::vector<double>(taps * taps, 0.0);
+            time_constants = std::vector<double>(taps, 0.0);
+            space_constants = std::vector<double>(taps-1, 0.0);
+        }
+        if (key.find("time_constant"))
+        {
+            // TODO: support list attribute
+            // E.g., time_constant[0], time_constant[1]
+        }
+        if (key.find("space_constant"))
+        {
+            // E.g.,
         }
     }
 }
 
+/*
 void sanafe::MultiTapModel::set_attributes(const size_t compartment_id,
         const std::map<std::string, std::string> &attr)
 {
@@ -230,6 +256,7 @@ void sanafe::MultiTapModel::set_attributes(const size_t src_compartment_id,
         }
     }
 }
+*/
 
 // **** Soma models ****
 sanafe::LoihiLifModel::LoihiLifModel(const int gid, const int nid)
@@ -582,7 +609,7 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
     }
     else if (model_name == "taps")
     {
-        return std::shared_ptr<DendriteModel>(new MultiTapModel());
+        return std::shared_ptr<DendriteModel>(new MultiTapModel1D());
     }
     else
     {

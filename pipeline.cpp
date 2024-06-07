@@ -162,7 +162,7 @@ double sanafe::pipeline_process_synapse(Timestep &ts, Architecture &arch,
         con.synapse_model->update();
         con.last_updated++;
     }
-    Synapse synapse_data = {0.0, con.dest_compartment};
+    Synapse synapse_data = {0.0, con.attributes};
     synapse_data.current = con.synapse_model->update(synapse_address, false);
 
     // Input and buffer synaptic info at the next hardware unit (dendrite unit)
@@ -193,8 +193,7 @@ double sanafe::pipeline_process_dendrite(
     }
     for (const auto &synapse : n.dendrite_input_synapses)
     {
-        n.soma_input_charge = n.dendrite_model->update(
-                synapse.current, synapse.dest_compartment, false);
+        n.soma_input_charge = n.dendrite_model->update(synapse, false);
     }
     n.dendrite_input_synapses.clear();
 

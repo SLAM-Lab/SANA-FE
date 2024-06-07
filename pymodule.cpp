@@ -202,7 +202,6 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("set_attributes", &sanafe::Neuron::set_attributes)
             .def("connect_to_neuron",
                     [](sanafe::Neuron *self, sanafe::Neuron &dest,
-                            size_t dest_compartment_id = 0,
                             std::optional<pybind11::dict> attr =
                                     pybind11::none()) {
                         if (!attr.has_value())
@@ -210,7 +209,6 @@ PYBIND11_MODULE(sanafecpp, m)
                             attr = pybind11::dict();
                         }
                         return self->connect_to_neuron(dest,
-                                dest_compartment_id,
                                 dict_to_str_map(attr.value()));
                     })
             .def("get_id", &sanafe::Neuron::get_id);

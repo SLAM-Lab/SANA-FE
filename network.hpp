@@ -45,8 +45,6 @@ class NeuronGroup;
 class Neuron;
 struct Connection;
 struct Synapse;
-struct Compartment;
-struct Branch;
 // Models
 class SynapseModel;
 class SomaModel;
@@ -104,8 +102,6 @@ class Neuron
 {
 public:
     std::vector<Connection> connections_out;
-    std::vector<Compartment> dendrite_compartments;
-    std::vector<Branch> dendrite_branches;
     std::vector<int> axon_out_addresses;
     std::map<std::string, std::string> attributes;
 
@@ -135,9 +131,9 @@ public:
     explicit Neuron(const size_t neuron_id);
     int get_id() { return id; }
     void set_attributes(const std::map<std::string, std::string> &attr);
-    void connect_to_neuron(Neuron &dest, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr);
-    void create_compartment(const std::map<std::string, std::string> &compartment_attr);
-    void create_branch(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &branch_attr);
+    void connect_to_neuron(Neuron &dest, const std::map<std::string, std::string> &attr);
+    //void create_compartment(const std::map<std::string, std::string> &compartment_attr);
+    //void create_branch(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &branch_attr);
     std::string info() const;
     std::string description(const bool write_mapping=true) const;
 };
@@ -149,7 +145,6 @@ struct Connection
     Neuron *post_neuron, *pre_neuron;
     SynapseUnit *synapse_hw;
     std::string synapse_hw_name;
-    size_t dest_compartment;
     int id, delay, last_updated;
 
     explicit Connection(const int connection_id);
@@ -159,9 +154,10 @@ struct Connection
 struct Synapse
 {
     double current;
-    size_t dest_compartment;
+    std::map<std::string, std::string> attributes;
 };
 
+/*
 struct Compartment
 {
     std::map<std::string, std::string> attributes;
@@ -175,6 +171,7 @@ struct Branch
     std::map<std::string, std::string> attributes;
     Branch(const size_t branch_id) : id(branch_id) {}
 };
+*/
 
 } // namespace
 

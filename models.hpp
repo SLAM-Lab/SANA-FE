@@ -6,6 +6,8 @@
 #ifndef MODELS_HEADER_INCLUDED_
 #define MODELS_HEADER_INCLUDED_
 
+#include "network.hpp"
+
 #include <map>
 #include <memory> // For shared_ptr<T>
 #include <optional>
@@ -38,15 +40,9 @@ class DendriteModel
 public:
     DendriteModel() {}
     virtual ~DendriteModel() {}
-    // TODO: figure out how this model works... do we update each compartment?
-    //virtual void input(const double current_in, const int compartment) = 0;
-    virtual double update(std::optional<double> current_in=std::nullopt, const int compartment=0,  const bool step=true) = 0;
-    // Set global dendritic attributes
+    // TODO: Can't forward declare synapses... find a better way?
+    virtual double update(std::optional<Synapse> synapse_in=std::nullopt, const bool step=true) = 0;
     virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
-    // Set per-compartment attributes
-    virtual void set_attributes(const size_t compartment_id, const std::map<std::string, std::string> &attr) {}
-    // Set per-branch attributes (between compartments)
-    virtual void set_attributes(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr) {}
 };
 
 class CurrentBasedSynapseModel: public SynapseModel
@@ -67,26 +63,22 @@ class SingleCompartmentModel: public DendriteModel
 public:
     SingleCompartmentModel();
     ~SingleCompartmentModel() {}
-    virtual double update(std::optional<double> current_in=std::nullopt, const int compartment=0,  const bool step=true);
+    virtual double update(std::optional<Synapse> current_in=std::nullopt, const bool step=true);
     virtual void set_attributes(const std::map<std::string, std::string> &attr);
 private:
     double accumulated_charge, leak_decay;
 };
 
-class MultiTapModel: public DendriteModel
+class MultiTapModel1D: public DendriteModel
 {
 public:
-    MultiTapModel();
-    virtual double update(std::optional<double> current_in=std::nullopt, const int compartment=0,  const bool step=true);
+    MultiTapModel1D();
+    virtual double update(std::optional<Synapse> current_in=std::nullopt, const bool step=true);
     virtual void set_attributes(const std::map<std::string, std::string> &attr);
-    virtual void set_attributes(const size_t compartment_id, const std::map<std::string, std::string> &attr);
-    virtual void set_attributes(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &attr);
 private:
-    // Use a simple dense matrix representation of tap to tap weights,
-    //  assuming that the number of taps is (reasonably) small. For larger
-    //  tap counts, a model implementing a sparse per-branch representation
-    //  would be more space efficient
-    std::vector<double> tap_voltages, next_voltages, weights;
+    // Assuming a 1D tap dendrite
+    std::vector<double> tap_voltages, next_voltages;
+    std::vector<double> space_constants, time_constants;
 };
 
 class SomaModel
@@ -99,8 +91,6 @@ public:
     virtual double get_potential() { return 0.0; }
 protected:
     const int group_id, neuron_id;
-    // TODO: this might be useful context
-    //const int mapped_tile_id, mapped_core_id, mapped_core_offset;
 };
 
 class LoihiLifModel: public SomaModel
