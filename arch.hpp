@@ -44,6 +44,11 @@ struct DendriteModel;
 struct SomaModel;
 struct AxonOutModel;
 
+struct TilePowerMetrics;
+struct SynapsePowerMetrics;
+struct SomaPowerMetrics;
+struct CorePipelineConfiguration;
+
 enum BufferPosition
 {
     BUFFER_BEFORE_DENDRITE_UNIT,
@@ -55,17 +60,16 @@ enum BufferPosition
 class Architecture
 {
 public:
-    std::vector<std::reference_wrapper<Core> > cores_vec;
-    std::vector<std::reference_wrapper<Tile> > tiles_vec;
-    std::list<Tile> tiles;
+    std::vector<std::reference_wrapper<Core>> cores_ref;
+    std::vector<Tile> tiles;
     std::string name;
     int noc_width, noc_height, noc_buffer_size, max_cores_per_tile;
 
     Architecture();
     int get_core_count();
     int set_noc_attributes(const std::map<std::string, std::string> &attr);
-    Tile &create_tile(const std::string &name, const std::map<std::string, std::string> &attr);
-    Core &create_core(const std::string &name, const size_t tile_id, const std::map<std::string, std::string> &attr);
+    Tile &create_tile(const std::string &name, const TilePowerMetrics &power_metrics);
+    Core &create_core(const std::string &name, const size_t parent_tile_id, const CorePipelineConfiguration &pipeline_config);
     void load_arch_description(const std::filesystem::path &filename);
     std::string info();
     std::string description() const;
@@ -98,30 +102,67 @@ struct Message
     explicit Message(const Architecture &arch, const Neuron &n, const int timestep, const int axon_address);
 };
 
+struct TilePowerMetrics
+{
+    double energy_north_hop, latency_north_hop;
+    double energy_east_hop, latency_east_hop;
+    double energy_south_hop, latency_south_hop;
+    double energy_west_hop, latency_west_hop;
+
+    TilePowerMetrics(const double energy_north = 0.0, const double latency_north = 0.0, const double energy_east = 0.0, const double latency_east = 0.0, const double energy_south = 0.0, const double latency_south = 0.0, const double energy_west = 0.0, const double latency_west = 0.0);
+};
+
+struct SynapsePowerMetrics
+{
+    double energy_memory_access, latency_memory_access;
+    double energy_spike_op, latency_spike_op;
+
+    SynapsePowerMetrics(const double energy_memory = 0.0, const double latency_memory = 0.0, const double energy_spike = 0.0, const double latency_spike = 0.0);
+};
+
+struct SomaPowerMetrics
+{
+    double energy_update_neuron, latency_update_neuron;
+    double energy_access_neuron, latency_access_neuron;
+    double energy_spiking, latency_spiking;
+
+    SomaPowerMetrics(const double energy_update = 0.0, const double latency_update = 0.0, const double energy_access = 0.0, const double latency_access = 0.0, const double energy_spiking = 0.0, const double latency_spiking = 0.0);
+};
+
+struct CorePipelineConfiguration
+{
+    BufferPosition timestep_buffer_pos;
+    size_t max_neurons_supported;
+
+    CorePipelineConfiguration(const std::string &buffer_pos="soma", const size_t max_neuron_supported=1024);
+};
+
 class Tile
 {
 public:
-    // Use a list of Cores that can be dynamically allocated and appended
-    //  to without reallocation
-    std::list<Core> cores;
-    // Vector of references into the Core object data, giving us random
-    //  access into a list, giving us the best of both worlds
-    std::vector<std::reference_wrapper<Core> > cores_vec;
+    // TODO: this may need to be a vector of core pointers, to avoid reallocation messing up the python
+    //  version of the objects
+    std::vector<Core> cores;
     std::string name;
     double energy;
-    double energy_east_hop, latency_east_hop;
-    double energy_west_hop, latency_west_hop;
     double energy_north_hop, latency_north_hop;
+    double energy_east_hop, latency_east_hop;
     double energy_south_hop, latency_south_hop;
+    double energy_west_hop, latency_west_hop;
     long int hops, messages_received, total_neurons_fired;
-    long int east_hops, west_hops, north_hops, south_hops;
-    int id, x, y;
+    long int north_hops, east_hops, south_hops, west_hops;
+    size_t id, x, y;
     int width; // For now just support 2 dimensions
 
-    Tile(const std::string &name, const int tile_id);
+    explicit Tile(const std::string &name, const size_t tile_id, const TilePowerMetrics &power_metrics);
     int get_id() { return id; }
     std::string info() const;
     std::string description() const;
+};
+
+struct CoreAddress
+{
+    size_t id, parent_tile_id, offset_within_tile;
 };
 
 class Core
@@ -141,19 +182,18 @@ public:
 
     std::list<BufferPosition> neuron_processing_units;
     std::list<BufferPosition> message_processing_units;
+    CorePipelineConfiguration pipeline_config;
     std::string name;
-    size_t max_neurons;
     double energy, next_message_generation_delay;
-    int id, offset, parent_tile_id;
-    BufferPosition timestep_buffer_position;
+    size_t id, offset, parent_tile_id;
     int message_count;
 
-    Core(const std::string &name, const int core_id, const int tile_id, const int offset);
-    AxonInUnit &create_axon_in(const std::string &name, const std::map<std::string, std::string> &attr);
-    SynapseUnit &create_synapse(const std::string &name, const std::map<std::string, std::string> &attr);
-    DendriteUnit &create_dendrite(const std::string &name, const std::map<std::string, std::string> &attr);
-    SomaUnit &create_soma(const std::string &name, const std::map<std::string, std::string> &attr);
-    AxonOutUnit &create_axon_out(const std::string &name, const std::map<std::string, std::string> &attr);
+    explicit Core(const std::string &name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
+    AxonInUnit &create_axon_in(const std::string &name, const double energy_message, const double latency_message);
+    SynapseUnit &create_synapse(const std::string &name, const std::string &model_str, const SynapsePowerMetrics &power_metrics);
+    DendriteUnit &create_dendrite(const std::string &name, const std::string &model_str, const double energy_access, const double latency_access);
+    SomaUnit &create_soma(const std::string &name, const std::string &model_str, const SomaPowerMetrics &power_metrics);
+    AxonOutUnit &create_axon_out(const std::string &name, const double energy_access, const double latency_access);
     void map_neuron(Neuron &n);
     int get_id() { return id; }
     int get_offset() { return offset; }
@@ -164,12 +204,12 @@ public:
 struct AxonInUnit
 {
     std::string name;
+    CoreAddress parent_core_address;
     long int spike_messages_in;
     double energy, time;
     double energy_spike_message, latency_spike_message;
-    int parent_tile_id, parent_core_offset;
 
-    explicit AxonInUnit(const std::string &axon_in_name);
+    explicit AxonInUnit(const std::string &axon_in_name, const CoreAddress &parent_core_address, const double energy_message=0.0, const double latency_message=0.0);
     std::string description() const;
 };
 
@@ -177,14 +217,13 @@ struct SynapseUnit
 {
     std::filesystem::path plugin_lib;
     std::string name, model;
-    int weight_bits;
+    CoreAddress parent_core_address;
     long int spikes_processed;
     double energy, time;
-    double energy_spike_op, energy_memory_access;
-    double latency_spike_op, latency_memory_access;
-    int parent_tile_id, parent_core_offset;
+    double energy_memory_access, latency_memory_access;
+    double energy_spike_op, latency_spike_op;
 
-    explicit SynapseUnit(const std::string &synapse_name);
+    explicit SynapseUnit(const std::string &synapse_name, const std::string &model_str, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics);
     std::string description() const;
 };
 
@@ -192,10 +231,10 @@ struct DendriteUnit
 {
     std::filesystem::path plugin_lib;
     std::string name, model;
+    CoreAddress parent_core_address;
     double energy, time;
     double energy_access, latency_access;
-    int parent_tile_id, parent_core_offset;
-    explicit DendriteUnit(const std::string &dendrite_name);
+    explicit DendriteUnit(const std::string &dendrite_name, const std::string &model_str, const CoreAddress &parent_core, const double energy_cost=0.0, const double latency_cost=0.0);
     std::string description() const;
 };
 
@@ -204,15 +243,15 @@ struct SomaUnit
     FILE *noise_stream;
     std::filesystem::path plugin_lib;
     std::string name, model;
+    CoreAddress parent_core_address;
     long int neuron_updates, neurons_fired, neuron_count;
     double energy, time;
     double energy_update_neuron, latency_update_neuron;
     double energy_access_neuron, latency_access_neuron;
     double energy_spiking, latency_spiking;
-    int leak_towards_zero, reset_mode, reverse_reset_mode;
-    int noise_type, parent_tile_id, parent_core_offset;
+    int noise_type;
 
-    explicit SomaUnit(const std::string &soma_name);
+    explicit SomaUnit(const std::string &soma_name, const std::string &model_str, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics);
     std::string description() const;
 };
 
@@ -221,12 +260,12 @@ struct AxonOutUnit
     // The axon output points to a number of axons, stored at the
     //  post-synaptic core. A neuron can point to a number of these
     std::string name;
+    CoreAddress parent_core_address;
     long int packets_out;
     double energy, time;
     double energy_access, latency_access;
-    int parent_tile_id, parent_core_offset;
 
-    explicit AxonOutUnit(const std::string &axon_out_name);
+    explicit AxonOutUnit(const std::string &axon_out_name, const CoreAddress &parent_core, const double energy_access, const double latency_access);
     std::string description() const;
 };
 

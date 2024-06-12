@@ -165,21 +165,7 @@ void sanafe::MultiTapModel1D::set_attributes(
         const std::string &value_str = a.second;
         std::istringstream ss(value_str);
 
-        /*
-        if (key == "taps")
-        {
-            int taps;
-            ss >> taps;
-            if (taps <= 0)
-            {
-                throw(std::invalid_argument("Error: Invalid tap count."));
-            }
-            tap_voltages = std::vector<double>(taps, 0.0);
-            next_voltages = std::vector<double>(taps, 0.0);
-            time_constants = std::vector<double>(taps, 0.0);
-            space_constants = std::vector<double>(taps-1, 0.0);
-        }
-        */
+        // TODO: simplify this once we figure the YAML parsing situation
         if (key.find("time_constant") != std::string::npos)
         {
             const size_t start_pos = key.find("[") + 1;

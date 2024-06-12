@@ -41,6 +41,8 @@ public:
     DendriteModel() {}
     virtual ~DendriteModel() {}
     // TODO: Can't forward declare synapses... find a better way?
+    //  Might be easier to just make it two optional arguments... unpack it from the Synapse struct
+    //  If it's optional, it gets harder to pass a reference, maybe should pass a pointer instead...
     virtual double update(std::optional<Synapse> synapse_in=std::nullopt, const bool step=true) = 0;
     virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
 };

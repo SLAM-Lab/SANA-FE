@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include <yaml-cpp/yaml.h>
+
 namespace sanafe
 {
 enum DescriptionRet
@@ -23,8 +25,11 @@ class NeuronGroup;
 class Neuron;
 class Tile;
 class Core;
+struct CorePipelineConfiguration;
+struct TilePowerMetrics;
 
-int description_parse_arch_file(std::ifstream &fp, Architecture &arch);
+void description_parse_arch_file(std::ifstream &fp, Architecture &arch);
+int description_parse_arch_file_old(std::ifstream &fp, Architecture &arch);
 int description_parse_net_file(std::ifstream &fp, Network &net, Architecture &arch);
 void description_get_fields(std::vector<std::string_view> &fields, const std::string &line);
 void description_read_arch_entry(const std::vector<std::string_view> &fields, Architecture &arch, const int line_number);
@@ -35,6 +40,17 @@ void parse_edge_field(const std::string_view &edge_field, size_t &group_id, size
 void parse_mapping_field(const std::string_view &mapping_field, size_t &group_id, size_t &neuron_id, size_t &tile_id, size_t &core_offset);
 size_t field_to_int(const std::string_view &field);
 
+void description_parse_arch_section(const YAML::Node &arch_node, Architecture &arch);
+void description_parse_tile_section(const YAML::Node &tile_node, Architecture &arch);
+void description_parse_core_section(const YAML::Node &core_node, const size_t parent_tile_id, Architecture &arch);
+void description_parse_axon_in_section(const YAML::Node &axon_in_node, Core &parent_core);
+void description_parse_synapse_section(const YAML::Node &synapse_node, Core &parent_core);
+void description_parse_dendrite_section(const YAML::Node &dendrite_node, Core &parent_core);
+void description_parse_soma_section(const YAML::Node &soma_node, Core &parent_core);
+void description_parse_axon_out_section(const YAML::Node &axon_out_node, Core &parent_core);
+std::pair<size_t, size_t> description_parse_range(const std::string &tile_name);
+CorePipelineConfiguration description_parse_core_pipeline(const YAML::Node &attributes);
+TilePowerMetrics description_parse_tile_metrics(const YAML::Node &attributes);
 }
 
 #endif

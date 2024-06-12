@@ -20,4 +20,5 @@ double pipeline_process_synapse(Timestep &ts, Architecture &arch, Connection &co
 double pipeline_process_dendrite(Timestep &ts, Architecture &arch, Neuron &n);
 double pipeline_process_soma(Timestep &ts, Architecture &arch, Neuron &n);
 double pipeline_process_axon_out(Timestep &ts, Architecture &arch, Neuron &n);
+BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str);
 }

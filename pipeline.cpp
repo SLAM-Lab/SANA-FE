@@ -18,9 +18,9 @@
 void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
 {
 #pragma omp parallel for schedule(dynamic)
-    for (size_t i = 0; i < arch.cores_vec.size(); i++)
+    for (size_t i = 0; i < arch.cores_ref.size(); i++)
     {
-        Core &core = arch.cores_vec[i];
+        Core &core = arch.cores_ref[i];
         for (Neuron *n : core.neurons)
         {
             pipeline_process_neuron(ts, arch, *n);
@@ -54,9 +54,9 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
 
     // Now process all messages at receiving cores
 #pragma omp parallel for schedule(dynamic)
-    for (size_t i = 0; i < arch.cores_vec.size(); i++)
+    for (size_t i = 0; i < arch.cores_ref.size(); i++)
     {
-        Core &core = arch.cores_vec[i];
+        Core &core = arch.cores_ref[i];
         TRACE1("Processing %lu message(s) for cid:%d\n",
                 core.messages_in.size(), core.id);
         for (auto m : core.messages_in)
@@ -68,14 +68,14 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
 
 void sanafe::pipeline_receive_message(Architecture &arch, Message &m)
 {
-    assert(static_cast<size_t>(m.src_tile_id) < arch.tiles_vec.size());
-    assert(static_cast<size_t>(m.dest_tile_id) < arch.tiles_vec.size());
-    Tile &src_tile = arch.tiles_vec[m.src_tile_id];
-    Tile &dest_tile = arch.tiles_vec[m.dest_tile_id];
+    assert(static_cast<size_t>(m.src_tile_id) < arch.tiles.size());
+    assert(static_cast<size_t>(m.dest_tile_id) < arch.tiles.size());
+    Tile &src_tile = arch.tiles[m.src_tile_id];
+    Tile &dest_tile = arch.tiles[m.dest_tile_id];
     m.network_delay = sim_estimate_network_costs(src_tile, dest_tile);
     m.hops = abs(src_tile.x - dest_tile.x) + abs(src_tile.y - dest_tile.y);
 
-    Core &core = dest_tile.cores_vec[m.dest_core_offset];
+    Core &core = dest_tile.cores[m.dest_core_offset];
     core.messages_in.push_back(&m);
 }
 
@@ -84,15 +84,17 @@ void sanafe::pipeline_process_neuron(
 {
     SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
     double neuron_processing_latency = 0.0;
-    if (n.core->timestep_buffer_position <= BUFFER_BEFORE_DENDRITE_UNIT)
+    if (n.core->pipeline_config.timestep_buffer_pos <=
+            BUFFER_BEFORE_DENDRITE_UNIT)
     {
         neuron_processing_latency += pipeline_process_dendrite(ts, arch, n);
     }
-    if (n.core->timestep_buffer_position <= BUFFER_BEFORE_SOMA_UNIT)
+    if (n.core->pipeline_config.timestep_buffer_pos <= BUFFER_BEFORE_SOMA_UNIT)
     {
         neuron_processing_latency += pipeline_process_soma(ts, arch, n);
     }
-    if (n.core->timestep_buffer_position <= BUFFER_BEFORE_AXON_OUT_UNIT)
+    if (n.core->pipeline_config.timestep_buffer_pos <=
+            BUFFER_BEFORE_AXON_OUT_UNIT)
     {
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
     }
@@ -118,7 +120,8 @@ double sanafe::pipeline_process_message(
         Connection &con = *(core.connections_in[synapse_address]);
         message_processing_latency +=
                 pipeline_process_synapse(ts, arch, con, synapse_address);
-        if (core.timestep_buffer_position == BUFFER_BEFORE_DENDRITE_UNIT)
+        if (core.pipeline_config.timestep_buffer_pos ==
+                BUFFER_BEFORE_DENDRITE_UNIT)
         {
             continue; // Process next synapse
         }
@@ -127,12 +130,13 @@ double sanafe::pipeline_process_message(
         Neuron &n = *(con.post_neuron);
         message_processing_latency += pipeline_process_dendrite(ts, arch, n);
 
-        if (core.timestep_buffer_position == BUFFER_BEFORE_SOMA_UNIT)
+        if (core.pipeline_config.timestep_buffer_pos == BUFFER_BEFORE_SOMA_UNIT)
         {
             continue; // Process next synapse
         }
         message_processing_latency += pipeline_process_soma(ts, arch, n);
-        assert(core.timestep_buffer_position == BUFFER_BEFORE_AXON_OUT_UNIT);
+        assert(core.pipeline_config.timestep_buffer_pos ==
+                BUFFER_BEFORE_AXON_OUT_UNIT);
     }
 
     return message_processing_latency;
@@ -273,4 +277,31 @@ double sanafe::pipeline_process_axon_out(
     n.axon_out_input_spike = false;
 
     return n.axon_out_hw->latency_access;
+}
+
+
+sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
+        const std::string &buffer_pos_str)
+{
+    BufferPosition buffer_pos;
+    if (buffer_pos_str == "dendrite")
+    {
+        buffer_pos = BUFFER_BEFORE_DENDRITE_UNIT;
+    }
+    else if (buffer_pos_str == "soma")
+    {
+        buffer_pos = BUFFER_BEFORE_SOMA_UNIT;
+    }
+    else if (buffer_pos_str == "axon_out")
+    {
+        buffer_pos = BUFFER_BEFORE_AXON_OUT_UNIT;
+    }
+    else
+    {
+        INFO("Error: Buffer position %s not supported",
+                buffer_pos_str.c_str());
+        throw std::invalid_argument("Error: Buffer position not supported");
+    }
+
+    return buffer_pos;
 }

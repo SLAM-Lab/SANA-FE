@@ -3,6 +3,7 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // arch.cpp
+#include <any>
 #include <cassert>
 #include <cctype>
 #include <cmath>
@@ -97,7 +98,7 @@ std::string sanafe::Architecture::info()
 {
     std::ostringstream ss;
     ss << "sanafe::Architecture(tiles=" << tiles.size();
-    ss << ", cores=" << cores_vec.size() << ")";
+    ss << ", cores=" << cores_ref.size() << ")";
 
     return ss.str();
 }
@@ -125,7 +126,7 @@ sanafe::Message::Message(
     //  default, messages without destinations act as a placeholder for neuron
     //  processing
     const Core &src_core = *(n.core);
-    const Tile &src_tile = arch.tiles_vec[src_core.parent_tile_id];
+    const Tile &src_tile = arch.tiles[src_core.parent_tile_id];
 
     placeholder = true;
     src_neuron_id = n.id;
@@ -161,8 +162,8 @@ sanafe::Message::Message(const Architecture &arch, const Neuron &n,
 {
     const Core &src_core = *(n.core);
     const AxonOutModel &src_axon = src_core.axons_out[axon_address];
-    const Tile &dest_tile = arch.tiles_vec[src_axon.dest_tile_id];
-    const Core &dest_core = dest_tile.cores_vec[src_axon.dest_core_offset];
+    const Tile &dest_tile = arch.tiles[src_axon.dest_tile_id];
+    const Core &dest_core = dest_tile.cores[src_axon.dest_core_offset];
     const AxonInModel &dest_axon = dest_core.axons_in[src_axon.dest_axon_id];
 
     placeholder = false;
@@ -177,27 +178,37 @@ sanafe::Message::Message(const Architecture &arch, const Neuron &n,
     dest_axon_hw = 0;
 }
 
-sanafe::Tile::Tile(const std::string &name, const int tile_id)
+sanafe::Tile::Tile(const std::string &name, const size_t tile_id,
+        const TilePowerMetrics &power_metrics)
         : name(name)
+        , energy(0.0)
+        , energy_north_hop(power_metrics.energy_north_hop)
+        , latency_north_hop(power_metrics.latency_north_hop)
+        , energy_east_hop(power_metrics.energy_east_hop)
+        , latency_east_hop(power_metrics.latency_east_hop)
+        , energy_south_hop(power_metrics.energy_south_hop)
+        , latency_south_hop(power_metrics.latency_south_hop)
+        , energy_west_hop(power_metrics.energy_south_hop)
+        , latency_west_hop(power_metrics.latency_east_hop)
+        , hops(0L)
+        , messages_received(0L)
+        , total_neurons_fired(0L)
+        , north_hops(0L)
+        , east_hops(0L)
+        , south_hops(0L)
+        , west_hops(0L)
+        , id(tile_id)
+        , x(0)
+        , y(0)
 {
-    id = tile_id;
-    energy = 0.0;
-    x = 0;
-    y = 0;
-    hops = 0L;
-    messages_received = 0L;
-    total_neurons_fired = 0L;
-    east_hops = 0L;
-    west_hops = 0L;
-    north_hops = 0L;
-    south_hops = 0L;
+    return;
 }
 
 std::string sanafe::Tile::info() const
 {
     std::ostringstream ss;
     ss << "sanafe::Tile(tile=" << id << " cores=";
-    ss << cores_vec.size() << ")";
+    ss << cores.size() << ")";
 
     return ss.str();
 }
@@ -219,74 +230,32 @@ std::string sanafe::Tile::description() const
     return ss.str();
 }
 
-sanafe::Core::Core(const std::string &name, const int core_id,
-        const int tile_id, const int core_offset)
-        : name(name)
+sanafe::Core::Core(const std::string &name, const CoreAddress &address,
+        const CorePipelineConfiguration &pipeline)
+        : pipeline_config(pipeline)
+        , name(name)
+        , energy(0.0)
+        , next_message_generation_delay(0.0)
+        , id(address.id)
+        , offset(address.offset_within_tile)
+        , parent_tile_id(address.parent_tile_id)
+        , message_count(0)
 {
-    id = core_id;
-    parent_tile_id = tile_id;
-    offset = core_offset;
-    energy = 0.0;
-    next_message_generation_delay = 0.0;
+    return;
 }
 
 sanafe::Tile &sanafe::Architecture::create_tile(
-        const std::string &name, const std::map<std::string, std::string> &attr)
-
+        const std::string &name, const TilePowerMetrics &power_metrics)
 {
-    tiles.push_back(Tile(name, tiles.size()));
-    Tile &tile = tiles.back();
-    tiles_vec.push_back(tile);
+    // Initialize a new tile given metrics by the user, and push it into the
+    //  Architecture's list of tiles
+    const size_t new_tile_id = tiles.size();
+    // The tile id is a unique global value that be used to index into the
+    //  Architecture's tile array
+    tiles.push_back(Tile(name, new_tile_id, power_metrics));
+    Tile &new_tile = tiles[new_tile_id];
 
-    // Set attributes
-    tile.energy_east_hop = 0.0;
-    tile.latency_east_hop = 0.0;
-    tile.energy_north_hop = 0.0;
-    tile.latency_north_hop = 0.0;
-    tile.energy_west_hop = 0.0;
-    tile.latency_west_hop = 0.0;
-    tile.energy_south_hop = 0.0;
-    tile.latency_south_hop = 0.0;
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-        if (key == "energy_east")
-        {
-            ss >> tile.energy_east_hop;
-        }
-        else if (key == "latency_east")
-        {
-            ss >> tile.latency_east_hop;
-        }
-        else if (key == "energy_west")
-        {
-            ss >> tile.energy_west_hop;
-        }
-        else if (key == "latency_west")
-        {
-            ss >> tile.latency_west_hop;
-        }
-        else if (key == "energy_north")
-        {
-            ss >> tile.energy_north_hop;
-        }
-        else if (key == "latency_north")
-        {
-            ss >> tile.latency_north_hop;
-        }
-        else if (key == "energy_south")
-        {
-            ss >> tile.energy_south_hop;
-        }
-        else if (key == "latency_south")
-        {
-            ss >> tile.latency_south_hop;
-        }
-    }
-
-    return tile;
+    return new_tile;
 }
 
 void sanafe::Architecture::load_arch_description(
@@ -297,115 +266,120 @@ void sanafe::Architecture::load_arch_description(
     {
         throw std::invalid_argument("Error: Architecture file failed to open.");
     }
-    int ret = description_parse_arch_file(arch_fp, *this);
+    description_parse_arch_file(arch_fp, *this);
     arch_fp.close();
-    if (ret == sanafe::RET_FAIL)
-    {
-        throw std::invalid_argument("Error: Invalid architecture file.");
-    }
+
+    return;
 }
 
-sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name)
+sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name,
+        const CoreAddress &parent_core, const double energy_message,
+        const double latency_message)
         : name(axon_in_name)
+        , parent_core_address(parent_core)
+        , spike_messages_in(0L)
+        , energy(0.0)
+        , time(0.0)
+        , energy_spike_message(energy_message)
+        , latency_spike_message(latency_message)
 {
     return;
 }
 
-sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name)
+sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
+        const std::string &model_str,
+        const CoreAddress &parent_core,
+        const SynapsePowerMetrics &power_metrics)
         : name(synapse_name)
+        , model(model_str)
+        , parent_core_address(parent_core)
+        , spikes_processed(0L)
+        , energy(0.0)
+        , time(0.0)
+        , energy_memory_access(power_metrics.energy_memory_access)
+        , latency_memory_access(power_metrics.latency_memory_access)
+        , energy_spike_op(power_metrics.energy_spike_op)
+        , latency_spike_op(power_metrics.latency_spike_op)
 {
     energy = 0.0;
     time = 0.0;
     return;
 }
 
-sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name)
+sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name,
+        const std::string &model_str, const CoreAddress &parent_core,
+        const double energy_cost, const double latency_cost)
         : name(dendrite_name)
+        , model(model_str)
+        , parent_core_address(parent_core)
+        , energy(0.0)
+        , time(0.0)
+        , energy_access(energy_cost)
+        , latency_access(latency_cost)
 {
-    energy = 0.0;
-    time = 0.0;
-    energy_access = 0.0;
-    latency_access = 0.0;
     return;
 }
 
-sanafe::SomaUnit::SomaUnit(const std::string &soma_name)
+sanafe::SomaUnit::SomaUnit(const std::string &soma_name,
+        const std::string &model_str, const CoreAddress &parent_core,
+        const SomaPowerMetrics &power_metrics)
         : name(soma_name)
+        , model(model_str)
+        , parent_core_address(parent_core)
+        , neuron_updates(0L)
+        , neurons_fired(0L)
+        , neuron_count(0L)
+        , energy(0.0)
+        , time(0.0)
+        , noise_type(NOISE_NONE)
 {
-    neuron_updates = 0;
-    neurons_fired = 0;
-    neuron_count = 0;
-    energy = 0.0;
-    time = 0.0;
     return;
 }
 
-sanafe::AxonOutUnit::AxonOutUnit(const std::string &axon_out_name)
+sanafe::AxonOutUnit::AxonOutUnit(const std::string &axon_out_name,
+        const CoreAddress &parent_core, const double energy_access,
+        const double latency_access)
         : name(axon_out_name)
+        , parent_core_address(parent_core)
+        , packets_out(0L)
+        , energy(0.0)
+        , time(0.0)
+        , energy_access(energy_access)
+        , latency_access(latency_access)
 {
-    energy = 0.0;
-    time = 0.0;
     return;
 }
 
 sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
-        const size_t tile_id, const std::map<std::string, std::string> &attr)
+        const size_t parent_tile_id,
+        const CorePipelineConfiguration &pipeline_config)
 {
-    if (tile_id > tiles.size())
+    if (parent_tile_id > tiles.size())
     {
         throw std::invalid_argument("Error: Tile ID > total tiles");
     }
-    Tile &tile = tiles_vec[tile_id];
-    const int core_offset = tile.cores.size();
-    tile.cores.push_back(Core(name, get_core_count(), tile.id, core_offset));
-    Core &c = tile.cores.back();
-    cores_vec.push_back(c);
-    tile.cores_vec.push_back(c);
+    // Lookup the parent tile to assign a new core to
+    Tile &parent_tile = tiles[parent_tile_id];
+    const size_t offset_within_tile = parent_tile.cores.size();
+    const size_t new_core_id = get_core_count();
+    CoreAddress new_core_address = {
+            new_core_id, parent_tile_id, offset_within_tile};
 
-    // *** Set attributes ***
-    c.timestep_buffer_position = BUFFER_BEFORE_SOMA_UNIT;
-    c.max_neurons = 1024;
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        if (key == "buffer_before")
-        {
-            if (value_str == "dendrite")
-            {
-                c.timestep_buffer_position = BUFFER_BEFORE_DENDRITE_UNIT;
-            }
-            else if (value_str == "soma")
-            {
-                c.timestep_buffer_position = BUFFER_BEFORE_SOMA_UNIT;
-            }
-            else if (value_str == "axon_out")
-            {
-                c.timestep_buffer_position = BUFFER_BEFORE_AXON_OUT_UNIT;
-            }
-            else
-            {
-                INFO("Error: Buffer position %s not supported",
-                        value_str.c_str());
-                throw std::invalid_argument(
-                        "Error: Buffer position not supported");
-            }
-        }
-        else if (key == "max_neurons")
-        {
-            std::istringstream ss(value_str);
-            ss >> c.max_neurons;
-        }
-    }
+    // Initialize the new core and refer to it at both tile and arch levels
+    parent_tile.cores.push_back(Core(name, new_core_address, pipeline_config));
+    Core &new_core = parent_tile.cores.back();
+    cores_ref.push_back(new_core);
 
-    // Initialize core state
-    c.energy = 0.0;
-    c.next_message_generation_delay = 0.0;
-
+    // The architecture tracks the maximum cores in *any* of its tiles.
+    //  This information is needed later by the scheduler, when creating
+    //  structures to track spike messages and congestion in the NoC
+    const size_t cores_in_parent_tile = parent_tile.cores.size();
     max_cores_per_tile =
-            std::max<size_t>(max_cores_per_tile, tile.cores.size());
-    TRACE1("Core created id:%d.%d (tile:%d).\n", c.parent_tile_id, c.id);
-    return c;
+            std::max<size_t>(max_cores_per_tile, cores_in_parent_tile);
+    TRACE1("Core created id:%d.%d (tile:%d).\n", new_core.parent_tile_id,
+            new_core.id);
+
+    return new_core;
 }
 
 std::string sanafe::Core::info() const
@@ -429,8 +403,8 @@ std::string sanafe::AxonInUnit::description() const
     attributes["energy_message"] = print_float(energy_spike_message);
     attributes["latency_message"] = print_float(latency_spike_message);
     std::ostringstream ss;
-    ss << "i " << name << ' ' << parent_tile_id;
-    ss << ' ' << parent_core_offset;
+    ss << "i " << name << ' ' << parent_core_address.parent_tile_id;
+    ss << ' ' << parent_core_address.offset_within_tile;
     ss << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
@@ -442,7 +416,8 @@ std::string sanafe::SynapseUnit::description() const
     attributes["latency_spike"] = print_float(latency_spike_op);
     attributes["model"] = model;
     std::ostringstream ss;
-    ss << "s " << name << ' ' << parent_tile_id << ' ' << parent_core_offset;
+    ss << "s " << name << ' ' << parent_core_address.parent_tile_id << ' ';
+    ss << parent_core_address.offset_within_tile;
     ss << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
@@ -454,8 +429,8 @@ std::string sanafe::DendriteUnit::description() const
     attributes["energy"] = print_float(energy_access);
     attributes["latency"] = print_float(latency_access);
     std::ostringstream ss;
-    ss << "d " << name << ' ' << parent_tile_id;
-    ss << ' ' << parent_core_offset;
+    ss << "d " << name << ' ' << parent_core_address.parent_tile_id;
+    ss << ' ' << parent_core_address.offset_within_tile;
     ss << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
@@ -471,8 +446,8 @@ std::string sanafe::SomaUnit::description() const
     attributes["energy_spike_out"] = print_float(energy_access_neuron);
     attributes["latency_spike_out"] = print_float(latency_access_neuron);
     std::ostringstream ss;
-    ss << "+ " << name << ' ' << parent_tile_id;
-    ss << ' ' << parent_core_offset;
+    ss << "+ " << name << ' ' << parent_core_address.parent_tile_id;
+    ss << ' ' << parent_core_address.offset_within_tile;
     ss << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
@@ -483,238 +458,78 @@ std::string sanafe::AxonOutUnit::description() const
     attributes["energy"] = print_float(energy_access);
     attributes["latency"] = print_float(latency_access);
     std::ostringstream ss;
-    ss << "o " << name << ' ' << parent_tile_id;
-    ss << ' ' << parent_core_offset;
+    ss << "o " << name << ' ' << parent_core_address.parent_tile_id;
+    ss << ' ' << parent_core_address.offset_within_tile;
     ss << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
 
-sanafe::AxonInUnit &sanafe::Core::create_axon_in(
-        const std::string &name, const std::map<std::string, std::string> &attr)
+sanafe::AxonInUnit &sanafe::Core::create_axon_in(const std::string &name,
+        const double energy_message, const double latency_message)
 {
-    axon_in_hw.push_back(AxonInUnit(name));
-    struct AxonInUnit &in = axon_in_hw.back();
+    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
+    axon_in_hw.push_back(AxonInUnit(
+            name, parent_core_address, energy_message, latency_message));
+    AxonInUnit &new_axon_in_hw_unit = axon_in_hw.back();
 
-    in.energy = 0.0;
-    in.time = 0.0;
-    in.parent_tile_id = parent_tile_id;
-    in.parent_core_offset = offset;
-
-    in.energy_spike_message = 0.0;
-    in.latency_spike_message = 0.0;
-    for (const auto &curr : attr)
-    {
-        const std::string &key = curr.first;
-        const std::string &value_str = curr.second;
-        std::istringstream ss(value_str);
-        if (key == "energy_message")
-        {
-            ss >> in.energy_spike_message;
-        }
-        else if (key == "latency_message")
-        {
-            ss >> in.latency_spike_message;
-        }
-    }
-
-    TRACE2("Axon input created (c:%d.%d)\n", c.t->id, c.id);
-
-    return in;
+    return new_axon_in_hw_unit;
 }
 
-sanafe::SynapseUnit &sanafe::Core::create_synapse(
-        const std::string &name, const std::map<std::string, std::string> &attr)
+sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
+        const std::string &model_str, const SynapsePowerMetrics &power_metrics)
 {
-    synapse.push_back(SynapseUnit(name));
-    SynapseUnit &s = synapse.back();
-    s.parent_tile_id = parent_tile_id;
-    s.parent_core_offset = offset;
+    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
+    synapse.push_back(
+            SynapseUnit(name, model_str, parent_core_address, power_metrics));
+    SynapseUnit &new_synapse_hw_unit = synapse.back();
+    TRACE1("New synapse h/w unit created (cid:%d.%d)\n",
+            parent_core_address.parent_tile_id,
+            parent_core_address.offset_within_tile);
 
-    /**** Set attributes ****/
-    s.energy_memory_access = 0.0;
-    s.latency_memory_access = 0.0;
-    s.energy_spike_op = 0.0;
-    s.latency_spike_op = 0.0;
-    s.weight_bits = 8;
-    s.name = name;
-    for (const auto &curr : attr)
-    {
-        const std::string &key = curr.first;
-        const std::string &value_str = curr.second;
-        std::istringstream ss(value_str);
-        if (key == "model")
-        {
-            s.model = value_str;
-        }
-        else if (key == "energy_memory")
-        {
-            ss >> s.energy_memory_access;
-        }
-        else if (key == "latency_memory")
-        {
-            ss >> s.latency_memory_access;
-        }
-        else if (key == "energy_spike")
-        {
-            ss >> s.energy_spike_op;
-        }
-        else if (key == "latency_spike")
-        {
-            ss >> s.latency_spike_op;
-        }
-    }
-
-    TRACE1("Synapse processor created (c:%d.%d)\n", c.parent_tile_id, c.offset);
-
-    return s;
+    return new_synapse_hw_unit;
 }
 
-sanafe::DendriteUnit &sanafe::Core::create_dendrite(
-        const std::string &name, const std::map<std::string, std::string> &attr)
+sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
+        const std::string &model_str, const double energy_access,
+        const double latency_access)
 {
-    dendrite.push_back(DendriteUnit(name));
-    DendriteUnit &d = dendrite.back();
-    d.parent_tile_id = parent_tile_id;
-    d.parent_core_offset = offset;
+    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
+    dendrite.push_back(DendriteUnit(name, model_str, parent_core_address,
+            energy_access, latency_access));
+    DendriteUnit &new_dendrite_hw_unit = dendrite.back();
+    TRACE1("New dendrite h/w unit created (c:%d.%d)\n",
+            parent_core_address.parent_tile_id,
+            parent_core_address.offset_within_tile);
 
-    /**** Set attributes ****/
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-        if (key == "model")
-        {
-            d.model = value_str;
-        }
-        else if (key == "energy")
-        {
-            ss >> d.energy_access;
-        }
-        else if (key == "latency")
-        {
-            ss >> d.latency_access;
-        }
-    }
-    TRACE1("Dendrite processor created (c:%d.%d)\n", c.parent_tile_id,
-            c.offset);
-
-    return d;
+    return new_dendrite_hw_unit;
 }
 
-sanafe::SomaUnit &sanafe::Core::create_soma(
-        const std::string &name, const std::map<std::string, std::string> &attr)
+sanafe::SomaUnit &sanafe::Core::create_soma(const std::string &name,
+        const std::string &model_str, const SomaPowerMetrics &power_metrics)
 {
-    TRACE1("cid:%d creating soma sid:%lu with %lu attributes\n", id,
-            soma.size(), attr.size());
-    soma.push_back(SomaUnit(name));
-    SomaUnit &s = soma.back();
-    s.parent_tile_id = parent_tile_id;
-    s.parent_core_offset = offset;
+    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
+    soma.push_back(
+            SomaUnit(name, model_str, parent_core_address, power_metrics));
+    SomaUnit &new_soma_hw_unit = soma.back();
+    TRACE1("New soma h/w unit created (c:%d.%d)\n",
+            parent_core_address.parent_tile_id,
+            parent_core_address.offset_within_tile);
 
-    /*** Set attributes ***/
-    s.energy_access_neuron = 0.0;
-    s.latency_access_neuron = 0.0;
-    s.energy_update_neuron = 0.0;
-    s.latency_update_neuron = 0.0;
-    s.energy_spiking = 0.0;
-    s.latency_spiking = 0.0;
-    s.leak_towards_zero = 1;
-    s.noise_type = NOISE_NONE;
-
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-        TRACE2("Soma attribute k:%s v%s\n", key.c_str(), value_str.c_str());
-        if (key == "energy_update_neuron")
-        {
-            ss >> s.energy_update_neuron;
-        }
-        else if (key == "latency_update_neuron")
-        {
-            ss >> s.latency_update_neuron;
-        }
-        else if (key == "energy_access_neuron")
-        {
-            ss >> s.energy_access_neuron;
-        }
-        else if (key == "latency_access_neuron")
-        {
-            ss >> s.latency_access_neuron;
-        }
-        else if (key == "energy_spike_out")
-        {
-            ss >> s.energy_spiking;
-        }
-        else if (key == "latency_spike_out")
-        {
-            ss >> s.latency_spiking;
-        }
-        else if (key == "noise")
-        {
-            /*
-			s.noise_type = NOISE_FILE_STREAM;
-			s.noise_stream = fopen(value_str.c_str(), "r");
-			TRACE1("Opening noise str: %s\n", value_str.c_str());
-			if (s.noise_stream == NULL)
-			{
-				INFO("Error: Failed to open noise stream: %s.\n",
-					value_str.c_str());
-				exit(1);
-			}
-			*/
-        }
-        else if (key == "model")
-        {
-            s.model = value_str;
-        }
-        else if (key == "plugin_lib")
-        {
-            s.plugin_lib = std::filesystem::path(value_str);
-        }
-    }
-
-    TRACE1("Soma processor created (c:%d.%d)\n", c.parent_tile_id, c.offset);
-    return s;
+    return new_soma_hw_unit;
 }
 
-sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
-        const std::string &name, const std::map<std::string, std::string> &attr)
+sanafe::AxonOutUnit &sanafe::Core::create_axon_out(const std::string &name,
+        const double energy_access, const double latency_access)
 {
-    axon_out_hw.push_back(AxonOutUnit(name));
-    AxonOutUnit &out = axon_out_hw.back();
-    out.parent_tile_id = parent_tile_id;
-    out.parent_core_offset = offset;
+    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
+    axon_out_hw.push_back(AxonOutUnit(
+            name, parent_core_address, energy_access, latency_access));
+    AxonOutUnit &new_axon_out_hw_unit = axon_out_hw.back();
+    TRACE1("New axon out h/w unit created (c:%d.%d)\n",
+            parent_core_address.parent_tile_id,
+            parent_core_address.offset_within_tile);
 
-    out.packets_out = 0;
-    out.energy = 0.0;
-    out.time = 0.0;
-    out.parent_tile_id = parent_tile_id;
-
-    /*** Set attributes ***/
-    out.energy_access = 0.0;
-    out.latency_access = 0.0;
-    for (const auto &curr : attr)
-    {
-        const std::string &key = curr.first;
-        const std::string &value_str = curr.second;
-        std::istringstream ss(value_str);
-        if (key == "energy")
-        {
-            ss >> out.energy_access;
-        }
-        else if (key == "latency")
-        {
-            ss >> out.latency_access;
-        }
-    }
-
-    // Track the tile the axon interfaces with
-    TRACE1("Axon output created (c:%d.%d)\n", c.parent_tile_id, c.offset);
-
-    return out;
+    return new_axon_out_hw_unit;
 }
 
 void sanafe::arch_create_axons(Architecture &arch)
@@ -876,9 +691,10 @@ void sanafe::Core::map_neuron(Neuron &n)
     TRACE1("Mapping neuron %d to core %d\n", n.id, id);
     neurons.push_back(&n);
 
-    if (neurons.size() > max_neurons)
+    if (neurons.size() > pipeline_config.max_neurons_supported)
     {
-        INFO("Error: Exceeded maximum neurons per core (%lu)", max_neurons);
+        INFO("Error: Exceeded maximum neurons per core (%lu)",
+                pipeline_config.max_neurons_supported);
         throw std::runtime_error("Error: Exceeded maximum neurons per core.");
     }
 
@@ -888,7 +704,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     //  default to the first one defined
     if (dendrite.size() == 0)
     {
-        INFO("Error: No dendrite units defined for cid:%d\n", id);
+        INFO("Error: No dendrite units defined for cid:%lu\n", id);
         throw std::runtime_error("Error: No dendrite units defined");
     }
     n.dendrite_hw = &(dendrite[0]);
@@ -915,7 +731,7 @@ void sanafe::Core::map_neuron(Neuron &n)
 
     if (soma.size() == 0)
     {
-        INFO("Error: No soma units defined for cid:%d\n", id);
+        INFO("Error: No soma units defined for cid:%lu\n", id);
         throw std::runtime_error("Error: No soma units defined");
     }
     n.soma_hw = &(soma[0]);
@@ -943,7 +759,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     // TODO: support multiple axon outputs
     if (axon_out_hw.size() == 0)
     {
-        INFO("Error: No axon out units defined for cid:%d\n", id);
+        INFO("Error: No axon out units defined for cid:%lu\n", id);
         throw std::runtime_error("Error: No axon out units defined");
     }
     n.axon_out_hw = &(axon_out_hw[0]);
@@ -1034,7 +850,7 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 
     // Then add the output axon to the sending pre-synaptic neuron
     pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
-    TRACE1("nid:%d.%d cid:%d.%d added one output axon address %d.\n",
+    TRACE1("nid:%d.%d cid:%lu.%lu added one output axon address %d.\n",
             pre_neuron.parent_group_id, pre_neuron.id, pre_core.parent_tile_id,
             pre_core.offset, new_axon_out_address);
 
@@ -1095,11 +911,9 @@ void sanafe::Architecture::save_arch_description(
                 "Error: Couldn't open arch file to save to.");
     }
 
-    assert(tiles_vec.size() == tiles.size());
-    INFO("tiles vector size:%lu\n", tiles_vec.size());
-    INFO("tiles size:%lu\n", tiles.size());
+    INFO("tile count:%lu\n", tiles.size());
 
-    for (const Tile &tile : tiles_vec)
+    for (const Tile &tile : tiles)
     {
         out << tile.description();
         for (const Core &core : tile.cores)
@@ -1128,4 +942,54 @@ void sanafe::Architecture::save_arch_description(
         }
     }
     out << description();
+}
+
+sanafe::TilePowerMetrics::TilePowerMetrics(const double energy_north,
+        const double latency_north, const double energy_east, const double latency_east,
+        const double energy_south, const double latency_south, const double energy_west,
+        const double latency_west)
+        : energy_north_hop(energy_north)
+        , latency_north_hop(latency_north)
+        , energy_east_hop(energy_east)
+        , latency_east_hop(latency_east)
+        , energy_south_hop(energy_south)
+        , latency_south_hop(latency_south)
+        , energy_west_hop(energy_west)
+        , latency_west_hop(latency_west)
+{
+    return;
+}
+
+sanafe::SynapsePowerMetrics::SynapsePowerMetrics(const double energy_memory,
+        const double latency_memory, const double energy_spike,
+        const double latency_spike)
+        : energy_memory_access(energy_memory)
+        , latency_memory_access(latency_memory)
+        , energy_spike_op(energy_spike)
+        , latency_spike_op(latency_spike)
+{
+    return;
+}
+
+sanafe::SomaPowerMetrics::SomaPowerMetrics(const double energy_update,
+        const double latency_update, const double energy_access,
+        const double latency_access, const double energy_spiking,
+        const double latency_spiking)
+        : energy_update_neuron(energy_update)
+        , latency_update_neuron(latency_update)
+        , energy_access_neuron(energy_access)
+        , latency_access_neuron(latency_access)
+        , energy_spiking(energy_spiking)
+        , latency_spiking(latency_spiking)
+{
+    return;
+}
+
+sanafe::CorePipelineConfiguration::CorePipelineConfiguration(
+                const std::string &buffer_pos, const size_t neurons_supported)
+        : max_neurons_supported(neurons_supported)
+{
+    timestep_buffer_pos = pipeline_parse_buffer_pos_str(buffer_pos);
+
+    return;
 }

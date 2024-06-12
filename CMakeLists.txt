@@ -4,7 +4,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
-set(PYTHON_BUILD_ENABLED True)
+#set(PYTHON_BUILD_ENABLED True)
+set(PYTHON_BUILD_ENABLED False)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -31,10 +32,13 @@ execute_process(
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
 find_package(PythonLibs REQUIRED)
+find_package(OpenMP REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
 include_directories(${PYTHON_INCLUDE_DIRS})
+include_directories(${YAMLCPP_INCLUDE_DIRS})
 
 # PyBind specific
-
 if(PYTHON_BUILD_ENABLED)
 find_package(pybind11 CONFIG)
 pybind11_add_module(
@@ -45,11 +49,11 @@ target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
 target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
 target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
+target_link_libraries(sanafecpp PRIVATE yaml-cpp::yaml-cpp)
 target_link_libraries(sanafecpp PUBLIC)
 endif()
 
 #include(CMakePrintHelpers)
-find_package(OpenMP REQUIRED)
 add_executable(sim main.cpp)
 #cmake_print_variables(SOURCE_FILES)
 list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
@@ -59,12 +63,12 @@ target_sources(
     PRIVATE ${SOURCE_FILES}
 )
 
+#include(CMakePrintHelpers)
+#cmake_print_variables(YAMLCPP_LIBRARIES)
 if(PYTHON_BUILD_ENABLED)
 target_link_libraries(sim PRIVATE ${PYTHON_LIBRARIES})
 endif()
-target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
-#target_link_libraries(sim PRIVATE pybind11::pybind11)
 #end of PyBind specific
-
+target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(sim PRIVATE yaml-cpp)
 target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})
-
