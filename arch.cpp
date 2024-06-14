@@ -229,7 +229,7 @@ sanafe::Tile &sanafe::Architecture::create_tile(
     return new_tile;
 }
 
-sanafe::Architecture sanafe::load_arch_description(
+sanafe::Architecture sanafe::load_arch(
         const std::filesystem::path &filename)
 {
     std::ifstream arch_fp(filename);

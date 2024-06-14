@@ -75,7 +75,7 @@ public:
     void save_arch_description(const std::filesystem::path &path);
 };
 
-Architecture load_arch_description(const std::filesystem::path &filename);
+Architecture load_arch(const std::filesystem::path &filename);
 
 struct Message
 {

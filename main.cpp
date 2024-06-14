@@ -88,10 +88,9 @@ int main(int argc, char *argv[])
     }
 
     // Read in program args, sanity check and parse inputs
-    sanafe::Architecture arch =
-            sanafe::load_arch_description(argv[sanafe::ARCH_FILENAME]);
-    sanafe::Network net;
-    net.load_net_description(argv[sanafe::NETWORK_FILENAME], arch);
+    sanafe::Architecture arch = sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
+    sanafe::Network net =
+            sanafe::load_net(argv[sanafe::NETWORK_FILENAME], arch);
     sanafe::Simulation sim(arch, net, output_dir, record_spikes,
             record_potentials, record_perf, record_messages);
 

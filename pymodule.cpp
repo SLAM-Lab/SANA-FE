@@ -151,8 +151,8 @@ PYBIND11_MODULE(sanafecpp, m)
            SANA_FE
     )pbdoc";
 
-    m.def("load_arch_description", &sanafe::load_arch_description);
-
+    m.def("load_arch", &sanafe::load_arch);
+    m.def("load_net", &sanafe::load_net);
     pybind11::register_exception<std::runtime_error>(m, "KernelRuntimeError");
     pybind11::register_exception<std::invalid_argument>(
             m, "KernelInvalidArgument");
@@ -160,7 +160,6 @@ PYBIND11_MODULE(sanafecpp, m)
     pybind11::class_<sanafe::Network>(m, "Network")
             .def(pybind11::init<>())
             .def("__repr__", &sanafe::Network::info)
-            .def("load_net_description", &sanafe::Network::load_net_description)
             .def("save_net_description", &sanafe::Network::save_net_description,
                     pybind11::arg("path"),
                     pybind11::arg("write_mappings") = true)

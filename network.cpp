@@ -377,7 +377,7 @@ void sanafe::Neuron::connect_to_neuron(Neuron &dest,
     return;
 }
 
-void sanafe::Network::load_net_description(
+sanafe::Network sanafe::load_net(
         const std::string &filename, Architecture &arch)
 {
     std::ifstream network_fp;
@@ -387,12 +387,15 @@ void sanafe::Network::load_net_description(
         throw std::runtime_error("Error: Network file failed to open.");
     }
     INFO("Reading network from file.\n");
-    int ret = description_parse_net_file(network_fp, *this, arch);
+    Network net;
+    int ret = description_parse_net_file(network_fp, net, arch);
     network_fp.close();
     if (ret == RET_FAIL)
     {
         throw std::invalid_argument("Error: Invalid network file.");
     }
+
+    return net;
 }
 
 void sanafe::Network::save_net_description(

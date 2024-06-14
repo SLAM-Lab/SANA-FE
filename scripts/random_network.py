@@ -108,10 +108,10 @@ if __name__ == "__main__":
                 writer.writeheader()
 
             for line in reader:
-                arch = kernel.load_arch_description(ARCH_FILENAME)
+                arch = kernel.load_arch(ARCH_FILENAME)
                 net = kernel.Network()
 
-                net.load_net_description(line["network"], arch)
+                net.load_net(line["network"], arch)
                 sim = kernel.Simulation(arch, net, record_perf=True)
                 results = sim.run(TIMESTEPS)
                 print(results)

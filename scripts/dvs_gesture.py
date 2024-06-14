@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
             # Use a pre-generated network for a realistic use case i.e.
             #  dvs-gesture
-            arch = kernel.load_arch_description(ARCH_PATH)
+            arch = kernel.load_arch(ARCH_PATH)
             net = sf.load_net(GENERATED_NETWORK_PATH, arch)
             sim = kernel.Simulation(arch, net, record_perf=True)
             sim.run(timesteps)

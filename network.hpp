@@ -58,13 +58,8 @@ public:
     std::list<NeuronGroup> groups;
     std::vector<std::reference_wrapper<NeuronGroup> > groups_vec;
     Network() {};
-    NeuronGroup &create_neuron_group(const int neuron_count, const std::map<std::string, std::string> &attr);
-    void load_net_description(const std::string &filename, Architecture &arch);
-    std::string info() const;
-    void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
-    void check_mapped() const;
-
-private:
+    Network(Network &&) = default;
+    Network &operator=(Network &&) = default;
     // Do *NOT* allow Network objects to be copied
     //  This is because Neuron objects link back to their parent Network
     //  (and need to be aware of the parent NeuronGroup). Linking to parent
@@ -72,8 +67,16 @@ private:
     //  by avoiding duplication of shared attributes.
     //  If the Network was moved or copied, all parent links in Neurons
     //  would be invalid.
-    Network(const Network &copy);
+    Network(const Network &) = delete;
+    Network &operator=(const Network &) = delete;
+
+    NeuronGroup &create_neuron_group(const int neuron_count, const std::map<std::string, std::string> &attr);
+    std::string info() const;
+    void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
+    void check_mapped() const;
 };
+
+Network load_net(const std::string &filename, Architecture &arch);
 
 class NeuronGroup
 {
@@ -132,8 +135,6 @@ public:
     int get_id() { return id; }
     void set_attributes(const std::map<std::string, std::string> &attr);
     void connect_to_neuron(Neuron &dest, const std::map<std::string, std::string> &attr);
-    //void create_compartment(const std::map<std::string, std::string> &compartment_attr);
-    //void create_branch(const size_t src_compartment_id, const size_t dest_compartment_id, const std::map<std::string, std::string> &branch_attr);
     std::string info() const;
     std::string description(const bool write_mapping=true) const;
 };
@@ -156,22 +157,6 @@ struct Synapse
     double current;
     std::map<std::string, std::string> attributes;
 };
-
-/*
-struct Compartment
-{
-    std::map<std::string, std::string> attributes;
-    size_t id, parent_neuron_id;
-    Compartment(const size_t compartment_id) : id(compartment_id) {}
-};
-
-struct Branch
-{
-    size_t id, src_compartment_id, dest_compartment_id;
-    std::map<std::string, std::string> attributes;
-    Branch(const size_t branch_id) : id(branch_id) {}
-};
-*/
 
 } // namespace
 
