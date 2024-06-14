@@ -17,10 +17,11 @@
 
 void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
 {
+    auto cores = arch.cores();
 #pragma omp parallel for schedule(dynamic)
-    for (size_t i = 0; i < arch.cores_ref.size(); i++)
+    for (size_t idx = 0; idx < cores.size(); idx++)
     {
-        Core &core = arch.cores_ref[i];
+        Core &core = cores[idx];
         for (Neuron *n : core.neurons)
         {
             pipeline_process_neuron(ts, arch, *n);
@@ -53,10 +54,11 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
     }
 
     // Now process all messages at receiving cores
+    auto cores = arch.cores();
 #pragma omp parallel for schedule(dynamic)
-    for (size_t i = 0; i < arch.cores_ref.size(); i++)
+    for (size_t idx = 0; idx < cores.size(); idx++)
     {
-        Core &core = arch.cores_ref[i];
+        Core &core = cores[idx];
         TRACE1("Processing %lu message(s) for cid:%d\n",
                 core.messages_in.size(), core.id);
         for (auto m : core.messages_in)

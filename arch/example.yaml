@@ -33,6 +33,7 @@ architecture:
           dendrite:
             - name: demo_dendrite
               attributes:
+                model: single_compartment
           soma:
             - name: demo_soma_default
               attributes:

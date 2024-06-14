@@ -31,8 +31,8 @@ LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
 SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
 SIM_ENERGY_DATA_FILENAME = "sim_gesture_32x32_energy.csv"
 
-NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
-#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
+#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
+NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
 DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
@@ -139,9 +139,9 @@ if __name__ == "__main__":
             open(SIM_TIME_DATA_PATH, "w")
 
         for inputs in range(0, frames):
+        #for inputs in range(0, 1):
         #for inputs in range(1, 2):
         #for inputs in range(50, frames):
-        #for inputs in range(0, 1):
             print(f"Running for input: {inputs}")
             # First create the network file from the inputs and SNN
             input_filename = os.path.join(NETWORK_DIR, f"inputs{inputs}.net")
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
             # Use a pre-generated network for a realistic use case i.e.
             #  dvs-gesture
-            arch = sf.load_arch(ARCH_PATH)
+            arch = kernel.load_arch_description(ARCH_PATH)
             net = sf.load_net(GENERATED_NETWORK_PATH, arch)
             sim = kernel.Simulation(arch, net, record_perf=True)
             sim.run(timesteps)

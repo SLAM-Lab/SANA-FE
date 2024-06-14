@@ -6,9 +6,9 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 
 sim.py - Simulator script and utility functionality
 """
-import sys
 import os
-import yaml
+import sys
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
@@ -146,19 +146,6 @@ def load_net(net_filename, arch):
     return net
 
 
-def load_arch_yaml(yaml_filename):
-    arch = sanafecpp.Architecture()
-    with open(yaml_filename, "r") as arch_file:
-        arch_dict = yaml.safe_load(arch_file)
-
-    if "architecture" not in arch_dict:
-        raise Exception("Error: no architecture section defined")
-
-    parse_arch_yaml(arch, arch_dict["architecture"])
-
-    return arch
-
-
 ### Architecture description parsing ###
 def parse_arch_yaml(arch, arch_dict):
     arch_name = arch_dict["name"]
@@ -276,37 +263,12 @@ def get_instances(element_dict):
     return instances
 
 
-## TODO: move these functions into the C++ kernel, this should be responsible
-##  for loading and saving this raw format. The Python script should build
-##  objects using the PyBind11 interface
-#def format_attributes(attributes):
-#    line = ""
-#    if attributes is None:
-#        attributes = {}
-
-#    for key in attributes:
-#        line += (f" {key}={attributes[key]}")
-#    return line
-
-
 project_dir = os.path.dirname(os.path.abspath(__file__))
 def run_kernel(arch_path, network_path, timesteps,
         perf_trace=False, spike_trace=False,
         potential_trace=False, message_trace=False, out_dir=None):
     print("Loading architecture\n")
-    try:
-        arch = load_arch_yaml(arch_path)
-        #arch = sanafecpp.Architecture()
-        #arch.load_arch_file("runs/example.yaml.parsed")
-    except yaml.parser.ParserError as yaml_parse_exc:
-        print("Error: Invalid YAML file given.")
-        if "expected '<document start>'" in str(yaml_parse_exc):
-            print("Did you mix up the order of simulator files?")
-            print("Run 'python3 sim.py' to check usage.")
-    except yaml.scanner.ScannerError as yaml_parse_exc:
-        print("Error: Problem parsing YAML file.")
-        print(f"Full Error: '{yaml_parse_exc}'")
-        exit()
+    arch = sanafecpp.load_arch(arch_path)
 
     print("Loading network\n")
     #net = load_from_net_file(network_path, arch)

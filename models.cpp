@@ -542,7 +542,7 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
         const std::string &model_name)
 {
-    if (model_name == "cuba")
+    if (model_name == "current_based")
     {
         return std::shared_ptr<SynapseModel>(new CurrentBasedSynapseModel());
     }

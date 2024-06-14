@@ -23,7 +23,6 @@
 std::pair<size_t, size_t> sanafe::description_parse_range(
         const std::string &range_str)
 {
-    std::cout << range_str << std::endl;
     const size_t start_pos = range_str.find("[");
     const size_t end_pos = range_str.find("]");
     const size_t delimiter_pos = range_str.find("..");
@@ -45,7 +44,6 @@ std::pair<size_t, size_t> sanafe::description_parse_range(
     last_ss >> last;
 
     std::pair<size_t, size_t> range = {first, last};
-    std::cout << range.first << ".." << range.second << std::endl;
 
     return range;
 }
@@ -56,17 +54,18 @@ void sanafe::description_parse_axon_in_section(
     std::string axon_in_name = axon_in_node["name"].as<std::string>();
     std::replace(axon_in_name.begin(), axon_in_name.end(), ' ', '_');
     std::replace(axon_in_name.begin(), axon_in_name.end(), '\t', '_');
-    double message_energy = 0.0;
-    double message_latency = 0.0;
-    if (axon_in_node["message_energy"])
+    const YAML::Node &attributes = axon_in_node["attributes"];
+    double energy_message = 0.0;
+    double latency_message = 0.0;
+    if (attributes["energy_message"])
     {
-        message_energy = axon_in_node["message_energy"].as<double>();
+        energy_message = attributes["energy_message"].as<double>();
     }
-    if (axon_in_node["message_latency"])
+    if (attributes["latency_message"])
     {
-        message_latency = axon_in_node["message_latency"].as<double>();
+        latency_message = attributes["latency_message"].as<double>();
     }
-    parent_core.create_axon_in(axon_in_name, message_energy, message_latency);
+    parent_core.create_axon_in(axon_in_name, energy_message, latency_message);
 
     return;
 }
@@ -78,10 +77,11 @@ void sanafe::description_parse_synapse_section(
     std::replace(synapse_name.begin(), synapse_name.end(), ' ', '_');
     std::replace(synapse_name.begin(), synapse_name.end(), '\t', '_');
 
+    const YAML::Node &attributes = synapse_node["attributes"];
     std::string model_str;
-    if (synapse_node["model"])
+    if (attributes["model"])
     {
-        model_str = synapse_node["model"].as<std::string>();
+        model_str = attributes["model"].as<std::string>();
     }
     else
     {
@@ -91,22 +91,22 @@ void sanafe::description_parse_synapse_section(
     double latency_memory = 0.0;
     double energy_spike = 0.0;
     double latency_spike = 0.0;
-    // Parse power metrics
-    if (synapse_node["energy_memory"])
+    // Parse power metricslatency_message
+    if (attributes["energy_memory_access"])
     {
-        energy_memory = synapse_node["energy_memory"].as<double>();
+        energy_memory = attributes["energy_memory_access"].as<double>();
     }
-    if (synapse_node["latency_memory"])
+    if (attributes["latency_memory_access"])
     {
-        latency_memory = synapse_node["latency_memory"].as<double>();
+        latency_memory = attributes["latency_memory_access"].as<double>();
     }
-    if (synapse_node["energy_spike"])
+    if (attributes["energy_process_spike"])
     {
-        energy_spike = synapse_node["energy_spike"].as<double>();
+        energy_spike = attributes["energy_process_spike"].as<double>();
     }
-    if (synapse_node["latency_spike"])
+    if (attributes["latency_process_spike"])
     {
-        latency_spike = synapse_node["latency_spike"].as<double>();
+        latency_spike = attributes["latency_process_spike"].as<double>();
     }
     SynapsePowerMetrics power_metrics(
             energy_memory, latency_memory, energy_spike, latency_spike);
@@ -124,10 +124,11 @@ void sanafe::description_parse_dendrite_section(
     std::replace(dendrite_name.begin(), dendrite_name.end(), ' ', '_');
     std::replace(dendrite_name.begin(), dendrite_name.end(), '\t', '_');
 
+    const YAML::Node &attributes = dendrite_node["attributes"];
     std::string model_str;
-    if (dendrite_node["model"])
+    if (attributes["model"])
     {
-        model_str = dendrite_node["model"].as<std::string>();
+        model_str = attributes["model"].as<std::string>();
     }
     else
     {
@@ -136,13 +137,13 @@ void sanafe::description_parse_dendrite_section(
 
     double energy_access = 0.0;
     double latency_access = 0.0;
-    if (dendrite_node["energy"])
+    if (attributes["energy"])
     {
-        energy_access = dendrite_node["energy"].as<double>();
+        energy_access = attributes["energy"].as<double>();
     }
-    if (dendrite_node["latency"])
+    if (attributes["latency"])
     {
-        latency_access = dendrite_node["latency"].as<double>();
+        latency_access = attributes["latency"].as<double>();
     }
     parent_core.create_dendrite(
             dendrite_name, model_str, energy_access, latency_access);
@@ -155,10 +156,11 @@ void sanafe::description_parse_soma_section(
     std::replace(soma_name.begin(), soma_name.end(), ' ', '_');
     std::replace(soma_name.begin(), soma_name.end(), '\t', '_');
 
+    const YAML::Node &attributes = soma_node["attributes"];
     std::string model_str;
-    if (soma_node["model"])
+    if (attributes["model"])
     {
-        model_str = soma_node["model"].as<std::string>();
+        model_str = attributes["model"].as<std::string>();
     }
     else
     {
@@ -166,7 +168,7 @@ void sanafe::description_parse_soma_section(
     }
 
     // TODO: figure how to define this plugin library parameter
-    if (soma_node["plugin_lib"])
+    if (attributes["plugin_lib"])
     {
         //std::string plugin_lib = std::filesystem::path(value_str);
     }
@@ -178,32 +180,34 @@ void sanafe::description_parse_soma_section(
     double latency_access_neuron = 0.0;
     double energy_spike_out = 0.0;
     double latency_spike_out = 0.0;
-    if (soma_node["energy_update_neuron"])
+    if (attributes["energy_update_neuron"])
     {
-        energy_update_neuron = soma_node["energy_update_neuron"].as<double>();
+        energy_update_neuron = attributes["energy_update_neuron"].as<double>();
     }
-    if (soma_node["latency_update_neuron"])
+    if (attributes["latency_update_neuron"])
     {
-        latency_update_neuron = soma_node["energy_update_neuron"].as<double>();
+        latency_update_neuron = attributes["latency_update_neuron"].as<double>();
     }
-    if (soma_node["energy_access_neuron"])
+    if (attributes["energy_access_neuron"])
     {
-        energy_access_neuron = soma_node["energy_access_neuron"].as<double>();
+        energy_access_neuron = attributes["energy_access_neuron"].as<double>();
     }
-    if (soma_node["latency_access_neuron"])
+    if (attributes["latency_access_neuron"])
     {
-        latency_access_neuron = soma_node["latency_access_neuron"].as<double>();
+        latency_access_neuron =
+                attributes["latency_access_neuron"].as<double>();
     }
-    if (soma_node["energy_spike_out"])
+    if (attributes["energy_spike_out"])
     {
-        energy_spike_out = soma_node["energy_spike_out"].as<double>();
+        energy_spike_out = attributes["energy_spike_out"].as<double>();
     }
-    if (soma_node["latency_spike_out"])
+    if (attributes["latency_spike_out"])
     {
-        latency_spike_out = soma_node["latency_access_neuron"].as<double>();
+        latency_spike_out = attributes["latency_spike_out"].as<double>();
     }
-    if (soma_node["noise"])
+    if (attributes["noise"])
     {
+        // TODO: support noise again alongside the plugin mechanism
         /*
         s.noise_type = NOISE_FILE_STREAM;
         s.noise_stream = fopen(value_str.c_str(), "r");
@@ -231,18 +235,19 @@ void sanafe::description_parse_axon_out_section(
     std::replace(axon_out_name.begin(), axon_out_name.end(), '\t', '_');
 
     // TODO: maybe just replace this with the metric struct
-    double energy_access = 0.0;
-    double latency_access = 0.0;
-    if (axon_out_node["energy_access"])
+    const YAML::Node &attributes = axon_out_node["attributes"];
+    double energy_message = 0.0;
+    double latency_message = 0.0;
+    if (attributes["energy_message_out"])
     {
-        energy_access = axon_out_node["energy_access"].as<double>();
+        energy_message = attributes["energy_message_out"].as<double>();
     }
-    if (axon_out_node["latency_access"])
+    if (attributes["latency_message_out"])
     {
-        latency_access = axon_out_node["latency_access"].as<double>();
+        latency_message = attributes["latency_message_out"].as<double>();
     }
 
-    parent_core.create_axon_out(axon_out_name, energy_access, latency_access);
+    parent_core.create_axon_out(axon_out_name, energy_message, latency_message);
 }
 
 void sanafe::description_parse_core_section(const YAML::Node &core_node,
@@ -316,7 +321,7 @@ void sanafe::description_parse_core_section(const YAML::Node &core_node,
             {
                 for (auto d : dendrite_node)
                 {
-                    description_parse_dendrite_section(dendrite_node, core);
+                    description_parse_dendrite_section(d, core);
                 }
             }
             else
@@ -409,38 +414,37 @@ sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics(
     double energy_south = 0.0;
     double latency_south = 0.0;
 
-    if (attributes["energy_east"])
+    if (attributes["energy_north_hop"])
     {
-        energy_east = attributes["energy_east"].as<double>();
+        energy_north = attributes["energy_north_hop"].as<double>();
     }
-    if (attributes["latency_east"])
+    if (attributes["latency_north_hop"])
     {
-        latency_east = attributes["latency_east"].as<double>();
-        ;
+        latency_north = attributes["latency_north_hop"].as<double>();
     }
-    if (attributes["energy_west"])
+    if (attributes["energy_east_hop"])
     {
-        energy_west = attributes["energy_west"].as<double>();
+        energy_east = attributes["energy_east_hop"].as<double>();
     }
-    if (attributes["latency_west"])
+    if (attributes["latency_east_hop"])
     {
-        latency_west = attributes["latency_west"].as<double>();
+        latency_east = attributes["latency_east_hop"].as<double>();
     }
-    if (attributes["energy_north"])
+    if (attributes["energy_south_hop"])
     {
-        energy_north = attributes["energy_north"].as<double>();
+        energy_south = attributes["energy_south_hop"].as<double>();
     }
-    if (attributes["latency_north"])
+    if (attributes["latency_south_hop"])
     {
-        latency_north = attributes["latency_north"].as<double>();
+        latency_south = attributes["latency_south_hop"].as<double>();
     }
-    if (attributes["energy_south"])
+    if (attributes["energy_west_hop"])
     {
-        energy_south = attributes["energy_south"].as<double>();
+        energy_west = attributes["energy_west_hop"].as<double>();
     }
-    if (attributes["latency_south"])
+    if (attributes["latency_west_hop"])
     {
-        latency_south = attributes["latency_south"].as<double>();
+        latency_west = attributes["latency_west_hop"].as<double>();
     }
 
     TilePowerMetrics tile_metrics(energy_north, latency_north, energy_east,
@@ -464,8 +468,8 @@ void sanafe::description_parse_tile_section(
 
     for (int t = range.first; t <= range.second; t++)
     {
-        std::string name = tile_name.substr(0, tile_name.find("[")) + "[" +
-                std::to_string(t) + "]";
+        const std::string name = tile_name.substr(0, tile_name.find("[")) +
+                "[" + std::to_string(t) + "]";
         const TilePowerMetrics power_metrics =
                 description_parse_tile_metrics(tile_node["attributes"]);
         Tile &new_tile = arch.create_tile(name, power_metrics);
@@ -490,16 +494,56 @@ void sanafe::description_parse_tile_section(
                     std::to_string(tile_node.Mark().column + 1) + ").\n";
         }
     }
+
+    return;
 }
 
-void sanafe::description_parse_arch_section(
-        const YAML::Node &arch_node, Architecture &arch)
+
+/*
+int sanafe::Architecture::set_noc_attributes(
+                          const std::map<std::string, std::string> &attr)
+{   noc_init = true;
+    TRACE1("NoC created, mesh, width:%d height:%d.\n", noc_width, noc_height);
+    return 0;
+}
+*/
+
+sanafe::NetworkOnChipConfiguration sanafe::description_parse_noc_configuration(
+        const YAML::Node &noc_attributes)
+{
+    int width_in_tiles = 1;
+    int height_in_tiles = 1;
+    int link_buffer_size = 0;
+
+    if (noc_attributes["width"])
+    {
+        width_in_tiles = noc_attributes["width"].as<int>();
+    }
+    if (noc_attributes["height"])
+    {
+        height_in_tiles = noc_attributes["height"].as<int>();
+    }
+    if (noc_attributes["link_buffer_size"])
+    {
+        link_buffer_size = noc_attributes["link_buffer_size"].as<int>();
+    }
+
+    const NetworkOnChipConfiguration noc(
+            width_in_tiles, height_in_tiles, link_buffer_size);
+    return noc;
+}
+
+sanafe::Architecture sanafe::description_parse_arch_section(
+        const YAML::Node &arch_node)
 {
     const std::string arch_name = arch_node["name"].as<std::string>();
     if (arch_name.find("[") != std::string::npos)
     {
         throw std::runtime_error("Error: Multiple architectures not supported");
     }
+    NetworkOnChipConfiguration noc =
+            description_parse_noc_configuration(arch_node["attributes"]);
+    Architecture new_arch(arch_name, noc);
     if (const YAML::Node tile_node = arch_node["tile"])
     {
         // Iterate through all tiles
@@ -507,12 +551,12 @@ void sanafe::description_parse_arch_section(
         {
             for (auto t : tile_node)
             {
-                description_parse_tile_section(t, arch);
+                description_parse_tile_section(t, new_arch);
             }
         }
         else
         {
-            description_parse_tile_section(tile_node, arch);
+            description_parse_tile_section(tile_node, new_arch);
         }
     }
     else
@@ -521,14 +565,16 @@ void sanafe::description_parse_arch_section(
                 std::to_string(tile_node.Mark().line + 1) + ":" +
                 std::to_string(tile_node.Mark().column + 1) + ").\n";
     }
+
+    return new_arch;
 }
 
-void sanafe::description_parse_arch_file(std::ifstream &fp, Architecture &arch)
+sanafe::Architecture sanafe::description_parse_arch_file(std::ifstream &fp)
 {
     YAML::Node top_level_yaml_node = YAML::Load(fp);
     if (YAML::Node arch_yaml_node = top_level_yaml_node["architecture"])
     {
-        description_parse_arch_section(arch_yaml_node, arch);
+        return description_parse_arch_section(arch_yaml_node);
     }
     else
     {
@@ -538,9 +584,6 @@ void sanafe::description_parse_arch_file(std::ifstream &fp, Architecture &arch)
                 std::to_string(top_level_yaml_node.Mark().column + 1) + ").\n";
         throw std::runtime_error(error);
     }
-
-    // TODO: ideally could this return a architecture object?
-    return;
 }
 
 /*

@@ -123,7 +123,7 @@ double sanafe::schedule_messages(
             TRACE1("Path capacity:%d messages:%lf delay:%e\n", path_capacity,
                     messages_along_route, network_delay);
 
-            double earliest_received_time =
+            const double earliest_received_time =
                     m.sent_timestamp + fmax(m.network_delay, network_delay);
             m.received_timestamp = fmax(noc.core_finished_receiving[dest_core],
                     earliest_received_time);

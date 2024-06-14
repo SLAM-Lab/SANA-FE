@@ -126,7 +126,6 @@ std::string pyobject_to_str(const pybind11::object &value)
 pybind11::dict run_data_to_dict(const sanafe::RunData &run)
 {
     pybind11::dict run_data_dict;
-
     run_data_dict["timestep_start"] = run.timestep_start;
     run_data_dict["timesteps_executed"] = run.timesteps_executed;
     run_data_dict["energy"] = run.energy;
@@ -141,16 +140,19 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run)
 PYBIND11_MODULE(sanafecpp, m)
 {
     m.doc() = R"pbdoc(
-	SANA-FE CPP Kernel Module
-	--------------------------------
+    SANA-FE CPP Kernel Module
+    --------------------------------
 
-	.. currentmodule:: sanafecpp
+    .. currentmodule:: sanafecpp
 
-	.. autosummary::
-	   :toctree: _generate
+    .. autosummary::
+       :toctree: _generate
 
-		   SANA_FE
-	)pbdoc";
+           SANA_FE
+    )pbdoc";
+
+    m.def("load_arch_description", &sanafe::load_arch_description);
+
     pybind11::register_exception<std::runtime_error>(m, "KernelRuntimeError");
     pybind11::register_exception<std::invalid_argument>(
             m, "KernelInvalidArgument");
@@ -213,46 +215,63 @@ PYBIND11_MODULE(sanafecpp, m)
                     })
             .def("get_id", &sanafe::Neuron::get_id);
 
+    pybind11::class_<sanafe::NetworkOnChipConfiguration>(
+            m, "NetworkOnChipConfiguration")
+            .def(pybind11::init<int, int, int>(),
+                    pybind11::arg("width_in_tiles") = 1,
+                    pybind11::arg("height_in_tiles") = 1,
+                    pybind11::arg("link_buffer_size") = 0);
+
+    pybind11::class_<sanafe::TilePowerMetrics>(m, "TilePowerMetrics")
+            .def(pybind11::init<double, double, double, double, double, double,
+                         double, double>(),
+                    pybind11::arg("energy_north") = 0.0,
+                    pybind11::arg("latency_north") = 0.0,
+                    pybind11::arg("energy_east") = 0.0,
+                    pybind11::arg("latency_east") = 0.0,
+                    pybind11::arg("energy_south") = 0.0,
+                    pybind11::arg("latency_south") = 0.0,
+                    pybind11::arg("energy_west") = 0.0,
+                    pybind11::arg("latency_west") = 0.0);
+
+    pybind11::class_<sanafe::CorePipelineConfiguration>(
+            m, "CorePipelineConfiguration")
+            .def(pybind11::init<const std::string, const size_t>(),
+                    pybind11::arg("buffer_pos") = "soma",
+                    pybind11::arg("max_neurons_supported") = 1024);
+
+    pybind11::class_<sanafe::CoreAddress>(m, "CoreAddress")
+            .def(pybind11::init<size_t, size_t, size_t>(),
+                    pybind11::arg("id"),
+                    pybind11::arg("parent_tile_id"),
+                    pybind11::arg("offset_within_tile"));
+
     pybind11::class_<sanafe::Architecture>(m, "Architecture")
-            .def(pybind11::init<>())
+            .def(pybind11::init<std::string,
+                    sanafe::NetworkOnChipConfiguration>())
             .def("__repr__", &sanafe::Architecture::info)
-            .def("load_arch_description",
-                    &sanafe::Architecture::load_arch_description)
             .def("save_arch_description",
                     &sanafe::Architecture::save_arch_description)
-            .def(
-                    "create_tile",
-                    [](sanafe::Architecture *self, const std::string &name,
-                            pybind11::dict &attr) -> sanafe::Tile & {
-                        return self->create_tile(name, dict_to_str_map(attr));
-                    },
+            .def("create_tile", &sanafe::Architecture::create_tile,
                     pybind11::return_value_policy::reference_internal)
-            .def(
-                    "create_core",
-                    [](sanafe::Architecture *self, const std::string &name,
-                            const size_t tile_id,
-                            pybind11::dict &attr) -> sanafe::Core & {
-                        return self->create_core(
-                                name, tile_id, dict_to_str_map(attr));
-                    },
+            .def("create_core", &sanafe::Architecture::create_core,
                     pybind11::return_value_policy::reference_internal)
-            .def("set_noc_attributes",
-                    [](sanafe::Architecture *self, pybind11::dict &attr) {
-                        return self->set_noc_attributes(dict_to_str_map(attr));
-                    })
             .def_readwrite("tiles", &sanafe::Architecture::tiles);
 
     pybind11::class_<sanafe::Tile>(m, "Tile")
-            .def(pybind11::init<const std::string, const int>())
+            .def(pybind11::init<const std::string, int,
+                    sanafe::TilePowerMetrics>())
             .def("get_id", &sanafe::Tile::get_id)
             .def_readwrite("cores", &sanafe::Tile::cores);
 
     pybind11::class_<sanafe::Core, std::shared_ptr<sanafe::Core>>(m, "Core")
-            .def(pybind11::init<const std::string, const int, const int,
-                         const int>(),
-                    pybind11::arg("name"), pybind11::arg("core_id"),
-                    pybind11::arg("tile_id"), pybind11::arg("offset"))
+            .def(pybind11::init<const std::string, const sanafe::CoreAddress &,
+                         const sanafe::CorePipelineConfiguration>(),
+                    pybind11::arg("name"), pybind11::arg("address"),
+                    pybind11::arg("pipeline"))
             .def("__repr__", &sanafe::Core::info)
+            // TODO: re-enable this at some point
+            /*
             .def(
                     "create_axon_in",
                     [](sanafe::Core *self, const std::string &name,
@@ -292,29 +311,32 @@ PYBIND11_MODULE(sanafecpp, m)
                                 name, dict_to_str_map(attr));
                     },
                     pybind11::return_value_policy::reference_internal)
+            */
             .def("map_neuron", &sanafe::Core::map_neuron)
             .def("get_id", &sanafe::Core::get_id)
-            .def("get_offset", &sanafe::Core::get_offset)
+            .def("get_offset", &sanafe::Core::get_offset);
+    /*
             .def_readwrite("axon_in_hw", &sanafe::Core::axon_in_hw)
             .def_readwrite("synapse", &sanafe::Core::synapse)
             .def_readwrite("dendrite", &sanafe::Core::dendrite)
             .def_readwrite("soma", &sanafe::Core::soma)
             .def_readwrite("axon_out_hw", &sanafe::Core::axon_out_hw);
+            */
 
-    pybind11::class_<sanafe::AxonInUnit>(m, "AxonInUnit")
-            .def(pybind11::init<std::string>());
+    //pybind11::class_<sanafe::AxonInUnit>(m, "AxonInUnit")
+    //        .def(pybind11::init<std::string>());
 
-    pybind11::class_<sanafe::DendriteUnit>(m, "DendriteUnit")
-            .def(pybind11::init<std::string>());
+    //pybind11::class_<sanafe::DendriteUnit>(m, "DendriteUnit")
+    //        .def(pybind11::init<std::string>());
 
-    pybind11::class_<sanafe::SynapseUnit>(m, "SynapseUnit")
-            .def(pybind11::init<std::string>());
+    //pybind11::class_<sanafe::SynapseUnit>(m, "SynapseUnit")
+    //        .def(pybind11::init<std::string>());
 
-    pybind11::class_<sanafe::SomaUnit>(m, "SomaUnit")
-            .def(pybind11::init<std::string>());
+    //pybind11::class_<sanafe::SomaUnit>(m, "SomaUnit")
+    //        .def(pybind11::init<std::string>());
 
-    pybind11::class_<sanafe::AxonOutUnit>(m, "AxonOutUnit")
-            .def(pybind11::init<std::string>());
+    //pybind11::class_<sanafe::AxonOutUnit>(m, "AxonOutUnit")
+    //        .def(pybind11::init<std::string>());
 
     pybind11::class_<sanafe::Simulation>(m, "Simulation")
             .def(pybind11::init<sanafe::Architecture &, sanafe::Network &,

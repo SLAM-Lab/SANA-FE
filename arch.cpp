@@ -26,88 +26,52 @@
 #include "plugins.hpp"
 #include "print.hpp"
 
-sanafe::Architecture::Architecture()
+sanafe::Architecture::Architecture(
+        const std::string &name, const NetworkOnChipConfiguration &noc)
+        : name(name)
+        , core_count(0UL)
+        , noc_width(noc.width_in_tiles)
+        , noc_height(noc.height_in_tiles)
+        , noc_buffer_size(noc.buffer_size)
+        , max_cores_per_tile(0)
 {
-    noc_buffer_size = 0;
-    noc_init = false;
-    max_cores_per_tile = 0U;
-
     return;
 }
 
-int sanafe::Architecture::get_core_count()
+sanafe::NetworkOnChipConfiguration::NetworkOnChipConfiguration(
+        const int width, const int height, const int buffer_size)
+        : width_in_tiles(width)
+        , height_in_tiles(height)
+        , buffer_size(buffer_size)
 {
-    int core_count = 0;
-    for (Tile &tile : tiles)
-    {
-        core_count += tile.cores.size();
-    }
-
-    return core_count;
+    return;
 }
 
-int sanafe::Architecture::set_noc_attributes(
-        const std::map<std::string, std::string> &attr)
+std::vector<std::reference_wrapper<sanafe::Core>> sanafe::Architecture::cores()
 {
-    const size_t tile_count = tiles.size();
-    if (tile_count == 0)
+    std::vector<std::reference_wrapper<Core>> all_cores_in_arch;
+    for (auto &tile : tiles)
     {
-        // The NoC interconnect is defined after tiles are all defined
-        //  This is because we link the tiles together in the NoC mesh
-        INFO("Error: NoC must be defined after tiles.\n");
-        throw std::runtime_error("Error: NoC must be defined after tiles");
-    }
-
-    // Default values
-    noc_width = 1;
-    noc_height = 1;
-    noc_buffer_size = 0;
-
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-        if (key == "width")
+        for (auto &core : tile.cores)
         {
-            ss >> noc_width;
-        }
-        else if (key == "height")
-        {
-            ss >> noc_height;
-        }
-        else if (key == "link_buffer_size")
-        {
-            ss >> noc_buffer_size;
+            all_cores_in_arch.push_back(core);
         }
     }
 
-    // Set the x and y coordinates of the NoC tiles
-    for (Tile &tile : tiles)
-    {
-        tile.x = tile.id / noc_height;
-        tile.y = tile.id % noc_height;
-    }
-
-    noc_init = true;
-    TRACE1("NoC created, mesh, width:%d height:%d.\n", noc_width, noc_height);
-    return 0;
+    return all_cores_in_arch;
 }
 
 std::string sanafe::Architecture::info()
 {
     std::ostringstream ss;
     ss << "sanafe::Architecture(tiles=" << tiles.size();
-    ss << ", cores=" << cores_ref.size() << ")";
+    ss << ", cores=" << core_count << ")";
 
     return ss.str();
 }
 
 std::string sanafe::Architecture::description() const
 {
-    // TODO: change to just a regular map - this way attributes will be
-    //  sorted and printed alphabetically. This will make for more
-    //  consistent and deterministic behavior
     std::map<std::string, std::string> attributes;
     attributes["link_buffer_size"] = print_int(noc_buffer_size);
     attributes["topology"] = "mesh";
@@ -154,6 +118,11 @@ sanafe::Message::Message(
     dest_axon_id = 0;
     dest_axon_hw = 0;
     in_noc = false;
+
+    hops = 0;
+    spikes = 0;
+
+    return;
 }
 
 sanafe::Message::Message(const Architecture &arch, const Neuron &n,
@@ -254,11 +223,13 @@ sanafe::Tile &sanafe::Architecture::create_tile(
     //  Architecture's tile array
     tiles.push_back(Tile(name, new_tile_id, power_metrics));
     Tile &new_tile = tiles[new_tile_id];
+    new_tile.x = new_tile.id / noc_height;
+    new_tile.y = new_tile.id % noc_height;
 
     return new_tile;
 }
 
-void sanafe::Architecture::load_arch_description(
+sanafe::Architecture sanafe::load_arch_description(
         const std::filesystem::path &filename)
 {
     std::ifstream arch_fp(filename);
@@ -266,10 +237,10 @@ void sanafe::Architecture::load_arch_description(
     {
         throw std::invalid_argument("Error: Architecture file failed to open.");
     }
-    description_parse_arch_file(arch_fp, *this);
+    Architecture arch = description_parse_arch_file(arch_fp);
     arch_fp.close();
 
-    return;
+    return arch;
 }
 
 sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name,
@@ -287,8 +258,7 @@ sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name,
 }
 
 sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
-        const std::string &model_str,
-        const CoreAddress &parent_core,
+        const std::string &model_str, const CoreAddress &parent_core,
         const SynapsePowerMetrics &power_metrics)
         : name(synapse_name)
         , model(model_str)
@@ -301,8 +271,6 @@ sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
         , energy_spike_op(power_metrics.energy_spike_op)
         , latency_spike_op(power_metrics.latency_spike_op)
 {
-    energy = 0.0;
-    time = 0.0;
     return;
 }
 
@@ -331,6 +299,12 @@ sanafe::SomaUnit::SomaUnit(const std::string &soma_name,
         , neuron_count(0L)
         , energy(0.0)
         , time(0.0)
+        , energy_update_neuron(power_metrics.energy_update_neuron)
+        , latency_update_neuron(power_metrics.latency_update_neuron)
+        , energy_access_neuron(power_metrics.energy_access_neuron)
+        , latency_access_neuron(power_metrics.latency_access_neuron)
+        , energy_spiking(power_metrics.energy_spiking)
+        , latency_spiking(power_metrics.latency_spiking)
         , noise_type(NOISE_NONE)
 {
     return;
@@ -361,23 +335,20 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
     // Lookup the parent tile to assign a new core to
     Tile &parent_tile = tiles[parent_tile_id];
     const size_t offset_within_tile = parent_tile.cores.size();
-    const size_t new_core_id = get_core_count();
+    const size_t new_core_id = core_count++;
     CoreAddress new_core_address = {
             new_core_id, parent_tile_id, offset_within_tile};
 
     // Initialize the new core and refer to it at both tile and arch levels
     parent_tile.cores.push_back(Core(name, new_core_address, pipeline_config));
-    Core &new_core = parent_tile.cores.back();
-    cores_ref.push_back(new_core);
 
     // The architecture tracks the maximum cores in *any* of its tiles.
     //  This information is needed later by the scheduler, when creating
     //  structures to track spike messages and congestion in the NoC
-    const size_t cores_in_parent_tile = parent_tile.cores.size();
     max_cores_per_tile =
-            std::max<size_t>(max_cores_per_tile, cores_in_parent_tile);
-    TRACE1("Core created id:%d.%d (tile:%d).\n", new_core.parent_tile_id,
-            new_core.id);
+            std::max<size_t>(max_cores_per_tile, offset_within_tile + 1);
+    TRACE1("Core created id:%d.%d (tile:%d).\n", parent_tile_id, new_core_id);
+    Core &new_core = parent_tile.cores[offset_within_tile];
 
     return new_core;
 }
@@ -582,10 +553,9 @@ void sanafe::arch_print_axon_summary(Architecture &arch)
             }
         }
     }
-    const int core_count = arch.get_core_count();
-    INFO("Total cores: %d\n", core_count);
-    INFO("Average in map count: %lf\n", (double) in_count / core_count);
-    INFO("Average out map count: %lf\n", (double) out_count / core_count);
+    INFO("Total cores: %lu\n", arch.core_count);
+    INFO("Average in map count: %lf\n", (double) in_count / arch.core_count);
+    INFO("Average out map count: %lf\n", (double) out_count / arch.core_count);
 
     return;
 }
@@ -945,8 +915,9 @@ void sanafe::Architecture::save_arch_description(
 }
 
 sanafe::TilePowerMetrics::TilePowerMetrics(const double energy_north,
-        const double latency_north, const double energy_east, const double latency_east,
-        const double energy_south, const double latency_south, const double energy_west,
+        const double latency_north, const double energy_east,
+        const double latency_east, const double energy_south,
+        const double latency_south, const double energy_west,
         const double latency_west)
         : energy_north_hop(energy_north)
         , latency_north_hop(latency_north)
@@ -986,7 +957,7 @@ sanafe::SomaPowerMetrics::SomaPowerMetrics(const double energy_update,
 }
 
 sanafe::CorePipelineConfiguration::CorePipelineConfiguration(
-                const std::string &buffer_pos, const size_t neurons_supported)
+        const std::string &buffer_pos, const size_t neurons_supported)
         : max_neurons_supported(neurons_supported)
 {
     timestep_buffer_pos = pipeline_parse_buffer_pos_str(buffer_pos);

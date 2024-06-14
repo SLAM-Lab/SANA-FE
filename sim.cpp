@@ -121,21 +121,15 @@ sanafe::RunData sanafe::Simulation::run(
 
 sanafe::Timestep sanafe::Simulation::step()
 {
-    // TODO: remove the need to pass the network struct, only the arch
-    //  should be needed (since it links back to the net anyway)
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
     total_timesteps++;
-    struct Timestep ts = Timestep(total_timesteps, arch.get_core_count());
+    struct Timestep ts = Timestep(total_timesteps, arch.core_count);
     struct timespec ts_start, ts_end, ts_elapsed;
 
-    // Measure the wall-clock time taken to run the simulation
-    //  on the host machine
+    // Run and measure the wall-clock time taken to run the simulation
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
-
     sim_timestep(ts, arch, net);
-
-    // Calculate elapsed time
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
@@ -162,10 +156,8 @@ sanafe::Timestep sanafe::Simulation::step()
         {
             for (const auto &m : q)
             {
-                // Ignore dummy messages (without a
-                //  destination). These are inserted to
-                //  account for processing that doesn't
-                //  result in a spike being sent
+                // Ignore dummy messages (without a destination). These account
+                //  for processing that doesn't result in a spike being sent
                 sim_trace_record_message(message_trace, m);
             }
         }
@@ -312,8 +304,8 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 {
     Scheduler scheduler;
 
-    // Start the next time-step
-    ts = Timestep(ts.timestep, arch.get_core_count());
+    // Start the next time-step, clear all buffers
+    ts = Timestep(ts.timestep, arch.core_count);
     sim_reset_measurements(net, arch);
 
     pipeline_process_neurons(ts, arch);
@@ -322,7 +314,7 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
     scheduler.noc_width = arch.noc_width;
     scheduler.noc_height = arch.noc_height;
     scheduler.buffer_size = arch.noc_buffer_size;
-    scheduler.core_count = arch.get_core_count();
+    scheduler.core_count = arch.core_count;
     scheduler.max_cores_per_tile = arch.max_cores_per_tile;
 
     ts.sim_time = schedule_messages(ts.messages, scheduler);

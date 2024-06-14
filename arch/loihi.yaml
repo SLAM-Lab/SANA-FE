@@ -12,14 +12,14 @@ architecture:
   tile:
     - name: loihi_tile[0..31]
       attributes:
-        energy_east: 3.0e-12
-        latency_east: 4.1e-9
-        energy_west: 3.0e-12
-        latency_west: 4.1e-9
-        energy_north: 4.2e-12
-        latency_north: 6.5e-9
-        energy_south: 4.2e-12
-        latency_south: 6.5e-9
+        energy_north_hop: 4.2e-12
+        latency_north_hop: 6.5e-9
+        energy_east_hop: 3.0e-12
+        latency_east_hop: 4.1e-9
+        energy_south_hop: 4.2e-12
+        latency_south_hop: 6.5e-9
+        energy_west_hop: 3.0e-12
+        latency_west_hop: 4.1e-9
       core:
         - name: loihi_core[0..3]
           attributes:
@@ -56,18 +56,18 @@ architecture:
             - name: loihi_dense_synapse  # Use the name to link
               attributes:
                 model: current_based
-                energy_spike: 35.5e-12
-                latency_spike: 4.0e-9
+                energy_process_spike: 35.5e-12
+                latency_process_spike: 4.0e-9
             - name: loihi_sparse_synapse
               attributes:
                 model: current_based
-                energy_spike: 33.6e-12
-                latency_spike: 4.7e-9
+                energy_process_spike: 33.6e-12
+                latency_process_spike: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
                 model: current_based
-                energy_spike: 24.0e-12
-                latency_spike: 3.1e-9
+                energy_process_spike: 24.0e-12
+                latency_process_spike: 3.1e-9
           dendrite:
           - name: loihi_dendrites
             attributes:
@@ -77,5 +77,5 @@ architecture:
           axon_out:
             - name: loihi_out
               attributes:
-                energy: 111.0e-12
-                latency: 5.1e-9
+                energy_message_out: 111.0e-12
+                latency_message_out: 5.1e-9

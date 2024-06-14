@@ -48,6 +48,7 @@ struct TilePowerMetrics;
 struct SynapsePowerMetrics;
 struct SomaPowerMetrics;
 struct CorePipelineConfiguration;
+struct NetworkOnChipConfiguration;
 
 enum BufferPosition
 {
@@ -60,30 +61,21 @@ enum BufferPosition
 class Architecture
 {
 public:
-    std::vector<std::reference_wrapper<Core>> cores_ref;
     std::vector<Tile> tiles;
     std::string name;
+    size_t core_count;
     int noc_width, noc_height, noc_buffer_size, max_cores_per_tile;
 
-    Architecture();
-    int get_core_count();
-    int set_noc_attributes(const std::map<std::string, std::string> &attr);
+    Architecture(const std::string &name, const NetworkOnChipConfiguration &noc);
+    std::vector<std::reference_wrapper<Core>> cores();
     Tile &create_tile(const std::string &name, const TilePowerMetrics &power_metrics);
     Core &create_core(const std::string &name, const size_t parent_tile_id, const CorePipelineConfiguration &pipeline_config);
-    void load_arch_description(const std::filesystem::path &filename);
     std::string info();
     std::string description() const;
     void save_arch_description(const std::filesystem::path &path);
-
-private:
-    bool noc_init;
-    // Do *NOT* allow Architecture objects to be copied
-    //  This is because the Architecture has a lot of allocated state
-    //  from models that are (dynamically) instantiated by the plugin
-    //  mechanism. It is simpler to not allow this state to be copied than
-    //  to try to deal with that.
-    Architecture(const Architecture &copy);
 };
+
+Architecture load_arch_description(const std::filesystem::path &filename);
 
 struct Message
 {
@@ -134,7 +126,14 @@ struct CorePipelineConfiguration
     BufferPosition timestep_buffer_pos;
     size_t max_neurons_supported;
 
-    CorePipelineConfiguration(const std::string &buffer_pos="soma", const size_t max_neuron_supported=1024);
+    CorePipelineConfiguration(const std::string &buffer_pos="soma", const size_t max_neurons_supported=1024);
+};
+
+struct NetworkOnChipConfiguration
+{
+    int width_in_tiles, height_in_tiles, buffer_size;
+
+    NetworkOnChipConfiguration(const int width = 1, const int height = 1, const int buffer_size = 0);
 };
 
 class Tile
@@ -152,7 +151,6 @@ public:
     long int hops, messages_received, total_neurons_fired;
     long int north_hops, east_hops, south_hops, west_hops;
     size_t id, x, y;
-    int width; // For now just support 2 dimensions
 
     explicit Tile(const std::string &name, const size_t tile_id, const TilePowerMetrics &power_metrics);
     int get_id() { return id; }

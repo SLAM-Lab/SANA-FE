@@ -153,7 +153,7 @@ def run_spiking_experiment(mapping, max_size=30):
         # Sweep across range of network sizes
         layer_neurons = i*i
         copy_network = (True if mapping == "split_2_diff_tiles" else False)
-        arch = sf.load_arch(ARCH_FILENAME)
+        arch = kernel.load_arch_description(ARCH_FILENAME)
 
         snn = connected_layers(arch, weights[i-1].transpose(), spiking=True,
                                mapping=mapping, copy_network=copy_network)
