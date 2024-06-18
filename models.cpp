@@ -37,20 +37,16 @@ double sanafe::CurrentBasedSynapseModel::update(
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attributes(
-        const std::map<std::string, std::string> &attr)
+        const std::map<std::string, NeuronAttribute> &attr)
 {
     weight = 0.0;
     weight_bits = 8;
     synaptic_current_decay = 0.0;
     for (const auto &a : attr)
     {
-        const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-
-        if ((key[0] == 'w') || (key == "weight"))
+        if ((a.first == "w") || (a.first == "weight"))
         {
-            ss >> weight;
+            weight = std::get<double>(a.second);
         }
     }
 
@@ -81,17 +77,14 @@ double sanafe::SingleCompartmentModel::update(
 }
 
 void sanafe::SingleCompartmentModel::set_attributes(
-        const std::map<std::string, std::string> &attr)
+        const std::map<std::string, NeuronAttribute> &attr)
 {
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
-
         if (key == "dendrite_leak_decay")
         {
-            ss >> leak_decay;
+            leak_decay = std::get<double>(a.second);
         }
     }
 }
@@ -145,7 +138,8 @@ double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
         // TODO: when we have attributes preparsed this will be easier
         if (syn.attributes.find("tap") != syn.attributes.end())
         {
-            compartment = field_to_int(syn.attributes.find("tap")->second);
+            compartment = std::get<int>(
+                    syn.attributes.find("tap")->second);
         }
         assert(compartment >= 0);
         assert((size_t) compartment < tap_voltages.size());
@@ -157,13 +151,11 @@ double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
 }
 
 void sanafe::MultiTapModel1D::set_attributes(
-        const std::map<std::string, std::string> &attr)
+        const std::map<std::string, NeuronAttribute> &attr)
 {
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
 
         // TODO: simplify this once we figure the YAML parsing situation
         if (key.find("time_constant") != std::string::npos)
@@ -184,7 +176,7 @@ void sanafe::MultiTapModel1D::set_attributes(
                 time_constants.resize(compartment+1);
                 space_constants.resize(compartment+1);
             }
-            ss >> time_constants[compartment];
+            time_constants[compartment] = std::get<double>(a.second);
         }
         if (key.find("space_constant") != std::string::npos)
         {
@@ -205,7 +197,7 @@ void sanafe::MultiTapModel1D::set_attributes(
                 time_constants.resize(compartment+2);
                 space_constants.resize(compartment+1);
             }
-            ss >> space_constants[compartment];
+            space_constants[compartment] = std::get<double>(a.second);
         }
     }
 }
@@ -231,48 +223,52 @@ sanafe::LoihiLifModel::LoihiLifModel(const int gid, const int nid)
 }
 
 void sanafe::LoihiLifModel::set_attributes(
-        const std::map<std::string, std::string> &attr)
+        const std::map<std::string, NeuronAttribute2> &attr)
 {
-    for (auto a : attr)
+    for (const auto &a : attr)
     {
         const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
+        const NeuronAttribute2 &value = a.second;
         if (key == "threshold")
         {
-            ss >> threshold;
+            threshold = static_cast<double>(value);
         }
         else if (key == "reverse_threshold")
         {
-            ss >> reverse_threshold;
+            reverse_threshold = static_cast<double>(value);
         }
         else if (key == "reset")
         {
-            ss >> reset;
+            reset = static_cast<double>(value);
         }
         else if (key == "reverse_reset")
         {
-            ss >> reverse_reset;
+            reverse_reset = static_cast<double>(value);
         }
         else if (key == "reset_mode")
         {
-            reset_mode = model_parse_reset_mode(value_str);
+            const std::string reset_mode_str = static_cast<std::string>(value);
+            reset_mode =
+                    model_parse_reset_mode(reset_mode_str);
         }
         else if (key == "reverse_reset_mode")
         {
-            reverse_reset_mode = model_parse_reset_mode(value_str);
+            const std::string reverse_reset_mode_str =
+                    static_cast<std::string>(value);
+            reverse_reset_mode =
+                    model_parse_reset_mode(reverse_reset_mode_str);
         }
         else if (key == "leak_decay")
         {
-            ss >> leak_decay;
+            leak_decay = static_cast<double>(value);
         }
         else if (key == "bias")
         {
-            ss >> bias;
+            bias = static_cast<double>(value);
         }
         else if (key == "force_update")
         {
-            ss >> force_update;
+            force_update = static_cast<bool>(value);
         }
     }
 }
@@ -373,52 +369,57 @@ sanafe::TrueNorthModel::TrueNorthModel(const int gid, const int nid)
 }
 
 void sanafe::TrueNorthModel::set_attributes(
-        const std::map<std::string, std::string> &attr)
+        const std::map<std::string, NeuronAttribute2> &attr)
 {
-    for (auto a : attr)
+    for (const auto &a : attr)
     {
         const std::string &key = a.first;
-        const std::string &value_str = a.second;
-        std::istringstream ss(value_str);
+        const NeuronAttribute2 &value = a.second;
+
         if (key == "threshold")
         {
-            ss >> threshold;
+            threshold = static_cast<double>(value);
         }
         else if (key == "reverse_threshold")
         {
-            ss >> reverse_threshold;
+            reverse_threshold = static_cast<double>(value);
         }
         else if (key == "reset")
         {
-            ss >> reset;
+            reset = static_cast<double>(value);
         }
         else if (key == "reverse_reset")
         {
-            ss >> reverse_reset;
+            reverse_reset = static_cast<double>(value);
         }
         else if (key == "reset_mode")
         {
-            reset_mode = model_parse_reset_mode(value_str);
+            const std::string reset_mode_str = static_cast<std::string>(value);
+            reset_mode =
+                    model_parse_reset_mode(reset_mode_str);
         }
         else if (key == "reverse_reset_mode")
         {
-            reverse_reset_mode = model_parse_reset_mode(value_str);
+            const std::string reverse_reset_mode_str =
+                    static_cast<std::string>(value);
+            reverse_reset_mode =
+                    model_parse_reset_mode(reverse_reset_mode_str);
         }
         else if (key == "leak")
         {
-            ss >> leak;
+            leak = static_cast<double>(value);
         }
         else if (key == "bias")
         {
-            ss >> bias;
+            bias = static_cast<double>(value);
         }
         else if (key == "force_update")
         {
-            ss >> force_update;
+            force_update = static_cast<bool>(value);
         }
         else if (key == "leak_towards_zero")
         {
-            ss >> leak_towards_zero;
+            leak_towards_zero = static_cast<bool>(value);
         }
     }
 }

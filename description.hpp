@@ -4,32 +4,20 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 #include <yaml-cpp/yaml.h>
 
+#include "arch.hpp"
+#include "network.hpp"
+
 namespace sanafe
 {
-enum DescriptionRet
-{
-    RET_FAIL = -1,
-    RET_OK = 0, // Anything >= 0 means successfully parsed
-};
-
-// Forward struct declarations
-class Simulation;
-class Architecture;
-class Network;
-class NeuronGroup;
-class Neuron;
-class Tile;
-class Core;
-struct CorePipelineConfiguration;
-struct TilePowerMetrics;
-struct NetworkOnChipConfiguration;
-
 Architecture description_parse_arch_file(std::ifstream &fp);
+/*
 int description_parse_net_file(std::ifstream &fp, Network &net, Architecture &arch);
 void description_get_fields(std::vector<std::string_view> &fields, const std::string &line);
 void description_read_network_entry(const std::vector<std::string_view> &fields, Architecture &arch, Network &net, const int line_number);
@@ -38,6 +26,7 @@ void parse_core_field(const std::string_view &core_field, size_t &tile_id, size_
 void parse_edge_field(const std::string_view &edge_field, size_t &group_id, size_t &neuron_id, size_t &dest_group_id, size_t &dest_neuron_id);
 void parse_mapping_field(const std::string_view &mapping_field, size_t &group_id, size_t &neuron_id, size_t &tile_id, size_t &core_offset);
 size_t field_to_int(const std::string_view &field);
+*/
 
 Architecture description_parse_arch_section(const YAML::Node &arch_node);
 void description_parse_tile_section(const YAML::Node &tile_node, Architecture &arch);
@@ -51,6 +40,20 @@ std::pair<size_t, size_t> description_parse_range(const std::string &tile_name);
 CorePipelineConfiguration description_parse_core_pipeline(const YAML::Node &attributes);
 TilePowerMetrics description_parse_tile_metrics(const YAML::Node &attributes);
 NetworkOnChipConfiguration description_parse_noc_configuration(const YAML::Node &arch_node);
+
+Network description_parse_net_file_new(std::ifstream &fp, Architecture &arch);
+Network description_parse_net_section(const YAML::Node &net_node, Architecture &arch);
+void description_parse_neuron_group_section(const YAML::Node &neuron_group_node, Architecture &arch, Network &net);
+void description_parse_edge_section(const YAML::Node &edge_node, Network &net);
+void description_parse_neuron_section(const YAML::Node &neuron_node, Architecture &arch, NeuronGroup &neuron_group);
+NeuronTemplate description_parse_neuron_attributes(const YAML::Node &attributes, const NeuronTemplate &default_template = NeuronTemplate());
+void description_parse_mapping_subsection(const YAML::Node &mapping_node, Architecture &arch, Neuron &neuron);
+
+std::map<std::string, NeuronAttribute2> description_parse_soma_model_parameters(const YAML::Node &soma_attributes);
+std::map<std::string, NeuronAttribute2> description_parse_dendrite_model_parameters(const YAML::Node &dendrite_attributes);
+
+NeuronAttribute2 description_parse_model_attribute(const YAML::Node &attribute_node);
+
 }
 
 #endif

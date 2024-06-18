@@ -6,13 +6,14 @@
 #ifndef PRINT_HEADER_INCLUDED_
 #define PRINT_HEADER_INCLUDED_
 
+#include <any>
 #include <cstdio>
 #include <map>
 #include <string>
 
 namespace sanafe
 {
-std::string print_format_attributes(const std::map<std::string, std::string> &attr);
+std::string print_format_attributes(const std::map<std::string, std::any> &attr);
 std::string print_float(const double val);
 std::string print_int(const long int val);
 }

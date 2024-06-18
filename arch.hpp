@@ -71,11 +71,11 @@ public:
     Tile &create_tile(const std::string &name, const TilePowerMetrics &power_metrics);
     Core &create_core(const std::string &name, const size_t parent_tile_id, const CorePipelineConfiguration &pipeline_config);
     std::string info();
-    std::string description() const;
-    void save_arch_description(const std::filesystem::path &path);
+    //std::string description() const;
+    //void save_arch_description(const std::filesystem::path &path);
 };
 
-Architecture load_arch(const std::filesystem::path &filename);
+Architecture load_arch(const std::filesystem::path &path);
 
 struct Message
 {
@@ -155,7 +155,7 @@ public:
     explicit Tile(const std::string &name, const size_t tile_id, const TilePowerMetrics &power_metrics);
     int get_id() { return id; }
     std::string info() const;
-    std::string description() const;
+    //std::string description() const;
 };
 
 struct CoreAddress
@@ -196,7 +196,7 @@ public:
     int get_id() { return id; }
     int get_offset() { return offset; }
     std::string info() const;
-    std::string description() const;
+    //std::string description() const;
 };
 
 struct AxonInUnit
@@ -208,7 +208,7 @@ struct AxonInUnit
     double energy_spike_message, latency_spike_message;
 
     explicit AxonInUnit(const std::string &axon_in_name, const CoreAddress &parent_core_address, const double energy_message=0.0, const double latency_message=0.0);
-    std::string description() const;
+    //std::string description() const;
 };
 
 struct SynapseUnit
@@ -222,7 +222,7 @@ struct SynapseUnit
     double energy_spike_op, latency_spike_op;
 
     explicit SynapseUnit(const std::string &synapse_name, const std::string &model_str, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics);
-    std::string description() const;
+    //std::string description() const;
 };
 
 struct DendriteUnit
@@ -233,7 +233,7 @@ struct DendriteUnit
     double energy, time;
     double energy_access, latency_access;
     explicit DendriteUnit(const std::string &dendrite_name, const std::string &model_str, const CoreAddress &parent_core, const double energy_cost=0.0, const double latency_cost=0.0);
-    std::string description() const;
+    //std::string description() const;
 };
 
 struct SomaUnit
@@ -250,7 +250,7 @@ struct SomaUnit
     int noise_type;
 
     explicit SomaUnit(const std::string &soma_name, const std::string &model_str, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics);
-    std::string description() const;
+    //std::string description() const;
 };
 
 struct AxonOutUnit
@@ -264,7 +264,7 @@ struct AxonOutUnit
     double energy_access, latency_access;
 
     explicit AxonOutUnit(const std::string &axon_out_name, const CoreAddress &parent_core, const double energy_access, const double latency_access);
-    std::string description() const;
+    //std::string description() const;
 };
 
 struct AxonInModel

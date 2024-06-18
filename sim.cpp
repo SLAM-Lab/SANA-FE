@@ -543,7 +543,7 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
 {
     for (auto &group : net.groups)
     {
-        for (auto &n : group.neurons)
+        for (auto &n : group->neurons)
         {
             n.status = sanafe::IDLE;
         }
@@ -630,11 +630,11 @@ void sanafe::sim_trace_write_potential_header(
     potential_trace_file << "timestep,";
     for (auto &group : net.groups)
     {
-        for (auto &n : group.neurons)
+        for (auto &n : group->neurons)
         {
             if (n.log_potential)
             {
-                potential_trace_file << "neuron " << group.id;
+                potential_trace_file << "neuron " << group->id;
                 potential_trace_file << "." << n.id << ",";
             }
         }
@@ -684,7 +684,7 @@ void sanafe::sim_trace_record_spikes(
 
     for (auto &group : net.groups)
     {
-        for (auto &n : group.neurons)
+        for (auto &n : group->neurons)
         {
             if (n.log_spikes && (n.status == sanafe::FIRED))
             {
@@ -711,7 +711,7 @@ void sanafe::sim_trace_record_potentials(
     long int potential_probe_count = 0;
     for (auto &group : net.groups)
     {
-        for (auto &n : group.neurons)
+        for (auto &n : group->neurons)
         {
             if (n.log_potential)
             {

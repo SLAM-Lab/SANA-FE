@@ -70,6 +70,7 @@ std::string sanafe::Architecture::info()
     return ss.str();
 }
 
+/*
 std::string sanafe::Architecture::description() const
 {
     std::map<std::string, std::string> attributes;
@@ -82,6 +83,7 @@ std::string sanafe::Architecture::description() const
     ss << '@' << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
+*/
 
 sanafe::Message::Message(
         const Architecture &arch, const Neuron &n, const int ts)
@@ -182,6 +184,7 @@ std::string sanafe::Tile::info() const
     return ss.str();
 }
 
+/*
 std::string sanafe::Tile::description() const
 {
     std::map<std::string, std::string> attributes;
@@ -198,6 +201,7 @@ std::string sanafe::Tile::description() const
     ss << "t " << name << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
+*/
 
 sanafe::Core::Core(const std::string &name, const CoreAddress &address,
         const CorePipelineConfiguration &pipeline)
@@ -229,14 +233,17 @@ sanafe::Tile &sanafe::Architecture::create_tile(
     return new_tile;
 }
 
-sanafe::Architecture sanafe::load_arch(
-        const std::filesystem::path &filename)
+sanafe::Architecture sanafe::load_arch(const std::filesystem::path &path)
 {
-    std::ifstream arch_fp(filename);
+    std::ifstream arch_fp(path);
+
     if (arch_fp.fail())
     {
-        throw std::invalid_argument("Error: Architecture file failed to open.");
+        const std::string error = "Error: Architecture file: " +
+                std::string(path) + "failed to open.";
+        throw std::invalid_argument(error);
     }
+    INFO("Loading architecture from file: %s\n", path.c_str());
     Architecture arch = description_parse_arch_file(arch_fp);
     arch_fp.close();
 
@@ -361,6 +368,7 @@ std::string sanafe::Core::info() const
     return ss.str();
 }
 
+/*
 std::string sanafe::Core::description() const
 {
     std::ostringstream ss;
@@ -434,6 +442,7 @@ std::string sanafe::AxonOutUnit::description() const
     ss << print_format_attributes(attributes) << std::endl;
     return ss.str();
 }
+*/
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(const std::string &name,
         const double energy_message, const double latency_message)
@@ -755,12 +764,13 @@ void sanafe::Core::map_neuron(Neuron &n)
             n.soma_model = plugin_get_soma(n.soma_hw->model, n.parent_group_id,
                     n.id, n.soma_hw->plugin_lib);
         }
-        const NeuronGroup &group = n.parent_net->groups_vec[n.parent_group_id];
+        const NeuronGroup &group = *(n.parent_net->groups[n.parent_group_id]);
         assert(n.soma_model != nullptr);
         // First set the group's default attribute values, and then
         //  any defined by the neuron
-        n.soma_model->set_attributes(group.default_attributes);
-        n.soma_model->set_attributes(n.attributes);
+        n.soma_model->set_attributes(
+                group.default_neuron_config.soma_model_attributes);
+        n.soma_model->set_attributes(n.soma_model_attributes);
     }
 
     if (n.dendrite_model == nullptr)
@@ -781,11 +791,12 @@ void sanafe::Core::map_neuron(Neuron &n)
             n.dendrite_model = sanafe::plugin_get_dendrite(
                     n.dendrite_hw->model, n.dendrite_hw->plugin_lib);
         }
-        const NeuronGroup &group = n.parent_net->groups_vec[n.parent_group_id];
+        const NeuronGroup &group = *(n.parent_net->groups[n.parent_group_id]);
         assert(n.dendrite_model != nullptr);
         // Global attributes for all compartments in the dendrite
-        n.dendrite_model->set_attributes(group.default_attributes);
-        n.dendrite_model->set_attributes(n.attributes);
+        n.dendrite_model->set_attributes(
+                group.default_neuron_config.dendrite_model_attributes);
+        n.dendrite_model->set_attributes(n.dendrite_model_attributes);
     }
 
     return;
@@ -870,6 +881,7 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
     return;
 }
 
+/*
 void sanafe::Architecture::save_arch_description(
         const std::filesystem::path &path)
 {
@@ -913,6 +925,7 @@ void sanafe::Architecture::save_arch_description(
     }
     out << description();
 }
+*/
 
 sanafe::TilePowerMetrics::TilePowerMetrics(const double energy_north,
         const double latency_north, const double energy_east,

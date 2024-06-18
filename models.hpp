@@ -32,7 +32,7 @@ public:
     virtual ~SynapseModel() {}
     virtual double update(std::optional<int> synapse_address=std::nullopt, const bool step=true) = 0;
     // Set synapse attributes
-    virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr) = 0;
 };
 
 class DendriteModel
@@ -44,7 +44,7 @@ public:
     //  Might be easier to just make it two optional arguments... unpack it from the Synapse struct
     //  If it's optional, it gets harder to pass a reference, maybe should pass a pointer instead...
     virtual double update(std::optional<Synapse> synapse_in=std::nullopt, const bool step=true) = 0;
-    virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr) = 0;
 };
 
 class CurrentBasedSynapseModel: public SynapseModel
@@ -53,7 +53,7 @@ public:
     CurrentBasedSynapseModel();
     ~CurrentBasedSynapseModel() {}
     virtual double update(std::optional<int> synapse_address=std::nullopt,  const bool step=true);
-    virtual void set_attributes(const std::map<std::string, std::string> &attr);
+    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr);
 
 private:
     double weight, min_synaptic_resolution, current, synaptic_current_decay;
@@ -66,7 +66,7 @@ public:
     SingleCompartmentModel();
     ~SingleCompartmentModel() {}
     virtual double update(std::optional<Synapse> current_in=std::nullopt, const bool step=true);
-    virtual void set_attributes(const std::map<std::string, std::string> &attr);
+    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr);
 private:
     double accumulated_charge, leak_decay;
 };
@@ -76,7 +76,7 @@ class MultiTapModel1D: public DendriteModel
 public:
     MultiTapModel1D();
     virtual double update(std::optional<Synapse> current_in=std::nullopt, const bool step=true);
-    virtual void set_attributes(const std::map<std::string, std::string> &attr);
+    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr);
 private:
     // Assuming a 1D tap dendrite
     std::vector<double> tap_voltages, next_voltages;
@@ -89,7 +89,7 @@ public:
     SomaModel(const int gid, const int nid) : group_id(gid), neuron_id(nid) {}
     virtual ~SomaModel() {}
     virtual NeuronStatus update(const std::optional<double> current_in=std::nullopt, const bool step=true) = 0;
-    virtual void set_attributes(const std::map<std::string, std::string> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, NeuronAttribute2> &attr) = 0;
     virtual double get_potential() { return 0.0; }
 protected:
     const int group_id, neuron_id;
@@ -100,7 +100,7 @@ class LoihiLifModel: public SomaModel
 public:
     LoihiLifModel(const int gid, const int nid);
     ~LoihiLifModel() {}
-    void set_attributes(const std::map<std::string, std::string> &attr);
+    void set_attributes(const std::map<std::string, NeuronAttribute2> &attr);
     NeuronStatus update(const std::optional<double> current_in,  const bool step=true);
     double get_potential() { return potential; }
 private:
@@ -116,7 +116,7 @@ class TrueNorthModel: public SomaModel
 public:
     TrueNorthModel(const int gid, const int nid);
     ~TrueNorthModel() {}
-    void set_attributes(const std::map<std::string, std::string> &attr);
+    void set_attributes(const std::map<std::string, NeuronAttribute2> &attr);
     NeuronStatus update(const std::optional<double> current_in=std::nullopt,  const bool step=true);
     double get_potential() { return potential; }
 private:
