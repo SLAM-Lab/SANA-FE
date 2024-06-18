@@ -47,13 +47,12 @@ void description_parse_neuron_group_section(const YAML::Node &neuron_group_node,
 void description_parse_edge_section(const YAML::Node &edge_node, Network &net);
 void description_parse_neuron_section(const YAML::Node &neuron_node, Architecture &arch, NeuronGroup &neuron_group);
 NeuronTemplate description_parse_neuron_attributes(const YAML::Node &attributes, const NeuronTemplate &default_template = NeuronTemplate());
-void description_parse_mapping_subsection(const YAML::Node &mapping_node, Architecture &arch, Neuron &neuron);
+void description_parse_neuron_mapping_subsection(const YAML::Node &mapping_node, Architecture &arch, Neuron &neuron);
+void description_parse_edge_mapping_subsection(const YAML::Node &mapping_node, Connection &edge);
 
-std::map<std::string, NeuronAttribute2> description_parse_soma_model_parameters(const YAML::Node &soma_attributes);
-std::map<std::string, NeuronAttribute2> description_parse_dendrite_model_parameters(const YAML::Node &dendrite_attributes);
-
-NeuronAttribute2 description_parse_model_attribute(const YAML::Node &attribute_node);
-
+std::map<std::string, ModelParam> description_parse_model_parameters(const YAML::Node &parameters_node);
+ModelParam description_parse_parameter(const YAML::Node &attribute_node);
+size_t description_count_neurons(const YAML::Node &neurons_node);
 }
 
 #endif

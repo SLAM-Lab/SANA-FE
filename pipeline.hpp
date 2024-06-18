@@ -5,7 +5,7 @@
 //  pipeline.hpp
 namespace sanafe
 {
-struct Architecture;
+class Architecture;
 struct Timestep;
 
 void pipeline_process_neurons(Timestep &ts, Architecture &arch);
@@ -13,12 +13,14 @@ void pipeline_process_messages(Timestep &ts, Architecture &arch);
 
 void pipeline_process_neuron(Timestep &ts, Architecture &arch, Neuron &n);
 void pipeline_receive_message(Architecture &arch, Message &m);
-double pipeline_process_message(Timestep &ts, Architecture &arch, Core &c, Message &m);
+double pipeline_process_message(Timestep &ts, Core &c, Message &m);
 
 double pipeline_process_axon_in(Core &core, const Message &m);
-double pipeline_process_synapse(Timestep &ts, Architecture &arch, Connection &con, const int synapse_address);
-double pipeline_process_dendrite(Timestep &ts, Architecture &arch, Neuron &n);
-double pipeline_process_soma(Timestep &ts, Architecture &arch, Neuron &n);
+double pipeline_process_synapse(Timestep &ts, Connection &con, const int synapse_address);
+double pipeline_process_dendrite(Timestep &ts, Neuron &n);
+double pipeline_process_soma(Timestep &ts, Neuron &n);
 double pipeline_process_axon_out(Timestep &ts, Architecture &arch, Neuron &n);
 BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str);
+
+size_t abs_diff(const size_t a, const size_t b);
 }

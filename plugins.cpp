@@ -125,12 +125,7 @@ std::shared_ptr<sanafe::SynapseModel> sanafe::plugin_get_synapse(
 {
     if (plugin_path.empty())
     {
-        // Use default path, which is in the plugin directory and
-        const std::string model_filename = model_name + ".so";
-        plugin_path = std::filesystem::path(".") /
-                std::filesystem::path("plugins") / model_filename;
-        INFO("No path given; setting path to default: %s\n",
-                plugin_path.c_str());
+        throw std::runtime_error("No plugin path given.");
     }
 
     INFO("Getting synapse:%s\n", model_name.c_str());
@@ -147,12 +142,7 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::plugin_get_dendrite(
 {
     if (plugin_path.empty())
     {
-        // Use default path, which is in the plugin directory and
-        const std::string model_filename = model_name + ".so";
-        plugin_path = std::filesystem::path(".") /
-                std::filesystem::path("plugins") / model_filename;
-        INFO("No path given; setting path to default: %s\n",
-                plugin_path.c_str());
+        throw std::runtime_error("No plugin path given.");
     }
 
     INFO("Getting dendrite:%s\n", model_name.c_str());
@@ -170,12 +160,7 @@ std::shared_ptr<sanafe::SomaModel> sanafe::plugin_get_soma(
 {
     if (plugin_path.empty())
     {
-        // Use default path, which is in the plugin directory and
-        const std::string model_filename = model_name + ".so";
-        plugin_path = std::filesystem::path(".") /
-                std::filesystem::path("plugins") / model_filename;
-        INFO("No path given; setting path to default: %s\n",
-                plugin_path.c_str());
+        throw std::runtime_error("No plugin path given.");
     }
 
     INFO("Getting soma:%s\n", model_name.c_str());

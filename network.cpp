@@ -24,13 +24,11 @@
 
 sanafe::NeuronTemplate::NeuronTemplate(const std::string &soma_hw_name,
         const std::string &default_synapse_hw_name,
-        const std::string &dendrite_hw_name, const size_t max_connections_out,
-        const bool log_spikes, const bool log_potential,
-        const bool force_update)
+        const std::string &dendrite_hw_name, const bool log_spikes,
+        const bool log_potential, const bool force_update)
         : soma_hw_name(soma_hw_name)
         , default_synapse_hw_name(default_synapse_hw_name)
         , dendrite_hw_name(dendrite_hw_name)
-        , max_connections_out(max_connections_out)
         , log_spikes(log_spikes)
         , log_potential(log_potential)
         , force_update(force_update)
@@ -39,13 +37,14 @@ sanafe::NeuronTemplate::NeuronTemplate(const std::string &soma_hw_name,
 }
 
 sanafe::Connection::Connection(const int connection_id)
+        : post_neuron(nullptr)
+        , pre_neuron(nullptr)
+        , synapse_hw(nullptr)
+        , id(connection_id)
+        , delay(0)
+        , last_updated(0)
 {
-    id = connection_id;
-    pre_neuron = nullptr;
-    post_neuron = nullptr;
-    synapse_hw = nullptr;
-    last_updated = 0;
-    delay = 0;
+    return;
 }
 
 /*
@@ -101,12 +100,12 @@ sanafe::Neuron::Neuron(const size_t neuron_id, const size_t parent_group_id,
         , spike_count(0)
         , soma_last_updated(0)
         , dendrite_last_updated(0)
-        , max_connections_out(config.max_connections_out)
         , maps_in_count(0)
         , maps_out_count(0)
         , status(sanafe::IDLE)
+        , soma_input_charge(0.0)
+        , axon_out_input_spike(false)
 {
-    connections_out.reserve(max_connections_out);
     return;
 }
 
@@ -182,31 +181,135 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &config)
 {
     assert(connections_out.size() == 0);
 
-    // TODO: does it actually make sense to allow this function to even exist,
-    //  or should Neurons be initialized at the point of creation
     soma_hw_name = config.soma_hw_name;
     default_synapse_hw_name = config.default_synapse_hw_name;
     dendrite_hw_name = config.dendrite_hw_name;
-    max_connections_out = config.max_connections_out;
-    //soma_plugin = config.soma_plugin;
 
     if (soma_model != nullptr)
     {
-        soma_model->set_attributes(config.soma_model_attributes);
+        soma_model->set_attributes(config.soma_model_params);
     }
-    soma_model_attributes.insert(config.soma_model_attributes.begin(),
-            config.soma_model_attributes.end());
+    soma_model_params.insert(
+            config.soma_model_params.begin(), config.soma_model_params.end());
     if (dendrite_model != nullptr)
     {
-        dendrite_model->set_attributes(config.dendrite_model_attributes);
+        dendrite_model->set_attributes(config.dendrite_model_params);
     }
-    dendrite_model_attributes.insert(config.dendrite_model_attributes.begin(),
-            config.dendrite_model_attributes.end());
+    dendrite_model_params.insert(config.dendrite_model_params.begin(),
+            config.dendrite_model_params.end());
 
     log_potential = config.log_potential;
     log_spikes = config.log_spikes;
     force_update = config.force_update;
 }
+
+void sanafe::Neuron::connect_to_neuron(Neuron &dest,
+        const std::map<std::string, ModelParam> &synapse_params,
+        const std::map<std::string, ModelParam> &dendrite_params,
+        const std::optional<std::string> &synapse_hw_name)
+{
+    connections_out.push_back(Connection(connections_out.size()));
+    Connection &con = connections_out.back();
+    con.pre_neuron = this;
+    con.post_neuron = &dest;
+    if (synapse_hw_name.has_value())
+    {
+        con.synapse_hw_name = synapse_hw_name.value();
+    }
+    else
+    {
+        con.synapse_hw_name = default_synapse_hw_name;
+    }
+    con.synapse_params.insert(synapse_params.begin(), synapse_params.end());
+    con.dendrite_params.insert(dendrite_params.begin(), dendrite_params.end());
+
+    INFO("\tAdded con %d.%d->%d.%d\n", con.pre_neuron->parent_group_id,
+            con.pre_neuron->id, con.post_neuron->parent_group_id,
+            con.post_neuron->id);
+    return;
+}
+
+sanafe::Network sanafe::load_net(
+        const std::filesystem::path &path, Architecture &arch)
+{
+    std::ifstream network_fp;
+
+    network_fp.open(path);
+    if (network_fp.fail())
+    {
+        const std::string error =
+                "Error: Network file: " + std::string(path) + "failed to open.";
+        throw std::invalid_argument(error);
+    }
+    INFO("Loading network from file: %s\n", path.c_str());
+    Network net = description_parse_net_file_new(network_fp, arch);
+    network_fp.close();
+
+    return net;
+}
+
+std::string sanafe::Network::info() const
+{
+    std::ostringstream ss;
+
+    ss << "sanafe::Network(groups=" << groups.size() << ")";
+    return ss.str();
+}
+
+void sanafe::Network::check_mapped() const
+{
+    // Check that all network neurons are mapped to a physical core
+    //  If a neuron is not, print an error message and stop the simulation
+    for (const auto &group : groups)
+    {
+        for (const Neuron &n : group->neurons)
+        {
+            if (n.core == nullptr)
+            {
+                INFO("Error: Neuron %d.%d not mapped to H/W.\n", group->id,
+                        n.id);
+                throw std::runtime_error("Error: Neuron isn't mapped");
+            }
+        }
+    }
+}
+
+/*
+void sanafe::Network::save_net_description(
+        const std::filesystem::path &path, const bool save_mapping) const
+{
+    std::ofstream out(path);
+    if (!out.is_open())
+    {
+        INFO("Error: Couldn't open net file to save to: %s\n", path.c_str());
+        throw std::invalid_argument(
+                "Error: Couldn't open net file to save to.");
+    }
+
+    // Save all groups first
+    for (const auto &group : groups)
+    {
+        out << group->description();
+    }
+
+    // Now save all neurons and connections
+    for (const auto &group : groups)
+    {
+        for (const Neuron &n : group->neurons)
+        {
+            // Save neuron description
+            out << n.description(save_mapping);
+            // Save all edges for this neuron
+            for (const Connection &con : n.connections_out)
+            {
+                out << con.description();
+            }
+        }
+    }
+
+    return;
+}
+*/
 
 /*
 void sanafe::NeuronGroup::set_attribute_multiple(
@@ -276,111 +379,3 @@ void sanafe::NeuronGroup::connect_neurons(NeuronGroup &dest_group,
     }
 }
 */
-
-void sanafe::Neuron::connect_to_neuron(Neuron &dest,
-        const std::map<std::string, NeuronAttribute> &attr)
-{
-    connections_out.push_back(Connection(connections_out.size()));
-    Connection &con = connections_out.back();
-    con.pre_neuron = this;
-    con.post_neuron = &dest;
-    con.synapse_hw_name = default_synapse_hw_name;
-
-    for (const auto &a : attr)
-    {
-        const std::string &key = a.first;
-        const std::string &value_str = std::get<std::string>(a.second);
-        if (key == "hw_name")
-        {
-            con.synapse_hw_name = value_str;
-        }
-    }
-    con.attributes.insert(attr.begin(), attr.end());
-
-    TRACE1("\tAdded con %d.%d->%d.%d (w:%lf)\n",
-            con.pre_neuron->parent_group_id, con.pre_neuron->id,
-            con.post_neuron->parent_group_id, con.post_neuron->id, con.weight);
-    return;
-}
-
-sanafe::Network sanafe::load_net(
-        const std::filesystem::path &path, Architecture &arch)
-{
-    std::ifstream network_fp;
-
-    network_fp.open(path);
-    if (network_fp.fail())
-    {
-        const std::string error =
-                "Error: Network file: " + std::string(path) + "failed to open.";
-        throw std::invalid_argument(error);
-    }
-    INFO("Loading network from file: %s\n", path.c_str());
-    Network net = description_parse_net_file_new(network_fp, arch);
-    network_fp.close();
-
-    return net;
-}
-
-/*
-void sanafe::Network::save_net_description(
-        const std::filesystem::path &path, const bool save_mapping) const
-{
-    std::ofstream out(path);
-    if (!out.is_open())
-    {
-        INFO("Error: Couldn't open net file to save to: %s\n", path.c_str());
-        throw std::invalid_argument(
-                "Error: Couldn't open net file to save to.");
-    }
-
-    // Save all groups first
-    for (const auto &group : groups)
-    {
-        out << group->description();
-    }
-
-    // Now save all neurons and connections
-    for (const auto &group : groups)
-    {
-        for (const Neuron &n : group->neurons)
-        {
-            // Save neuron description
-            out << n.description(save_mapping);
-            // Save all edges for this neuron
-            for (const Connection &con : n.connections_out)
-            {
-                out << con.description();
-            }
-        }
-    }
-
-    return;
-}
-*/
-
-std::string sanafe::Network::info() const
-{
-    std::ostringstream ss;
-
-    ss << "sanafe::Network(groups=" << groups.size() << ")";
-    return ss.str();
-}
-
-void sanafe::Network::check_mapped() const
-{
-    // Check that all network neurons are mapped to a physical core
-    //  If a neuron is not, print an error message and stop the simulation
-    for (const auto &group : groups)
-    {
-        for (const Neuron &n : group->neurons)
-        {
-            if (n.core == nullptr)
-            {
-                INFO("Error: Neuron %d.%d not mapped to H/W.\n", group->id,
-                        n.id);
-                throw std::runtime_error("Error: Neuron isn't mapped");
-            }
-        }
-    }
-}

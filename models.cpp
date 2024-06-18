@@ -37,16 +37,19 @@ double sanafe::CurrentBasedSynapseModel::update(
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attributes(
-        const std::map<std::string, NeuronAttribute> &attr)
+        const std::map<std::string, ModelParam> &attr)
 {
     weight = 0.0;
     weight_bits = 8;
     synaptic_current_decay = 0.0;
+
     for (const auto &a : attr)
     {
-        if ((a.first == "w") || (a.first == "weight"))
+        const std::string &key = a.first;
+        const ModelParam &value = a.second;
+        if ((key == "w") || (key == "weight"))
         {
-            weight = std::get<double>(a.second);
+            weight = static_cast<double>(value);
         }
     }
 
@@ -77,29 +80,30 @@ double sanafe::SingleCompartmentModel::update(
 }
 
 void sanafe::SingleCompartmentModel::set_attributes(
-        const std::map<std::string, NeuronAttribute> &attr)
+        const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
+        const ModelParam &value = a.second;
         if (key == "dendrite_leak_decay")
         {
-            leak_decay = std::get<double>(a.second);
+            leak_decay = static_cast<double>(value);
         }
     }
 }
 
 sanafe::MultiTapModel1D::MultiTapModel1D()
 {
-    const int default_taps = 1;
+    const size_t default_taps = 1;
     tap_voltages = std::vector<double>(default_taps, 0.0);
     next_voltages = std::vector<double>(default_taps, 0.0);
-    space_constants = std::vector<double>(default_taps-1, 0.0);
+    space_constants = std::vector<double>(default_taps - 1, 0.0);
     time_constants = std::vector<double>(default_taps, 0.0);
 }
 
-double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
-        const bool step)
+double sanafe::MultiTapModel1D::update(
+        const std::optional<Synapse> synapse_in, const bool step)
 {
     if (step)
     {
@@ -112,16 +116,16 @@ double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
         {
             if (src_tap > 0)
             {
-                const double proximal_current = tap_voltages[src_tap] *
-                        space_constants[src_tap - 1];
+                const double proximal_current =
+                        tap_voltages[src_tap] * space_constants[src_tap - 1];
                 next_voltages[src_tap - 1] += proximal_current;
                 next_voltages[src_tap] -= proximal_current;
                 //INFO("t%ld proximal current:%lf ", src_tap, proximal_current);
             }
             if (src_tap < (taps - 1))
             {
-                const double distal_current = tap_voltages[src_tap] *
-                        space_constants[src_tap];
+                const double distal_current =
+                        tap_voltages[src_tap] * space_constants[src_tap];
                 next_voltages[src_tap + 1] += distal_current;
                 next_voltages[src_tap] -= distal_current;
             }
@@ -135,69 +139,81 @@ double sanafe::MultiTapModel1D::update(const std::optional<Synapse> synapse_in,
     {
         const Synapse &syn = synapse_in.value();
         int compartment = 0;
-        // TODO: when we have attributes preparsed this will be easier
-        if (syn.attributes.find("tap") != syn.attributes.end())
+        const auto &tap = syn.dendrite_params.find("tap");
+        if (tap != syn.dendrite_params.end())
         {
-            compartment = std::get<int>(
-                    syn.attributes.find("tap")->second);
+            compartment = static_cast<int>(tap->second);
         }
         assert(compartment >= 0);
         assert((size_t) compartment < tap_voltages.size());
         tap_voltages[compartment] += synapse_in.value().current;
     }
 
+    INFO("***\n");
+    for (size_t i = 0; i < tap_voltages.size(); i++)
+    {
+        printf("\tv[%lu]: %lf\n", i, tap_voltages[i]);
+    }
+    INFO("***\n");
     // Return current for most proximal tap (which is always the first tap)
     return tap_voltages[0];
 }
 
 void sanafe::MultiTapModel1D::set_attributes(
-        const std::map<std::string, NeuronAttribute> &attr)
+        const std::map<std::string, ModelParam> &attr)
 {
+    if (attr.find("taps") != attr.end())
+    {
+        if (tap_voltages.size() > 1)
+        {
+            INFO("Warning: Redefining number of taps, constants might be "
+                 "wrong.\n");
+        }
+        const size_t n_taps = static_cast<int>(attr.at("taps"));
+        if (n_taps == 0)
+        {
+            throw std::invalid_argument("Error: Number of taps must be > 0\n");
+        }
+        tap_voltages.resize(n_taps);
+        next_voltages.resize(n_taps);
+        time_constants.resize(n_taps);
+        space_constants.resize(n_taps - 1);
+    }
+
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
+        const ModelParam &params = a.second;
 
-        // TODO: simplify this once we figure the YAML parsing situation
-        if (key.find("time_constant") != std::string::npos)
+        if (key == "time_constants")
         {
-            const size_t start_pos = key.find("[") + 1;
-            const size_t end_pos = key.find("]");
-            std::istringstream compartment_ss(
-                    key.substr(start_pos, end_pos - start_pos));
-            // E.g., time_constant[0], time_constant[1]
-            size_t compartment;
-            compartment_ss >> compartment;
-            // TODO: hacky way to allow for any order of attributes to be
-            //  supported.  When this a list of values then it'll get easier
-            if ((compartment+1) > time_constants.size())
+            time_constants = static_cast<std::vector<double>>(params);
+            const size_t n_taps = tap_voltages.size();
+            if (time_constants.size() != n_taps)
             {
-                tap_voltages.resize(compartment+1);
-                next_voltages.resize(compartment+1);
-                time_constants.resize(compartment+1);
-                space_constants.resize(compartment+1);
+                std::string error = "Error: Expected " +
+                        std::to_string(n_taps) + " but received " +
+                        std::to_string(time_constants.size()) +
+                        "time constants.";
+                throw std::invalid_argument(error);
             }
-            time_constants[compartment] = std::get<double>(a.second);
         }
-        if (key.find("space_constant") != std::string::npos)
+        else if (key == "space_constants")
         {
-            // TODO: hacky way to allow for any order of attributes to be
-            //  supported.  When this a list of values then it'll get easier
-            const size_t start_pos = key.find("[") + 1;
-            const size_t end_pos = key.find("]");
-            INFO("start%ld end:%ld\n", start_pos, end_pos);
-            std::istringstream compartment_ss(
-                    key.substr(start_pos, end_pos - start_pos));
-            size_t compartment;
-            compartment_ss >> compartment;
-
-            if ((compartment+1) > space_constants.size())
+            space_constants = static_cast<std::vector<double>>(params);
+            const size_t n_taps = tap_voltages.size();
+            if (space_constants.size() != (n_taps - 1))
             {
-                tap_voltages.resize(compartment+2);
-                next_voltages.resize(compartment+2);
-                time_constants.resize(compartment+2);
-                space_constants.resize(compartment+1);
+                std::string error = "Error: Expected " +
+                        std::to_string(n_taps - 1) + " but received " +
+                        std::to_string(time_constants.size()) +
+                        "time constants.";
+                throw std::invalid_argument(error);
             }
-            space_constants[compartment] = std::get<double>(a.second);
+        }
+        else if (key != "taps")
+        {
+            INFO("Warning: attribute '%s' not recognized.\n", key.c_str());
         }
     }
 }
@@ -223,12 +239,12 @@ sanafe::LoihiLifModel::LoihiLifModel(const int gid, const int nid)
 }
 
 void sanafe::LoihiLifModel::set_attributes(
-        const std::map<std::string, NeuronAttribute2> &attr)
+        const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
-        const NeuronAttribute2 &value = a.second;
+        const ModelParam &value = a.second;
         if (key == "threshold")
         {
             threshold = static_cast<double>(value);
@@ -248,15 +264,13 @@ void sanafe::LoihiLifModel::set_attributes(
         else if (key == "reset_mode")
         {
             const std::string reset_mode_str = static_cast<std::string>(value);
-            reset_mode =
-                    model_parse_reset_mode(reset_mode_str);
+            reset_mode = model_parse_reset_mode(reset_mode_str);
         }
         else if (key == "reverse_reset_mode")
         {
             const std::string reverse_reset_mode_str =
                     static_cast<std::string>(value);
-            reverse_reset_mode =
-                    model_parse_reset_mode(reverse_reset_mode_str);
+            reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
         }
         else if (key == "leak_decay")
         {
@@ -278,7 +292,8 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
 {
     // Calculate the change in potential since the last update e.g.
     //  integate inputs and apply any potential leak
-    TRACE1("Updating potential, before:%f\n", potential);
+    TRACE1("Updating potential (nid:%d.%d), before:%lf\n", group_id, neuron_id,
+            potential);
     sanafe::NeuronStatus state = sanafe::IDLE;
     // Update soma, if there are any received spikes, there is a non-zero
     //  bias or we force the neuron to update every time-step
@@ -304,17 +319,15 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
         }
         */
         // Add the synaptic / dendrite current to the potential
-        TRACE1("bias:%lf potential before:%lf current_in:%lf\n", bias,
-                potential, current_in.value());
+        TRACE1("bias:%lf potential before:%lf\n", bias, potential);
         potential += bias;
     }
     if (current_in.has_value())
     {
         potential += current_in.value();
     }
-    TRACE1("leak decay:%lf bias:%lf threshold:%lf potential after:%lf\n",
-            leak_decay, bias, threshold, potential);
-    TRACE1("Updating potential, after:%f\n", potential);
+    TRACE1("Updating potential (nid:%d.%d), after:%lf\n", group_id, neuron_id,
+            potential);
 
     // Check against threshold potential (for spiking)
     if (potential > threshold)
@@ -328,7 +341,7 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
             potential -= threshold;
         }
         state = sanafe::FIRED;
-        TRACE1("Neuron fired\n");
+        TRACE1("Neuron fired.\n");
     }
     // Check against reverse threshold
     if (potential < reverse_threshold)
@@ -369,12 +382,12 @@ sanafe::TrueNorthModel::TrueNorthModel(const int gid, const int nid)
 }
 
 void sanafe::TrueNorthModel::set_attributes(
-        const std::map<std::string, NeuronAttribute2> &attr)
+        const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
-        const NeuronAttribute2 &value = a.second;
+        const ModelParam &value = a.second;
 
         if (key == "threshold")
         {
@@ -395,15 +408,13 @@ void sanafe::TrueNorthModel::set_attributes(
         else if (key == "reset_mode")
         {
             const std::string reset_mode_str = static_cast<std::string>(value);
-            reset_mode =
-                    model_parse_reset_mode(reset_mode_str);
+            reset_mode = model_parse_reset_mode(reset_mode_str);
         }
         else if (key == "reverse_reset_mode")
         {
             const std::string reverse_reset_mode_str =
                     static_cast<std::string>(value);
-            reverse_reset_mode =
-                    model_parse_reset_mode(reverse_reset_mode_str);
+            reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
         }
         else if (key == "leak")
         {
@@ -549,7 +560,9 @@ std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
     }
     else
     {
-        throw std::invalid_argument("Synapse model not supported.");
+        const std::string error =
+                "Synapse model not supported (" + model_name + ")\n";
+        throw std::invalid_argument(error);
     }
 }
 

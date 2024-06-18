@@ -61,14 +61,15 @@ sanafe::Simulation::~Simulation()
 }
 
 sanafe::RunData::RunData(const long int start, const long int steps)
+        : timestep_start(start)
+        , timesteps_executed(steps)
+        , energy(0.0)
+        , sim_time(0.0)
+        , wall_time(0.0)
+        , spikes(0L)
+        , packets_sent(0L)
+        , neurons_fired(0L)
 {
-    timestep_start = start;
-    timesteps_executed = steps;
-    energy = 0.0;
-    sim_time = 0.0;
-    spikes = 0L;
-    packets_sent = 0L;
-    neurons_fired = 0L;
     return;
 }
 
@@ -80,8 +81,6 @@ sanafe::RunData sanafe::Simulation::run(
     {
         // If no timesteps have been simulated, open the trace files
         //  and simulate.
-        // TODO: consider moving this back and initializing the
-        //  simulation with a reference to an arch and network
         if (spike_trace_enabled)
         {
             spike_trace = sim_trace_open_spike_trace(out_dir);
@@ -104,7 +103,7 @@ sanafe::RunData sanafe::Simulation::run(
     {
         if ((timestep % heartbeat) == 0)
         {
-            // Print heart-beat every hundred timesteps
+            // Print a heart-beat message to show that the simulation is running
             INFO("*** Time-step %ld ***\n", timestep);
         }
         const Timestep ts = step();
@@ -238,8 +237,6 @@ void sanafe::sim_format_run_summary(std::ostream &out, const RunData &run_data)
 std::ofstream sanafe::sim_trace_open_spike_trace(
         const std::filesystem::path &out_dir)
 {
-    // TODO: warning, this is specific to Linux
-    // To be more portable, consider using the filesystem library in C++17
     const std::filesystem::path spike_path = out_dir / "spikes.csv";
     std::ofstream spike_file(spike_path);
 
@@ -255,8 +252,6 @@ std::ofstream sanafe::sim_trace_open_spike_trace(
 std::ofstream sanafe::sim_trace_open_potential_trace(
         const std::filesystem::path &out_dir, const Network &net)
 {
-    // TODO: warning, this is specific to Linux
-    // To be more portable, consider using the filesystem library in C++17
     const std::filesystem::path potential_path = out_dir / "potential.csv";
     std::ofstream potential_file(potential_path);
 
@@ -272,8 +267,6 @@ std::ofstream sanafe::sim_trace_open_potential_trace(
 std::ofstream sanafe::sim_trace_open_perf_trace(
         const std::filesystem::path &out_dir)
 {
-    // TODO: warning, this is specific to Linux
-    // To be more portable, consider using the filesystem library in C++17
     const std::filesystem::path perf_path = out_dir / "perf.csv";
     std::ofstream perf_file(perf_path);
     if (!perf_file.is_open())
@@ -369,8 +362,8 @@ double sanafe::sim_estimate_network_costs(Tile &src, Tile &dest)
     network_latency = 0.0;
 
     // Calculate the energy and time for sending spike packets
-    x_hops = abs(src.x - dest.x);
-    y_hops = abs(src.y - dest.y);
+    x_hops = abs_diff(src.x, dest.x);
+    y_hops = abs_diff(src.y, dest.y);
     // E-W hops
 
     if (src.x < dest.x)
@@ -698,7 +691,6 @@ void sanafe::sim_trace_record_spikes(
     return;
 }
 
-// TODO: should potential be a required value in the soma?
 void sanafe::sim_trace_record_potentials(
         std::ofstream &out, const int timestep, const Network &net)
 {

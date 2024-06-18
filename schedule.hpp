@@ -59,11 +59,11 @@ struct NocInfo
     long int messages_in_noc;
 
     NocInfo(const int width, const int height, const int core_count, const size_t max_cores_per_tile);
-    const int idx(const int x, const int y, const int link)
+    int idx(const int x, const int y, const int link)
     {
         const int links_per_router = max_cores_per_tile + ndirections;
-        return (x*noc_height*links_per_router) +
-            (y*links_per_router) + link;
+        return (x * noc_height * links_per_router) + (y * links_per_router) +
+                link;
     }
 };
 

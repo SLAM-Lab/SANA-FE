@@ -28,32 +28,45 @@ enum NeuronResetModes
 class SynapseModel
 {
 public:
-    SynapseModel() {}
-    virtual ~SynapseModel() {}
+    SynapseModel() = default;
+    SynapseModel(const SynapseModel &copy) = default;
+    SynapseModel(SynapseModel &&other) = default;
+    virtual ~SynapseModel() = default;
+    SynapseModel &operator=(const SynapseModel &other) = default;
+    SynapseModel &operator=(SynapseModel &&other) = default;
+
     virtual double update(std::optional<int> synapse_address=std::nullopt, const bool step=true) = 0;
     // Set synapse attributes
-    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 };
 
 class DendriteModel
 {
 public:
-    DendriteModel() {}
-    virtual ~DendriteModel() {}
-    // TODO: Can't forward declare synapses... find a better way?
-    //  Might be easier to just make it two optional arguments... unpack it from the Synapse struct
-    //  If it's optional, it gets harder to pass a reference, maybe should pass a pointer instead...
+    DendriteModel() = default;
+    DendriteModel(const DendriteModel &copy) = default;
+    DendriteModel(DendriteModel &&other) = default;
+    virtual ~DendriteModel() = default;
+    DendriteModel &operator=(const DendriteModel &other) = default;
+    DendriteModel &operator=(DendriteModel &&other) = default;
+
     virtual double update(std::optional<Synapse> synapse_in=std::nullopt, const bool step=true) = 0;
-    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 };
 
 class CurrentBasedSynapseModel: public SynapseModel
 {
 public:
     CurrentBasedSynapseModel();
-    ~CurrentBasedSynapseModel() {}
+    CurrentBasedSynapseModel(const CurrentBasedSynapseModel &copy) = default;
+    CurrentBasedSynapseModel(CurrentBasedSynapseModel &&other) = default;
+    virtual ~CurrentBasedSynapseModel() = default;
+    CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
+    CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
+
+
     virtual double update(std::optional<int> synapse_address=std::nullopt,  const bool step=true);
-    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr);
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr);
 
 private:
     double weight, min_synaptic_resolution, current, synaptic_current_decay;
@@ -64,9 +77,14 @@ class SingleCompartmentModel: public DendriteModel
 {
 public:
     SingleCompartmentModel();
-    ~SingleCompartmentModel() {}
+    SingleCompartmentModel(const SingleCompartmentModel &copy) = default;
+    SingleCompartmentModel(SingleCompartmentModel &&other) = default;
+    virtual ~SingleCompartmentModel() = default;
+    SingleCompartmentModel &operator=(const SingleCompartmentModel &other) = default;
+    SingleCompartmentModel &operator=(SingleCompartmentModel &&other) = default;
+
     virtual double update(std::optional<Synapse> current_in=std::nullopt, const bool step=true);
-    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr);
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr);
 private:
     double accumulated_charge, leak_decay;
 };
@@ -75,8 +93,14 @@ class MultiTapModel1D: public DendriteModel
 {
 public:
     MultiTapModel1D();
+    MultiTapModel1D(const MultiTapModel1D &copy) = default;
+    MultiTapModel1D(MultiTapModel1D &&other) = default;
+    virtual ~MultiTapModel1D() = default;
+    MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
+    MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
+
     virtual double update(std::optional<Synapse> current_in=std::nullopt, const bool step=true);
-    virtual void set_attributes(const std::map<std::string, NeuronAttribute> &attr);
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr);
 private:
     // Assuming a 1D tap dendrite
     std::vector<double> tap_voltages, next_voltages;
@@ -87,9 +111,14 @@ class SomaModel
 {
 public:
     SomaModel(const int gid, const int nid) : group_id(gid), neuron_id(nid) {}
-    virtual ~SomaModel() {}
+    SomaModel(const SomaModel &copy) = default;
+    SomaModel(SomaModel &&other) = default;
+    virtual ~SomaModel() = default;
+    SomaModel &operator=(const SomaModel &other) = delete;
+    SomaModel &operator=(SomaModel &&other) = delete;
+
     virtual NeuronStatus update(const std::optional<double> current_in=std::nullopt, const bool step=true) = 0;
-    virtual void set_attributes(const std::map<std::string, NeuronAttribute2> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
     virtual double get_potential() { return 0.0; }
 protected:
     const int group_id, neuron_id;
@@ -99,8 +128,13 @@ class LoihiLifModel: public SomaModel
 {
 public:
     LoihiLifModel(const int gid, const int nid);
-    ~LoihiLifModel() {}
-    void set_attributes(const std::map<std::string, NeuronAttribute2> &attr);
+    LoihiLifModel(const LoihiLifModel &copy) = default;
+    LoihiLifModel(LoihiLifModel &&other) = default;
+    virtual ~LoihiLifModel() = default;
+    LoihiLifModel &operator=(const LoihiLifModel &other) = delete;
+    LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
+
+    void set_attributes(const std::map<std::string, ModelParam> &attr);
     NeuronStatus update(const std::optional<double> current_in,  const bool step=true);
     double get_potential() { return potential; }
 private:
@@ -115,8 +149,13 @@ class TrueNorthModel: public SomaModel
 {
 public:
     TrueNorthModel(const int gid, const int nid);
-    ~TrueNorthModel() {}
-    void set_attributes(const std::map<std::string, NeuronAttribute2> &attr);
+    TrueNorthModel(const TrueNorthModel &copy) = default;
+    TrueNorthModel(TrueNorthModel &&other) = default;
+    virtual ~TrueNorthModel() = default;
+    TrueNorthModel &operator=(const TrueNorthModel &other) = delete;
+    TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
+
+    void set_attributes(const std::map<std::string, ModelParam> &attr);
     NeuronStatus update(const std::optional<double> current_in=std::nullopt,  const bool step=true);
     double get_potential() { return potential; }
 private:

@@ -45,6 +45,9 @@ public:
     //int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
     double get_power();
     RunData get_run_summary();
+    // Do not allow copying of Simulation object
+    Simulation(const Simulation &copy) = delete;
+    Simulation(const Simulation &&move) = delete;
 
 private:
     Architecture &arch;
@@ -55,11 +58,10 @@ private:
     double total_energy, total_sim_time, wall_time;
     bool spike_trace_enabled, potential_trace_enabled;
     bool perf_trace_enabled, message_trace_enabled;
-    FILE *stats_fp;
+    //FILE *stats_fp;
     std::ofstream spike_trace, potential_trace, message_trace, perf_trace;
 
     Timestep step();
-    Simulation(const Simulation &copy);
 };
 
 struct RunData
@@ -115,7 +117,6 @@ timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end
 
 //int sim_poisson_input(const double firing_probability);
 //int sim_rate_input(const double firing_rate, double *spike_val);
-
 }
 
 #endif

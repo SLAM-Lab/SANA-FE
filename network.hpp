@@ -21,6 +21,8 @@
 #include <optional>
 #include <variant>
 
+#include "print.hpp"
+
 namespace sanafe
 {
 enum ConnectionConfigFormat
@@ -59,10 +61,10 @@ class Network
 {
 public:
     // Use a vector of dynamically allocated groups, so we get vectors random
-    //  access, but do not reallocate objects when growing or shrinking
+    //  access, but do not reallocate objects when growing the vector
     std::vector<std::unique_ptr<NeuronGroup>> groups;
     std::string name;
-    Network(const std::string &net_name) : name(net_name) {};
+    explicit Network(const std::string &net_name) : name(net_name) {};
     Network(Network &&) = default;
     Network &operator=(Network &&) = default;
     // Do *NOT* allow Network objects to be copied
@@ -83,16 +85,12 @@ public:
 
 Network load_net(const std::filesystem::path &path, Architecture &arch);
 
-using NeuronAttribute =
-        std::variant<bool, int, double, std::string, std::vector<bool>,
-                std::vector<int>, std::vector<double>>;
-
 // An attribute can contain a scalar value, or either a list or named set of
 //  attributes i.e., attributes are recursively defined attributes. However,
 //  in C++, variants cannot be defined recursively. Use metaprogramming to
 //  define the attribute type, with some C++ magic. Note that vectors *can* be
 //  created with incomplete types, whereas maps *cannot*.
-struct NeuronAttribute2
+struct ModelParam
 {
     operator bool() const { return std::get<bool>(value); }
     operator int() const { return std::get<int>(value); }
@@ -105,7 +103,8 @@ struct NeuronAttribute2
         else if (std::holds_alternative<int>(value))
         {
             // Assume it is safe to convert from any integer to double
-            return static_cast<int>(std::get<double>(value));
+            INFO("Warning: Casting integer value to double type.\n");
+            return static_cast<double>(std::get<int>(value));
         }
         else
         {
@@ -123,7 +122,7 @@ struct NeuronAttribute2
     {
         std::vector<T> cast_vector;
         const auto value_vector =
-                std::get<std::vector<NeuronAttribute2>>(value);
+                std::get<std::vector<ModelParam>>(value);
         cast_vector.reserve(value_vector.size());
 
         for (const auto &element : value_vector)
@@ -133,23 +132,23 @@ struct NeuronAttribute2
         return cast_vector;
     }
     template <typename T>
-    operator std::map<std::string, NeuronAttribute2>() const
+    operator std::map<std::string, ModelParam>() const
     {
-        std::map<std::string, NeuronAttribute2> cast_map;
+        std::map<std::string, ModelParam> cast_map;
         const auto value_vector =
-                std::get<std::vector<NeuronAttribute2>>(value);
+                std::get<std::vector<ModelParam>>(value);
         for (const auto &element : value_vector)
         {
-            cast_map[element.name.value()] = element.value;
+            cast_map[element.name.value()] = static_cast<T>(element.value);
         }
         return cast_map;
     }
-    bool operator==(const NeuronAttribute2 &rhs) const
+    bool operator==(const ModelParam &rhs) const
     {
         return (value == rhs.value);
     }
 
-    std::variant<bool, int, double, std::string, std::vector<NeuronAttribute2>>
+    std::variant<bool, int, double, std::string, std::vector<ModelParam>>
             value;
     std::optional<std::string> name;
     // In C++17, we cannot use std::map (which would be the natural choice) with
@@ -164,7 +163,105 @@ struct NeuronAttribute2
     //  require complex solutions.
 };
 
+struct NeuronTemplate
+{
+    std::map<std::string, ModelParam> soma_model_params;
+    std::map<std::string, ModelParam> dendrite_model_params;
+    std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
+    bool log_spikes, log_potential, force_update;
+
+    explicit NeuronTemplate(const std::string &soma_hw_name = "", const std::string &default_synapse_hw_name = "", const std::string &dendrite_hw_name = "", const bool log_spikes = false, const bool log_potential = false, const bool force_update = false);
+};
+
+class NeuronGroup
+{
+public:
+    // A neuron group is a collection of neurons that share common
+    //  parameters. All neurons must be based on the same neuron model.
+    std::vector<Neuron> neurons;
+    NeuronTemplate default_neuron_config;
+    std::string name;
+    int id;
+    int get_id() { return id; }
+    explicit NeuronGroup(const std::string &group_name, const size_t group_id, const size_t neuron_count, const NeuronTemplate &default_config);
+    //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
+    //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
+    std::string info() const;
+    //std::string description() const;
+};
+
+class Neuron
+{
+public:
+    std::vector<Connection> connections_out;
+    std::vector<int> axon_out_addresses;
+    std::map<std::string, ModelParam> soma_model_params;
+    std::map<std::string, ModelParam> dendrite_model_params;
+
+    // Mapped hardware
+    Network *parent_net;
+    Core *core, *post_synaptic_cores;
+    DendriteUnit *dendrite_hw;
+    SomaUnit *soma_hw;
+    AxonOutUnit *axon_out_hw;
+    std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
+
+    std::shared_ptr<SomaModel> soma_model;
+    std::shared_ptr<DendriteModel> dendrite_model;
+
+    bool force_update, log_spikes, log_potential;
+    int id, parent_group_id, forced_spikes, spike_count;
+    int soma_last_updated, dendrite_last_updated;
+    int maps_in_count, maps_out_count;
+    NeuronStatus status;
+
+    // Inputs to H/W units
+    std::vector<Synapse> dendrite_input_synapses;
+    double soma_input_charge;
+    bool axon_out_input_spike;
+
+    explicit Neuron(const size_t neuron_id, const size_t parent_group_id, const NeuronTemplate &config);
+    int get_id() { return id; }
+    void set_attributes(const NeuronTemplate &attributes);
+    void connect_to_neuron(Neuron &dest, const std::map<std::string, ModelParam> &synapse_params, const std::map<std::string, ModelParam> &dendrite_params,  const std::optional<std::string> &synapse_hw_name = std::nullopt);
+    std::string info() const;
+    //std::string description(const bool write_mapping=true) const;
+};
+
+struct Connection
+{
+    std::map<std::string, ModelParam> synapse_params;
+    std::map<std::string, ModelParam> dendrite_params;
+    std::shared_ptr<SynapseModel> synapse_model;
+    Neuron *post_neuron, *pre_neuron;
+    SynapseUnit *synapse_hw;
+    std::string synapse_hw_name;
+    int id, delay, last_updated;
+
+    explicit Connection(const int connection_id);
+    //std::string description() const;
+};
+
+struct Synapse
+{
+    double current;
+    // TODO: prepare the dendrite parameters into an object? would be much
+    //  more efficient. This can be an any pointer? Or to a base dendrite class
+    std::map<std::string, ModelParam> dendrite_params;
+};
+
+// Alternative ModelParameter implementations. Keep for now.. maybe find
+//  somewhere better for this
+// Simpler NeuronAttribute implementation that supports one level of lists
+//  This is basically just a specialization of the variant class
+//using NeuronAttribute =
+//        std::variant<bool, int, double, std::string, std::vector<bool>,
+//                std::vector<int>, std::vector<double>>;
+
 /*
+// More complex attribute / parameter implementation. However, this relies on
+//  undefined behavior as std::map is being defined with an incomplete type.
+//  This seems to work for GCC but isn't portable.
 template<typename T>
 class IncompleteTypeWrapper
 {
@@ -204,93 +301,6 @@ struct AttributePrototype
 };
 using NeuronAttribute3 = AttributePrototype::type;
 */
-
-struct NeuronTemplate
-{
-    std::map<std::string, NeuronAttribute2> soma_model_attributes;
-    std::map<std::string, NeuronAttribute> dendrite_model_attributes;
-    std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
-    std::filesystem::path soma_plugin;
-    size_t max_connections_out;
-    bool log_spikes, log_potential, force_update;
-
-    NeuronTemplate(const std::string &soma_hw_name = "", const std::string &default_synapse_hw_name = "", const std::string &dendrite_hw_name = "", const size_t max_connections_out = 0, const bool log_spikes = false, const bool log_potential = false, const bool force_update = false);
-};
-
-class NeuronGroup
-{
-public:
-    // A neuron group is a collection of neurons that share common
-    //  parameters. All neurons must be based on the same neuron model.
-    std::vector<Neuron> neurons;
-    NeuronTemplate default_neuron_config;
-    std::string name;
-    int id;
-    int get_id() { return id; }
-    explicit NeuronGroup(const std::string &group_name, const size_t group_id, const size_t neuron_count, const NeuronTemplate &default_config);
-    //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
-    //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
-    std::string info() const;
-    //std::string description() const;
-};
-
-class Neuron
-{
-public:
-    std::vector<Connection> connections_out;
-    std::vector<int> axon_out_addresses;
-    std::map<std::string, NeuronAttribute2> soma_model_attributes;
-    std::map<std::string, NeuronAttribute> dendrite_model_attributes;
-
-    // Mapped hardware
-    Network *parent_net;
-    Core *core, *post_synaptic_cores;
-    DendriteUnit *dendrite_hw;
-    SomaUnit *soma_hw;
-    AxonOutUnit *axon_out_hw;
-    std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
-
-    std::shared_ptr<SomaModel> soma_model;
-    std::shared_ptr<DendriteModel> dendrite_model;
-
-    bool force_update, log_spikes, log_potential;
-    int id, parent_group_id, forced_spikes, spike_count;
-    int soma_last_updated, dendrite_last_updated;
-    int max_connections_out, max_compartments;
-    int maps_in_count, maps_out_count;
-    NeuronStatus status;
-
-    // Inputs to H/W units
-    std::vector<Synapse> dendrite_input_synapses;
-    double soma_input_charge;
-    bool axon_out_input_spike;
-
-    explicit Neuron(const size_t neuron_id, const size_t parent_group_id, const NeuronTemplate &config);
-    int get_id() { return id; }
-    void set_attributes(const NeuronTemplate &attributes);
-    void connect_to_neuron(Neuron &dest, const std::map<std::string, NeuronAttribute> &attr);
-    std::string info() const;
-    //std::string description(const bool write_mapping=true) const;
-};
-
-struct Connection
-{
-    std::map<std::string, NeuronAttribute> attributes;
-    std::shared_ptr<SynapseModel> synapse_model;
-    Neuron *post_neuron, *pre_neuron;
-    SynapseUnit *synapse_hw;
-    std::string synapse_hw_name;
-    int id, delay, last_updated;
-
-    explicit Connection(const int connection_id);
-    //std::string description() const;
-};
-
-struct Synapse
-{
-    double current;
-    std::map<std::string, NeuronAttribute> attributes;
-};
 
 } // namespace
 

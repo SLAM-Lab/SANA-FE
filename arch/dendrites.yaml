@@ -25,7 +25,7 @@ architecture:
           synapse:
             - name: demo_synapse
               attributes:
-                model: cuba
+                model: current_based
                 energy_process_spike: 20.0e-12
                 latency_process_spike: 3.0e-9
           dendrite:

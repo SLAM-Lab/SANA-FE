@@ -209,8 +209,8 @@ PYBIND11_MODULE(sanafecpp, m)
                         {
                             attr = pybind11::dict();
                         }
-                        return self->connect_to_neuron(dest,
-                                dict_to_str_map(attr.value()));
+                        return self->connect_to_neuron(
+                                dest, dict_to_str_map(attr.value()));
                     })
             .def("get_id", &sanafe::Neuron::get_id);
 
@@ -240,8 +240,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("max_neurons_supported") = 1024);
 
     pybind11::class_<sanafe::CoreAddress>(m, "CoreAddress")
-            .def(pybind11::init<size_t, size_t, size_t>(),
-                    pybind11::arg("id"),
+            .def(pybind11::init<size_t, size_t, size_t>(), pybind11::arg("id"),
                     pybind11::arg("parent_tile_id"),
                     pybind11::arg("offset_within_tile"));
 

@@ -38,11 +38,11 @@ struct DendriteUnit;
 struct SomaUnit;
 struct AxonOutUnit;
 
-struct AxonInModel;
-struct SynapseModel;
-struct DendriteModel;
-struct SomaModel;
-struct AxonOutModel;
+class AxonInModel;
+class SynapseModel;
+class DendriteModel;
+class SomaModel;
+class AxonOutModel;
 
 struct TilePowerMetrics;
 struct SynapsePowerMetrics;
@@ -188,9 +188,9 @@ public:
 
     explicit Core(const std::string &name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
     AxonInUnit &create_axon_in(const std::string &name, const double energy_message, const double latency_message);
-    SynapseUnit &create_synapse(const std::string &name, const std::string &model_str, const SynapsePowerMetrics &power_metrics);
-    DendriteUnit &create_dendrite(const std::string &name, const std::string &model_str, const double energy_access, const double latency_access);
-    SomaUnit &create_soma(const std::string &name, const std::string &model_str, const SomaPowerMetrics &power_metrics);
+    SynapseUnit &create_synapse(const std::string &name, const std::string &model_str, const SynapsePowerMetrics &power_metrics, const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
+    DendriteUnit &create_dendrite(const std::string &name, const std::string &model_str, const double energy_access, const double latency_access,  const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
+    SomaUnit &create_soma(const std::string &name, const std::string &model_str, const SomaPowerMetrics &power_metrics, const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
     AxonOutUnit &create_axon_out(const std::string &name, const double energy_access, const double latency_access);
     void map_neuron(Neuron &n);
     int get_id() { return id; }
@@ -213,7 +213,7 @@ struct AxonInUnit
 
 struct SynapseUnit
 {
-    std::filesystem::path plugin_lib;
+    std::optional<std::filesystem::path> plugin_lib;
     std::string name, model;
     CoreAddress parent_core_address;
     long int spikes_processed;
@@ -221,25 +221,25 @@ struct SynapseUnit
     double energy_memory_access, latency_memory_access;
     double energy_spike_op, latency_spike_op;
 
-    explicit SynapseUnit(const std::string &synapse_name, const std::string &model_str, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics);
+    explicit SynapseUnit(const std::string &synapse_name, const std::string &model_str, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics,  const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
     //std::string description() const;
 };
 
 struct DendriteUnit
 {
-    std::filesystem::path plugin_lib;
+    std::optional<std::filesystem::path> plugin_lib;
     std::string name, model;
     CoreAddress parent_core_address;
     double energy, time;
     double energy_access, latency_access;
-    explicit DendriteUnit(const std::string &dendrite_name, const std::string &model_str, const CoreAddress &parent_core, const double energy_cost=0.0, const double latency_cost=0.0);
+    explicit DendriteUnit(const std::string &dendrite_name, const std::string &model_str, const CoreAddress &parent_core, const double energy_cost=0.0, const double latency_cost=0.0, const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
     //std::string description() const;
 };
 
 struct SomaUnit
 {
     FILE *noise_stream;
-    std::filesystem::path plugin_lib;
+    std::optional<std::filesystem::path> plugin_lib;
     std::string name, model;
     CoreAddress parent_core_address;
     long int neuron_updates, neurons_fired, neuron_count;
@@ -249,7 +249,7 @@ struct SomaUnit
     double energy_spiking, latency_spiking;
     int noise_type;
 
-    explicit SomaUnit(const std::string &soma_name, const std::string &model_str, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics);
+    explicit SomaUnit(const std::string &soma_name, const std::string &model_str, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics, const std::optional<std::filesystem::path> plugin_lib = std::nullopt);
     //std::string description() const;
 };
 
@@ -267,8 +267,9 @@ struct AxonOutUnit
     //std::string description() const;
 };
 
-struct AxonInModel
+class AxonInModel
 {
+public:
     // List of all neuron connections to send spikes to
     std::vector<int> synapse_addresses;
 
@@ -277,8 +278,9 @@ struct AxonInModel
     int spikes_received, active_synapses;
 };
 
-struct AxonOutModel
+class AxonOutModel
 {
+public:
     // List of all neuron connections to send spike to
     int dest_axon_id, dest_tile_id, dest_core_offset;
     int src_neuron_id;
@@ -296,7 +298,6 @@ void arch_print_axon_summary(Architecture &arch);
 void arch_map_neuron_connections(Neuron &n);
 void arch_allocate_axon(Neuron &pre_neuron, Core &post_core);
 void arch_add_connection_to_axon(Connection &con, Core &post_core);
-int arch_parse_synapse_model(const std::string &model_str);
 }
 
 #endif

@@ -266,8 +266,10 @@ sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name,
 
 sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
         const std::string &model_str, const CoreAddress &parent_core,
-        const SynapsePowerMetrics &power_metrics)
-        : name(synapse_name)
+        const SynapsePowerMetrics &power_metrics,
+        const std::optional<std::filesystem::path> &plugin_lib_path)
+        : plugin_lib(plugin_lib_path)
+        , name(synapse_name)
         , model(model_str)
         , parent_core_address(parent_core)
         , spikes_processed(0L)
@@ -283,8 +285,10 @@ sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
 
 sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name,
         const std::string &model_str, const CoreAddress &parent_core,
-        const double energy_cost, const double latency_cost)
-        : name(dendrite_name)
+        const double energy_cost, const double latency_cost,
+        const std::optional<std::filesystem::path> &plugin_lib_path)
+        : plugin_lib(plugin_lib_path)
+        , name(dendrite_name)
         , model(model_str)
         , parent_core_address(parent_core)
         , energy(0.0)
@@ -297,8 +301,10 @@ sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name,
 
 sanafe::SomaUnit::SomaUnit(const std::string &soma_name,
         const std::string &model_str, const CoreAddress &parent_core,
-        const SomaPowerMetrics &power_metrics)
-        : name(soma_name)
+        const SomaPowerMetrics &power_metrics,
+        const std::optional<std::filesystem::path> plugin_lib)
+        : plugin_lib(plugin_lib)
+        , name(soma_name)
         , model(model_str)
         , parent_core_address(parent_core)
         , neuron_updates(0L)
@@ -456,11 +462,12 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(const std::string &name,
 }
 
 sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
-        const std::string &model_str, const SynapsePowerMetrics &power_metrics)
+        const std::string &model_str, const SynapsePowerMetrics &power_metrics,
+        const std::optional<std::filesystem::path> &plugin_lib_path)
 {
     const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    synapse.push_back(
-            SynapseUnit(name, model_str, parent_core_address, power_metrics));
+    synapse.push_back(SynapseUnit(name, model_str, parent_core_address,
+            power_metrics, plugin_lib_path));
     SynapseUnit &new_synapse_hw_unit = synapse.back();
     TRACE1("New synapse h/w unit created (cid:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -471,11 +478,12 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
 
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
         const std::string &model_str, const double energy_access,
-        const double latency_access)
+        const double latency_access,
+        const std::optional<std::filesystem::path> &plugin_lib)
 {
     const CoreAddress parent_core_address = {id, parent_tile_id, offset};
     dendrite.push_back(DendriteUnit(name, model_str, parent_core_address,
-            energy_access, latency_access));
+            energy_access, latency_access, plugin_lib));
     DendriteUnit &new_dendrite_hw_unit = dendrite.back();
     TRACE1("New dendrite h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -485,11 +493,12 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
 }
 
 sanafe::SomaUnit &sanafe::Core::create_soma(const std::string &name,
-        const std::string &model_str, const SomaPowerMetrics &power_metrics)
+        const std::string &model_str, const SomaPowerMetrics &power_metrics,
+        const std::optional<std::filesystem::path> &plugin_lib)
 {
     const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    soma.push_back(
-            SomaUnit(name, model_str, parent_core_address, power_metrics));
+    soma.push_back(SomaUnit(
+            name, model_str, parent_core_address, power_metrics, plugin_lib));
     SomaUnit &new_soma_hw_unit = soma.back();
     TRACE1("New soma h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -629,7 +638,16 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
         // Create the synapse model
         if (curr_connection.synapse_model == nullptr)
         {
-            if (curr_connection.synapse_hw->plugin_lib.empty())
+            if (curr_connection.synapse_hw->plugin_lib.has_value())
+            {
+                const std::filesystem::path plugin_lib_path =
+                        curr_connection.synapse_hw->plugin_lib.value();
+                INFO("Creating synapse from plugin: %s.\n",
+                        plugin_lib_path.c_str());
+                curr_connection.synapse_model = plugin_get_synapse(
+                        curr_connection.synapse_hw->model, plugin_lib_path);
+            }
+            else
             {
                 // Use built in models
                 TRACE1("Creating synapse built-in model %s.\n",
@@ -637,17 +655,9 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
                 curr_connection.synapse_model = sanafe::model_get_synapse(
                         curr_connection.synapse_hw->model);
             }
-            else
-            {
-                INFO("Creating synapse from plugin %s.\n",
-                        curr_connection.synapse_hw->plugin_lib.c_str());
-                curr_connection.synapse_model =
-                        plugin_get_synapse(curr_connection.synapse_hw->model,
-                                curr_connection.synapse_hw->plugin_lib);
-            }
         }
         curr_connection.synapse_model->set_attributes(
-                curr_connection.attributes);
+                curr_connection.synapse_params);
     }
     TRACE1("Finished mapping connections to hardware for nid:%d.%d.\n",
             pre_neuron.parent_group_id, pre_neuron.id);
@@ -749,54 +759,58 @@ void sanafe::Core::map_neuron(Neuron &n)
         // Setup the soma model
         TRACE1("Soma hw name: %s", soma_hw_name.c_str());
         assert(n.soma_hw != nullptr);
-        if (n.soma_hw->plugin_lib.empty())
+        if (n.soma_hw->plugin_lib.has_value())
         {
-            // Use built in models
-            TRACE1("Creating soma built-in model %s.\n",
-                    n.soma_hw->model.c_str());
-            n.soma_model = sanafe::model_get_soma(
-                    n.soma_hw->model, n.parent_group_id, n.id);
+            // Use external plug-in
+            const std::filesystem::path &plugin_lib_path =
+                    n.soma_hw->plugin_lib.value();
+            INFO("Creating soma from plugin %s.\n", plugin_lib_path.c_str());
+            n.soma_model = plugin_get_soma(
+                    n.soma_hw->model, n.parent_group_id, n.id, plugin_lib_path);
         }
         else
         {
-            TRACE1("Creating soma from plugin %s.\n",
-                    n.soma_hw->plugin_lib.c_str());
-            n.soma_model = plugin_get_soma(n.soma_hw->model, n.parent_group_id,
-                    n.id, n.soma_hw->plugin_lib);
+            // Use built in models
+            INFO("Creating soma built-in model %s.\n",
+                    n.soma_hw->model.c_str());
+            n.soma_model =
+                    model_get_soma(n.soma_hw->model, n.parent_group_id, n.id);
         }
         const NeuronGroup &group = *(n.parent_net->groups[n.parent_group_id]);
         assert(n.soma_model != nullptr);
         // First set the group's default attribute values, and then
         //  any defined by the neuron
         n.soma_model->set_attributes(
-                group.default_neuron_config.soma_model_attributes);
-        n.soma_model->set_attributes(n.soma_model_attributes);
+                group.default_neuron_config.soma_model_params);
+        n.soma_model->set_attributes(n.soma_model_params);
     }
 
     if (n.dendrite_model == nullptr)
     {
-        // Setup the soma model
+        // Setup the dendrite model
         TRACE1("Dendrite hw name: %s", dendrite_hw_name.c_str());
-        if (n.dendrite_hw->plugin_lib.empty())
+        if (n.dendrite_hw->plugin_lib.has_value())
+        {
+            const std::filesystem::path &plugin_lib_path =
+                    n.dendrite_hw->plugin_lib.value();
+            INFO("Creating dendrite from plugin %s.\n",
+                    plugin_lib_path.c_str());
+            n.dendrite_model = sanafe::plugin_get_dendrite(
+                    n.dendrite_hw->model, plugin_lib_path);
+        }
+        else
         {
             // Use built in models
             TRACE1("Creating dendrite built-in model %s.\n",
                     n.dendrite_hw->model.c_str());
             n.dendrite_model = sanafe::model_get_dendrite(n.dendrite_hw->model);
         }
-        else
-        {
-            INFO("Creating dendrite from plugin %s.\n",
-                    n.dendrite_hw->plugin_lib.c_str());
-            n.dendrite_model = sanafe::plugin_get_dendrite(
-                    n.dendrite_hw->model, n.dendrite_hw->plugin_lib);
-        }
         const NeuronGroup &group = *(n.parent_net->groups[n.parent_group_id]);
         assert(n.dendrite_model != nullptr);
         // Global attributes for all compartments in the dendrite
         n.dendrite_model->set_attributes(
-                group.default_neuron_config.dendrite_model_attributes);
-        n.dendrite_model->set_attributes(n.dendrite_model_attributes);
+                group.default_neuron_config.dendrite_model_params);
+        n.dendrite_model->set_attributes(n.dendrite_model_params);
     }
 
     return;
