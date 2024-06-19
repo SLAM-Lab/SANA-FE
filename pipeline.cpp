@@ -61,7 +61,7 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
         Core &core = cores[idx];
         TRACE1("Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
-        for (auto m : core.messages_in)
+        for (auto *m : core.messages_in)
         {
             m->receive_delay += pipeline_process_message(ts, core, *m);
         }

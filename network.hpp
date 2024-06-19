@@ -79,7 +79,7 @@ public:
     Network &operator=(const Network &) = delete;
 
     NeuronGroup &create_neuron_group(const std::string &name, const size_t neuron_count, const NeuronTemplate &default_config);
-    std::string info() const;
+    [[nodiscard]] std::string info() const;
     //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
     void check_mapped() const;
 };
@@ -101,23 +101,22 @@ struct ModelParam
         {
             return std::get<double>(value);
         }
-        else if (std::holds_alternative<int>(value))
+        if (std::holds_alternative<int>(value))
         {
             // Assume it is safe to convert from any integer to double
             INFO("Warning: Casting integer value to double type.\n");
             return static_cast<double>(std::get<int>(value));
         }
-        else
+
+        std::string error = "Error: Attribute ";
+        if (name.has_value())
         {
-            std::string error = "Error: Attribute ";
-            if (name.has_value())
-            {
-                error += name.value();
-            }
-            error += " cannot be cast to a double";
-            throw std::runtime_error(error);
+            error += name.value();
         }
+        error += " cannot be cast to a double";
+        throw std::runtime_error(error);
     }
+
     operator std::string() const { return std::get<std::string>(value); }
     template <typename T> operator std::vector<T>() const
     {
@@ -136,7 +135,7 @@ struct ModelParam
     operator std::map<std::string, ModelParam>() const
     {
         std::map<std::string, ModelParam> cast_map;
-        const auto value_vector =
+        const auto &value_vector =
                 std::get<std::vector<ModelParam>>(value);
         for (const auto &element : value_vector)
         {
@@ -171,7 +170,7 @@ struct NeuronTemplate
     std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
     bool log_spikes, log_potential, force_update;
 
-    explicit NeuronTemplate(const std::string &soma_hw_name = "", const std::string &default_synapse_hw_name = "", const std::string &dendrite_hw_name = "", const bool log_spikes = false, const bool log_potential = false, const bool force_update = false);
+    explicit NeuronTemplate(const std::string &soma_hw_name = "", const std::string &default_synapse_hw_name = "", const std::string &dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_update = false);
 };
 
 class NeuronGroup
@@ -184,7 +183,7 @@ public:
     std::string name;
     int id;
     int get_id() { return id; }
-    explicit NeuronGroup(const std::string &group_name, const size_t group_id, const size_t neuron_count, const NeuronTemplate &default_config);
+    explicit NeuronGroup(const std::string &group_name, size_t group_id, size_t neuron_count, const NeuronTemplate &default_config);
     //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
     //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
     std::string info() const;

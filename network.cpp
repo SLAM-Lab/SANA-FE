@@ -140,8 +140,8 @@ sanafe::NeuronGroup &sanafe::Network::create_neuron_group(
         const NeuronTemplate &default_config)
 {
     const size_t new_group_id = groups.size();
-    groups.push_back(std::unique_ptr<NeuronGroup>(
-            new NeuronGroup(name, new_group_id, neuron_count, default_config)));
+    groups.push_back(std::make_unique<NeuronGroup>(
+            NeuronGroup(name, new_group_id, neuron_count, default_config)));
     NeuronGroup &group = *(groups.back());
 
     // Initialize all neurons in this group

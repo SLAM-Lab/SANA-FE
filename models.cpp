@@ -482,7 +482,7 @@ sanafe::NeuronStatus sanafe::TrueNorthModel::update(
     randomize_threshold = (random_range_mask != 0);
     if (randomize_threshold)
     {
-        unsigned int r = rand() & random_range_mask;
+        const unsigned int r = std::rand() & random_range_mask;
         v += static_cast<double>(r);
     }
     TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, threshold,

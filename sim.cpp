@@ -652,11 +652,11 @@ void sanafe::sim_trace_write_message_header(std::ofstream &message_trace_file)
     return;
 }
 
-void sanafe::sim_trace_record_spikes(
-        std::ofstream &out, const long int timestep, const Network &net)
+void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
+        const long int timestep, const Network &net)
 {
     // A trace of all spikes that are generated
-    assert(out.is_open());
+    assert(spike_trace_file.is_open());
 
     for (const auto &group : net.groups)
     {
@@ -664,9 +664,9 @@ void sanafe::sim_trace_record_spikes(
         {
             if (n.log_spikes && (n.status == sanafe::FIRED))
             {
-                out << n.parent_group_id << "." << n.id << ",";
-                out << timestep;
-                out << std::endl;
+                spike_trace_file << n.parent_group_id << "." << n.id << ",";
+                spike_trace_file << timestep;
+                spike_trace_file << std::endl;
             }
         }
     }
@@ -716,30 +716,31 @@ void sanafe::sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts)
     out << std::endl;
 }
 
-void sanafe::sim_trace_record_message(std::ofstream &out, const Message &m)
+void sanafe::sim_trace_record_message(std::ofstream &message_trace_file, const Message &m)
 {
-    assert(out.is_open());
-    out << m.timestep << ",";
-    out << m.src_neuron_group_id << "." << m.src_neuron_id << ",";
-    out << m.src_tile_id << "." << m.src_core_offset << ",";
+    assert(message_trace_file.is_open());
+    message_trace_file << m.timestep << ",";
+    message_trace_file << m.src_neuron_group_id << ".";
+    message_trace_file << m.src_neuron_id << ",";
+    message_trace_file << m.src_tile_id << "." << m.src_core_offset << ",";
 
     if (m.placeholder)
     {
-        out << "x.x,";
+        message_trace_file << "x.x,";
     }
     else
     {
-        out << m.dest_tile_id << "." << m.dest_core_offset << ",";
+        message_trace_file << m.dest_tile_id << ".";
+        message_trace_file << m.dest_core_offset << ",";
     }
 
-    out << m.hops << ",";
-    out << m.spikes << ",";
-    out << m.generation_delay << ",";
-    out << m.network_delay << ",";
-    out << m.receive_delay << ",";
-    out << m.blocked_delay << ",";
-
-    out << std::endl;
+    message_trace_file << m.hops << ",";
+    message_trace_file << m.spikes << ",";
+    message_trace_file << m.generation_delay << ",";
+    message_trace_file << m.network_delay << ",";
+    message_trace_file << m.receive_delay << ",";
+    message_trace_file << m.blocked_delay << ",";
+    message_trace_file << std::endl;
 
     return;
 }

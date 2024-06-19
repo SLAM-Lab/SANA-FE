@@ -46,9 +46,9 @@ double sanafe::schedule_messages(
     NocInfo noc(scheduler.noc_width, scheduler.noc_height, scheduler.core_count,
             scheduler.max_cores_per_tile);
     double last_timestamp;
-    const int total_links = noc.noc_height * noc.noc_width *
+    const size_t total_links = noc.noc_height * noc.noc_width *
             (sanafe::ndirections + noc.max_cores_per_tile);
-    noc.message_density = std::vector<double>(total_links);
+    noc.message_density = std::vector<double>(total_links, 0.0);
 
     std::vector<MessageFifo> messages_sent_per_core(noc.core_count);
     for (size_t core = 0; core < messages.size(); core++)
@@ -73,7 +73,7 @@ double sanafe::schedule_messages(
     //  the point of sending, and the average processing delay of
     //  all of those messages. When a message is added or removed from the
     //  NoC we update the average counts.
-    while (priority.size() > 0)
+    while (!priority.empty())
     {
         // Get the core's queue with the earliest simulation time
         Message &m = priority.top();
@@ -136,7 +136,7 @@ double sanafe::schedule_messages(
 
         // Get the next message for this core
         const size_t src_core = m.src_core_id;
-        if (messages_sent_per_core[src_core].size() > 0)
+        if (!messages_sent_per_core[src_core].empty())
         {
             auto &q = messages_sent_per_core[src_core];
             Message &next_message = q.front();
@@ -414,7 +414,7 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
     {
         // For each per-core queue, get the first message for that core
         //  and add it to the corresponding priority queue
-        if (q.size() > 0) // messages
+        if (!q.empty() > 0) // messages
         {
             Message &m = q.front();
             q.pop_front();

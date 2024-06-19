@@ -59,9 +59,9 @@ struct NocInfo
     long int messages_in_noc;
 
     NocInfo(const int width, const int height, const int core_count, const size_t max_cores_per_tile);
-    int idx(const int x, const int y, const int link)
+    size_t idx(const int x, const int y, const int link)
     {
-        const int links_per_router = max_cores_per_tile + ndirections;
+        const size_t links_per_router = max_cores_per_tile + ndirections;
         return (x * noc_height * links_per_router) + (y * links_per_router) +
                 link;
     }
@@ -69,9 +69,9 @@ struct NocInfo
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
 double schedule_messages(std::vector<std::list<Message>> &messages_sent_per_core, const Scheduler &scheduler);
-void schedule_update_noc_message_counts(const Message &m, NocInfo &noc, const bool message_in);
+void schedule_update_noc_message_counts(const Message &m, NocInfo &noc, bool message_in);
 double schedule_calculate_messages_along_route(const Message &m, NocInfo &noc);
-void schedule_update_noc(const double t, NocInfo &noc);
+void schedule_update_noc(double t, NocInfo &noc);
 
 }
 

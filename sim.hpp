@@ -36,6 +36,7 @@ class Neuron;
 class Tile;
 class Core;
 
+const long int default_heartbeat_timesteps = 100L;
 class Simulation
 {
 public:
@@ -46,7 +47,7 @@ public:
     Simulation(Simulation &&other) = delete;
     Simulation &operator=(const Simulation &copy) = delete;
     Simulation &operator=(Simulation &&other) = delete;
-    RunData run(long int timesteps=1, long int heartbeat=100);
+    RunData run(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps);
     //int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
     double get_power() const;
     RunData get_run_summary() const;
@@ -109,7 +110,7 @@ void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
 void sim_trace_write_message_header(std::ofstream &message_trace_file);
 void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps, const Network &net);
 void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep, const Network &net);
-void sim_trace_record_message(std::ofstream &perf_trace_file, const Message &m);
+void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
 void sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts);
 
 void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data);
