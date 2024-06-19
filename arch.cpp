@@ -303,7 +303,8 @@ sanafe::SomaUnit::SomaUnit(const std::string &soma_name,
         const std::string &model_str, const CoreAddress &parent_core,
         const SomaPowerMetrics &power_metrics,
         const std::optional<std::filesystem::path> plugin_lib)
-        : plugin_lib(plugin_lib)
+        : noise_stream(nullptr)
+        , plugin_lib(plugin_lib)
         , name(soma_name)
         , model(model_str)
         , parent_core_address(parent_core)
@@ -360,7 +361,7 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
     //  structures to track spike messages and congestion in the NoC
     max_cores_per_tile =
             std::max<size_t>(max_cores_per_tile, offset_within_tile + 1);
-    TRACE1("Core created id:%d.%d (tile:%d).\n", parent_tile_id, new_core_id);
+    TRACE1("Core created id:%d.%d.\n", parent_tile_id, new_core_id);
     Core &new_core = parent_tile.cores[offset_within_tile];
 
     return new_core;
@@ -682,7 +683,7 @@ void sanafe::Core::map_neuron(Neuron &n)
 
     if (neurons.size() > pipeline_config.max_neurons_supported)
     {
-        INFO("Error: Exceeded maximum neurons per core (%lu)",
+        INFO("Error: Exceeded maximum neurons per core (%zu)",
                 pipeline_config.max_neurons_supported);
         throw std::runtime_error("Error: Exceeded maximum neurons per core.");
     }
