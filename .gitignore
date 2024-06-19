@@ -26,6 +26,5 @@ simcpp.*
 _deps/
 build/
 CMakeFiles/
-reports/
-reports_html/
 Makefile
+compile_commands.json
