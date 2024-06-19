@@ -27,7 +27,7 @@
 #include "print.hpp"
 
 sanafe::Architecture::Architecture(
-        const std::string &name, const NetworkOnChipConfiguration &noc)
+        std::string name, const NetworkOnChipConfiguration &noc)
         : name(name)
         , core_count(0UL)
         , noc_width(noc.width_in_tiles)
@@ -35,7 +35,6 @@ sanafe::Architecture::Architecture(
         , noc_buffer_size(noc.buffer_size)
         , max_cores_per_tile(0)
 {
-    return;
 }
 
 sanafe::NetworkOnChipConfiguration::NetworkOnChipConfiguration(
@@ -44,7 +43,6 @@ sanafe::NetworkOnChipConfiguration::NetworkOnChipConfiguration(
         , height_in_tiles(height)
         , buffer_size(buffer_size)
 {
-    return;
 }
 
 std::vector<std::reference_wrapper<sanafe::Core>> sanafe::Architecture::cores()
@@ -262,7 +260,7 @@ sanafe::Architecture sanafe::load_arch(const std::filesystem::path &path)
         throw std::invalid_argument(error);
     }
     INFO("Loading architecture from file: %s\n", path.c_str());
-    Architecture arch = description_parse_arch_file(arch_fp);
+    Architecture arch = description_parse_arch_file_yaml(arch_fp);
     arch_fp.close();
 
     return arch;

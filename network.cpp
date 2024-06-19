@@ -33,7 +33,6 @@ sanafe::NeuronTemplate::NeuronTemplate(const std::string &soma_hw_name,
         , log_potential(log_potential)
         , force_update(force_update)
 {
-    return;
 }
 
 sanafe::Connection::Connection(const int connection_id)
@@ -44,7 +43,6 @@ sanafe::Connection::Connection(const int connection_id)
         , delay(0)
         , last_updated(0)
 {
-    return;
 }
 
 /*
@@ -74,8 +72,6 @@ sanafe::NeuronGroup::NeuronGroup(const std::string &group_name,
             neuron_count);
     // Reserve space for the neurons to go
     neurons.reserve(neuron_count);
-
-    return;
 }
 
 sanafe::Neuron::Neuron(const size_t neuron_id, const size_t parent_group_id,
@@ -106,7 +102,6 @@ sanafe::Neuron::Neuron(const size_t neuron_id, const size_t parent_group_id,
         , soma_input_charge(0.0)
         , axon_out_input_spike(false)
 {
-    return;
 }
 
 std::string sanafe::Neuron::info() const
@@ -208,7 +203,7 @@ void sanafe::Neuron::connect_to_neuron(Neuron &dest,
         const std::map<std::string, ModelParam> &dendrite_params,
         const std::optional<std::string> &synapse_hw_name)
 {
-    connections_out.push_back(Connection(connections_out.size()));
+    connections_out.emplace_back(Connection(connections_out.size()));
     Connection &con = connections_out.back();
     con.pre_neuron = this;
     con.post_neuron = &dest;
@@ -226,7 +221,6 @@ void sanafe::Neuron::connect_to_neuron(Neuron &dest,
     INFO("\tAdded con %d.%d->%d.%d\n", con.pre_neuron->parent_group_id,
             con.pre_neuron->id, con.post_neuron->parent_group_id,
             con.post_neuron->id);
-    return;
 }
 
 sanafe::Network sanafe::load_net(
@@ -237,12 +231,12 @@ sanafe::Network sanafe::load_net(
     network_fp.open(path);
     if (network_fp.fail())
     {
-        const std::string error =
-                "Error: Network file: " + std::string(path) + "failed to open.";
+        const std::string error = "Error: Network file: failed to open (" +
+                std::string(path) + ").";
         throw std::invalid_argument(error);
     }
     INFO("Loading network from file: %s\n", path.c_str());
-    Network net = description_parse_net_file_new(network_fp, arch);
+    Network net = description_parse_net_file_yaml(network_fp, arch);
     network_fp.close();
 
     return net;
@@ -250,10 +244,7 @@ sanafe::Network sanafe::load_net(
 
 std::string sanafe::Network::info() const
 {
-    std::ostringstream ss;
-
-    ss << "sanafe::Network(groups=" << groups.size() << ")";
-    return ss.str();
+    return "sanafe::Network(groups=" + std::to_string(groups.size()) + ")";
 }
 
 void sanafe::Network::check_mapped() const
@@ -311,6 +302,7 @@ void sanafe::Network::save_net_description(
 }
 */
 
+// Reimplement setting functions for multiple neurons and edges
 /*
 void sanafe::NeuronGroup::set_attribute_multiple(
         const std::string &attr, const std::vector<std::string> &values)

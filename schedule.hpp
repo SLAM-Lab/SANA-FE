@@ -46,8 +46,7 @@ struct Scheduler
 struct NocInfo
 {
     std::vector<MessageFifo> messages_received;
-    const int noc_width, noc_height, core_count;
-    const size_t max_cores_per_tile;
+    const size_t noc_width, noc_height, core_count, max_cores_per_tile;
     // Message density is the distribution of messages buffered in different
     //  links across the NoC. This vector is flattened row-major order
     //  where indexes are (x, y, links) and the links idx change fastest
@@ -58,8 +57,8 @@ struct NocInfo
     double mean_in_flight_receive_delay;
     long int messages_in_noc;
 
-    NocInfo(const int width, const int height, const int core_count, const size_t max_cores_per_tile);
-    size_t idx(const int x, const int y, const int link)
+    NocInfo(int width, int height, int core_count, size_t max_cores_per_tile);
+    size_t idx(const size_t x, const size_t y, const size_t link)
     {
         const size_t links_per_router = max_cores_per_tile + ndirections;
         return (x * noc_height * links_per_router) + (y * links_per_router) +

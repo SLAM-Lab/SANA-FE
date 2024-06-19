@@ -66,7 +66,7 @@ public:
     size_t core_count;
     int noc_width, noc_height, noc_buffer_size, max_cores_per_tile;
 
-    Architecture(const std::string &name, const NetworkOnChipConfiguration &noc);
+    Architecture(std::string name, const NetworkOnChipConfiguration &noc);
     std::vector<std::reference_wrapper<Core>> cores();
     Tile &create_tile(const std::string &name, const TilePowerMetrics &power_metrics);
     Core &create_core(const std::string &name, const size_t parent_tile_id, const CorePipelineConfiguration &pipeline_config);
