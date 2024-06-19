@@ -70,7 +70,7 @@ sanafe::NeuronGroup::NeuronGroup(const std::string &group_name,
         , name(group_name)
         , id(group_id)
 {
-    INFO("Creating neuron group: %lu with %lu neurons\n", group_id,
+    INFO("Creating neuron group: %zu with %zu neurons\n", group_id,
             neuron_count);
     // Reserve space for the neurons to go
     neurons.reserve(neuron_count);

@@ -59,7 +59,7 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
         Core &core = cores[idx];
-        TRACE1("Processing %lu message(s) for cid:%d\n",
+        TRACE1("Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
         for (auto m : core.messages_in)
         {
@@ -72,7 +72,7 @@ void sanafe::pipeline_receive_message(Architecture &arch, Message &m)
 {
     assert(static_cast<size_t>(m.src_tile_id) < arch.tiles.size());
     assert(static_cast<size_t>(m.dest_tile_id) < arch.tiles.size());
-    Tile &src_tile = arch.tiles[m.src_tile_id];
+    const Tile &src_tile = arch.tiles[m.src_tile_id];
     Tile &dest_tile = arch.tiles[m.dest_tile_id];
     m.network_delay = sim_estimate_network_costs(src_tile, dest_tile);
     m.hops = abs_diff(src_tile.x, dest_tile.x) +
@@ -83,7 +83,7 @@ void sanafe::pipeline_receive_message(Architecture &arch, Message &m)
 }
 
 void sanafe::pipeline_process_neuron(
-        Timestep &ts, Architecture &arch, Neuron &n)
+        Timestep &ts, const Architecture &arch, Neuron &n)
 {
     SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
     double neuron_processing_latency = 0.0;
@@ -108,7 +108,8 @@ void sanafe::pipeline_process_neuron(
     return;
 }
 
-double sanafe::pipeline_process_message(Timestep &ts, Core &core, Message &m)
+double sanafe::pipeline_process_message(
+        const Timestep &ts, Core &core, Message &m)
 {
     // Simulate message m in the message processing pipeline. The message is
     //  sequentially handled by units up to the time-step buffer
@@ -116,7 +117,7 @@ double sanafe::pipeline_process_message(Timestep &ts, Core &core, Message &m)
     double message_processing_latency = pipeline_process_axon_in(core, m);
 
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
-    AxonInModel &axon_in = core.axons_in[m.dest_axon_id];
+    const AxonInModel &axon_in = core.axons_in[m.dest_axon_id];
     for (const int synapse_address : axon_in.synapse_addresses)
     {
         Connection &con = *(core.connections_in[synapse_address]);
@@ -155,7 +156,7 @@ double sanafe::pipeline_process_axon_in(Core &core, const Message &m)
 }
 
 double sanafe::pipeline_process_synapse(
-        Timestep &ts, Connection &con, const int synapse_address)
+        const Timestep &ts, Connection &con, const int synapse_address)
 {
     // Update all synapses to different neurons in one core. If a synaptic
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
@@ -163,7 +164,7 @@ double sanafe::pipeline_process_synapse(
     SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
     while (con.last_updated < ts.timestep)
     {
-        SIM_TRACE1("Updating synaptic current (last updated:%ld, ts:%ld)\n",
+        SIM_TRACE1("Updating synaptic current (last updated:%d, ts:%ld)\n",
                 con.last_updated, ts.timestep);
         con.synapse_model->update();
         con.last_updated++;
@@ -183,7 +184,7 @@ double sanafe::pipeline_process_synapse(
     return con.synapse_hw->latency_spike_op;
 }
 
-double sanafe::pipeline_process_dendrite(Timestep &ts, Neuron &n)
+double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 {
     double latency;
     latency = 0.0;
@@ -209,7 +210,7 @@ double sanafe::pipeline_process_dendrite(Timestep &ts, Neuron &n)
     return latency;
 }
 
-double sanafe::pipeline_process_soma(Timestep &ts, Neuron &n)
+double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 {
     TRACE1("nid:%d updating, current_in:%lf\n", n.id, n.soma_input_charge);
     double soma_processing_latency = 0.0;
@@ -251,14 +252,14 @@ double sanafe::pipeline_process_soma(Timestep &ts, Neuron &n)
 }
 
 double sanafe::pipeline_process_axon_out(
-        Timestep &ts, Architecture &arch, Neuron &n)
+        Timestep &ts, const Architecture &arch, Neuron &n)
 {
     if (!n.axon_out_input_spike)
     {
         return 0.0;
     }
 
-    TRACE1("nid:%d.%d sending spike message to %lu axons out\n",
+    TRACE1("nid:%d.%d sending spike message to %zu axons out\n",
             n.parent_group_id, n.id, n.axon_out_addresses.size());
     for (int axon_address : n.axon_out_addresses)
     {

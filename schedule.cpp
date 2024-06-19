@@ -154,18 +154,18 @@ double sanafe::schedule_messages(
         }
 
 #ifdef DEBUG
+        // Print contents of priority queue. Because of how the queue works,
+        //  to view all elements we need to copy and pop off elements
         auto view = priority;
         INFO("***\n");
-        while (view.size())
+        while (const Message &curr = view.pop())
         {
-            Message &m = view.top();
-            INFO("m:%e\n", m.sent_timestamp);
-            view.pop();
+            INFO("m:%e\n", curr.sent_timestamp);
         }
         INFO("***\n");
 #endif
 
-        TRACE1("Priority size:%lu\n", priority.size());
+        TRACE1("Priority size:%zu\n", priority.size());
     }
     TRACE1("Scheduler finished.\n");
 
@@ -208,7 +208,6 @@ void sanafe::schedule_update_noc_message_counts(
     {
         y_increment = -1;
     }
-    assert(m.src_core_offset == m.src_core_offset);
     int prev_direction = sanafe::ndirections + (m.src_core_offset);
     for (int x = m.src_x; x != m.dest_x; x += x_increment)
     {
@@ -223,7 +222,6 @@ void sanafe::schedule_update_noc_message_counts(
         }
         if (x == m.src_x)
         {
-            assert(m.src_core_offset == m.src_core_offset);
             const int link = sanafe::ndirections + (m.src_core_offset);
             noc.message_density[noc.idx(x, m.src_y, link)] += adjust;
         }
@@ -259,7 +257,6 @@ void sanafe::schedule_update_noc_message_counts(
 
     if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
     {
-        assert(m.src_core_offset == m.src_core_offset);
         const int link = sanafe::ndirections + (m.src_core_offset);
         noc.message_density[noc.idx(m.dest_x, m.dest_y, link)] += adjust;
     }
@@ -298,13 +295,13 @@ void sanafe::schedule_update_noc_message_counts(
     return;
 }
 
-double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
+double sanafe::schedule_calculate_messages_along_route(
+        const Message &m, NocInfo &noc)
 {
     // Calculate the total flow density along a spike message route.
     //  Sum the densities for all links the message will travel
     double flow_density;
     int x_increment, y_increment;
-    int direction;
 
     flow_density = 0.0;
     if (m.src_x < m.dest_x)
@@ -323,18 +320,11 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
     {
         y_increment = -1;
     }
+
     int prev_direction = sanafe::ndirections + (m.src_core_offset);
     for (int x = m.src_x; x != m.dest_x; x += x_increment)
     {
-        int direction = 0;
-        if (x_increment > 0)
-        {
-            direction = sanafe::east;
-        }
-        else
-        {
-            direction = sanafe::west;
-        }
+        const int direction = (x_increment > 0) ? sanafe::east : sanafe::west;
         if (x == m.src_x)
         {
             const int link = sanafe::ndirections + m.src_core_offset;
@@ -349,14 +339,7 @@ double sanafe::schedule_calculate_messages_along_route(Message &m, NocInfo &noc)
 
     for (int y = m.src_y; y != m.dest_y; y += y_increment)
     {
-        if (y_increment > 0)
-        {
-            direction = sanafe::north;
-        }
-        else
-        {
-            direction = sanafe::south;
-        }
+        const int direction = (y_increment > 0) ? sanafe::north : sanafe::south;
         if (m.src_x == m.dest_x && y == m.src_y)
         {
             const int link = sanafe::ndirections + m.src_core_offset;
@@ -393,6 +376,8 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
         // Go through all messages in the NoC and check to see if that
         //  message has been fully received by time t. If so, remove it
         //  from the NoC.
+        // TODO: replace all of this with std::remove_if() algorithm?
+        //  When we remove, we need to also update the noc counts before erasing
         auto it = q.begin();
         while (it != q.end())
         {
@@ -441,14 +426,6 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
             TRACE1("No messages for core %d\n", i);
         }
     }
-
-#ifdef DEBUG2
-    int i = 0;
-    for (Core *curr = priority_queue; curr != NULL; curr = curr->next)
-    {
-        // TODO
-    }
-#endif
 
     return priority;
 }

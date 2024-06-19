@@ -85,7 +85,7 @@ std::map<std::string, std::string> dict_to_str_map(const pybind11::dict &vals)
         map[key] = value_str;
         TRACE1_PYBIND("Set map[%s]=%s\n", key.c_str(), map[key].c_str());
     }
-    TRACE1_PYBIND("Converted map.size()=%lu\n", map.size());
+    TRACE1_PYBIND("Converted map.size()=%zu\n", map.size());
 
     return map;
 }
@@ -179,7 +179,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("__repr__", &sanafe::NeuronGroup::info)
             .def("set_attribute_multiple",
                     [](sanafe::NeuronGroup *self, const std::string &attr_name,
-                            pybind11::iterable &values) {
+                            const pybind11::iterable &values) {
                         return self->set_attribute_multiple(
                                 attr_name, pylist_to_str_vec(values));
                     })
@@ -188,7 +188,7 @@ PYBIND11_MODULE(sanafecpp, m)
                             sanafe::NeuronGroup &dest_group,
                             const std::vector<std::pair<int, int>>
                                     &src_dest_id_pairs,
-                            pybind11::dict &attr) {
+                            const pybind11::dict &attr) {
                         return self->connect_neurons(dest_group,
                                 src_dest_id_pairs,
                                 pylist_or_object_to_str_vec(

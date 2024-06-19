@@ -39,15 +39,18 @@ class Core;
 class Simulation
 {
 public:
-    Simulation(Architecture &arch, Network &net, const std::string &output_dir, const bool record_spikes, const bool record_potentials, const bool record_perf, const bool record_messages);
+    Simulation(Architecture &arch, Network &net, const std::filesystem::path &output_dir = ".", bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false);
     ~Simulation();
-    RunData run(const long int timesteps=1, const long int heartbeat=100);
-    //int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
-    double get_power();
-    RunData get_run_summary();
     // Do not allow copying of Simulation object
     Simulation(const Simulation &copy) = delete;
-    Simulation(const Simulation &&move) = delete;
+    Simulation(Simulation &&other) = delete;
+    Simulation &operator=(const Simulation &copy) = delete;
+    Simulation &operator=(Simulation &&other) = delete;
+    RunData run(long int timesteps=1, long int heartbeat=100);
+    //int update_neuron(std::vector<NeuronGroup>::size_type group_id, std::vector<Neuron>::size_type n_id, std::vector<std::string> kwargs, int count);
+    double get_power() const;
+    RunData get_run_summary() const;
+
 
 private:
     Architecture &arch;
@@ -70,7 +73,7 @@ struct RunData
     double energy, sim_time, wall_time;
     long int spikes, packets_sent, neurons_fired;
 
-    RunData(const long int start, const long int steps);
+    RunData( long int start,  long int steps);
 };
 
 struct Timestep
@@ -80,7 +83,7 @@ struct Timestep
     long int neurons_fired;
     double energy, sim_time;
 
-    Timestep(const long int ts, const int core_count);
+    Timestep( long int ts,  int core_count);
 };
 
 enum ProgramArgs
@@ -92,7 +95,7 @@ enum ProgramArgs
 };
 
 void sim_timestep(Timestep &ts, Architecture &arch, Network &net);
-double sim_estimate_network_costs(Tile &src, Tile &dest);
+double sim_estimate_network_costs(const Tile &src, Tile &dest);
 void sim_reset_measurements(Network &net, Architecture &arch);
 double sim_calculate_energy(const Architecture &arch);
 
@@ -104,19 +107,19 @@ void sim_trace_write_spike_header(std::ofstream &spike_trace_file);
 void sim_trace_write_potential_header(std::ofstream &potential_trace_file, const Network &net);
 void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
 void sim_trace_write_message_header(std::ofstream &message_trace_file);
-void sim_trace_record_spikes(std::ofstream &spike_trace_file, const long int timesteps, const Network &net);
-void sim_trace_record_potentials(std::ofstream &potential_trace_file, const int timestep, const Network &net);
+void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps, const Network &net);
+void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep, const Network &net);
 void sim_trace_record_message(std::ofstream &perf_trace_file, const Message &m);
 void sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts);
 
-void sim_output_run_summary(const std::filesystem::path &output_file, const RunData &run_data);
+void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data);
 void sim_format_run_summary(std::ostream &out, const RunData &run_data);
 
 //double sim_generate_noise(Neuron *n);
 timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end);
 
-//int sim_poisson_input(const double firing_probability);
-//int sim_rate_input(const double firing_rate, double *spike_val);
+//int sim_poisson_input( double firing_probability);
+//int sim_rate_input( double firing_rate, double *spike_val);
 }
 
 #endif

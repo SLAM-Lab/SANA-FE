@@ -272,18 +272,19 @@ class AxonInModel
 public:
     // List of all neuron connections to send spikes to
     std::vector<int> synapse_addresses;
-
     Message *message;
     long int last_updated;
     int spikes_received, active_synapses;
+
+    AxonInModel();
 };
 
 class AxonOutModel
 {
 public:
     // List of all neuron connections to send spike to
-    int dest_axon_id, dest_tile_id, dest_core_offset;
-    int src_neuron_id;
+    int dest_axon_id, dest_tile_id, dest_core_offset, src_neuron_id;
+    AxonOutModel();
 };
 
 enum NoiseType

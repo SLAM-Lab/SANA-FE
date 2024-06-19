@@ -24,9 +24,9 @@
 #include "sim.hpp"
 
 sanafe::Simulation::Simulation(Architecture &a, Network &n,
-        const std::string &output_dir = ".", const bool record_spikes = false,
-        const bool record_potentials = false, const bool record_perf = false,
-        const bool record_messages = false)
+        const std::filesystem::path &output_dir,
+        const bool record_spikes, const bool record_potentials,
+        const bool record_perf, const bool record_messages)
         : arch(a)
         , net(n)
         , out_dir(output_dir)
@@ -123,8 +123,8 @@ sanafe::Timestep sanafe::Simulation::step()
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
     total_timesteps++;
-    struct Timestep ts = Timestep(total_timesteps, arch.core_count);
-    struct timespec ts_start, ts_end, ts_elapsed;
+    Timestep ts = Timestep(total_timesteps, arch.core_count);
+    timespec ts_start, ts_end, ts_elapsed;
 
     // Run and measure the wall-clock time taken to run the simulation
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
@@ -169,7 +169,7 @@ sanafe::Timestep sanafe::Simulation::step()
     return ts;
 }
 
-double sanafe::Simulation::get_power()
+double sanafe::Simulation::get_power() const
 {
     double power; // Watts
     if (total_sim_time > 0.0)
@@ -185,7 +185,7 @@ double sanafe::Simulation::get_power()
     return power;
 }
 
-sanafe::RunData sanafe::Simulation::get_run_summary()
+sanafe::RunData sanafe::Simulation::get_run_summary() const
 {
     // Store the summary data in a string to string mapping
     RunData run_data(0, total_timesteps);
@@ -201,14 +201,14 @@ sanafe::RunData sanafe::Simulation::get_run_summary()
 }
 
 void sanafe::sim_output_run_summary(
-        const std::filesystem::path &out_dir, const RunData &run_data)
+        const std::filesystem::path &output_dir, const RunData &run_data)
 {
     // Summarize and output the run data using a YAML format to the console
     sim_format_run_summary(std::cout, run_data);
 
     // Output the same YAML-formatted summary to the given output file
     const std::filesystem::path summary_filename("run_summary.yaml");
-    const std::filesystem::path summary_path = out_dir / summary_filename;
+    const std::filesystem::path summary_path = output_dir / summary_filename;
     std::ofstream summary_file(summary_path);
     if (summary_file.is_open())
     {
@@ -311,29 +311,24 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
     scheduler.max_cores_per_tile = arch.max_cores_per_tile;
 
     ts.sim_time = schedule_messages(ts.messages, scheduler);
-    // Performance statistics for this time step
     ts.energy = sim_calculate_energy(arch);
 
     for (auto &tile : arch.tiles)
     {
-        int tile_spike_count = 0;
         ts.total_hops += tile.hops;
         for (auto &c : tile.cores)
         {
-            for (std::vector<SynapseUnit>::size_type k = 0;
-                    k < c.synapse.size(); k++)
+            for (const auto &syn : c.synapse)
             {
-                ts.spike_count += c.synapse[k].spikes_processed;
-                tile_spike_count += c.synapse[k].spikes_processed;
+                ts.spike_count += syn.spikes_processed;
             }
-            for (std::vector<SomaUnit>::size_type k = 0; k < c.soma.size(); k++)
+            for (const auto &soma : c.soma)
             {
-                ts.neurons_fired += c.soma[k].neurons_fired;
+                ts.neurons_fired += soma.neurons_fired;
             }
-            for (std::vector<AxonOutUnit>::size_type k = 0;
-                    k < c.axon_out_hw.size(); k++)
+            for (const auto &axon_out : c.axon_out_hw)
             {
-                ts.packets_sent += c.axon_out_hw[k].packets_out;
+                ts.packets_sent += axon_out.packets_out;
             }
         }
     }
@@ -343,18 +338,19 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
+        : messages(std::vector<std::list<Message>>(core_count))
+        , timestep(ts)
+        , spike_count(0L)
+        , total_hops(0L)
+        , packets_sent(0L)
+        , neurons_fired(0L)
+        , energy(0.0)
+        , sim_time(0.0)
 {
-    timestep = ts;
-    spike_count = 0L;
-    messages = std::vector<std::list<Message>>(core_count);
-    neurons_fired = 0L;
-    total_hops = 0L;
-    energy = 0.0;
-    sim_time = 0.0;
-    packets_sent = 0L;
+    return;
 }
 
-double sanafe::sim_estimate_network_costs(Tile &src, Tile &dest)
+double sanafe::sim_estimate_network_costs(const Tile &src, Tile &dest)
 {
     double network_latency;
     long int x_hops, y_hops;
@@ -451,16 +447,14 @@ double sanafe::sim_generate_noise(Neuron *n)
 double sanafe::sim_calculate_energy(const Architecture &arch)
 {
     // Returns the total energy across the design, for this timestep
-    double network_energy, synapse_energy, soma_energy, axon_out_energy;
-    double axon_in_energy, total_energy;
+    double total_energy = 0.0;
+    double network_energy = 0.0;
+    double axon_in_energy = 0.0;
+    double synapse_energy = 0.0;
+    double soma_energy = 0.0;
+    double axon_out_energy = 0.0;
 
-    network_energy = 0.0;
-    axon_in_energy = 0.0;
-    synapse_energy = 0.0;
-    soma_energy = 0.0;
-    axon_out_energy = 0.0;
-
-    for (auto &t : arch.tiles)
+    for (const auto &t : arch.tiles)
     {
         double total_hop_energy =
                 (static_cast<double>(t.east_hops) * t.energy_east_hop);
@@ -474,47 +468,40 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
         TRACE1("east:%ld west:%ld north:%ld south:%ld\n", t.east_hops,
                 t.west_hops, t.north_hops, t.south_hops);
 
-        for (auto &c : t.cores)
+        for (const auto &c : t.cores)
         {
-            for (std::vector<AxonInUnit>::size_type k = 0;
-                    k < c.axon_in_hw.size(); k++)
+            for (const auto &axon : c.axon_in_hw)
             {
-                axon_in_energy += c.axon_in_hw[k].spike_messages_in *
-                        c.axon_in_hw[k].energy_spike_message;
-                TRACE1("spikes in: %ld, energy:%e\n",
-                        c.axon_in_hw[k].spike_messages_in,
-                        c.axon_in_hw[k].energy_spike_message);
+                axon_in_energy += static_cast<double>(axon.spike_messages_in) *
+                        axon.energy_spike_message;
+                TRACE1("spikes in: %ld, energy:%e\n", axon.spike_messages_in,
+                        axon.energy_spike_message);
             }
-            for (std::vector<SynapseUnit>::size_type k = 0;
-                    k < c.synapse.size(); k++)
+            for (const auto &syn : c.synapse)
             {
-                synapse_energy += c.synapse[k].spikes_processed *
-                        c.synapse[k].energy_spike_op;
+                synapse_energy += static_cast<double>(syn.spikes_processed) *
+                        syn.energy_spike_op;
                 TRACE1("synapse processed: %ld, energy:%e\n",
-                        c.synapse[k].spikes_processed,
-                        c.synapse[k].energy_spike_op);
+                        syn.spikes_processed, syn.energy_spike_op);
             }
-            for (std::vector<SomaUnit>::size_type k = 0; k < c.soma.size(); k++)
+            for (const auto &soma : c.soma)
             {
-                soma_energy += static_cast<double>(c.soma[k].neuron_count) *
-                        c.soma[k].energy_access_neuron;
-                soma_energy += static_cast<double>(c.soma[k].neuron_updates) *
-                        c.soma[k].energy_update_neuron;
-                soma_energy += static_cast<double>(c.soma[k].neurons_fired) *
-                        c.soma[k].energy_spiking;
+                soma_energy += static_cast<double>(soma.neuron_count) *
+                        soma.energy_access_neuron;
+                soma_energy += static_cast<double>(soma.neuron_updates) *
+                        soma.energy_update_neuron;
+                soma_energy += static_cast<double>(soma.neurons_fired) *
+                        soma.energy_spiking;
                 TRACE1("neurons:%ld updates:%ld, spiking:%ld\n",
-                        c.soma[k].neuron_count, c.soma[k].neuron_updates,
-                        c.soma[k].neurons_fired);
+                        soma.neuron_count, soma.neuron_updates,
+                        soma.neurons_fired);
             }
-            for (std::vector<AxonOutUnit>::size_type k = 0;
-                    k < c.axon_out_hw.size(); k++)
+            for (const auto &axon : c.axon_out_hw)
             {
-                axon_out_energy +=
-                        static_cast<double>(c.axon_out_hw[k].packets_out) *
-                        c.axon_out_hw[k].energy_access;
-                TRACE1("packets: %ld, energy:%e\n",
-                        c.axon_out_hw[k].packets_out,
-                        c.axon_out_hw[k].energy_access);
+                axon_out_energy += static_cast<double>(axon.packets_out) *
+                        axon.energy_access;
+                TRACE1("packets: %ld, energy:%e\n", axon.packets_out,
+                        axon.energy_access);
             }
         }
     }
@@ -561,43 +548,39 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
             c.energy = 0.0;
             c.next_message_generation_delay = 0.0;
 
-            for (std::vector<AxonInUnit>::size_type k = 0;
-                    k < c.axon_in_hw.size(); k++)
+            for (auto axon : c.axon_in_hw)
             {
-                c.axon_in_hw[k].spike_messages_in = 0L;
-                c.axon_in_hw[k].energy = 0.0;
-                c.axon_in_hw[k].time = 0;
+                axon.spike_messages_in = 0L;
+                axon.energy = 0.0;
+                axon.time = 0;
             }
 
-            for (std::vector<DendriteUnit>::size_type k = 0;
-                    k < c.dendrite.size(); k++)
+            for (auto &dendrite : c.dendrite)
             {
-                c.dendrite[k].energy = 0.0;
-                c.dendrite[k].time = 0.0;
+                dendrite.energy = 0.0;
+                dendrite.time = 0.0;
             }
 
-            for (std::vector<SynapseUnit>::size_type k = 0;
-                    k < c.synapse.size(); k++)
+            for (auto &syn : c.synapse)
             {
-                c.synapse[k].energy = 0.0;
-                c.synapse[k].time = 0.0;
-                c.synapse[k].spikes_processed = 0;
+                syn.energy = 0.0;
+                syn.time = 0.0;
+                syn.spikes_processed = 0;
             }
 
-            for (std::vector<SomaUnit>::size_type k = 0; k < c.soma.size(); k++)
+            for (auto &soma : c.soma)
             {
-                c.soma[k].energy = 0.0;
-                c.soma[k].time = 0.0;
-                c.soma[k].neuron_updates = 0L;
-                c.soma[k].neurons_fired = 0L;
+                soma.energy = 0.0;
+                soma.time = 0.0;
+                soma.neuron_updates = 0L;
+                soma.neurons_fired = 0L;
             }
 
-            for (std::vector<AxonOutUnit>::size_type k = 0;
-                    k < c.axon_out_hw.size(); k++)
+            for (auto &axon : c.axon_out_hw)
             {
-                c.axon_out_hw[k].energy = 0.0;
-                c.axon_out_hw[k].time = 0.0;
-                c.axon_out_hw[k].packets_out = 0;
+                axon.energy = 0.0;
+                axon.time = 0.0;
+                axon.packets_out = 0;
             }
 
             // Reset the message buffer
@@ -621,7 +604,7 @@ void sanafe::sim_trace_write_potential_header(
     //  probed
     assert(potential_trace_file.is_open());
     potential_trace_file << "timestep,";
-    for (auto &group : net.groups)
+    for (const auto &group : net.groups)
     {
         for (auto &n : group->neurons)
         {
@@ -675,7 +658,7 @@ void sanafe::sim_trace_record_spikes(
     // A trace of all spikes that are generated
     assert(out.is_open());
 
-    for (auto &group : net.groups)
+    for (const auto &group : net.groups)
     {
         for (auto &n : group->neurons)
         {
@@ -691,23 +674,23 @@ void sanafe::sim_trace_record_spikes(
     return;
 }
 
-void sanafe::sim_trace_record_potentials(
-        std::ofstream &out, const int timestep, const Network &net)
+void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
+        const long int timestep, const Network &net)
 {
     // Each line of this csv file is the potential of all probed neurons for
     //  one time-step
-    assert(out.is_open());
+    assert(potential_trace_file.is_open());
     SIM_TRACE1("Recording potential for timestep: %d\n", timestep);
-    out << timestep << ",";
+    potential_trace_file << timestep << ",";
 
     long int potential_probe_count = 0;
-    for (auto &group : net.groups)
+    for (const auto &group : net.groups)
     {
         for (auto &n : group->neurons)
         {
             if (n.log_potential)
             {
-                out << n.soma_model->get_potential() << ",";
+                potential_trace_file << n.soma_model->get_potential() << ",";
                 potential_probe_count++;
             }
         }
@@ -716,7 +699,7 @@ void sanafe::sim_trace_record_potentials(
     // Each timestep takes up a line in the respective csv file
     if (potential_probe_count > 0)
     {
-        out << std::endl;
+        potential_trace_file << std::endl;
     }
 
     return;

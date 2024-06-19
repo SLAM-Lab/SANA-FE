@@ -566,6 +566,7 @@ sanafe::Architecture sanafe::description_parse_arch_section(
         const std::string error = "Error: No tile section defined (line:" +
                 std::to_string(tile_node.Mark().line + 1) + ":" +
                 std::to_string(tile_node.Mark().column + 1) + ").\n";
+        throw std::invalid_argument(error);
     }
 
     return new_arch;
@@ -643,6 +644,7 @@ sanafe::Network sanafe::description_parse_net_section(
         const std::string error = "Error: No group section defined (line:" +
                 std::to_string(group_node.Mark().line + 1) + ":" +
                 std::to_string(group_node.Mark().column + 1) + ").\n";
+        throw std::invalid_argument(error);
     }
 
     if (const YAML::Node edges_node = net_node["edges"])
@@ -665,6 +667,7 @@ sanafe::Network sanafe::description_parse_net_section(
         const std::string error = "Error: No edge section defined (line:" +
                 std::to_string(edges_node.Mark().line + 1) + ":" +
                 std::to_string(edges_node.Mark().column + 1) + ").\n";
+        throw std::invalid_argument(error);
     }
 
     return new_net;
@@ -736,7 +739,7 @@ sanafe::ModelParam sanafe::description_parse_parameter(
             ModelParam curr = description_parse_parameter(node);
             attribute_list.push_back(curr);
         }
-        INFO("Setting attribute to an unnamed list of %lu attributes",
+        INFO("Setting attribute to an unnamed list of %zu attributes",
                 attribute_list.size());
         attribute.value = attribute_list;
     }
@@ -752,7 +755,7 @@ sanafe::ModelParam sanafe::description_parse_parameter(
             INFO("Saving to key: %s\n", curr.name.value().c_str());
             attribute_list.push_back(curr);
         }
-        INFO("Setting attribute to a named list of %lu attributes",
+        INFO("Setting attribute to a named list of %zu attributes",
                 attribute_list.size());
         attribute.value = attribute_list;
     }

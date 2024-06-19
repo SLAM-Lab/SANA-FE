@@ -12,9 +12,13 @@
 
 // *** Synapse models ***
 sanafe::CurrentBasedSynapseModel::CurrentBasedSynapseModel()
+        : weight(0.0)
+        , min_synaptic_resolution(0.0)
+        , current(0.0)
+        , synaptic_current_decay(0.0)
+        , weight_bits(8)
 {
-    current = 0.0;
-    min_synaptic_resolution = 0.0;
+    return;
 }
 
 double sanafe::CurrentBasedSynapseModel::update(
@@ -39,10 +43,6 @@ double sanafe::CurrentBasedSynapseModel::update(
 void sanafe::CurrentBasedSynapseModel::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
-    weight = 0.0;
-    weight_bits = 8;
-    synaptic_current_decay = 0.0;
-
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
@@ -94,12 +94,12 @@ void sanafe::SingleCompartmentModel::set_attributes(
 }
 
 sanafe::MultiTapModel1D::MultiTapModel1D()
+        : tap_voltages(std::vector<double>(1, 0.0))
+        , next_voltages(std::vector<double>(1, 0.0))
+        , space_constants(std::vector<double>(0))
+        , time_constants(std::vector<double>(1, 0.0))
 {
-    const size_t default_taps = 1;
-    tap_voltages = std::vector<double>(default_taps, 0.0);
-    next_voltages = std::vector<double>(default_taps, 0.0);
-    space_constants = std::vector<double>(default_taps - 1, 0.0);
-    time_constants = std::vector<double>(default_taps, 0.0);
+    return;
 }
 
 double sanafe::MultiTapModel1D::update(
@@ -152,7 +152,7 @@ double sanafe::MultiTapModel1D::update(
     INFO("***\n");
     for (size_t i = 0; i < tap_voltages.size(); i++)
     {
-        printf("\tv[%lu]: %lf\n", i, tap_voltages[i]);
+        printf("\tv[%zu]: %lf\n", i, tap_voltages[i]);
     }
     INFO("***\n");
     // Return current for most proximal tap (which is always the first tap)

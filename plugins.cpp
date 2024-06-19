@@ -33,7 +33,7 @@ void sanafe::plugin_init_synapse(
     if (synapse == nullptr)
     {
         INFO("Error: Couldn't load library %s\n", plugin_path.c_str());
-        exit(1);
+        throw std::runtime_error("Error: Could not load library.\n");
     }
 
     // Reset DLL errors
@@ -44,14 +44,15 @@ void sanafe::plugin_init_synapse(
     _create_synapse *create_func =
             (_create_synapse *) dlsym(synapse, create.c_str());
     plugin_create_synapse[model_name] = create_func;
+
     const char *dlsym_error = dlerror();
+    dlclose(synapse);
     if (dlsym_error)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
                 dlsym_error);
-        exit(1);
+        throw std::runtime_error("Error: Could not load symbol.\n");
     }
-
     INFO("Loaded plugin symbols for %s.\n", model_name.c_str());
 }
 
@@ -66,7 +67,7 @@ void sanafe::plugin_init_dendrite(
     if (dendrite == nullptr)
     {
         INFO("Error: Couldn't load library %s\n", plugin_path.c_str());
-        exit(1);
+        throw std::runtime_error("Error: Could not load library.\n");
     }
 
     // Reset DLL errors
@@ -77,12 +78,14 @@ void sanafe::plugin_init_dendrite(
     _create_dendrite *create_func =
             (_create_dendrite *) dlsym(dendrite, create.c_str());
     plugin_create_dendrite[model_name] = create_func;
+
     const char *dlsym_error = dlerror();
+    dlclose(dendrite);
     if (dlsym_error)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
                 dlsym_error);
-        exit(1);
+        throw std::runtime_error("Error: Could not load symbol.\n");
     }
 
     INFO("Loaded plugin symbols for %s.\n", model_name.c_str());
@@ -99,7 +102,7 @@ void sanafe::plugin_init_soma(
     if (soma == nullptr)
     {
         INFO("Error: Couldn't load library %s\n", plugin_path.c_str());
-        exit(1);
+        throw std::invalid_argument("Error: Could not load library.\n");
     }
 
     // Reset DLL errors
@@ -109,12 +112,14 @@ void sanafe::plugin_init_soma(
     INFO("Loading function: %s\n", create.c_str());
     _create_soma *create_func = (_create_soma *) dlsym(soma, create.c_str());
     plugin_create_soma[model_name] = create_func;
+
     const char *dlsym_error = dlerror();
+    dlclose(soma);
     if (dlsym_error)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
                 dlsym_error);
-        exit(1);
+        throw std::runtime_error("Error: Could not load symbol.\n");
     }
 
     INFO("Loaded plugin symbols for %s.\n", model_name.c_str());

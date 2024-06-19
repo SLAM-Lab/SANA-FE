@@ -70,7 +70,7 @@ struct NocInfo
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
 double schedule_messages(std::vector<std::list<Message>> &messages_sent_per_core, const Scheduler &scheduler);
 void schedule_update_noc_message_counts(const Message &m, NocInfo &noc, const bool message_in);
-double schedule_calculate_messages_along_route(Message &m, NocInfo &noc);
+double schedule_calculate_messages_along_route(const Message &m, NocInfo &noc);
 void schedule_update_noc(const double t, NocInfo &noc);
 
 }

@@ -85,6 +85,24 @@ std::string sanafe::Architecture::description() const
 }
 */
 
+sanafe::AxonInModel::AxonInModel()
+        : message(nullptr)
+        , last_updated(0L)
+        , spikes_received(0)
+        , active_synapses(0)
+{
+    return;
+}
+
+sanafe::AxonOutModel::AxonOutModel()
+        : dest_axon_id(-1)
+        , dest_tile_id(-1)
+        , dest_core_offset(-1)
+        , src_neuron_id(-1)
+{
+    return;
+}
+
 sanafe::Message::Message(
         const Architecture &arch, const Neuron &n, const int ts)
 {
@@ -361,7 +379,7 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
     //  structures to track spike messages and congestion in the NoC
     max_cores_per_tile =
             std::max<size_t>(max_cores_per_tile, offset_within_tile + 1);
-    TRACE1("Core created id:%d.%d.\n", parent_tile_id, new_core_id);
+    TRACE1("Core created id:%zu.%zu.\n", parent_tile_id, new_core_id);
     Core &new_core = parent_tile.cores[offset_within_tile];
 
     return new_core;
@@ -369,7 +387,6 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
 
 std::string sanafe::Core::info() const
 {
-    std::map<std::string, std::string> attributes;
     std::ostringstream ss;
     ss << "sanafe::Core(name= " << name << " tile=" << parent_tile_id << ")";
     return ss.str();
@@ -572,7 +589,7 @@ void sanafe::arch_print_axon_summary(Architecture &arch)
             }
         }
     }
-    INFO("Total cores: %lu\n", arch.core_count);
+    INFO("Total cores: %zu\n", arch.core_count);
     INFO("Average in map count: %lf\n", (double) in_count / arch.core_count);
     INFO("Average out map count: %lf\n", (double) out_count / arch.core_count);
 
@@ -586,17 +603,16 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 
     // Figure out the unique set of cores that this neuron broadcasts to
     TRACE1("Counting connections for neuron nid:%d\n", pre_neuron.id);
-    std::vector<bool> core_inserted;
     std::set<Core *> cores_out;
     for (Connection &curr_connection : pre_neuron.connections_out)
     {
         TRACE1("Looking at connection id: %d\n", curr_connection.id);
         Core *dest_core = curr_connection.post_neuron->core;
         cores_out.insert(dest_core);
-        TRACE1("Connected to dest core: %d\n", dest_core->id);
+        TRACE1("Connected to dest core: %zu\n", dest_core->id);
     }
 
-    TRACE1("Creating connections for neuron nid:%d to %lu core(s)\n",
+    TRACE1("Creating connections for neuron nid:%d to %zu core(s)\n",
             pre_neuron.id, cores_out.size());
     for (Core *dest_core : cores_out)
     {
@@ -668,7 +684,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 
 void sanafe::Core::map_neuron(Neuron &n)
 {
-    TRACE1("Mapping nid:%d to core: %d\n", n.id, id);
+    TRACE1("Mapping nid:%d to core: %zu\n", n.id, id);
     // Map the neuron to hardware units
     if (n.core != nullptr)
     {
@@ -678,7 +694,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     }
 
     n.core = this;
-    TRACE1("Mapping neuron %d to core %d\n", n.id, id);
+    TRACE1("Mapping neuron %d to core %zu\n", n.id, id);
     neurons.push_back(&n);
 
     if (neurons.size() > pipeline_config.max_neurons_supported)
@@ -694,7 +710,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     //  default to the first one defined
     if (dendrite.size() == 0)
     {
-        INFO("Error: No dendrite units defined for cid:%lu\n", id);
+        INFO("Error: No dendrite units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No dendrite units defined");
     }
     n.dendrite_hw = &(dendrite[0]);
@@ -721,7 +737,7 @@ void sanafe::Core::map_neuron(Neuron &n)
 
     if (soma.size() == 0)
     {
-        INFO("Error: No soma units defined for cid:%lu\n", id);
+        INFO("Error: No soma units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No soma units defined");
     }
     n.soma_hw = &(soma[0]);
@@ -749,7 +765,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     // TODO: support multiple axon outputs
     if (axon_out_hw.size() == 0)
     {
-        INFO("Error: No axon out units defined for cid:%lu\n", id);
+        INFO("Error: No axon out units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No axon out units defined");
     }
     n.axon_out_hw = &(axon_out_hw[0]);
@@ -796,7 +812,7 @@ void sanafe::Core::map_neuron(Neuron &n)
                     n.dendrite_hw->plugin_lib.value();
             INFO("Creating dendrite from plugin %s.\n",
                     plugin_lib_path.c_str());
-            n.dendrite_model = sanafe::plugin_get_dendrite(
+            n.dendrite_model = plugin_get_dendrite(
                     n.dendrite_hw->model, plugin_lib_path);
         }
         else
@@ -804,7 +820,7 @@ void sanafe::Core::map_neuron(Neuron &n)
             // Use built in models
             TRACE1("Creating dendrite built-in model %s.\n",
                     n.dendrite_hw->model.c_str());
-            n.dendrite_model = sanafe::model_get_dendrite(n.dendrite_hw->model);
+            n.dendrite_model = model_get_dendrite(n.dendrite_hw->model);
         }
         const NeuronGroup &group = *(n.parent_net->groups[n.parent_group_id]);
         assert(n.dendrite_model != nullptr);
@@ -827,14 +843,11 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 
     TRACE3("Adding connection to core.\n");
     // Allocate the axon and its connections at the post-synaptic core
-    AxonInModel in;
-    in.active_synapses = 0;
-    in.last_updated = -1;
-    post_core.axons_in.push_back(in);
+    post_core.axons_in.push_back(AxonInModel());
     const size_t new_axon_in_address = post_core.axons_in.size() - 1;
 
     // Add the axon at the sending, pre-synaptic core
-    TRACE1("axon in address:%d for core:%d.%d\n", new_axon_in_address,
+    TRACE1("Axon in address:%zu for core:%zu.%zu\n", new_axon_in_address,
             post_core.parent_tile_id, post_core.id);
     AxonOutModel out;
     out.dest_axon_id = new_axon_in_address;
@@ -846,7 +859,7 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 
     // Then add the output axon to the sending pre-synaptic neuron
     pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
-    TRACE1("nid:%d.%d cid:%lu.%lu added one output axon address %d.\n",
+    TRACE1("nid:%d.%d cid:%zu.%zu added one output axon address %zu.\n",
             pre_neuron.parent_group_id, pre_neuron.id, pre_core.parent_tile_id,
             pre_core.offset, new_axon_out_address);
 
@@ -857,7 +870,7 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
 {
     // Add a given connection to the axon in the post-synaptic
     //  (destination) core
-    TRACE3("Adding to connection to axon:%lu\n",
+    TRACE3("Adding to connection to axon:%zu\n",
             post_core.axons_out.size() - 1);
 
     post_core.connections_in.push_back(&con);
@@ -908,7 +921,7 @@ void sanafe::Architecture::save_arch_description(
                 "Error: Couldn't open arch file to save to.");
     }
 
-    INFO("tile count:%lu\n", tiles.size());
+    INFO("tile count:%zu\n", tiles.size());
 
     for (const Tile &tile : tiles)
     {

@@ -83,8 +83,8 @@ public:
     SingleCompartmentModel &operator=(const SingleCompartmentModel &other) = default;
     SingleCompartmentModel &operator=(SingleCompartmentModel &&other) = default;
 
-    virtual double update(std::optional<Synapse> current_in = std::nullopt, const bool step = true) override;
-    virtual void set_attributes(const std::map<std::string, ModelParam> &attr) override;
+    double update(std::optional<Synapse> current_in = std::nullopt, const bool step = true) override;
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     double accumulated_charge, leak_decay;
 };

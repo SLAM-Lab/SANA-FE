@@ -23,7 +23,8 @@ int main(int argc, char *argv[])
 
     if (argc < 1)
     {
-        throw std::invalid_argument("Error: No program arguments.");
+        INFO("Error: No program arguments.");
+        return 1;
     }
     // First arg is always program name, skip
     argc--;
@@ -43,11 +44,6 @@ int main(int argc, char *argv[])
             switch (argv[0][1])
             {
             case 'o': {
-                if (argc <= 0)
-                {
-                    throw std::invalid_argument(
-                            "Error: No output dir given.\n");
-                }
                 argc--;
                 argv++;
                 output_dir = std::filesystem::path(argv[0]);
@@ -112,7 +108,20 @@ int main(int argc, char *argv[])
 
     // Step simulation
     INFO("Running simulation.\n");
-    sim.run(timesteps);
+    try
+    {
+        sim.run(timesteps);
+    }
+    catch (const std::runtime_error &exc)
+    {
+        INFO("Error: runtime exception thrown: %s\n", exc.what());
+        return 1;
+    }
+    catch (const std::invalid_argument &exc)
+    {
+        INFO("Error: invalid argument thrown: %s\n", exc.what());
+        return 1;
+    }
 
     INFO("***** Run Summary *****\n");
     const auto run_data = sim.get_run_summary();

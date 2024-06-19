@@ -65,6 +65,7 @@ public:
     std::vector<std::unique_ptr<NeuronGroup>> groups;
     std::string name;
     explicit Network(const std::string &net_name) : name(net_name) {};
+    ~Network() = default;
     Network(Network &&) = default;
     Network &operator=(Network &&) = default;
     // Do *NOT* allow Network objects to be copied
@@ -121,7 +122,7 @@ struct ModelParam
     template <typename T> operator std::vector<T>() const
     {
         std::vector<T> cast_vector;
-        const auto value_vector =
+        const auto &value_vector =
                 std::get<std::vector<ModelParam>>(value);
         cast_vector.reserve(value_vector.size());
 
