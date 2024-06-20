@@ -1,0 +1,50 @@
+## dendrite.yaml
+#  n(0.3)         n(0.2)         n(0.1)
+#    |              |              |
+#   \ /            \ /            \ /
+# n(0.0:2) <---> n(0.0:1) <---> n(0.0:0) proximal
+#                                  |
+#                                 \ /
+#                                n(0.0)
+network:
+  name: dendrite_example_network
+  groups:
+    name: dendrite_chain
+    attributes: {log_potential: true}
+    neurons:
+      - id: 0
+        map_to: {tile: 0, core: 0, dendrite: demo_dendrite}
+        attributes:
+          soma: {threshold: 100}
+          dendrite:
+            taps: 3
+            time_constants: [0.8, 0.8, 0.7]
+            space_constants: [0.1, 0.2]
+      - id: 1
+        map_to: {tile: 0, core: 0}
+        attributes:
+          soma: {bias: 0.0, threshold: 1.0}
+      - id: 2
+        map_to: {tile: 0, core: 0}
+        attributes:
+          soma: {bias: 0.0, threshold: 1.0}
+      - id: 3
+        map_to: {tile: 0, core: 0}
+        attributes:
+          soma: {bias: 1.0, threshold: 20}
+  edges:
+    - src: {group: 0, id: 1}
+      dst: {group: 0, id: 0}
+      attributes:
+        synapse: {weight: 10}
+        dendrite: {tap: 0}
+    - src: {group: 0, id: 2}
+      dst: {group: 0, id: 0}
+      attributes:
+        synapse: {weight: 10}
+        dendrite: {tap: 1}
+    - src: {group: 0, id: 3}
+      dst: {group: 0, id: 0}
+      attributes:
+        synapse: {weight: 10}
+        dendrite: {tap: 2}
