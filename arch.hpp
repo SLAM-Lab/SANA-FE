@@ -101,15 +101,22 @@ struct TilePowerMetrics
     double energy_south_hop, latency_south_hop;
     double energy_west_hop, latency_west_hop;
 
-    TilePowerMetrics(const double energy_north = 0.0, const double latency_north = 0.0, const double energy_east = 0.0, const double latency_east = 0.0, const double energy_south = 0.0, const double latency_south = 0.0, const double energy_west = 0.0, const double latency_west = 0.0);
+    TilePowerMetrics(double energy_north = 0.0, double latency_north = 0.0, double energy_east = 0.0, double latency_east = 0.0, double energy_south = 0.0, double latency_south = 0.0, double energy_west = 0.0, double latency_west = 0.0);
+};
+
+struct AxonInPowerMetrics
+{
+    double energy_message_in, latency_message_in;
+
+    AxonInPowerMetrics(double energy = 0.0, double latency = 0.0);
 };
 
 struct SynapsePowerMetrics
 {
-    double energy_memory_access, latency_memory_access;
-    double energy_spike_op, latency_spike_op;
+    //double energy_memory_access, latency_memory_access;
+    double energy_process_spike, latency_process_spike;
 
-    SynapsePowerMetrics(const double energy_memory = 0.0, const double latency_memory = 0.0, const double energy_spike = 0.0, const double latency_spike = 0.0);
+    SynapsePowerMetrics(double energy_spike = 0.0, double latency_spike = 0.0);
 };
 
 struct SomaPowerMetrics
@@ -118,7 +125,7 @@ struct SomaPowerMetrics
     double energy_access_neuron, latency_access_neuron;
     double energy_spiking, latency_spiking;
 
-    SomaPowerMetrics(const double energy_update = 0.0, const double latency_update = 0.0, const double energy_access = 0.0, const double latency_access = 0.0, const double energy_spiking = 0.0, const double latency_spiking = 0.0);
+    SomaPowerMetrics(double energy_update = 0.0, double latency_update = 0.0, double energy_access = 0.0, double latency_access = 0.0, double energy_spiking = 0.0, double latency_spiking = 0.0);
 };
 
 struct CorePipelineConfiguration
@@ -163,6 +170,14 @@ struct CoreAddress
     size_t id, parent_tile_id, offset_within_tile;
 };
 
+struct ModelInfo
+{
+    std::optional<std::filesystem::path> plugin_library_path;
+    std::string name;
+
+    ModelInfo() : plugin_library_path(std::nullopt), name() {}
+};
+
 class Core
 {
 public:
@@ -187,8 +202,8 @@ public:
     int message_count;
 
     explicit Core(const std::string &name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
-    AxonInUnit &create_axon_in(const std::string &name, const double energy_message, const double latency_message);
-    SynapseUnit &create_synapse(const std::string &name, const std::string &model_str, const SynapsePowerMetrics &power_metrics, const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
+    AxonInUnit &create_axon_in(const std::string &name, const AxonInPowerMetrics &power_metrics);
+    SynapseUnit &create_synapse(const std::string &name, const SynapsePowerMetrics &power_metrics, const ModelInfo &model);
     DendriteUnit &create_dendrite(const std::string &name, const std::string &model_str, const double energy_access, const double latency_access,  const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
     SomaUnit &create_soma(const std::string &name, const std::string &model_str, const SomaPowerMetrics &power_metrics, const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
     AxonOutUnit &create_axon_out(const std::string &name, const double energy_access, const double latency_access);
@@ -207,7 +222,7 @@ struct AxonInUnit
     double energy, time;
     double energy_spike_message, latency_spike_message;
 
-    explicit AxonInUnit(const std::string &axon_in_name, const CoreAddress &parent_core_address, const double energy_message=0.0, const double latency_message=0.0);
+    explicit AxonInUnit(const std::string &axon_in_name, const CoreAddress &parent_core_address, const AxonInPowerMetrics &power_metrics);
     //std::string description() const;
 };
 
@@ -221,7 +236,7 @@ struct SynapseUnit
     double energy_memory_access, latency_memory_access;
     double energy_spike_op, latency_spike_op;
 
-    explicit SynapseUnit(const std::string &synapse_name, const std::string &model_str, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics,  const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
+    explicit SynapseUnit(const std::string &synapse_name, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics,  const ModelInfo &model);
     //std::string description() const;
 };
 

@@ -20,166 +20,167 @@
 #include "network.hpp"
 #include "print.hpp"
 
-std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
-        const std::string &range_str)
+sanafe::DescriptionParsingError::DescriptionParsingError(
+        const std::string &error, const YAML::Mark &pos)
+        : std::invalid_argument(error)
 {
-    const size_t start_pos = range_str.find('[');
-    const size_t end_pos = range_str.find(']');
-    const size_t delimiter_pos = range_str.find("..");
-    if ((start_pos == std::string::npos) || (end_pos == std::string::npos) ||
-            (delimiter_pos == std::string::npos) || (end_pos <= start_pos))
-    {
-        const std::string error = "Error: Invalid range:" + range_str + '\n';
-        throw std::invalid_argument(error);
-    }
-    // Use stringstreams to parse the size_t values from the range substrings
-    std::istringstream first_ss(
-            range_str.substr(start_pos + 1, delimiter_pos - start_pos - 1));
-    std::istringstream last_ss(
-            range_str.substr(delimiter_pos + 2, end_pos - 2 - delimiter_pos));
-    size_t first;
-    first_ss >> first;
-    size_t last;
-    last_ss >> last;
+    message = ("Error: " + error + " (Line " + std::to_string(pos.line + 1) +
+            ':' + std::to_string(pos.column + 1) + ").");
+};
 
-    return {first, last};
+const char *sanafe::DescriptionParsingError::what() const noexcept
+{
+    return message.c_str();
+}
+
+template <>
+YAML::Node sanafe::description_required_field<YAML::Node>(
+        const YAML::Node &node, const std::string &key)
+{
+    // Specialization of YAML-CPP wrapper for node=map[key], see generic
+    //  implementation below (for scalar values)
+    if (!node.IsMap())
+    {
+        throw DescriptionParsingError(
+                "Node should be a mapping\n. For more info on YAML mappings "
+                "refer to the YAML 1.2 specification, 7.4.2 'Flow Mappings' "
+                "and 8.2.2 'Block Mappings'",
+                node.Mark());
+    }
+    const YAML::Node &child = node[key];
+    if (!child.IsDefined())
+    {
+        const std::string message = "Value for key '" + key + "' not defined";
+        throw DescriptionParsingError(message, node.Mark());
+    }
+
+    return child;
+}
+
+template <typename T>
+T sanafe::description_required_field(
+        const YAML::Node &node, const std::string &key)
+{
+    // Wrapper around YAML-CPP for field=map[key], adding more error prints
+    const auto &field_node = description_required_field<YAML::Node>(node, key);
+    if (!field_node.IsScalar())
+    {
+        const std::string message = "'" + key + "' value should be a scalar";
+        throw DescriptionParsingError(message, field_node.Mark());
+    }
+
+    // Efficiently convert to type T by trying the YAML-CPP decoder.
+    //  If decode() fails, it returns false and execution falls through
+    T field;
+    if (YAML::convert<T>::decode(field_node, field))
+    {
+        return field;  // type T
+    }
+
+    const std::string error = "Could not cast field '" +
+            YAML::Dump(field_node) + "' (key '" + key +
+            "') to type: " + description_get_type_string(field);
+    throw DescriptionParsingError(error, field_node.Mark());
+}
+
+template <typename T>
+std::string sanafe::description_get_type_string(const T &value)
+{
+    if (typeid(value) == typeid(bool))
+    {
+        return "bool";
+    }
+    else if (typeid(value) == typeid(int))
+    {
+        return "int";
+    }
+    else if (typeid(value) == typeid(size_t))
+    {
+        return "size_t";
+    }
+    else if (typeid(value) == typeid(double))
+    {
+        return "double";
+    }
+    else if (typeid(value) == typeid(std::string))
+    {
+        return "string";
+    }
+    else
+    {
+        // Not a scalar type; fall back to default name which may be mangled
+        return typeid(value).name();
+    }
 }
 
 void sanafe::description_parse_axon_in_section_yaml(
         const YAML::Node &axon_in_node, Core &parent_core)
 {
-    std::string axon_in_name;
-    if (axon_in_node["name"])
-    {
-        axon_in_name = axon_in_node["name"].as<std::string>();
-    }
-    else
-    {
-        throw std::invalid_argument(description_yaml_parsing_error(
-                "'name' not defined for axon in", axon_in_node.Mark()));
-    }
+    const auto name =
+            description_required_field<std::string>(axon_in_node, "name");
+    const auto &attributes =
+            description_required_field<YAML::Node>(axon_in_node, "attributes");
+    const AxonInPowerMetrics in_metrics =
+            description_parse_axon_in_attributes_yaml(attributes, parent_core);
+    parent_core.create_axon_in(name, in_metrics);
+}
 
-    const YAML::Node &attributes = axon_in_node["attributes"];
-    std::optional<double> energy_message;
-    std::optional<double> latency_message;
-    if (attributes.IsMap())
-    {
-        // TODO: rewind a bit, require all of these arguments.. don't allow
-        //  default metrics, this has bitten me too many times. Only make truly
-        //  optional parameters optional. and then make it clear whether or not
-        //  they get set.
-        for (const auto &attribute : attributes)
-        {
-            try
-            {
-                const auto &key = attribute.first.as<std::string>();
-                const auto value = attribute.second.as<double>();
-                if (key == "energy_message")
-                {
-                    energy_message = value;
-                }
-                else if (key == "latency_message")
-                {
-                    latency_message = value;
-                }
-                else
-                {
-                    INFO("Warning: Attribute %s not recognized.\n",
-                            key.c_str());
-                }
-            }
-            catch (const std::exception &exc)
-            {
-                INFO("yaml-cpp raised exception: %s\n", exc.what());
-                throw std::invalid_argument(description_yaml_parsing_error(
-                        "For axon in, expected <std::string>: <double> pairs.",
-                        attributes.Mark()));
-            }
-        }
-    }
-    else if (attributes.IsNull())
-    {
-        INFO("Warning: No attributes map defined for axon in.\n");
-    }
-    else
-    {
-        throw std::invalid_argument(description_yaml_parsing_error(
-                "Invalid attributes section; this section should be either a "
-                "map (key: value pairs) or left blank",
-                attributes.Mark()));
-    }
+sanafe::AxonInPowerMetrics sanafe::description_parse_axon_in_attributes_yaml(
+        const YAML::Node &attributes, const Core &parent_core)
+{
+    AxonInPowerMetrics axon_in_metrics;
+    axon_in_metrics.energy_message_in =
+            description_required_field<double>(attributes, "energy_message_in");
+    axon_in_metrics.latency_message_in = description_required_field<double>(
+            attributes, "latency_message_in");
 
-    // Warn if any values were unset, this may be a mistake by the user
-    if (!energy_message.has_value())
-    {
-        INFO("Warning: Setting default value for energy_message (0.0).\n");
-        energy_message = 0.0;
-    }
-    if (!latency_message.has_value())
-    {
-        INFO("Warning: Setting default value for latency_message (0.0)\n");
-        latency_message = 0.0;
-    }
-
-    parent_core.create_axon_in(
-            axon_in_name, energy_message.value(), latency_message.value());
-
-    return;
+    return axon_in_metrics;
 }
 
 void sanafe::description_parse_synapse_section_yaml(
         const YAML::Node &synapse_node, Core &parent_core)
 {
-    std::string synapse_name = synapse_node["name"].as<std::string>();
-    std::replace(synapse_name.begin(), synapse_name.end(), ' ', '_');
-    std::replace(synapse_name.begin(), synapse_name.end(), '\t', '_');
+    const auto name =
+            description_required_field<std::string>(synapse_node, "name");
+    const auto &attributes =
+            description_required_field<YAML::Node>(synapse_node, "attributes");
 
-    const YAML::Node &attributes = synapse_node["attributes"];
-    std::string model_str;
-    if (attributes["model"])
+    auto [power_metrics, model] =
+            description_parse_synapse_attributes_yaml(attributes, parent_core);
+    parent_core.create_synapse(name, power_metrics, model);
+}
+
+std::pair<sanafe::SynapsePowerMetrics, sanafe::ModelInfo>
+sanafe::description_parse_synapse_attributes_yaml(
+        const YAML::Node &attributes, Core &parent_core)
+{
+    ModelInfo model;
+    model.name = description_required_field<std::string>(attributes, "model");
+    if (const YAML::Node &plugin_path_node = attributes["plugin"])
     {
-        model_str = attributes["model"].as<std::string>();
-    }
-    else
-    {
-        throw std::invalid_argument("No synapse model defined.\n");
+        if (plugin_path_node.IsScalar())
+        {
+            model.plugin_library_path = plugin_path_node.as<std::string>();
+        }
+        else
+        {
+            DescriptionParsingError("Expected plugin path to be string",
+                    plugin_path_node.Mark());
+        }
     }
 
-    std::optional<std::filesystem::path> plugin_lib_path;
-    if (attributes["plugin"])
-    {
-        plugin_lib_path = attributes["plugin"].as<std::string>();
-    }
+    SynapsePowerMetrics power_metrics;
+    // TODO: possibly remove this code entirely - leave for now
+    //power_metrics.energy_memory_access = description_required_field<double>(
+    //        attributes, "energy_memory_access");
+    //power_metrics.latency_memory_access = description_required_field<double>(
+    //    attributes, "latecy_memory_access");
+    power_metrics.energy_process_spike = description_required_field<double>(
+        attributes, "energy_process_spike");
+    power_metrics.latency_process_spike = description_required_field<double>(
+        attributes, "latency_process_spike");
 
-    double energy_memory = 0.0;
-    double latency_memory = 0.0;
-    double energy_spike = 0.0;
-    double latency_spike = 0.0;
-    // Parse power metricslatency_message
-    if (attributes["energy_memory_access"])
-    {
-        energy_memory = attributes["energy_memory_access"].as<double>();
-    }
-    if (attributes["latency_memory_access"])
-    {
-        latency_memory = attributes["latency_memory_access"].as<double>();
-    }
-    if (attributes["energy_process_spike"])
-    {
-        energy_spike = attributes["energy_process_spike"].as<double>();
-    }
-    if (attributes["latency_process_spike"])
-    {
-        latency_spike = attributes["latency_process_spike"].as<double>();
-    }
-    SynapsePowerMetrics power_metrics(
-            energy_memory, latency_memory, energy_spike, latency_spike);
-    // TODO: I think we need more information on the model.. i.e. possibly an
-    //  optional plugin path (indicating its a plugin not a built-in model)
-    parent_core.create_synapse(
-            synapse_name, model_str, power_metrics, plugin_lib_path);
-
-    return;
+    return {power_metrics, model};
 }
 
 void sanafe::description_parse_dendrite_section_yaml(
@@ -564,8 +565,6 @@ void sanafe::description_parse_tile_section_yaml(
                     "No core section defined", tile_node.Mark()));
         }
     }
-
-    return;
 }
 
 sanafe::NetworkOnChipConfiguration
@@ -1077,6 +1076,31 @@ void sanafe::description_parse_neuron_section_yaml(
     {
         throw std::invalid_argument("No valid neuron to H/W mapping given.\n");
     }
+}
+
+std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
+        const std::string &range_str)
+{
+    const size_t start_pos = range_str.find('[');
+    const size_t end_pos = range_str.find(']');
+    const size_t delimiter_pos = range_str.find("..");
+    if ((start_pos == std::string::npos) || (end_pos == std::string::npos) ||
+            (delimiter_pos == std::string::npos) || (end_pos <= start_pos))
+    {
+        const std::string error = "Error: Invalid range:" + range_str + '\n';
+        throw std::invalid_argument(error);
+    }
+    // Use stringstreams to parse the size_t values from the range substrings
+    std::istringstream first_ss(
+            range_str.substr(start_pos + 1, delimiter_pos - start_pos - 1));
+    std::istringstream last_ss(
+            range_str.substr(delimiter_pos + 2, end_pos - 2 - delimiter_pos));
+    size_t first;
+    first_ss >> first;
+    size_t last;
+    last_ss >> last;
+
+    return {first, last};
 }
 
 /*

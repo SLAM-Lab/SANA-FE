@@ -24,6 +24,8 @@ architecture:
           axon_in:
             - name: demo_in
               attributes:
+                energy_message_in: 0.0
+                latency_message_in: 0.0
           synapse:
             - name: demo_synapse
               attributes:

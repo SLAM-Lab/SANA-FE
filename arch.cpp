@@ -89,7 +89,6 @@ sanafe::AxonInModel::AxonInModel()
         , spikes_received(0)
         , active_synapses(0)
 {
-    return;
 }
 
 sanafe::AxonOutModel::AxonOutModel()
@@ -98,7 +97,6 @@ sanafe::AxonOutModel::AxonOutModel()
         , dest_core_offset(-1)
         , src_neuron_id(-1)
 {
-    return;
 }
 
 sanafe::Message::Message(
@@ -139,8 +137,6 @@ sanafe::Message::Message(
 
     hops = 0;
     spikes = 0;
-
-    return;
 }
 
 sanafe::Message::Message(const Architecture &arch, const Neuron &n,
@@ -188,7 +184,6 @@ sanafe::Tile::Tile(const std::string &name, const size_t tile_id,
         , x(0)
         , y(0)
 {
-    return;
 }
 
 std::string sanafe::Tile::info() const
@@ -230,7 +225,6 @@ sanafe::Core::Core(const std::string &name, const CoreAddress &address,
         , parent_tile_id(address.parent_tile_id)
         , message_count(0)
 {
-    return;
 }
 
 sanafe::Tile &sanafe::Architecture::create_tile(
@@ -267,36 +261,30 @@ sanafe::Architecture sanafe::load_arch(const std::filesystem::path &path)
 }
 
 sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name,
-        const CoreAddress &parent_core, const double energy_message,
-        const double latency_message)
+        const CoreAddress &parent_core, const AxonInPowerMetrics &power_metrics)
         : name(axon_in_name)
         , parent_core_address(parent_core)
         , spike_messages_in(0L)
         , energy(0.0)
         , time(0.0)
-        , energy_spike_message(energy_message)
-        , latency_spike_message(latency_message)
+        , energy_spike_message(power_metrics.energy_message_in)
+        , latency_spike_message(power_metrics.latency_message_in)
 {
-    return;
 }
 
 sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
-        const std::string &model_str, const CoreAddress &parent_core,
-        const SynapsePowerMetrics &power_metrics,
-        const std::optional<std::filesystem::path> &plugin_lib_path)
-        : plugin_lib(plugin_lib_path)
+        const CoreAddress &parent_core,
+        const SynapsePowerMetrics &power_metrics, const ModelInfo &model)
+        : plugin_lib(model.plugin_library_path)
         , name(synapse_name)
-        , model(model_str)
+        , model(model.name)
         , parent_core_address(parent_core)
         , spikes_processed(0L)
         , energy(0.0)
         , time(0.0)
-        , energy_memory_access(power_metrics.energy_memory_access)
-        , latency_memory_access(power_metrics.latency_memory_access)
-        , energy_spike_op(power_metrics.energy_spike_op)
-        , latency_spike_op(power_metrics.latency_spike_op)
+        , energy_spike_op(power_metrics.energy_process_spike)
+        , latency_spike_op(power_metrics.latency_process_spike)
 {
-    return;
 }
 
 sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name,
@@ -312,7 +300,6 @@ sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name,
         , energy_access(energy_cost)
         , latency_access(latency_cost)
 {
-    return;
 }
 
 sanafe::SomaUnit::SomaUnit(const std::string &soma_name,
@@ -351,7 +338,6 @@ sanafe::AxonOutUnit::AxonOutUnit(const std::string &axon_out_name,
         , energy_access(energy_access)
         , latency_access(latency_access)
 {
-    return;
 }
 
 sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
@@ -467,23 +453,21 @@ std::string sanafe::AxonOutUnit::description() const
 */
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(const std::string &name,
-        const double energy_message, const double latency_message)
+        const AxonInPowerMetrics &power_metrics)
 {
     const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    axon_in_hw.push_back(AxonInUnit(
-            name, parent_core_address, energy_message, latency_message));
+    axon_in_hw.push_back(AxonInUnit(name, parent_core_address, power_metrics));
     AxonInUnit &new_axon_in_hw_unit = axon_in_hw.back();
 
     return new_axon_in_hw_unit;
 }
 
 sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
-        const std::string &model_str, const SynapsePowerMetrics &power_metrics,
-        const std::optional<std::filesystem::path> &plugin_lib_path)
+        const SynapsePowerMetrics &power_metrics, const ModelInfo &model)
 {
     const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    synapse.push_back(SynapseUnit(name, model_str, parent_core_address,
-            power_metrics, plugin_lib_path));
+    synapse.push_back(SynapseUnit(name, parent_core_address,
+            power_metrics, model));
     SynapseUnit &new_synapse_hw_unit = synapse.back();
     TRACE1("New synapse h/w unit created (cid:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -967,18 +951,20 @@ sanafe::TilePowerMetrics::TilePowerMetrics(const double energy_north,
         , energy_west_hop(energy_west)
         , latency_west_hop(latency_west)
 {
-    return;
 }
 
-sanafe::SynapsePowerMetrics::SynapsePowerMetrics(const double energy_memory,
-        const double latency_memory, const double energy_spike,
-        const double latency_spike)
-        : energy_memory_access(energy_memory)
-        , latency_memory_access(latency_memory)
-        , energy_spike_op(energy_spike)
-        , latency_spike_op(latency_spike)
+sanafe::AxonInPowerMetrics::AxonInPowerMetrics(
+        const double energy, const double latency)
+        : energy_message_in(energy)
+        , latency_message_in(latency)
 {
-    return;
+}
+
+sanafe::SynapsePowerMetrics::SynapsePowerMetrics(const double energy_spike,
+        const double latency_spike)
+        : energy_process_spike(energy_spike)
+        , latency_process_spike(latency_spike)
+{
 }
 
 sanafe::SomaPowerMetrics::SomaPowerMetrics(const double energy_update,
@@ -992,7 +978,6 @@ sanafe::SomaPowerMetrics::SomaPowerMetrics(const double energy_update,
         , energy_spiking(energy_spiking)
         , latency_spiking(latency_spiking)
 {
-    return;
 }
 
 sanafe::CorePipelineConfiguration::CorePipelineConfiguration(
@@ -1000,6 +985,4 @@ sanafe::CorePipelineConfiguration::CorePipelineConfiguration(
         : max_neurons_supported(neurons_supported)
 {
     timestep_buffer_pos = pipeline_parse_buffer_pos_str(buffer_pos);
-
-    return;
 }
