@@ -261,7 +261,7 @@ double sanafe::pipeline_process_axon_out(
 
     TRACE1("nid:%d.%d sending spike message to %zu axons out\n",
             n.parent_group_id, n.id, n.axon_out_addresses.size());
-    for (int axon_address : n.axon_out_addresses)
+    for (const int axon_address : n.axon_out_addresses)
     {
         Message m(arch, n, ts.timestep, axon_address);
         // Add axon access cost to message latency and energy

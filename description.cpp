@@ -26,7 +26,7 @@ sanafe::DescriptionParsingError::DescriptionParsingError(
 {
     message = ("Error: " + error + " (Line " + std::to_string(pos.line + 1) +
             ':' + std::to_string(pos.column + 1) + ").");
-};
+}
 
 const char *sanafe::DescriptionParsingError::what() const noexcept
 {

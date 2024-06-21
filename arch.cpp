@@ -28,7 +28,7 @@
 
 sanafe::Architecture::Architecture(
         std::string name, const NetworkOnChipConfiguration &noc)
-        : name(name)
+        : name(std::move(name))
         , core_count(0UL)
         , noc_width(noc.width_in_tiles)
         , noc_height(noc.height_in_tiles)
@@ -52,14 +52,14 @@ std::vector<std::reference_wrapper<sanafe::Core>> sanafe::Architecture::cores()
     {
         for (auto &core : tile.cores)
         {
-            all_cores_in_arch.push_back(core);
+            all_cores_in_arch.emplace_back(core);
         }
     }
 
     return all_cores_in_arch;
 }
 
-std::string sanafe::Architecture::info()
+std::string sanafe::Architecture::info() const
 {
     std::ostringstream ss;
     ss << "sanafe::Architecture(tiles=" << tiles.size();
@@ -83,65 +83,27 @@ std::string sanafe::Architecture::description() const
 }
 */
 
-sanafe::AxonInModel::AxonInModel()
-        : message(nullptr)
-        , last_updated(0L)
-        , spikes_received(0)
-        , active_synapses(0)
-{
-}
-
-sanafe::AxonOutModel::AxonOutModel()
-        : dest_axon_id(-1)
-        , dest_tile_id(-1)
-        , dest_core_offset(-1)
-        , src_neuron_id(-1)
-{
-}
-
 sanafe::Message::Message(
-        const Architecture &arch, const Neuron &n, const int ts)
+        const Architecture &arch, const Neuron &n, const int timestep)
+        : timestep(timestep)
+        , src_neuron_id(n.id)
+        , src_neuron_group_id(n.parent_group_id)
 {
     // If no axon was given create a message with no destination. By
     //  default, messages without destinations act as a placeholder for neuron
     //  processing
     const Core &src_core = *(n.core);
     const Tile &src_tile = arch.tiles[src_core.parent_tile_id];
-
-    placeholder = true;
-    src_neuron_id = n.id;
-    src_neuron_group_id = n.parent_group_id;
     src_x = src_tile.x;
     src_y = src_tile.y;
     src_tile_id = src_tile.id;
     src_core_id = src_core.id;
     src_core_offset = src_core.offset;
-    timestep = ts;
-
-    generation_delay = 0.0;
-    network_delay = 0.0;
-    receive_delay = 0.0;
-    blocked_delay = 0.0;
-    sent_timestamp = -std::numeric_limits<double>::infinity();
-    received_timestamp = -std::numeric_limits<double>::infinity();
-    processed_timestamp = -std::numeric_limits<double>::infinity();
-
-    dest_x = 0;
-    dest_y = 0;
-    dest_core_offset = 0;
-    dest_core_id = 0;
-    dest_tile_id = 0;
-    dest_axon_id = 0;
-    dest_axon_hw = 0;
-    in_noc = false;
-
-    hops = 0;
-    spikes = 0;
 }
 
 sanafe::Message::Message(const Architecture &arch, const Neuron &n,
-        const int ts, const int axon_address)
-        : Message(arch, n, ts)
+        const int timestep, const int axon_address)
+        : Message(arch, n, timestep)
 {
     const Core &src_core = *(n.core);
     const AxonOutModel &src_axon = src_core.axons_out[axon_address];
@@ -161,9 +123,9 @@ sanafe::Message::Message(const Architecture &arch, const Neuron &n,
     dest_axon_hw = 0;
 }
 
-sanafe::Tile::Tile(const std::string &name, const size_t tile_id,
+sanafe::Tile::Tile(std::string name, const size_t tile_id,
         const TilePowerMetrics &power_metrics)
-        : name(name)
+        : name(std::move(name))
         , energy(0.0)
         , energy_north_hop(power_metrics.energy_north_hop)
         , latency_north_hop(power_metrics.latency_north_hop)
@@ -214,10 +176,10 @@ std::string sanafe::Tile::description() const
 }
 */
 
-sanafe::Core::Core(const std::string &name, const CoreAddress &address,
+sanafe::Core::Core(std::string name, const CoreAddress &address,
         const CorePipelineConfiguration &pipeline)
         : pipeline_config(pipeline)
-        , name(name)
+        , name(std::move(name))
         , energy(0.0)
         , next_message_generation_delay(0.0)
         , id(address.id)
@@ -228,14 +190,14 @@ sanafe::Core::Core(const std::string &name, const CoreAddress &address,
 }
 
 sanafe::Tile &sanafe::Architecture::create_tile(
-        const std::string &name, const TilePowerMetrics &power_metrics)
+        std::string name, const TilePowerMetrics &power_metrics)
 {
     // Initialize a new tile given metrics by the user, and push it into the
     //  Architecture's list of tiles
     const size_t new_tile_id = tiles.size();
     // The tile id is a unique global value that be used to index into the
     //  Architecture's tile array
-    tiles.push_back(Tile(name, new_tile_id, power_metrics));
+    tiles.emplace_back(std::move(name), new_tile_id, power_metrics);
     Tile &new_tile = tiles[new_tile_id];
     new_tile.x = new_tile.id / noc_height;
     new_tile.y = new_tile.id % noc_height;
@@ -260,9 +222,9 @@ sanafe::Architecture sanafe::load_arch(const std::filesystem::path &path)
     return arch;
 }
 
-sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name,
+sanafe::AxonInUnit::AxonInUnit(std::string axon_in_name,
         const CoreAddress &parent_core, const AxonInPowerMetrics &power_metrics)
-        : name(axon_in_name)
+        : name(std::move(axon_in_name))
         , parent_core_address(parent_core)
         , spike_messages_in(0L)
         , energy(0.0)
@@ -272,11 +234,11 @@ sanafe::AxonInUnit::AxonInUnit(const std::string &axon_in_name,
 {
 }
 
-sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
+sanafe::SynapseUnit::SynapseUnit(std::string synapse_name,
         const CoreAddress &parent_core,
         const SynapsePowerMetrics &power_metrics, const ModelInfo &model)
         : plugin_lib(model.plugin_library_path)
-        , name(synapse_name)
+        , name(std::move(synapse_name))
         , model(model.name)
         , parent_core_address(parent_core)
         , spikes_processed(0L)
@@ -287,13 +249,13 @@ sanafe::SynapseUnit::SynapseUnit(const std::string &synapse_name,
 {
 }
 
-sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name,
-        const std::string &model_str, const CoreAddress &parent_core,
+sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
+        std::string model_str, const CoreAddress &parent_core,
         const double energy_cost, const double latency_cost,
-        const std::optional<std::filesystem::path> &plugin_lib_path)
-        : plugin_lib(plugin_lib_path)
-        , name(dendrite_name)
-        , model(model_str)
+        std::optional<std::filesystem::path> plugin_library_path)
+        : plugin_lib(std::move(plugin_library_path))
+        , name(std::move(dendrite_name))
+        , model(std::move(model_str))
         , parent_core_address(parent_core)
         , energy(0.0)
         , time(0.0)
@@ -302,14 +264,13 @@ sanafe::DendriteUnit::DendriteUnit(const std::string &dendrite_name,
 {
 }
 
-sanafe::SomaUnit::SomaUnit(const std::string &soma_name,
-        const std::string &model_str, const CoreAddress &parent_core,
-        const SomaPowerMetrics &power_metrics,
-        const std::optional<std::filesystem::path> plugin_lib)
+sanafe::SomaUnit::SomaUnit(std::string soma_name, std::string model_str,
+        const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics,
+        std::optional<std::filesystem::path> plugin_library_path)
         : noise_stream(nullptr)
-        , plugin_lib(plugin_lib)
-        , name(soma_name)
-        , model(model_str)
+        , plugin_lib(std::move(plugin_library_path))
+        , name(std::move(soma_name))
+        , model(std::move(model_str))
         , parent_core_address(parent_core)
         , neuron_updates(0L)
         , neurons_fired(0L)
@@ -324,13 +285,12 @@ sanafe::SomaUnit::SomaUnit(const std::string &soma_name,
         , latency_spiking(power_metrics.latency_spiking)
         , noise_type(NOISE_NONE)
 {
-    return;
 }
 
-sanafe::AxonOutUnit::AxonOutUnit(const std::string &axon_out_name,
+sanafe::AxonOutUnit::AxonOutUnit(std::string axon_out_name,
         const CoreAddress &parent_core, const double energy_access,
         const double latency_access)
-        : name(axon_out_name)
+        : name(std::move(axon_out_name))
         , parent_core_address(parent_core)
         , packets_out(0L)
         , energy(0.0)
@@ -340,7 +300,7 @@ sanafe::AxonOutUnit::AxonOutUnit(const std::string &axon_out_name,
 {
 }
 
-sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
+sanafe::Core &sanafe::Architecture::create_core(std::string name,
         const size_t parent_tile_id,
         const CorePipelineConfiguration &pipeline_config)
 {
@@ -353,10 +313,11 @@ sanafe::Core &sanafe::Architecture::create_core(const std::string &name,
     const size_t offset_within_tile = parent_tile.cores.size();
     const size_t new_core_id = core_count++;
     CoreAddress new_core_address = {
-            new_core_id, parent_tile_id, offset_within_tile};
+            parent_tile_id, offset_within_tile, new_core_id};
 
     // Initialize the new core and refer to it at both tile and arch levels
-    parent_tile.cores.push_back(Core(name, new_core_address, pipeline_config));
+    parent_tile.cores.emplace_back(
+            Core(std::move(name), new_core_address, pipeline_config));
 
     // The architecture tracks the maximum cores in *any* of its tiles.
     //  This information is needed later by the scheduler, when creating
@@ -452,11 +413,12 @@ std::string sanafe::AxonOutUnit::description() const
 }
 */
 
-sanafe::AxonInUnit &sanafe::Core::create_axon_in(const std::string &name,
-        const AxonInPowerMetrics &power_metrics)
+sanafe::AxonInUnit &sanafe::Core::create_axon_in(
+        const std::string &name, const AxonInPowerMetrics &power_metrics)
 {
-    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    axon_in_hw.push_back(AxonInUnit(name, parent_core_address, power_metrics));
+    const CoreAddress parent_core_address = {parent_tile_id, offset, id};
+    axon_in_hw.emplace_back(
+            AxonInUnit(name, parent_core_address, power_metrics));
     AxonInUnit &new_axon_in_hw_unit = axon_in_hw.back();
 
     return new_axon_in_hw_unit;
@@ -465,9 +427,9 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(const std::string &name,
 sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
         const SynapsePowerMetrics &power_metrics, const ModelInfo &model)
 {
-    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    synapse.push_back(SynapseUnit(name, parent_core_address,
-            power_metrics, model));
+    const CoreAddress parent_core_address = {parent_tile_id, offset, id};
+    synapse.emplace_back(
+            SynapseUnit(name, parent_core_address, power_metrics, model));
     SynapseUnit &new_synapse_hw_unit = synapse.back();
     TRACE1("New synapse h/w unit created (cid:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -479,11 +441,11 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
         const std::string &model_str, const double energy_access,
         const double latency_access,
-        const std::optional<std::filesystem::path> &plugin_lib)
+        std::optional<std::filesystem::path> plugin_lib)
 {
-    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    dendrite.push_back(DendriteUnit(name, model_str, parent_core_address,
-            energy_access, latency_access, plugin_lib));
+    const CoreAddress parent_core_address = {parent_tile_id, offset, id};
+    dendrite.emplace_back(DendriteUnit(name, model_str, parent_core_address,
+            energy_access, latency_access, std::move(plugin_lib)));
     DendriteUnit &new_dendrite_hw_unit = dendrite.back();
     TRACE1("New dendrite h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -492,13 +454,13 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
     return new_dendrite_hw_unit;
 }
 
-sanafe::SomaUnit &sanafe::Core::create_soma(const std::string &name,
-        const std::string &model_str, const SomaPowerMetrics &power_metrics,
+sanafe::SomaUnit &sanafe::Core::create_soma(std::string name,
+        std::string model_str, const SomaPowerMetrics &power_metrics,
         const std::optional<std::filesystem::path> &plugin_lib)
 {
-    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    soma.push_back(SomaUnit(
-            name, model_str, parent_core_address, power_metrics, plugin_lib));
+    const CoreAddress parent_core_address = {parent_tile_id, offset, id};
+    soma.emplace_back(SomaUnit(std::move(name), std::move(model_str),
+            parent_core_address, power_metrics, plugin_lib));
     SomaUnit &new_soma_hw_unit = soma.back();
     TRACE1("New soma h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -510,8 +472,8 @@ sanafe::SomaUnit &sanafe::Core::create_soma(const std::string &name,
 sanafe::AxonOutUnit &sanafe::Core::create_axon_out(const std::string &name,
         const double energy_access, const double latency_access)
 {
-    const CoreAddress parent_core_address = {id, parent_tile_id, offset};
-    axon_out_hw.push_back(AxonOutUnit(
+    const CoreAddress parent_core_address = {parent_tile_id, offset, id};
+    axon_out_hw.emplace_back(AxonOutUnit(
             name, parent_core_address, energy_access, latency_access));
     AxonOutUnit &new_axon_out_hw_unit = axon_out_hw.back();
     TRACE1("New axon out h/w unit created (c:%d.%d)\n",
@@ -528,7 +490,7 @@ void sanafe::arch_create_axons(Architecture &arch)
     {
         for (Core &c : tile.cores)
         {
-            for (auto n_ptr : c.neurons)
+            for (auto *n_ptr : c.neurons)
             {
                 arch_map_neuron_connections(*n_ptr);
             }
@@ -541,9 +503,8 @@ void sanafe::arch_create_axons(Architecture &arch)
 
 void sanafe::arch_print_axon_summary(Architecture &arch)
 {
-    int in_count, out_count, core_used;
-    in_count = 0;
-    out_count = 0;
+    int in_count = 0;
+    int out_count = 0;
 
     INFO("** Mapping summary **\n");
     for (Tile &tile : arch.tiles)
@@ -551,16 +512,15 @@ void sanafe::arch_print_axon_summary(Architecture &arch)
         // For debug only, print the axon maps
         for (Core &c : tile.cores)
         {
-            core_used = 0;
-            for (std::vector<Neuron *>::size_type k = 0; k < c.neurons.size();
-                    k++)
+            bool core_used = false;
+            for (size_t k = 0; k < c.neurons.size(); k++)
             {
 #ifdef DEBUG
                 Neuron *n = c->neurons[k];
                 TRACE2("\tnid:%d.%d ", n->group->id, n->id);
                 TRACE2("i:%d o:%d\n", n->maps_in_count, n->maps_out_count);
 #endif
-                core_used = 1;
+                core_used = true;
             }
 
             if (core_used)
@@ -572,10 +532,10 @@ void sanafe::arch_print_axon_summary(Architecture &arch)
         }
     }
     INFO("Total cores: %zu\n", arch.core_count);
-    INFO("Average in map count: %lf\n", (double) in_count / arch.core_count);
-    INFO("Average out map count: %lf\n", (double) out_count / arch.core_count);
-
-    return;
+    INFO("Average in map count: %lf\n",
+            static_cast<double>(in_count) / arch.core_count);
+    INFO("Average out map count: %lf\n",
+            static_cast<double>(out_count) / arch.core_count);
 }
 
 void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
@@ -660,8 +620,6 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
     }
     TRACE1("Finished mapping connections to hardware for nid:%d.%d.\n",
             pre_neuron.parent_group_id, pre_neuron.id);
-
-    return;
 }
 
 void sanafe::Core::map_neuron(Neuron &n)
@@ -690,7 +648,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     //  Search through all models implemented by this core and return the
     //  one that matches. If no dendrite / soma hardware is specified,
     //  default to the first one defined
-    if (dendrite.size() == 0)
+    if (dendrite.empty())
     {
         INFO("Error: No dendrite units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No dendrite units defined");
@@ -717,7 +675,7 @@ void sanafe::Core::map_neuron(Neuron &n)
         }
     }
 
-    if (soma.size() == 0)
+    if (soma.empty())
     {
         INFO("Error: No soma units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No soma units defined");
@@ -745,7 +703,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     n.soma_hw->neuron_count++;
 
     // TODO: support multiple axon outputs
-    if (axon_out_hw.size() == 0)
+    if (axon_out_hw.empty())
     {
         INFO("Error: No axon out units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No axon out units defined");
@@ -794,8 +752,8 @@ void sanafe::Core::map_neuron(Neuron &n)
                     n.dendrite_hw->plugin_lib.value();
             INFO("Creating dendrite from plugin %s.\n",
                     plugin_lib_path.c_str());
-            n.dendrite_model = plugin_get_dendrite(
-                    n.dendrite_hw->model, plugin_lib_path);
+            n.dendrite_model =
+                    plugin_get_dendrite(n.dendrite_hw->model, plugin_lib_path);
         }
         else
         {
@@ -811,8 +769,6 @@ void sanafe::Core::map_neuron(Neuron &n)
                 group.default_neuron_config.dendrite_model_params);
         n.dendrite_model->set_attributes(n.dendrite_model_params);
     }
-
-    return;
 }
 
 void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
@@ -825,7 +781,7 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 
     TRACE3("Adding connection to core.\n");
     // Allocate the axon and its connections at the post-synaptic core
-    post_core.axons_in.push_back(AxonInModel());
+    post_core.axons_in.emplace_back(AxonInModel());
     const size_t new_axon_in_address = post_core.axons_in.size() - 1;
 
     // Add the axon at the sending, pre-synaptic core
@@ -844,8 +800,6 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
     TRACE1("nid:%d.%d cid:%zu.%zu added one output axon address %zu.\n",
             pre_neuron.parent_group_id, pre_neuron.id, pre_core.parent_tile_id,
             pre_core.offset, new_axon_out_address);
-
-    return;
 }
 
 void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
@@ -856,8 +810,7 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
             post_core.axons_out.size() - 1);
 
     post_core.connections_in.push_back(&con);
-    const std::vector<Connection *>::size_type synapse_address =
-            post_core.connections_in.size() - 1;
+    const size_t synapse_address = post_core.connections_in.size() - 1;
 
     // Access the most recently created axon in for the post-synaptic core
     AxonInModel &last_added_target_axon = post_core.axons_in.back();
@@ -883,12 +836,10 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
         }
         if (!mapped)
         {
-            INFO("Error: Could not map connection to synapse h/w.\n");
-            exit(1);
+            throw std::runtime_error(
+                    "Error: Could not map connection to synapse h/w.\n");
         }
     }
-
-    return;
 }
 
 /*
@@ -960,8 +911,8 @@ sanafe::AxonInPowerMetrics::AxonInPowerMetrics(
 {
 }
 
-sanafe::SynapsePowerMetrics::SynapsePowerMetrics(const double energy_spike,
-        const double latency_spike)
+sanafe::SynapsePowerMetrics::SynapsePowerMetrics(
+        const double energy_spike, const double latency_spike)
         : energy_process_spike(energy_spike)
         , latency_process_spike(latency_spike)
 {
