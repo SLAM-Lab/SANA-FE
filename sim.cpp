@@ -24,9 +24,9 @@
 #include "sim.hpp"
 
 sanafe::Simulation::Simulation(Architecture &a, Network &n,
-        const std::filesystem::path &output_dir,
-        const bool record_spikes, const bool record_potentials,
-        const bool record_perf, const bool record_messages)
+        const std::filesystem::path &output_dir, const bool record_spikes,
+        const bool record_potentials, const bool record_perf,
+        const bool record_messages)
         : arch(a)
         , net(n)
         , out_dir(output_dir)
@@ -230,8 +230,6 @@ void sanafe::sim_format_run_summary(std::ostream &out, const RunData &run_data)
     out << "total_messages_sent: " << run_data.packets_sent << std::endl;
     out << "wall_time: " << std::fixed << run_data.wall_time << std::endl;
     out << "total_neurons_fired: " << run_data.neurons_fired << std::endl;
-
-    return;
 }
 
 std::ofstream sanafe::sim_trace_open_spike_trace(
@@ -716,7 +714,8 @@ void sanafe::sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts)
     out << std::endl;
 }
 
-void sanafe::sim_trace_record_message(std::ofstream &message_trace_file, const Message &m)
+void sanafe::sim_trace_record_message(
+        std::ofstream &message_trace_file, const Message &m)
 {
     assert(message_trace_file.is_open());
     message_trace_file << m.timestep << ",";

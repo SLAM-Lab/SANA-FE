@@ -29,11 +29,9 @@
 sanafe::Architecture::Architecture(
         std::string name, const NetworkOnChipConfiguration &noc)
         : name(std::move(name))
-        , core_count(0UL)
         , noc_width(noc.width_in_tiles)
         , noc_height(noc.height_in_tiles)
         , noc_buffer_size(noc.buffer_size)
-        , max_cores_per_tile(0)
 {
 }
 
@@ -48,12 +46,11 @@ sanafe::NetworkOnChipConfiguration::NetworkOnChipConfiguration(
 std::vector<std::reference_wrapper<sanafe::Core>> sanafe::Architecture::cores()
 {
     std::vector<std::reference_wrapper<Core>> all_cores_in_arch;
+
     for (auto &tile : tiles)
     {
-        for (auto &core : tile.cores)
-        {
-            all_cores_in_arch.emplace_back(core);
-        }
+        std::copy(tile.cores.begin(), tile.cores.end(),
+                std::back_inserter(all_cores_in_arch));
     }
 
     return all_cores_in_arch;
@@ -126,7 +123,6 @@ sanafe::Message::Message(const Architecture &arch, const Neuron &n,
 sanafe::Tile::Tile(std::string name, const size_t tile_id,
         const TilePowerMetrics &power_metrics)
         : name(std::move(name))
-        , energy(0.0)
         , energy_north_hop(power_metrics.energy_north_hop)
         , latency_north_hop(power_metrics.latency_north_hop)
         , energy_east_hop(power_metrics.energy_east_hop)
@@ -135,16 +131,7 @@ sanafe::Tile::Tile(std::string name, const size_t tile_id,
         , latency_south_hop(power_metrics.latency_south_hop)
         , energy_west_hop(power_metrics.energy_south_hop)
         , latency_west_hop(power_metrics.latency_east_hop)
-        , hops(0L)
-        , messages_received(0L)
-        , total_neurons_fired(0L)
-        , north_hops(0L)
-        , east_hops(0L)
-        , south_hops(0L)
-        , west_hops(0L)
         , id(tile_id)
-        , x(0)
-        , y(0)
 {
 }
 
@@ -180,12 +167,9 @@ sanafe::Core::Core(std::string name, const CoreAddress &address,
         const CorePipelineConfiguration &pipeline)
         : pipeline_config(pipeline)
         , name(std::move(name))
-        , energy(0.0)
-        , next_message_generation_delay(0.0)
         , id(address.id)
         , offset(address.offset_within_tile)
         , parent_tile_id(address.parent_tile_id)
-        , message_count(0)
 {
 }
 
@@ -226,9 +210,6 @@ sanafe::AxonInUnit::AxonInUnit(std::string axon_in_name,
         const CoreAddress &parent_core, const AxonInPowerMetrics &power_metrics)
         : name(std::move(axon_in_name))
         , parent_core_address(parent_core)
-        , spike_messages_in(0L)
-        , energy(0.0)
-        , time(0.0)
         , energy_spike_message(power_metrics.energy_message_in)
         , latency_spike_message(power_metrics.latency_message_in)
 {
@@ -241,9 +222,6 @@ sanafe::SynapseUnit::SynapseUnit(std::string synapse_name,
         , name(std::move(synapse_name))
         , model(model.name)
         , parent_core_address(parent_core)
-        , spikes_processed(0L)
-        , energy(0.0)
-        , time(0.0)
         , energy_spike_op(power_metrics.energy_process_spike)
         , latency_spike_op(power_metrics.latency_process_spike)
 {
@@ -257,8 +235,6 @@ sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
         , name(std::move(dendrite_name))
         , model(std::move(model_str))
         , parent_core_address(parent_core)
-        , energy(0.0)
-        , time(0.0)
         , energy_access(energy_cost)
         , latency_access(latency_cost)
 {
@@ -267,23 +243,16 @@ sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
 sanafe::SomaUnit::SomaUnit(std::string soma_name, std::string model_str,
         const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics,
         std::optional<std::filesystem::path> plugin_library_path)
-        : noise_stream(nullptr)
-        , plugin_lib(std::move(plugin_library_path))
+        : plugin_lib(std::move(plugin_library_path))
         , name(std::move(soma_name))
         , model(std::move(model_str))
         , parent_core_address(parent_core)
-        , neuron_updates(0L)
-        , neurons_fired(0L)
-        , neuron_count(0L)
-        , energy(0.0)
-        , time(0.0)
         , energy_update_neuron(power_metrics.energy_update_neuron)
         , latency_update_neuron(power_metrics.latency_update_neuron)
         , energy_access_neuron(power_metrics.energy_access_neuron)
         , latency_access_neuron(power_metrics.latency_access_neuron)
         , energy_spiking(power_metrics.energy_spiking)
         , latency_spiking(power_metrics.latency_spiking)
-        , noise_type(NOISE_NONE)
 {
 }
 
@@ -292,9 +261,6 @@ sanafe::AxonOutUnit::AxonOutUnit(std::string axon_out_name,
         const double latency_access)
         : name(std::move(axon_out_name))
         , parent_core_address(parent_core)
-        , packets_out(0L)
-        , energy(0.0)
-        , time(0.0)
         , energy_access(energy_access)
         , latency_access(latency_access)
 {
@@ -816,25 +782,18 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
     AxonInModel &last_added_target_axon = post_core.axons_in.back();
     last_added_target_axon.synapse_addresses.push_back(synapse_address);
 
-    // Map the connection to the synapse hardware
-    const std::vector<SynapseUnit>::size_type default_hw_id = 0;
-    // Default to the first defined hardware unit (there must be at least
-    // one hardware unit defined)
+    // Map the connection to the synapse hardware. Default to the first defined
+    //  hardware unit (there must be at least one hardware unit defined)
+    const size_t default_hw_id = 0;
     con.synapse_hw = &(post_core.synapse[default_hw_id]);
-    if (con.synapse_hw_name.length() > 0)
+    if (!con.synapse_hw_name.empty())
     {
-        bool mapped = false;
-        // Search for the specified synapse hardware
-        for (auto &s : post_core.synapse)
-        {
-            if (con.synapse_hw_name == s.name)
-            {
-                con.synapse_hw = &s;
-                mapped = true;
-                break;
-            }
-        }
-        if (!mapped)
+        const auto mapped_hw = std::find_if(post_core.synapse.begin(),
+                post_core.synapse.end(), [&](const SynapseUnit &syn) {
+                    return syn.name == con.synapse_hw_name;
+                });
+        const bool mapped_successfully = (mapped_hw != post_core.synapse.end());
+        if (!mapped_successfully)
         {
             throw std::runtime_error(
                     "Error: Could not map connection to synapse h/w.\n");

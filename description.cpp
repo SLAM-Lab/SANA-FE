@@ -74,7 +74,7 @@ T sanafe::description_required_field(
     T field;
     if (YAML::convert<T>::decode(field_node, field))
     {
-        return field;  // type T
+        return field; // type T
     }
 
     const std::string error = "Could not cast field '" +
@@ -176,9 +176,9 @@ sanafe::description_parse_synapse_attributes_yaml(
     //power_metrics.latency_memory_access = description_required_field<double>(
     //    attributes, "latecy_memory_access");
     power_metrics.energy_process_spike = description_required_field<double>(
-        attributes, "energy_process_spike");
+            attributes, "energy_process_spike");
     power_metrics.latency_process_spike = description_required_field<double>(
-        attributes, "latency_process_spike");
+            attributes, "latency_process_spike");
 
     return {power_metrics, model};
 }
@@ -219,9 +219,6 @@ void sanafe::description_parse_soma_section_yaml(
         const YAML::Node &soma_node, Core &parent_core)
 {
     std::string soma_name = soma_node["name"].as<std::string>();
-    std::replace(soma_name.begin(), soma_name.end(), ' ', '_');
-    std::replace(soma_name.begin(), soma_name.end(), '\t', '_');
-
     const YAML::Node &attributes = soma_node["attributes"];
     std::string model_str;
     if (attributes["model"])
@@ -293,8 +290,8 @@ void sanafe::description_parse_soma_section_yaml(
     SomaPowerMetrics power_metrics(energy_update_neuron, latency_update_neuron,
             energy_access_neuron, latency_access_neuron, energy_spike_out,
             latency_spike_out);
-    parent_core.create_soma(
-            soma_name, model_str, power_metrics, plugin_lib_path);
+    parent_core.create_soma(std::move(soma_name), std::move(model_str),
+            power_metrics, plugin_lib_path);
 }
 
 void sanafe::description_parse_axon_out_section(
@@ -554,7 +551,7 @@ void sanafe::description_parse_tile_section_yaml(
                             core, new_tile.id, arch);
                 }
             }
-            else  // Is a single core
+            else // Is a single core
             {
                 description_parse_core_section_yaml(cores, new_tile.id, arch);
             }
@@ -622,7 +619,7 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
                 description_parse_tile_section_yaml(tile, new_arch);
             }
         }
-        else  // Only one tile defined
+        else // Only one tile defined
         {
             description_parse_tile_section_yaml(tiles, new_arch);
         }
@@ -899,7 +896,8 @@ void sanafe::description_parse_neuron_group_section_yaml(
                 "Error: No neurons defined for neuron group.\n");
     }
     const YAML::Node neurons_node = neuron_group_node["neurons"];
-    const size_t group_neuron_count = description_count_neurons_yaml(neurons_node);
+    const size_t group_neuron_count =
+            description_count_neurons_yaml(neurons_node);
 
     if (!neuron_group_node["attributes"])
     {
