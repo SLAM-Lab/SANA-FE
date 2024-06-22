@@ -48,7 +48,7 @@ YAML::Node sanafe::description_required_field<YAML::Node>(
                 node.Mark());
     }
     const YAML::Node &child = node[key];
-    if (child.IsNull() || !child.IsDefined())
+    if ((child == nullptr) || child.IsNull() || !child.IsDefined())
     {
         const std::string message = "Value for key '" + key + "' not defined";
         throw DescriptionParsingError(message, node.Mark());
@@ -114,8 +114,7 @@ std::string sanafe::description_get_type_string(const T &value)
 void sanafe::description_parse_axon_in_section_yaml(
         const YAML::Node &axon_in_node, Core &parent_core)
 {
-    const auto name =
-            description_required_field<std::string>(axon_in_node, "name");
+    auto name = description_required_field<std::string>(axon_in_node, "name");
     const auto &attributes =
             description_required_field<YAML::Node>(axon_in_node, "attributes");
     const AxonInPowerMetrics in_metrics =
@@ -138,8 +137,7 @@ sanafe::AxonInPowerMetrics sanafe::description_parse_axon_in_attributes_yaml(
 void sanafe::description_parse_synapse_section_yaml(
         const YAML::Node &synapse_node, Core &parent_core)
 {
-    const auto name =
-            description_required_field<std::string>(synapse_node, "name");
+    auto name = description_required_field<std::string>(synapse_node, "name");
     const auto &attributes =
             description_required_field<YAML::Node>(synapse_node, "attributes");
 
@@ -149,8 +147,7 @@ void sanafe::description_parse_synapse_section_yaml(
 }
 
 std::pair<sanafe::SynapsePowerMetrics, sanafe::ModelInfo>
-sanafe::description_parse_synapse_attributes_yaml(
-        const YAML::Node &attributes)
+sanafe::description_parse_synapse_attributes_yaml(const YAML::Node &attributes)
 {
     ModelInfo model;
     model.name = description_required_field<std::string>(attributes, "model");
@@ -179,93 +176,73 @@ sanafe::description_parse_synapse_attributes_yaml(
 void sanafe::description_parse_dendrite_section_yaml(
         const YAML::Node &dendrite_node, Core &parent_core)
 {
-    const auto dendrite_name = dendrite_node["name"].as<std::string>();
-    const YAML::Node &attributes = dendrite_node["attributes"];
-    std::string model_str;
+    auto dendrite_name =
+            description_required_field<std::string>(dendrite_node, "name");
+    const YAML::Node &attributes =
+            description_required_field<YAML::Node>(dendrite_node, "attributes");
 
-    if (attributes["model"] != nullptr)
+    ModelInfo model;
+    model.name = description_required_field<std::string>(attributes, "model");
+    if (const YAML::Node &plugin_path_node = attributes["plugin"])
     {
-        model_str = attributes["model"].as<std::string>();
-    }
-    else
-    {
-        throw std::invalid_argument("No dendrite model defined.\n");
+        if (plugin_path_node.IsScalar())
+        {
+            model.plugin_library_path = plugin_path_node.as<std::string>();
+        }
+        else
+        {
+            throw DescriptionParsingError("Expected plugin path to be string",
+                    plugin_path_node.Mark());
+        }
     }
 
-    double energy_access = 0.0;
-    double latency_access = 0.0;
-    if (attributes["energy"] != nullptr)
-    {
-        energy_access = attributes["energy"].as<double>();
-    }
-    if (attributes["latency"] != nullptr)
-    {
-        latency_access = attributes["latency"].as<double>();
-    }
-    parent_core.create_dendrite(
-            dendrite_name, model_str, energy_access, latency_access);
+    DendritePowerMetrics power_metrics;
+    power_metrics.energy_access =
+            description_required_field<double>(attributes, "energy_access");
+    power_metrics.latency_access =
+            description_required_field<double>(attributes, "latency_access");
+    parent_core.create_dendrite(dendrite_name, power_metrics, model);
 }
 
 void sanafe::description_parse_soma_section_yaml(
         const YAML::Node &soma_node, Core &parent_core)
 {
-    auto soma_name = soma_node["name"].as<std::string>();
+    auto soma_name = description_required_field<std::string>(soma_node, "name");
     const YAML::Node &attributes = soma_node["attributes"];
     std::string model_str;
 
-    if (attributes["model"] != nullptr)
+    ModelInfo model;
+    model.name = description_required_field<std::string>(attributes, "model");
+    if (const YAML::Node &plugin_path_node = attributes["plugin"])
     {
-        model_str = attributes["model"].as<std::string>();
-    }
-    else
-    {
-        throw std::invalid_argument("No dendrite model defined.\n");
+        if (plugin_path_node.IsScalar())
+        {
+            model.plugin_library_path = plugin_path_node.as<std::string>();
+        }
+        else
+        {
+            throw DescriptionParsingError("Expected plugin path to be string",
+                    plugin_path_node.Mark());
+        }
     }
 
-    std::optional<std::string> plugin_lib_path;
-    if (attributes["plugin"] != nullptr)
-    {
-        plugin_lib_path =
-                std::filesystem::path(attributes["plugin"].as<std::string>());
-    }
+    SomaPowerMetrics power_metrics;
+    power_metrics.energy_update_neuron = description_required_field<double>(
+            attributes, "energy_update_neuron");
+    power_metrics.latency_update_neuron = description_required_field<double>(
+            attributes, "latency_update_neuron");
+    power_metrics.energy_access_neuron = description_required_field<double>(
+            attributes, "energy_access_neuron");
+    power_metrics.latency_access_neuron = description_required_field<double>(
+            attributes, "latency_access_neuron");
+    power_metrics.energy_spike_out =
+            description_required_field<double>(attributes, "energy_spike_out");
+    power_metrics.latency_spike_out =
+            description_required_field<double>(attributes, "latency_spike_out");
 
-    // TODO: maybe just replace this with the metric struct rather than
-    //  constructing it twice?
-    double energy_update_neuron = 0.0;
-    double latency_update_neuron = 0.0;
-    double energy_access_neuron = 0.0;
-    double latency_access_neuron = 0.0;
-    double energy_spike_out = 0.0;
-    double latency_spike_out = 0.0;
-    if (attributes["energy_update_neuron"] != nullptr)
-    {
-        energy_update_neuron = attributes["energy_update_neuron"].as<double>();
-    }
-    if (attributes["latency_update_neuron"] != nullptr)
-    {
-        latency_update_neuron =
-                attributes["latency_update_neuron"].as<double>();
-    }
-    if (attributes["energy_access_neuron"] != nullptr)
-    {
-        energy_access_neuron = attributes["energy_access_neuron"].as<double>();
-    }
-    if (attributes["latency_access_neuron"] != nullptr)
-    {
-        latency_access_neuron =
-                attributes["latency_access_neuron"].as<double>();
-    }
-    if (attributes["energy_spike_out"] != nullptr)
-    {
-        energy_spike_out = attributes["energy_spike_out"].as<double>();
-    }
-    if (attributes["latency_spike_out"] != nullptr)
-    {
-        latency_spike_out = attributes["latency_spike_out"].as<double>();
-    }
     if (attributes["noise"] != nullptr)
     {
-        // TODO: support noise again alongside the plugin mechanism
+        // TODO: support optioanl noise arg again alongside the plugin mechanism
         /*
         s.noise_type = NOISE_FILE_STREAM;
         s.noise_stream = fopen(value_str.c_str(), "r");
@@ -278,44 +255,30 @@ void sanafe::description_parse_soma_section_yaml(
         }
         */
     }
-
-    SomaPowerMetrics power_metrics(energy_update_neuron, latency_update_neuron,
-            energy_access_neuron, latency_access_neuron, energy_spike_out,
-            latency_spike_out);
-    parent_core.create_soma(std::move(soma_name), std::move(model_str),
-            power_metrics, plugin_lib_path);
+    parent_core.create_soma(std::move(soma_name), power_metrics, model);
 }
 
 void sanafe::description_parse_axon_out_section(
         const YAML::Node &axon_out_node, Core &parent_core)
 {
-    auto axon_out_name = axon_out_node["name"].as<std::string>();
-    std::replace(axon_out_name.begin(), axon_out_name.end(), ' ', '_');
-    std::replace(axon_out_name.begin(), axon_out_name.end(), '\t', '_');
+    auto axon_out_name =
+            description_required_field<std::string>(axon_out_node, "name");
 
-    // TODO: maybe just replace this with the metric struct
-    const YAML::Node &attributes = axon_out_node["attributes"];
-    double energy_message = 0.0;
-    double latency_message = 0.0;
-    if (attributes["energy_message_out"] != nullptr)
-    {
-        energy_message = attributes["energy_message_out"].as<double>();
-    }
-    if (attributes["latency_message_out"] != nullptr)
-    {
-        latency_message = attributes["latency_message_out"].as<double>();
-    }
+    const auto &attributes =
+            description_required_field<YAML::Node>(axon_out_node, "attributes");
+    AxonOutPowerMetrics power_metrics;
+    power_metrics.energy_message_out = description_required_field<double>(
+            attributes, "energy_message_out");
+    power_metrics.latency_message_out = description_required_field<double>(
+            attributes, "latency_message_out");
 
-    parent_core.create_axon_out(axon_out_name, energy_message, latency_message);
+    parent_core.create_axon_out(axon_out_name, power_metrics);
 }
 
 void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
         const size_t parent_tile_id, Architecture &arch)
 {
-    auto core_name = core_node["name"].as<std::string>();
-    std::replace(core_name.begin(), core_name.end(), ' ', '_');
-    std::replace(core_name.begin(), core_name.end(), '\t', '_');
-
+    auto core_name = description_required_field<std::string>(core_node, "name");
     std::pair<int, int> core_range = {0, 0};
     if (core_name.find('[') != std::string::npos)
     {
@@ -446,6 +409,7 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
 {
     std::string buffer_pos = "soma";
     size_t max_neurons_supported = default_max_neurons;
+
     if (attributes["buffer_position"] != nullptr)
     {
         buffer_pos = attributes["buffer_position"].as<std::string>();
@@ -1092,456 +1056,3 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
 
     return {first, last};
 }
-
-/*
-void sanafe::description_get_fields(
-        std::vector<std::string_view> &fields, const std::string &line)
-{
-    // Get all the fields from a line of text. Every field is separated by
-    //  whitespace and has the format <Attribute>=<value>
-    // Returns a vector of field strings
-    const char *delim = " \t\r\n";
-
-    fields.clear();
-    std::string_view line_buffer(line);
-    auto field_start = line_buffer.find_first_not_of(delim);
-    while (field_start != std::string_view::npos)
-    {
-        auto field_end = line_buffer.find_first_of(delim, field_start);
-
-        const std::string_view new_field =
-                line_buffer.substr(field_start, field_end - field_start);
-        if (field_end != field_start)
-        {
-            fields.push_back(new_field);
-        }
-        field_start = line_buffer.find_first_not_of(delim, field_end);
-    }
-
-    return;
-}
-*/
-
-/*
-void sanafe::description_read_arch_entry(
-        const std::vector<std::string_view> &fields, Architecture &arch,
-        const int line_number)
-{
-    std::map<std::string, std::string> attributes;
-    std::string name;
-    Tile *tile_ptr;
-    Core *core_ptr;
-    int tile_id, core_offset, first_field;
-
-    assert(fields.size() > 0);
-    const char entry_type = fields[0][0];
-    // Sanity check input
-    if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#') ||
-            (entry_type == '\r'))
-    {
-        TRACE1("Warning: No entry, skipping\n");
-        return;
-    }
-
-    tile_ptr = nullptr;
-    core_ptr = nullptr;
-    first_field = 1;
-    tile_id = -1;
-    if (entry_type != '@')
-    {
-        name = fields[1];
-        first_field++;
-    }
-    if (entry_type != '@' && entry_type != 't')
-    {
-        tile_id = field_to_int(fields[2]);
-        Tile &t = arch.tiles[tile_id];
-        tile_ptr = &t;
-        first_field++;
-    }
-    if ((entry_type != '@') && (entry_type != 't') && (entry_type != 'c'))
-    {
-        core_offset = field_to_int(fields[3]);
-        assert(tile_ptr != nullptr);
-        Core &c = tile_ptr->cores_ref[core_offset];
-        core_ptr = &c;
-        first_field++;
-    }
-
-    // Parse attributes from fields
-    for (size_t i = first_field; i < fields.size(); i++)
-    {
-        TRACE1("Parsing field:%s\n", std::string(fields[i]).c_str());
-
-        if ((fields[i].length() < 3))
-        {
-            INFO("Error: Line: %d Invalid field: %s\n", line_number,
-                    std::string(fields[i]).c_str());
-            continue;
-        }
-
-        int pos = fields[i].find_first_of('=');
-        std::string key = std::string(fields[i].substr(0, pos));
-        std::string value_str = std::string(fields[i].substr(pos + 1));
-
-        if ((key.length() == 0) || (value_str.length() == 0))
-        {
-            INFO("Invalid attribute: %s\n", std::string(fields[i]).c_str());
-            continue;
-        }
-        attributes.insert({key, value_str});
-    }
-
-    // Process the command and create the unit
-    switch (entry_type)
-    {
-    case '@':
-        arch.set_noc_attributes(attributes);
-        break;
-    case 't':
-        arch.create_tile(name, attributes);
-        break;
-    case 'c':
-        arch.create_core(name, tile_id, attributes);
-        break;
-    case 'i':
-        core_ptr->create_axon_in(name, attributes);
-        break;
-    case 's':
-        core_ptr->create_synapse(name, attributes);
-        break;
-    case 'd':
-        core_ptr->create_dendrite(name, attributes);
-        break;
-    case '+':
-        core_ptr->create_soma(name, attributes);
-        break;
-    case 'o':
-        core_ptr->create_axon_out(name, attributes);
-        break;
-    default:
-        INFO("Warning: unrecognized unit (%c) - skipping.\n", entry_type);
-        break;
-    }
-
-    return;
-}
-*/
-
-/*
-void sanafe::parse_neuron_with_compartment_field(
-        const std::string_view &neuron_field, size_t &group_id,
-        size_t &neuron_id, std::optional<size_t> &compartment_id)
-{
-    parse_neuron_field(neuron_field, group_id, neuron_id);
-    const auto pos = neuron_field.find(':');
-    if (pos != std::string_view::npos)
-    {
-        const auto compartment_str = neuron_field.substr(pos + 1);
-        compartment_id = field_to_int(compartment_str);
-    }
-    else
-    {
-        TRACE1("Compartment not set, leaving default value\n");
-    }
-
-    return;
-}
-*/
-
-/*
-size_t sanafe::field_to_int(const std::string_view &field)
-{
-    size_t val = 0;
-    auto [ptr, error_code] =
-            std::from_chars(field.data(), field.data() + field.size(), val);
-    if (error_code != std::errc())
-    {
-        std::string error_str = "Error: Couldn't parse integer val for field:" +
-                std::string(field);
-        throw std::runtime_error(std::string(error_str));
-    }
-
-    return val;
-}
-
-void sanafe::parse_neuron_field(const std::string_view &neuron_field,
-        size_t &group_id, size_t &neuron_id)
-{
-    const auto pos = neuron_field.find('.');
-    if (pos == std::string_view::npos)
-    {
-        throw std::runtime_error("Error: Invalid neuron format");
-    }
-
-    const auto group_str = neuron_field.substr(0, pos);
-    group_id = field_to_int(group_str);
-    const auto neuron_str = neuron_field.substr(pos + 1, neuron_field.size());
-    neuron_id = field_to_int(neuron_str);
-
-    return;
-}
-*/
-
-/*
-void sanafe::parse_core_field(const std::string_view &core_field,
-        size_t &tile_id, size_t &core_offset)
-{
-    const auto pos = core_field.find('.');
-    if (pos == std::string_view::npos)
-    {
-        throw std::runtime_error("Error: Invalid neuron format");
-    }
-
-    const auto tile_str = core_field.substr(0, pos);
-    tile_id = field_to_int(tile_str);
-    const auto core_str = core_field.substr(pos + 1, core_field.size());
-    core_offset = field_to_int(core_str);
-
-    return;
-}
-*/
-
-/*
-void sanafe::parse_edge_field(const std::string_view &edge_field,
-        size_t &group_id, size_t &neuron_id, size_t &dest_group_id,
-        size_t &dest_neuron_id)
-{
-    // Edge description entries support two formats, to represent
-    //  neuron-neuron connections and compartment-compartment branches
-    // i.e. Connection: e group.neuron->group.neuron:compartment <attributes>
-    // i.e. Branch:     e group.neuron:compartment->compartment <attributes>
-    //   Note that the destination compartment is optional (default=0)
-    // Split the source and destination neuron addresses
-    TRACE1("Parsing edge.\n");
-    const auto pos = edge_field.find("->");
-    if (pos == std::string_view::npos)
-    {
-        throw std::runtime_error("Invalid edge format");
-    }
-
-    // Parse the source group, neuron and optional compartment identifiers
-    //  from the source neuron substring (before the "->")
-    const auto src_neuron_address = edge_field.substr(0, pos);
-    parse_neuron_field(src_neuron_address, group_id, neuron_id);
-    // Parse the destination group, neuron and compartment
-    //  identifiers from the substring after "->"
-    const auto dest_neuron_address =
-            edge_field.substr(pos + 2, edge_field.size());
-    parse_neuron_field(dest_neuron_address, dest_group_id, dest_neuron_id);
-
-    return;
-}
-*/
-
-/*
-void sanafe::parse_mapping_field(const std::string_view &mapping_field,
-        size_t &group_id, size_t &neuron_id, size_t &tile_id,
-        size_t &core_offset)
-{
-    const auto pos = mapping_field.find("@");
-    if (pos == std::string_view::npos)
-    {
-        throw std::runtime_error("Invalid mapping format");
-    }
-    else if (pos >= mapping_field.size())
-    {
-        throw std::runtime_error("Invalid mapping format");
-    }
-
-    const auto neuron_address = mapping_field.substr(0, pos);
-    parse_neuron_field(neuron_address, group_id, neuron_id);
-
-    const auto core_address =
-            mapping_field.substr(pos + 1, mapping_field.size());
-    parse_neuron_field(core_address, tile_id, core_offset);
-
-    return;
-}
-*/
-
-/*
-void sanafe::description_read_network_entry(
-        const std::vector<std::string_view> &fields, Architecture &arch,
-        Network &net, const int line_number)
-{
-    std::map<std::string, std::string> attributes;
-    NeuronGroup *group_ptr, *dest_group_ptr;
-    Neuron *neuron_ptr, *dest_ptr;
-    Tile *tile_ptr;
-    Core *core_ptr;
-    size_t tile_id, core_offset, neuron_group_id, dest_group_id;
-    size_t neuron_id, dest_neuron_id;
-    int neuron_count;
-    bool group_set, neuron_set;
-
-    assert(fields.size() > 0);
-    const char entry_type = fields[0][0];
-    // Sanity check input
-    if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#') ||
-            (entry_type == '\r'))
-    {
-        TRACE1("Warning: No entry, skipping line %d\n", line_number);
-        return;
-    }
-
-    if (fields.size() < 2)
-    {
-        INFO("Error: fields < 2 (%ld)", fields.size());
-    }
-
-    neuron_count = 0;
-    neuron_ptr = nullptr;
-    group_ptr = nullptr;
-    core_ptr = nullptr;
-    dest_group_ptr = nullptr;
-    dest_ptr = nullptr;
-
-    group_set = false;
-    neuron_set = false;
-
-    if (entry_type == 'g')
-    {
-        neuron_count = field_to_int(fields[1]);
-    }
-    else if (entry_type == '&')
-    {
-        parse_mapping_field(
-                fields[1], neuron_group_id, neuron_id, tile_id, core_offset);
-        if (tile_id >= arch.tiles.size())
-        {
-            INFO("Error: Line %d: Tile (%lu) >= tile count (%lu)\n",
-                    line_number, tile_id, arch.tiles.size());
-            exit(1);
-        }
-        Tile &tile = arch.tiles[tile_id];
-        tile_ptr = &tile;
-
-        if (core_offset >= tile_ptr->cores.size())
-        {
-            INFO("Error: Line %d: Core (%lu) >= core count (%lu)\n",
-                    line_number, core_offset, tile_ptr->cores.size());
-            exit(1);
-        }
-        Core &core = tile_ptr->cores[core_offset];
-        core_ptr = &core;
-        group_set = true;
-        neuron_set = true;
-    }
-    else if (entry_type == 'e')
-    {
-        // Edge on SNN graph (e.g., connection between neurons)
-        parse_edge_field(fields[1], neuron_group_id, neuron_id, dest_group_id,
-                dest_neuron_id);
-        if (dest_group_id >= net.groups.size())
-        {
-            INFO("Error: Line %d: Group (%lu) >= group count (%lu).\n",
-                    line_number, dest_group_id, net.groups.size());
-            throw std::invalid_argument("Invalid group id");
-        }
-        NeuronGroup &dest_group = *(net.groups[dest_group_id]);
-        dest_group_ptr = &dest_group;
-
-        TRACE1("Parsed neuron gid:%lu nid:%lu\n", dest_group_id, neuron_id);
-        if (dest_neuron_id >= dest_group_ptr->neurons.size())
-        {
-            INFO("Error: Line %d: Trying to access neuron "
-                 "(%d.%lu) but group %d only "
-                 "allocates %lu neurons.\n",
-                    line_number, dest_group_ptr->id, dest_neuron_id,
-                    dest_group_ptr->id, dest_group_ptr->neurons.size());
-            throw std::invalid_argument("Invalid nid");
-        }
-        dest_ptr = &(dest_group_ptr->neurons[dest_neuron_id]);
-        group_set = true;
-        neuron_set = true;
-    }
-    else if (entry_type == 'n') // parse neuron
-    {
-        parse_neuron_field(fields[1], neuron_group_id, neuron_id);
-        group_set = true;
-        neuron_set = true;
-    }
-    else
-    {
-        INFO("Error: Line %d: Invalid entry type (%s)", line_number,
-                std::string(fields[0]).c_str());
-        throw std::invalid_argument("Invalid description entry type");
-    }
-
-    if (group_set)
-    {
-        if (neuron_group_id >= net.groups.size())
-        {
-            INFO("Error: Line %d: Group (%lu) >= group count (%lu).\n",
-                    line_number, neuron_group_id, net.groups.size());
-            throw std::invalid_argument("Invalid group id");
-        }
-        group_ptr = net.groups[neuron_group_id].get();
-        NeuronGroup &group = *group_ptr;
-        TRACE1("Parsed neuron gid:%lu nid:%lu\n", neuron_group_id, neuron_id);
-        if (neuron_set)
-        {
-            if (neuron_id >= group.neurons.size())
-            {
-                INFO("Error: Line %d: Trying to access neuron "
-                     "(%d.%lu) but group %d only "
-                     "allocates %lu neuron(s).\n",
-                        line_number, group.id, neuron_id, group.id,
-                        group.neurons.size());
-                throw std::invalid_argument("Invalid neuron id");
-            }
-            neuron_ptr = &(group.neurons[neuron_id]);
-        }
-    }
-
-    // Parse attributes from fields
-    for (size_t i = 2; i < fields.size(); i++)
-    {
-        TRACE1("Parsing field:%s\n", fields[i].c_str());
-
-        if ((fields[i].length() < 3))
-        {
-            INFO("Error: Line %d: Invalid field: %s\n", line_number,
-                    std::string(fields[i]).c_str());
-            continue;
-        }
-
-        const auto pos = fields[i].find_first_of('=');
-        std::string key = std::string(fields[i].substr(0, pos));
-        std::string value_str = std::string(fields[i].substr(pos + 1));
-
-        if ((key.length() == 0) || (value_str.length() == 0))
-        {
-            INFO("Error: Line %d: Invalid attribute: %s\n", line_number,
-                    std::string(fields[i]).c_str());
-            continue;
-        }
-
-        attributes.insert({key, value_str});
-    }
-
-    // Process the entry
-    switch (entry_type)
-    {
-    case 'g': // Add neuron group
-        //net.create_neuron_group("", neuron_count, attributes);
-        break;
-    case 'n': // Add neuron
-        //neuron_ptr->set_attributes(attributes);
-        break;
-    case 'e':
-        assert(neuron_ptr != nullptr);
-        // Zero initialize all connections
-        neuron_ptr->connect_to_neuron(*dest_ptr, attributes);
-        break;
-    case '&': // Map neuron to hardware
-        core_ptr->map_neuron(*neuron_ptr);
-        break;
-    default:
-        break;
-    }
-
-    return;
-}
-*/

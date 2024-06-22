@@ -46,7 +46,9 @@ struct AxonOutModel;
 
 struct TilePowerMetrics;
 struct SynapsePowerMetrics;
+struct DendritePowerMetrics;
 struct SomaPowerMetrics;
+struct AxonOutPowerMetrics;
 struct CorePipelineConfiguration;
 struct NetworkOnChipConfiguration;
 
@@ -144,12 +146,16 @@ struct AxonInPowerMetrics
 
 struct SynapsePowerMetrics
 {
-    // double energy_memory_access
-    // double latency_memory_access;
     double energy_process_spike;
     double latency_process_spike;
 
     SynapsePowerMetrics(double energy_spike = 0.0, double latency_spike = 0.0);
+};
+
+struct DendritePowerMetrics
+{
+    double energy_access;
+    double latency_access;
 };
 
 struct SomaPowerMetrics
@@ -158,10 +164,16 @@ struct SomaPowerMetrics
     double latency_update_neuron;
     double energy_access_neuron;
     double latency_access_neuron;
-    double energy_spiking;
-    double latency_spiking;
+    double energy_spike_out;
+    double latency_spike_out;
 
     SomaPowerMetrics(double energy_update = 0.0, double latency_update = 0.0, double energy_access = 0.0, double latency_access = 0.0, double energy_spiking = 0.0, double latency_spiking = 0.0);
+};
+
+struct AxonOutPowerMetrics
+{
+    double energy_message_out;
+    double latency_message_out;
 };
 
 constexpr size_t default_max_neurons = 1024;  // The same as Loihi 1
@@ -170,7 +182,7 @@ struct CorePipelineConfiguration
     BufferPosition timestep_buffer_pos;
     size_t max_neurons_supported;
 
-    CorePipelineConfiguration(const std::string &buffer_pos="soma", size_t max_neurons_supported = default_max_neurons);
+    CorePipelineConfiguration(const std::string &buffer_pos = "soma", size_t max_neurons_supported = default_max_neurons);
 };
 
 struct NetworkOnChipConfiguration
@@ -255,9 +267,9 @@ public:
     explicit Core(std::string name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
     AxonInUnit &create_axon_in(const std::string &name, const AxonInPowerMetrics &power_metrics);
     SynapseUnit &create_synapse(const std::string &name, const SynapsePowerMetrics &power_metrics, const ModelInfo &model);
-    DendriteUnit &create_dendrite(const std::string &name, const std::string &model_str, double energy_access, double latency_access,  std::optional<std::filesystem::path> plugin_library_path = std::nullopt);
-    SomaUnit &create_soma(std::string name, std::string model_str, const SomaPowerMetrics &power_metrics, const std::optional<std::filesystem::path> &plugin_lib = std::nullopt);
-    AxonOutUnit &create_axon_out(const std::string &name, double energy_access, double latency_access);
+    DendriteUnit &create_dendrite(const std::string &name, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
+    SomaUnit &create_soma(std::string name, const SomaPowerMetrics &power_metrics, const ModelInfo &model);
+    AxonOutUnit &create_axon_out(const std::string &name, const AxonOutPowerMetrics &power_metrics);
     void map_neuron(Neuron &n);
     [[nodiscard]] int get_id() const { return id; }
     [[nodiscard]] int get_offset() const { return offset; }
@@ -306,7 +318,7 @@ struct DendriteUnit
     double time{0.0};
     double energy_access;
     double latency_access;
-    explicit DendriteUnit(std::string dendrite_name, std::string model_str, const CoreAddress &parent_core, double energy_cost=0.0, double latency_cost=0.0, std::optional<std::filesystem::path> plugin_library_path = std::nullopt);
+    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
     //std::string description() const;
 };
 
@@ -330,7 +342,7 @@ struct SomaUnit
     double latency_spiking;
     int noise_type{NOISE_NONE};
 
-    explicit SomaUnit(std::string soma_name, std::string model_str, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics, std::optional<std::filesystem::path> plugin_library_path = std::nullopt);
+    explicit SomaUnit(std::string soma_name, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics, const ModelInfo &model);
     //std::string description() const;
 };
 
@@ -346,7 +358,7 @@ struct AxonOutUnit
     double energy_access;
     double latency_access;
 
-    explicit AxonOutUnit(std::string axon_out_name, const CoreAddress &parent_core, double energy_access, double latency_access);
+    explicit AxonOutUnit(std::string axon_out_name, const CoreAddress &parent_core, const AxonOutPowerMetrics &power_metrics);
     //std::string description() const;
 };
 

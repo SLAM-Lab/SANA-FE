@@ -228,41 +228,40 @@ sanafe::SynapseUnit::SynapseUnit(std::string synapse_name,
 }
 
 sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
-        std::string model_str, const CoreAddress &parent_core,
-        const double energy_cost, const double latency_cost,
-        std::optional<std::filesystem::path> plugin_library_path)
-        : plugin_lib(std::move(plugin_library_path))
+        const CoreAddress &parent_core,
+        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
+        : plugin_lib(std::move(model.plugin_library_path))
         , name(std::move(dendrite_name))
-        , model(std::move(model_str))
+        , model(std::move(model.name))
         , parent_core_address(parent_core)
-        , energy_access(energy_cost)
-        , latency_access(latency_cost)
+        , energy_access(power_metrics.energy_access)
+        , latency_access(power_metrics.latency_access)
 {
 }
 
-sanafe::SomaUnit::SomaUnit(std::string soma_name, std::string model_str,
+sanafe::SomaUnit::SomaUnit(std::string soma_name,
         const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics,
-        std::optional<std::filesystem::path> plugin_library_path)
-        : plugin_lib(std::move(plugin_library_path))
+        const ModelInfo &model)
+        : plugin_lib(std::move(model.plugin_library_path))
         , name(std::move(soma_name))
-        , model(std::move(model_str))
+        , model(std::move(model.name))
         , parent_core_address(parent_core)
         , energy_update_neuron(power_metrics.energy_update_neuron)
         , latency_update_neuron(power_metrics.latency_update_neuron)
         , energy_access_neuron(power_metrics.energy_access_neuron)
         , latency_access_neuron(power_metrics.latency_access_neuron)
-        , energy_spiking(power_metrics.energy_spiking)
-        , latency_spiking(power_metrics.latency_spiking)
+        , energy_spiking(power_metrics.energy_spike_out)
+        , latency_spiking(power_metrics.latency_spike_out)
 {
 }
 
 sanafe::AxonOutUnit::AxonOutUnit(std::string axon_out_name,
-        const CoreAddress &parent_core, const double energy_access,
-        const double latency_access)
+        const CoreAddress &parent_core,
+        const AxonOutPowerMetrics &power_metrics)
         : name(std::move(axon_out_name))
         , parent_core_address(parent_core)
-        , energy_access(energy_access)
-        , latency_access(latency_access)
+        , energy_access(power_metrics.energy_message_out)
+        , latency_access(power_metrics.latency_message_out)
 {
 }
 
@@ -405,48 +404,42 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
 }
 
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
-        const std::string &model_str, const double energy_access,
-        const double latency_access,
-        std::optional<std::filesystem::path> plugin_lib)
+        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
-    dendrite.emplace_back(DendriteUnit(name, model_str, parent_core_address,
-            energy_access, latency_access, std::move(plugin_lib)));
-    DendriteUnit &new_dendrite_hw_unit = dendrite.back();
+    dendrite.emplace_back(
+            DendriteUnit(name, parent_core_address, power_metrics, model));
     TRACE1("New dendrite h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
 
-    return new_dendrite_hw_unit;
+    return dendrite.back();
 }
 
 sanafe::SomaUnit &sanafe::Core::create_soma(std::string name,
-        std::string model_str, const SomaPowerMetrics &power_metrics,
-        const std::optional<std::filesystem::path> &plugin_lib)
+        const SomaPowerMetrics &power_metrics, const ModelInfo &model)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
-    soma.emplace_back(SomaUnit(std::move(name), std::move(model_str),
-            parent_core_address, power_metrics, plugin_lib));
-    SomaUnit &new_soma_hw_unit = soma.back();
+    soma.emplace_back(SomaUnit(
+            std::move(name), parent_core_address, power_metrics, model));
     TRACE1("New soma h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
 
-    return new_soma_hw_unit;
+    return soma.back();
 }
 
 sanafe::AxonOutUnit &sanafe::Core::create_axon_out(const std::string &name,
-        const double energy_access, const double latency_access)
+        const AxonOutPowerMetrics &power_metrics)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
     axon_out_hw.emplace_back(AxonOutUnit(
-            name, parent_core_address, energy_access, latency_access));
-    AxonOutUnit &new_axon_out_hw_unit = axon_out_hw.back();
+            name, parent_core_address, power_metrics));
     TRACE1("New axon out h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
 
-    return new_axon_out_hw_unit;
+    return axon_out_hw.back();
 }
 
 void sanafe::arch_create_axons(Architecture &arch)
@@ -885,8 +878,8 @@ sanafe::SomaPowerMetrics::SomaPowerMetrics(const double energy_update,
         , latency_update_neuron(latency_update)
         , energy_access_neuron(energy_access)
         , latency_access_neuron(latency_access)
-        , energy_spiking(energy_spiking)
-        , latency_spiking(latency_spiking)
+        , energy_spike_out(energy_spiking)
+        , latency_spike_out(latency_spiking)
 {
 }
 

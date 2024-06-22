@@ -36,6 +36,8 @@ architecture:
             - name: demo_dendrite
               attributes:
                 model: single_compartment
+                energy_access: 0.0
+                latency_access: 0.0
           soma:
             - name: demo_soma_default
               attributes:
