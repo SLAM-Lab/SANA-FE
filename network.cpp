@@ -99,7 +99,6 @@ sanafe::Neuron::Neuron(const size_t neuron_id, const size_t parent_group_id,
         , maps_in_count(0)
         , maps_out_count(0)
         , status(sanafe::IDLE)
-        , soma_input_charge(0.0)
         , axon_out_input_spike(false)
 {
 }

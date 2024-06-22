@@ -216,7 +216,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
     double soma_processing_latency = 0.0;
     while (n.soma_last_updated < ts.timestep)
     {
-        std::optional<double> soma_current_in = std::nullopt;
+        std::optional<double> soma_current_in;
         if ((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
         {
             soma_current_in = n.soma_input_charge;

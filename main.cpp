@@ -12,6 +12,7 @@
 #include <string>
 
 #include "arch.hpp"
+#include "description.hpp"
 #include "models.hpp"
 #include "network.hpp"
 #include "print.hpp"
@@ -19,8 +20,6 @@
 
 int main(int argc, char *argv[])
 {
-    long int timesteps;
-
     if (argc < 1)
     {
         INFO("Error: No program arguments.");
@@ -32,11 +31,11 @@ int main(int argc, char *argv[])
 
     // Parse optional args
     std::filesystem::path output_dir = std::filesystem::current_path();
-    bool record_spikes, record_potentials, record_perf, record_messages;
-    record_spikes = false;
-    record_potentials = false;
-    record_perf = false;
-    record_messages = false;
+    bool record_spikes = false;
+    bool record_potentials = false;
+    bool record_perf = false;
+    bool record_messages = false;
+
     while (argc > 2)
     {
         if (argv[0][0] == '-')
@@ -84,33 +83,55 @@ int main(int argc, char *argv[])
     }
 
     // Read in program args, sanity check and parse inputs
-    sanafe::Architecture arch = sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
-    INFO("Architecture initialized.\n");
-    sanafe::Network net =
-            sanafe::load_net(argv[sanafe::NETWORK_FILENAME], arch);
-    INFO("Network initialized.\n");
-    sanafe::Simulation sim(arch, net, output_dir, record_spikes,
-            record_potentials, record_perf, record_messages);
-
-    timesteps = 0;
-    int ret = sscanf(argv[sanafe::TIMESTEPS], "%ld", &timesteps);
-    if (ret < 1)
-    {
-        INFO("Error: Time-steps must be integer > 0 (%s).\n",
-                argv[sanafe::TIMESTEPS]);
-        return 1;
-    }
-    else if (timesteps <= 0)
-    {
-        INFO("Error: Time-steps must be > 0 (%ld)\n", timesteps);
-        return 1;
-    }
-
-    // Step simulation
-    INFO("Running simulation.\n");
     try
     {
+        sanafe::Architecture arch =
+                sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
+        INFO("Architecture initialized.\n");
+        sanafe::Network net =
+                sanafe::load_net(argv[sanafe::NETWORK_FILENAME], arch);
+        INFO("Network initialized.\n");
+
+        sanafe::Simulation sim(arch, net, output_dir, record_spikes,
+                record_potentials, record_perf, record_messages);
+
+        char *end_ptr = nullptr;
+        const long int timesteps =
+                std::strtol(argv[sanafe::TIMESTEPS], &end_ptr, 10);
+        if (end_ptr == argv[sanafe::TIMESTEPS])
+        {
+            INFO("Error: Time-steps must be integer > 0 (%s).\n",
+                    argv[sanafe::TIMESTEPS]);
+            return 1;
+        }
+        if (timesteps <= 0)
+        {
+            INFO("Error: Time-steps must be > 0 (%ld)\n", timesteps);
+            return 1;
+        }
+
+        // Step simulation
+        INFO("Running simulation.\n");
         sim.run(timesteps);
+
+        INFO("***** Run Summary *****\n");
+        const auto run_data = sim.get_run_summary();
+        sim_output_run_summary(output_dir, run_data);
+        double average_power = sim.get_power();
+        INFO("Average power consumption: %f W.\n", average_power);
+        INFO("Run finished.\n");
+
+        return 0;
+    }
+    catch (const sanafe::DescriptionParsingError &exc)
+    {
+        INFO("%s", exc.what());
+        return 1;
+    }
+    catch (const YAML::InvalidNode &exc)
+    {
+        INFO("Error: YAML parsing error %s\n", exc.what());
+        return 1;
     }
     catch (const std::runtime_error &exc)
     {
@@ -122,13 +143,4 @@ int main(int argc, char *argv[])
         INFO("Error: invalid argument thrown: %s\n", exc.what());
         return 1;
     }
-
-    INFO("***** Run Summary *****\n");
-    const auto run_data = sim.get_run_summary();
-    sim_output_run_summary(output_dir, run_data);
-    double average_power = sim.get_power();
-    INFO("Average power consumption: %f W.\n", average_power);
-    INFO("Run finished.\n");
-
-    return 0;
 }

@@ -217,7 +217,7 @@ public:
 
     // Inputs to H/W units
     std::vector<Synapse> dendrite_input_synapses;
-    double soma_input_charge;
+    double soma_input_charge{0.0};
     bool axon_out_input_spike;
 
     explicit Neuron(const size_t neuron_id, const size_t parent_group_id, const NeuronTemplate &config);

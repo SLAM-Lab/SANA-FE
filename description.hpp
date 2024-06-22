@@ -24,7 +24,7 @@ public:
     DescriptionParsingError(const std::string &error, const YAML::Mark &pos);
     [[nodiscard]] const char *what() const noexcept override;
 private:
-    std::string message;
+    const std::string message;
 };
 
 template <typename T>
@@ -38,9 +38,9 @@ Architecture description_parse_arch_section_yaml(const YAML::Node &arch_node);
 void description_parse_tile_section_yaml(const YAML::Node &tile_node, Architecture &arch);
 void description_parse_core_section_yaml(const YAML::Node &core_node, size_t parent_tile_id, Architecture &arch);
 void description_parse_axon_in_section_yaml(const YAML::Node &axon_in_node, Core &parent_core);
-AxonInPowerMetrics description_parse_axon_in_attributes_yaml(const YAML::Node &attributes, const Core &parent_core);
+AxonInPowerMetrics description_parse_axon_in_attributes_yaml(const YAML::Node &attributes);
 void description_parse_synapse_section_yaml(const YAML::Node &synapse_node, Core &parent_core);
-std::pair<SynapsePowerMetrics, ModelInfo> description_parse_synapse_attributes_yaml(const YAML::Node &synapse_node, Core &parent_core);
+std::pair<SynapsePowerMetrics, ModelInfo> description_parse_synapse_attributes_yaml(const YAML::Node &attributes);
 void description_parse_dendrite_section_yaml(const YAML::Node &dendrite_node, Core &parent_core);
 void description_parse_soma_section_yaml(const YAML::Node &soma_node, Core &parent_core);
 void description_parse_axon_out_section(const YAML::Node &axon_out_node, Core &parent_core);
