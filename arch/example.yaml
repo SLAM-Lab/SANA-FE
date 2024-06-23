@@ -1,5 +1,3 @@
-
-
 architecture:
   name: demo
   attributes:
@@ -20,7 +18,8 @@ architecture:
       core:
         - name: demo_core[0..3]
           attributes:
-            buffer_before: soma
+            buffer_position: soma
+            max_neurons_supported: 100
           axon_in:
             - name: demo_in
               attributes:

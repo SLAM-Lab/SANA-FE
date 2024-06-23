@@ -18,6 +18,7 @@
 #include "arch.hpp"
 #include "description.hpp"
 #include "network.hpp"
+#include "pipeline.hpp"
 #include "print.hpp"
 
 sanafe::DescriptionParsingError::DescriptionParsingError(
@@ -79,36 +80,35 @@ T sanafe::description_required_field(
 
     const std::string message = "Could not cast field '" +
             YAML::Dump(field_node) + "' (key '" + key +
-            "') to type: " + description_get_type_string(field);
+            "') to type: " + description_get_type_string(typeid(field));
     throw DescriptionParsingError(message, field_node.Mark());
 }
 
-template <typename T>
-std::string sanafe::description_get_type_string(const T &value)
+std::string sanafe::description_get_type_string(const std::type_info &type)
 {
-    if (typeid(value) == typeid(bool))
+    if (type == typeid(bool))
     {
         return "bool";
     }
-    if (typeid(value) == typeid(int))
+    if (type == typeid(int))
     {
         return "int";
     }
-    if (typeid(value) == typeid(size_t))
+    if (type == typeid(size_t))
     {
         return "size_t";
     }
-    if (typeid(value) == typeid(double))
+    if (type == typeid(double))
     {
         return "double";
     }
-    if (typeid(value) == typeid(std::string))
+    if (type == typeid(std::string))
     {
         return "string";
     }
 
     // Not a scalar type; fall back to default name which may be mangled
-    return typeid(value).name();
+    return type.name();
 }
 
 void sanafe::description_parse_axon_in_section_yaml(
@@ -407,19 +407,13 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
 sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
         const YAML::Node &attributes)
 {
-    std::string buffer_pos = "soma";
-    size_t max_neurons_supported = default_max_neurons;
+    CorePipelineConfiguration pipeline_config;
 
-    if (attributes["buffer_position"] != nullptr)
-    {
-        buffer_pos = attributes["buffer_position"].as<std::string>();
-    }
-    if (attributes["max_neurons_supported"] != nullptr)
-    {
-        max_neurons_supported = attributes["buffer_position"].as<size_t>();
-    }
-    CorePipelineConfiguration pipeline_config(
-            buffer_pos, max_neurons_supported);
+    pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
+            description_required_field<std::string>(
+                    attributes, "buffer_position"));
+    pipeline_config.max_neurons_supported = description_required_field<int>(
+            attributes, "max_neurons_supported");
 
     return pipeline_config;
 }
@@ -427,52 +421,28 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
 sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
         const YAML::Node &attributes)
 {
-    // Per-hop power metrics
-    double energy_north = 0.0;
-    double latency_north = 0.0;
-    double energy_east = 0.0;
-    double latency_east = 0.0;
-    double energy_west = 0.0;
-    double latency_west = 0.0;
-    double energy_south = 0.0;
-    double latency_south = 0.0;
+    TilePowerMetrics tile_metrics;
 
-    if (attributes["energy_north_hop"] != nullptr)
-    {
-        energy_north = attributes["energy_north_hop"].as<double>();
-    }
-    if (attributes["latency_north_hop"] != nullptr)
-    {
-        latency_north = attributes["latency_north_hop"].as<double>();
-    }
-    if (attributes["energy_east_hop"] != nullptr)
-    {
-        energy_east = attributes["energy_east_hop"].as<double>();
-    }
-    if (attributes["latency_east_hop"] != nullptr)
-    {
-        latency_east = attributes["latency_east_hop"].as<double>();
-    }
-    if (attributes["energy_south_hop"] != nullptr)
-    {
-        energy_south = attributes["energy_south_hop"].as<double>();
-    }
-    if (attributes["latency_south_hop"] != nullptr)
-    {
-        latency_south = attributes["latency_south_hop"].as<double>();
-    }
-    if (attributes["energy_west_hop"] != nullptr)
-    {
-        energy_west = attributes["energy_west_hop"].as<double>();
-    }
-    if (attributes["latency_west_hop"] != nullptr)
-    {
-        latency_west = attributes["latency_west_hop"].as<double>();
-    }
+    tile_metrics.energy_north_hop =
+            description_required_field<double>(attributes, "energy_north_hop");
+    tile_metrics.latency_north_hop =
+            description_required_field<double>(attributes, "latency_north_hop");
 
-    TilePowerMetrics tile_metrics(energy_north, latency_north, energy_east,
-            latency_east, energy_south, latency_south, energy_west,
-            latency_west);
+    tile_metrics.energy_east_hop =
+            description_required_field<double>(attributes, "energy_east_hop");
+    tile_metrics.latency_east_hop =
+            description_required_field<double>(attributes, "latency_east_hop");
+
+    tile_metrics.energy_south_hop =
+            description_required_field<double>(attributes, "energy_south_hop");
+    tile_metrics.latency_south_hop =
+            description_required_field<double>(attributes, "latency_south_hop");
+
+    tile_metrics.energy_west_hop =
+            description_required_field<double>(attributes, "energy_west_hop");
+    tile_metrics.latency_west_hop =
+            description_required_field<double>(attributes, "latency_west_hop");
+
     return tile_metrics;
 }
 
@@ -480,10 +450,8 @@ void sanafe::description_parse_tile_section_yaml(
         const YAML::Node &tile_node, Architecture &arch)
 {
     auto tile_name = tile_node["name"].as<std::string>();
-    std::replace(tile_name.begin(), tile_name.end(), ' ', '_');
-    std::replace(tile_name.begin(), tile_name.end(), '\t', '_');
-
     std::pair<int, int> range = {0, 0};
+
     if (tile_name.find('[') != std::string::npos)
     {
         range = description_parse_range_yaml(tile_name);
@@ -524,25 +492,14 @@ sanafe::NetworkOnChipConfiguration
 sanafe::description_parse_noc_configuration_yaml(
         const YAML::Node &noc_attributes)
 {
-    size_t width_in_tiles = 1;
-    size_t height_in_tiles = 1;
-    size_t link_buffer_size = 0;
+    NetworkOnChipConfiguration noc;
+    noc.width_in_tiles =
+            description_required_field<int>(noc_attributes, "width");
+    noc.height_in_tiles =
+            description_required_field<int>(noc_attributes, "height");
+    noc.link_buffer_size =
+            description_required_field<int>(noc_attributes, "link_buffer_size");
 
-    if (noc_attributes["width"] != nullptr)
-    {
-        width_in_tiles = noc_attributes["width"].as<size_t>();
-    }
-    if (noc_attributes["height"] != nullptr)
-    {
-        height_in_tiles = noc_attributes["height"].as<size_t>();
-    }
-    if (noc_attributes["link_buffer_size"] != nullptr)
-    {
-        link_buffer_size = noc_attributes["link_buffer_size"].as<size_t>();
-    }
-
-    const NetworkOnChipConfiguration noc(
-            width_in_tiles, height_in_tiles, link_buffer_size);
     return noc;
 }
 

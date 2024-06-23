@@ -30,8 +30,7 @@ private:
 template <typename T>
 T description_required_field(const YAML::Node &node, const std::string &key);
 
-template <typename T>
-std::string description_get_type_string(const T &value);
+std::string description_get_type_string(const std::type_info &value);
 
 Architecture description_parse_arch_file_yaml(std::ifstream &fp);
 Architecture description_parse_arch_section_yaml(const YAML::Node &arch_node);

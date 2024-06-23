@@ -87,16 +87,17 @@ void sanafe::pipeline_process_neuron(
 {
     SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
     double neuron_processing_latency = 0.0;
-    if (n.core->pipeline_config.timestep_buffer_pos <=
+    if (n.core->pipeline_config.buffer_position <=
             BUFFER_BEFORE_DENDRITE_UNIT)
     {
         neuron_processing_latency += pipeline_process_dendrite(ts, n);
     }
-    if (n.core->pipeline_config.timestep_buffer_pos <= BUFFER_BEFORE_SOMA_UNIT)
+    if (n.core->pipeline_config.buffer_position <=
+            BUFFER_BEFORE_SOMA_UNIT)
     {
         neuron_processing_latency += pipeline_process_soma(ts, n);
     }
-    if (n.core->pipeline_config.timestep_buffer_pos <=
+    if (n.core->pipeline_config.buffer_position <=
             BUFFER_BEFORE_AXON_OUT_UNIT)
     {
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
@@ -123,7 +124,7 @@ double sanafe::pipeline_process_message(
         Connection &con = *(core.connections_in[synapse_address]);
         message_processing_latency +=
                 pipeline_process_synapse(ts, con, synapse_address);
-        if (core.pipeline_config.timestep_buffer_pos ==
+        if (core.pipeline_config.buffer_position ==
                 BUFFER_BEFORE_DENDRITE_UNIT)
         {
             continue; // Process next synapse
@@ -133,12 +134,13 @@ double sanafe::pipeline_process_message(
         Neuron &n = *(con.post_neuron);
         message_processing_latency += pipeline_process_dendrite(ts, n);
 
-        if (core.pipeline_config.timestep_buffer_pos == BUFFER_BEFORE_SOMA_UNIT)
+        if (core.pipeline_config.buffer_position ==
+                BUFFER_BEFORE_SOMA_UNIT)
         {
             continue; // Process next synapse
         }
         message_processing_latency += pipeline_process_soma(ts, n);
-        assert(core.pipeline_config.timestep_buffer_pos ==
+        assert(core.pipeline_config.buffer_position ==
                 BUFFER_BEFORE_AXON_OUT_UNIT);
     }
 

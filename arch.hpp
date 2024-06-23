@@ -118,85 +118,73 @@ struct Message
     bool placeholder{true};
     bool in_noc{false};
 
-    explicit Message(const Architecture &arch, const Neuron &n, int timestep);
-    explicit Message(const Architecture &arch, const Neuron &n, int timestep, int axon_address);
+    explicit Message(const Architecture &arch, const Neuron &n, long int timestep);
+    explicit Message(const Architecture &arch, const Neuron &n, long int timestep, int axon_address);
 };
 
 struct TilePowerMetrics
 {
-    double energy_north_hop;
-    double latency_north_hop;
-    double energy_east_hop;
-    double latency_east_hop;
-    double energy_south_hop;
-    double latency_south_hop;
-    double energy_west_hop;
-    double latency_west_hop;
-
-    TilePowerMetrics(double energy_north = 0.0, double latency_north = 0.0, double energy_east = 0.0, double latency_east = 0.0, double energy_south = 0.0, double latency_south = 0.0, double energy_west = 0.0, double latency_west = 0.0);
+    double energy_north_hop{0.0};
+    double latency_north_hop{0.0};
+    double energy_east_hop{0.0};
+    double latency_east_hop{0.0};
+    double energy_south_hop{0.0};
+    double latency_south_hop{0.0};
+    double energy_west_hop{0.0};
+    double latency_west_hop{0.0};
 };
 
 struct AxonInPowerMetrics
 {
-    double energy_message_in;
-    double latency_message_in;
-
-    AxonInPowerMetrics(double energy = 0.0, double latency = 0.0);
+    double energy_message_in{0.0};
+    double latency_message_in{0.0};
 };
 
 struct SynapsePowerMetrics
 {
-    double energy_process_spike;
-    double latency_process_spike;
-
-    SynapsePowerMetrics(double energy_spike = 0.0, double latency_spike = 0.0);
+    double energy_process_spike{0.0};
+    double latency_process_spike{0.0};
 };
 
 struct DendritePowerMetrics
 {
-    double energy_access;
-    double latency_access;
+    double energy_access{0.0};
+    double latency_access{0.0};
 };
 
 struct SomaPowerMetrics
 {
-    double energy_update_neuron;
-    double latency_update_neuron;
-    double energy_access_neuron;
-    double latency_access_neuron;
-    double energy_spike_out;
-    double latency_spike_out;
-
-    SomaPowerMetrics(double energy_update = 0.0, double latency_update = 0.0, double energy_access = 0.0, double latency_access = 0.0, double energy_spiking = 0.0, double latency_spiking = 0.0);
+    double energy_update_neuron{0.0};
+    double latency_update_neuron{0.0};
+    double energy_access_neuron{0.0};
+    double latency_access_neuron{0.0};
+    double energy_spike_out{0.0};
+    double latency_spike_out{0.0};
 };
 
 struct AxonOutPowerMetrics
 {
-    double energy_message_out;
-    double latency_message_out;
+    double energy_message_out{0.0};
+    double latency_message_out{0.0};
 };
 
 constexpr size_t default_max_neurons = 1024;  // The same as Loihi 1
 struct CorePipelineConfiguration
 {
-    BufferPosition timestep_buffer_pos;
-    size_t max_neurons_supported;
-
-    CorePipelineConfiguration(const std::string &buffer_pos = "soma", size_t max_neurons_supported = default_max_neurons);
+    BufferPosition buffer_position{BUFFER_BEFORE_SOMA_UNIT};
+    size_t max_neurons_supported{default_max_neurons};
 };
 
 struct NetworkOnChipConfiguration
 {
-    int width_in_tiles, height_in_tiles, buffer_size;
-
-    NetworkOnChipConfiguration(int width = 1, int height = 1, int buffer_size = 0);
+    int width_in_tiles{1};
+    int height_in_tiles{1};
+    int link_buffer_size{0};
 };
 
 class Tile
 {
 public:
-    // TODO: this may need to be a vector of core pointers, to avoid reallocation messing up the python
-    //  version of the objects
     std::vector<Core> cores{};
     std::string name;
     double energy{0.0};

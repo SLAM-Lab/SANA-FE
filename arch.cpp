@@ -22,7 +22,7 @@
 #include "description.hpp"
 #include "models.hpp"
 #include "network.hpp"
-#include "pipeline.hpp"
+//#include "pipeline.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
 
@@ -31,15 +31,7 @@ sanafe::Architecture::Architecture(
         : name(std::move(name))
         , noc_width(noc.width_in_tiles)
         , noc_height(noc.height_in_tiles)
-        , noc_buffer_size(noc.buffer_size)
-{
-}
-
-sanafe::NetworkOnChipConfiguration::NetworkOnChipConfiguration(
-        const int width, const int height, const int buffer_size)
-        : width_in_tiles(width)
-        , height_in_tiles(height)
-        , buffer_size(buffer_size)
+        , noc_buffer_size(noc.link_buffer_size)
 {
 }
 
@@ -81,7 +73,7 @@ std::string sanafe::Architecture::description() const
 */
 
 sanafe::Message::Message(
-        const Architecture &arch, const Neuron &n, const int timestep)
+        const Architecture &arch, const Neuron &n, const long int timestep)
         : timestep(timestep)
         , src_neuron_id(n.id)
         , src_neuron_group_id(n.parent_group_id)
@@ -99,7 +91,7 @@ sanafe::Message::Message(
 }
 
 sanafe::Message::Message(const Architecture &arch, const Neuron &n,
-        const int timestep, const int axon_address)
+        const long int timestep, const int axon_address)
         : Message(arch, n, timestep)
 {
     const Core &src_core = *(n.core);
@@ -230,9 +222,9 @@ sanafe::SynapseUnit::SynapseUnit(std::string synapse_name,
 sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
         const CoreAddress &parent_core,
         const DendritePowerMetrics &power_metrics, const ModelInfo &model)
-        : plugin_lib(std::move(model.plugin_library_path))
+        : plugin_lib(model.plugin_library_path)
         , name(std::move(dendrite_name))
-        , model(std::move(model.name))
+        , model(model.name)
         , parent_core_address(parent_core)
         , energy_access(power_metrics.energy_access)
         , latency_access(power_metrics.latency_access)
@@ -242,9 +234,9 @@ sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
 sanafe::SomaUnit::SomaUnit(std::string soma_name,
         const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics,
         const ModelInfo &model)
-        : plugin_lib(std::move(model.plugin_library_path))
+        : plugin_lib(model.plugin_library_path)
         , name(std::move(soma_name))
-        , model(std::move(model.name))
+        , model(model.name)
         , parent_core_address(parent_core)
         , energy_update_neuron(power_metrics.energy_update_neuron)
         , latency_update_neuron(power_metrics.latency_update_neuron)
@@ -839,53 +831,3 @@ void sanafe::Architecture::save_arch_description(
     out << description();
 }
 */
-
-sanafe::TilePowerMetrics::TilePowerMetrics(const double energy_north,
-        const double latency_north, const double energy_east,
-        const double latency_east, const double energy_south,
-        const double latency_south, const double energy_west,
-        const double latency_west)
-        : energy_north_hop(energy_north)
-        , latency_north_hop(latency_north)
-        , energy_east_hop(energy_east)
-        , latency_east_hop(latency_east)
-        , energy_south_hop(energy_south)
-        , latency_south_hop(latency_south)
-        , energy_west_hop(energy_west)
-        , latency_west_hop(latency_west)
-{
-}
-
-sanafe::AxonInPowerMetrics::AxonInPowerMetrics(
-        const double energy, const double latency)
-        : energy_message_in(energy)
-        , latency_message_in(latency)
-{
-}
-
-sanafe::SynapsePowerMetrics::SynapsePowerMetrics(
-        const double energy_spike, const double latency_spike)
-        : energy_process_spike(energy_spike)
-        , latency_process_spike(latency_spike)
-{
-}
-
-sanafe::SomaPowerMetrics::SomaPowerMetrics(const double energy_update,
-        const double latency_update, const double energy_access,
-        const double latency_access, const double energy_spiking,
-        const double latency_spiking)
-        : energy_update_neuron(energy_update)
-        , latency_update_neuron(latency_update)
-        , energy_access_neuron(energy_access)
-        , latency_access_neuron(latency_access)
-        , energy_spike_out(energy_spiking)
-        , latency_spike_out(latency_spiking)
-{
-}
-
-sanafe::CorePipelineConfiguration::CorePipelineConfiguration(
-        const std::string &buffer_pos, const size_t neurons_supported)
-        : max_neurons_supported(neurons_supported)
-{
-    timestep_buffer_pos = pipeline_parse_buffer_pos_str(buffer_pos);
-}
