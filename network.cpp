@@ -62,19 +62,13 @@ std::string sanafe::Connection::description() const
 */
 
 sanafe::NeuronGroup::NeuronGroup(const std::string &group_name,
-        const size_t group_id, const size_t neuron_count,
         const NeuronTemplate &default_config)
         : default_neuron_config(default_config)
         , name(group_name)
-        , id(group_id)
 {
-    INFO("Creating neuron group: %zu with %zu neurons\n", group_id,
-            neuron_count);
-    // Reserve space for the neurons to go
-    neurons.reserve(neuron_count);
 }
 
-sanafe::Neuron::Neuron(const size_t neuron_id, const size_t parent_group_id,
+sanafe::Neuron::Neuron(const std::string neuron_id, const std::string parent_group_id,
         const NeuronTemplate &config)
         : parent_net(nullptr)
         , core(nullptr)
@@ -91,7 +85,6 @@ sanafe::Neuron::Neuron(const size_t neuron_id, const size_t parent_group_id,
         , log_spikes(config.log_spikes)
         , log_potential(config.log_potential)
         , id(neuron_id)
-        , parent_group_id(parent_group_id)
         , forced_spikes(0)
         , spike_count(0)
         , soma_last_updated(0)
@@ -173,7 +166,7 @@ std::string sanafe::NeuronGroup::info() const
 
 void sanafe::Neuron::set_attributes(const NeuronTemplate &config)
 {
-    assert(connections_out.size() == 0);
+    assert(connections_out.empty());
 
     soma_hw_name = config.soma_hw_name;
     default_synapse_hw_name = config.default_synapse_hw_name;

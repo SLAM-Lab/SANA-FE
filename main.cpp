@@ -95,15 +95,18 @@ int main(int argc, char *argv[])
         sanafe::Simulation sim(arch, net, output_dir, record_spikes,
                 record_potentials, record_perf, record_messages);
 
-        char *end_ptr = nullptr;
-        const long int timesteps =
-                std::strtol(argv[sanafe::TIMESTEPS], &end_ptr, 10);
-        if (end_ptr == argv[sanafe::TIMESTEPS])
+        long int timesteps;
+        try
         {
-            INFO("Error: Time-steps must be integer > 0 (%s).\n",
+            timesteps = std::stol(argv[sanafe::TIMESTEPS]);
+        }
+        catch(const std::exception& e)
+        {
+            INFO("Error: Invalid time-step format: %s\n",
                     argv[sanafe::TIMESTEPS]);
             return 1;
         }
+
         if (timesteps <= 0)
         {
             INFO("Error: Time-steps must be > 0 (%ld)\n", timesteps);

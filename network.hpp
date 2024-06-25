@@ -45,6 +45,7 @@ struct DendriteUnit;
 struct SomaUnit;
 struct AxonOutUnit;
 // Network
+class Network;
 class NeuronGroup;
 class Neuron;
 struct Connection;
@@ -56,35 +57,6 @@ class DendriteModel;
 
 struct NeuronTemplate;
 enum NeuronStatus: int;
-
-class Network
-{
-public:
-    // Use a vector of dynamically allocated groups, so we get vectors random
-    //  access, but do not reallocate objects when growing the vector
-    std::vector<std::unique_ptr<NeuronGroup>> groups;
-    std::string name;
-    explicit Network(const std::string &net_name) : name(net_name) {};
-    ~Network() = default;
-    Network(Network &&) = default;
-    Network &operator=(Network &&) = default;
-    // Do *NOT* allow Network objects to be copied
-    //  This is because Neuron objects link back to their parent Network
-    //  (and need to be aware of the parent NeuronGroup). Linking to parent
-    //  objects allows us to efficiently store Attributes for neurons i.e.,
-    //  by avoiding duplication of shared attributes.
-    //  If the Network was moved or copied, all parent links in Neurons
-    //  would be invalid.
-    Network(const Network &) = delete;
-    Network &operator=(const Network &) = delete;
-
-    NeuronGroup &create_neuron_group(const std::string &name, const size_t neuron_count, const NeuronTemplate &default_config);
-    [[nodiscard]] std::string info() const;
-    //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
-    void check_mapped() const;
-};
-
-Network load_net(const std::filesystem::path &path, Architecture &arch);
 
 // An attribute can contain a scalar value, or either a list or named set of
 //  attributes i.e., attributes are recursively defined attributes. However,
@@ -173,23 +145,6 @@ struct NeuronTemplate
     explicit NeuronTemplate(const std::string &soma_hw_name = "", const std::string &default_synapse_hw_name = "", const std::string &dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_update = false);
 };
 
-class NeuronGroup
-{
-public:
-    // A neuron group is a collection of neurons that share common
-    //  parameters. All neurons must be based on the same neuron model.
-    std::vector<Neuron> neurons;
-    NeuronTemplate default_neuron_config;
-    std::string name;
-    int id;
-    int get_id() { return id; }
-    explicit NeuronGroup(const std::string &group_name, size_t group_id, size_t neuron_count, const NeuronTemplate &default_config);
-    //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
-    //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
-    std::string info() const;
-    //std::string description() const;
-};
-
 class Neuron
 {
 public:
@@ -204,13 +159,20 @@ public:
     DendriteUnit *dendrite_hw;
     SomaUnit *soma_hw;
     AxonOutUnit *axon_out_hw;
-    std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
+    std::string soma_hw_name;
+    std::string default_synapse_hw_name;
+    std::string dendrite_hw_name;
 
     std::shared_ptr<SomaModel> soma_model;
     std::shared_ptr<DendriteModel> dendrite_model;
 
-    bool force_update, log_spikes, log_potential;
-    int id, parent_group_id, forced_spikes, spike_count;
+    bool force_update;
+    bool log_spikes;
+    bool log_potential;
+    std::string id;
+    std::string parent_group_id;
+    int forced_spikes;
+    int spike_count;
     int soma_last_updated, dendrite_last_updated;
     int maps_in_count, maps_out_count;
     NeuronStatus status;
@@ -220,13 +182,58 @@ public:
     double soma_input_charge{0.0};
     bool axon_out_input_spike;
 
-    explicit Neuron(const size_t neuron_id, const size_t parent_group_id, const NeuronTemplate &config);
-    int get_id() { return id; }
+    explicit Neuron(const std::string neuron_id, const std::string parent_group_id, const NeuronTemplate &config);
+    std::string get_id() const { return id; }
     void set_attributes(const NeuronTemplate &attributes);
     void connect_to_neuron(Neuron &dest, const std::map<std::string, ModelParam> &synapse_params, const std::map<std::string, ModelParam> &dendrite_params,  const std::optional<std::string> &synapse_hw_name = std::nullopt);
-    std::string info() const;
+    [[nodiscard]] std::string info() const;
     //std::string description(const bool write_mapping=true) const;
 };
+
+class NeuronGroup
+{
+public:
+    // A neuron group is a collection of neurons that share common
+    //  parameters. All neurons must be based on the same neuron model.
+    std::unordered_map<std::string, Neuron> neurons;
+    NeuronTemplate default_neuron_config;
+    std::string name;
+    [[nodiscard]] std::string get_id() const { return name; }
+    explicit NeuronGroup(const std::string &group_name, const NeuronTemplate &default_config);
+    //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
+    //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
+    [[nodiscard]] std::string info() const;
+    //std::string description() const;
+};
+
+class Network
+{
+public:
+    // Use a vector of dynamically allocated groups, so we get vectors random
+    //  access, but do not reallocate objects when growing the vector
+    std::unordered_map<std::string, NeuronGroup> groups;
+    std::string name;
+    explicit Network(const std::string &net_name) : name(net_name) {};
+    ~Network() = default;
+    Network(Network &&) = default;
+    Network &operator=(Network &&) = default;
+    // Do *NOT* allow Network objects to be copied
+    //  This is because Neuron objects link back to their parent Network
+    //  (and need to be aware of the parent NeuronGroup). Linking to parent
+    //  objects allows us to efficiently store Attributes for neurons i.e.,
+    //  by avoiding duplication of shared attributes.
+    //  If the Network was moved or copied, all parent links in Neurons
+    //  would be invalid.
+    Network(const Network &) = delete;
+    Network &operator=(const Network &) = delete;
+
+    NeuronGroup &create_neuron_group(const std::string &name, size_t neuron_count, const NeuronTemplate &default_config);
+    [[nodiscard]] std::string info() const;
+    //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
+    void check_mapped() const;
+};
+
+Network load_net(const std::filesystem::path &path, Architecture &arch);
 
 struct Connection
 {

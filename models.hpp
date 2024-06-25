@@ -36,7 +36,7 @@ public:
     SynapseModel &operator=(const SynapseModel &other) = default;
     SynapseModel &operator=(SynapseModel &&other) = default;
 
-    virtual double update(std::optional<int> synapse_address = std::nullopt, const bool step = true) = 0;
+    virtual double update(std::optional<int> synapse_address = std::nullopt, bool step = true) = 0;
     // Set synapse attributes
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 };
@@ -51,7 +51,7 @@ public:
     DendriteModel &operator=(const DendriteModel &other) = default;
     DendriteModel &operator=(DendriteModel &&other) = default;
 
-    virtual double update(std::optional<Synapse> synapse_in = std::nullopt, const bool step = true) = 0;
+    virtual double update(std::optional<Synapse> synapse_in = std::nullopt, bool step = true) = 0;
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 };
 
@@ -65,12 +65,15 @@ public:
     CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
-    double update(std::optional<int> synapse_address = std::nullopt,  const bool step = true) override;
+    double update(std::optional<int> synapse_address = std::nullopt,  bool step = true) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 
 private:
-    double weight, min_synaptic_resolution, current, synaptic_current_decay;
-    int weight_bits;
+    double weight{0.0};
+    double min_synaptic_resolution{0.0};
+    double current{0.0};
+    double synaptic_current_decay{1.0};
+    int weight_bits{8};
 };
 
 class SingleCompartmentModel : public DendriteModel

@@ -282,7 +282,8 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
     std::pair<int, int> core_range = {0, 0};
     if (core_name.find('[') != std::string::npos)
     {
-        core_range = description_parse_range_yaml(core_name);
+        core_range = description_parse_range_yaml(
+                core_name, core_node["name"].Mark());
     }
 
     for (int c = core_range.first; c <= core_range.second; c++)
@@ -309,11 +310,8 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
         }
         else
         {
-            const std::string error =
-                    "Error: No axon in section defined (line:" +
-                    std::to_string(axon_in_node.Mark().line + 1) + ":" +
-                    std::to_string(axon_in_node.Mark().column + 1) + ").\n";
-            throw std::invalid_argument(error);
+            const std::string error = "No axon in section defined";
+            throw DescriptionParsingError(error, core_node.Mark());
         }
 
         if (const YAML::Node synapses = core_node["synapse"])
@@ -332,10 +330,8 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
         }
         else
         {
-            const std::string error =
-                    "Error: No synapse section defined (line:" +
-                    std::to_string(synapses.Mark().line + 1) + ":" +
-                    std::to_string(synapses.Mark().column + 1) + ").\n";
+            const std::string error = "No synapse section defined";
+            throw DescriptionParsingError(error, core_node.Mark());
         }
         if (const YAML::Node dendrite_node = core_node["dendrite"])
         {
@@ -353,10 +349,8 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
         }
         else
         {
-            const std::string error =
-                    "Error: No dendrite section defined (line:" +
-                    std::to_string(dendrite_node.Mark().line + 1) + ":" +
-                    std::to_string(dendrite_node.Mark().column + 1) + ").\n";
+            const std::string error = "No dendrite section defined";
+            throw DescriptionParsingError(error, core_node.Mark());
         }
 
         if (const YAML::Node soma_node = core_node["soma"])
@@ -375,9 +369,8 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
         }
         else
         {
-            const std::string error = "Error: No soma section defined (line:" +
-                    std::to_string(soma_node.Mark().line + 1) + ":" +
-                    std::to_string(soma_node.Mark().column + 1) + ").\n";
+            const std::string error = "No soma section defined";
+            throw DescriptionParsingError(error, core_node.Mark());
         }
 
         if (const YAML::Node axon_out_node = core_node["axon_out"])
@@ -396,10 +389,8 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
         }
         else
         {
-            const std::string error =
-                    "Error: No axon out section defined (line:" +
-                    std::to_string(core_node.Mark().line + 1) + ":" +
-                    std::to_string(core_node.Mark().column + 1) + ").\n";
+            const std::string error = "No axon out seciont defined";
+            throw DescriptionParsingError(error, core_node.Mark());
         }
     }
 }
@@ -454,7 +445,8 @@ void sanafe::description_parse_tile_section_yaml(
 
     if (tile_name.find('[') != std::string::npos)
     {
-        range = description_parse_range_yaml(tile_name);
+        range = description_parse_range_yaml(
+                tile_name, tile_node["name"].Mark());
     }
 
     for (int t = range.first; t <= range.second; t++)
@@ -482,8 +474,8 @@ void sanafe::description_parse_tile_section_yaml(
         }
         else
         {
-            throw std::invalid_argument(description_yaml_parsing_error(
-                    "No core section defined", tile_node.Mark()));
+            const std::string error = "No core section defined";
+            throw DescriptionParsingError(error, tile_node.Mark());
         }
     }
 }
@@ -516,8 +508,8 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
     const auto arch_name = arch_node["name"].as<std::string>();
     if (arch_name.find('[') != std::string::npos)
     {
-        throw std::invalid_argument(description_yaml_parsing_error(
-                "Multiple architectures not supported", arch_node.Mark()));
+        throw DescriptionParsingError(
+                "Multiple architectures not supported", arch_node.Mark());
     }
     NetworkOnChipConfiguration noc =
             description_parse_noc_configuration_yaml(arch_node["attributes"]);
@@ -539,8 +531,7 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
     }
     else
     {
-        throw std::invalid_argument(description_yaml_parsing_error(
-                "No tile section defined", tiles.Mark()));
+        throw DescriptionParsingError("No tile section defined", tiles.Mark());
     }
 
     return new_arch;
@@ -553,91 +544,175 @@ sanafe::Architecture sanafe::description_parse_arch_file_yaml(std::ifstream &fp)
     {
         return description_parse_arch_section_yaml(arch_yaml_node);
     }
-    throw std::runtime_error(description_yaml_parsing_error(
-            "No top-level architecture section defined",
-            top_level_yaml_node.Mark()));
+    throw DescriptionParsingError("No top-level architecture section defined",
+            top_level_yaml_node.Mark());
 }
 
-sanafe::Network sanafe::description_parse_net_file_yaml(
-        std::ifstream &fp, Architecture &arch)
+sanafe::Network sanafe::description_parse_network_file_yaml(
+        std::ifstream &fp)
 {
     YAML::Node yaml_node = YAML::Load(fp);
     if (yaml_node.IsMap() && (yaml_node["network"] != nullptr))
     {
-        return description_parse_net_section_yaml(yaml_node["network"], arch);
+        return description_parse_network_section_yaml(yaml_node["network"]);
     }
-    const std::string error = "Error: No network section defined (line:" +
-            std::to_string(yaml_node.Mark().line + 1) + ":" +
-            std::to_string(yaml_node.Mark().column + 1) + ").\n";
-    throw std::runtime_error(error);
+    throw DescriptionParsingError(
+            "No top-level network section defined", yaml_node.Mark());
 }
 
-sanafe::Network sanafe::description_parse_net_section_yaml(
-        const YAML::Node &net_node, Architecture &arch)
+sanafe::Network sanafe::description_parse_network_section_yaml(
+        const YAML::Node &net_node)
 {
-    std::string net_name;
+    std::string net_name{};
+    // TODO: refactor?
     if (net_node["name"] != nullptr)
     {
         net_name = net_node["name"].as<std::string>();
         if (net_name.find('[') != std::string::npos)
         {
-            throw std::runtime_error("Error: Multiple networks not supported");
+            throw DescriptionParsingError(
+                    "Multiple networks not supported", net_node.Mark());
         }
     }
     else
     {
-        INFO("No network name given; leaving name empty.\n");
+        INFO("Warning: No network name given; leaving name empty.\n");
     }
 
     Network new_net(net_name);
-    if (const YAML::Node group_node = net_node["groups"])
-    {
-        // Iterate through all tiles
-        if (group_node.IsSequence())
-        {
-            for (const auto &g : group_node)
-            {
-                description_parse_neuron_group_section_yaml(g, arch, new_net);
-            }
-        }
-        else
-        {
-            description_parse_neuron_group_section_yaml(
-                    group_node, arch, new_net);
-        }
-    }
-    else
-    {
-        const std::string error = "Error: No group section defined (line:" +
-                std::to_string(group_node.Mark().line + 1) + ":" +
-                std::to_string(group_node.Mark().column + 1) + ").\n";
-        throw std::invalid_argument(error);
-    }
-
-    if (const YAML::Node edges_node = net_node["edges"])
-    {
-        // Iterate through all tiles
-        if (edges_node.IsSequence())
-        {
-            for (const auto &e : edges_node)
-            {
-                description_parse_edge_section_yaml(e, new_net);
-            }
-        }
-        else
-        {
-            description_parse_edge_section_yaml(edges_node, new_net);
-        }
-    }
-    else
-    {
-        const std::string error = "No edge section defined" +
-                std::to_string(edges_node.Mark().line + 1) + ":" +
-                std::to_string(edges_node.Mark().column + 1) + ").\n";
-        throw std::invalid_argument(error);
-    }
+    description_parse_neuron_group_section_yaml(
+            description_required_field<YAML::Node>(net_node, "groups"), new_net);
+    description_parse_edges_section_yaml(
+            description_required_field<YAML::Node>(net_node, "edges"), new_net);
 
     return new_net;
+}
+
+void sanafe::description_parse_neuron_group_section_yaml(
+        const YAML::Node &groups_node, Network &net)
+{
+    if (groups_node.IsSequence())
+    {
+        for (const auto &group: groups_node)
+        description_parse_group(group, net);
+    }
+    else
+    {
+        throw DescriptionParsingError(
+                "Neuron group section does not define a list of groups",
+                groups_node.Mark());
+    }
+}
+
+void sanafe::description_parse_edges_section_yaml(const YAML::Node &edges_node, Network &net)
+{
+    if (edges_node.IsMap())
+    {
+        for (const auto &edge: edges_node)
+        {
+            const auto edge_description = edge.first;
+            const YAML::Node edge_attributes = edge.second;
+            description_parse_edge_long_format(edges_node, net);
+        }
+    }
+    else if (edges_node.IsSequence())
+    {
+        for (const auto &edge : edges_node)
+        {
+            description_parse_edge_short_format(edge, net);
+        }
+    }
+    else
+    {
+        throw DescriptionParsingError("Edges section does not define a list or mapping of edges");
+    }
+}
+
+void sanafe::description_parse_group(
+        const YAML::Node &neuron_group_node, Network &net)
+{
+    const auto name =
+            description_required_field<std::string>(neuron_group_node, "name");
+    const auto &neurons_node = description_required_field<YAML::Node>(
+            neuron_group_node, "neurons");
+    const size_t group_neuron_count =
+            description_count_neurons_yaml(neurons_node);
+
+    NeuronTemplate default_neuron_config{};
+    if (const YAML::Node &group_attributes = neuron_group_node["attributes"])
+    {
+        default_neuron_config = description_parse_neuron_attributes_yaml(
+                group_attributes);
+    }
+    NeuronGroup &group = net.create_neuron_group(
+            name, group_neuron_count, default_neuron_config);
+    description_parse_neuron_section_yaml(neurons_node, group);
+}
+
+void sanafe::description_parse_neuron_section_yaml(
+        const YAML::Node &neuron_node,
+        NeuronGroup &neuron_group)
+{
+    if (neuron_node.IsMap())
+    {
+        for (const auto &it: neuron_node)
+        {
+            const auto name = it.first.as<std::string>();
+            description_parse_neuron_short_format(name, it.second, neuron_group);
+        }
+    }
+    else if (neuron_node.IsSequence())
+    {
+        for (const auto &neuron: neuron_group)
+        {
+            description_parse_neuron_long_format(neuron, neuron_group);
+        }
+    }
+    else
+    {
+        throw DescriptionParsingError(
+                "Invalid neuron format", neuron_node.Mark());
+    }
+}
+
+void sanafe::description_parse_neuron_long_format(const YAML::Node &neuron_node, NeuronGroup &neuron_group)
+{
+    const auto &neuron_name =
+            description_required_field<std::string>(neuron_node, "name");
+    std::pair<size_t, size_t> range = {0, 0};
+    if (neuron_name.find('[') != std::string::npos)
+    {
+        range = description_parse_range_yaml(
+                neuron_name, neuron_node["name"].Mark());
+    }
+    const auto &attributes =
+            description_required_field<YAML::Node>(neuron_node, "attributes");
+    const NeuronTemplate config =
+            description_parse_neuron_attributes_yaml(attributes);
+
+    for (size_t id = range.first; id <= range.second; id++)
+    {
+        const std::string name = neuron_name.substr(0, neuron_name.find('[')) +
+                '[' + std::to_string(id) + ']';
+        neuron_group.neurons[name].set_attributes(config);
+    }
+}
+
+void sanafe::description_parse_neuron_short_format(const std::string &neuron_name,
+        const YAML::Node &attributes, NeuronGroup &neuron_group)
+{
+    std::pair<size_t, size_t> range = {0, 0};
+    if (neuron_name.find('['))
+    {
+        range = description_parse_range_yaml(neuron_name, attributes.Mark());
+    }
+    const NeuronTemplate config = description_parse_neuron_attributes_yaml(attributes);
+    for (size_t id = range.first; id <= range.second; id++)
+    {
+        const std::string name = neuron_name.substr(0, neuron_name.find('[')) +
+                '[' + std::to_string(id) + ']';
+        neuron_group.neurons[name].set_attributes(config);
+    }
 }
 
 sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
@@ -669,6 +744,136 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
     }
 
     return neuron_template;
+}
+
+void sanafe::description_parse_edge(
+        const YAML::Node &edge_node, Network &net)
+{
+    const YAML::Node &src_node = edge_node["src"];
+    const YAML::Node &dst_node = edge_node["dst"];
+
+    if (!src_node.IsMap() || !dst_node.IsMap())
+    {
+        throw DescriptionParsingError(
+                "Source or dest node not defined correctly. "
+                "Both should be tuples [<group id>, <neuron id>]",
+                edge_node.Mark());
+    }
+
+    const auto src_group_id = src_node["group"].as<std::string>();
+    const auto src_nid = src_node["id"].as<std::string>();
+    const auto dst_group_id = dst_node["group"].as<std::string>();
+    const auto dst_nid = dst_node["id"].as<std::string>();
+
+    /*
+    if (src_group_id >= net.groups.size())
+    {
+        const std::string error = "Invalid group ID for source neuron: " +
+                std::to_string(src_group_id) +
+                ">=" + std::to_string(net.groups.size());
+        throw std::invalid_argument(
+                description_yaml_parsing_error(error, src_node.Mark()));
+    }
+    */
+
+    /*
+    if (dst_group_id >= net.groups.size())
+    {
+        const std::string error = "Invalid group ID for source neuron: " +
+                std::to_string(dst_group_id) +
+                ">=" + std::to_string(net.groups.size());
+        throw std::invalid_argument(
+                description_yaml_parsing_error(error, dst_node.Mark()));
+    }
+    */
+
+    NeuronGroup &src_group = *(net.groups[src_group_id]);
+    /*
+    if (src_nid >= src_group.neurons.size())
+    {
+        const std::string error = "Invalid neuron ID for source neuron" +
+                std::to_string(src_nid) +
+                ">=" + std::to_string(src_group.neurons.size());
+        throw std::invalid_argument(
+                description_yaml_parsing_error(error, src_node.Mark()));
+    }
+    */
+    Neuron &src_neuron = src_group.neurons[src_nid];
+    NeuronGroup &dst_group = *(net.groups[dst_group_id]);
+    /*
+    if (dst_nid >= dst_group.neurons.size())
+    {
+        const std::string error = "Invalid neuron ID for source neuron" +
+                std::to_string(dst_nid) +
+                ">=" + std::to_string(dst_group.neurons.size());
+        throw std::invalid_argument(
+                description_yaml_parsing_error(error, dst_node.Mark()));
+    }
+    */
+    Neuron &dst_neuron = dst_group.neurons[dst_nid];
+
+    std::map<std::string, ModelParam> synapse_params;
+    std::map<std::string, ModelParam> dendrite_params;
+    if (const YAML::Node &attributes_node = edge_node["attributes"])
+    {
+        if (const YAML::Node &synapse_node = attributes_node["synapse"])
+        {
+            synapse_params =
+                    description_parse_model_parameters_yaml(synapse_node);
+        }
+        if (const YAML::Node &dendrite_node = attributes_node["dendrite"])
+        {
+            dendrite_params =
+                    description_parse_model_parameters_yaml(dendrite_node);
+        }
+    }
+    std::optional<std::string> synapse_hw_name;
+    if (edge_node["map_to"] != nullptr)
+    {
+        synapse_hw_name = edge_node["map_to"].as<std::string>();
+    }
+    src_neuron.connect_to_neuron(
+            dst_neuron, synapse_params, dendrite_params, synapse_hw_name);
+}
+
+void sanafe::description_parse_neuron_mapping_subsection_yaml(
+        const YAML::Node &mapping_node, Architecture &arch, Neuron &neuron)
+{
+    const auto tile_id = mapping_node["tile"].as<size_t>();
+    const auto core_offset_within_tile = mapping_node["core"].as<size_t>();
+    if (mapping_node["soma"] != nullptr)
+    {
+        neuron.soma_hw_name = mapping_node["soma"].as<std::string>();
+    }
+    if (mapping_node["dendrite"] != nullptr)
+    {
+        neuron.dendrite_hw_name = mapping_node["dendrite"].as<std::string>();
+    }
+    if (mapping_node["synapse"] != nullptr)
+    {
+        neuron.default_synapse_hw_name =
+                mapping_node["synapse"].as<std::string>();
+    }
+
+    if (tile_id > arch.tiles.size())
+    {
+        throw DescriptionParsingError(
+                "Tile ID >= tile count", mapping_node.Mark());
+    }
+    Tile &tile = arch.tiles[tile_id];
+    if (core_offset_within_tile > arch.tiles.size())
+    {
+        throw DescriptionParsingError(
+                "Core ID >= core count", mapping_node.Mark());
+    }
+    Core &core = tile.cores[core_offset_within_tile];
+    core.map_neuron(neuron);
+}
+
+void sanafe::description_parse_edge_mapping_subsection_yaml(
+        const YAML::Node &mapping_node, Connection &edge)
+{
+    edge.synapse_hw_name = mapping_node.as<std::string>();
 }
 
 std::map<std::string, sanafe::ModelParam>
@@ -763,253 +968,44 @@ sanafe::ModelParam sanafe::description_parse_parameter_yaml(
     return attribute;
 }
 
-size_t sanafe::description_count_neurons_yaml(const YAML::Node &neurons_node)
-{
-    // TODO: is this basically just overloading the YAML::Node::size() function..
-    //  check to see what this api is doing
-    if (neurons_node.IsNull())
-    {
-        INFO("Warning: No neurons defined for group");
-        return 0;
-    }
-    if (neurons_node.IsScalar())
-    {
-        return 1;
-    }
-    if (neurons_node.IsSequence())
-    {
-        return neurons_node.size();
-    }
-
-    throw std::invalid_argument("Invalid YAML node type for neurons.\n");
-}
-
-void sanafe::description_parse_neuron_group_section_yaml(
-        const YAML::Node &neuron_group_node, Architecture &arch, Network &net)
-{
-    if (neuron_group_node["name"] == nullptr)
-    {
-        INFO("Error: No neuron group name given.\n");
-        throw std::invalid_argument("Error: No neuron group name given.\n");
-    }
-
-    const auto group_name = neuron_group_node["name"].as<std::string>();
-    if (neuron_group_node["neurons"] == nullptr)
-    {
-        INFO("Error: No neurons defined for neuron group.\n");
-        throw std::invalid_argument(
-                "Error: No neurons defined for neuron group.\n");
-    }
-    const YAML::Node neurons_node = neuron_group_node["neurons"];
-    const size_t group_neuron_count =
-            description_count_neurons_yaml(neurons_node);
-
-    if (neuron_group_node["attributes"] == nullptr)
-    {
-        INFO("Error: No neuron group attributes defined.\n");
-        throw std::invalid_argument(
-                "Error: No neuron group attributes defined.\n");
-    }
-    const YAML::Node &neuron_group_attributes = neuron_group_node["attributes"];
-    const NeuronTemplate default_neuron_config =
-            description_parse_neuron_attributes_yaml(neuron_group_attributes);
-    NeuronGroup &neuron_group = net.create_neuron_group(
-            group_name, group_neuron_count, default_neuron_config);
-
-    if (neurons_node.IsSequence())
-    {
-        for (const auto &n : neurons_node)
-        {
-            description_parse_neuron_section_yaml(n, arch, neuron_group);
-        }
-    }
-    else
-    {
-        description_parse_neuron_section_yaml(neurons_node, arch, neuron_group);
-    }
-}
-
-void sanafe::description_parse_edge_section_yaml(
-        const YAML::Node &edge_node, Network &net)
-{
-    const YAML::Node &src_node = edge_node["src"];
-    const YAML::Node &dst_node = edge_node["dst"];
-
-    if (!src_node.IsMap() || !dst_node.IsMap())
-    {
-        throw std::invalid_argument(description_yaml_parsing_error(
-                "Source or dest node not defined correctly. "
-                "Both should be tuples [<group id>, <neuron id>]",
-                edge_node.Mark()));
-    }
-
-    const auto src_group_id = src_node["group"].as<size_t>();
-    const auto src_nid = src_node["id"].as<size_t>();
-    const auto dst_group_id = dst_node["group"].as<size_t>();
-    const auto dst_nid = dst_node["id"].as<size_t>();
-
-    if (src_group_id >= net.groups.size())
-    {
-        const std::string error = "Invalid group ID for source neuron: " +
-                std::to_string(src_group_id) +
-                ">=" + std::to_string(net.groups.size());
-        throw std::invalid_argument(
-                description_yaml_parsing_error(error, src_node.Mark()));
-    }
-
-    if (dst_group_id >= net.groups.size())
-    {
-        const std::string error = "Invalid group ID for source neuron: " +
-                std::to_string(dst_group_id) +
-                ">=" + std::to_string(net.groups.size());
-        throw std::invalid_argument(
-                description_yaml_parsing_error(error, dst_node.Mark()));
-    }
-
-    NeuronGroup &src_group = *(net.groups[src_group_id]);
-    if (src_nid >= src_group.neurons.size())
-    {
-        const std::string error = "Invalid neuron ID for source neuron" +
-                std::to_string(src_nid) +
-                ">=" + std::to_string(src_group.neurons.size());
-        throw std::invalid_argument(
-                description_yaml_parsing_error(error, src_node.Mark()));
-    }
-    Neuron &src_neuron = src_group.neurons[src_nid];
-    NeuronGroup &dst_group = *(net.groups[dst_group_id]);
-    if (dst_nid >= dst_group.neurons.size())
-    {
-        const std::string error = "Invalid neuron ID for source neuron" +
-                std::to_string(dst_nid) +
-                ">=" + std::to_string(dst_group.neurons.size());
-        throw std::invalid_argument(
-                description_yaml_parsing_error(error, dst_node.Mark()));
-    }
-    Neuron &dst_neuron = dst_group.neurons[dst_nid];
-
-    std::map<std::string, ModelParam> synapse_params;
-    std::map<std::string, ModelParam> dendrite_params;
-    if (const YAML::Node &attributes_node = edge_node["attributes"])
-    {
-        if (const YAML::Node &synapse_node = attributes_node["synapse"])
-        {
-            synapse_params =
-                    description_parse_model_parameters_yaml(synapse_node);
-        }
-        if (const YAML::Node &dendrite_node = attributes_node["dendrite"])
-        {
-            dendrite_params =
-                    description_parse_model_parameters_yaml(dendrite_node);
-        }
-    }
-    std::optional<std::string> synapse_hw_name;
-    if (edge_node["map_to"] != nullptr)
-    {
-        synapse_hw_name = edge_node["map_to"].as<std::string>();
-    }
-    src_neuron.connect_to_neuron(
-            dst_neuron, synapse_params, dendrite_params, synapse_hw_name);
-}
-
-void sanafe::description_parse_neuron_mapping_subsection_yaml(
-        const YAML::Node &mapping_node, Architecture &arch, Neuron &neuron)
-{
-    const auto tile_id = mapping_node["tile"].as<size_t>();
-    const auto core_offset_within_tile = mapping_node["core"].as<size_t>();
-    if (mapping_node["soma"] != nullptr)
-    {
-        neuron.soma_hw_name = mapping_node["soma"].as<std::string>();
-    }
-    if (mapping_node["dendrite"] != nullptr)
-    {
-        neuron.dendrite_hw_name = mapping_node["dendrite"].as<std::string>();
-    }
-    if (mapping_node["synapse"] != nullptr)
-    {
-        neuron.default_synapse_hw_name =
-                mapping_node["synapse"].as<std::string>();
-    }
-
-    if (tile_id > arch.tiles.size())
-    {
-        throw DescriptionParsingError(
-                "Tile ID >= tile count", mapping_node.Mark());
-    }
-    Tile &tile = arch.tiles[tile_id];
-    if (core_offset_within_tile > arch.tiles.size())
-    {
-        throw DescriptionParsingError(
-                "Core ID >= core count", mapping_node.Mark());
-    }
-    Core &core = tile.cores[core_offset_within_tile];
-    core.map_neuron(neuron);
-}
-
-void sanafe::description_parse_edge_mapping_subsection_yaml(
-        const YAML::Node &mapping_node, Connection &edge)
-{
-    edge.synapse_hw_name = mapping_node.as<std::string>();
-}
-
-void sanafe::description_parse_neuron_section_yaml(
-        const YAML::Node &neuron_node, Architecture &arch,
-        NeuronGroup &neuron_group)
-{
-    size_t neuron_id;
-    if (neuron_node["id"] != nullptr)
-    {
-        neuron_id = neuron_node["id"].as<size_t>();
-        if (neuron_id >= neuron_group.neurons.size())
-        {
-            throw std::invalid_argument("Neuron ID > max neurons in group.\n");
-        }
-    }
-    else
-    {
-        throw std::invalid_argument("No valid neuron ID given.\n");
-    }
-
-    if (neuron_node["attributes"] != nullptr)
-    {
-        // TODO: we need to have it set to the defaults set by the group, and
-        //  only override parameters set in the attributes section
-        const NeuronTemplate config = description_parse_neuron_attributes_yaml(
-                neuron_node["attributes"]);
-        neuron_group.neurons[neuron_id].set_attributes(config);
-    }
-
-    if (neuron_node["map_to"] != nullptr)
-    {
-        description_parse_neuron_mapping_subsection_yaml(
-                neuron_node["map_to"], arch, neuron_group.neurons[neuron_id]);
-    }
-    else
-    {
-        throw std::invalid_argument("No valid neuron to H/W mapping given.\n");
-    }
-}
-
 std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
-        const std::string &range_str)
+        const std::string &range_str, const YAML::Mark &entry_mark)
 {
     const size_t start_pos = range_str.find('[');
     const size_t end_pos = range_str.find(']');
     const size_t delimiter_pos = range_str.find("..");
     if ((start_pos == std::string::npos) || (end_pos == std::string::npos) ||
-            (delimiter_pos == std::string::npos) || (end_pos <= start_pos))
+            (delimiter_pos == std::string::npos) || (end_pos <= start_pos) ||
+            (delimiter_pos <= start_pos) || (delimiter_pos >= end_pos))
     {
-        const std::string error = "Error: Invalid range:" + range_str + '\n';
-        throw std::invalid_argument(error);
+        throw DescriptionParsingError("Invalid range format", entry_mark);
     }
-    // Use stringstreams to parse the size_t values from the range substrings
-    std::istringstream first_ss(
-            range_str.substr(start_pos + 1, delimiter_pos - start_pos - 1));
-    std::istringstream last_ss(
-            range_str.substr(delimiter_pos + 2, end_pos - 2 - delimiter_pos));
+
+    YAML::Mark range_mark(entry_mark);
+    range_mark.column = start_pos;
+    const std::string first_str =
+            range_str.substr(start_pos + 1, delimiter_pos - start_pos - 1);
+    const std::string last_str =
+            range_str.substr(delimiter_pos + 2, end_pos - 2 - delimiter_pos);
+
     size_t first;
-    first_ss >> first;
     size_t last;
-    last_ss >> last;
+    try
+    {
+        first = std::stoull(first_str);
+        last = std::stoull(last_str);
+    }
+    catch(const std::exception &e)
+    {
+        throw DescriptionParsingError("Invalid range string", range_mark);
+    }
+
+    if (first > last)
+    {
+        throw DescriptionParsingError(
+                "Invalid range; first > last", range_mark);
+    }
 
     return {first, last};
+
 }
