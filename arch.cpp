@@ -569,13 +569,13 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
         curr_connection.synapse_model->set_attributes(
                 curr_connection.synapse_params);
     }
-    TRACE1("Finished mapping connections to hardware for nid:%d.%d.\n",
-            pre_neuron.parent_group_id, pre_neuron.id);
+    TRACE1("Finished mapping connections to hardware for nid:%s.%d.\n",
+            pre_neuron.parent_group_id.c_str(), pre_neuron.id.c_str());
 }
 
 void sanafe::Core::map_neuron(Neuron &n)
 {
-    TRACE1("Mapping nid:%d to core: %zu\n", n.id, id);
+    INFO("Mapping nid:%s to core: %zu\n", n.id.c_str(), id);
     // Map the neuron to hardware units
     if (n.core != nullptr)
     {
@@ -585,7 +585,6 @@ void sanafe::Core::map_neuron(Neuron &n)
     }
 
     n.core = this;
-    TRACE1("Mapping neuron %d to core %zu\n", n.id, id);
     neurons.push_back(&n);
 
     if (neurons.size() > pipeline_config.max_neurons_supported)
@@ -618,9 +617,9 @@ void sanafe::Core::map_neuron(Neuron &n)
         }
         if (!dendrite_found)
         {
-            INFO("Error: Could not map neuron nid:%d (hw:%s) "
+            INFO("Error: Could not map neuron nid:%s (hw:%s) "
                  "to any dendrite h/w.\n",
-                    n.id, n.dendrite_hw_name.c_str());
+                    n.id.c_str(), n.dendrite_hw_name.c_str());
             throw std::runtime_error(
                     "Error: Could not map neuron to dendrite h/w");
         }
@@ -645,9 +644,9 @@ void sanafe::Core::map_neuron(Neuron &n)
         }
         if (!soma_found)
         {
-            INFO("Error: Could not map neuron nid:%d (hw:%s) "
+            INFO("Error: Could not map neuron nid:%s (hw:%s) "
                  "to any soma h/w.\n",
-                    n.id, n.soma_hw_name.c_str());
+                    n.id.c_str(), n.soma_hw_name.c_str());
             throw std::runtime_error("Error: Could not map neuron to soma h/w");
         }
     }
@@ -684,7 +683,9 @@ void sanafe::Core::map_neuron(Neuron &n)
             n.soma_model =
                     model_get_soma(n.soma_hw->model, n.parent_group_id, n.id);
         }
-        const NeuronGroup &group = *(n.parent_net->groups[n.parent_group_id]);
+        assert(n.parent_net != nullptr);
+        const auto &neuron_groups = n.parent_net->groups;
+        const NeuronGroup &group = neuron_groups.at(n.parent_group_id);
         assert(n.soma_model != nullptr);
         // First set the group's default attribute values, and then
         //  any defined by the neuron
@@ -713,7 +714,8 @@ void sanafe::Core::map_neuron(Neuron &n)
                     n.dendrite_hw->model.c_str());
             n.dendrite_model = model_get_dendrite(n.dendrite_hw->model);
         }
-        const NeuronGroup &group = *(n.parent_net->groups[n.parent_group_id]);
+        const auto &neuron_groups = n.parent_net->groups;
+        const NeuronGroup &group = neuron_groups.at(n.parent_group_id);
         assert(n.dendrite_model != nullptr);
         // Global attributes for all compartments in the dendrite
         n.dendrite_model->set_attributes(

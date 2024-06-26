@@ -16,7 +16,6 @@
 
 namespace sanafe
 {
-enum NeuronStatus: int { IDLE, UPDATED, FIRED};
 enum NeuronResetModes
 {
     NEURON_NO_RESET,
@@ -113,24 +112,25 @@ private:
 class SomaModel
 {
 public:
-    SomaModel(const int gid, const int nid) : group_id(gid), neuron_id(nid) {}
+    SomaModel(const std::string &gid, const std::string &nid) : group_id(gid), neuron_id(nid) {}
     SomaModel(const SomaModel &copy) = default;
     SomaModel(SomaModel &&other) = default;
     virtual ~SomaModel() = default;
     SomaModel &operator=(const SomaModel &other) = delete;
     SomaModel &operator=(SomaModel &&other) = delete;
 
-    virtual NeuronStatus update(const std::optional<double> current_in = std::nullopt, const bool step = true) = 0;
+    virtual NeuronStatus update(std::optional<double> current_in = std::nullopt, bool step = true) = 0;
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
     virtual double get_potential() { return 0.0; }
 protected:
-    const int group_id, neuron_id;
+    const std::string group_id;
+    const std::string neuron_id;
 };
 
 class LoihiLifModel : public SomaModel
 {
 public:
-    LoihiLifModel(const int gid, const int nid);
+    LoihiLifModel(const std::string &gid, const std::string &nid);
     LoihiLifModel(const LoihiLifModel &copy) = default;
     LoihiLifModel(LoihiLifModel &&other) = default;
     virtual ~LoihiLifModel() = default;
@@ -151,7 +151,7 @@ private:
 class TrueNorthModel : public SomaModel
 {
 public:
-    TrueNorthModel(const int gid, const int nid);
+    TrueNorthModel(const std::string &gid, const std::string &nid);
     TrueNorthModel(const TrueNorthModel &copy) = default;
     TrueNorthModel(TrueNorthModel &&other) = default;
     virtual ~TrueNorthModel() = default;
@@ -174,7 +174,7 @@ private:
 NeuronResetModes model_parse_reset_mode(const std::string &str);
 std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name);
 std::shared_ptr<DendriteModel> model_get_dendrite(const std::string &model_name);
-std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const int group_id, const int id);
+std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const std::string &group_id, const std::string &id);
 
 }
 

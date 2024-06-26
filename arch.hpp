@@ -101,8 +101,8 @@ struct Message
     long int timestep;
     int spikes{0};
     int hops{0};
-    int src_neuron_id;
-    int src_neuron_group_id;
+    std::string src_neuron_id;
+    std::string src_neuron_group_id;
     int src_x;
     int dest_x{0};
     int src_y;
@@ -222,7 +222,7 @@ struct CoreAddress
 
 struct ModelInfo
 {
-    std::optional<std::filesystem::path> plugin_library_path{std::nullopt};
+    std::optional<std::filesystem::path> plugin_library_path{};
     std::string name;
 };
 
@@ -353,7 +353,7 @@ struct AxonOutUnit
 struct AxonInModel
 {
     // List of all neuron connections to send spikes to
-    std::vector<int> synapse_addresses;
+    std::vector<int> synapse_addresses{};
     Message *message{nullptr};
     long int last_updated{0L};
     int spikes_received{0};
@@ -365,7 +365,7 @@ struct AxonOutModel
     int dest_axon_id{-1};
     int dest_tile_id{-1};
     int dest_core_offset{-1};
-    int src_neuron_id{-1};
+    std::string src_neuron_id{};
 };
 
 void arch_create_axons(Architecture &arch);

@@ -89,7 +89,9 @@ int main(int argc, char *argv[])
                 sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
         INFO("Architecture initialized.\n");
         sanafe::Network net =
-                sanafe::load_net(argv[sanafe::NETWORK_FILENAME], arch);
+                sanafe::load_net(argv[sanafe::NETWORK_FILENAME]);
+        // TODO
+        sanafe::map_net(argv[sanafe::NETWORK_FILENAME], net, arch);
         INFO("Network initialized.\n");
 
         sanafe::Simulation sim(arch, net, output_dir, record_spikes,

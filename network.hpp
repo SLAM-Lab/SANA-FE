@@ -56,7 +56,8 @@ class SomaModel;
 class DendriteModel;
 
 struct NeuronTemplate;
-enum NeuronStatus: int;
+
+enum NeuronStatus: int { IDLE, UPDATED, FIRED};
 
 // An attribute can contain a scalar value, or either a list or named set of
 //  attributes i.e., attributes are recursively defined attributes. However,
@@ -154,36 +155,41 @@ public:
     std::map<std::string, ModelParam> dendrite_model_params;
 
     // Mapped hardware
-    Network *parent_net;
-    Core *core, *post_synaptic_cores;
-    DendriteUnit *dendrite_hw;
-    SomaUnit *soma_hw;
-    AxonOutUnit *axon_out_hw;
+    Network *parent_net{nullptr};
+    Core *core{nullptr};
+    Core *post_synaptic_cores{nullptr};
+    DendriteUnit *dendrite_hw{nullptr};
+    SomaUnit *soma_hw{nullptr};
+    AxonOutUnit *axon_out_hw{nullptr};
     std::string soma_hw_name;
     std::string default_synapse_hw_name;
     std::string dendrite_hw_name;
 
-    std::shared_ptr<SomaModel> soma_model;
-    std::shared_ptr<DendriteModel> dendrite_model;
+    std::shared_ptr<SomaModel> soma_model{nullptr};
+    std::shared_ptr<DendriteModel> dendrite_model{nullptr};
 
+    std::string id;
+    std::string parent_group_id;
+    size_t order_created_within_group;
+    size_t position_defined;
+    int forced_spikes{0};
+    int spike_count{0};
+    int soma_last_updated{0};
+    int dendrite_last_updated{0};
+    int maps_in_count{0};
+    int maps_out_count{0};
+    NeuronStatus status{sanafe::IDLE};
     bool force_update;
     bool log_spikes;
     bool log_potential;
-    std::string id;
-    std::string parent_group_id;
-    int forced_spikes;
-    int spike_count;
-    int soma_last_updated, dendrite_last_updated;
-    int maps_in_count, maps_out_count;
-    NeuronStatus status;
 
     // Inputs to H/W units
     std::vector<Synapse> dendrite_input_synapses;
     double soma_input_charge{0.0};
-    bool axon_out_input_spike;
+    bool axon_out_input_spike{false};
 
-    explicit Neuron(const std::string neuron_id, const std::string parent_group_id, const NeuronTemplate &config);
-    std::string get_id() const { return id; }
+    explicit Neuron(const std::string &neuron_id, Network &parent_net, const std::string &parent_group_id, const NeuronTemplate &config);
+    [[nodiscard]] std::string get_id() const { return id; }
     void set_attributes(const NeuronTemplate &attributes);
     void connect_to_neuron(Neuron &dest, const std::map<std::string, ModelParam> &synapse_params, const std::map<std::string, ModelParam> &dendrite_params,  const std::optional<std::string> &synapse_hw_name = std::nullopt);
     [[nodiscard]] std::string info() const;
@@ -195,11 +201,16 @@ class NeuronGroup
 public:
     // A neuron group is a collection of neurons that share common
     //  parameters. All neurons must be based on the same neuron model.
-    std::unordered_map<std::string, Neuron> neurons;
+    std::map<std::string, Neuron> neurons;
     NeuronTemplate default_neuron_config;
+    Network *parent_net{nullptr};
     std::string name;
+    size_t order_created;
+    size_t position_defined;
     [[nodiscard]] std::string get_id() const { return name; }
-    explicit NeuronGroup(const std::string &group_name, const NeuronTemplate &default_config);
+    explicit NeuronGroup(const std::string &group_name, Network &parent_net, const NeuronTemplate &default_config);
+    Neuron &create_neuron(const std::string &id, const NeuronTemplate &config);
+
     //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
     //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
     [[nodiscard]] std::string info() const;
@@ -211,7 +222,7 @@ class Network
 public:
     // Use a vector of dynamically allocated groups, so we get vectors random
     //  access, but do not reallocate objects when growing the vector
-    std::unordered_map<std::string, NeuronGroup> groups;
+    std::map<std::string, NeuronGroup> groups;
     std::string name;
     explicit Network(const std::string &net_name) : name(net_name) {};
     ~Network() = default;
@@ -227,13 +238,14 @@ public:
     Network(const Network &) = delete;
     Network &operator=(const Network &) = delete;
 
-    NeuronGroup &create_neuron_group(const std::string &name, size_t neuron_count, const NeuronTemplate &default_config);
+    NeuronGroup &create_neuron_group(const std::string &name, const NeuronTemplate &default_config);
     [[nodiscard]] std::string info() const;
     //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
     void check_mapped() const;
 };
 
-Network load_net(const std::filesystem::path &path, Architecture &arch);
+Network load_net(const std::filesystem::path &path);
+void map_net(const std::filesystem::path &path, Network &net, Architecture &arch);
 
 struct Connection
 {
@@ -255,6 +267,12 @@ struct Synapse
     // TODO: prepare the dendrite parameters into an object? would be much
     //  more efficient. This can be an any pointer? Or to a base dendrite class
     std::map<std::string, ModelParam> dendrite_params;
+};
+
+struct NeuronAddress
+{
+    std::string group_name{};
+    std::string neuron_id{};
 };
 
 // Alternative ModelParameter implementations. Keep for now.. maybe find

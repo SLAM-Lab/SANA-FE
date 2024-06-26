@@ -519,11 +519,11 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 
 void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
 {
-    for (auto &group : net.groups)
+    for (auto &[group_name, group]: net.groups)
     {
-        for (auto &n : group->neurons)
+        for (auto &[id, neuron] : group.neurons)
         {
-            n.status = sanafe::IDLE;
+            neuron.status = sanafe::IDLE;
         }
     }
 
@@ -602,20 +602,18 @@ void sanafe::sim_trace_write_potential_header(
     //  probed
     assert(potential_trace_file.is_open());
     potential_trace_file << "timestep,";
-    for (const auto &group : net.groups)
+    for (const auto &[group_name, group]: net.groups)
     {
-        for (auto &n : group->neurons)
+        for (const auto &[id, neuron] : group.neurons)
         {
-            if (n.log_potential)
+            if (neuron.log_potential)
             {
-                potential_trace_file << "neuron " << group->id;
-                potential_trace_file << "." << n.id << ",";
+                potential_trace_file << "neuron " << group.name;
+                potential_trace_file << "." << neuron.id << ",";
             }
         }
     }
     potential_trace_file << std::endl;
-
-    return;
 }
 
 void sanafe::sim_trace_write_perf_header(std::ofstream &perf_trace_file)
@@ -628,8 +626,6 @@ void sanafe::sim_trace_write_perf_header(std::ofstream &perf_trace_file)
     perf_trace_file << "sim_time,";
     perf_trace_file << "total_energy,";
     perf_trace_file << std::endl;
-
-    return;
 }
 
 void sanafe::sim_trace_write_message_header(std::ofstream &message_trace_file)
@@ -646,8 +642,6 @@ void sanafe::sim_trace_write_message_header(std::ofstream &message_trace_file)
     message_trace_file << "processing_latency,";
     message_trace_file << "blocking_latency";
     message_trace_file << std::endl;
-
-    return;
 }
 
 void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
@@ -656,20 +650,19 @@ void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
     // A trace of all spikes that are generated
     assert(spike_trace_file.is_open());
 
-    for (const auto &group : net.groups)
+    for (const auto &[group_name, group] : net.groups)
     {
-        for (auto &n : group->neurons)
+        for (const auto &[id, neuron] : group.neurons)
         {
-            if (n.log_spikes && (n.status == sanafe::FIRED))
+            if (neuron.log_spikes && (neuron.status == sanafe::FIRED))
             {
-                spike_trace_file << n.parent_group_id << "." << n.id << ",";
+                spike_trace_file << neuron.parent_group_id << ".";
+                spike_trace_file << neuron.id << ",";
                 spike_trace_file << timestep;
                 spike_trace_file << std::endl;
             }
         }
     }
-
-    return;
 }
 
 void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
@@ -682,13 +675,14 @@ void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
     potential_trace_file << timestep << ",";
 
     long int potential_probe_count = 0;
-    for (const auto &group : net.groups)
+    for (const auto &[group_name, group]: net.groups)
     {
-        for (auto &n : group->neurons)
+        for (const auto &[id, neuron] : group.neurons)
         {
-            if (n.log_potential)
+            if (neuron.log_potential)
             {
-                potential_trace_file << n.soma_model->get_potential() << ",";
+                potential_trace_file << neuron.soma_model->get_potential();
+                potential_trace_file << ",";
                 potential_probe_count++;
             }
         }

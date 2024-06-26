@@ -1,0 +1,23 @@
+network:
+  name: example
+  groups:
+    - name: snd
+      attributes: [log_spikes: true, threshold: 1.0]
+      neurons:
+        n0: [log_potential: true, bias: 1.0]
+        n[1..2]: [bias: 0.0]
+    - name: rcv
+      attributes: [log_spikes: true, soma: {threshold: 2.0}]
+      neurons:
+        n[0..2]: [bias: 1.0]
+  edges:
+    snd.n0 -> rcv.n[0]: [weight: -1.0]
+    snd.n[1] -> rcv.n[2]: [weight: -2.0]
+    snd.n[2] -> rcv.n[2]: [weight: 3.0]
+mappings:
+  - snd.n0: {core: 0.0}
+  - snd.n[1]: {core: 0.0}
+  - snd.n[2]: {core: 0.1}
+  - rcv.n[0]: {core: 0.0, soma: demo_soma_alt}
+  - rcv.n[1]: {core: 0.0, soma: demo_soma_alt}
+  - rcv.n[2]: {core: 0.1, soma: demo_soma_alt}
