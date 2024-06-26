@@ -18,7 +18,12 @@
 void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
 {
     auto cores = arch.cores();
-    //#pragma omp parallel for schedule(dynamic)
+
+    // Older versions of OpenMP don't support range-based for loops yet...
+    // TODO: Figure a way so that the timestep and Architecture structs aren't
+    //  shared between threads (dangerous)
+#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
+    // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
         Core &core = cores[idx];
@@ -55,7 +60,9 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
 
     // Now process all messages at receiving cores
     auto cores = arch.cores();
-    //#pragma omp parallel for schedule(dynamic)
+    // Older versions of OpenMP don't support range-based for loops yet...
+#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
+    // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
         Core &core = cores[idx];
@@ -105,8 +112,6 @@ void sanafe::pipeline_process_neuron(
 
     n.core->next_message_generation_delay += neuron_processing_latency;
     n.spike_count = 0;
-
-    return;
 }
 
 double sanafe::pipeline_process_message(

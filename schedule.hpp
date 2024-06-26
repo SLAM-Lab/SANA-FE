@@ -38,7 +38,11 @@ using MessageFifo = std::list<MessageRef>;
 
 struct Scheduler
 {
-    int noc_width, noc_height, buffer_size, core_count, max_cores_per_tile;
+    int noc_width;
+    int noc_height;
+    int buffer_size;
+    int core_count;
+    int max_cores_per_tile;
 };
 
 // NocInfo is used by the scheduler to track the high-level state of the NoC
@@ -46,19 +50,22 @@ struct Scheduler
 struct NocInfo
 {
     std::vector<MessageFifo> messages_received;
-    const size_t noc_width, noc_height, core_count, max_cores_per_tile;
+    const size_t noc_width;
+    const size_t noc_height;
+    const size_t core_count;
+    const size_t max_cores_per_tile;
     // Message density is the distribution of messages buffered in different
     //  links across the NoC. This vector is flattened row-major order
     //  where indexes are (x, y, links) and the links idx change fastest
-    std::vector<double> message_density;
+    std::vector<double> message_density{};
     // The time that cores finish receiving their last message, i.e. the
     //  time at which they become free again to process more messages
-    std::vector<double> core_finished_receiving;
-    double mean_in_flight_receive_delay;
-    long int messages_in_noc;
+    std::vector<double> core_finished_receiving{};
+    double mean_in_flight_receive_delay{0.0};
+    long int messages_in_noc{0L};
 
     NocInfo(int width, int height, int core_count, size_t max_cores_per_tile);
-    size_t idx(const size_t x, const size_t y, const size_t link)
+    [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
     {
         const size_t links_per_router = max_cores_per_tile + ndirections;
         return (x * noc_height * links_per_router) + (y * links_per_router) +

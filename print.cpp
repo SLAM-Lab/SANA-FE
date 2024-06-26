@@ -17,7 +17,7 @@ std::string sanafe::print_format_attributes(
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
-        const std::string value_str = std::any_cast<std::string>(a.second);
+        const auto value_str = std::any_cast<std::string>(a.second);
 
         attr_str += " ";
         attr_str += key;

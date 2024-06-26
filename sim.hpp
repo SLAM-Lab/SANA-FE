@@ -62,7 +62,6 @@ private:
     double total_energy, total_sim_time, wall_time;
     bool spike_trace_enabled, potential_trace_enabled;
     bool perf_trace_enabled, message_trace_enabled;
-    //FILE *stats_fp;
     std::ofstream spike_trace, potential_trace, message_trace, perf_trace;
 
     Timestep step();
@@ -70,21 +69,30 @@ private:
 
 struct RunData
 {
-    long int timestep_start, timesteps_executed;
-    double energy, sim_time, wall_time;
-    long int spikes, packets_sent, neurons_fired;
+    double energy{0.0};
+    double sim_time{0.0};
+    double wall_time{0.0};
+    long int spikes{0L};
+    long int packets_sent{0L};
+    long int neurons_fired{0L};
+    long int timestep_start;
+    long int timesteps_executed;
 
-    RunData( long int start,  long int steps);
+    RunData(long int start,  long int steps);
 };
 
 struct Timestep
 {
     std::vector<std::list<Message>> messages;
-    long int timestep, spike_count, total_hops, packets_sent;
-    long int neurons_fired;
-    double energy, sim_time;
+    long int timestep;
+    long int spike_count{0L};
+    long int total_hops{0L};
+    long int packets_sent{0L};
+    long int neurons_fired{0L};
+    double energy{0.0};
+    double sim_time{0.0};
 
-    Timestep( long int ts,  int core_count);
+    Timestep(long int ts,  int core_count);
 };
 
 enum ProgramArgs

@@ -24,15 +24,12 @@
 #include "sim.hpp" // For sim_message_fifo
 
 sanafe::NocInfo::NocInfo(const int width, const int height,
-        const int total_cores, const size_t cores_per_tile)
+        const int core_count, const size_t max_cores_per_tile)
         : noc_width(width)
         , noc_height(height)
-        , core_count(total_cores)
-        , max_cores_per_tile(cores_per_tile)
+        , core_count(core_count)
+        , max_cores_per_tile(max_cores_per_tile)
 {
-    messages_in_noc = 0UL;
-    mean_in_flight_receive_delay = 0.0;
-    return;
 }
 
 double sanafe::schedule_messages(
@@ -101,7 +98,7 @@ double sanafe::schedule_messages(
             const double messages_along_route =
                     schedule_calculate_messages_along_route(m, noc);
 
-            const int path_capacity = (m.hops + 1) * scheduler.buffer_size;
+            const size_t path_capacity = (m.hops + 1) * scheduler.buffer_size;
             if (messages_along_route > path_capacity)
             {
                 m.sent_timestamp += (messages_along_route - path_capacity) *
@@ -120,7 +117,7 @@ double sanafe::schedule_messages(
 
             double network_delay = messages_along_route *
                     noc.mean_in_flight_receive_delay / (m.hops + 1.0);
-            TRACE1("Path capacity:%d messages:%lf delay:%e\n", path_capacity,
+            TRACE1("Path capacity:%zu messages:%lf delay:%e\n", path_capacity,
                     messages_along_route, network_delay);
 
             const double earliest_received_time =
@@ -180,12 +177,14 @@ void sanafe::schedule_update_noc_message_counts(
     // Go along x path, then y path (dimension order routing), and increment
     //  or decrement counter depending on whether a message is coming in or
     //  out
-    int x_increment, y_increment;
+    int x_increment;
+    int y_increment;
     // Adjust by dividing by the total number of links along the path, also
     //  including the output link at the sending core and input link at the
     //  receiving core, i.e. the hops plus 2. The total sum of the added
     //  densities along the path should equal one for one new message.
-    double adjust = (1.0 / (2.0 + m.hops));
+    constexpr double input_plus_output_link = 2.0;
+    double adjust = (1.0 / (input_plus_output_link + m.hops));
 
     if (!message_in)
     {
@@ -291,8 +290,6 @@ void sanafe::schedule_update_noc_message_counts(
 
         noc.messages_in_noc--;
     }
-
-    return;
 }
 
 double sanafe::schedule_calculate_messages_along_route(
@@ -301,7 +298,8 @@ double sanafe::schedule_calculate_messages_along_route(
     // Calculate the total flow density along a spike message route.
     //  Sum the densities for all links the message will travel
     double flow_density;
-    int x_increment, y_increment;
+    int x_increment;
+    int y_increment;
 
     flow_density = 0.0;
     if (m.src_x < m.dest_x)
@@ -364,7 +362,10 @@ double sanafe::schedule_calculate_messages_along_route(
                 noc.message_density[noc.idx(m.dest_x, m.dest_y, prev_direction)];
     }
 
-    assert(flow_density >= -0.1);
+#ifndef NDEBUG
+    constexpr double epsilon = 0.1; // In case density is very slightly below 0
+#endif
+    assert(flow_density >= (-epsilon));
     return flow_density;
 }
 
@@ -399,8 +400,6 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
             }
         }
     }
-
-    return;
 }
 
 sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
@@ -414,7 +413,7 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
     {
         // For each per-core queue, get the first message for that core
         //  and add it to the corresponding priority queue
-        if (!q.empty() > 0) // messages
+        if (!q.empty()) // messages
         {
             Message &m = q.front();
             q.pop_front();

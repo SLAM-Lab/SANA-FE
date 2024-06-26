@@ -101,7 +101,7 @@ struct Message
     double processed_timestamp{-std::numeric_limits<double>::infinity()};
     long int timestep;
     int spikes{0};
-    int hops{0};
+    size_t hops{0UL};
     std::string src_neuron_id;
     std::string src_neuron_group_id;
     int src_x;

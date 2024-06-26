@@ -143,7 +143,7 @@ struct NeuronTemplate
     std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
     bool log_spikes, log_potential, force_update;
 
-    explicit NeuronTemplate(const std::string &soma_hw_name = "", const std::string &default_synapse_hw_name = "", const std::string &dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_update = false);
+    explicit NeuronTemplate(std::string soma_hw_name = "", std::string default_synapse_hw_name = "", std::string dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_update = false);
 };
 
 class Neuron
@@ -188,7 +188,7 @@ public:
     double soma_input_charge{0.0};
     bool axon_out_input_spike{false};
 
-    explicit Neuron(const std::string &neuron_id, Network &parent_net, const std::string &parent_group_id, const NeuronTemplate &config);
+    explicit Neuron(std::string neuron_id, Network &parent_net, std::string parent_group_id, const NeuronTemplate &config);
     [[nodiscard]] std::string get_id() const { return id; }
     void set_attributes(const NeuronTemplate &attributes);
     void connect_to_neuron(Neuron &dest, const std::map<std::string, ModelParam> &synapse_params, const std::map<std::string, ModelParam> &dendrite_params,  const std::optional<std::string> &synapse_hw_name = std::nullopt);
@@ -208,8 +208,8 @@ public:
     size_t order_created{0};
     size_t position_defined{0};
     [[nodiscard]] std::string get_id() const { return name; }
-    explicit NeuronGroup(const std::string &group_name, Network &parent_net, const NeuronTemplate &default_config);
-    Neuron &create_neuron(const std::string &id, const NeuronTemplate &config);
+    explicit NeuronGroup(std::string group_name, Network &parent_net, const NeuronTemplate &default_config);
+    Neuron &create_neuron(std::string id, const NeuronTemplate &config);
 
     //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
     //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
@@ -224,7 +224,7 @@ public:
     //  access, but do not reallocate objects when growing the vector
     std::map<std::string, NeuronGroup> groups;
     std::string name;
-    explicit Network(const std::string &net_name) : name(net_name) {};
+    explicit Network(std::string net_name) : name(std::move(net_name)) {};
     ~Network() = default;
     Network(Network &&) = default;
     Network &operator=(Network &&) = default;
@@ -238,7 +238,7 @@ public:
     Network(const Network &) = delete;
     Network &operator=(const Network &) = delete;
 
-    NeuronGroup &create_neuron_group(const std::string &name, const NeuronTemplate &default_config);
+    NeuronGroup &create_neuron_group(std::string name, const NeuronTemplate &default_config);
     [[nodiscard]] std::string info() const;
     //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
     void check_mapped() const;
@@ -257,7 +257,7 @@ struct Connection
     std::string synapse_hw_name;
     int id, delay, last_updated;
 
-    explicit Connection(const int connection_id);
+    explicit Connection(int connection_id);
     //std::string description() const;
 };
 

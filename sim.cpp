@@ -63,14 +63,7 @@ sanafe::Simulation::~Simulation()
 sanafe::RunData::RunData(const long int start, const long int steps)
         : timestep_start(start)
         , timesteps_executed(steps)
-        , energy(0.0)
-        , sim_time(0.0)
-        , wall_time(0.0)
-        , spikes(0L)
-        , packets_sent(0L)
-        , neurons_fired(0L)
 {
-    return;
 }
 
 sanafe::RunData sanafe::Simulation::run(
@@ -122,9 +115,11 @@ sanafe::Timestep sanafe::Simulation::step()
 {
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
-    total_timesteps++;
+    ++total_timesteps;
     Timestep ts = Timestep(total_timesteps, arch.core_count);
-    timespec ts_start, ts_end, ts_elapsed;
+    timespec ts_start;
+    timespec ts_end;
+    timespec ts_elapsed;
 
     // Run and measure the wall-clock time taken to run the simulation
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
@@ -161,10 +156,12 @@ sanafe::Timestep sanafe::Simulation::step()
             }
         }
     }
-    wall_time += (double) ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / 1.0e9);
+    constexpr double ns_in_second = 1.0e9;
+    wall_time +=
+            (double) ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / ns_in_second);
     SIM_TRACE1("Time-step took: %fs.\n",
             static_cast<double>(
-                    ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / 1.0e9)));
+                    ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / ns_in_second)));
 
     return ts;
 }
@@ -332,26 +329,19 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
     }
 
     SIM_TRACE1("Spikes sent: %ld\n", ts.spike_count);
-    return;
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
         : messages(std::vector<std::list<Message>>(core_count))
         , timestep(ts)
-        , spike_count(0L)
-        , total_hops(0L)
-        , packets_sent(0L)
-        , neurons_fired(0L)
-        , energy(0.0)
-        , sim_time(0.0)
 {
-    return;
 }
 
 double sanafe::sim_estimate_network_costs(const Tile &src, Tile &dest)
 {
     double network_latency;
-    long int x_hops, y_hops;
+    long int x_hops;
+    long int y_hops;
 
     network_latency = 0.0;
 
@@ -591,8 +581,6 @@ void sanafe::sim_trace_write_spike_header(std::ofstream &spike_trace_file)
 {
     assert(spike_trace_file.is_open());
     spike_trace_file << "neuron,timestep" << std::endl;
-
-    return;
 }
 
 void sanafe::sim_trace_write_potential_header(
@@ -693,8 +681,6 @@ void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
     {
         potential_trace_file << std::endl;
     }
-
-    return;
 }
 
 void sanafe::sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts)
@@ -734,8 +720,6 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.receive_delay << ",";
     message_trace_file << m.blocked_delay << ",";
     message_trace_file << std::endl;
-
-    return;
 }
 
 timespec sanafe::calculate_elapsed_time(
@@ -748,8 +732,9 @@ timespec sanafe::calculate_elapsed_time(
     ts_elapsed.tv_sec = ts_end.tv_sec - ts_start.tv_sec;
     if (ts_end.tv_nsec < ts_start.tv_nsec)
     {
-        ts_elapsed.tv_sec--;
-        ts_elapsed.tv_nsec += 1000000000UL;
+        --ts_elapsed.tv_sec;
+        constexpr double ns_in_second = 1000000000UL;
+        ts_elapsed.tv_nsec += ns_in_second;
     }
 
     return ts_elapsed;

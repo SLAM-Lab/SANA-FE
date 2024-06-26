@@ -22,13 +22,13 @@
 #include "network.hpp"
 #include "print.hpp"
 
-sanafe::NeuronTemplate::NeuronTemplate(const std::string &soma_hw_name,
-        const std::string &default_synapse_hw_name,
-        const std::string &dendrite_hw_name, const bool log_spikes,
+sanafe::NeuronTemplate::NeuronTemplate(std::string soma_hw_name,
+        std::string default_synapse_hw_name,
+        std::string dendrite_hw_name, const bool log_spikes,
         const bool log_potential, const bool force_update)
-        : soma_hw_name(soma_hw_name)
-        , default_synapse_hw_name(default_synapse_hw_name)
-        , dendrite_hw_name(dendrite_hw_name)
+        : soma_hw_name(std::move(soma_hw_name))
+        , default_synapse_hw_name(std::move(default_synapse_hw_name))
+        , dendrite_hw_name(std::move(dendrite_hw_name))
         , log_spikes(log_spikes)
         , log_potential(log_potential)
         , force_update(force_update)
@@ -61,23 +61,23 @@ std::string sanafe::Connection::description() const
 }
 */
 
-sanafe::NeuronGroup::NeuronGroup(const std::string &group_name,
+sanafe::NeuronGroup::NeuronGroup(std::string group_name,
         Network &parent_net, const NeuronTemplate &default_config)
         : default_neuron_config(default_config)
         , parent_net(&parent_net)
-        , name(group_name)
+        , name(std::move(group_name))
 {
 }
 
-sanafe::Neuron::Neuron(const std::string &neuron_id,
-        Network &parent_net, const std::string &parent_group_id,
+sanafe::Neuron::Neuron(std::string neuron_id,
+        Network &parent_net, std::string parent_group_id,
         const NeuronTemplate &config)
         : parent_net(&parent_net)
         , soma_hw_name(config.soma_hw_name)
         , default_synapse_hw_name(config.default_synapse_hw_name)
         , dendrite_hw_name(config.dendrite_hw_name)
-        , id(neuron_id)
-        , parent_group_id(parent_group_id)
+        , id(std::move(neuron_id))
+        , parent_group_id(std::move(parent_group_id))
         , force_update(config.force_update)
         , log_spikes(config.log_spikes)
         , log_potential(config.log_potential)
@@ -127,8 +127,7 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 */
 
 sanafe::NeuronGroup &sanafe::Network::create_neuron_group(
-        const std::string &name,
-        const NeuronTemplate &default_config)
+        std::string name, const NeuronTemplate &default_config)
 {
     groups.emplace(name, NeuronGroup(name, *this, default_config));
     INFO("Created neuron group gid:%s\n", name.c_str());
@@ -156,8 +155,8 @@ std::string sanafe::NeuronGroup::info() const
     return ss.str();
 }
 
-sanafe::Neuron &sanafe::NeuronGroup::create_neuron(const std::string &id,
-        const NeuronTemplate &config)
+sanafe::Neuron &sanafe::NeuronGroup::create_neuron(
+        std::string id, const NeuronTemplate &config)
 {
     neurons.emplace(id, Neuron(id, *parent_net, name, config));
     INFO("Created neuron nid:%s.%s\n", name.c_str(), id.c_str());
