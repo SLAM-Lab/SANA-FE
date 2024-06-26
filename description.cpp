@@ -236,7 +236,7 @@ void sanafe::description_parse_soma_section_yaml(
     power_metrics.latency_spike_out =
             description_required_field<double>(attributes, "latency_spike_out");
 
-    if (attributes["noise"] != nullptr)
+    if (attributes["noise"])
     {
         // TODO: support optioanl noise arg again alongside the plugin mechanism
         /*
