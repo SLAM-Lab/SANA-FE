@@ -19,6 +19,7 @@
 #include <functional> // For std::reference_wrapper
 #include <list>
 #include <map>
+#include <optional>
 #include <vector>
 
 #define ARCH_INVALID_ID (-1)

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <ctime>
 #include <filesystem> // For std::filesystem::path
+#include <optional>
 #include <string>
 
 #include "arch.hpp"

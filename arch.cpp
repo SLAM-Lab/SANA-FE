@@ -468,7 +468,7 @@ void sanafe::arch_print_axon_summary(Architecture &arch)
             {
 #ifdef DEBUG
                 Neuron *n = c->neurons[k];
-                TRACE2("\tnid:%d.%d ", n->group->id, n->id);
+                TRACE2("\tnid:%s.%s ", n->group->id.c_str(), n->id.c_str());
                 TRACE2("i:%d o:%d\n", n->maps_in_count, n->maps_out_count);
 #endif
                 core_used = true;
@@ -495,7 +495,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
     assert(pre_neuron.core != nullptr);
 
     // Figure out the unique set of cores that this neuron broadcasts to
-    TRACE1("Counting connections for neuron nid:%d\n", pre_neuron.id);
+    TRACE1("Counting connections for neuron nid:%s\n", pre_neuron.id.c_str());
     std::set<Core *> cores_out;
     for (Connection &curr_connection : pre_neuron.connections_out)
     {
@@ -505,15 +505,15 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
         TRACE1("Connected to dest core: %zu\n", dest_core->id);
     }
 
-    TRACE1("Creating connections for neuron nid:%d to %zu core(s)\n",
-            pre_neuron.id, cores_out.size());
+    TRACE1("Creating connections for neuron nid:%s to %zu core(s)\n",
+            pre_neuron.id.c_str(), cores_out.size());
     for (Core *dest_core : cores_out)
     {
         // Create the axon, and add it to both the destination and
         //  source cores
         arch_allocate_axon(pre_neuron, *dest_core);
     }
-    TRACE3("Counted all maps for nid:%d count: %d\n", pre_neuron.id);
+    TRACE3("Counted all maps for nid:%s count: %d\n", pre_neuron.id.c_str());
 
     for (Connection &curr_connection : pre_neuron.connections_out)
     {
@@ -750,9 +750,9 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 
     // Then add the output axon to the sending pre-synaptic neuron
     pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
-    TRACE1("nid:%d.%d cid:%zu.%zu added one output axon address %zu.\n",
-            pre_neuron.parent_group_id, pre_neuron.id, pre_core.parent_tile_id,
-            pre_core.offset, new_axon_out_address);
+    TRACE1("nid:%s.%s cid:%zu.%zu added one output axon address %zu.\n",
+            pre_neuron.parent_group_id.c_str(), pre_neuron.id.c_str(),
+            pre_core.parent_tile_id, pre_core.offset, new_axon_out_address);
 }
 
 void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)

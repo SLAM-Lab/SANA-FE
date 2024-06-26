@@ -34,7 +34,7 @@ add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
 find_package(PythonLibs REQUIRED)
 find_package(OpenMP REQUIRED)
-find_package(yaml-cpp REQUIRED)
+find_package(yaml-cpp 0.6.0 REQUIRED)
 
 include_directories(${PYTHON_INCLUDE_DIRS})
 include_directories(${YAMLCPP_INCLUDE_DIRS})

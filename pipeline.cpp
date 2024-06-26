@@ -179,9 +179,10 @@ double sanafe::pipeline_process_synapse(
     con.post_neuron->spike_count++;
     assert(con.synapse_hw != nullptr);
     con.synapse_hw->spikes_processed++;
-    SIM_TRACE1("(nid:%d.%d->nid:%d.%d) con->current:%lf\n",
-            con.pre_neuron->parent_group_id, con.pre_neuron->id,
-            con.post_neuron->parent_group_id, con.post_neuron->id, con.current);
+    SIM_TRACE1("(nid:%s.%s->nid:%s.%s) con->current:%lf\n",
+            con.pre_neuron->parent_group_id.c_str(), con.pre_neuron->id.c_str(),
+            con.post_neuron->parent_group_id.c_str(),
+            con.post_neuron->id.c_str(), con.current);
 
     return con.synapse_hw->latency_spike_op;
 }
@@ -193,9 +194,9 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 
     while (n.dendrite_last_updated < ts.timestep)
     {
-        TRACE2("Updating nid:%d dendritic current "
+        TRACE2("Updating nid:%s dendritic current "
                "(last_updated:%d, ts:%ld)\n",
-                n.id, n.dendrite_last_updated, ts.timestep);
+                n.id.c_str(), n.dendrite_last_updated, ts.timestep);
         n.soma_input_charge = n.dendrite_model->update();
         n.dendrite_last_updated++;
     }
@@ -206,7 +207,7 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
     n.dendrite_input_synapses.clear();
 
     // Finally, send dendritic current to the soma
-    TRACE2("nid:%d updating dendrite, soma_input_charge:%lf\n", n.id,
+    TRACE2("nid:%s updating dendrite, soma_input_charge:%lf\n", n.id.c_str(),
             n.soma_input_charge);
 
     return latency;
@@ -214,7 +215,8 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 
 double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 {
-    TRACE1("nid:%d updating, current_in:%lf\n", n.id, n.soma_input_charge);
+    TRACE1("nid:%s updating, current_in:%lf\n", n.id.c_str(),
+            n.soma_input_charge);
     double soma_processing_latency = 0.0;
     while (n.soma_last_updated < ts.timestep)
     {
@@ -261,8 +263,9 @@ double sanafe::pipeline_process_axon_out(
         return 0.0;
     }
 
-    TRACE1("nid:%d.%d sending spike message to %zu axons out\n",
-            n.parent_group_id, n.id, n.axon_out_addresses.size());
+    TRACE1("nid:%s.%s sending spike message to %zu axons out\n",
+            n.parent_group_id.c_str(), n.id.c_str(),
+            n.axon_out_addresses.size());
     for (const int axon_address : n.axon_out_addresses)
     {
         Message m(arch, n, ts.timestep, axon_address);

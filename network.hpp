@@ -170,8 +170,8 @@ public:
 
     std::string id;
     std::string parent_group_id;
-    size_t order_created_within_group;
-    size_t position_defined;
+    size_t order_created_within_group{0};
+    size_t position_defined{0};
     int forced_spikes{0};
     int spike_count{0};
     int soma_last_updated{0};
@@ -205,8 +205,8 @@ public:
     NeuronTemplate default_neuron_config;
     Network *parent_net{nullptr};
     std::string name;
-    size_t order_created;
-    size_t position_defined;
+    size_t order_created{0};
+    size_t position_defined{0};
     [[nodiscard]] std::string get_id() const { return name; }
     explicit NeuronGroup(const std::string &group_name, Network &parent_net, const NeuronTemplate &default_config);
     Neuron &create_neuron(const std::string &id, const NeuronTemplate &config);
