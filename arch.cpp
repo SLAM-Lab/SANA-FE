@@ -3,6 +3,7 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // arch.cpp
+#include <algorithm>
 #include <any>
 #include <cassert>
 #include <cctype>
@@ -22,7 +23,6 @@
 #include "description.hpp"
 #include "models.hpp"
 #include "network.hpp"
-//#include "pipeline.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
 

@@ -45,7 +45,7 @@ YAML::Node sanafe::description_required_field<YAML::Node>(
                 node.Mark());
     }
     const YAML::Node &child = node[key];
-    if (!node[key] || child.IsNull() || !child.IsDefined())
+    if (!child.IsDefined() || child.IsNull())
     {
         const std::string message = "Value for key '" + key + "' not defined";
         throw DescriptionParsingError(message, node.Mark());
@@ -236,7 +236,7 @@ void sanafe::description_parse_soma_section_yaml(
     power_metrics.latency_spike_out =
             description_required_field<double>(attributes, "latency_spike_out");
 
-    if (attributes["noise"])
+    if (attributes["noise"].IsDefined())
     {
         // TODO: support optioanl noise arg again alongside the plugin mechanism
         /*
@@ -540,7 +540,7 @@ sanafe::Architecture sanafe::description_parse_arch_file_yaml(std::ifstream &fp)
 sanafe::Network sanafe::description_parse_network_file_yaml(std::ifstream &fp)
 {
     YAML::Node yaml_node = YAML::Load(fp);
-    if (yaml_node.IsMap() && (yaml_node["network"]))
+    if (yaml_node.IsMap() && (yaml_node["network"].IsDefined()))
     {
         return description_parse_network_section_yaml(yaml_node["network"]);
     }
@@ -553,7 +553,7 @@ sanafe::Network sanafe::description_parse_network_section_yaml(
 {
     std::string net_name{};
     // TODO: refactor?
-    if (net_node["name"])
+    if (net_node["name"].IsDefined())
     {
         net_name = net_node["name"].as<std::string>();
         if (net_name.find('[') != std::string::npos)
@@ -583,7 +583,9 @@ void sanafe::description_parse_neuron_group_section_yaml(
     if (groups_node.IsSequence())
     {
         for (const auto &group : groups_node)
+        {
             description_parse_group(group, net);
+        }
     }
     else
     {
@@ -730,15 +732,15 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
                 });
     }
 
-    if (attributes["log_potential"])
+    if (attributes["log_potential"].IsDefined())
     {
         neuron_template.log_potential = attributes["log_potential"].as<bool>();
     }
-    if (attributes["log_spikes"])
+    if (attributes["log_spikes"].IsDefined())
     {
         neuron_template.log_spikes = attributes["log_spikes"].as<bool>();
     }
-    if (attributes["force_update"])
+    if (attributes["force_update"].IsDefined())
     {
         neuron_template.force_update = attributes["force_update"].as<bool>();
     }
@@ -752,14 +754,14 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
     }
     // Parse and add unit specific model parameters defined under 'dendrite' or
     //  'soma' keys
-    if (attributes["dendrite"])
+    if (attributes["dendrite"].IsDefined())
     {
         auto dendrite_params =
                 description_parse_model_parameters_yaml(attributes["dendrite"]);
         neuron_template.dendrite_model_params.insert(
                 dendrite_params.begin(), dendrite_params.end());
     }
-    if (attributes["soma"])
+    if (attributes["soma"].IsDefined())
     {
         auto soma_params =
                 description_parse_model_parameters_yaml(attributes["soma"]);
@@ -981,7 +983,7 @@ void sanafe::description_parse_mapping_file_yaml(
         std::ifstream &fp, Architecture &arch, Network &net)
 {
     YAML::Node yaml_node = YAML::Load(fp);
-    if (yaml_node.IsMap() && yaml_node["mappings"])
+    if (yaml_node.IsMap() && yaml_node["mappings"].IsDefined())
     {
         description_parse_mapping_section_yaml(
                 yaml_node["mappings"], arch, net);
@@ -1033,8 +1035,10 @@ void sanafe::description_parse_mapping_section_yaml(
             NeuronGroup &group = net.groups.at(group_name);
             if (group.neurons.find(neuron_id) == group.neurons.end())
             {
-                const std::string error =
-                        "Invalid neuron id: " + group_name + '.' + neuron_id;
+                std::string error = "Invalid neuron id: ";
+                error += group_name;
+                error += '.';
+                error += neuron_id;
                 throw DescriptionParsingError(error, mapping.Mark());
             }
             Neuron &neuron = group.neurons.at(neuron_id);
@@ -1063,15 +1067,15 @@ void sanafe::description_parse_mapping(Neuron &neuron,
     const size_t core_offset_within_tile =
             std::stoull(core_address.substr(dot_pos + 1));
 
-    if (mapping_info["soma"])
+    if (mapping_info["soma"].IsDefined())
     {
         neuron.soma_hw_name = mapping_info["soma"].as<std::string>();
     }
-    if (mapping_info["dendrite"])
+    if (mapping_info["dendrite"].IsDefined())
     {
         neuron.dendrite_hw_name = mapping_info["dendrite"].as<std::string>();
     }
-    if (mapping_info["synapse"])
+    if (mapping_info["synapse"].IsDefined())
     {
         neuron.default_synapse_hw_name =
                 mapping_info["synapse"].as<std::string>();
