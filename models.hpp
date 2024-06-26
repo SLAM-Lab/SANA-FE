@@ -54,13 +54,14 @@ public:
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 };
 
+constexpr int default_weight_bits = 8;  // Based on real-world H/W e.g., Loihi
 class CurrentBasedSynapseModel : public SynapseModel
 {
 public:
-    CurrentBasedSynapseModel();
+    CurrentBasedSynapseModel() = default;
     CurrentBasedSynapseModel(const CurrentBasedSynapseModel &copy) = default;
     CurrentBasedSynapseModel(CurrentBasedSynapseModel &&other) = default;
-    virtual ~CurrentBasedSynapseModel() = default;
+    ~CurrentBasedSynapseModel() override = default;
     CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
@@ -72,7 +73,7 @@ private:
     double min_synaptic_resolution{0.0};
     double current{0.0};
     double synaptic_current_decay{1.0};
-    int weight_bits{8};
+    int weight_bits{default_weight_bits};
 };
 
 class SingleCompartmentModel : public DendriteModel
@@ -81,11 +82,11 @@ public:
     SingleCompartmentModel();
     SingleCompartmentModel(const SingleCompartmentModel &copy) = default;
     SingleCompartmentModel(SingleCompartmentModel &&other) = default;
-    virtual ~SingleCompartmentModel() = default;
+    ~SingleCompartmentModel() override = default;
     SingleCompartmentModel &operator=(const SingleCompartmentModel &other) = default;
     SingleCompartmentModel &operator=(SingleCompartmentModel &&other) = default;
 
-    double update(std::optional<Synapse> current_in = std::nullopt, const bool step = true) override;
+    double update(std::optional<Synapse> synapse_in = std::nullopt, bool step = true) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     double accumulated_charge, leak_decay;
@@ -97,11 +98,11 @@ public:
     MultiTapModel1D();
     MultiTapModel1D(const MultiTapModel1D &copy) = default;
     MultiTapModel1D(MultiTapModel1D &&other) = default;
-    virtual ~MultiTapModel1D() = default;
+    ~MultiTapModel1D() override = default;
     MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
-    double update(std::optional<Synapse> current_in = std::nullopt, const bool step = true) override;
+    double update(std::optional<Synapse> synapse_in = std::nullopt, bool step = true) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     // Assuming a 1D tap dendrite
@@ -112,7 +113,7 @@ private:
 class SomaModel
 {
 public:
-    SomaModel(const std::string &gid, const std::string &nid) : group_id(gid), neuron_id(nid) {}
+    SomaModel(std::string gid, std::string nid) : group_id(std::move(gid)), neuron_id(std::move(nid)) {}
     SomaModel(const SomaModel &copy) = default;
     SomaModel(SomaModel &&other) = default;
     virtual ~SomaModel() = default;
@@ -130,22 +131,28 @@ protected:
 class LoihiLifModel : public SomaModel
 {
 public:
-    LoihiLifModel(const std::string &gid, const std::string &nid);
+    LoihiLifModel(std::string gid, std::string nid);
     LoihiLifModel(const LoihiLifModel &copy) = default;
     LoihiLifModel(LoihiLifModel &&other) = default;
-    virtual ~LoihiLifModel() = default;
+    ~LoihiLifModel() override = default;
     LoihiLifModel &operator=(const LoihiLifModel &other) = delete;
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    NeuronStatus update(const std::optional<double> current_in,  const bool step = true) override;
+    NeuronStatus update(std::optional<double> current_in,  bool step = true) override;
     double get_potential() override { return potential; }
 private:
-    bool force_update;
-    int reset_mode, reverse_reset_mode;
+    bool force_update{false};
+    int reset_mode{NEURON_RESET_HARD};
+    int reverse_reset_mode{NEURON_NO_RESET};
     //int noise_type;
-    double potential, leak_decay, bias, threshold, reverse_threshold;
-    double reset, reverse_reset;
+    double potential{0.0};
+    double leak_decay{1.0};
+    double bias{0.0};
+    double threshold{0.0};
+    double reverse_threshold{0.0};
+    double reset{0.0};
+    double reverse_reset{0.0};
 };
 
 class TrueNorthModel : public SomaModel
@@ -154,21 +161,27 @@ public:
     TrueNorthModel(const std::string &gid, const std::string &nid);
     TrueNorthModel(const TrueNorthModel &copy) = default;
     TrueNorthModel(TrueNorthModel &&other) = default;
-    virtual ~TrueNorthModel() = default;
+    ~TrueNorthModel() override = default;
     TrueNorthModel &operator=(const TrueNorthModel &other) = delete;
     TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    NeuronStatus update(const std::optional<double> current_in = std::nullopt,  const bool step = true) override;
+    NeuronStatus update(std::optional<double> current_in = std::nullopt, bool step = true) override;
     double get_potential() override { return potential; }
 private:
-    bool force_update;
-    unsigned int random_range_mask;
-    int reset_mode, reverse_reset_mode;
-    bool leak_towards_zero;
+    bool force_update{false};
+    unsigned int random_range_mask{0U};
+    int reset_mode{NEURON_RESET_HARD};
+    int reverse_reset_mode{NEURON_NO_RESET};
+    bool leak_towards_zero{true};
     // int noise_type;
-    double potential, leak, bias, threshold, reverse_threshold;
-    double reset, reverse_reset;
+    double potential{0.0};
+    double leak{0.0};  // Default is no leak (potential decay)
+    double bias{0.0};
+    double threshold{0.0};
+    double reverse_threshold{0.0};
+    double reset{0.0};
+    double reverse_reset{0.0};
 };
 
 NeuronResetModes model_parse_reset_mode(const std::string &str);

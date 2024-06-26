@@ -11,16 +11,6 @@
 #include "print.hpp"
 
 // *** Synapse models ***
-sanafe::CurrentBasedSynapseModel::CurrentBasedSynapseModel()
-        : weight(0.0)
-        , min_synaptic_resolution(0.0)
-        , current(0.0)
-        , synaptic_current_decay(0.0)
-        , weight_bits(8)
-{
-    return;
-}
-
 double sanafe::CurrentBasedSynapseModel::update(
         const std::optional<int> synapse_address, const bool step)
 {
@@ -99,7 +89,6 @@ sanafe::MultiTapModel1D::MultiTapModel1D()
         , space_constants(std::vector<double>(0))
         , time_constants(std::vector<double>(1, 0.0))
 {
-    return;
 }
 
 double sanafe::MultiTapModel1D::update(
@@ -220,23 +209,9 @@ void sanafe::MultiTapModel1D::set_attributes(
 
 // **** Soma models ****
 sanafe::LoihiLifModel::LoihiLifModel(
-        const std::string &gid, const std::string &nid)
-        : sanafe::SomaModel(gid, nid)
+        std::string gid, std::string nid)
+        : sanafe::SomaModel(std::move(gid), std::move(nid))
 {
-    force_update = false;
-    potential = 0.0;
-    bias = 0.0;
-    threshold = 0.0;
-    reverse_threshold = 0.0;
-    reset = 0.0;
-    reverse_reset = 0.0;
-    reset_mode = sanafe::NEURON_RESET_HARD;
-    reverse_reset_mode = sanafe::NEURON_NO_RESET;
-    // Default is no leak (potential decay), i.e., the potential for the
-    //  next timestep is 100% of the previous timestep's
-    leak_decay = 1.0;
-
-    return;
 }
 
 void sanafe::LoihiLifModel::set_attributes(
@@ -367,20 +342,6 @@ sanafe::TrueNorthModel::TrueNorthModel(
         const std::string &gid, const std::string &nid)
         : sanafe::SomaModel(gid, nid)
 {
-    force_update = false;
-    potential = 0.0;
-    bias = 0.0;
-    threshold = 0.0;
-    reverse_threshold = 0.0;
-    reset = 0.0;
-    reverse_reset = 0.0;
-    reset_mode = sanafe::NEURON_RESET_HARD;
-    reverse_reset_mode = sanafe::NEURON_NO_RESET;
-    leak_towards_zero = true;
-    random_range_mask = 0U;
-    // Default is no leak (potential decay), i.e., the potential for the
-    //  next timestep is 100% of the previous timestep's
-    leak = 0.0;
 }
 
 void sanafe::TrueNorthModel::set_attributes(
@@ -484,6 +445,11 @@ sanafe::NeuronStatus sanafe::TrueNorthModel::update(
     randomize_threshold = (random_range_mask != 0);
     if (randomize_threshold)
     {
+        // rand() generates values using a Linear Feedback Shift Register (LFSR)
+        //  which are often implemented in H/W to generate psuedorandom numbers.
+        //  Checkers will complain this function is not very 'random'
+        //  but here we care about emulating hardware behavior over randomness.
+        // codechecker_suppress [cert-msc30-c, cert-msc50-cpp]
         const unsigned int r = std::rand() & random_range_mask;
         v += static_cast<double>(r);
     }
@@ -560,12 +526,9 @@ std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
     {
         return std::shared_ptr<SynapseModel>(new CurrentBasedSynapseModel());
     }
-    else
-    {
-        const std::string error =
-                "Synapse model not supported (" + model_name + ")\n";
-        throw std::invalid_argument(error);
-    }
+    const std::string error =
+            "Synapse model not supported (" + model_name + ")\n";
+    throw std::invalid_argument(error);
 }
 
 std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
@@ -575,14 +538,13 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
     {
         return std::shared_ptr<DendriteModel>(new SingleCompartmentModel());
     }
-    else if (model_name == "taps")
+
+    if (model_name == "taps")
     {
         return std::shared_ptr<DendriteModel>(new MultiTapModel1D());
     }
-    else
-    {
-        throw std::invalid_argument("Model not supported.");
-    }
+
+    throw std::invalid_argument("Model not supported.");
 }
 
 std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
@@ -593,12 +555,11 @@ std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
     {
         return std::shared_ptr<SomaModel>(new LoihiLifModel(group_id, id));
     }
-    else if (model_name == "truenorth")
+
+    if (model_name == "truenorth")
     {
         return std::shared_ptr<SomaModel>(new TrueNorthModel(group_id, id));
     }
-    else
-    {
-        throw std::invalid_argument("Model not supported.");
-    }
+
+    throw std::invalid_argument("Model not supported.");
 }
