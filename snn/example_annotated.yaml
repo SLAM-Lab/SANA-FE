@@ -38,9 +38,8 @@ mappings:
   - rcv.n[1]: {core: 0.0, soma: demo_soma_alt}
   - rcv.n[2]: {core: 0.1, soma: demo_soma_alt}
 
-## Wishlist and TODO
-# - Support neuron ids that are empty apart from an array subscript (currently errors out because empty)
-# - Allow for array subscripts without a range to be used.. e.g., n[0] as a valid name (currently confuses range code)
-# Wishlist
+### Wishlist and TODO
+## TODO
+## Wishlist
 # - support mapping multiple edges in a group e.g.,
 # - {src: {group: 0}, dst: {group: 1}, pattern: conv2d, kernels: {}}

@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
-#include <numeric>  // For std::accumulate
+#include <numeric> // For std::accumulate
 #include <optional>
 #include <string>
 #include <string_view>
@@ -276,7 +276,7 @@ void sanafe::description_parse_core_section_yaml(const YAML::Node &core_node,
 {
     auto core_name = description_required_field<std::string>(core_node, "name");
     std::pair<int, int> core_range = {0, 0};
-    if (core_name.find('[') != std::string::npos)
+    if (core_name.find("..") != std::string::npos)
     {
         core_range = description_parse_range_yaml(
                 core_name, core_node["name"].Mark());
@@ -439,7 +439,7 @@ void sanafe::description_parse_tile_section_yaml(
     auto tile_name = tile_node["name"].as<std::string>();
     std::pair<int, int> range = {0, 0};
 
-    if (tile_name.find('[') != std::string::npos)
+    if (tile_name.find("..") != std::string::npos)
     {
         range = description_parse_range_yaml(
                 tile_name, tile_node["name"].Mark());
@@ -670,13 +670,13 @@ void sanafe::description_parse_neuron_section_yaml(
 void sanafe::description_parse_neuron_long_format(
         const YAML::Node &neuron_node, NeuronGroup &neuron_group)
 {
-    const auto &neuron_name =
+    const auto &id =
             description_required_field<std::string>(neuron_node, "id");
     std::pair<size_t, size_t> range = {0, 0};
-    if (neuron_name.find('[') != std::string::npos)
+    if (id.find("..") != std::string::npos)
     {
         range = description_parse_range_yaml(
-                neuron_name, neuron_node["name"].Mark());
+                id, neuron_node["name"].Mark());
     }
     const auto &attributes =
             description_required_field<YAML::Node>(neuron_node, "attributes");
@@ -684,11 +684,24 @@ void sanafe::description_parse_neuron_long_format(
     const NeuronTemplate config =
             description_parse_neuron_attributes_yaml(attributes);
 
-    for (size_t id = range.first; id <= range.second; id++)
+    for (size_t instance = range.first; instance <= range.second; ++instance)
     {
-        const std::string instance_name =
-                neuron_name.substr(0, neuron_name.find('[')) + '[' +
-                std::to_string(id) + ']';
+        std::string instance_name = id;
+        const bool range_given = (range.second > range.first);
+        if (range_given)
+        {
+            const bool bracket_notation =
+                    (id.find('[') != std::string::npos);
+            if (bracket_notation)  // E.g., n[123] for instance 123
+            {
+                instance_name = id.substr(0, id.find('[')) +
+                        '[' + std::to_string(instance) + ']';
+            }
+            else  // Special case where id is only integer value in the range
+            {
+                instance_name = std::to_string(instance);
+            }
+        }
         neuron_group.create_neuron(instance_name, config);
     }
 }
@@ -697,7 +710,7 @@ void sanafe::description_parse_neuron_short_format(const std::string &id,
         const YAML::Node &attributes, NeuronGroup &neuron_group)
 {
     std::pair<size_t, size_t> range = {0, 0};
-    if (id.find('[') != std::string::npos)
+    if (id.find("..") != std::string::npos)
     {
         range = description_parse_range_yaml(id, attributes.Mark());
     }
@@ -706,10 +719,20 @@ void sanafe::description_parse_neuron_short_format(const std::string &id,
     for (size_t instance = range.first; instance <= range.second; ++instance)
     {
         std::string instance_name = id;
-        if (range.second > range.first)
+        const bool range_given = (range.second > range.first);
+        if (range_given)
         {
-            instance_name = id.substr(0, id.find('[')) + '[' +
-                    std::to_string(instance) + ']';
+            const bool bracket_notation =
+                    (id.find('[') != std::string::npos);
+            if (bracket_notation)  // E.g., n[123] for instance 123
+            {
+                instance_name = id.substr(0, id.find('[')) +
+                        '[' + std::to_string(instance) + ']';
+            }
+            else  // Special case where id is only integer value in the range
+            {
+                instance_name = std::to_string(instance);
+            }
         }
 
         neuron_group.create_neuron(instance_name, config);
@@ -989,7 +1012,8 @@ void sanafe::description_parse_mapping_file_yaml(
                 yaml_node["mappings"], arch, net);
         return;
     }
-    throw DescriptionParsingError("No top level mapping section defined", yaml_node.Mark());
+    throw DescriptionParsingError(
+            "No top level mapping section defined", yaml_node.Mark());
 }
 
 void sanafe::description_parse_mapping_section_yaml(
@@ -1023,10 +1047,8 @@ void sanafe::description_parse_mapping_section_yaml(
             auto neuron_address = pair.first.as<std::string>();
             const auto dot_pos = neuron_address.find('.');
 
-            const std::string group_name =
-                    neuron_address.substr(0, dot_pos);
-            const std::string neuron_id =
-                    neuron_address.substr(dot_pos + 1);
+            const std::string group_name = neuron_address.substr(0, dot_pos);
+            const std::string neuron_id = neuron_address.substr(dot_pos + 1);
             if (net.groups.find(group_name) == net.groups.end())
             {
                 const std::string error = "Invalid neuron group:" + group_name;
@@ -1048,8 +1070,8 @@ void sanafe::description_parse_mapping_section_yaml(
     }
 }
 
-void sanafe::description_parse_mapping(Neuron &neuron,
-        const YAML::Node &mapping_info, Architecture &arch)
+void sanafe::description_parse_mapping(
+        Neuron &neuron, const YAML::Node &mapping_info, Architecture &arch)
 {
     if (!mapping_info.IsMap())
     {
@@ -1212,11 +1234,29 @@ sanafe::ModelParam sanafe::description_parse_parameter_yaml(
 std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
         const std::string &range_str, const YAML::Mark &entry_mark)
 {
-    const size_t start_pos = range_str.find('[');
-    const size_t end_pos = range_str.find(']');
     const size_t delimiter_pos = range_str.find("..");
-    if ((start_pos == std::string::npos) || (end_pos == std::string::npos) ||
-            (delimiter_pos == std::string::npos) || (end_pos <= start_pos) ||
+
+    size_t start_pos;
+    size_t end_pos;
+    if (range_str.find('[') == std::string::npos)
+    {
+        start_pos = 0;
+    }
+    else
+    {
+        start_pos = range_str.find('[') + 1;
+    }
+
+    if (range_str.find(']') == std::string::npos)
+    {
+        end_pos = range_str.length();
+    }
+    else
+    {
+        end_pos = range_str.find(']');
+    }
+
+    if ((end_pos <= start_pos) || (delimiter_pos == std::string::npos) ||
             (delimiter_pos <= start_pos) || (delimiter_pos >= end_pos))
     {
         throw DescriptionParsingError("Invalid range format", entry_mark);
@@ -1225,9 +1265,9 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
     YAML::Mark range_mark(entry_mark);
     range_mark.column = start_pos;
     const std::string first_str =
-            range_str.substr(start_pos + 1, delimiter_pos - start_pos - 1);
+            range_str.substr(start_pos, delimiter_pos - start_pos);
     const std::string last_str =
-            range_str.substr(delimiter_pos + 2, end_pos - 2 - delimiter_pos);
+            range_str.substr(delimiter_pos + 2, (end_pos - delimiter_pos) - 2);
 
     size_t first;
     size_t last;
@@ -1240,6 +1280,7 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
     {
         throw DescriptionParsingError("Invalid range string", range_mark);
     }
+    INFO("Range: %zu to %zu\n", first, last);
 
     if (first > last)
     {
@@ -1247,5 +1288,5 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
                 "Invalid range; first > last", range_mark);
     }
 
-    return {first, last};
+    return std::make_pair(first, last);
 }
