@@ -14,9 +14,9 @@
 #include "plugins.hpp"
 #include "print.hpp"
 
-typedef sanafe::SynapseModel *_create_synapse();
-typedef sanafe::DendriteModel *_create_dendrite();
-typedef sanafe::SomaModel *_create_soma(
+using _create_synapse = sanafe::SynapseModel *();
+using _create_dendrite = sanafe::DendriteModel *();
+using _create_soma = sanafe::SomaModel *(
         const std::string &gid, const std::string &nid);
 
 std::map<std::string, _create_synapse *> plugin_create_synapse;
@@ -42,13 +42,12 @@ void sanafe::plugin_init_synapse(
 
     // Function to create an instance of the Soma class
     INFO("Loading function: %s\n", create.c_str());
-    _create_synapse *create_func =
-            (_create_synapse *) dlsym(synapse, create.c_str());
+    auto *create_func = (_create_synapse *) dlsym(synapse, create.c_str());
     plugin_create_synapse[model_name] = create_func;
 
     const char *dlsym_error = dlerror();
     dlclose(synapse);
-    if (dlsym_error)
+    if (dlsym_error != nullptr)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
                 dlsym_error);
@@ -76,13 +75,12 @@ void sanafe::plugin_init_dendrite(
 
     // Function to create an instance of the Soma class
     INFO("Loading function: %s\n", create.c_str());
-    _create_dendrite *create_func =
-            (_create_dendrite *) dlsym(dendrite, create.c_str());
+    auto *create_func = (_create_dendrite *) dlsym(dendrite, create.c_str());
     plugin_create_dendrite[model_name] = create_func;
 
     const char *dlsym_error = dlerror();
     dlclose(dendrite);
-    if (dlsym_error)
+    if (dlsym_error != nullptr)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
                 dlsym_error);
@@ -111,12 +109,12 @@ void sanafe::plugin_init_soma(
 
     // Function to create an instance of the Soma class
     INFO("Loading function: %s\n", create.c_str());
-    _create_soma *create_func = (_create_soma *) dlsym(soma, create.c_str());
+    auto *create_func = (_create_soma *) dlsym(soma, create.c_str());
     plugin_create_soma[model_name] = create_func;
 
     const char *dlsym_error = dlerror();
     dlclose(soma);
-    if (dlsym_error)
+    if (dlsym_error != nullptr)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
                 dlsym_error);
@@ -127,7 +125,7 @@ void sanafe::plugin_init_soma(
 }
 
 std::shared_ptr<sanafe::SynapseModel> sanafe::plugin_get_synapse(
-        const std::string &model_name, std::filesystem::path plugin_path)
+        const std::string &model_name, const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
     {
@@ -144,7 +142,7 @@ std::shared_ptr<sanafe::SynapseModel> sanafe::plugin_get_synapse(
 }
 
 std::shared_ptr<sanafe::DendriteModel> sanafe::plugin_get_dendrite(
-        const std::string &model_name, std::filesystem::path plugin_path)
+        const std::string &model_name, const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
     {
@@ -162,7 +160,7 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::plugin_get_dendrite(
 
 std::shared_ptr<sanafe::SomaModel> sanafe::plugin_get_soma(
         const std::string &model_name, const std::string &gid,
-        const std::string &nid, std::filesystem::path plugin_path)
+        const std::string &nid, const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
     {

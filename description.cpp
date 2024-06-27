@@ -1281,7 +1281,6 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
         throw DescriptionParsingError("Invalid range string", range_mark);
     }
     INFO("Range: %zu to %zu\n", first, last);
-
     if (first > last)
     {
         throw DescriptionParsingError(
