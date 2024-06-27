@@ -63,7 +63,6 @@ NeuronTemplate description_parse_neuron_attributes_yaml(const YAML::Node &attrib
 
 void description_parse_edge_long_format(const YAML::Node &edge_node, Network &network);
 void description_parse_edge_short_format(const std::string &description, const YAML::Node &edge_node, Network &network);
-void description_parse_edge(const YAML::Node &edge_node, Network &net);
 std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description);
 
 // Neuron to Hardware Mapping
@@ -74,9 +73,7 @@ void description_parse_mapping(Neuron &neuron, const YAML::Node &mapping_info, A
 // Helper functions
 std::map<std::string, ModelParam> description_parse_model_parameters_yaml(const YAML::Node &parameters_node);
 ModelParam description_parse_parameter_yaml(const YAML::Node &attribute_node);
-size_t description_count_neurons_yaml(const YAML::Node &neurons_node);
-std::string description_yaml_parsing_error(const std::string &detail, const YAML::Mark &location);
-
+void check_key(const YAML::Node &node, const std::string &key);
 }
 
 #endif

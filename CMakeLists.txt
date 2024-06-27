@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
+#set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
 #set(PYTHON_BUILD_ENABLED True)
 set(PYTHON_BUILD_ENABLED False)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -17,7 +17,6 @@ project(sana-fe)
 add_compile_options(
     -Wall -pedantic -Werror -g -fopenmp
 )
-    #-ldl -Wall -pedantic -Werror -g -fopenmp -Wno-stringop-truncation -Ofast
 
 file (GLOB SOURCE_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.cpp")
 

@@ -77,7 +77,7 @@ struct ModelParam
         if (std::holds_alternative<int>(value))
         {
             // Assume it is safe to convert from any integer to double
-            INFO("Warning: Casting integer value to double type.\n");
+            TRACE1("Warning: Casting integer value to double type.\n");
             return static_cast<double>(std::get<int>(value));
         }
 
@@ -209,7 +209,7 @@ public:
     size_t position_defined{0};
     [[nodiscard]] std::string get_id() const { return name; }
     explicit NeuronGroup(std::string group_name, Network &parent_net, const NeuronTemplate &default_config);
-    Neuron &create_neuron(std::string id, const NeuronTemplate &config);
+    Neuron &create_neuron(const std::string &id, const NeuronTemplate &config);
 
     //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
     //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
@@ -238,7 +238,7 @@ public:
     Network(const Network &) = delete;
     Network &operator=(const Network &) = delete;
 
-    NeuronGroup &create_neuron_group(std::string name, const NeuronTemplate &default_config);
+    NeuronGroup &create_neuron_group(const std::string &name, const NeuronTemplate &default_config);
     [[nodiscard]] std::string info() const;
     //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
     void check_mapped() const;

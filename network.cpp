@@ -127,7 +127,7 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 */
 
 sanafe::NeuronGroup &sanafe::Network::create_neuron_group(
-        std::string name, const NeuronTemplate &default_config)
+        const std::string &name, const NeuronTemplate &default_config)
 {
     groups.emplace(name, NeuronGroup(name, *this, default_config));
     INFO("Created neuron group gid:%s\n", name.c_str());
@@ -156,10 +156,10 @@ std::string sanafe::NeuronGroup::info() const
 }
 
 sanafe::Neuron &sanafe::NeuronGroup::create_neuron(
-        std::string id, const NeuronTemplate &config)
+        const std::string &id, const NeuronTemplate &config)
 {
     neurons.emplace(id, Neuron(id, *parent_net, name, config));
-    INFO("Created neuron nid:%s.%s\n", name.c_str(), id.c_str());
+    //INFO("Created neuron nid:%s.%s\n", name.c_str(), id.c_str());
 
     return neurons.at(id);
 }
@@ -184,9 +184,9 @@ void sanafe::Neuron::connect_to_neuron(Neuron &dest,
     con.synapse_params.insert(synapse_params.begin(), synapse_params.end());
     con.dendrite_params.insert(dendrite_params.begin(), dendrite_params.end());
 
-    INFO("\tAdded con %s.%s->%s.%s\n", con.pre_neuron->parent_group_id.c_str(),
-            con.pre_neuron->id.c_str(), con.post_neuron->parent_group_id.c_str(),
-            con.post_neuron->id.c_str());
+    //INFO("\tAdded con %s.%s->%s.%s\n", con.pre_neuron->parent_group_id.c_str(),
+    //        con.pre_neuron->id.c_str(), con.post_neuron->parent_group_id.c_str(),
+    //        con.post_neuron->id.c_str());
 }
 
 sanafe::Network sanafe::load_net(const std::filesystem::path &path)

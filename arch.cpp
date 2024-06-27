@@ -575,7 +575,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 
 void sanafe::Core::map_neuron(Neuron &n)
 {
-    INFO("Mapping nid:%s to core: %zu\n", n.id.c_str(), id);
+    //INFO("Mapping nid:%s to core: %zu\n", n.id.c_str(), id);
     // Map the neuron to hardware units
     if (n.core != nullptr)
     {
@@ -678,7 +678,7 @@ void sanafe::Core::map_neuron(Neuron &n)
         else
         {
             // Use built in models
-            INFO("Creating soma built-in model %s.\n",
+            TRACE1("Creating soma built-in model %s.\n",
                     n.soma_hw->model.c_str());
             n.soma_model =
                     model_get_soma(n.soma_hw->model, n.parent_group_id, n.id);

@@ -40,6 +40,7 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
         if ((key == "w") || (key == "weight"))
         {
             weight = static_cast<double>(value);
+            //std::cout << "Set weight to " << weight << '\n';
         }
     }
 

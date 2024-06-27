@@ -23,6 +23,8 @@ architecture:
       core:
         - name: loihi_core[0..3]
           attributes:
+            buffer_position: soma
+            max_neurons_supported: 1024
           axon_in:
             - name: loihi_in
               attributes:
@@ -72,8 +74,8 @@ architecture:
           - name: loihi_dendrites
             attributes:
               model: single_compartment
-              energy: 0.0
-              latency: 0.0
+              energy_access: 0.0
+              latency_access: 0.0
           axon_out:
             - name: loihi_out
               attributes:
