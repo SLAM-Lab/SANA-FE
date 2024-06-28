@@ -642,6 +642,16 @@ void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
     {
         for (const auto &[id, neuron] : group.neurons)
         {
+            if (id != neuron.id)
+            {
+                INFO("ERROR");
+                exit(1);
+            }
+            if (group_name != neuron.parent_group_id)
+            {
+                INFO("ERROR");
+                exit(1);
+            }
             if (neuron.log_spikes && (neuron.status == sanafe::FIRED))
             {
                 spike_trace_file << neuron.parent_group_id << ".";

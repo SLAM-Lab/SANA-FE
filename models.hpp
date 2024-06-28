@@ -72,7 +72,7 @@ private:
     double weight{0.0};
     double min_synaptic_resolution{0.0};
     double current{0.0};
-    double synaptic_current_decay{1.0};
+    double synaptic_current_decay{0.0};
     int weight_bits{default_weight_bits};
 };
 
@@ -89,7 +89,8 @@ public:
     double update(std::optional<Synapse> synapse_in = std::nullopt, bool step = true) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
-    double accumulated_charge, leak_decay;
+    double accumulated_charge{0.0};
+    double leak_decay{0.0};
 };
 
 class MultiTapModel1D : public DendriteModel

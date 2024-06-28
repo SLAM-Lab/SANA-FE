@@ -190,7 +190,7 @@ public:
 
     explicit Neuron(std::string neuron_id, Network &parent_net, std::string parent_group_id, const NeuronTemplate &config);
     [[nodiscard]] std::string get_id() const { return id; }
-    void set_attributes(const NeuronTemplate &attributes);
+    //void set_attributes(const NeuronTemplate &attributes);
     void connect_to_neuron(Neuron &dest, const std::map<std::string, ModelParam> &synapse_params, const std::map<std::string, ModelParam> &dendrite_params,  const std::optional<std::string> &synapse_hw_name = std::nullopt);
     [[nodiscard]] std::string info() const;
     //std::string description(const bool write_mapping=true) const;

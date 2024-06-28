@@ -598,6 +598,7 @@ void sanafe::description_parse_edges_section_yaml(
         for (const auto &edge : edges_node)
         {
             const auto &edge_description = edge.first.as<std::string>();
+            //std::cout << "edge:" << edge_description << ':' << edge.second << '\n';
             const YAML::Node &edge_attributes = edge.second;
             description_parse_edge_short_format(
                     edge_description, edge_attributes, net);
@@ -762,6 +763,16 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
     {
         neuron_template.force_update = attributes["force_update"].as<bool>();
     }
+    if (attributes["synapse_hw_name"].IsDefined())
+    {
+        neuron_template.default_synapse_hw_name =
+                attributes["synapse_hw_name"].as<std::string>();
+    }
+    if (attributes["soma_hw_name"].IsDefined())
+    {
+        neuron_template.soma_hw_name =
+                attributes["soma_hw_name"].as<std::string>();
+    }
 
     // Parse and add shared parameters, which are defined alongside attributes
     auto model_params = description_parse_model_parameters_yaml(attributes);
@@ -886,6 +897,7 @@ void sanafe::description_parse_edge_short_format(const std::string &description,
     }
     Neuron &dst_neuron = dst_group.neurons.at(target_address.neuron_id);
 
+    // TODO: fix this space wastage
     std::map<std::string, ModelParam> synapse_params{};
     std::map<std::string, ModelParam> dendrite_params{};
 
@@ -907,18 +919,13 @@ void sanafe::description_parse_edge_short_format(const std::string &description,
         //static const std::unordered_set<std::string> unit_specific_keys = {
         //    "synapse", "dendrite", "soma"};
         //if (unit_specific_keys.find(key) != unit_specific_keys.end())
-        if (key != "synapse" && key != "dendrite" && key != "soma")
+        if ((key != "synapse") && (key != "dendrite") && (key != "soma"))
         {
             synapse_params.insert({key, parameter});
             dendrite_params.insert({key, parameter});
         }
     }
     std::optional<std::string> synapse_hw_name;
-    // TODO: remove
-    //if (src_neuron.connections_out.size())
-    //{
-    //    exit(1);
-    //}
     src_neuron.connect_to_neuron(
             dst_neuron, synapse_params, dendrite_params, synapse_hw_name);
 }

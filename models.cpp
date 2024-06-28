@@ -40,7 +40,6 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
         if ((key == "w") || (key == "weight"))
         {
             weight = static_cast<double>(value);
-            //std::cout << "Set weight to " << weight << '\n';
         }
     }
 
@@ -50,8 +49,6 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
 // *** Dendrite models ***
 sanafe::SingleCompartmentModel::SingleCompartmentModel()
 {
-    accumulated_charge = 0.0;
-    leak_decay = 0.0;
 }
 
 double sanafe::SingleCompartmentModel::update(

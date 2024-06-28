@@ -86,16 +86,8 @@ sanafe::Neuron::Neuron(std::string neuron_id,
     default_synapse_hw_name = config.default_synapse_hw_name;
     dendrite_hw_name = config.dendrite_hw_name;
 
-    if (soma_model != nullptr)
-    {
-        soma_model->set_attributes(config.soma_model_params);
-    }
     soma_model_params.insert(
             config.soma_model_params.begin(), config.soma_model_params.end());
-    if (dendrite_model != nullptr)
-    {
-        dendrite_model->set_attributes(config.dendrite_model_params);
-    }
     dendrite_model_params.insert(config.dendrite_model_params.begin(),
             config.dendrite_model_params.end());
 }
@@ -184,9 +176,9 @@ void sanafe::Neuron::connect_to_neuron(Neuron &dest,
     con.synapse_params.insert(synapse_params.begin(), synapse_params.end());
     con.dendrite_params.insert(dendrite_params.begin(), dendrite_params.end());
 
-    //INFO("\tAdded con %s.%s->%s.%s\n", con.pre_neuron->parent_group_id.c_str(),
+    //INFO("\tAdded con %s.%s->%s.%s (w:%lf)\n", con.pre_neuron->parent_group_id.c_str(),
     //        con.pre_neuron->id.c_str(), con.post_neuron->parent_group_id.c_str(),
-    //        con.post_neuron->id.c_str());
+    //        con.post_neuron->id.c_str(), static_cast<double>(con.synapse_params["w"]));
 }
 
 sanafe::Network sanafe::load_net(const std::filesystem::path &path)
