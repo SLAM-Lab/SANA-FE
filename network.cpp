@@ -40,8 +40,6 @@ sanafe::Connection::Connection(const int connection_id)
         , pre_neuron(nullptr)
         , synapse_hw(nullptr)
         , id(connection_id)
-        , delay(0)
-        , last_updated(0)
 {
 }
 

@@ -252,10 +252,12 @@ struct Connection
     std::map<std::string, ModelParam> synapse_params;
     std::map<std::string, ModelParam> dendrite_params;
     std::shared_ptr<SynapseModel> synapse_model;
-    Neuron *post_neuron, *pre_neuron;
+    Neuron *post_neuron;
+    Neuron *pre_neuron;
     SynapseUnit *synapse_hw;
     std::string synapse_hw_name;
-    int id, delay, last_updated;
+    int id;
+    int last_updated{0};
 
     explicit Connection(int connection_id);
     //std::string description() const;
