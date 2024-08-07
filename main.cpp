@@ -133,11 +133,6 @@ int main(int argc, char *argv[])
         INFO("%s", exc.what());
         return 1;
     }
-    catch (const YAML::InvalidNode &exc)
-    {
-        INFO("Error: YAML parsing error %s\n", exc.what());
-        return 1;
-    }
     catch (const std::runtime_error &exc)
     {
         INFO("Error: runtime exception thrown: %s\n", exc.what());

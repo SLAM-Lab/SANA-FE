@@ -210,7 +210,9 @@ void sanafe::map_net(const std::filesystem::path &path, Network &net,
         throw std::invalid_argument(error);
     }
     INFO("Loading mappings from file: %s\n", path.c_str());
-    description_parse_mapping_file_yaml(mapping_fp, arch, net);
+    INFO("TODO: reenable mapping");
+    exit(1);
+//    description_parse_mapping_file_yaml(mapping_fp, arch, net);
     mapping_fp.close();
 }
 

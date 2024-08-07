@@ -3,11 +3,13 @@ network:
   groups:
     - name: 0
       attributes: [log_spikes: true, threshold: 1.0]
+      size: 3
       neurons:
         - 0: [log_potential: true, bias: 1.0]
         - 1..2: [bias: 0.0]
     - name: 1
       attributes: [log_spikes: true, threshold: 2.0, soma_hw_name: demo_soma_alt]
+      size: 3
       neurons:
         - 0..2: [bias: 1.0]
   edges:
