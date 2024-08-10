@@ -50,23 +50,21 @@ TilePowerMetrics description_parse_tile_metrics_yaml(ryml::ConstNodeRef attribut
 NetworkOnChipConfiguration description_parse_noc_configuration_yaml(ryml::ConstNodeRef noc_attributes);
 
 // Network description
-Network description_parse_network_file_yaml(std::ifstream &fp);
+Network description_parse_network_file_yaml(std::ifstream &fp, Architecture &arch);
 Network description_parse_network_section_yaml(ryml::ConstNodeRef net_node);
 void description_parse_neuron_group_section_yaml(ryml::ConstNodeRef groups_node, Network &net);
 void description_parse_edges_section_yaml(ryml::ConstNodeRef edges_node, Network &net);
 void description_parse_group(ryml::ConstNodeRef neuron_group_node, Network &net);
 void description_parse_neuron_section_yaml(ryml::ConstNodeRef neuron_node, NeuronGroup &neuron_group);
+// Neuron to Hardware Mapping
+void description_parse_mapping_section_yaml(const ryml::ConstNodeRef mappings_node, Architecture &arch, Network &net);
+void description_parse_mapping(Neuron &neuron, const ryml::ConstNodeRef mapping_info, Architecture &arch);
 
 void description_parse_neuron(const std::string &id, const ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
 NeuronTemplate description_parse_neuron_attributes_yaml(const ryml::ConstNodeRef attributes, const NeuronTemplate &default_template = NeuronTemplate());
 
 void description_parse_edge(const std::string &description, const ryml::ConstNodeRef edge_node, Network &network);
 std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description);
-
-// Neuron to Hardware Mapping
-void description_parse_mapping_file_yaml(std::ifstream &fp, Architecture &arch, Network &net);
-void description_parse_mapping_section_yaml(const ryml::ConstNodeRef mappings_node, Architecture &arch, Network &net);
-void description_parse_mapping(Neuron &neuron, const ryml::ConstNodeRef mapping_info, Architecture &arch);
 
 // Helper functions
 std::map<std::string, ModelParam> description_parse_model_parameters_yaml(const ryml::ConstNodeRef parameters_node);

@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 
     if (argc < sanafe::PROGRAM_NARGS)
     {
-        INFO("Usage: ./sim [-psvmo] <arch description> <network description> <mapping description> <timesteps>\n");
+        INFO("Usage: ./sim [-psvmo] <arch description> <network description> <timesteps>\n");
         return 0;
     }
 
@@ -90,8 +90,7 @@ int main(int argc, char *argv[])
                 sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
         INFO("Architecture initialized.\n");
         sanafe::Network net =
-                sanafe::load_net(argv[sanafe::NETWORK_FILENAME]);
-        sanafe::map_net(argv[sanafe::MAPPING_FILENAME], net, arch);
+                sanafe::load_net(argv[sanafe::NETWORK_FILENAME], arch);
         INFO("Network initialized.\n");
 
         sanafe::Simulation sim(arch, net, output_dir, record_spikes,

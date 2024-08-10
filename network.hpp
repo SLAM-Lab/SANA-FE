@@ -244,8 +244,7 @@ public:
     void check_mapped() const;
 };
 
-Network load_net(const std::filesystem::path &path);
-void map_net(const std::filesystem::path &path, Network &net, Architecture &arch);
+Network load_net(const std::filesystem::path &path, Architecture &arch);
 
 struct Connection
 {

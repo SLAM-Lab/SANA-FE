@@ -581,7 +581,8 @@ sanafe::Architecture sanafe::description_parse_arch_file_yaml(std::ifstream &fp)
             "No top-level architecture section defined", {});
 }
 
-sanafe::Network sanafe::description_parse_network_file_yaml(std::ifstream &fp)
+sanafe::Network sanafe::description_parse_network_file_yaml(
+        std::ifstream &fp, Architecture &arch)
 {
     if (!fp.is_open()) {
         throw std::runtime_error("Error opening file\n");
@@ -589,7 +590,7 @@ sanafe::Network sanafe::description_parse_network_file_yaml(std::ifstream &fp)
 
     // Get file size
     fp.seekg(0, std::ios::end);
-    std::streampos file_size = fp.tellg();
+    const std::streampos file_size = fp.tellg();
     fp.seekg(0, std::ios::beg);
 
     // Allocate memory
@@ -609,19 +610,32 @@ sanafe::Network sanafe::description_parse_network_file_yaml(std::ifstream &fp)
     INFO("Network YAML information loaded from file.\n");
 
     ryml::ConstNodeRef yaml_node = tree.rootref();
-    if (yaml_node.is_map() && (!yaml_node["network"].invalid()))
+    if (yaml_node.is_map())
     {
-        return description_parse_network_section_yaml(yaml_node["network"]);
+        if (yaml_node["network"].invalid())
+        {
+            throw DescriptionParsingError(
+                "No top-level 'network' section defined", yaml_node);
+        }
+        Network net = description_parse_network_section_yaml(
+                yaml_node["network"]);
+        if (yaml_node["mappings"].invalid())
+        {
+            throw DescriptionParsingError(
+                "No 'mappings' section defined", yaml_node);
+        }
+        description_parse_mapping_section_yaml(yaml_node["mappings"], arch, net);
+
+        return net;
     }
     throw DescriptionParsingError(
-            "No top-level network section defined", yaml_node);
+            "Mapped network file has invalid format", yaml_node);
 }
 
 sanafe::Network sanafe::description_parse_network_section_yaml(
         const ryml::ConstNodeRef net_node)
 {
     std::string net_name;
-    // TODO: refactor?
     if (!net_node["name"].invalid())
     {
         net_node["name"] >> net_name;
@@ -962,23 +976,6 @@ void sanafe::description_parse_edge(const std::string &description,
             dst_neuron, synapse_params, dendrite_params, synapse_hw_name);
 }
 
-// TODO: Disabling for now while adapting to rapidyaml
-/*
-void sanafe::description_parse_mapping_file_yaml(
-        std::ifstream &fp, Architecture &arch, Network &net)
-{
-    ryml::ConstNodeRef yaml_node = YAML::Load(fp);
-    INFO("YAML information loaded from file.\n");
-    if (yaml_node.is_map() && yaml_node["mappings"].IsDefined())
-    {
-        description_parse_mapping_section_yaml(
-                yaml_node["mappings"], arch, net);
-        return;
-    }
-    throw DescriptionParsingError(
-            "No top level mapping section defined", yaml_node.Mark());
-}
-
 void sanafe::description_parse_mapping_section_yaml(
         const ryml::ConstNodeRef mappings_node, Architecture &arch, Network &net)
 {
@@ -991,7 +988,7 @@ void sanafe::description_parse_mapping_section_yaml(
                 "core address.\nE.g.: "
                 "- G.n: {core: 1.1}\nThis maps group G's neuron 'n' "
                 "to Tile 1's Core 1, specifically using soma unit 'foo'.)",
-                mappings_node.Mark());
+                mappings_node);
     }
 
     for (const auto &mapping : mappings_node)
@@ -999,15 +996,14 @@ void sanafe::description_parse_mapping_section_yaml(
         if (!mapping.is_map())
         {
             throw DescriptionParsingError(
-                    "Expected mapping to be defined with "
-                    "the neuron as the key, and the destination hardware as "
-                    "the value.",
-                    mapping.Mark());
+                    "Expected mapping to be defined in the format: "
+                    "<group>.<neuron>: {core: <tile>.<core>}", mapping);
         }
 
-        for (const auto &pair : mapping)
+        for (const auto &entry : mapping)
         {
-            auto neuron_address = pair.first.as<std::string>();
+            std::string neuron_address;
+            entry >> ryml::key(neuron_address);
             const auto dot_pos = neuron_address.find('.');
 
             const std::string group_name = neuron_address.substr(0, dot_pos);
@@ -1015,7 +1011,7 @@ void sanafe::description_parse_mapping_section_yaml(
             if (net.groups.find(group_name) == net.groups.end())
             {
                 const std::string error = "Invalid neuron group:" + group_name;
-                throw DescriptionParsingError(error, mapping.Mark());
+                throw DescriptionParsingError(error, mapping);
             }
             NeuronGroup &group = net.groups.at(group_name);
             if (group.neurons.find(neuron_id) == group.neurons.end())
@@ -1024,11 +1020,11 @@ void sanafe::description_parse_mapping_section_yaml(
                 error += group_name;
                 error += '.';
                 error += neuron_id;
-                throw DescriptionParsingError(error, mapping.Mark());
+                throw DescriptionParsingError(error, mapping);
             }
             Neuron &neuron = group.neurons.at(neuron_id);
 
-            description_parse_mapping(neuron, pair.second, arch);
+            description_parse_mapping(neuron, entry, arch);
         }
     }
 }
@@ -1040,8 +1036,8 @@ void sanafe::description_parse_mapping(
     {
         throw DescriptionParsingError(
                 "Invalid mapping: mappings must be defined using a YAML map "
-                "using 'core', 'synapse', 'dendrite' and / or 'soma' keys",
-                mapping_info.Mark());
+                "using 'core' key",
+                mapping_info);
     }
 
     const auto core_address =
@@ -1052,35 +1048,20 @@ void sanafe::description_parse_mapping(
     const size_t core_offset_within_tile =
             std::stoull(core_address.substr(dot_pos + 1));
 
-    if (mapping_info["soma"].IsDefined())
-    {
-        neuron.soma_hw_name = mapping_info["soma"].as<std::string>();
-    }
-    if (mapping_info["dendrite"].IsDefined())
-    {
-        neuron.dendrite_hw_name = mapping_info["dendrite"].as<std::string>();
-    }
-    if (mapping_info["synapse"].IsDefined())
-    {
-        neuron.default_synapse_hw_name =
-                mapping_info["synapse"].as<std::string>();
-    }
-
     if (tile_id > arch.tiles.size())
     {
         throw DescriptionParsingError(
-                "Tile ID >= tile count", mapping_info.Mark());
+                "Tile ID >= tile count", mapping_info);
     }
     Tile &tile = arch.tiles[tile_id];
     if (core_offset_within_tile > arch.tiles.size())
     {
         throw DescriptionParsingError(
-                "Core ID >= core count", mapping_info.Mark());
+                "Core ID >= core count", mapping_info);
     }
     Core &core = tile.cores[core_offset_within_tile];
     core.map_neuron(neuron);
 }
-*/
 
 std::map<std::string, sanafe::ModelParam>
 sanafe::description_parse_model_parameters_yaml(

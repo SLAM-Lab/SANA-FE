@@ -99,7 +99,6 @@ enum ProgramArgs
 {
     ARCH_FILENAME = 0,
     NETWORK_FILENAME,
-    MAPPING_FILENAME,
     TIMESTEPS,
     PROGRAM_NARGS,
 };

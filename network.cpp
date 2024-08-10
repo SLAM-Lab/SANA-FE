@@ -179,7 +179,8 @@ void sanafe::Neuron::connect_to_neuron(Neuron &dest,
     //        con.post_neuron->id.c_str(), static_cast<double>(con.synapse_params["w"]));
 }
 
-sanafe::Network sanafe::load_net(const std::filesystem::path &path)
+sanafe::Network sanafe::load_net(
+        const std::filesystem::path &path, Architecture &arch)
 {
     std::ifstream network_fp;
 
@@ -191,29 +192,10 @@ sanafe::Network sanafe::load_net(const std::filesystem::path &path)
         throw std::invalid_argument(error);
     }
     INFO("Loading network from file: %s\n", path.c_str());
-    Network net = description_parse_network_file_yaml(network_fp);
+    Network net = description_parse_network_file_yaml(network_fp, arch);
     network_fp.close();
 
     return net;
-}
-
-void sanafe::map_net(const std::filesystem::path &path, Network &net,
-        Architecture &arch)
-{
-    std::ifstream mapping_fp;
-
-    mapping_fp.open(path);
-    if (mapping_fp.fail())
-    {
-        const std::string error = "Error: Mapping file: failed to open (" +
-                std::string(path) + ").";
-        throw std::invalid_argument(error);
-    }
-    INFO("Loading mappings from file: %s\n", path.c_str());
-    INFO("TODO: reenable mapping");
-    exit(1);
-//    description_parse_mapping_file_yaml(mapping_fp, arch, net);
-    mapping_fp.close();
 }
 
 std::string sanafe::Network::info() const
