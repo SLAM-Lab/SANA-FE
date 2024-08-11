@@ -126,8 +126,8 @@ double sanafe::MultiTapModel1D::update(
     {
         const Synapse &syn = synapse_in.value();
         int compartment = 0;
-        const auto &tap = syn.dendrite_params.find("tap");
-        if (tap != syn.dendrite_params.end())
+        const auto &tap = syn.con.dendrite_params.find("tap");
+        if (tap != syn.con.dendrite_params.end())
         {
             compartment = static_cast<int>(tap->second);
         }

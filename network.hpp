@@ -264,7 +264,8 @@ struct Synapse
     double current;
     // TODO: prepare the dendrite parameters into an object? would be much
     //  more efficient. This can be an any pointer? Or to a base dendrite class
-    std::map<std::string, ModelParam> dendrite_params;
+    //std::map<std::string, ModelParam> dendrite_params;
+    Connection &con;
 };
 
 struct NeuronAddress

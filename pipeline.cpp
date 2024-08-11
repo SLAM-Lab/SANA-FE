@@ -176,7 +176,7 @@ double sanafe::pipeline_process_synapse(
         con.synapse_model->update();
         con.last_updated++;
     }
-    Synapse synapse_data = {0.0, con.dendrite_params};
+    Synapse synapse_data = {0.0, con};
     synapse_data.current = con.synapse_model->update(synapse_address, false);
 
     // Input and buffer synaptic info at the next hardware unit (dendrite unit)
