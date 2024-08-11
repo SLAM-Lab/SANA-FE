@@ -66,7 +66,6 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name, Network &parent_n
         , name(std::move(group_name))
 {
     neurons.reserve(neuron_count);
-    INFO("Neuron count: %zu\n", neuron_count);
     for (size_t nid = 0; nid < neuron_count; nid++)
     {
         neurons.emplace_back(

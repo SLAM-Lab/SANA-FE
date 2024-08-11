@@ -55,6 +55,7 @@ FetchContent_Declare(ryml
     GIT_SHALLOW FALSE  # ensure submodules are checked out
 )
 FetchContent_MakeAvailable(ryml)
+set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 ##### END OF rapid-yaml
 
 include_directories(${PYTHON_INCLUDE_DIRS})
