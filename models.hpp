@@ -114,7 +114,7 @@ private:
 class SomaModel
 {
 public:
-    SomaModel(std::string gid, std::string nid) : group_id(std::move(gid)), neuron_id(std::move(nid)) {}
+    SomaModel(std::string gid, size_t nid) : group_id(std::move(gid)), neuron_id(nid) {}
     SomaModel(const SomaModel &copy) = default;
     SomaModel(SomaModel &&other) = default;
     virtual ~SomaModel() = default;
@@ -126,13 +126,13 @@ public:
     virtual double get_potential() { return 0.0; }
 protected:
     const std::string group_id;
-    const std::string neuron_id;
+    const size_t neuron_id;
 };
 
 class LoihiLifModel : public SomaModel
 {
 public:
-    LoihiLifModel(std::string gid, std::string nid);
+    LoihiLifModel(std::string gid, size_t nid);
     LoihiLifModel(const LoihiLifModel &copy) = default;
     LoihiLifModel(LoihiLifModel &&other) = default;
     ~LoihiLifModel() override = default;
@@ -159,7 +159,7 @@ private:
 class TrueNorthModel : public SomaModel
 {
 public:
-    TrueNorthModel(const std::string &gid, const std::string &nid);
+    TrueNorthModel(const std::string &gid, size_t nid);
     TrueNorthModel(const TrueNorthModel &copy) = default;
     TrueNorthModel(TrueNorthModel &&other) = default;
     ~TrueNorthModel() override = default;
@@ -188,7 +188,7 @@ private:
 NeuronResetModes model_parse_reset_mode(const std::string &str);
 std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name);
 std::shared_ptr<DendriteModel> model_get_dendrite(const std::string &model_name);
-std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const std::string &group_id, const std::string &id);
+std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const std::string &group_id, size_t id);
 
 }
 

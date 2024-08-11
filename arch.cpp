@@ -569,8 +569,8 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
         curr_connection.synapse_model->set_attributes(
                 curr_connection.synapse_params);
     }
-    TRACE1("Finished mapping connections to hardware for nid:%s.%d.\n",
-            pre_neuron.parent_group_id.c_str(), pre_neuron.id.c_str());
+    TRACE1("Finished mapping connections to hardware for nid:%s.%zu.\n",
+            pre_neuron.parent_group_id.c_str(), pre_neuron.id);
 }
 
 void sanafe::Core::map_neuron(Neuron &n)
@@ -617,9 +617,9 @@ void sanafe::Core::map_neuron(Neuron &n)
         }
         if (!dendrite_found)
         {
-            INFO("Error: Could not map neuron nid:%s (hw:%s) "
+            INFO("Error: Could not map neuron nid:%zu (hw:%s) "
                  "to any dendrite h/w.\n",
-                    n.id.c_str(), n.dendrite_hw_name.c_str());
+                    n.id, n.dendrite_hw_name.c_str());
             throw std::runtime_error(
                     "Error: Could not map neuron to dendrite h/w");
         }
@@ -644,9 +644,9 @@ void sanafe::Core::map_neuron(Neuron &n)
         }
         if (!soma_found)
         {
-            INFO("Error: Could not map neuron nid:%s (hw:%s) "
+            INFO("Error: Could not map neuron nid:%zu (hw:%s) "
                  "to any soma h/w.\n",
-                    n.id.c_str(), n.soma_hw_name.c_str());
+                    n.id, n.soma_hw_name.c_str());
             throw std::runtime_error("Error: Could not map neuron to soma h/w");
         }
     }
@@ -750,7 +750,7 @@ void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)
 
     // Then add the output axon to the sending pre-synaptic neuron
     pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
-    TRACE1("nid:%s.%s cid:%zu.%zu added one output axon address %zu.\n",
+    TRACE1("nid:%s.%zu cid:%zu.%zu added one output axon address %zu.\n",
             pre_neuron.parent_group_id.c_str(), pre_neuron.id.c_str(),
             pre_core.parent_tile_id, pre_core.offset, new_axon_out_address);
 }

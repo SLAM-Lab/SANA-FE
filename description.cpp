@@ -713,6 +713,14 @@ void sanafe::description_parse_group(
 
     check_key(neuron_group_node, "neurons");
     const auto &neurons_node = neuron_group_node["neurons"];
+    if (neuron_group_node["size"].invalid())
+    {
+        throw DescriptionParsingError(
+                "Neuron group 'size' (aka neuron count) not given",
+                neuron_group_node);
+    }
+    size_t neuron_count;
+    neuron_group_node["size"] >> neuron_count;
 
     NeuronTemplate default_neuron_config{};
     if (!neuron_group_node["attributes"].invalid())
@@ -721,8 +729,8 @@ void sanafe::description_parse_group(
         default_neuron_config = description_parse_neuron_attributes_yaml(
                 neuron_group_node["attributes"]);
     }
-    NeuronGroup &group =
-            net.create_neuron_group(group_name, default_neuron_config);
+    NeuronGroup &group = net.create_neuron_group(
+            group_name, neuron_count, default_neuron_config);
     INFO("Parsing neuron section\n");
     description_parse_neuron_section_yaml(neurons_node, group);
 }
@@ -754,34 +762,24 @@ void sanafe::description_parse_neuron_section_yaml(
 void sanafe::description_parse_neuron(const std::string &id,
         const ryml::ConstNodeRef attributes, NeuronGroup &neuron_group)
 {
-    std::pair<size_t, size_t> range = {0, 0};
+    std::pair<size_t, size_t> range;
     INFO("Parsing neuron(s): %s\n", id.c_str());
+    const NeuronTemplate config = description_parse_neuron_attributes_yaml(
+            attributes, neuron_group.default_neuron_config);
     if (id.find("..") != std::string::npos)
     {
         range = description_parse_range_yaml(id);
-    }
-    const NeuronTemplate config = description_parse_neuron_attributes_yaml(
-            attributes, neuron_group.default_neuron_config);
-    for (size_t instance = range.first; instance <= range.second; ++instance)
-    {
-        std::string instance_name = id;
-        const bool range_given = (range.second > range.first);
-        if (range_given)
+        for (size_t instance = range.first; instance <= range.second; ++instance)
         {
-            const bool bracket_notation =
-                    (id.find('[') != std::string::npos);
-            if (bracket_notation)  // E.g., n[123] for instance 123
-            {
-                instance_name = id.substr(0, id.find('[')) +
-                        '[' + std::to_string(instance) + ']';
-            }
-            else  // Special case where id is only integer value in the range
-            {
-                instance_name = std::to_string(instance);
-            }
+            Neuron &n = neuron_group.neurons[instance];
+            n.set_attributes(config);
         }
-
-        neuron_group.create_neuron(instance_name, config);
+    }
+    else
+    {
+        const size_t nid = std::stoull(id);
+        Neuron &n = neuron_group.neurons[nid];
+        n.set_attributes(config);
     }
 }
 
@@ -887,11 +885,11 @@ sanafe::description_parse_edge_description(const std::string_view &description)
 
     NeuronAddress source;
     source.group_name = source_part.substr(0, source_dot_pos);
-    source.neuron_id = source_part.substr(source_dot_pos + 1);
+    source.neuron_id = std::stoull(std::string(source_part.substr(source_dot_pos + 1)));
 
     NeuronAddress target;
     target.group_name = target_part.substr(0, target_dot_pos);
-    target.neuron_id = target_part.substr(target_dot_pos + 1);
+    target.neuron_id = std::stoull(std::string(target_part.substr(target_dot_pos + 1)));
 
     return std::make_tuple(source, target);
 }
@@ -919,14 +917,14 @@ void sanafe::description_parse_edge(const std::string &description,
         throw DescriptionParsingError(error, attributes_node);
     }
     NeuronGroup &src_group = net.groups.at(source_address.group_name);
-    if (src_group.neurons.find(source_address.neuron_id) ==
-            src_group.neurons.end())
+    if (source_address.neuron_id > src_group.neurons.size())
     {
-        const std::string error = "Invalid source neuron id: " +
-                source_address.group_name + "." + source_address.neuron_id;
+        const std::string error =
+                "Invalid source neuron id: " + source_address.group_name + "." +
+                std::to_string(source_address.neuron_id);
         throw DescriptionParsingError(error, attributes_node);
     }
-    Neuron &src_neuron = src_group.neurons.at(source_address.neuron_id);
+    Neuron &src_neuron = src_group.neurons[source_address.neuron_id];
 
     if (net.groups.find(target_address.group_name) == net.groups.end())
     {
@@ -936,11 +934,11 @@ void sanafe::description_parse_edge(const std::string &description,
     }
     NeuronGroup &dst_group = net.groups.at(target_address.group_name);
 
-    if (dst_group.neurons.find(target_address.neuron_id) ==
-            dst_group.neurons.end())
+    if (target_address.neuron_id > dst_group.neurons.size())
     {
-        const std::string error = "Invalid target neuron id: " +
-                target_address.group_name + "." + target_address.neuron_id;
+        const std::string error =
+                "Invalid target neuron id: " + target_address.group_name + "." +
+                std::to_string(target_address.neuron_id);
         throw DescriptionParsingError(error, attributes_node);
     }
     Neuron &dst_neuron = dst_group.neurons.at(target_address.neuron_id);
@@ -1007,14 +1005,16 @@ void sanafe::description_parse_mapping_section_yaml(
             const auto dot_pos = neuron_address.find('.');
 
             const std::string group_name = neuron_address.substr(0, dot_pos);
-            const std::string neuron_id = neuron_address.substr(dot_pos + 1);
+            const size_t neuron_id =
+                    std::stoull(neuron_address.substr(dot_pos + 1));
             if (net.groups.find(group_name) == net.groups.end())
             {
                 const std::string error = "Invalid neuron group:" + group_name;
                 throw DescriptionParsingError(error, mapping);
             }
+            //INFO("Mapping neuron: %s.%zu\n", group_name.c_str(), neuron_id);
             NeuronGroup &group = net.groups.at(group_name);
-            if (group.neurons.find(neuron_id) == group.neurons.end())
+            if (neuron_id >= group.neurons.size())
             {
                 std::string error = "Invalid neuron id: ";
                 error += group_name;
@@ -1022,7 +1022,7 @@ void sanafe::description_parse_mapping_section_yaml(
                 error += neuron_id;
                 throw DescriptionParsingError(error, mapping);
             }
-            Neuron &neuron = group.neurons.at(neuron_id);
+            Neuron &neuron = group.neurons[neuron_id];
 
             description_parse_mapping(neuron, entry, arch);
         }
@@ -1036,7 +1036,7 @@ void sanafe::description_parse_mapping(
     {
         throw DescriptionParsingError(
                 "Invalid mapping: mappings must be defined using a YAML map "
-                "using 'core' key",
+                "<group>.<neuron>: core: <tile>.<core>",
                 mapping_info);
     }
 

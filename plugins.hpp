@@ -19,7 +19,7 @@ void plugin_init_dendrite(const std::string &model_name, const std::filesystem::
 void plugin_init_soma(const std::string &model_name, const std::filesystem::path &plugin_path);
 std::shared_ptr<SynapseModel> plugin_get_synapse(const std::string &model_name, const std::filesystem::path &plugin_path);
 std::shared_ptr<DendriteModel> plugin_get_dendrite(const std::string &model_name, const std::filesystem::path &plugin_path);
-std::shared_ptr<SomaModel> plugin_get_soma(const std::string &model_name, const std::string &gid, const std::string &nid, const std::filesystem::path &plugin_path);
+std::shared_ptr<SomaModel> plugin_get_soma(const std::string &model_name, const std::string &gid, size_t nid, const std::filesystem::path &plugin_path);
 }
 
 #endif

@@ -207,8 +207,8 @@ void sanafe::MultiTapModel1D::set_attributes(
 
 // **** Soma models ****
 sanafe::LoihiLifModel::LoihiLifModel(
-        std::string gid, std::string nid)
-        : sanafe::SomaModel(std::move(gid), std::move(nid))
+        std::string gid, size_t nid)
+        : sanafe::SomaModel(std::move(gid), nid)
 {
 }
 
@@ -337,7 +337,7 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
 }
 
 sanafe::TrueNorthModel::TrueNorthModel(
-        const std::string &gid, const std::string &nid)
+        const std::string &gid, const size_t nid)
         : sanafe::SomaModel(gid, nid)
 {
 }
@@ -547,7 +547,7 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
 
 std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
         const std::string &model_name, const std::string &group_id,
-        const std::string &id)
+        const size_t id)
 {
     if (model_name == "leaky_integrate_fire")
     {

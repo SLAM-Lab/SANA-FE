@@ -168,10 +168,8 @@ public:
     std::shared_ptr<SomaModel> soma_model{nullptr};
     std::shared_ptr<DendriteModel> dendrite_model{nullptr};
 
-    std::string id;
     std::string parent_group_id;
-    size_t order_created_within_group{0};
-    size_t position_defined{0};
+    size_t id{};
     int forced_spikes{0};
     int spike_count{0};
     int soma_last_updated{0};
@@ -188,9 +186,9 @@ public:
     double soma_input_charge{0.0};
     bool axon_out_input_spike{false};
 
-    explicit Neuron(std::string neuron_id, Network &parent_net, std::string parent_group_id, const NeuronTemplate &config);
-    [[nodiscard]] std::string get_id() const { return id; }
-    //void set_attributes(const NeuronTemplate &attributes);
+    explicit Neuron(size_t neuron_id, Network &parent_net, const std::string parent_group_id, const NeuronTemplate &config);
+    [[nodiscard]] size_t get_id() const { return id; }
+    void set_attributes(const NeuronTemplate &attributes);
     void connect_to_neuron(Neuron &dest, const std::map<std::string, ModelParam> &synapse_params, const std::map<std::string, ModelParam> &dendrite_params,  const std::optional<std::string> &synapse_hw_name = std::nullopt);
     [[nodiscard]] std::string info() const;
     //std::string description(const bool write_mapping=true) const;
@@ -201,15 +199,14 @@ class NeuronGroup
 public:
     // A neuron group is a collection of neurons that share common
     //  parameters. All neurons must be based on the same neuron model.
-    std::map<std::string, Neuron> neurons;
+    std::vector<Neuron> neurons;
     NeuronTemplate default_neuron_config;
     Network *parent_net{nullptr};
     std::string name;
     size_t order_created{0};
     size_t position_defined{0};
     [[nodiscard]] std::string get_id() const { return name; }
-    explicit NeuronGroup(std::string group_name, Network &parent_net, const NeuronTemplate &default_config);
-    Neuron &create_neuron(const std::string &id, const NeuronTemplate &config);
+    explicit NeuronGroup(const std::string group_name, Network &parent_net, size_t neuron_count, const NeuronTemplate &default_config);
 
     //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
     //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
@@ -238,7 +235,7 @@ public:
     Network(const Network &) = delete;
     Network &operator=(const Network &) = delete;
 
-    NeuronGroup &create_neuron_group(const std::string &name, const NeuronTemplate &default_config);
+    NeuronGroup &create_neuron_group(const std::string name, size_t neuron_count, const NeuronTemplate &default_config);
     [[nodiscard]] std::string info() const;
     //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
     void check_mapped() const;
@@ -273,7 +270,7 @@ struct Synapse
 struct NeuronAddress
 {
     std::string group_name{};
-    std::string neuron_id{};
+    size_t neuron_id{};
 };
 
 // Alternative ModelParameter implementations. Keep for now.. maybe find

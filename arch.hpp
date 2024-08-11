@@ -102,7 +102,7 @@ struct Message
     long int timestep;
     int spikes{0};
     size_t hops{0UL};
-    std::string src_neuron_id;
+    size_t src_neuron_id;
     std::string src_neuron_group_id;
     int src_x;
     int dest_x{0};
@@ -366,7 +366,7 @@ struct AxonOutModel
     int dest_axon_id{-1};
     int dest_tile_id{-1};
     int dest_core_offset{-1};
-    std::string src_neuron_id{};
+    size_t src_neuron_id{};
 };
 
 void arch_create_axons(Architecture &arch);

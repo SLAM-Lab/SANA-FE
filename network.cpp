@@ -59,23 +59,30 @@ std::string sanafe::Connection::description() const
 }
 */
 
-sanafe::NeuronGroup::NeuronGroup(std::string group_name,
-        Network &parent_net, const NeuronTemplate &default_config)
+sanafe::NeuronGroup::NeuronGroup(const std::string group_name, Network &parent_net,
+        const size_t neuron_count, const NeuronTemplate &default_config)
         : default_neuron_config(default_config)
         , parent_net(&parent_net)
         , name(std::move(group_name))
 {
+    neurons.reserve(neuron_count);
+    INFO("Neuron count: %zu\n", neuron_count);
+    for (size_t nid = 0; nid < neuron_count; nid++)
+    {
+        neurons.emplace_back(
+                Neuron(nid, parent_net, group_name, default_config));
+    }
 }
 
-sanafe::Neuron::Neuron(std::string neuron_id,
-        Network &parent_net, std::string parent_group_id,
+sanafe::Neuron::Neuron(const size_t neuron_id,
+        Network &parent_net, const std::string parent_group_id,
         const NeuronTemplate &config)
         : parent_net(&parent_net)
         , soma_hw_name(config.soma_hw_name)
         , default_synapse_hw_name(config.default_synapse_hw_name)
         , dendrite_hw_name(config.dendrite_hw_name)
-        , id(std::move(neuron_id))
         , parent_group_id(std::move(parent_group_id))
+        , id(neuron_id)
         , force_update(config.force_update)
         , log_spikes(config.log_spikes)
         , log_potential(config.log_potential)
@@ -88,6 +95,14 @@ sanafe::Neuron::Neuron(std::string neuron_id,
             config.soma_model_params.begin(), config.soma_model_params.end());
     dendrite_model_params.insert(config.dendrite_model_params.begin(),
             config.dendrite_model_params.end());
+}
+
+void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
+{
+    soma_model_params.insert(attributes.soma_model_params.begin(),
+            attributes.soma_model_params.end());
+    dendrite_model_params.insert(attributes.dendrite_model_params.begin(),
+            attributes.dendrite_model_params.end());
 }
 
 std::string sanafe::Neuron::info() const
@@ -117,10 +132,13 @@ std::string sanafe::Neuron::description(const bool write_mapping) const
 */
 
 sanafe::NeuronGroup &sanafe::Network::create_neuron_group(
-        const std::string &name, const NeuronTemplate &default_config)
+        const std::string name, const size_t neuron_count,
+        const NeuronTemplate &default_config)
 {
-    groups.emplace(name, NeuronGroup(name, *this, default_config));
-    INFO("Created neuron group gid:%s\n", name.c_str());
+    groups.emplace(
+            name, NeuronGroup(name, *this, neuron_count, default_config));
+    INFO("Created neuron group gid:%s with %zu neurons\n", name.c_str(),
+            neuron_count);
 
     return groups.at(name);
 }
@@ -143,15 +161,6 @@ std::string sanafe::NeuronGroup::info() const
     //ss << " attributes={" << print_format_attributes(default_attributes);
     ss << "})";
     return ss.str();
-}
-
-sanafe::Neuron &sanafe::NeuronGroup::create_neuron(
-        const std::string &id, const NeuronTemplate &config)
-{
-    neurons.emplace(id, Neuron(id, *parent_net, name, config));
-    //INFO("Created neuron nid:%s.%s\n", name.c_str(), id.c_str());
-
-    return neurons.at(id);
 }
 
 void sanafe::Neuron::connect_to_neuron(Neuron &dest,
@@ -210,13 +219,12 @@ void sanafe::Network::check_mapped() const
     for (const auto &group_entry : groups)
     {
         const NeuronGroup &group = group_entry.second;
-        for (const auto &neuron_entry : group.neurons)
+        for (const auto &neuron : group.neurons)
         {
-            const Neuron &neuron = neuron_entry.second;
             if (neuron.core == nullptr)
             {
-                INFO("Error: Neuron %s.%s not mapped to H/W.\n",
-                        group.name.c_str(), neuron.id.c_str());
+                INFO("Error: Neuron %s.%zu not mapped to H/W.\n",
+                        group.name.c_str(), neuron.id);
                 throw std::runtime_error("Error: Neuron isn't mapped");
             }
         }

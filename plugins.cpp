@@ -17,7 +17,7 @@
 using _create_synapse = sanafe::SynapseModel *();
 using _create_dendrite = sanafe::DendriteModel *();
 using _create_soma = sanafe::SomaModel *(
-        const std::string &gid, const std::string &nid);
+        const std::string &gid, const size_t nid);
 
 std::map<std::string, _create_synapse *> plugin_create_synapse;
 std::map<std::string, _create_dendrite *> plugin_create_dendrite;
@@ -160,7 +160,7 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::plugin_get_dendrite(
 
 std::shared_ptr<sanafe::SomaModel> sanafe::plugin_get_soma(
         const std::string &model_name, const std::string &gid,
-        const std::string &nid, const std::filesystem::path &plugin_path)
+        const size_t nid, const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
     {
