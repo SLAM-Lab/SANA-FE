@@ -64,6 +64,7 @@ void description_parse_neuron(const std::string &id, const ryml::Parser &parser,
 NeuronTemplate description_parse_neuron_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes, const NeuronTemplate &default_template = NeuronTemplate());
 
 void description_parse_edge(const std::string &description, const ryml::Parser &parser, const ryml::ConstNodeRef edge_node, Network &network);
+void description_parse_edge_attributes(Connection &con, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node);
 std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description);
 
 // Helper functions

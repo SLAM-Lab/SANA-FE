@@ -926,15 +926,6 @@ void sanafe::description_parse_edge(const std::string &description,
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node,
         Network &net)
 {
-    /*
-    if (attributes_node.is_seq())
-    {
-        for (const YAML::Node &attr : attributes_node)
-        {
-            description_parse_edge(description, attr, net);
-        }
-    }
-    */
     // Description has format src_group.src_neuron -> tgt_group.tgt_neuron
     auto [source_address, target_address] =
             description_parse_edge_description(description);
@@ -972,19 +963,34 @@ void sanafe::description_parse_edge(const std::string &description,
     }
     Neuron &dst_neuron = dst_group.neurons.at(target_address.neuron_id);
 
-    // TODO: fix this inefficient space usage. There's a lot of duplication of
-    //  attributes. We only need to store the unique entries
-    std::map<std::string, ModelParam> synapse_params{};
-    std::map<std::string, ModelParam> dendrite_params{};
+    Connection &con = src_neuron.connect_to_neuron(dst_neuron);
+    // TODO: create a ConnectionTemplate? and pass this when connecting two
+    //  neurons instead. The problem with using a reference is when the vector
+    //  of connections expands, any references may become invalidated...
+    description_parse_edge_attributes(con, parser, attributes_node);
+}
+
+void sanafe::description_parse_edge_attributes(Connection &con,
+        const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node)
+{
+    if (attributes_node.is_seq())
+    {
+        for (const auto &attribute : attributes_node)
+        {
+            description_parse_edge_attributes(con, parser, attribute);
+        }
+
+        return;
+    }
 
     if (!attributes_node.find_child("synapse").invalid())
     {
-        synapse_params = description_parse_model_parameters_yaml(
+        con.synapse_params = description_parse_model_parameters_yaml(
                 parser, attributes_node["synapse"]);
     }
     if (!attributes_node.find_child("dendrite").invalid())
     {
-        dendrite_params = description_parse_model_parameters_yaml(
+        con.dendrite_params = description_parse_model_parameters_yaml(
                 parser, attributes_node["dendrite"]);
     }
 
@@ -994,14 +1000,12 @@ void sanafe::description_parse_edge(const std::string &description,
     {
         if ((key != "synapse") && (key != "dendrite") && (key != "soma"))
         {
-            synapse_params.insert({key, parameter});
-            dendrite_params.insert({key, parameter});
+            con.synapse_params.insert({key, parameter});
+            con.dendrite_params.insert({key, parameter});
         }
     }
-    std::optional<std::string> synapse_hw_name;
-    src_neuron.connect_to_neuron(
-            dst_neuron, synapse_params, dendrite_params, synapse_hw_name);
 }
+
 
 void sanafe::description_parse_mapping_section_yaml(const ryml::Parser &parser,
         const ryml::ConstNodeRef mappings_node, Architecture &arch,

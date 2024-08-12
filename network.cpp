@@ -162,29 +162,26 @@ std::string sanafe::NeuronGroup::info() const
     return ss.str();
 }
 
-void sanafe::Neuron::connect_to_neuron(Neuron &dest,
-        const std::map<std::string, ModelParam> &synapse_params,
-        const std::map<std::string, ModelParam> &dendrite_params,
-        const std::optional<std::string> &synapse_hw_name)
+sanafe::Connection &sanafe::Neuron::connect_to_neuron(Neuron &dest)
 {
     connections_out.emplace_back(Connection(connections_out.size()));
     Connection &con = connections_out.back();
     con.pre_neuron = this;
     con.post_neuron = &dest;
-    if (synapse_hw_name.has_value())
-    {
-        con.synapse_hw_name = synapse_hw_name.value();
-    }
-    else
+    //if (synapse_hw_name.has_value())
+    //{
+    //    con.synapse_hw_name = synapse_hw_name.value();
+    //}
+    //else
     {
         con.synapse_hw_name = default_synapse_hw_name;
     }
-    con.synapse_params.insert(synapse_params.begin(), synapse_params.end());
-    con.dendrite_params.insert(dendrite_params.begin(), dendrite_params.end());
 
-    //INFO("\tAdded con %s.%s->%s.%s (w:%lf)\n", con.pre_neuron->parent_group_id.c_str(),
-    //        con.pre_neuron->id.c_str(), con.post_neuron->parent_group_id.c_str(),
-    //        con.post_neuron->id.c_str(), static_cast<double>(con.synapse_params["w"]));
+    TRACE1("\tAdded con %s.%s->%s.%s (w:%lf)\n", con.pre_neuron->parent_group_id.c_str(),
+            con.pre_neuron->id.c_str(), con.post_neuron->parent_group_id.c_str(),
+            con.post_neuron->id.c_str(), static_cast<double>(con.synapse_params["w"]));
+
+    return con;
 }
 
 sanafe::Network sanafe::load_net(
