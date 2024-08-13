@@ -539,7 +539,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
             if (!synapse_found)
             {
                 INFO("Error: Could not map connection (hw:%s) "
-                     "to any dendrite h/w.\n",
+                     "to any synapse h/w.\n",
                         curr_connection.synapse_hw_name.c_str());
                 throw std::runtime_error(
                         "Error: Could not map connection to synapse h/w");

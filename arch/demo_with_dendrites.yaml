@@ -1,11 +1,11 @@
 architecture:
-  name: demo
+  name: dendrite
   attributes:
     link_buffer_size: 4
     width: 2
     height: 1
   tile:
-    - name: demo_tile
+    - name: tile
       attributes:
         energy_north_hop: 2.0e-12
         latency_north_hop: 1.4e-9
@@ -16,24 +16,29 @@ architecture:
         energy_west_hop: 1.8e-12
         latency_west_hop: 2.0e-9
       core:
-        - name: demo_core
+        - name: core
           attributes:
-            buffer_before: soma
+            buffer_position: soma
+            max_neurons_supported: 1024
           axon_in:
-            - name: demo_in
+            - name: axon_in
               attributes:
+                energy_message_in: 0.0
+                latency_message_in: 0.0
           synapse:
-            - name: demo_synapse
+            - name: synapse
               attributes:
                 model: current_based
                 energy_process_spike: 20.0e-12
                 latency_process_spike: 3.0e-9
           dendrite:
-            - name: demo_dendrite
+            - name: dendrite
               attributes:
+                energy_access: 0.0
+                latency_access: 0.0
                 model: taps
           soma:
-            - name: demo_soma_default
+            - name: soma
               attributes:
                 model: leaky_integrate_fire
                 energy_access_neuron: 20.0e-12
@@ -43,7 +48,7 @@ architecture:
                 energy_spike_out: 60.0e-12
                 latency_spike_out: 30.0e-9
           axon_out:
-            - name: demo_out
+            - name: axon_out
               attributes:
                 energy_message_out: 100.0e-12
                 latency_message_out: 5.0e-9

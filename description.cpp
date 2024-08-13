@@ -8,10 +8,8 @@
 #include <set>
 #include <string>
 #include <string_view>
-//#include <unordered_set>
 #include <vector>
 
-//#include <yaml-cpp/yaml.h>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
 
@@ -60,10 +58,15 @@ T sanafe::description_required_field(const ryml::Parser &parser,
         const ryml::ConstNodeRef node, const std::string &key)
 {
     // Wrapper around YAML library for field=map[key], adding more error prints
-    const ryml::ConstNodeRef field_node = node[key.c_str()];
+    if (node.invalid())
+    {
+        const std::string message = "Invalid node when looking up key: " + key;
+        throw std::runtime_error(message);
+    }
+    const ryml::ConstNodeRef field_node = node.find_child(key.c_str());
     if (field_node.invalid())
     {
-        const std::string message = "'" + key + "' does not exist";
+        const std::string message = "Key '" + key + "' does not exist";
         throw DescriptionParsingError(message, parser, node);
     }
     if (!field_node.has_val())
@@ -117,9 +120,15 @@ void sanafe::description_parse_axon_in_section_yaml(const ryml::Parser &parser,
 {
     auto name = description_required_field<std::string>(
             parser, axon_in_node, "name");
+    const ryml::ConstNodeRef &attributes =
+            axon_in_node.find_child("attributes");
+    if (attributes.invalid())
+    {
+        throw DescriptionParsingError(
+                "No attributes section defined", parser, axon_in_node);
+    }
     const AxonInPowerMetrics in_metrics =
-            description_parse_axon_in_attributes_yaml(
-                    parser, axon_in_node["attributes"]);
+            description_parse_axon_in_attributes_yaml(parser, attributes);
     parent_core.create_axon_in(name, in_metrics);
 }
 
@@ -141,7 +150,7 @@ void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
     auto name = description_required_field<std::string>(
             parser, synapse_node, "name");
     auto [power_metrics, model] = description_parse_synapse_attributes_yaml(
-            parser, synapse_node["attributes"]);
+            parser, synapse_node.find_child("attributes"));
     parent_core.create_synapse(name, power_metrics, model);
 }
 
@@ -182,8 +191,13 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
 {
     auto dendrite_name = description_required_field<std::string>(
             parser, dendrite_node, "name");
-    check_key(parser, dendrite_node, "attributes");
-    const ryml::ConstNodeRef attributes = dendrite_node["attributes"];
+    const ryml::ConstNodeRef attributes =
+            dendrite_node.find_child("attributes");
+    if (attributes.invalid())
+    {
+        throw DescriptionParsingError(
+                "No attributes section defined", parser, dendrite_node);
+    }
 
     ModelInfo model;
     model.name = description_required_field<std::string>(
@@ -217,7 +231,12 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
 {
     auto soma_name =
             description_required_field<std::string>(parser, soma_node, "name");
-    const ryml::ConstNodeRef attributes = soma_node["attributes"];
+    const ryml::ConstNodeRef attributes = soma_node.find_child("attributes");
+    if (attributes.invalid())
+    {
+        throw DescriptionParsingError(
+                "No attributes section defined", parser, soma_node);
+    }
     std::string model_str;
 
     ModelInfo model;
@@ -277,8 +296,12 @@ void sanafe::description_parse_axon_out_section(const ryml::Parser &parser,
     auto axon_out_name = description_required_field<std::string>(
             parser, axon_out_node, "name");
 
-    check_key(parser, axon_out_node, "attributes");
-    const auto &attributes = axon_out_node["attributes"];
+    const auto &attributes = axon_out_node.find_child("attributes");
+    if (attributes.invalid())
+    {
+        throw DescriptionParsingError(
+                "No attributes section defined", parser, axon_out_node);
+    }
     AxonOutPowerMetrics power_metrics;
     power_metrics.energy_message_out = description_required_field<double>(
             parser, attributes, "energy_message_out");
@@ -309,7 +332,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
                         parser, core_node["attributes"]);
         Core &core = arch.create_core(name, parent_tile_id, pipeline_config);
 
-        if (!core_node["axon_in"].invalid())
+        if (!core_node.find_child("axon_in").invalid())
         {
             const ryml::ConstNodeRef axon_in_node = core_node["axon_in"];
             if (axon_in_node.is_seq())
@@ -331,7 +354,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
             throw DescriptionParsingError(error, parser, core_node);
         }
 
-        if (!core_node["synapse"].invalid())
+        if (!core_node.find_child("synapse").invalid())
         {
             const ryml::ConstNodeRef synapses = core_node["synapse"];
             if (synapses.is_seq())
@@ -351,7 +374,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
             const std::string error = "No synapse section defined";
             throw DescriptionParsingError(error, parser, core_node);
         }
-        if (!core_node["dendrite"].invalid())
+        if (!core_node.find_child("dendrite").invalid())
         {
             const ryml::ConstNodeRef dendrite_node = core_node["dendrite"];
             if (dendrite_node.is_seq())
@@ -374,7 +397,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
             throw DescriptionParsingError(error, parser, core_node);
         }
 
-        if (!core_node["soma"].invalid())
+        if (!core_node.find_child("soma").invalid())
         {
             const ryml::ConstNodeRef soma_node = core_node["soma"];
             if (soma_node.is_seq())
@@ -395,7 +418,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
             throw DescriptionParsingError(error, parser, core_node);
         }
 
-        if (!core_node["axon_out"].invalid())
+        if (!core_node.find_child("axon_out").invalid())
         {
             const ryml::ConstNodeRef axon_out_node = core_node["axon_out"];
             if (axon_out_node.is_seq())
@@ -480,7 +503,7 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
                 description_parse_tile_metrics_yaml(
                         parser, tile_node["attributes"]);
         Tile &new_tile = arch.create_tile(name, power_metrics);
-        if (tile_node["core"].invalid())
+        if (tile_node.find_child("core").invalid())
         {
             const std::string error = "No core section defined";
             throw DescriptionParsingError(error, parser, tile_node);
@@ -536,7 +559,7 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
     NetworkOnChipConfiguration noc = description_parse_noc_configuration_yaml(
             parser, arch_node["attributes"]);
     Architecture new_arch(arch_name, noc);
-    if (!arch_node["tile"].invalid())
+    if (!arch_node.find_child("tile").invalid())
     {
         const ryml::ConstNodeRef tiles = arch_node["tile"];
         const bool is_list_of_tiles = tiles.is_seq();
@@ -630,7 +653,7 @@ sanafe::Network sanafe::description_parse_network_file_yaml(
     ryml::ConstNodeRef yaml_node = tree.rootref();
     if (yaml_node.is_map())
     {
-        if (yaml_node["network"].invalid())
+        if (yaml_node.find_child("network").invalid())
         {
             throw DescriptionParsingError(
                     "No top-level 'network' section defined", parser,
@@ -638,7 +661,7 @@ sanafe::Network sanafe::description_parse_network_file_yaml(
         }
         Network net = description_parse_network_section_yaml(
                 parser, yaml_node["network"]);
-        if (yaml_node["mappings"].invalid())
+        if (yaml_node.find_child("mappings").invalid())
         {
             throw DescriptionParsingError(
                     "No 'mappings' section defined", parser, yaml_node);
@@ -656,7 +679,7 @@ sanafe::Network sanafe::description_parse_network_section_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef net_node)
 {
     std::string net_name;
-    if (!net_node["name"].invalid())
+    if (!net_node.find_child("name").invalid())
     {
         net_node["name"] >> net_name;
         if (net_name.find('[') != std::string::npos)
@@ -733,7 +756,7 @@ void sanafe::description_parse_group(const ryml::Parser &parser,
     INFO("Parsing neuron group: %s\n", group_name.c_str());
 
     const auto &neurons_node = neuron_group_node["neurons"];
-    if (neuron_group_node["size"].invalid())
+    if (neuron_group_node.find_child("size").invalid())
     {
         throw DescriptionParsingError(
                 "Neuron group 'size' (aka neuron count) not given", parser,
@@ -743,7 +766,7 @@ void sanafe::description_parse_group(const ryml::Parser &parser,
     neuron_group_node["size"] >> neuron_count;
 
     NeuronTemplate default_neuron_config{};
-    if (!neuron_group_node["attributes"].invalid())
+    if (!neuron_group_node.find_child("attributes").invalid())
     {
         TRACE1("Parsing neuron group attributes\n");
         default_neuron_config = description_parse_neuron_attributes_yaml(
@@ -1006,7 +1029,6 @@ void sanafe::description_parse_edge_attributes(Connection &con,
     }
 }
 
-
 void sanafe::description_parse_mapping_section_yaml(const ryml::Parser &parser,
         const ryml::ConstNodeRef mappings_node, Architecture &arch,
         Network &net)
@@ -1084,13 +1106,13 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
     const size_t core_offset_within_tile =
             std::stoull(core_address.substr(dot_pos + 1));
 
-    if (tile_id > arch.tiles.size())
+    if (tile_id >= arch.tiles.size())
     {
         throw DescriptionParsingError(
                 "Tile ID >= tile count", parser, mapping_info);
     }
     Tile &tile = arch.tiles[tile_id];
-    if (core_offset_within_tile > arch.tiles.size())
+    if (core_offset_within_tile >= tile.cores.size())
     {
         throw DescriptionParsingError(
                 "Core ID >= core count", parser, mapping_info);
