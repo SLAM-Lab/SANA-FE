@@ -94,22 +94,32 @@ void sanafe::pipeline_process_neuron(
 {
     SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
     double neuron_processing_latency = 0.0;
-    if (n.core->pipeline_config.buffer_position <=
-            BUFFER_BEFORE_DENDRITE_UNIT)
+
+    // Update any H/W following the time-step buffer in pipeline order
+    if ((n.core->pipeline_config.buffer_position <=
+                BUFFER_BEFORE_DENDRITE_UNIT))
     {
         neuron_processing_latency += pipeline_process_dendrite(ts, n);
     }
-    if (n.core->pipeline_config.buffer_position <=
-            BUFFER_BEFORE_SOMA_UNIT)
+    if (n.core->pipeline_config.buffer_position <= BUFFER_BEFORE_SOMA_UNIT)
     {
         neuron_processing_latency += pipeline_process_soma(ts, n);
     }
-    if (n.core->pipeline_config.buffer_position <=
-            BUFFER_BEFORE_AXON_OUT_UNIT)
+
+    if (n.core->pipeline_config.buffer_position <= BUFFER_BEFORE_AXON_OUT_UNIT)
     {
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
     }
 
+    // Finally see if any H/W units have been forced to update every time-step.
+    //  This may be needed if the H/W has some state e.g., a leak, that has
+    //  to be constantly updated every time-step for enabled neurons
+    if (n.dendrite_hw->force_update)
+    {
+        neuron_processing_latency += pipeline_process_dendrite(ts, n);
+    }
+
+    // Account for latencies and reset counters
     n.core->next_message_generation_delay += neuron_processing_latency;
     n.spike_count = 0;
 }
@@ -194,9 +204,6 @@ double sanafe::pipeline_process_synapse(
 
 double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 {
-    double latency;
-    latency = 0.0;
-
     while (n.dendrite_last_updated < ts.timestep)
     {
         TRACE2("Updating nid:%s dendritic current "
@@ -215,7 +222,7 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
     TRACE2("nid:%s updating dendrite, soma_input_charge:%lf\n", n.id.c_str(),
             n.soma_input_charge);
 
-    return latency;
+    return 0.0;
 }
 
 double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)

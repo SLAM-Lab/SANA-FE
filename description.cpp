@@ -223,7 +223,13 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
             parser, attributes, "energy_access");
     power_metrics.latency_access = description_required_field<double>(
             parser, attributes, "latency_access");
-    parent_core.create_dendrite(dendrite_name, power_metrics, model);
+    bool force_update = false;
+    if (!attributes.find_child("force_update").invalid())
+    {
+        force_update = true;
+    }
+    parent_core.create_dendrite(
+            dendrite_name, power_metrics, model, force_update);
 }
 
 void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,

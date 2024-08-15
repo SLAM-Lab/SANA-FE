@@ -37,6 +37,7 @@ architecture:
                 model: single_compartment
                 energy_access: 0.0
                 latency_access: 0.0
+                force_update: true
           soma:
             - name: demo_soma_default
               attributes:

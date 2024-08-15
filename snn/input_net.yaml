@@ -2,7 +2,7 @@ network:
   name: example
   groups:
     - name: in
-      attributes: [soma_hw_name: demo_input]
+      attributes: [soma_hw_name: demo_input, log_spikes: true]
       size: 3
       neurons:
         - 0: [spikes: [1,0,0,0]]

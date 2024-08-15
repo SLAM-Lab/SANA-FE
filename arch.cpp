@@ -396,7 +396,8 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
 }
 
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
-        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
+        const DendritePowerMetrics &power_metrics, const ModelInfo &model,
+        const bool force_update)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
     dendrite.emplace_back(
