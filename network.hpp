@@ -61,12 +61,29 @@ enum NeuronStatus: int { IDLE, UPDATED, FIRED};
 
 // An attribute can contain a scalar value, or either a list or named set of
 //  attributes i.e., attributes are recursively defined attributes. However,
-//  in C++, variants cannot be defined recursively. Use metaprogramming to
-//  define the attribute type, with some C++ magic. Note that vectors *can* be
-//  created with incomplete types, whereas maps *cannot*.
+//  in C++, variants cannot be defined recursively.
 struct ModelParam
 {
-    operator bool() const { return std::get<bool>(value); }
+    operator bool() const
+    {
+        if (std::holds_alternative<bool>(value))
+        {
+            return std::get<bool>(value);
+        }
+        else if (std::holds_alternative<int>(value))
+        {
+            TRACE1("Warning: Casting integer value to bool type.\n");
+            return (std::get<int>(value) != 0);
+        }
+
+        std::string error = "Error: Attribute ";
+        if (name.has_value())
+        {
+            error += name.value();
+        }
+        error += " cannot be cast to a bool";
+        throw std::runtime_error(error);
+    }
     operator int() const { return std::get<int>(value); }
     operator double() const
     {
@@ -74,7 +91,7 @@ struct ModelParam
         {
             return std::get<double>(value);
         }
-        if (std::holds_alternative<int>(value))
+        else if (std::holds_alternative<int>(value))
         {
             // Assume it is safe to convert from any integer to double
             TRACE1("Warning: Casting integer value to double type.\n");
@@ -100,7 +117,7 @@ struct ModelParam
 
         for (const auto &element : value_vector)
         {
-            cast_vector.push_back(std::get<T>(element.value));
+            cast_vector.push_back(static_cast<T>(element));
         }
         return cast_vector;
     }
@@ -112,7 +129,7 @@ struct ModelParam
                 std::get<std::vector<ModelParam>>(value);
         for (const auto &element : value_vector)
         {
-            cast_map[element.name.value()] = static_cast<T>(element.value);
+            cast_map[element.name.value()] = static_cast<T>(element);
         }
         return cast_map;
     }

@@ -489,6 +489,44 @@ sanafe::NeuronStatus sanafe::TrueNorthModel::update(
     return state;
 }
 
+void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> &attr)
+{
+    for (const auto &a : attr)
+    {
+        const std::string &key = a.first;
+        const ModelParam &value = a.second;
+        if (key == "spikes")
+        {
+            spikes = static_cast<std::vector<bool>>(value);
+            curr_spike = spikes.begin();
+        }
+    }
+}
+
+sanafe::NeuronStatus sanafe::InputModel::update(
+        std::optional<double> current_in, bool step)
+{
+    // This models a dummy input node; all input currents are ignored
+    if (step)
+    {
+        if (curr_spike != spikes.end())
+        {
+            send_spike = *curr_spike;
+            curr_spike = std::next(curr_spike);
+        }
+        else
+        {
+            send_spike = false;
+        }
+    }
+
+    if (send_spike)
+    {
+        return FIRED;
+    }
+    return IDLE;
+}
+
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 {
     sanafe::NeuronResetModes reset_mode;
@@ -536,8 +574,7 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
     {
         return std::shared_ptr<DendriteModel>(new SingleCompartmentModel());
     }
-
-    if (model_name == "taps")
+    else if (model_name == "taps")
     {
         return std::shared_ptr<DendriteModel>(new MultiTapModel1D());
     }
@@ -549,12 +586,15 @@ std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
         const std::string &model_name, const std::string &group_id,
         const size_t id)
 {
+    if (model_name == "input")
+    {
+        return std::shared_ptr<SomaModel>(new InputModel(group_id, id));
+    }
     if (model_name == "leaky_integrate_fire")
     {
         return std::shared_ptr<SomaModel>(new LoihiLifModel(group_id, id));
     }
-
-    if (model_name == "truenorth")
+    else if (model_name == "truenorth")
     {
         return std::shared_ptr<SomaModel>(new TrueNorthModel(group_id, id));
     }

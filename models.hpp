@@ -185,6 +185,25 @@ private:
     double reverse_reset{0.0};
 };
 
+class InputModel: public SomaModel
+{
+public:
+    InputModel(const std::string &gid, size_t nid) : SomaModel(gid, nid) {}
+    InputModel(const InputModel &copy) = default;
+    InputModel(InputModel &&other) = default;
+    ~InputModel() override = default;
+    InputModel &operator=(const InputModel &other) = delete;
+    InputModel &operator=(InputModel &&other) = delete;
+
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
+    NeuronStatus update(std::optional<double> current_in = std::nullopt, bool step = true) override;
+
+private:
+    std::vector<bool> spikes{};
+    std::vector<bool>::const_iterator curr_spike{spikes.begin()};
+    bool send_spike{false};
+};
+
 NeuronResetModes model_parse_reset_mode(const std::string &str);
 std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name);
 std::shared_ptr<DendriteModel> model_get_dendrite(const std::string &model_name);
