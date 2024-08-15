@@ -869,6 +869,10 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
         attributes["synapse_hw_name"] >>
                 neuron_template.default_synapse_hw_name;
     }
+    if (!attributes.find_child("dendrite_hw_name").invalid())
+    {
+        attributes["dendrite_hw_name"] >> neuron_template.dendrite_hw_name;
+    }
     if (!attributes.find_child("soma_hw_name").invalid())
     {
         attributes["soma_hw_name"] >> neuron_template.soma_hw_name;
