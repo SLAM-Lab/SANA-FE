@@ -307,8 +307,8 @@ struct DendriteUnit
     double time{0.0};
     double energy_access;
     double latency_access;
-    bool force_update{false};
-    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
+    bool force_update;
+    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const DendritePowerMetrics &power_metrics, const ModelInfo &model, bool force_update = false);
     //std::string description() const;
 };
 

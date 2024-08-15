@@ -226,7 +226,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
     bool force_update = false;
     if (!attributes.find_child("force_update").invalid())
     {
-        force_update = true;
+        attributes["force_update"] >> force_update;
     }
     parent_core.create_dendrite(
             dendrite_name, power_metrics, model, force_update);

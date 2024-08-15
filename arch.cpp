@@ -221,13 +221,15 @@ sanafe::SynapseUnit::SynapseUnit(std::string synapse_name,
 
 sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
         const CoreAddress &parent_core,
-        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
+        const DendritePowerMetrics &power_metrics, const ModelInfo &model,
+        const bool force_update)
         : plugin_lib(model.plugin_library_path)
         , name(std::move(dendrite_name))
         , model(model.name)
         , parent_core_address(parent_core)
         , energy_access(power_metrics.energy_access)
         , latency_access(power_metrics.latency_access)
+        , force_update(force_update)
 {
 }
 
@@ -400,8 +402,8 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
         const bool force_update)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
-    dendrite.emplace_back(
-            DendriteUnit(name, parent_core_address, power_metrics, model));
+    dendrite.emplace_back(DendriteUnit(
+            name, parent_core_address, power_metrics, model, force_update));
     TRACE1("New dendrite h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
