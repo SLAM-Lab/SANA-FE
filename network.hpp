@@ -158,9 +158,10 @@ struct NeuronTemplate
     std::map<std::string, ModelParam> soma_model_params;
     std::map<std::string, ModelParam> dendrite_model_params;
     std::string soma_hw_name, default_synapse_hw_name, dendrite_hw_name;
-    bool log_spikes, log_potential, force_update;
+    bool log_spikes, log_potential, force_synapse_update, force_dendrite_update;
+    bool force_soma_update;
 
-    explicit NeuronTemplate(std::string soma_hw_name = "", std::string default_synapse_hw_name = "", std::string dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_update = false);
+    explicit NeuronTemplate(std::string soma_hw_name = "", std::string default_synapse_hw_name = "", std::string dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_synapse_update = false, bool force_dendrite_update = false, bool force_soma_update = false);
 };
 
 class Neuron
@@ -194,7 +195,9 @@ public:
     int maps_in_count{0};
     int maps_out_count{0};
     NeuronStatus status{sanafe::IDLE};
-    bool force_update;
+    bool force_synapse_update;
+    bool force_dendrite_update;
+    bool force_soma_update;
     bool log_spikes;
     bool log_potential;
 
@@ -269,6 +272,7 @@ struct Connection
     Neuron *pre_neuron;
     SynapseUnit *synapse_hw;
     std::string synapse_hw_name;
+    size_t synapse_address{0UL};
     int id;
     int last_updated{0};
 

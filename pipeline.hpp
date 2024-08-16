@@ -16,7 +16,7 @@ void pipeline_receive_message(Architecture &arch, Message &m);
 double pipeline_process_message(const Timestep &ts, Core &c, Message &m);
 
 double pipeline_process_axon_in(Core &core, const Message &m);
-double pipeline_process_synapse(const Timestep &ts, Connection &con, int synapse_address);
+double pipeline_process_synapse(const Timestep &ts, Connection &con);
 double pipeline_process_dendrite(const Timestep &ts, Neuron &n);
 double pipeline_process_soma(const Timestep &ts, Neuron &n);
 double pipeline_process_axon_out(Timestep &ts, const Architecture &arch, Neuron &n);

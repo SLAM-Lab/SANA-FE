@@ -256,7 +256,7 @@ public:
     explicit Core(std::string name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
     AxonInUnit &create_axon_in(const std::string &name, const AxonInPowerMetrics &power_metrics);
     SynapseUnit &create_synapse(const std::string &name, const SynapsePowerMetrics &power_metrics, const ModelInfo &model);
-    DendriteUnit &create_dendrite(const std::string &name, const DendritePowerMetrics &power_metrics, const ModelInfo &model, bool force_update = false);
+    DendriteUnit &create_dendrite(const std::string &name, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
     SomaUnit &create_soma(std::string name, const SomaPowerMetrics &power_metrics, const ModelInfo &model);
     AxonOutUnit &create_axon_out(const std::string &name, const AxonOutPowerMetrics &power_metrics);
     void map_neuron(Neuron &n);
@@ -307,8 +307,8 @@ struct DendriteUnit
     double time{0.0};
     double energy_access;
     double latency_access;
-    bool force_update;
-    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const DendritePowerMetrics &power_metrics, const ModelInfo &model, bool force_update = false);
+
+    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
     //std::string description() const;
 };
 

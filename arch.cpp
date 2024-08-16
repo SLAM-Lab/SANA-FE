@@ -221,15 +221,13 @@ sanafe::SynapseUnit::SynapseUnit(std::string synapse_name,
 
 sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
         const CoreAddress &parent_core,
-        const DendritePowerMetrics &power_metrics, const ModelInfo &model,
-        const bool force_update)
+        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
         : plugin_lib(model.plugin_library_path)
         , name(std::move(dendrite_name))
         , model(model.name)
         , parent_core_address(parent_core)
         , energy_access(power_metrics.energy_access)
         , latency_access(power_metrics.latency_access)
-        , force_update(force_update)
 {
 }
 
@@ -398,12 +396,11 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
 }
 
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
-        const DendritePowerMetrics &power_metrics, const ModelInfo &model,
-        const bool force_update)
+        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
     dendrite.emplace_back(DendriteUnit(
-            name, parent_core_address, power_metrics, model, force_update));
+            name, parent_core_address, power_metrics, model));
     TRACE1("New dendrite h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
@@ -558,7 +555,8 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
                 INFO("Creating synapse from plugin: %s.\n",
                         plugin_lib_path.c_str());
                 curr_connection.synapse_model = plugin_get_synapse(
-                        curr_connection.synapse_hw->model, plugin_lib_path);
+                        curr_connection.synapse_hw->model,
+                        curr_connection.synapse_address, plugin_lib_path);
             }
             else
             {
@@ -566,7 +564,8 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
                 TRACE1("Creating synapse built-in model %s.\n",
                         curr_connection.synapse_hw->model.c_str());
                 curr_connection.synapse_model = sanafe::model_get_synapse(
-                        curr_connection.synapse_hw->model);
+                        curr_connection.synapse_hw->model,
+                        curr_connection.synapse_address);
             }
         }
         curr_connection.synapse_model->set_attributes(
@@ -766,11 +765,11 @@ void sanafe::arch_add_connection_to_axon(Connection &con, Core &post_core)
             post_core.axons_out.size() - 1);
 
     post_core.connections_in.push_back(&con);
-    const size_t synapse_address = post_core.connections_in.size() - 1;
+    con.synapse_address = post_core.connections_in.size() - 1;
 
     // Access the most recently created axon in for the post-synaptic core
     AxonInModel &last_added_target_axon = post_core.axons_in.back();
-    last_added_target_axon.synapse_addresses.push_back(synapse_address);
+    last_added_target_axon.synapse_addresses.push_back(con.synapse_address);
 
     // Map the connection to the synapse hardware. Default to the first defined
     //  hardware unit (there must be at least one hardware unit defined)

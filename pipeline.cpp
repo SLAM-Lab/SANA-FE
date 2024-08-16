@@ -105,7 +105,6 @@ void sanafe::pipeline_process_neuron(
     {
         neuron_processing_latency += pipeline_process_soma(ts, n);
     }
-
     if (n.core->pipeline_config.buffer_position <= BUFFER_BEFORE_AXON_OUT_UNIT)
     {
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
@@ -113,10 +112,22 @@ void sanafe::pipeline_process_neuron(
 
     // Finally see if any H/W units have been forced to update every time-step.
     //  This may be needed if the H/W has some state e.g., a leak, that has
-    //  to be constantly updated every time-step for enabled neurons
-    if (n.dendrite_hw->force_update)
+    //  to be updated regardless of input
+    if (n.force_synapse_update)
+    {
+        for (auto &con : n.connections_out)
+        {
+            neuron_processing_latency += pipeline_process_synapse(ts, con);
+        }
+    }
+    if (n.force_dendrite_update)
     {
         neuron_processing_latency += pipeline_process_dendrite(ts, n);
+    }
+    //INFO("Force soma update for nid:%s.%zu: %d\n", n.parent_group_id.c_str(), n.id, n.force_soma_update);
+    if (n.force_soma_update)
+    {
+        //neuron_processing_latency += pipeline_process_soma(ts, n);
     }
 
     // Account for latencies and reset counters
@@ -137,10 +148,8 @@ double sanafe::pipeline_process_message(
     for (const int synapse_address : axon_in.synapse_addresses)
     {
         Connection &con = *(core.connections_in[synapse_address]);
-        message_processing_latency +=
-                pipeline_process_synapse(ts, con, synapse_address);
-        if (core.pipeline_config.buffer_position ==
-                BUFFER_BEFORE_DENDRITE_UNIT)
+        message_processing_latency += pipeline_process_synapse(ts, con);
+        if (core.pipeline_config.buffer_position == BUFFER_BEFORE_DENDRITE_UNIT)
         {
             continue; // Process next synapse
         }
@@ -149,8 +158,7 @@ double sanafe::pipeline_process_message(
         Neuron &n = *(con.post_neuron);
         message_processing_latency += pipeline_process_dendrite(ts, n);
 
-        if (core.pipeline_config.buffer_position ==
-                BUFFER_BEFORE_SOMA_UNIT)
+        if (core.pipeline_config.buffer_position == BUFFER_BEFORE_SOMA_UNIT)
         {
             continue; // Process next synapse
         }
@@ -172,8 +180,7 @@ double sanafe::pipeline_process_axon_in(Core &core, const Message &m)
     return axon_unit.latency_spike_message;
 }
 
-double sanafe::pipeline_process_synapse(
-        const Timestep &ts, Connection &con, const int synapse_address)
+double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
 {
     // Update all synapses to different neurons in one core. If a synaptic
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
@@ -187,7 +194,9 @@ double sanafe::pipeline_process_synapse(
         con.last_updated++;
     }
     Synapse synapse_data = {0.0, con};
-    synapse_data.current = con.synapse_model->update(synapse_address, false);
+    const bool read = true;
+    const bool step = false;
+    synapse_data.current = con.synapse_model->update(read, step);
 
     // Input and buffer synaptic info at the next hardware unit (dendrite unit)
     con.post_neuron->dendrite_input_synapses.push_back(synapse_data);

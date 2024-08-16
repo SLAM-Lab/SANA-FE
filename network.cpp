@@ -25,13 +25,16 @@
 sanafe::NeuronTemplate::NeuronTemplate(std::string soma_hw_name,
         std::string default_synapse_hw_name,
         std::string dendrite_hw_name, const bool log_spikes,
-        const bool log_potential, const bool force_update)
+        const bool log_potential, const bool force_synapse_update,
+        const bool force_dendrite_update, const bool force_soma_update)
         : soma_hw_name(std::move(soma_hw_name))
         , default_synapse_hw_name(std::move(default_synapse_hw_name))
         , dendrite_hw_name(std::move(dendrite_hw_name))
         , log_spikes(log_spikes)
         , log_potential(log_potential)
-        , force_update(force_update)
+        , force_synapse_update(force_synapse_update)
+        , force_dendrite_update(force_dendrite_update)
+        , force_soma_update(force_soma_update)
 {
 }
 
@@ -82,7 +85,9 @@ sanafe::Neuron::Neuron(const size_t neuron_id,
         , dendrite_hw_name(config.dendrite_hw_name)
         , parent_group_id(std::move(parent_group_id))
         , id(neuron_id)
-        , force_update(config.force_update)
+        , force_synapse_update(config.force_synapse_update)
+        , force_dendrite_update(config.force_dendrite_update)
+        , force_soma_update(config.force_soma_update)
         , log_spikes(config.log_spikes)
         , log_potential(config.log_potential)
 {

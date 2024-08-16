@@ -199,8 +199,8 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
                 "No attributes section defined", parser, dendrite_node);
     }
 
-    ModelInfo model;
-    model.name = description_required_field<std::string>(
+    ModelInfo model_details;
+    model_details.name = description_required_field<std::string>(
             parser, attributes, "model");
     const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
     if (!plugin_path_node.invalid())
@@ -209,7 +209,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
         {
             std::string plugin_path;
             plugin_path_node >> plugin_path;
-            model.plugin_library_path = plugin_path;
+            model_details.plugin_library_path = plugin_path;
         }
         else
         {
@@ -223,13 +223,8 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
             parser, attributes, "energy_access");
     power_metrics.latency_access = description_required_field<double>(
             parser, attributes, "latency_access");
-    bool force_update = false;
-    if (!attributes.find_child("force_update").invalid())
-    {
-        attributes["force_update"] >> force_update;
-    }
     parent_core.create_dendrite(
-            dendrite_name, power_metrics, model, force_update);
+            dendrite_name, power_metrics, model_details);
 }
 
 void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
@@ -860,9 +855,19 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
     {
         attributes["log_spikes"] >> neuron_template.log_spikes;
     }
-    if (!attributes.find_child("force_update").invalid())
+    if (!attributes.find_child("force_synapse_update").invalid())
     {
-        attributes["force_update"] >> neuron_template.force_update;
+        attributes["force_synapse_update"] >>
+                neuron_template.force_synapse_update;
+    }
+    if (!attributes.find_child("force_dendrite_update").invalid())
+    {
+        attributes["force_dendrite_update"] >>
+                neuron_template.force_dendrite_update;
+    }
+    if (!attributes.find_child("force_soma_update").invalid())
+    {
+        attributes["force_soma_update"] >> neuron_template.force_soma_update;
     }
     if (!attributes.find_child("synapse_hw_name").invalid())
     {

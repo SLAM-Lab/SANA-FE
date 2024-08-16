@@ -12,7 +12,7 @@
 
 // *** Synapse models ***
 double sanafe::CurrentBasedSynapseModel::update(
-        const std::optional<int> synapse_address, const bool step)
+        const bool read, const bool step)
 {
     if (step)
     {
@@ -22,7 +22,7 @@ double sanafe::CurrentBasedSynapseModel::update(
             current = 0.0;
         }
     }
-    if (synapse_address.has_value())
+    if (read)
     {
         current += weight;
     }
@@ -254,7 +254,7 @@ void sanafe::LoihiLifModel::set_attributes(
         {
             bias = static_cast<double>(value);
         }
-        else if (key == "force_update")
+        else if (key == "force_soma_update")
         {
             force_update = static_cast<bool>(value);
         }
@@ -385,7 +385,7 @@ void sanafe::TrueNorthModel::set_attributes(
         {
             bias = static_cast<double>(value);
         }
-        else if (key == "force_update")
+        else if (key == "force_soma_update")
         {
             force_update = static_cast<bool>(value);
         }
@@ -556,11 +556,12 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 }
 
 std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
-        const std::string &model_name)
+        const std::string &model_name, const size_t synapse_address)
 {
     if (model_name == "current_based")
     {
-        return std::shared_ptr<SynapseModel>(new CurrentBasedSynapseModel());
+        return std::shared_ptr<SynapseModel>(
+                new CurrentBasedSynapseModel(synapse_address));
     }
     const std::string error =
             "Synapse model not supported (" + model_name + ")\n";

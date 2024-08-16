@@ -28,16 +28,19 @@ enum NeuronResetModes
 class SynapseModel
 {
 public:
-    SynapseModel() = default;
+    SynapseModel(size_t address) : synapse_address(address) {}
     SynapseModel(const SynapseModel &copy) = default;
     SynapseModel(SynapseModel &&other) = default;
     virtual ~SynapseModel() = default;
     SynapseModel &operator=(const SynapseModel &other) = default;
     SynapseModel &operator=(SynapseModel &&other) = default;
 
-    virtual double update(std::optional<int> synapse_address = std::nullopt, bool step = true) = 0;
+    virtual double update(bool read = false, bool step = true) = 0;
     // Set synapse attributes
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
+
+protected:
+    size_t synapse_address;
 };
 
 class DendriteModel
@@ -58,14 +61,14 @@ constexpr int default_weight_bits = 8;  // Based on real-world H/W e.g., Loihi
 class CurrentBasedSynapseModel : public SynapseModel
 {
 public:
-    CurrentBasedSynapseModel() = default;
+    CurrentBasedSynapseModel(size_t address) : SynapseModel(address) {};
     CurrentBasedSynapseModel(const CurrentBasedSynapseModel &copy) = default;
     CurrentBasedSynapseModel(CurrentBasedSynapseModel &&other) = default;
     ~CurrentBasedSynapseModel() override = default;
     CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
-    double update(std::optional<int> synapse_address = std::nullopt,  bool step = true) override;
+    double update(bool read = false,  bool step = true) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 
 private:
@@ -205,7 +208,7 @@ private:
 };
 
 NeuronResetModes model_parse_reset_mode(const std::string &str);
-std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name);
+std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name, size_t synapse_address);
 std::shared_ptr<DendriteModel> model_get_dendrite(const std::string &model_name);
 std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const std::string &group_id, size_t id);
 
