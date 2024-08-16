@@ -127,7 +127,7 @@ void sanafe::pipeline_process_neuron(
     //INFO("Force soma update for nid:%s.%zu: %d\n", n.parent_group_id.c_str(), n.id, n.force_soma_update);
     if (n.force_soma_update)
     {
-        //neuron_processing_latency += pipeline_process_soma(ts, n);
+        neuron_processing_latency += pipeline_process_soma(ts, n);
     }
 
     // Account for latencies and reset counters
@@ -186,19 +186,26 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
     //  update filtered current and any other connection properties
     SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
+    double latency{0.0};
+    Core &dest_core = *(con.post_neuron->core);
+
     while (con.last_updated < ts.timestep)
     {
         SIM_TRACE1("Updating synaptic current (last updated:%d, ts:%ld)\n",
                 con.last_updated, ts.timestep);
-        con.synapse_model->update();
+
+        const SynapseStatus ret = con.synapse_model->update();
+        latency += ret.simulated_latency;
+        dest_core.energy += ret.simulated_energy;
+
         con.last_updated++;
     }
-    Synapse synapse_data = {0.0, con};
-    const bool read = true;
-    const bool step = false;
-    synapse_data.current = con.synapse_model->update(read, step);
+    const SynapseStatus ret = con.synapse_model->update(true, false);
+    latency += ret.simulated_latency;
+    dest_core.energy += ret.simulated_energy;
 
     // Input and buffer synaptic info at the next hardware unit (dendrite unit)
+    Synapse synapse_data = {ret.synaptic_current, con};
     con.post_neuron->dendrite_input_synapses.push_back(synapse_data);
     con.post_neuron->spike_count++;
     assert(con.synapse_hw != nullptr);
@@ -208,22 +215,31 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
             con.post_neuron->parent_group_id.c_str(),
             con.post_neuron->id.c_str(), con.current);
 
-    return con.synapse_hw->latency_spike_op;
+    latency += con.synapse_hw->latency_spike_op;
+    return latency;
 }
 
 double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 {
+    double latency{0.0};
+
     while (n.dendrite_last_updated < ts.timestep)
     {
         TRACE2("Updating nid:%s dendritic current "
                "(last_updated:%d, ts:%ld)\n",
                 n.id.c_str(), n.dendrite_last_updated, ts.timestep);
-        n.soma_input_charge = n.dendrite_model->update();
+        DendriteStatus ret = n.dendrite_model->update();
+        n.soma_input_charge = ret.dendritic_current;
+        latency += ret.simulated_latency;
+        latency += n.dendrite_hw->latency_access;
+        n.core->energy += ret.simulated_energy;
+
         n.dendrite_last_updated++;
     }
     for (const auto &synapse : n.dendrite_input_synapses)
     {
-        n.soma_input_charge = n.dendrite_model->update(synapse, false);
+        DendriteStatus ret = n.dendrite_model->update(synapse, false);
+        n.soma_input_charge = ret.dendritic_current;
     }
     n.dendrite_input_synapses.clear();
 
@@ -231,7 +247,7 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
     TRACE2("nid:%s updating dendrite, soma_input_charge:%lf\n", n.id.c_str(),
             n.soma_input_charge);
 
-    return 0.0;
+    return latency;
 }
 
 double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
@@ -242,18 +258,28 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
     while (n.soma_last_updated < ts.timestep)
     {
         std::optional<double> soma_current_in;
-        if ((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
+        // TODO: clean up / fix this and model the pipeline timestep buffer
+        //  properly
+        bool simulating_latest_ts = (n.soma_last_updated == (ts.timestep - 1));
+        if (simulating_latest_ts)
         {
-            soma_current_in = n.soma_input_charge;
-            n.soma_input_charge = 0.0;
-        }
-        n.status = n.soma_model->update(soma_current_in);
-        if (n.forced_spikes > 0)
-        {
-            n.status = sanafe::FIRED;
-            n.forced_spikes--;
+            if((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
+            {
+                soma_current_in = n.soma_input_charge;
+                n.soma_input_charge = 0.0;
+            }
         }
 
+        SomaStatus ret = n.soma_model->update(soma_current_in);
+        if (ret.neuron_status == INVALID_NEURON_STATE)
+        {
+            std::string error = "Soma model for nid: " + n.parent_group_id +
+                    "." + std::to_string(n.id) + " returned invalid state.\n";
+            throw std::runtime_error(error);
+        }
+        n.status = ret.neuron_status;
+        n.core->energy = ret.simulated_energy;
+        soma_processing_latency += ret.simulated_latency;
         soma_processing_latency += n.soma_hw->latency_access_neuron;
         if ((n.status == sanafe::UPDATED) || (n.status == sanafe::FIRED))
         {

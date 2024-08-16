@@ -22,8 +22,6 @@
 #include <optional>
 #include <vector>
 
-#define ARCH_INVALID_ID (-1)
-
 namespace sanafe
 {
 

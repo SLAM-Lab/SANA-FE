@@ -25,17 +25,6 @@
 
 namespace sanafe
 {
-enum ConnectionConfigFormat
-{
-    // This is the structure of the CSV format for specifying synaptic
-    //  connections in a network for this simulator.  Each row represents
-    //  a unique connection.
-    CONNECTION_DEST_GID = 0,
-    CONNECTION_DEST_NID,
-    CONNECTION_WEIGHT,
-    CONNECTION_FIELDS,
-};
-
 // Forward declarations
 // Architecture
 class Architecture;
@@ -57,7 +46,7 @@ class DendriteModel;
 
 struct NeuronTemplate;
 
-enum NeuronStatus: int { IDLE, UPDATED, FIRED};
+enum NeuronStatus: int { INVALID_NEURON_STATE, IDLE, UPDATED, FIRED };
 
 // An attribute can contain a scalar value, or either a list or named set of
 //  attributes i.e., attributes are recursively defined attributes. However,

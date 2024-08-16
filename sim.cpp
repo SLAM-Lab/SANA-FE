@@ -435,12 +435,13 @@ double sanafe::sim_generate_noise(Neuron *n)
 double sanafe::sim_calculate_energy(const Architecture &arch)
 {
     // Returns the total energy across the design, for this timestep
-    double total_energy = 0.0;
-    double network_energy = 0.0;
-    double axon_in_energy = 0.0;
-    double synapse_energy = 0.0;
-    double soma_energy = 0.0;
-    double axon_out_energy = 0.0;
+    double total_energy{0.0};
+    double network_energy{0.0};
+    double axon_in_energy{0.0};
+    double synapse_energy{0.0};
+    double soma_energy{0.0};
+    double axon_out_energy{0.0};
+    double model_simulated_energy{0.0};
 
     for (const auto &t : arch.tiles)
     {
@@ -458,6 +459,7 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
 
         for (const auto &c : t.cores)
         {
+            model_simulated_energy += c.energy;
             for (const auto &axon : c.axon_in_hw)
             {
                 axon_in_energy += static_cast<double>(axon.spike_messages_in) *
@@ -494,9 +496,12 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
         }
     }
 
-    total_energy = axon_in_energy + synapse_energy + soma_energy +
-            axon_out_energy + network_energy;
+    // TODO: clean up energy breakdown. Include model simulated energies
+    //  in their respective units, and track energies of cores, tiles etc
+    total_energy = model_simulated_energy + axon_in_energy + synapse_energy +
+            soma_energy + axon_out_energy + network_energy;
 
+    TRACE1("model_simulated_energy:%e\n", model_simulated_energy);
     TRACE1("axon_in_energy:%e\n", axon_in_energy);
     TRACE1("synapse_energy:%e\n", synapse_energy);
     TRACE1("soma_energy:%e\n", soma_energy);

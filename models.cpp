@@ -11,7 +11,7 @@
 #include "print.hpp"
 
 // *** Synapse models ***
-double sanafe::CurrentBasedSynapseModel::update(
+sanafe::SynapseStatus sanafe::CurrentBasedSynapseModel::update(
         const bool read, const bool step)
 {
     if (step)
@@ -27,7 +27,7 @@ double sanafe::CurrentBasedSynapseModel::update(
         current += weight;
     }
 
-    return current;
+    return {current, 0.0, 0.0};
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attributes(
@@ -51,7 +51,7 @@ sanafe::SingleCompartmentModel::SingleCompartmentModel()
 {
 }
 
-double sanafe::SingleCompartmentModel::update(
+sanafe::DendriteStatus sanafe::SingleCompartmentModel::update(
         const std::optional<Synapse> synapse_in, const bool step)
 {
     if (step)
@@ -64,7 +64,7 @@ double sanafe::SingleCompartmentModel::update(
         accumulated_charge += synapse_in.value().current;
     }
 
-    return accumulated_charge;
+    return {accumulated_charge, 0.0, 0.0};
 }
 
 void sanafe::SingleCompartmentModel::set_attributes(
@@ -89,7 +89,7 @@ sanafe::MultiTapModel1D::MultiTapModel1D()
 {
 }
 
-double sanafe::MultiTapModel1D::update(
+sanafe::DendriteStatus sanafe::MultiTapModel1D::update(
         const std::optional<Synapse> synapse_in, const bool step)
 {
     if (step)
@@ -143,7 +143,7 @@ double sanafe::MultiTapModel1D::update(
     }
     INFO("***\n");
     // Return current for most proximal tap (which is always the first tap)
-    return tap_voltages[0];
+    return {tap_voltages[0], 0.0, 0.0};
 }
 
 void sanafe::MultiTapModel1D::set_attributes(
@@ -261,7 +261,7 @@ void sanafe::LoihiLifModel::set_attributes(
     }
 }
 
-sanafe::NeuronStatus sanafe::LoihiLifModel::update(
+sanafe::SomaStatus sanafe::LoihiLifModel::update(
         const std::optional<double> current_in, const bool step)
 {
     // Calculate the change in potential since the last update e.g.
@@ -333,7 +333,7 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
             potential = reverse_threshold;
         }
     }
-    return state;
+    return {state, 0.0, 0.0};
 }
 
 sanafe::TrueNorthModel::TrueNorthModel(
@@ -396,7 +396,7 @@ void sanafe::TrueNorthModel::set_attributes(
     }
 }
 
-sanafe::NeuronStatus sanafe::TrueNorthModel::update(
+sanafe::SomaStatus sanafe::TrueNorthModel::update(
         const std::optional<double> current_in, const bool step)
 {
     bool randomize_threshold;
@@ -486,7 +486,7 @@ sanafe::NeuronStatus sanafe::TrueNorthModel::update(
         // No spike is generated
     }
     TRACE2("potential:%lf threshold %lf\n", potential, threshold);
-    return state;
+    return {state, 0.0, 0.0};
 }
 
 void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> &attr)
@@ -503,7 +503,7 @@ void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> 
     }
 }
 
-sanafe::NeuronStatus sanafe::InputModel::update(
+sanafe::SomaStatus sanafe::InputModel::update(
         std::optional<double> current_in, bool step)
 {
     // This models a dummy input node; all input currents are ignored
@@ -520,11 +520,13 @@ sanafe::NeuronStatus sanafe::InputModel::update(
         }
     }
 
+    NeuronStatus status = IDLE;
     if (send_spike)
     {
-        return FIRED;
+        status = FIRED;
     }
-    return IDLE;
+
+    return {status, 0.0, 0.0};
 }
 
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
