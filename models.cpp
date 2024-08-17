@@ -206,12 +206,6 @@ void sanafe::MultiTapModel1D::set_attributes(
 }
 
 // **** Soma models ****
-sanafe::LoihiLifModel::LoihiLifModel(
-        std::string gid, size_t nid)
-        : sanafe::SomaModel(std::move(gid), nid)
-{
-}
-
 void sanafe::LoihiLifModel::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
@@ -334,12 +328,6 @@ sanafe::SomaStatus sanafe::LoihiLifModel::update(
         }
     }
     return {state, 0.0, 0.0};
-}
-
-sanafe::TrueNorthModel::TrueNorthModel(
-        const std::string &gid, const size_t nid)
-        : sanafe::SomaModel(gid, nid)
-{
 }
 
 void sanafe::TrueNorthModel::set_attributes(
@@ -558,12 +546,12 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 }
 
 std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
-        const std::string &model_name, const size_t synapse_address)
+        const std::string &model_name)
 {
     if (model_name == "current_based")
     {
         return std::shared_ptr<SynapseModel>(
-                new CurrentBasedSynapseModel(synapse_address));
+                new CurrentBasedSynapseModel());
     }
     const std::string error =
             "Synapse model not supported (" + model_name + ")\n";
@@ -586,20 +574,19 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
 }
 
 std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
-        const std::string &model_name, const std::string &group_id,
-        const size_t id)
+        const std::string &model_name)
 {
     if (model_name == "input")
     {
-        return std::shared_ptr<SomaModel>(new InputModel(group_id, id));
+        return std::shared_ptr<SomaModel>(new InputModel());
     }
     if (model_name == "leaky_integrate_fire")
     {
-        return std::shared_ptr<SomaModel>(new LoihiLifModel(group_id, id));
+        return std::shared_ptr<SomaModel>(new LoihiLifModel());
     }
     else if (model_name == "truenorth")
     {
-        return std::shared_ptr<SomaModel>(new TrueNorthModel(group_id, id));
+        return std::shared_ptr<SomaModel>(new TrueNorthModel());
     }
 
     throw std::invalid_argument("Model not supported.");

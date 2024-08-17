@@ -555,8 +555,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
                 INFO("Creating synapse from plugin: %s.\n",
                         plugin_lib_path.c_str());
                 curr_connection.synapse_model = plugin_get_synapse(
-                        curr_connection.synapse_hw->model,
-                        curr_connection.synapse_address, plugin_lib_path);
+                        curr_connection.synapse_hw->model, plugin_lib_path);
             }
             else
             {
@@ -564,8 +563,7 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
                 TRACE1("Creating synapse built-in model %s.\n",
                         curr_connection.synapse_hw->model.c_str());
                 curr_connection.synapse_model = sanafe::model_get_synapse(
-                        curr_connection.synapse_hw->model,
-                        curr_connection.synapse_address);
+                        curr_connection.synapse_hw->model);
             }
         }
         curr_connection.synapse_model->set_attributes(
@@ -675,7 +673,7 @@ void sanafe::Core::map_neuron(Neuron &n)
                     n.soma_hw->plugin_lib.value();
             INFO("Creating soma from plugin %s.\n", plugin_lib_path.c_str());
             n.soma_model = plugin_get_soma(
-                    n.soma_hw->model, n.parent_group_id, n.id, plugin_lib_path);
+                    n.soma_hw->model, plugin_lib_path);
         }
         else
         {
@@ -683,7 +681,7 @@ void sanafe::Core::map_neuron(Neuron &n)
             TRACE1("Creating soma built-in model %s.\n",
                     n.soma_hw->model.c_str());
             n.soma_model =
-                    model_get_soma(n.soma_hw->model, n.parent_group_id, n.id);
+                    model_get_soma(n.soma_hw->model);
         }
         assert(n.parent_net != nullptr);
         const auto &neuron_groups = n.parent_net->groups;

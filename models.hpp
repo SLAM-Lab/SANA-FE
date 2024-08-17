@@ -51,7 +51,7 @@ struct SomaStatus
 class SynapseModel
 {
 public:
-    SynapseModel(size_t address) : synapse_address(address) {}
+    SynapseModel() = default;
     SynapseModel(const SynapseModel &copy) = default;
     SynapseModel(SynapseModel &&other) = default;
     virtual ~SynapseModel() = default;
@@ -83,26 +83,33 @@ public:
 class SomaModel
 {
 public:
-    SomaModel(std::string gid, size_t nid) : group_id(std::move(gid)), neuron_id(nid) {}
+    SomaModel() = default;
     SomaModel(const SomaModel &copy) = default;
     SomaModel(SomaModel &&other) = default;
     virtual ~SomaModel() = default;
     SomaModel &operator=(const SomaModel &other) = delete;
     SomaModel &operator=(SomaModel &&other) = delete;
+    void update_time(long int timestep)
+    {
+        sim_time = timestep;
+    }
 
     virtual SomaStatus update(std::optional<double> current_in = std::nullopt, bool step = true) = 0;
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
-    virtual double get_potential() { return 0.0; }
+    virtual double get_potential()
+    {
+        return 0.0;
+    }
+
 protected:
-    const std::string group_id;
-    const size_t neuron_id;
+    long int sim_time;
 };
 
 constexpr int default_weight_bits = 8;  // Based on real-world H/W e.g., Loihi
 class CurrentBasedSynapseModel : public SynapseModel
 {
 public:
-    CurrentBasedSynapseModel(size_t address) : SynapseModel(address) {};
+    CurrentBasedSynapseModel() = default;
     CurrentBasedSynapseModel(const CurrentBasedSynapseModel &copy) = default;
     CurrentBasedSynapseModel(CurrentBasedSynapseModel &&other) = default;
     ~CurrentBasedSynapseModel() override = default;
@@ -158,7 +165,7 @@ private:
 class LoihiLifModel : public SomaModel
 {
 public:
-    LoihiLifModel(std::string gid, size_t nid);
+    LoihiLifModel() = default;
     LoihiLifModel(const LoihiLifModel &copy) = default;
     LoihiLifModel(LoihiLifModel &&other) = default;
     ~LoihiLifModel() override = default;
@@ -185,7 +192,7 @@ private:
 class TrueNorthModel : public SomaModel
 {
 public:
-    TrueNorthModel(const std::string &gid, size_t nid);
+    TrueNorthModel() = default;
     TrueNorthModel(const TrueNorthModel &copy) = default;
     TrueNorthModel(TrueNorthModel &&other) = default;
     ~TrueNorthModel() override = default;
@@ -214,7 +221,7 @@ private:
 class InputModel: public SomaModel
 {
 public:
-    InputModel(const std::string &gid, size_t nid) : SomaModel(gid, nid) {}
+    InputModel() = default;
     InputModel(const InputModel &copy) = default;
     InputModel(InputModel &&other) = default;
     ~InputModel() override = default;
@@ -231,9 +238,9 @@ private:
 };
 
 NeuronResetModes model_parse_reset_mode(const std::string &str);
-std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name, size_t synapse_address);
+std::shared_ptr<SynapseModel> model_get_synapse(const std::string &model_name);
 std::shared_ptr<DendriteModel> model_get_dendrite(const std::string &model_name);
-std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name, const std::string &group_id, size_t id);
+std::shared_ptr<SomaModel> model_get_soma(const std::string &model_name);
 
 }
 
