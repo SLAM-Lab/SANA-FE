@@ -355,7 +355,6 @@ struct AxonInModel
     // List of all neuron connections to send spikes to
     std::vector<int> synapse_addresses{};
     Message *message{nullptr};
-    long int last_updated{0L};
     int spikes_received{0};
     int active_synapses{0};
 };

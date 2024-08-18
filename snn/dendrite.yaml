@@ -9,20 +9,25 @@
 network:
   name: dendrite_example_network
   groups:
-    - name: d
-      size: 4
-      attributes: {log_potential: true}
+    - name: inputs
+      size: 3
+      attributes: {soma_hw_name: dummy_input}
       neurons:
-        - 0: {threshold: 100, taps: 3, time_constants: [0.8, 0.8, 0.7], space_constants: [0.1, 0.2]}
-        - 1: {bias: 0.0, threshold: 1.0}
-        - 2: {bias: 0.0, threshold: 1.0}
-        - 3: {bias: 1.0, threshold: 20}
+        - 0: {spikes:  [0,0]}
+        - 1: {}
+        - 2: {spikes: [1,0]}
+    - name: dendrite
+      size: 1
+      attributes: {log_potential: true, force_dendrite_update: true}
+      neurons:
+        - 0: {threshold: 100, taps: 3, time_constants: [0.8, 0.8, 0.7],
+              space_constants: [0.1, 0.2]}
   edges:
-    - d.1 -> d.0: {weight: 10, tap: 0}
-    - d.2 -> d.0: {weight: 10, tap: 1}
-    - d.3 -> d.0: {weight: 10, tap: 2}
+    - inputs.0 -> dendrite.0: {weight: 10, tap: 0}
+    - inputs.1 -> dendrite.0: {weight: 10, tap: 1}
+    - inputs.2 -> dendrite.0: {weight: 10, tap: 2}
 mappings:
-  - d.0: {core: 0.0}
-  - d.1: {core: 0.0}
-  - d.2: {core: 0.0}
-  - d.3: {core: 0.0}
+  - dendrite.0: {core: 0.0}
+  - inputs.0: {core: 0.0}
+  - inputs.1: {core: 0.0}
+  - inputs.2: {core: 0.0}

@@ -58,12 +58,14 @@ public:
     SynapseModel &operator=(const SynapseModel &other) = default;
     SynapseModel &operator=(SynapseModel &&other) = default;
 
-    virtual SynapseStatus update(bool read = false, bool step = true) = 0;
+    void set_time(const long int timestep) { sim_time = timestep; }
+
+    virtual SynapseStatus update(bool read = false) = 0;
     // Set synapse attributes
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 
 protected:
-    size_t synapse_address;
+    long int sim_time{0L};
 };
 
 class DendriteModel
@@ -76,8 +78,13 @@ public:
     DendriteModel &operator=(const DendriteModel &other) = default;
     DendriteModel &operator=(DendriteModel &&other) = default;
 
-    virtual DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt, bool step = true) = 0;
+    void set_time(const long int timestep) { sim_time = timestep; }
+
+    virtual DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt) = 0;
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
+
+protected:
+    long int sim_time{0L};
 };
 
 class SomaModel
@@ -89,20 +96,15 @@ public:
     virtual ~SomaModel() = default;
     SomaModel &operator=(const SomaModel &other) = delete;
     SomaModel &operator=(SomaModel &&other) = delete;
-    void update_time(long int timestep)
-    {
-        sim_time = timestep;
-    }
 
-    virtual SomaStatus update(std::optional<double> current_in = std::nullopt, bool step = true) = 0;
+    void set_time(const long int timestep) { sim_time = timestep; }
+
+    virtual SomaStatus update(std::optional<double> current_in = std::nullopt) = 0;
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
-    virtual double get_potential()
-    {
-        return 0.0;
-    }
+    virtual double get_potential() { return 0.0; }
 
 protected:
-    long int sim_time;
+    long int sim_time{0L};
 };
 
 constexpr int default_weight_bits = 8;  // Based on real-world H/W e.g., Loihi
@@ -116,50 +118,52 @@ public:
     CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
-    SynapseStatus update(bool read = false,  bool step = true) override;
+    SynapseStatus update(bool read = false) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 
 private:
     double weight{0.0};
     double min_synaptic_resolution{0.0};
-    double current{0.0};
-    double synaptic_current_decay{0.0};
     int weight_bits{default_weight_bits};
 };
 
 class SingleCompartmentModel : public DendriteModel
 {
 public:
-    SingleCompartmentModel();
+    SingleCompartmentModel() = default;
     SingleCompartmentModel(const SingleCompartmentModel &copy) = default;
     SingleCompartmentModel(SingleCompartmentModel &&other) = default;
     ~SingleCompartmentModel() override = default;
     SingleCompartmentModel &operator=(const SingleCompartmentModel &other) = default;
     SingleCompartmentModel &operator=(SingleCompartmentModel &&other) = default;
 
-    DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt, bool step = true) override;
+    DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     double accumulated_charge{0.0};
     double leak_decay{0.0};
+    long int timesteps_simulated{0L};
 };
 
 class MultiTapModel1D : public DendriteModel
 {
 public:
-    MultiTapModel1D();
+    MultiTapModel1D() = default;
     MultiTapModel1D(const MultiTapModel1D &copy) = default;
     MultiTapModel1D(MultiTapModel1D &&other) = default;
     ~MultiTapModel1D() override = default;
     MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
-    DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt, bool step = true) override;
+    DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
-    // Assuming a 1D tap dendrite
-    std::vector<double> tap_voltages, next_voltages;
-    std::vector<double> space_constants, time_constants;
+    // Modeling a 1D dendrite with taps
+    std::vector<double> tap_voltages{std::vector<double>(1, 0.0)};
+    std::vector<double> next_voltages{std::vector<double>(1, 0.0)};
+    std::vector<double> space_constants{std::vector<double>(0)};
+    std::vector<double> time_constants{std::vector<double>(1, 0.0)};
+    long int timesteps_simulated{0L};
 };
 
 class LoihiLifModel : public SomaModel
@@ -173,10 +177,11 @@ public:
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    SomaStatus update(std::optional<double> current_in,  bool step = true) override;
+    SomaStatus update(std::optional<double> current_in) override;
     double get_potential() override { return potential; }
 private:
     bool force_update{false};
+    long int timesteps_simulated{0L};
     int reset_mode{NEURON_RESET_HARD};
     int reverse_reset_mode{NEURON_NO_RESET};
     //int noise_type;
@@ -200,7 +205,7 @@ public:
     TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    SomaStatus update(std::optional<double> current_in = std::nullopt, bool step = true) override;
+    SomaStatus update(std::optional<double> current_in = std::nullopt) override;
     double get_potential() override { return potential; }
 private:
     bool force_update{false};
@@ -229,7 +234,7 @@ public:
     InputModel &operator=(InputModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    SomaStatus update(std::optional<double> current_in = std::nullopt, bool step = true) override;
+    SomaStatus update(std::optional<double> current_in = std::nullopt) override;
 
 private:
     std::vector<bool> spikes{};

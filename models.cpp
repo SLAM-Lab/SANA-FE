@@ -11,23 +11,13 @@
 #include "print.hpp"
 
 // *** Synapse models ***
-sanafe::SynapseStatus sanafe::CurrentBasedSynapseModel::update(
-        const bool read, const bool step)
+sanafe::SynapseStatus sanafe::CurrentBasedSynapseModel::update(const bool read)
 {
-    if (step)
-    {
-        current *= synaptic_current_decay;
-        if (fabs(current) < min_synaptic_resolution)
-        {
-            current = 0.0;
-        }
-    }
     if (read)
     {
-        current += weight;
+        return {weight, 0.0, 0.0};
     }
-
-    return {current, 0.0, 0.0};
+    return {0.0, 0.0, 0.0};
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attributes(
@@ -47,20 +37,18 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
 }
 
 // *** Dendrite models ***
-sanafe::SingleCompartmentModel::SingleCompartmentModel()
-{
-}
-
 sanafe::DendriteStatus sanafe::SingleCompartmentModel::update(
-        const std::optional<Synapse> synapse_in, const bool step)
+        const std::optional<Synapse> synapse_in)
 {
-    if (step)
+    while (timesteps_simulated < sim_time)
     {
+        // Apply leak for 1 or more timesteps
+        ++timesteps_simulated;
         accumulated_charge *= leak_decay;
     }
     if (synapse_in.has_value())
     {
-        // Integrate any input current
+        // Integrate input charges
         accumulated_charge += synapse_in.value().current;
     }
 
@@ -81,19 +69,12 @@ void sanafe::SingleCompartmentModel::set_attributes(
     }
 }
 
-sanafe::MultiTapModel1D::MultiTapModel1D()
-        : tap_voltages(std::vector<double>(1, 0.0))
-        , next_voltages(std::vector<double>(1, 0.0))
-        , space_constants(std::vector<double>(0))
-        , time_constants(std::vector<double>(1, 0.0))
-{
-}
-
 sanafe::DendriteStatus sanafe::MultiTapModel1D::update(
-        const std::optional<Synapse> synapse_in, const bool step)
+        const std::optional<Synapse> synapse_in)
 {
-    if (step)
+    while (timesteps_simulated < sim_time)
     {
+        ++timesteps_simulated;
         const size_t taps = tap_voltages.size();
         for (size_t t = 0; t < taps; t++)
         {
@@ -121,7 +102,15 @@ sanafe::DendriteStatus sanafe::MultiTapModel1D::update(
         {
             tap_voltages[t] = next_voltages[t];
         }
+
+        INFO("***\n");
+        for (size_t i = 0; i < tap_voltages.size(); i++)
+        {
+            printf("\tv[%zu]: %lf\n", i, tap_voltages[i]);
+        }
+        INFO("***\n");
     }
+
     if (synapse_in.has_value())
     {
         const Synapse &syn = synapse_in.value();
@@ -136,12 +125,6 @@ sanafe::DendriteStatus sanafe::MultiTapModel1D::update(
         tap_voltages[compartment] += synapse_in.value().current;
     }
 
-    INFO("***\n");
-    for (size_t i = 0; i < tap_voltages.size(); i++)
-    {
-        printf("\tv[%zu]: %lf\n", i, tap_voltages[i]);
-    }
-    INFO("***\n");
     // Return current for most proximal tap (which is always the first tap)
     return {tap_voltages[0], 0.0, 0.0};
 }
@@ -256,8 +239,19 @@ void sanafe::LoihiLifModel::set_attributes(
 }
 
 sanafe::SomaStatus sanafe::LoihiLifModel::update(
-        const std::optional<double> current_in, const bool step)
+        const std::optional<double> current_in)
 {
+    if (timesteps_simulated == sim_time)
+    {
+        throw std::runtime_error("Error: This Loihi model does not support "
+                                 "multiple updates per time-step");
+    }
+    else if (timesteps_simulated < (sim_time - 1))
+    {
+        throw std::runtime_error(
+                "Error: This Loihi model must update every time-step.\n");
+    }
+
     // Calculate the change in potential since the last update e.g.
     //  integate inputs and apply any potential leak
     TRACE1("Updating potential (nid:%d.%d), before:%lf\n", group_id, neuron_id,
@@ -272,24 +266,22 @@ sanafe::SomaStatus sanafe::LoihiLifModel::update(
         state = sanafe::UPDATED;
     }
 
-    if (step)
+    potential *= leak_decay;
+    // Add randomized noise to potential if enabled
+    /*
+    if (noise_type == NOISE_FILE_STREAM)
     {
-        potential *= leak_decay;
-        // Add randomized noise to potential if enabled
-        /*
-        if (noise_type == NOISE_FILE_STREAM)
-        {
-            // TODO: fix noise generation. This depends on which core
-            //  is simulating the neuron. So somehow the neuron can still
-            //  need information about which core it is executing on
-            double random_potential = sim_generate_noise(n);
-            n->potential += random_potential;
-        }
-        */
-        // Add the synaptic / dendrite current to the potential
-        TRACE1("bias:%lf potential before:%lf\n", bias, potential);
-        potential += bias;
+        // TODO: fix noise generation. This depends on which core
+        //  is simulating the neuron. So somehow the neuron can still
+        //  need information about which core it is executing on
+        double random_potential = sim_generate_noise(n);
+        n->potential += random_potential;
     }
+    */
+    // Add the synaptic / dendrite current to the potential
+    TRACE1("bias:%lf potential before:%lf\n", bias, potential);
+    potential += bias;
+
     if (current_in.has_value())
     {
         potential += current_in.value();
@@ -327,6 +319,8 @@ sanafe::SomaStatus sanafe::LoihiLifModel::update(
             potential = reverse_threshold;
         }
     }
+
+    ++timesteps_simulated;
     return {state, 0.0, 0.0};
 }
 
@@ -385,7 +379,7 @@ void sanafe::TrueNorthModel::set_attributes(
 }
 
 sanafe::SomaStatus sanafe::TrueNorthModel::update(
-        const std::optional<double> current_in, const bool step)
+        const std::optional<double> current_in)
 {
     bool randomize_threshold;
     sanafe::NeuronStatus state = sanafe::IDLE;
@@ -396,32 +390,31 @@ sanafe::SomaStatus sanafe::TrueNorthModel::update(
         // Neuron is turned on and potential write
         state = sanafe::UPDATED;
     }
-    if (step)
+
+    // Apply leak
+    if (leak_towards_zero)
     {
-        // Apply leak
-        if (leak_towards_zero)
+        // TODO: what happens if we're above zero but by less
+        //  than the leak amount (for convergent), will we
+        //  oscillate between the two? Does it matter
+        if (potential > 0.0)
         {
-            // TODO: what happens if we're above zero but by less
-            //  than the leak amount (for convergent), will we
-            //  oscillate between the two? Does it matter
-            if (potential > 0.0)
-            {
-                // TrueNorth uses additive leak
-                potential -= leak;
-            }
-            else if (potential < 0.0)
-            {
-                potential += leak;
-            }
-            // else equals zero, so no leak is applied
+            // TrueNorth uses additive leak
+            potential -= leak;
         }
-        else
+        else if (potential < 0.0)
         {
             potential += leak;
         }
-
-        potential += bias;
+        // else equals zero, so no leak is applied
     }
+    else
+    {
+        potential += leak;
+    }
+
+    potential += bias;
+
     if (current_in.has_value())
     {
         potential += current_in.value();
@@ -492,28 +485,22 @@ void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> 
 }
 
 sanafe::SomaStatus sanafe::InputModel::update(
-        std::optional<double> current_in, bool step)
+        std::optional<double> current_in)
 {
-    // This models a dummy input node; all input currents are ignored
-    if (step)
+    // This models a dummy input node
+    if (current_in.has_value())
     {
-        if (curr_spike != spikes.end())
-        {
-            send_spike = *curr_spike;
-            curr_spike = std::next(curr_spike);
-        }
-        else
-        {
-            send_spike = false;
-        }
+        throw std::runtime_error("Error: Sending current to input node.\n");
     }
 
-    NeuronStatus status = IDLE;
-    if (send_spike)
+    bool send_spike = false;
+    if (curr_spike != spikes.end())
     {
-        status = FIRED;
+        send_spike = *curr_spike;
+        curr_spike = std::next(curr_spike);
     }
 
+    const NeuronStatus status = send_spike ? FIRED : IDLE;
     return {status, 0.0, 0.0};
 }
 
