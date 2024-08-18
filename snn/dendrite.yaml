@@ -10,14 +10,12 @@ network:
   name: dendrite_example_network
   groups:
     - name: inputs
-      size: 3
       attributes: {soma_hw_name: dummy_input}
       neurons:
         - 0: {spikes:  [0,0]}
         - 1: {}
         - 2: {spikes: [1,0]}
     - name: dendrite
-      size: 1
       attributes: {log_potential: true, force_dendrite_update: true}
       neurons:
         - 0: {threshold: 100, taps: 3, time_constants: [0.8, 0.8, 0.7],

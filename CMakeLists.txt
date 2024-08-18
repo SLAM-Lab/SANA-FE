@@ -71,7 +71,6 @@ target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
 target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
 target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
-target_link_libraries(sanafecpp PRIVATE yaml-cpp)
 endif()
 
 #include(CMakePrintHelpers)

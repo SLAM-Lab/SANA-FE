@@ -756,15 +756,13 @@ void sanafe::description_parse_group(const ryml::Parser &parser,
             parser, neuron_group_node, "name");
     INFO("Parsing neuron group: %s\n", group_name.c_str());
 
-    const auto &neurons_node = neuron_group_node["neurons"];
-    if (neuron_group_node.find_child("size").invalid())
+    if (neuron_group_node.find_child("neurons").invalid())
     {
         throw DescriptionParsingError(
-                "Neuron group 'size' (aka neuron count) not given", parser,
-                neuron_group_node);
+                "No neurons section defined.", parser, neuron_group_node);
     }
-    size_t neuron_count;
-    neuron_group_node["size"] >> neuron_count;
+    const auto &neurons_node = neuron_group_node["neurons"];
+    const size_t neuron_count = description_count_neurons(parser, neurons_node);
 
     NeuronTemplate default_neuron_config{};
     if (!neuron_group_node.find_child("attributes").invalid())
@@ -777,6 +775,42 @@ void sanafe::description_parse_group(const ryml::Parser &parser,
             group_name, neuron_count, default_neuron_config);
     TRACE1("Parsing neuron section\n");
     description_parse_neuron_section_yaml(parser, neurons_node, group);
+}
+
+size_t sanafe::description_count_neurons(
+        const ryml::Parser &parser, const ryml::ConstNodeRef neuron_node)
+{
+    size_t neuron_count{0UL};
+
+    if (neuron_node.is_seq())
+    {
+        for (const auto neuron_entry : neuron_node)
+        {
+            for (const auto neuron_description : neuron_entry)
+            {
+                std::string id;
+                neuron_description >> ryml::key(id);
+                const bool is_range = (id.find("..") != std::string::npos);
+                if (is_range)
+                {
+                    const auto range = description_parse_range_yaml(id);
+                    neuron_count += (range.second - range.first) + 1;
+                }
+                else // if entry defines a single neuron
+                {
+                    ++neuron_count;
+                }
+            }
+        }
+    }
+    else
+    {
+        throw DescriptionParsingError(
+                "Invalid neuron format, should be list", parser, neuron_node);
+    }
+
+    INFO("Counted %zu neurons\n", neuron_count);
+    return neuron_count;
 }
 
 void sanafe::description_parse_neuron_section_yaml(const ryml::Parser &parser,
@@ -799,7 +833,7 @@ void sanafe::description_parse_neuron_section_yaml(const ryml::Parser &parser,
     else
     {
         throw DescriptionParsingError(
-                "Invalid neuron format", parser, neuron_node);
+                "Invalid neuron format, should be list", parser, neuron_node);
     }
 }
 

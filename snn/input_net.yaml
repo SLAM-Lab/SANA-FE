@@ -3,14 +3,12 @@ network:
   groups:
     - name: in
       attributes: [soma_hw_name: demo_input, log_spikes: true]
-      size: 3
       neurons:
         - 0: [spikes: [1,0,0,0]]
         - 1: [spikes: [1,0,0,0]]
         - 2: [spikes: [0,0,0,1]]
     - name: 1
       attributes: [log_spikes: true, threshold: 2.0, soma_hw_name: demo_soma_default]
-      size: 3
       neurons:
         - 0..2: [bias: 1.0]
   edges:

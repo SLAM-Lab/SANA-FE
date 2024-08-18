@@ -53,6 +53,7 @@ NetworkOnChipConfiguration description_parse_noc_configuration_yaml(const ryml::
 Network description_parse_network_file_yaml(std::ifstream &fp, Architecture &arch);
 Network description_parse_network_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef net_node);
 void description_parse_neuron_group_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef groups_node, Network &net);
+size_t description_count_neurons(const ryml::Parser &parser, ryml::ConstNodeRef neuron_node);
 void description_parse_edges_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef edges_node, Network &net);
 void description_parse_group(const ryml::Parser &parser, ryml::ConstNodeRef neuron_group_node, Network &net);
 void description_parse_neuron_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef neuron_node, NeuronGroup &neuron_group);
