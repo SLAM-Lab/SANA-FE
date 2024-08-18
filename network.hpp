@@ -228,8 +228,6 @@ public:
 class Network
 {
 public:
-    // Use a vector of dynamically allocated groups, so we get vectors random
-    //  access, but do not reallocate objects when growing the vector
     std::map<std::string, NeuronGroup> groups;
     std::string name;
     explicit Network(std::string net_name) : name(std::move(net_name)) {};

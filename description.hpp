@@ -49,7 +49,7 @@ CorePipelineConfiguration description_parse_core_pipeline_yaml(const ryml::Parse
 TilePowerMetrics description_parse_tile_metrics_yaml(const ryml::Parser &parser, ryml::ConstNodeRef attributes);
 NetworkOnChipConfiguration description_parse_noc_configuration_yaml(const ryml::Parser &parser, ryml::ConstNodeRef noc_attributes);
 
-// Network description
+// YAML network description
 Network description_parse_network_file_yaml(std::ifstream &fp, Architecture &arch);
 Network description_parse_network_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef net_node);
 void description_parse_neuron_group_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef groups_node, Network &net);
@@ -72,6 +72,16 @@ std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(cons
 std::map<std::string, ModelParam> description_parse_model_parameters_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef parameters_node);
 ModelParam description_parse_parameter_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node);
 void check_key(const ryml::Parser &parser, const ryml::ConstNodeRef node, const std::string &key);
+
+// Markdown (SANA-FE v1) network description format
+Network description_parse_net_markdown(std::ifstream &fp, Architecture &arch);
+void description_get_fields(std::vector<std::string_view> &fields, const std::string &line);
+size_t field_to_int(const std::string_view &field);
+std::pair<std::string, size_t> parse_neuron_field(const std::string_view &neuron_field);
+std::tuple<std::string, size_t, std::string, size_t> parse_edge_field(const std::string_view &edge_field);
+std::tuple<std::string, size_t, size_t, size_t> parse_mapping_field(const std::string_view &mapping_field);
+void description_read_network_entry(const std::vector<std::string_view> &fields, Architecture &arch, Network &net, const int line_number);
+
 }
 
 #endif
