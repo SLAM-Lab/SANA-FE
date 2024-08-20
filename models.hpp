@@ -25,29 +25,6 @@ enum NeuronResetModes
     NEURON_RESET_MODE_COUNT,
 };
 
-struct SynapseStatus
-{
-    // Initialize current to be an invalid value
-    double synaptic_current{std::numeric_limits<double>::signaling_NaN()};
-    double simulated_energy{0.0};
-    double simulated_latency{0.0};
-};
-
-struct DendriteStatus
-{
-    // Initialize current to be an invalid value
-    double dendritic_current{std::numeric_limits<double>::signaling_NaN()};
-    double simulated_energy{0.0};
-    double simulated_latency{0.0};
-};
-
-struct SomaStatus
-{
-    NeuronStatus neuron_status{INVALID_NEURON_STATE};
-    double simulated_energy{0.0};
-    double simulated_latency{0.0};
-};
-
 class SynapseModel
 {
 public:
@@ -60,7 +37,8 @@ public:
 
     void set_time(const long int timestep) { sim_time = timestep; }
 
-    virtual SynapseStatus update(bool read = false) = 0;
+    virtual double update(bool read = false) = 0;
+    virtual double update(bool read, double &energy, double &latency);
     // Set synapse attributes
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 
@@ -80,7 +58,8 @@ public:
 
     void set_time(const long int timestep) { sim_time = timestep; }
 
-    virtual DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt) = 0;
+    virtual double update(std::optional<Synapse> synapse_in = std::nullopt) = 0;
+    virtual double update(std::optional<Synapse> synapse_in, double &energy, double &latency);
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 
 protected:
@@ -99,7 +78,8 @@ public:
 
     void set_time(const long int timestep) { sim_time = timestep; }
 
-    virtual SomaStatus update(std::optional<double> current_in = std::nullopt) = 0;
+    virtual NeuronStatus update(std::optional<double> current_in = std::nullopt) = 0;
+    virtual NeuronStatus update(std::optional<double> current_in, double &energy, double &latency);
     virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
     virtual double get_potential() { return 0.0; }
 
@@ -118,7 +98,7 @@ public:
     CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
-    SynapseStatus update(bool read = false) override;
+    double update(bool read = false) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 
 private:
@@ -137,7 +117,7 @@ public:
     SingleCompartmentModel &operator=(const SingleCompartmentModel &other) = default;
     SingleCompartmentModel &operator=(SingleCompartmentModel &&other) = default;
 
-    DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt) override;
+    double update(std::optional<Synapse> synapse_in = std::nullopt) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     double accumulated_charge{0.0};
@@ -155,7 +135,7 @@ public:
     MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
-    DendriteStatus update(std::optional<Synapse> synapse_in = std::nullopt) override;
+    double update(std::optional<Synapse> synapse_in = std::nullopt) override;
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     // Modeling a 1D dendrite with taps
@@ -177,7 +157,7 @@ public:
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    SomaStatus update(std::optional<double> current_in) override;
+    NeuronStatus update(std::optional<double> current_in) override;
     double get_potential() override { return potential; }
 private:
     bool force_update{false};
@@ -205,7 +185,7 @@ public:
     TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    SomaStatus update(std::optional<double> current_in = std::nullopt) override;
+    NeuronStatus update(std::optional<double> current_in = std::nullopt) override;
     double get_potential() override { return potential; }
 private:
     bool force_update{false};
@@ -234,7 +214,7 @@ public:
     InputModel &operator=(InputModel &&other) = delete;
 
     void set_attributes(const std::map<std::string, ModelParam> &attr) override;
-    SomaStatus update(std::optional<double> current_in = std::nullopt) override;
+    NeuronStatus update(std::optional<double> current_in = std::nullopt) override;
 
 private:
     std::vector<bool> spikes{};

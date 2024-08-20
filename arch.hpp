@@ -287,9 +287,9 @@ struct SynapseUnit
     long int spikes_processed{0L};
     double energy{0.0};
     double time{0.0};
-    //double energy_memory_access, latency_memory_access;
     double energy_spike_op;
     double latency_spike_op;
+    bool model_power{false};
 
     explicit SynapseUnit(std::string synapse_name, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics,  const ModelInfo &model);
     //std::string description() const;
@@ -305,6 +305,7 @@ struct DendriteUnit
     double time{0.0};
     double energy_access;
     double latency_access;
+    bool model_power{false};
 
     explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
     //std::string description() const;
@@ -329,6 +330,7 @@ struct SomaUnit
     double energy_spiking;
     double latency_spiking;
     int noise_type{NOISE_NONE};
+    bool model_power{false};
 
     explicit SomaUnit(std::string soma_name, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics, const ModelInfo &model);
     //std::string description() const;

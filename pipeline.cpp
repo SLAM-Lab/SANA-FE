@@ -172,12 +172,24 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
     con.synapse_model->set_time(ts.timestep);
     Core &dest_core = *(con.post_neuron->core);
 
-    const SynapseStatus ret = con.synapse_model->update(true);
-    latency += ret.simulated_latency;
-    dest_core.energy += ret.simulated_energy;
+    double synaptic_current;
+    if (con.synapse_hw->model_power)
+    {
+        double simulated_energy{0.0};
+        double simulated_latency{0.0};
+        synaptic_current = con.synapse_model->update(
+                true, simulated_energy, simulated_latency);
+        latency += simulated_latency;
+        dest_core.energy += simulated_energy;
+    }
+    else
+    {
+        synaptic_current = con.synapse_model->update(true);
+        latency += con.synapse_hw->latency_spike_op;
+    }
 
     // Input and buffer synaptic info at the next hardware unit (dendrite unit)
-    Synapse synapse_data = {ret.synaptic_current, con};
+    Synapse synapse_data = {synaptic_current, con};
     con.post_neuron->dendrite_input_synapses.push_back(synapse_data);
     con.post_neuron->spike_count++;
     assert(con.synapse_hw != nullptr);
@@ -187,7 +199,6 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
             con.post_neuron->parent_group_id.c_str(),
             con.post_neuron->id.c_str(), con.current);
 
-    latency += con.synapse_hw->latency_spike_op;
     return latency;
 }
 
@@ -199,29 +210,48 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
             "(last_updated:%d, ts:%ld)\n",
             n.id.c_str(), n.dendrite_last_updated, ts.timestep);
 
-    DendriteStatus ret;
+    double dendritic_current;
     if (n.dendrite_input_synapses.empty())
     {
         // Update the dendrite h/w at least once, even if there are no inputs.
         //  This might be required e.g., if there is a leak to apply
-        ret = n.dendrite_model->update();
-        latency += ret.simulated_latency;
-        n.core->energy += ret.simulated_energy;
+        if (n.dendrite_hw->model_power)
+        {
+            double simulated_energy{0.0};
+            double simulated_latency{0.0};
+            dendritic_current = n.dendrite_model->update(std::nullopt, simulated_energy, simulated_latency);
+            n.core->energy += simulated_energy;
+            latency += simulated_latency;
+        }
+        else
+        {
+            dendritic_current = n.dendrite_model->update();
+        }
+        n.soma_input_charge = dendritic_current;
     }
     else
     {
         // Update the dendrite h/w for all input synaptic currents
         for (const auto &synapse : n.dendrite_input_synapses)
         {
-            DendriteStatus ret = n.dendrite_model->update(synapse);
-            n.soma_input_charge = ret.dendritic_current;
-            latency += ret.simulated_latency;
-            n.core->energy += ret.simulated_energy;
+            if (n.dendrite_hw->model_power)
+            {
+                double simulated_energy{0.0};
+                double simulated_latency{0.0};
+                dendritic_current = n.dendrite_model->update(
+                        synapse, simulated_energy, simulated_latency);
+                latency += simulated_latency;
+                n.core->energy += simulated_energy;
+            }
+            else
+            {
+                dendritic_current = n.dendrite_model->update(synapse);
+                latency += n.dendrite_hw->latency_access;
+            }
         }
         n.dendrite_input_synapses.clear();
+        n.soma_input_charge = dendritic_current;
     }
-
-    latency += n.dendrite_hw->latency_access;
 
     // Finally, send dendritic current to the soma
     TRACE2("nid:%s updating dendrite, soma_input_charge:%lf\n", n.id.c_str(),
@@ -234,7 +264,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 {
     TRACE1("nid:%s updating, current_in:%lf\n", n.id.c_str(),
             n.soma_input_charge);
-    double soma_processing_latency = 0.0;
+    double soma_processing_latency{0.0};
     n.soma_model->set_time(ts.timestep);
 
     std::optional<double> soma_current_in;
@@ -244,25 +274,42 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
         n.soma_input_charge = 0.0;
     }
 
-    SomaStatus ret = n.soma_model->update(soma_current_in);
-    if (ret.neuron_status == INVALID_NEURON_STATE)
+    if (n.soma_hw->model_power)
+    {
+        double simulated_energy{0.0};
+        double simulated_latency{0.0};
+        n.status = n.soma_model->update(
+                soma_current_in, simulated_energy, simulated_latency);
+        n.core->energy += simulated_energy;
+        soma_processing_latency += simulated_latency;
+    }
+    else
+    {
+        n.status = n.soma_model->update(soma_current_in);
+        soma_processing_latency += n.soma_hw->latency_access_neuron;
+    }
+
+    if (n.status == INVALID_NEURON_STATE)
     {
         std::string error = "Soma model for nid: " + n.parent_group_id +
                 "." + std::to_string(n.id) + " returned invalid state.\n";
         throw std::runtime_error(error);
     }
-    n.status = ret.neuron_status;
-    n.core->energy = ret.simulated_energy;
-    soma_processing_latency += ret.simulated_latency;
-    soma_processing_latency += n.soma_hw->latency_access_neuron;
-    if ((n.status == sanafe::UPDATED) || (n.status == sanafe::FIRED))
+    else if ((n.status == sanafe::UPDATED) || (n.status == sanafe::FIRED))
     {
-        soma_processing_latency += n.soma_hw->latency_update_neuron;
+        if (!n.soma_hw->model_power)
+        {
+            soma_processing_latency += n.soma_hw->latency_update_neuron;
+        }
         n.soma_hw->neuron_updates++;
     }
+
     if (n.status == sanafe::FIRED)
     {
-        soma_processing_latency += n.soma_hw->latency_spiking;
+        if (!n.soma_hw->model_power)
+        {
+            soma_processing_latency += n.soma_hw->latency_spiking;
+        }
         n.soma_hw->neurons_fired++;
         n.axon_out_input_spike = true;
         SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);

@@ -11,13 +11,22 @@
 #include "print.hpp"
 
 // *** Synapse models ***
-sanafe::SynapseStatus sanafe::CurrentBasedSynapseModel::update(const bool read)
+double sanafe::SynapseModel::update(
+        const bool read, double &energy, double &latency)
+{
+    INFO("Error: update() with power (energy/latency) modeling not "
+         "implemented");
+    throw std::invalid_argument(
+            "update() with power (energy/latency) modeling not implemented");
+}
+
+double sanafe::CurrentBasedSynapseModel::update(const bool read)
 {
     if (read)
     {
-        return {weight, 0.0, 0.0};
+        return weight;
     }
-    return {0.0, 0.0, 0.0};
+    return 0.0;
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attributes(
@@ -37,7 +46,16 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
 }
 
 // *** Dendrite models ***
-sanafe::DendriteStatus sanafe::SingleCompartmentModel::update(
+double sanafe::DendriteModel::update(
+        std::optional<Synapse> synapse_in, double &energy, double &latency)
+{
+    INFO("Error: update() with power (energy/latency) modeling not "
+         "implemented");
+    throw std::invalid_argument(
+            "update() with power (energy/latency) modeling not implemented");
+}
+
+double sanafe::SingleCompartmentModel::update(
         const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated < sim_time)
@@ -52,7 +70,7 @@ sanafe::DendriteStatus sanafe::SingleCompartmentModel::update(
         accumulated_charge += synapse_in.value().current;
     }
 
-    return {accumulated_charge, 0.0, 0.0};
+    return accumulated_charge;
 }
 
 void sanafe::SingleCompartmentModel::set_attributes(
@@ -69,7 +87,7 @@ void sanafe::SingleCompartmentModel::set_attributes(
     }
 }
 
-sanafe::DendriteStatus sanafe::MultiTapModel1D::update(
+double sanafe::MultiTapModel1D::update(
         const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated < sim_time)
@@ -126,7 +144,7 @@ sanafe::DendriteStatus sanafe::MultiTapModel1D::update(
     }
 
     // Return current for most proximal tap (which is always the first tap)
-    return {tap_voltages[0], 0.0, 0.0};
+    return tap_voltages[0];
 }
 
 void sanafe::MultiTapModel1D::set_attributes(
@@ -189,6 +207,14 @@ void sanafe::MultiTapModel1D::set_attributes(
 }
 
 // **** Soma models ****
+sanafe::NeuronStatus sanafe::SomaModel::update(
+        std::optional<double> current_in, double &energy, double &latency)
+{
+ INFO("Error: update() with energy,latency modeling not implemented.\n");
+    throw std::invalid_argument(
+            "update() with power (energy/latency) modeling not implemented");
+}
+
 void sanafe::LoihiLifModel::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
@@ -238,7 +264,7 @@ void sanafe::LoihiLifModel::set_attributes(
     }
 }
 
-sanafe::SomaStatus sanafe::LoihiLifModel::update(
+sanafe::NeuronStatus sanafe::LoihiLifModel::update(
         const std::optional<double> current_in)
 {
     if (timesteps_simulated == sim_time)
@@ -321,7 +347,7 @@ sanafe::SomaStatus sanafe::LoihiLifModel::update(
     }
 
     ++timesteps_simulated;
-    return {state, 0.0, 0.0};
+    return state;
 }
 
 void sanafe::TrueNorthModel::set_attributes(
@@ -378,7 +404,7 @@ void sanafe::TrueNorthModel::set_attributes(
     }
 }
 
-sanafe::SomaStatus sanafe::TrueNorthModel::update(
+sanafe::NeuronStatus sanafe::TrueNorthModel::update(
         const std::optional<double> current_in)
 {
     bool randomize_threshold;
@@ -467,7 +493,7 @@ sanafe::SomaStatus sanafe::TrueNorthModel::update(
         // No spike is generated
     }
     TRACE2("potential:%lf threshold %lf\n", potential, threshold);
-    return {state, 0.0, 0.0};
+    return state;
 }
 
 void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> &attr)
@@ -484,7 +510,7 @@ void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> 
     }
 }
 
-sanafe::SomaStatus sanafe::InputModel::update(
+sanafe::NeuronStatus sanafe::InputModel::update(
         std::optional<double> current_in)
 {
     // This models a dummy input node
@@ -501,7 +527,7 @@ sanafe::SomaStatus sanafe::InputModel::update(
     }
 
     const NeuronStatus status = send_spike ? FIRED : IDLE;
-    return {status, 0.0, 0.0};
+    return status;
 }
 
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
