@@ -467,6 +467,8 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
                 TRACE1("spikes in: %ld, energy:%e\n", axon.spike_messages_in,
                         axon.energy_spike_message);
             }
+            // TODO: fix energy and latency for individual units
+            /*
             for (const auto &syn : c.synapse)
             {
                 synapse_energy += static_cast<double>(syn.spikes_processed) *
@@ -486,6 +488,7 @@ double sanafe::sim_calculate_energy(const Architecture &arch)
                         soma.neuron_count, soma.neuron_updates,
                         soma.neurons_fired);
             }
+            */
             for (const auto &axon : c.axon_out_hw)
             {
                 axon_out_energy += static_cast<double>(axon.packets_out) *

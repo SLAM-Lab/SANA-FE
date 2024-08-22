@@ -40,7 +40,7 @@ void description_parse_core_section_yaml(const ryml::Parser &parser, ryml::Const
 void description_parse_axon_in_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef axon_in_node, Core &parent_core);
 AxonInPowerMetrics description_parse_axon_in_attributes_yaml(const ryml::Parser &parser, ryml::ConstNodeRef attributes);
 void description_parse_synapse_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef synapse_node, Core &parent_core);
-std::pair<SynapsePowerMetrics, ModelInfo> description_parse_synapse_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes);
+ModelInfo description_parse_synapse_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes);
 void description_parse_dendrite_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef dendrite_node, Core &parent_core);
 void description_parse_soma_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef soma_node, Core &parent_core);
 void description_parse_axon_out_section(const ryml::Parser &parser, ryml::ConstNodeRef axon_out_node, Core &parent_core);

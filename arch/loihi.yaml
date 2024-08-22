@@ -74,8 +74,8 @@ architecture:
           - name: loihi_dendrites
             attributes:
               model: single_compartment
-              energy_access: 0.0
-              latency_access: 0.0
+              energy_update: 0.0
+              latency_update: 0.0
           axon_out:
             - name: loihi_out
               attributes:

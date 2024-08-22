@@ -149,22 +149,25 @@ void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
 {
     auto name = description_required_field<std::string>(
             parser, synapse_node, "name");
-    auto [power_metrics, model] = description_parse_synapse_attributes_yaml(
+    auto model = description_parse_synapse_attributes_yaml(
             parser, synapse_node.find_child("attributes"));
-    parent_core.create_synapse(name, power_metrics, model);
+    parent_core.create_synapse(name, model);
 }
 
-std::pair<sanafe::SynapsePowerMetrics, sanafe::ModelInfo>
-sanafe::description_parse_synapse_attributes_yaml(
+sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
-    ModelInfo model;
-    model.name = description_required_field<std::string>(
+    ModelInfo model_details;
+    model_details.name = description_required_field<std::string>(
             parser, attributes, "model");
+    model_details.model_parameters =
+            description_parse_model_parameters_yaml(parser, attributes);
+    /*
     const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
+
     if (!plugin_path_node.invalid())
     {
-        if (plugin_path_node.is_val())
+        if (plugin_path_node.is_val()) // Is a value, not nested struct
         {
             std::string plugin_path;
             plugin_path_node >> plugin_path;
@@ -172,18 +175,21 @@ sanafe::description_parse_synapse_attributes_yaml(
         }
         else
         {
-            throw DescriptionParsingError("Expected plugin path to be string",
+            throw DescriptionParsingError("Expected plugin path to be scalar.",
                     parser, plugin_path_node);
         }
     }
+    if (!attributes.find_child("energy_process_spike").invalid())
+    {
 
-    SynapsePowerMetrics power_metrics;
-    power_metrics.energy_process_spike = description_required_field<double>(
-            parser, attributes, "energy_process_spike");
-    power_metrics.latency_process_spike = description_required_field<double>(
-            parser, attributes, "latency_process_spike");
+    }
+    if (!attributes.find_child("latency_process_spike").invalid())
+    {
 
-    return {power_metrics, model};
+    }
+    */
+
+    return model_details;
 }
 
 void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
@@ -217,14 +223,9 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
                     parser, plugin_path_node);
         }
     }
-
-    DendritePowerMetrics power_metrics;
-    power_metrics.energy_access = description_required_field<double>(
-            parser, attributes, "energy_access");
-    power_metrics.latency_access = description_required_field<double>(
-            parser, attributes, "latency_access");
-    parent_core.create_dendrite(
-            dendrite_name, power_metrics, model_details);
+    model_details.model_parameters =
+            description_parse_model_parameters_yaml(parser, attributes);
+    parent_core.create_dendrite(dendrite_name, model_details);
 }
 
 void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
@@ -240,9 +241,11 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
     }
     std::string model_str;
 
-    ModelInfo model;
-    model.name = description_required_field<std::string>(
+    ModelInfo model_details;
+    model_details.name = description_required_field<std::string>(
             parser, attributes, "model");
+    model_details.model_parameters =
+            description_parse_model_parameters_yaml(parser, attributes);
     const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
     if (!plugin_path_node.invalid())
     {
@@ -250,7 +253,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         {
             std::string plugin_path;
             plugin_path_node >> plugin_path;
-            model.plugin_library_path = plugin_path;
+            model_details.plugin_library_path = plugin_path;
         }
         else
         {
@@ -259,23 +262,9 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         }
     }
 
-    SomaPowerMetrics power_metrics;
-    power_metrics.energy_update_neuron = description_required_field<double>(
-            parser, attributes, "energy_update_neuron");
-    power_metrics.latency_update_neuron = description_required_field<double>(
-            parser, attributes, "latency_update_neuron");
-    power_metrics.energy_access_neuron = description_required_field<double>(
-            parser, attributes, "energy_access_neuron");
-    power_metrics.latency_access_neuron = description_required_field<double>(
-            parser, attributes, "latency_access_neuron");
-    power_metrics.energy_spike_out = description_required_field<double>(
-            parser, attributes, "energy_spike_out");
-    power_metrics.latency_spike_out = description_required_field<double>(
-            parser, attributes, "latency_spike_out");
-
     if (!attributes.find_child("noise").invalid())
     {
-        // TODO: support optioanl noise arg again alongside the plugin mechanism
+        // TODO: support optional noise arg again alongside the plugin mechanism
         /*
         s.noise_type = NOISE_FILE_STREAM;
         s.noise_stream = fopen(value_str.c_str(), "r");
@@ -288,7 +277,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         }
         */
     }
-    parent_core.create_soma(std::move(soma_name), power_metrics, model);
+    parent_core.create_soma(std::move(soma_name), model_details);
 }
 
 void sanafe::description_parse_axon_out_section(const ryml::Parser &parser,

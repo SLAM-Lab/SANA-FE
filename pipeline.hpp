@@ -22,5 +22,6 @@ double pipeline_process_soma(const Timestep &ts, Neuron &n);
 double pipeline_process_axon_out(Timestep &ts, const Architecture &arch, Neuron &n);
 BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str);
 
-size_t abs_diff(const size_t a, const size_t b);
+std::pair<double, double> pipeline_apply_default_dendrite_power_model(Neuron &n, std::optional<double> energy, std::optional<double> latency);
+size_t abs_diff(size_t a, size_t b);
 }

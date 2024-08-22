@@ -22,6 +22,8 @@
 #include <optional>
 #include <vector>
 
+#include "network.hpp"
+
 namespace sanafe
 {
 
@@ -44,9 +46,6 @@ class SomaModel;
 struct AxonOutModel;
 
 struct TilePowerMetrics;
-struct SynapsePowerMetrics;
-struct DendritePowerMetrics;
-struct SomaPowerMetrics;
 struct AxonOutPowerMetrics;
 struct CorePipelineConfiguration;
 struct NetworkOnChipConfiguration;
@@ -139,28 +138,6 @@ struct AxonInPowerMetrics
     double latency_message_in{0.0};
 };
 
-struct SynapsePowerMetrics
-{
-    double energy_process_spike{0.0};
-    double latency_process_spike{0.0};
-};
-
-struct DendritePowerMetrics
-{
-    double energy_access{0.0};
-    double latency_access{0.0};
-};
-
-struct SomaPowerMetrics
-{
-    double energy_update_neuron{0.0};
-    double latency_update_neuron{0.0};
-    double energy_access_neuron{0.0};
-    double latency_access_neuron{0.0};
-    double energy_spike_out{0.0};
-    double latency_spike_out{0.0};
-};
-
 struct AxonOutPowerMetrics
 {
     double energy_message_out{0.0};
@@ -219,12 +196,6 @@ struct CoreAddress
     size_t id;
 };
 
-struct ModelInfo
-{
-    std::optional<std::filesystem::path> plugin_library_path{};
-    std::string name;
-};
-
 class Core
 {
 public:
@@ -253,9 +224,9 @@ public:
 
     explicit Core(std::string name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
     AxonInUnit &create_axon_in(const std::string &name, const AxonInPowerMetrics &power_metrics);
-    SynapseUnit &create_synapse(const std::string &name, const SynapsePowerMetrics &power_metrics, const ModelInfo &model);
-    DendriteUnit &create_dendrite(const std::string &name, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
-    SomaUnit &create_soma(std::string name, const SomaPowerMetrics &power_metrics, const ModelInfo &model);
+    SynapseUnit &create_synapse(const std::string &name, const ModelInfo &model_details);
+    DendriteUnit &create_dendrite(const std::string &name, const ModelInfo &model_details);
+    SomaUnit &create_soma(std::string name, const ModelInfo &model_details);
     AxonOutUnit &create_axon_out(const std::string &name, const AxonOutPowerMetrics &power_metrics);
     void map_neuron(Neuron &n);
     [[nodiscard]] int get_id() const { return id; }
@@ -280,39 +251,55 @@ struct AxonInUnit
 
 struct SynapseUnit
 {
+    std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
     CoreAddress parent_core_address;
+    std::optional<double> default_energy_process_spike{std::nullopt};
+    std::optional<double> default_latency_process_spike{std::nullopt};
+
     long int spikes_processed{0L};
     double energy{0.0};
     double time{0.0};
-    double energy_spike_op;
-    double latency_spike_op;
-    bool model_power{false};
 
-    explicit SynapseUnit(std::string synapse_name, const CoreAddress &parent_core, const SynapsePowerMetrics &power_metrics,  const ModelInfo &model);
+    explicit SynapseUnit(std::string synapse_name, const CoreAddress &parent_core, const ModelInfo &model_details);
     //std::string description() const;
 };
 
 struct DendriteUnit
 {
+    std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
+    std::optional<double> default_energy_update{std::nullopt};
+    std::optional<double> default_latency_update{std::nullopt};
     CoreAddress parent_core_address;
     double energy{0.0};
     double time{0.0};
-    double energy_access;
-    double latency_access;
-    bool model_power{false};
 
-    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const DendritePowerMetrics &power_metrics, const ModelInfo &model);
+    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const ModelInfo &model_details);
     //std::string description() const;
 };
 
 struct SomaUnit
 {
+    struct SomaEnergyMetrics
+    {
+        double energy_update_neuron{0.0};
+        double energy_access_neuron{0.0};
+        double energy_spike_out{0.0};
+    };
+
+    struct SomaLatencyMetrics
+    {
+        double latency_update_neuron{0.0};
+        double latency_access_neuron{0.0};
+        double latency_spike_out{0.0};
+    };
+
+    std::map<std::string, ModelParam> model_parameters{};
     FILE *noise_stream{nullptr};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
@@ -323,16 +310,11 @@ struct SomaUnit
     long int neuron_count{0L};
     double energy{0.0};
     double time{0.0};
-    double energy_update_neuron;
-    double latency_update_neuron;
-    double energy_access_neuron;
-    double latency_access_neuron;
-    double energy_spiking;
-    double latency_spiking;
+    std::optional<SomaEnergyMetrics> default_energy_metrics;
+    std::optional<SomaLatencyMetrics> default_latency_metrics;
     int noise_type{NOISE_NONE};
-    bool model_power{false};
 
-    explicit SomaUnit(std::string soma_name, const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics, const ModelInfo &model);
+    explicit SomaUnit(std::string soma_name, const CoreAddress &parent_core, const ModelInfo &model_details);
     //std::string description() const;
 };
 

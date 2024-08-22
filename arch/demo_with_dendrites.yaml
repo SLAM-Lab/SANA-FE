@@ -34,8 +34,8 @@ architecture:
           dendrite:
             - name: dendrite
               attributes:
-                energy_access: 0.0
-                latency_access: 0.0
+                energy_update: 0.0
+                latency_update: 0.0
                 model: taps
           soma:
             - name: soma

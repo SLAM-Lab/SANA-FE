@@ -11,25 +11,17 @@
 #include "print.hpp"
 
 // *** Synapse models ***
-double sanafe::SynapseModel::update(
-        const bool read, double &energy, double &latency)
-{
-    INFO("Error: update() with power (energy/latency) modeling not "
-         "implemented");
-    throw std::invalid_argument(
-            "update() with power (energy/latency) modeling not implemented");
-}
-
-double sanafe::CurrentBasedSynapseModel::update(const bool read)
+sanafe::SynapseModel::SynapseModelResult
+sanafe::CurrentBasedSynapseModel::update(const bool read)
 {
     if (read)
     {
-        return weight;
+        return {weight, std::nullopt, std::nullopt};
     }
-    return 0.0;
+    return {0.0, std::nullopt, std::nullopt};
 }
 
-void sanafe::CurrentBasedSynapseModel::set_attributes(
+void sanafe::CurrentBasedSynapseModel::configure(
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -46,19 +38,10 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
 }
 
 // *** Dendrite models ***
-double sanafe::DendriteModel::update(
-        std::optional<Synapse> synapse_in, double &energy, double &latency)
+sanafe::DendriteModel::DendriteModelResult
+sanafe::SingleCompartmentModel::update(const std::optional<Synapse> synapse_in)
 {
-    INFO("Error: update() with power (energy/latency) modeling not "
-         "implemented");
-    throw std::invalid_argument(
-            "update() with power (energy/latency) modeling not implemented");
-}
-
-double sanafe::SingleCompartmentModel::update(
-        const std::optional<Synapse> synapse_in)
-{
-    while (timesteps_simulated < sim_time)
+    while (timesteps_simulated < simulation_time)
     {
         // Apply leak for 1 or more timesteps
         ++timesteps_simulated;
@@ -70,10 +53,10 @@ double sanafe::SingleCompartmentModel::update(
         accumulated_charge += synapse_in.value().current;
     }
 
-    return accumulated_charge;
+    return {accumulated_charge, std::nullopt, std::nullopt};
 }
 
-void sanafe::SingleCompartmentModel::set_attributes(
+void sanafe::SingleCompartmentModel::configure(
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -87,10 +70,10 @@ void sanafe::SingleCompartmentModel::set_attributes(
     }
 }
 
-double sanafe::MultiTapModel1D::update(
+sanafe::DendriteModel::DendriteModelResult sanafe::MultiTapModel1D::update(
         const std::optional<Synapse> synapse_in)
 {
-    while (timesteps_simulated < sim_time)
+    while (timesteps_simulated < simulation_time)
     {
         ++timesteps_simulated;
         const size_t taps = tap_voltages.size();
@@ -144,10 +127,10 @@ double sanafe::MultiTapModel1D::update(
     }
 
     // Return current for most proximal tap (which is always the first tap)
-    return tap_voltages[0];
+    return {tap_voltages[0], std::nullopt, std::nullopt};
 }
 
-void sanafe::MultiTapModel1D::set_attributes(
+void sanafe::MultiTapModel1D::configure(
         const std::map<std::string, ModelParam> &attr)
 {
     if (attr.find("taps") != attr.end())
@@ -207,72 +190,64 @@ void sanafe::MultiTapModel1D::set_attributes(
 }
 
 // **** Soma models ****
-sanafe::NeuronStatus sanafe::SomaModel::update(
-        std::optional<double> current_in, double &energy, double &latency)
+void sanafe::LoihiLifModel::configure(
+        const std::map<std::string, ModelParam> &attributes)
 {
- INFO("Error: update() with energy,latency modeling not implemented.\n");
-    throw std::invalid_argument(
-            "update() with power (energy/latency) modeling not implemented");
-}
-
-void sanafe::LoihiLifModel::set_attributes(
-        const std::map<std::string, ModelParam> &attr)
-{
-    for (const auto &a : attr)
+    for (const auto &attribute_pair : attributes)
     {
-        const std::string &key = a.first;
-        const ModelParam &value = a.second;
+        const std::string &key = attribute_pair.first;
+        const ModelParam &param = attribute_pair.second;
         if (key == "threshold")
         {
-            threshold = static_cast<double>(value);
+            threshold = static_cast<double>(param);
         }
         else if (key == "reverse_threshold")
         {
-            reverse_threshold = static_cast<double>(value);
+            reverse_threshold = static_cast<double>(param);
         }
         else if (key == "reset")
         {
-            reset = static_cast<double>(value);
+            reset = static_cast<double>(param);
         }
         else if (key == "reverse_reset")
         {
-            reverse_reset = static_cast<double>(value);
+            reverse_reset = static_cast<double>(param);
         }
         else if (key == "reset_mode")
         {
-            const std::string reset_mode_str = static_cast<std::string>(value);
+            const std::string reset_mode_str = static_cast<std::string>(param);
             reset_mode = model_parse_reset_mode(reset_mode_str);
         }
         else if (key == "reverse_reset_mode")
         {
             const std::string reverse_reset_mode_str =
-                    static_cast<std::string>(value);
+                    static_cast<std::string>(param);
             reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
         }
         else if (key == "leak_decay")
         {
-            leak_decay = static_cast<double>(value);
+            leak_decay = static_cast<double>(param);
         }
         else if (key == "bias")
         {
-            bias = static_cast<double>(value);
+            bias = static_cast<double>(param);
         }
         else if (key == "force_soma_update")
         {
-            force_update = static_cast<bool>(value);
+            force_update = static_cast<bool>(param);
         }
     }
 }
 
-sanafe::NeuronStatus sanafe::LoihiLifModel::update(
+sanafe::SomaModel::SomaModelResult sanafe::LoihiLifModel::update(
         const std::optional<double> current_in)
 {
-    if (timesteps_simulated == sim_time)
+    if (timesteps_simulated == simulation_time)
     {
         throw std::runtime_error("Error: This Loihi model does not support "
                                  "multiple updates per time-step");
     }
-    else if (timesteps_simulated < (sim_time - 1))
+    else if (timesteps_simulated < (simulation_time - 1))
     {
         throw std::runtime_error(
                 "Error: This Loihi model must update every time-step.\n");
@@ -347,10 +322,10 @@ sanafe::NeuronStatus sanafe::LoihiLifModel::update(
     }
 
     ++timesteps_simulated;
-    return state;
+    return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::TrueNorthModel::set_attributes(
+void sanafe::TrueNorthModel::configure(
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -404,7 +379,7 @@ void sanafe::TrueNorthModel::set_attributes(
     }
 }
 
-sanafe::NeuronStatus sanafe::TrueNorthModel::update(
+sanafe::SomaModel::SomaModelResult sanafe::TrueNorthModel::update(
         const std::optional<double> current_in)
 {
     bool randomize_threshold;
@@ -493,10 +468,11 @@ sanafe::NeuronStatus sanafe::TrueNorthModel::update(
         // No spike is generated
     }
     TRACE2("potential:%lf threshold %lf\n", potential, threshold);
-    return state;
+    return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> &attr)
+void sanafe::InputModel::configure(
+        const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
     {
@@ -510,7 +486,7 @@ void sanafe::InputModel::set_attributes(const std::map<std::string, ModelParam> 
     }
 }
 
-sanafe::NeuronStatus sanafe::InputModel::update(
+sanafe::SomaModel::SomaModelResult sanafe::InputModel::update(
         std::optional<double> current_in)
 {
     // This models a dummy input node
@@ -527,7 +503,7 @@ sanafe::NeuronStatus sanafe::InputModel::update(
     }
 
     const NeuronStatus status = send_spike ? FIRED : IDLE;
-    return status;
+    return {status, std::nullopt, std::nullopt};
 }
 
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
@@ -563,8 +539,7 @@ std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
 {
     if (model_name == "current_based")
     {
-        return std::shared_ptr<SynapseModel>(
-                new CurrentBasedSynapseModel());
+        return std::shared_ptr<SynapseModel>(new CurrentBasedSynapseModel());
     }
     const std::string error =
             "Synapse model not supported (" + model_name + ")\n";

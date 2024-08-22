@@ -168,24 +168,19 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
     //  update filtered current and any other connection properties
     SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
-    double latency{0.0};
     con.synapse_model->set_time(ts.timestep);
     Core &dest_core = *(con.post_neuron->core);
 
-    double synaptic_current;
-    if (con.synapse_hw->model_power)
+    auto [synaptic_current, simulated_energy, simulated_latency] =
+            con.synapse_model->update(true);
+    if (con.synapse_hw->default_energy_process_spike.has_value())
     {
-        double simulated_energy{0.0};
-        double simulated_latency{0.0};
-        synaptic_current = con.synapse_model->update(
-                true, simulated_energy, simulated_latency);
-        latency += simulated_latency;
-        dest_core.energy += simulated_energy;
+        simulated_energy = con.synapse_hw->default_energy_process_spike.value();
     }
-    else
+    if (con.synapse_hw->default_latency_process_spike.has_value())
     {
-        synaptic_current = con.synapse_model->update(true);
-        latency += con.synapse_hw->latency_spike_op;
+        simulated_latency =
+                con.synapse_hw->default_latency_process_spike.value();
     }
 
     // Input and buffer synaptic info at the next hardware unit (dendrite unit)
@@ -199,72 +194,104 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
             con.post_neuron->parent_group_id.c_str(),
             con.post_neuron->id.c_str(), con.current);
 
-    return latency;
+    // Check that both the energy and latency costs have been set, either within
+    //  the synapse h/w model, or by default metrics
+    if (!simulated_energy.has_value())
+    {
+        INFO("Error: No synapse energy model or metrics. Either return an "
+             "energy value or set the attribute: 'energy_process_spike'\n");
+        throw std::runtime_error("Error: No synapse energy model or metrics.");
+    }
+    if (!simulated_latency.has_value())
+    {
+        INFO("Error: No synapse latency model or metrics. Either return a "
+             "latency value or set the attribute: 'latency_process_spike'\n");
+        throw std::runtime_error("Error: No synapse latency model or metrics.");
+    }
+
+    dest_core.energy += simulated_energy.value();
+    return simulated_latency.value();
+}
+
+std::pair<double, double>
+sanafe::pipeline_apply_default_dendrite_power_model(
+        Neuron &n, std::optional<double> energy, std::optional<double> latency)
+{
+    // Apply default energy and latency metrics if set
+    if (n.dendrite_hw->default_energy_update.has_value())
+    {
+        energy = n.dendrite_hw->default_energy_update.value();
+    }
+    if (n.dendrite_hw->default_latency_update.has_value())
+    {
+        latency = n.dendrite_hw->default_latency_update.value();
+    }
+
+    // Check that both the energy and latency costs have been set, either within
+    //  the dendrite h/w model, or by default metrics
+    if (!energy.has_value())
+    {
+        INFO("Error: No dendrite energy model or metrics.\n");
+        throw std::runtime_error(
+                "Error: No dendrite energy model or metrics.\n");
+    }
+    if (!latency.has_value())
+    {
+        INFO("Error: No dendrite latency model or metrics.\n");
+        throw std::runtime_error(
+                "Error: No dendrite latency model or metrics.\n");
+    }
+
+    return {energy.value(), latency.value()};
 }
 
 double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 {
-    double latency{0.0};
     n.dendrite_model->set_time(ts.timestep);
     TRACE2("Updating nid:%s dendritic current "
             "(last_updated:%d, ts:%ld)\n",
             n.id.c_str(), n.dendrite_last_updated, ts.timestep);
 
-    double dendritic_current;
+    double total_latency{0.0};
     if (n.dendrite_input_synapses.empty())
     {
         // Update the dendrite h/w at least once, even if there are no inputs.
         //  This might be required e.g., if there is a leak to apply
-        if (n.dendrite_hw->model_power)
-        {
-            double simulated_energy{0.0};
-            double simulated_latency{0.0};
-            dendritic_current = n.dendrite_model->update(std::nullopt, simulated_energy, simulated_latency);
-            n.core->energy += simulated_energy;
-            latency += simulated_latency;
-        }
-        else
-        {
-            dendritic_current = n.dendrite_model->update();
-        }
-        n.soma_input_charge = dendritic_current;
+        auto [current, model_energy, model_latency] =
+                n.dendrite_model->update(std::nullopt);
+        n.soma_input_charge = current;
+        auto [energy, latency] = pipeline_apply_default_dendrite_power_model(
+                n, model_energy, model_latency);
+        n.core->energy += energy;
+        total_latency += latency;
     }
     else
     {
         // Update the dendrite h/w for all input synaptic currents
         for (const auto &synapse : n.dendrite_input_synapses)
         {
-            if (n.dendrite_hw->model_power)
-            {
-                double simulated_energy{0.0};
-                double simulated_latency{0.0};
-                dendritic_current = n.dendrite_model->update(
-                        synapse, simulated_energy, simulated_latency);
-                latency += simulated_latency;
-                n.core->energy += simulated_energy;
-            }
-            else
-            {
-                dendritic_current = n.dendrite_model->update(synapse);
-                latency += n.dendrite_hw->latency_access;
-            }
+            auto [current, model_energy, model_latency] =
+                    n.dendrite_model->update(synapse);
+            n.soma_input_charge = current;
+            auto [energy, latency] =
+                    pipeline_apply_default_dendrite_power_model(
+                            n, model_energy, model_latency);
+            n.core->energy += energy;
+            total_latency += latency;
         }
         n.dendrite_input_synapses.clear();
-        n.soma_input_charge = dendritic_current;
     }
 
     // Finally, send dendritic current to the soma
     TRACE2("nid:%s updating dendrite, soma_input_charge:%lf\n", n.id.c_str(),
             n.soma_input_charge);
-
-    return latency;
+    return total_latency;
 }
 
 double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 {
     TRACE1("nid:%s updating, current_in:%lf\n", n.id.c_str(),
             n.soma_input_charge);
-    double soma_processing_latency{0.0};
     n.soma_model->set_time(ts.timestep);
 
     std::optional<double> soma_current_in;
@@ -274,50 +301,77 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
         n.soma_input_charge = 0.0;
     }
 
-    if (n.soma_hw->model_power)
+    auto [neuron_status, simulated_energy, simulated_latency] =
+            n.soma_model->update(soma_current_in);
+
+    if (n.soma_hw->default_energy_metrics.has_value())
     {
-        double simulated_energy{0.0};
-        double simulated_latency{0.0};
-        n.status = n.soma_model->update(
-                soma_current_in, simulated_energy, simulated_latency);
-        n.core->energy += simulated_energy;
-        soma_processing_latency += simulated_latency;
+        simulated_energy =
+                n.soma_hw->default_energy_metrics->energy_access_neuron;
     }
-    else
+    if (n.soma_hw->default_latency_metrics.has_value())
     {
-        n.status = n.soma_model->update(soma_current_in);
-        soma_processing_latency += n.soma_hw->latency_access_neuron;
+        simulated_latency =
+                n.soma_hw->default_latency_metrics->latency_access_neuron;
     }
 
-    if (n.status == INVALID_NEURON_STATE)
+    if (neuron_status == INVALID_NEURON_STATE)
     {
-        std::string error = "Soma model for nid: " + n.parent_group_id +
-                "." + std::to_string(n.id) + " returned invalid state.\n";
+        std::string error = "Soma model for nid: " + n.parent_group_id + "." +
+                std::to_string(n.id) + " returned invalid state.\n";
         throw std::runtime_error(error);
     }
-    else if ((n.status == sanafe::UPDATED) || (n.status == sanafe::FIRED))
+    else if ((neuron_status == sanafe::UPDATED) ||
+            (neuron_status == sanafe::FIRED))
     {
-        if (!n.soma_hw->model_power)
-        {
-            soma_processing_latency += n.soma_hw->latency_update_neuron;
-        }
         n.soma_hw->neuron_updates++;
+        if (n.soma_hw->default_energy_metrics.has_value())
+        {
+            simulated_energy.value() +=
+                    n.soma_hw->default_energy_metrics->energy_update_neuron;
+        }
+        if (n.soma_hw->default_latency_metrics.has_value())
+        {
+            simulated_latency.value() +=
+                    n.soma_hw->default_latency_metrics->latency_update_neuron;
+        }
     }
 
-    if (n.status == sanafe::FIRED)
+    if (neuron_status == sanafe::FIRED)
     {
-        if (!n.soma_hw->model_power)
+        if (n.soma_hw->default_energy_metrics.has_value())
         {
-            soma_processing_latency += n.soma_hw->latency_spiking;
+            simulated_energy.value() +=
+                    n.soma_hw->default_energy_metrics->energy_spike_out;
         }
+        if (n.soma_hw->default_latency_metrics.has_value())
+        {
+            simulated_latency.value() +=
+                    n.soma_hw->default_latency_metrics->latency_spike_out;
+        }
+
         n.soma_hw->neurons_fired++;
         n.axon_out_input_spike = true;
         SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
     }
 
+    n.status = neuron_status;
     SIM_TRACE1("neuron status:%d\n", n.status);
 
-    return soma_processing_latency;
+    // Check that both the energy and latency costs have been set, either within
+    //  the synapse h/w model, or by default metrics
+    if (!simulated_energy.has_value())
+    {
+        INFO("Error: No soma energy model or metrics.\n");
+        throw std::runtime_error("Error: No soma energy model or metrics.");
+    }
+    if (!simulated_latency.has_value())
+    {
+        INFO("Error: No soma latency model or metrics.\n");
+        throw std::runtime_error("Error: No soma latency model or metrics.");
+    }
+    n.core->energy += simulated_energy.value();
+    return simulated_latency.value();
 }
 
 double sanafe::pipeline_process_axon_out(

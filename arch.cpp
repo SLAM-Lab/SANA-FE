@@ -209,42 +209,109 @@ sanafe::AxonInUnit::AxonInUnit(std::string axon_in_name,
 
 sanafe::SynapseUnit::SynapseUnit(std::string synapse_name,
         const CoreAddress &parent_core,
-        const SynapsePowerMetrics &power_metrics, const ModelInfo &model)
-        : plugin_lib(model.plugin_library_path)
+        const ModelInfo &model)
+        : model_parameters(model.model_parameters)
+        , plugin_lib(model.plugin_library_path)
         , name(std::move(synapse_name))
         , model(model.name)
         , parent_core_address(parent_core)
-        , energy_spike_op(power_metrics.energy_process_spike)
-        , latency_spike_op(power_metrics.latency_process_spike)
 {
+    if (model_parameters.find("energy_process_spike") != model_parameters.end())
+    {
+        default_energy_process_spike =
+                static_cast<double>(model_parameters["energy_process_spike"]);
+    }
+    if (model_parameters.find("latency_process_spike") !=
+            model_parameters.end())
+    {
+        default_latency_process_spike =
+                static_cast<double>(model_parameters["latency_process_spike"]);
+    }
 }
 
 sanafe::DendriteUnit::DendriteUnit(std::string dendrite_name,
-        const CoreAddress &parent_core,
-        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
-        : plugin_lib(model.plugin_library_path)
+        const CoreAddress &parent_core, const ModelInfo &model_details)
+        : model_parameters(model_details.model_parameters)
+        , plugin_lib(model_details.plugin_library_path)
         , name(std::move(dendrite_name))
-        , model(model.name)
+        , model(model_details.name)
         , parent_core_address(parent_core)
-        , energy_access(power_metrics.energy_access)
-        , latency_access(power_metrics.latency_access)
 {
+    if (model_parameters.find("energy_update") != model_parameters.end())
+    {
+        default_energy_update =
+                static_cast<double>(model_parameters["energy_update"]);
+    }
+    if (model_parameters.find("latency_update") != model_parameters.end())
+    {
+        default_latency_update =
+                static_cast<double>(model_parameters["latency_update"]);
+    }
 }
 
 sanafe::SomaUnit::SomaUnit(std::string soma_name,
-        const CoreAddress &parent_core, const SomaPowerMetrics &power_metrics,
-        const ModelInfo &model)
-        : plugin_lib(model.plugin_library_path)
+        const CoreAddress &parent_core, const ModelInfo &model_details)
+        : model_parameters(model_details.model_parameters)
+        , plugin_lib(model_details.plugin_library_path)
         , name(std::move(soma_name))
-        , model(model.name)
+        , model(model_details.name)
         , parent_core_address(parent_core)
-        , energy_update_neuron(power_metrics.energy_update_neuron)
-        , latency_update_neuron(power_metrics.latency_update_neuron)
-        , energy_access_neuron(power_metrics.energy_access_neuron)
-        , latency_access_neuron(power_metrics.latency_access_neuron)
-        , energy_spiking(power_metrics.energy_spike_out)
-        , latency_spiking(power_metrics.latency_spike_out)
 {
+    auto key_exists = [this](const std::string &key) {
+        return model_parameters.find(key) != model_parameters.end();
+    };
+
+    const std::set<std::string> energy_metric_names{
+            "energy_access_neuron", "energy_update_neuron", "energy_spike_out"};
+    bool parse_energy_metrics = std::any_of(
+            energy_metric_names.begin(), energy_metric_names.end(), key_exists);
+    if (parse_energy_metrics)
+    {
+        for (const auto &metric : energy_metric_names)
+        {
+            if (!key_exists(metric))
+            {
+                const std::string error =
+                        "Error: Metric not defined: " + metric + "\n";
+                INFO("%s", error.c_str());
+                throw std::invalid_argument(error);
+            }
+        }
+        SomaEnergyMetrics energy_metrics;
+        energy_metrics.energy_access_neuron =
+                static_cast<double>(model_parameters["energy_access_neuron"]);
+        energy_metrics.energy_update_neuron =
+                static_cast<double>(model_parameters["energy_update_neuron"]);
+        energy_metrics.energy_spike_out =
+                static_cast<double>(model_parameters["energy_spike_out"]);
+        default_energy_metrics = energy_metrics;
+    }
+
+    const std::set<std::string> latency_metric_names{"latency_access_neuron",
+            "latency_update_neuron", "latency_spike_out"};
+    bool parse_latency_metrics = std::any_of(latency_metric_names.begin(),
+            latency_metric_names.end(), key_exists);
+    if (parse_latency_metrics)
+    {
+        for (const auto &metric : latency_metric_names)
+        {
+            if (!key_exists(metric))
+            {
+                const std::string error =
+                        "Error: Missing metric: " + metric + "\n";
+                INFO("%s", error.c_str());
+                throw std::invalid_argument(error);
+            }
+        }
+        SomaLatencyMetrics latency_metrics;
+        latency_metrics.latency_access_neuron =
+                static_cast<double>(model_parameters["latency_access_neuron"]);
+        latency_metrics.latency_update_neuron =
+                static_cast<double>(model_parameters["latency_update_neuron"]);
+        latency_metrics.latency_spike_out =
+                static_cast<double>(model_parameters["latency_spike_out"]);
+        default_latency_metrics = latency_metrics;
+    }
 }
 
 sanafe::AxonOutUnit::AxonOutUnit(std::string axon_out_name,
@@ -382,11 +449,11 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(
 }
 
 sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
-        const SynapsePowerMetrics &power_metrics, const ModelInfo &model)
+        const ModelInfo &model_details)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
     synapse.emplace_back(
-            SynapseUnit(name, parent_core_address, power_metrics, model));
+            SynapseUnit(name, parent_core_address, model_details));
     SynapseUnit &new_synapse_hw_unit = synapse.back();
     TRACE1("New synapse h/w unit created (cid:%d.%d)\n",
             parent_core_address.parent_tile_id,
@@ -396,24 +463,25 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(const std::string &name,
 }
 
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
-        const DendritePowerMetrics &power_metrics, const ModelInfo &model)
+        const ModelInfo &model)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
     dendrite.emplace_back(DendriteUnit(
-            name, parent_core_address, power_metrics, model));
+            name, parent_core_address, model));
     TRACE1("New dendrite h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
+    DendriteUnit &new_dendrite_hw_unit = dendrite.back();
 
-    return dendrite.back();
+    return new_dendrite_hw_unit;
 }
 
 sanafe::SomaUnit &sanafe::Core::create_soma(std::string name,
-        const SomaPowerMetrics &power_metrics, const ModelInfo &model)
+        const ModelInfo &model_details)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
     soma.emplace_back(SomaUnit(
-            std::move(name), parent_core_address, power_metrics, model));
+            std::move(name), parent_core_address, model_details));
     TRACE1("New soma h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
@@ -566,7 +634,9 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
                         curr_connection.synapse_hw->model);
             }
         }
-        curr_connection.synapse_model->set_attributes(
+        curr_connection.synapse_model->configure(
+                curr_connection.synapse_hw->model_parameters);
+        curr_connection.synapse_model->configure(
                 curr_connection.synapse_params);
     }
     TRACE1("Finished mapping connections to hardware for nid:%s.%zu.\n",
@@ -689,9 +759,10 @@ void sanafe::Core::map_neuron(Neuron &n)
         assert(n.soma_model != nullptr);
         // First set the group's default attribute values, and then
         //  any defined by the neuron
-        n.soma_model->set_attributes(
+        n.soma_model->configure(n.soma_hw->model_parameters);
+        n.soma_model->configure(
                 group.default_neuron_config.soma_model_params);
-        n.soma_model->set_attributes(n.soma_model_params);
+        n.soma_model->configure(n.soma_model_params);
     }
 
     if (n.dendrite_model == nullptr)
@@ -717,10 +788,15 @@ void sanafe::Core::map_neuron(Neuron &n)
         const auto &neuron_groups = n.parent_net->groups;
         const NeuronGroup &group = neuron_groups.at(n.parent_group_id);
         assert(n.dendrite_model != nullptr);
-        // Global attributes for all compartments in the dendrite
-        n.dendrite_model->set_attributes(
+        // Pass all parameters from the h/w description
+        n.dendrite_model->configure(
+                n.dendrite_hw->model_parameters);
+        // Pass global attributes from the group
+        n.dendrite_model->configure(
                 group.default_neuron_config.dendrite_model_params);
-        n.dendrite_model->set_attributes(n.dendrite_model_params);
+        // Pass specific attributes for this neuron
+        n.dendrite_model->configure(
+                n.dendrite_model_params);
     }
 }
 
