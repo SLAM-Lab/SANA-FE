@@ -17,21 +17,13 @@ Then build Makefiles with:
 
 ## Dependencies
 
-Building this project requires `cmake`, `make`, and a compiler that supports the C++11
-standard.
-
-This project uses Python to launch simulations, parse input files, and process
-simulation results. Most project features require Python 3.8 or later, and the
-modules listed in `requirements.txt`.
-
-We recommend using `conda` to manage environments e.g.,
-
-`conda create --name sanafe-env --file ./requirements.txt`
-`conda activate sanafe-env`
+Building this project requires `cmake`, `make`, and a compiler that supports the
+C++17 standard. Some non-essential scripts in this project may also require
+Python 3.
 
 # To Run an Example
 
-`python3 sim.py arch/example.yaml snn/example.net 10`
+`python3 sim.py arch/example.yaml snn/example.yaml 10`
 
 This simulates 10 time-steps of a tiny connected spiking network.
 
@@ -59,40 +51,11 @@ Flags:
 * `-s`: Enable spike traces to `spikes.trace`
 * `-p`: Record the simulated performance of each timestep to `perf.csv`
 * `-m`: Enable message traces to `messages.trace`
-* `-r`: Launch command-line interface for continuous execution.
-* `-g`: Enable gui-specific simulation traces.
+* `-n`: Use the (legacy) netlist format for SNNs, instead of YAML.
 
 ## SNN Description
 
-Spiking Neural Networks are defined flexibly using a simple custom format.
-Each line defines a new entry which may either be a neuron group (g),
-neuron (n), edge (e), or mapping (&). Each entry starts with the type of entry
-followed by one required field and then any number of named attributes.
-Fields are separated by one or more spaces.
 
-Attributes are defined using the syntax: `<attribute>=<value>`. Note, there
-is no space before or after the equals. The attribute `soma_hw_name` is required
-to be set for every neuron or neuron group.
-
-A neuron group is some population of neurons. The group defines any common
-parameters e.g., for a layer of a deep SNN.
-
-`g <number of neurons> <common attributes>`
-
-Neurons are addressed (using the group number followed by neuron number), and
-then all attributes are specified. Note the group must be defined first.
-
-`n group_id.neuron_id <unique attributes>`
-
-An edge connects one source neuron (presynaptic) to one destination neuron
-(postsynaptic). The edge may also have attributes such as synaptic weight.
-
-`e src_group_id.src_neuron_id->dest_group_id.dest_neuron_id <edge attributes>`
-
-Finally, mappings place predefined neurons on a hardware core. Here we specify
-the neuron and the core.
-
-`& group_id.neuron_id@tile_id.core_id`
 
 ## Architecture Description
 
@@ -163,57 +126,94 @@ estimates.
 
 `run_summary.yaml`: High-level statistics for the simulation e.g. runtime
 
-# Soma Plugin Model
+# Plugins
 
-SANA-FE's plugin model utilizes shared .so C++ files to execute all soma
-calculations. There are some common plugins provided in the `/plugins`
-folder along with their corresponding .cpp file.
+As part of SANA-FE, the user can implement different hardware models using
+custom plugins. Models for synapses, dendrites and somas are all supported.
+The plugin mechanism defines common interfaces for you to create .so files.
+There are some example plugins provided in the `/plugins` folder, including an
+implementation of a Hodgkin-Huxley neuron.
 
-To specify the soma plugin, several steps need to be taken:
-1. The plugin name needs to be specified in the
-architecture yaml file under `soma: -name:`
-2. The plugin name is set in the net file with the keyword
-`soma_hw_name`.
-3. The `/plugins` file contains the plugin compiled into a file with the
+To include your plugin, several steps need to be taken:
+1. The path to the plugin needs to be specified in the architecture yaml file,
+inside the corresponding `synapse`, `dendrite` or `soma` hardware section.
+You must provide the plugin path using the attribute `plugin: <name>`. You must
+also specify the name of the model inside the file using the attribute
+`model: <name>`.
+2. The hardware name is set in the net file with the keyword `soma_hw_name`.
+3. The `/plugins`folder contains the plugin compiled into a file with the
 format `[plugin name].so`.
 
-Each plugin holds a class that executes the functionality of the soma.
-On every creation of a neuron, a new instance of the specific plugin
-class will be created and stored.
+Each plugin must implement a class derived from the base classes `SynapseModel`,
+`DendriteModel` or `SomaModel` classes. On every creation of a neuron or
+connection, a new instance of the specific plugin class will be created.
 
 ## Creating a New Plugin
 
-SANA-FE's plugin model makes it easy to create new soma classes and
+SANA-FE's plugin model makes it easy to create new models and
 integrate them directly into your SNN execution. There are, however,
 two main interfacing requirements to allow plugins to smoothly execute.
 
-1. The plugin class must extend the `Base_Soma` located in `plugins.hpp`.
-This includes implementing the base constructor, `update_soma`, and
-`parameters` functions.
-2. Two class factory functions need to be created. These have to be in the 
-format `create_[plugin_name]` and `destroy_[plugin_name]`. These functions
-are used to get an instance of the class.
+1. The plugin class must extend the `BaseSoma` located in `plugins.hpp`.
+This includes implementing the base constructor, `update()`, and
+`configure()` functions.
+2. Two class factory functions need to be created. These have to be in the
+format `create_<plugin_name>` and `destroy_<plugin_name>`. These functions
+are used to get an instance of your new class.
 
-It is recommended new users read through the loihi_lif.cpp file to see what
+It is recommended new users read through the hodgkin_huxley.cpp file to see what
 an example soma class looks like. The `update_soma` function will be passed
-the input current spike as a double and returns `Neuron_Status`, an enum
+the input current spike as a double and returns `NeuronStatus`, an enum
 representing whether the neuron is idle, updated, or fired. The `parameters`
 function takes in a struct of `attributes` with a specified int length.
 These parameters are arbitrary keyword=value pairs that can pass in any
 information to the class. This is where parameters specified in the network
 file will be passed to.
 
-To compile a .cpp file into the desired .so plugin file, run these commands
-from within the plugins folder:
-`g++ -c -fPIC -o [plugin_name].o [plugin_name].cpp`
-`gcc -shared -o [plugin_name].so [plugin_name].o`
-
 The .so should be kept, the .o file is unnecessary and can be deleted.
+
+## Alternative SNN Description Format (netlist)
+
+Version 1 of SANA-FE (written in C) defined a simpler, less capable SNN
+description format (compared to the YAML-based format). For back-compatability,
+the netlist-style format is still supported. To use the netlist format, use the
+command-line flag (-n).
+
+In this format, each line defines a new entry which may either be a neuron group
+(g), neuron (n), edge (e), or mapping (&). Each entry starts with the type of
+entry followed by one required field and then any number of named attributes.
+Fields are separated by one or more spaces.
+
+Attributes are defined using the syntax: `<attribute>=<value>`. Note, there
+is no space before or after the equals. The attribute `soma_hw_name` is required
+to be set for every neuron or neuron group.
+
+A neuron group is some population of neurons. The group defines any common
+parameters e.g., for a layer of a deep SNN.
+
+`g <number of neurons> <common attributes>`
+
+Neurons are addressed (using the group number followed by neuron number), and
+then all attributes are specified. Note the group must be defined first.
+
+`n group_id.neuron_id <unique attributes>`
+
+An edge connects one source neuron (presynaptic) to one destination neuron
+(postsynaptic). The edge may also have attributes such as synaptic weight.
+
+`e src_group_id.src_neuron_id->dest_group_id.dest_neuron_id <edge attributes>`
+
+Finally, mappings place predefined neurons on a hardware core. Here we specify
+the neuron and the core.
+
+`& group_id.neuron_id@tile_id.core_id`
+
+An example of how to use the netlist format is given in `snn/example.net`
 
 # Project Code
 
-This project has been written in C, C++, and Python. See header files for
-more detail.
+This project has been written in C++, and Python. See header files for more
+detail.
 
 `sim.py`
 `main.cpp`
@@ -222,11 +222,11 @@ more detail.
 `arch.cpp`
 `description.cpp`
 `command.cpp`
+`pipeline.cpp`
 `plugins.cpp`
-`module.cpp`
+`pymodule.cpp`
 
-C code has been written based on the C99 standard.
-C++ code has been written based on the C++11 standard.
+C++ code has been written using the C++17 standard.
 
 # Contact
 James Boyle: james.boyle@utexas.edu
