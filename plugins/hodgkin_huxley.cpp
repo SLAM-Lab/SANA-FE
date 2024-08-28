@@ -7,156 +7,156 @@
 //  Robin Sam.
 // Model inspired by this paper: https://ieeexplore.ieee.org/document/9235538
 //  and this textbook: https://mrgreene09.github.io/computational-neuroscience-textbook
-#include <cstring>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <map>
 
-#include "../print.hpp"
+#include "../arch.hpp"
 #include "../models.hpp"
 #include "../plugins.hpp"
-#include "../arch.hpp"
+#include "../print.hpp"
 
-class HH: public sanafe::SomaModel
+class HH : public sanafe::SomaModel
 {
-// HH specific
+    // HH specific
 public:
-	// system variables
-	double C_m;
-	double g_Na;
-	double g_K;
-	double g_L;
-	double V_Na;
-	double V_K;
-	double V_L;
-	double dt;
+    // system variables
+    double C_m;
+    double g_Na;
+    double g_K;
+    double g_L;
+    double V_Na;
+    double V_K;
+    double V_L;
+    double dt;
 
-	// main parameters
-	double V, prev_V;	// Membrane potential
-	double I;		// Stimulation current per area
-	double m;		// m, n, h are coeff
-	double n;
-	double h;
+    // main parameters
+    double V, prev_V; // Membrane potential
+    double I; // Stimulation current per area
+    double m; // m, n, h are coeff
+    double n;
+    double h;
 
-	// internal results of various differential equations
-	double alpha_m;
-	double alpha_n;
-	double alpha_h;
-	double beta_m;
-	double beta_n;
-	double beta_h;
+    // internal results of various differential equations
+    double alpha_m;
+    double alpha_n;
+    double alpha_h;
+    double beta_m;
+    double beta_n;
+    double beta_h;
 
-	double tau_m, tau_n, tau_h;
-	double pm, pn, ph;
-	double denominator, tau_V, Vinf;
+    double tau_m, tau_n, tau_h;
+    double pm, pn, ph;
+    double denominator, tau_V, Vinf;
 
-	HH(const int gid, const int nid) : SomaModel(gid, nid)
-	{
-		V = 0.0;
-		C_m = 10.0;	// Effective capacitance per area of membrane; default is 1
-		g_Na= 1200.0;	// Conductance of sodium
-		g_K = 360.0;	// Conductance of potassium
-		g_L = 3.0;	// Conductance of leak channel
-		V_Na = 50.0;	// Reverse potential of sodium
-		V_K = -77.0;	// Reverse potential of potassium
-		V_L = -54.387;	// Reverse potential of leak channel
-		dt = 0.1;
-	}
+    HH()
+            : SomaModel()
+    {
+        V = 0.0;
+        C_m = 10.0; // Effective capacitance per area of membrane; default is 1
+        g_Na = 1200.0; // Conductance of sodium
+        g_K = 360.0; // Conductance of potassium
+        g_L = 3.0; // Conductance of leak channel
+        V_Na = 50.0; // Reverse potential of sodium
+        V_K = -77.0; // Reverse potential of potassium
+        V_L = -54.387; // Reverse potential of leak channel
+        dt = 0.1;
+    }
 
-	virtual double get_potential() { return V; }
-	virtual void set_attributes(
-		const std::map<std::string, std::string> &attr)
-	{
-		/*** Set attributes ***/
-		for (auto a: attr)
-		{
-			int ret = 1;
-			const std::string &key = a.first;
-			const std::string &value_str = a.second;
-			if (strncmp("m", key.c_str(), key.length()) == 0)
-			{
-				ret = sscanf(value_str.c_str(), "%lf", &m);
-			}
-			else if (strncmp("n", key.c_str(), key.length()) == 0)
-			{
-				ret = sscanf(value_str.c_str(), "%lf", &n);
-			}
-			else if (strncmp("h", key.c_str(), key.length()) == 0)
-			{
-				ret = sscanf(value_str.c_str(), "%lf", &h);
-			}
-			else if (strncmp(
-				"current", key.c_str(), key.length()) == 0)
-			{
-				ret = sscanf(value_str.c_str(), "%lf", &I);
-			}
-			if (ret < 1)
-			{
-				INFO("Invalid attribute (%s:%s)\n",
-					key.c_str(), value_str.c_str());
-				exit(1);
-			}
-		}
-	}
+    virtual double get_potential()
+    {
+        return V;
+    }
+    virtual void configure(
+            const std::map<std::string, sanafe::ModelParam> &attributes)
+    {
+        /*** Set attributes ***/
+        for (auto &attribute_pair : attributes)
+        {
+            const std::string &key = attribute_pair.first;
+            const sanafe::ModelParam &param = attribute_pair.second;
 
-	sanafe::NeuronStatus update(const std::optional<double> current_in)
-	{
-		sanafe::NeuronStatus status = sanafe::IDLE;
+            if (key == "m")
+            {
+                m = static_cast<double>(param);
+            }
+            else if (key == "n")
+            {
+                n = static_cast<double>(param);
+            }
+            else if (key == "h")
+            {
+                h = static_cast<double>(param);
+            }
+            else if (key == "current")
+            {
+                I = static_cast<double>(param);
+            }
+        }
+    }
 
-		// Calculate the change in potential since the last update e.g.
-		//  integate inputs and apply any potential leak
-		TRACE1("Updating potential, before:%f\n", V);
+    sanafe::SomaModel::SomaModelResult update(
+            const std::optional<double> current_in)
+    {
+        sanafe::NeuronStatus status = sanafe::IDLE;
 
-		alpha_n = (0.01*(V+55)) / (1-exp(-0.1*(V+55)));
-		alpha_m = (0.1*(V+40)) / (1-exp(-0.1*(V+40)));
-		alpha_h = 0.07*exp(-0.05*(V+65));
+        // Calculate the change in potential since the last update e.g.
+        //  integate inputs and apply any potential leak
+        TRACE1("Updating potential, before:%f\n", V);
 
-		beta_n = 0.125*exp(-0.01125*(V+55));
-		beta_m = 4*exp(-0.05556*(V+65));
-		beta_h = 1/(1 + exp(-0.1*(V+35)));
+        alpha_n = (0.01 * (V + 55)) / (1 - exp(-0.1 * (V + 55)));
+        alpha_m = (0.1 * (V + 40)) / (1 - exp(-0.1 * (V + 40)));
+        alpha_h = 0.07 * exp(-0.05 * (V + 65));
 
-		tau_n = 1 / (alpha_n + beta_n);
-		tau_m = 1 / (alpha_m + beta_m);
-		tau_h = 1 / (alpha_h + beta_h);
+        beta_n = 0.125 * exp(-0.01125 * (V + 55));
+        beta_m = 4 * exp(-0.05556 * (V + 65));
+        beta_h = 1 / (1 + exp(-0.1 * (V + 35)));
 
-		pm = alpha_m / (alpha_m + beta_m);
-		pn = alpha_n / (alpha_n + beta_n);
-		ph = alpha_h / (alpha_h + beta_h);
+        tau_n = 1 / (alpha_n + beta_n);
+        tau_m = 1 / (alpha_m + beta_m);
+        tau_h = 1 / (alpha_h + beta_h);
 
-		denominator = g_L + g_K*(pow(n,4)) + g_Na*(pow(m,3)*h);
-		tau_V = C_m/denominator;
-		Vinf = ((g_L)*V_L + g_K*(pow(n,4))*V_K + g_Na*(pow(m,3))*h*V_Na + I)/denominator;
+        pm = alpha_m / (alpha_m + beta_m);
+        pn = alpha_n / (alpha_n + beta_n);
+        ph = alpha_h / (alpha_h + beta_h);
 
-		// update main parameters
-		prev_V = V;
-		V = Vinf + (V - Vinf)*exp(-1*dt/tau_V);
-		m = pm + (m - pm)*exp(-1*dt/tau_m);
-		n = pn + (n - pn)*exp(-1*dt/tau_n);
-		h = ph + (h - ph)*exp(-1*dt/tau_h);
+        denominator = g_L + g_K * (pow(n, 4)) + g_Na * (pow(m, 3) * h);
+        tau_V = C_m / denominator;
+        Vinf = ((g_L) *V_L + g_K * (pow(n, 4)) * V_K +
+                       g_Na * (pow(m, 3)) * h * V_Na + I) /
+                denominator;
 
-		// Check against threshold potential (for spiking)
-		if ((prev_V < 25) && (V > 25))
-		{
-			// If voltage just crossed the 25 mV boundary, then
-			//  spike
-			status = sanafe::FIRED;
-		}
-		else
-		{
-			status = sanafe::UPDATED;
-		}
+        // update main parameters
+        prev_V = V;
+        V = Vinf + (V - Vinf) * exp(-1 * dt / tau_V);
+        m = pm + (m - pm) * exp(-1 * dt / tau_m);
+        n = pn + (n - pn) * exp(-1 * dt / tau_n);
+        h = ph + (h - ph) * exp(-1 * dt / tau_h);
 
-		INFO("Updating potential, after:%f\n", V);
+        // Check against threshold potential (for spiking)
+        if ((prev_V < 25) && (V > 25))
+        {
+            // If voltage just crossed the 25 mV boundary, then
+            //  spike
+            status = sanafe::FIRED;
+        }
+        else
+        {
+            status = sanafe::UPDATED;
+        }
 
-		return status;
-	}
+        INFO("Updating potential, after:%f\n", V);
+
+        return {status, std::nullopt, std::nullopt};
+    }
 };
 
 // the Class factories
-extern "C" sanafe::SomaModel *create_HH(const int gid, const int nid)
+extern "C" sanafe::SomaModel *create_HH()
 {
-	TRACE1("Creating HH soma instance\n");
-	return (sanafe::SomaModel *) new HH(gid, nid);
+    TRACE1("Creating HH soma instance\n");
+    return (sanafe::SomaModel *) new HH();
 }
 
 // Memory Leak?
