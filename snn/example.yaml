@@ -5,7 +5,7 @@ network:
       attributes: [log_spikes: true, threshold: 1.0]
       neurons:
         - 0: [log_potential: true, bias: 1.0]
-        - 1..2: [bias: 0.0]
+        - 1..2
     - name: 1
       attributes: [log_spikes: true, threshold: 2.0, soma_hw_name: demo_soma_alt]
       neurons:
@@ -15,9 +15,7 @@ network:
     - 0.1 -> 1.2: [weight: -2.0]
     - 0.2 -> 1.2: [weight: 3.0]
 mappings:
-  - 0.0: {core: 0.0}
-  - 0.1: {core: 0.0}
+  - 0.0..1: {core: 0.0}
   - 0.2: {core: 0.1}
-  - 1.0: {core: 0.0}
-  - 1.1: {core: 0.0}
+  - 1.0..1: {core: 0.0}
   - 1.2: {core: 0.1}
