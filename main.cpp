@@ -32,10 +32,11 @@ int main(int argc, char *argv[])
 
     // Parse optional args
     std::filesystem::path output_dir = std::filesystem::current_path();
-    bool record_spikes = false;
-    bool record_potentials = false;
-    bool record_perf = false;
-    bool record_messages = false;
+    bool record_spikes{false};
+    bool record_potentials{false};
+    bool record_perf{false};
+    bool record_messages{false};
+    bool use_netlist_format{false};
 
     while (argc > 2)
     {
@@ -52,18 +53,22 @@ int main(int argc, char *argv[])
                 ;
                 break;
             }
+
+            case 'm':
+                record_messages = true;
+                break;
+            case 'n':
+                use_netlist_format = true;
+            case 'p':
+                record_perf = true;
+                break;
             case 's':
                 record_spikes = true;
                 break;
             case 'v':
                 record_potentials = true;
                 break;
-            case 'p':
-                record_perf = true;
-                break;
-            case 'm':
-                record_messages = true;
-                break;
+
             default:
                 INFO("Error: Flag %c not recognized.\n", argv[0][1]);
                 break;
@@ -89,8 +94,8 @@ int main(int argc, char *argv[])
         sanafe::Architecture arch =
                 sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
         INFO("Architecture initialized.\n");
-        sanafe::Network net =
-                sanafe::load_net(argv[sanafe::NETWORK_FILENAME], arch);
+        sanafe::Network net = sanafe::load_net(
+                argv[sanafe::NETWORK_FILENAME], arch, use_netlist_format);
         INFO("Network initialized.\n");
 
         sanafe::Simulation sim(arch, net, output_dir, record_spikes,

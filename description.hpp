@@ -60,10 +60,8 @@ void description_parse_neuron_section_yaml(const ryml::Parser &parser, ryml::Con
 // Neuron to Hardware Mapping
 void description_parse_mapping_section_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef mappings_node, Architecture &arch, Network &net);
 void description_parse_mapping(const ryml::Parser &parser, Neuron &neuron, const ryml::ConstNodeRef mapping_info, Architecture &arch);
-
 void description_parse_neuron(const std::string &id, const ryml::Parser &parser, const ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
 NeuronTemplate description_parse_neuron_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes, const NeuronTemplate &default_template = NeuronTemplate());
-
 void description_parse_edge(const std::string &description, const ryml::Parser &parser, const ryml::ConstNodeRef edge_node, Network &network);
 void description_parse_edge_attributes(Connection &con, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node);
 std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description);
@@ -73,11 +71,12 @@ std::map<std::string, ModelParam> description_parse_model_parameters_yaml(const 
 ModelParam description_parse_parameter_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node);
 void check_key(const ryml::Parser &parser, const ryml::ConstNodeRef node, const std::string &key);
 
-// Markdown (SANA-FE v1) network description format
-Network description_parse_net_markdown(std::ifstream &fp, Architecture &arch);
+// Netlist (SANA-FE v1) network description format
+Network description_parse_network_file_netlist(std::ifstream &fp, Architecture &arch);
 void description_get_fields(std::vector<std::string_view> &fields, const std::string &line);
 size_t field_to_int(const std::string_view &field);
 std::pair<std::string, size_t> parse_neuron_field(const std::string_view &neuron_field);
+std::pair<size_t, size_t> parse_core_field(const std::string_view &core_field);
 std::tuple<std::string, size_t, std::string, size_t> parse_edge_field(const std::string_view &edge_field);
 std::tuple<std::string, size_t, size_t, size_t> parse_mapping_field(const std::string_view &mapping_field);
 void description_read_network_entry(const std::vector<std::string_view> &fields, Architecture &arch, Network &net, const int line_number);

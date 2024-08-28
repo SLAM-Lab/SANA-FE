@@ -232,7 +232,7 @@ void sanafe::LoihiLifModel::configure(
         {
             bias = static_cast<double>(param);
         }
-        else if (key == "force_soma_update")
+        else if ((key == "force_update") || (key == "force_soma_update"))
         {
             force_update = static_cast<bool>(param);
         }

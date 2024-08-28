@@ -101,8 +101,12 @@ sanafe::Neuron::Neuron(const size_t neuron_id,
             config.dendrite_model_params.end());
 }
 
-void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
+void sanafe::Neuron::configure(const NeuronTemplate &attributes)
 {
+    // TODO: here we don't set the various simulator fields, e.g., log_spikes,
+    //  log_potential, force_soma_update and so on
+    // Make these fields <optional> so that they can be set and override the
+    //  group / neuron defaults
     soma_model_params.insert(attributes.soma_model_params.begin(),
             attributes.soma_model_params.end());
     dendrite_model_params.insert(attributes.dendrite_model_params.begin(),
@@ -189,8 +193,8 @@ sanafe::Connection &sanafe::Neuron::connect_to_neuron(Neuron &dest)
     return con;
 }
 
-sanafe::Network sanafe::load_net(
-        const std::filesystem::path &path, Architecture &arch)
+sanafe::Network sanafe::load_net(const std::filesystem::path &path,
+        Architecture &arch, const bool use_netlist_format)
 {
     std::ifstream network_fp;
 
@@ -201,8 +205,20 @@ sanafe::Network sanafe::load_net(
                 std::string(path) + ").";
         throw std::invalid_argument(error);
     }
-    INFO("Loading network from file: %s\n", path.c_str());
-    Network net = description_parse_network_file_yaml(network_fp, arch);
+
+    Network net;
+    if (use_netlist_format)
+    {
+        INFO("Loading network from netlist file (legacy): %s\n", path.c_str());
+        // Fall back to the original netlist based format used by SANA-FE v1.
+        //  This is supported mainly for back-compatibility
+        net = description_parse_network_file_netlist(network_fp, arch);
+    }
+    else
+    {
+        INFO("Loading network from YAML file: %s\n", path.c_str());
+        net = description_parse_network_file_yaml(network_fp, arch);
+    }
     network_fp.close();
 
     return net;

@@ -19,6 +19,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <variant>
 
 #include "models.hpp"
@@ -107,7 +108,7 @@ public:
 
     explicit Neuron(size_t neuron_id, Network &parent_net, const std::string parent_group_id, const NeuronTemplate &config);
     [[nodiscard]] size_t get_id() const { return id; }
-    void set_attributes(const NeuronTemplate &attributes);
+    void configure(const NeuronTemplate &attributes);
     Connection &connect_to_neuron(Neuron &dest);
     [[nodiscard]] std::string info() const;
     //std::string description(const bool write_mapping=true) const;
@@ -136,9 +137,9 @@ public:
 class Network
 {
 public:
-    std::map<std::string, NeuronGroup> groups;
+    std::unordered_map<std::string, NeuronGroup> groups;
     std::string name;
-    explicit Network(std::string net_name) : name(std::move(net_name)) {};
+    explicit Network(std::string net_name = "") : name(std::move(net_name)) {};
     ~Network() = default;
     Network(Network &&) = default;
     Network &operator=(Network &&) = default;
@@ -158,7 +159,7 @@ public:
     void check_mapped() const;
 };
 
-Network load_net(const std::filesystem::path &path, Architecture &arch);
+Network load_net(const std::filesystem::path &path, Architecture &arch, bool use_netlist_format = false);
 
 struct Connection
 {

@@ -211,7 +211,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
     const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
     if (!plugin_path_node.invalid())
     {
-        if (plugin_path_node.is_val())
+        if (plugin_path_node.has_val())
         {
             std::string plugin_path;
             plugin_path_node >> plugin_path;
@@ -249,7 +249,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
     const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
     if (!plugin_path_node.invalid())
     {
-        if (plugin_path_node.is_val())
+        if (plugin_path_node.has_val())
         {
             std::string plugin_path;
             plugin_path_node >> plugin_path;
@@ -842,14 +842,14 @@ void sanafe::description_parse_neuron(const std::string &id,
                 ++instance)
         {
             Neuron &n = neuron_group.neurons[instance];
-            n.set_attributes(config);
+            n.configure(config);
         }
     }
     else
     {
         const size_t nid = std::stoull(id);
         Neuron &n = neuron_group.neurons[nid];
-        n.set_attributes(config);
+        n.configure(config);
     }
 }
 
@@ -1336,7 +1336,7 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
 constexpr int default_line_len = 4096;
 constexpr int default_fields = 32;
 
-sanafe::Network sanafe::description_parse_net_markdown(
+sanafe::Network sanafe::description_parse_network_file_netlist(
         std::ifstream &fp, Architecture &arch)
 {
     Network net("");
@@ -1411,6 +1411,23 @@ std::pair<std::string, size_t> sanafe::parse_neuron_field(
     return {group_id, neuron_id};
 }
 
+std::pair<size_t, size_t> sanafe::parse_core_field(
+        const std::string_view &core_field)
+{
+    const auto pos = core_field.find('.');
+    if (pos == std::string_view::npos)
+    {
+        throw std::runtime_error("Error: Invalid neuron format");
+    }
+
+    auto tile_str = core_field.substr(0, pos);
+    size_t tile_id = field_to_int(tile_str);
+    auto core_str = core_field.substr(pos + 1, core_field.size());
+    size_t core_offset = field_to_int(core_str);
+
+    return {tile_id, core_offset};
+}
+
 std::tuple<std::string, size_t, std::string, size_t> sanafe::parse_edge_field(
         const std::string_view &edge_field)
 {
@@ -1458,12 +1475,7 @@ std::tuple<std::string, size_t, size_t, size_t> sanafe::parse_mapping_field(
 
     const auto core_address =
             mapping_field.substr(pos + 1, mapping_field.size());
-    // TODO: fix this
-    //auto [tile_id, core_offset] = parse_neuron_field(core_address);
-    std::cout << "implement: " << core_address;
-    exit(1);
-    size_t tile_id{};
-    size_t core_offset{};
+    auto [tile_id, core_offset] = parse_core_field(core_address);
 
     return {group_id, neuron_id, tile_id, core_offset};
 }
@@ -1513,6 +1525,7 @@ void sanafe::description_read_network_entry(
     if (entry_type == 'g')
     {
         neuron_count = field_to_int(fields[1]);
+        neuron_group_id = std::to_string(net.groups.size());
     }
     else if (entry_type == '&')
     {
@@ -1607,7 +1620,7 @@ void sanafe::description_read_network_entry(
 
     // TODO:
     // if the first character is [ or { read using a YAML parser, otherwise
-    //  parse as list of space separated fields using <key>=<value>
+    //  parse as list of space separated fields using <key>=<value> as below
     std::map<std::string, ModelParam> params{};
     for (size_t i = 2; i < fields.size(); i++)
     {
@@ -1662,24 +1675,64 @@ void sanafe::description_read_network_entry(
         params.insert({key, parameter});
     }
 
+    NeuronTemplate neuron_config{};
+    if (group_set)
+    {
+        NeuronGroup &group = net.groups.at(neuron_group_id);
+        neuron_config = group.default_neuron_config;
+    }
+    // Process simulator specific keys
+    if (params.find("synapse_hw_name") != params.end())
+    {
+        neuron_config.default_synapse_hw_name =
+                static_cast<std::string>(params["synapse_hw_name"]);
+    }
+    if (params.find("dendrite_hw_name") != params.end())
+    {
+        neuron_config.dendrite_hw_name =
+                static_cast<std::string>(params["dendrite_hw_name"]);
+    }
+    if (params.find("soma_hw_name") != params.end())
+    {
+        neuron_config.soma_hw_name =
+                static_cast<std::string>(params["soma_hw_name"]);
+    }
+    if (params.find("force_update") != params.end())
+    {
+        neuron_config.force_soma_update =
+                static_cast<bool>(params["force_update"]);
+    }
+    if (params.find("log_spikes") != params.end())
+    {
+        neuron_config.log_spikes =
+                static_cast<bool>(params["log_spikes"]);
+    }
+    if (params.find("log_v") != params.end())
+    {
+        neuron_config.log_potential =
+                static_cast<bool>(params["log_v"]);
+    }
+
     // Process the entry
-    NeuronTemplate todo{};
-    Connection con{0};
+    neuron_config.dendrite_model_params = params;
+    neuron_config.soma_model_params = params;
     switch (entry_type)
     {
     case 'g': // Add neuron group
-        net.create_neuron_group(neuron_group_id, neuron_count, todo);
+        net.create_neuron_group(neuron_group_id, neuron_count, neuron_config);
         break;
     case 'n': // Add neuron
-        todo.dendrite_model_params = params;
-        todo.soma_model_params = params;
-        neuron_ptr->set_attributes(todo);
+        // TODO: currently configure is broken and does not correctly set
+        //  simulator attributes such as log_spikes or force_soma_update
+        neuron_ptr->configure(neuron_config);
         break;
     case 'e':
+    {
         assert(neuron_ptr != nullptr);
-        con = neuron_ptr->connect_to_neuron(*dest_ptr);
+        Connection &con = neuron_ptr->connect_to_neuron(*dest_ptr);
         con.dendrite_params = params;
         con.synapse_params = params;
+    }
         break;
     case '&': // Map neuron to hardware
         core_ptr->map_neuron(*neuron_ptr);
