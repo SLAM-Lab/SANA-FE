@@ -45,7 +45,6 @@ void sanafe::plugin_init_synapse(
     plugin_create_synapse[model_name] = create_func;
 
     const char *dlsym_error = dlerror();
-    dlclose(synapse);
     if (dlsym_error != nullptr)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
@@ -78,7 +77,6 @@ void sanafe::plugin_init_dendrite(
     plugin_create_dendrite[model_name] = create_func;
 
     const char *dlsym_error = dlerror();
-    dlclose(dendrite);
     if (dlsym_error != nullptr)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
@@ -112,7 +110,6 @@ void sanafe::plugin_init_soma(
     plugin_create_soma[model_name] = create_func;
 
     const char *dlsym_error = dlerror();
-    dlclose(soma);
     if (dlsym_error != nullptr)
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
