@@ -68,7 +68,7 @@ public:
     {
         return V;
     }
-    virtual void configure(
+    virtual void set_attributes(
             const std::map<std::string, sanafe::ModelParam> &attributes)
     {
         /*** Set attributes ***/

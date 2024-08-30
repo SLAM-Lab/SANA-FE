@@ -150,7 +150,7 @@ public:
     SynapseModel &operator=(SynapseModel &&other) = default;
 
     virtual SynapseModelResult update(bool read = false) = 0;
-    virtual void configure(const std::map<std::string, ModelParam> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
 
     // Additional helper functions
     void set_time(const long int timestep) { simulation_time = timestep; }
@@ -175,7 +175,7 @@ public:
     DendriteModel &operator=(const DendriteModel &other) = default;
     DendriteModel &operator=(DendriteModel &&other) = default;
 
-    virtual void configure(const std::map<std::string, ModelParam> &attributes) = 0;
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attributes) = 0;
     virtual DendriteModelResult update(std::optional<Synapse> synapse_in) = 0;
 
     // Additional helper functions
@@ -208,7 +208,7 @@ public:
     void set_time(const long int timestep) { simulation_time = timestep; }
 
     virtual SomaModelResult update(std::optional<double> current_in) = 0;
-    virtual void configure(const std::map<std::string, ModelParam> &attr) = 0;
+    virtual void set_attributes(const std::map<std::string, ModelParam> &attr) = 0;
     virtual double get_potential() { return 0.0; }
 
 protected:
@@ -227,7 +227,7 @@ public:
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
     SynapseModelResult update(bool read) override;
-    void configure(const std::map<std::string, ModelParam> &attr) override;
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 
 private:
     double weight{0.0};
@@ -246,7 +246,7 @@ public:
     SingleCompartmentModel &operator=(SingleCompartmentModel &&other) = default;
 
     DendriteModelResult update(std::optional<Synapse> synapse_in) override;
-    void configure(const std::map<std::string, ModelParam> &attr) override;
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     double accumulated_charge{0.0};
     double leak_decay{0.0};
@@ -264,7 +264,7 @@ public:
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
     DendriteModelResult update(std::optional<Synapse> synapse_in) override;
-    void configure(const std::map<std::string, ModelParam> &attr) override;
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
 private:
     // Modeling a 1D dendrite with taps
     std::vector<double> tap_voltages{std::vector<double>(1, 0.0)};
@@ -284,7 +284,7 @@ public:
     LoihiLifModel &operator=(const LoihiLifModel &other) = delete;
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
-    void configure(const std::map<std::string, ModelParam> &attr) override;
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
     SomaModelResult update(std::optional<double> current_in) override;
     double get_potential() override { return potential; }
 private:
@@ -312,7 +312,7 @@ public:
     TrueNorthModel &operator=(const TrueNorthModel &other) = delete;
     TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
 
-    void configure(const std::map<std::string, ModelParam> &attr) override;
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
     SomaModelResult update(std::optional<double> current_in = std::nullopt) override;
     double get_potential() override { return potential; }
 private:
@@ -341,7 +341,7 @@ public:
     InputModel &operator=(const InputModel &other) = delete;
     InputModel &operator=(InputModel &&other) = delete;
 
-    void configure(const std::map<std::string, ModelParam> &attr) override;
+    void set_attributes(const std::map<std::string, ModelParam> &attr) override;
     SomaModelResult update(std::optional<double> current_in = std::nullopt) override;
 
 private:

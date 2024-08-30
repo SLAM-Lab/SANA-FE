@@ -860,14 +860,14 @@ void sanafe::description_parse_neuron(const std::string &id,
                 ++instance)
         {
             Neuron &n = neuron_group.neurons[instance];
-            n.configure(config);
+            n.set_attributes(config);
         }
     }
     else
     {
         const size_t nid = std::stoull(id);
         Neuron &n = neuron_group.neurons[nid];
-        n.configure(config);
+        n.set_attributes(config);
     }
 }
 
@@ -1758,7 +1758,7 @@ void sanafe::description_read_network_entry(
     case 'n': // Add neuron
         // TODO: currently configure is broken and does not correctly set
         //  simulator attributes such as log_spikes or force_soma_update
-        neuron_ptr->configure(neuron_config);
+        neuron_ptr->set_attributes(neuron_config);
         break;
     case 'e':
     {

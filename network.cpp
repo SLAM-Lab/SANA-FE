@@ -101,7 +101,7 @@ sanafe::Neuron::Neuron(const size_t neuron_id,
             config.dendrite_model_params.end());
 }
 
-void sanafe::Neuron::configure(const NeuronTemplate &attributes)
+void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
 {
     // TODO: here we don't set the various simulator fields, e.g., log_spikes,
     //  log_potential, force_soma_update and so on

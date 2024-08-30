@@ -21,7 +21,7 @@ sanafe::CurrentBasedSynapseModel::update(const bool read)
     return {0.0, std::nullopt, std::nullopt};
 }
 
-void sanafe::CurrentBasedSynapseModel::configure(
+void sanafe::CurrentBasedSynapseModel::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -56,7 +56,7 @@ sanafe::SingleCompartmentModel::update(const std::optional<Synapse> synapse_in)
     return {accumulated_charge, std::nullopt, std::nullopt};
 }
 
-void sanafe::SingleCompartmentModel::configure(
+void sanafe::SingleCompartmentModel::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -130,7 +130,7 @@ sanafe::DendriteModel::DendriteModelResult sanafe::MultiTapModel1D::update(
     return {tap_voltages[0], std::nullopt, std::nullopt};
 }
 
-void sanafe::MultiTapModel1D::configure(
+void sanafe::MultiTapModel1D::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
     if (attr.find("taps") != attr.end())
@@ -190,7 +190,7 @@ void sanafe::MultiTapModel1D::configure(
 }
 
 // **** Soma models ****
-void sanafe::LoihiLifModel::configure(
+void sanafe::LoihiLifModel::set_attributes(
         const std::map<std::string, ModelParam> &attributes)
 {
     for (const auto &attribute_pair : attributes)
@@ -325,7 +325,7 @@ sanafe::SomaModel::SomaModelResult sanafe::LoihiLifModel::update(
     return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::TrueNorthModel::configure(
+void sanafe::TrueNorthModel::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -471,7 +471,7 @@ sanafe::SomaModel::SomaModelResult sanafe::TrueNorthModel::update(
     return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::InputModel::configure(
+void sanafe::InputModel::set_attributes(
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)

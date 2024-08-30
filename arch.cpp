@@ -634,9 +634,9 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
                         curr_connection.synapse_hw->model);
             }
         }
-        curr_connection.synapse_model->configure(
+        curr_connection.synapse_model->set_attributes(
                 curr_connection.synapse_hw->model_parameters);
-        curr_connection.synapse_model->configure(
+        curr_connection.synapse_model->set_attributes(
                 curr_connection.synapse_params);
     }
     TRACE1("Finished mapping connections to hardware for nid:%s.%zu.\n",
@@ -759,10 +759,10 @@ void sanafe::Core::map_neuron(Neuron &n)
         assert(n.soma_model != nullptr);
         // First set the group's default attribute values, and then
         //  any defined by the neuron
-        n.soma_model->configure(n.soma_hw->model_parameters);
-        n.soma_model->configure(
+        n.soma_model->set_attributes(n.soma_hw->model_parameters);
+        n.soma_model->set_attributes(
                 group.default_neuron_config.soma_model_params);
-        n.soma_model->configure(n.soma_model_params);
+        n.soma_model->set_attributes(n.soma_model_params);
     }
 
     if (n.dendrite_model == nullptr)
@@ -789,13 +789,13 @@ void sanafe::Core::map_neuron(Neuron &n)
         const NeuronGroup &group = neuron_groups.at(n.parent_group_id);
         assert(n.dendrite_model != nullptr);
         // Pass all parameters from the h/w description
-        n.dendrite_model->configure(
+        n.dendrite_model->set_attributes(
                 n.dendrite_hw->model_parameters);
         // Pass global attributes from the group
-        n.dendrite_model->configure(
+        n.dendrite_model->set_attributes(
                 group.default_neuron_config.dendrite_model_params);
         // Pass specific attributes for this neuron
-        n.dendrite_model->configure(
+        n.dendrite_model->set_attributes(
                 n.dendrite_model_params);
     }
 }

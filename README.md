@@ -156,7 +156,7 @@ two main interfacing requirements to allow plugins to smoothly execute.
 
 1. The plugin class must extend the `BaseSoma` located in `plugins.hpp`.
 This includes implementing the base constructor, `update()`, and
-`configure()` functions.
+`set_attributes()` functions.
 2. Two class factory functions need to be created. These have to be in the
 format `create_<plugin_name>` and `destroy_<plugin_name>`. These functions
 are used to get an instance of your new class.
