@@ -483,6 +483,10 @@ void sanafe::InputModel::set_attributes(
             spikes = static_cast<std::vector<bool>>(value);
             curr_spike = spikes.begin();
         }
+        else if (key == "poisson")
+        {
+            poisson_probability = static_cast<double>(value);
+        }
     }
 }
 
@@ -500,6 +504,11 @@ sanafe::SomaModel::SomaModelResult sanafe::InputModel::update(
     {
         send_spike = *curr_spike;
         curr_spike = std::next(curr_spike);
+    }
+
+    if (poisson_probability > uniform_distribution(gen))
+    {
+        send_spike = true;
     }
 
     const NeuronStatus status = send_spike ? FIRED : IDLE;
