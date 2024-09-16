@@ -36,9 +36,7 @@ class Neuron;
 class Tile;
 class Core;
 
-//const long int default_heartbeat_timesteps = 100L;
-// TODO: revert
-const long int default_heartbeat_timesteps = 1L;
+const long int default_heartbeat_timesteps = 100L;
 class Simulation
 {
 public:
