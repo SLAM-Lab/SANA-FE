@@ -11,26 +11,33 @@
 #include "print.hpp"
 
 // *** Synapse models ***
-sanafe::SynapseModel::SynapseModelResult
-sanafe::CurrentBasedSynapseModel::update(const bool read)
+sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
+        const size_t synapse_address, const bool read)
 {
     if (read)
     {
-        return {weight, std::nullopt, std::nullopt};
+        return {weights[synapse_address], std::nullopt, std::nullopt};
     }
     return {0.0, std::nullopt, std::nullopt};
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attributes(
+        const size_t synapse_address,
         const std::map<std::string, ModelParam> &attr)
 {
+    if (weights.size() <= synapse_address)
+    {
+        TRACE1("Resizing weights to: %lu\n", synapse_address+1);
+        weights.resize(std::max(weights.size() * 2, synapse_address + 1));
+    }
+
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
         const ModelParam &value = a.second;
         if ((key == "w") || (key == "weight"))
         {
-            weight = static_cast<double>(value);
+            weights[synapse_address] = static_cast<double>(value);
         }
     }
 
@@ -38,25 +45,26 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
 }
 
 // *** Dendrite models ***
-sanafe::DendriteModel::DendriteModelResult
-sanafe::SingleCompartmentModel::update(const std::optional<Synapse> synapse_in)
+sanafe::DendriteUnit::DendriteResult
+sanafe::AccumulatorModel::update(
+        const size_t neuron_address, const std::optional<Synapse> synapse_in)
 {
-    while (timesteps_simulated < simulation_time)
+    while (timesteps_simulated[neuron_address] < simulation_time)
     {
         // Apply leak for 1 or more timesteps
-        ++timesteps_simulated;
-        accumulated_charge *= leak_decay;
+        ++(timesteps_simulated[neuron_address]);
+        accumulated_charges[neuron_address] *= leak_decay;
     }
     if (synapse_in.has_value())
     {
         // Integrate input charges
-        accumulated_charge += synapse_in.value().current;
+        accumulated_charges[neuron_address] += synapse_in.value().current;
     }
 
-    return {accumulated_charge, std::nullopt, std::nullopt};
+    return {accumulated_charges[neuron_address], std::nullopt, std::nullopt};
 }
 
-void sanafe::SingleCompartmentModel::set_attributes(
+void sanafe::AccumulatorModel::set_attributes(const size_t neuron_address,
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -70,8 +78,8 @@ void sanafe::SingleCompartmentModel::set_attributes(
     }
 }
 
-sanafe::DendriteModel::DendriteModelResult sanafe::MultiTapModel1D::update(
-        const std::optional<Synapse> synapse_in)
+sanafe::DendriteUnit::DendriteResult sanafe::MultiTapModel1D::update(
+        const size_t neuron_address, const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated < simulation_time)
     {
@@ -130,7 +138,7 @@ sanafe::DendriteModel::DendriteModelResult sanafe::MultiTapModel1D::update(
     return {tap_voltages[0], std::nullopt, std::nullopt};
 }
 
-void sanafe::MultiTapModel1D::set_attributes(
+void sanafe::MultiTapModel1D::set_attributes(const size_t neuron_address,
         const std::map<std::string, ModelParam> &attr)
 {
     if (attr.find("taps") != attr.end())
@@ -191,63 +199,66 @@ void sanafe::MultiTapModel1D::set_attributes(
 
 // **** Soma models ****
 void sanafe::LoihiLifModel::set_attributes(
-        const std::map<std::string, ModelParam> &attributes)
+        const size_t neuron_address, const std::map<std::string, ModelParam> &attributes)
 {
+    LoihiCompartment &cx = compartments[neuron_address];
     for (const auto &attribute_pair : attributes)
     {
         const std::string &key = attribute_pair.first;
         const ModelParam &param = attribute_pair.second;
         if (key == "threshold")
         {
-            threshold = static_cast<double>(param);
+            cx.threshold = static_cast<double>(param);
         }
         else if (key == "reverse_threshold")
         {
-            reverse_threshold = static_cast<double>(param);
+            cx.reverse_threshold = static_cast<double>(param);
         }
         else if (key == "reset")
         {
-            reset = static_cast<double>(param);
+            cx.reset = static_cast<double>(param);
         }
         else if (key == "reverse_reset")
         {
-            reverse_reset = static_cast<double>(param);
+            cx.reverse_reset = static_cast<double>(param);
         }
         else if (key == "reset_mode")
         {
             const std::string reset_mode_str = static_cast<std::string>(param);
-            reset_mode = model_parse_reset_mode(reset_mode_str);
+            cx.reset_mode = model_parse_reset_mode(reset_mode_str);
         }
         else if (key == "reverse_reset_mode")
         {
             const std::string reverse_reset_mode_str =
                     static_cast<std::string>(param);
-            reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
+            cx.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
         }
         else if (key == "leak_decay")
         {
-            leak_decay = static_cast<double>(param);
+            cx.leak_decay = static_cast<double>(param);
         }
         else if (key == "bias")
         {
-            bias = static_cast<double>(param);
+            cx.bias = static_cast<double>(param);
         }
         else if ((key == "force_update") || (key == "force_soma_update"))
         {
-            force_update = static_cast<bool>(param);
+            cx.force_update = static_cast<bool>(param);
         }
     }
 }
 
-sanafe::SomaModel::SomaModelResult sanafe::LoihiLifModel::update(
-        const std::optional<double> current_in)
+sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
+        const size_t neuron_address, const std::optional<double> current_in)
 {
-    if (timesteps_simulated == simulation_time)
+    LoihiCompartment &cx = compartments[neuron_address];
+    if (cx.timesteps_simulated == simulation_time)
     {
         throw std::runtime_error("Error: This Loihi model does not support "
-                                 "multiple updates per time-step");
+                                 "multiple updates to the same compartment "
+                                 "in one time-step.");
     }
-    else if (timesteps_simulated < (simulation_time - 1))
+    else if (cx.timesteps_simulated < (simulation_time - 1))
     {
         throw std::runtime_error(
                 "Error: This Loihi model must update every time-step.\n");
@@ -260,14 +271,14 @@ sanafe::SomaModel::SomaModelResult sanafe::LoihiLifModel::update(
     sanafe::NeuronStatus state = sanafe::IDLE;
     // Update soma, if there are any received spikes, there is a non-zero
     //  bias or we force the neuron to update every time-step
-    if ((std::fabs(potential) > 0.0) || current_in.has_value() ||
-            (std::fabs(bias) > 0.0) || force_update)
+    if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
+            (std::fabs(cx.bias) > 0.0) || cx.force_update)
     {
         // Neuron is turned on and potential write
         state = sanafe::UPDATED;
     }
 
-    potential *= leak_decay;
+    cx.potential *= cx.leak_decay;
     // Add randomized noise to potential if enabled
     /*
     if (noise_type == NOISE_FILE_STREAM)
@@ -281,53 +292,54 @@ sanafe::SomaModel::SomaModelResult sanafe::LoihiLifModel::update(
     */
     // Add the synaptic / dendrite current to the potential
     TRACE1("bias:%lf potential before:%lf\n", bias, potential);
-    potential += bias;
+    cx.potential += cx.bias;
 
     if (current_in.has_value())
     {
-        potential += current_in.value();
+        cx.potential += current_in.value();
     }
     TRACE1("Updating potential (nid:%d.%d), after:%lf\n", group_id, neuron_id,
             potential);
 
     // Check against threshold potential (for spiking)
-    if (potential > threshold)
+    if (cx.potential > cx.threshold)
     {
-        if (reset_mode == sanafe::NEURON_RESET_HARD)
+        if (cx.reset_mode == sanafe::NEURON_RESET_HARD)
         {
-            potential = reset;
+            cx.potential = cx.reset;
         }
-        else if (reset_mode == sanafe::NEURON_RESET_SOFT)
+        else if (cx.reset_mode == sanafe::NEURON_RESET_SOFT)
         {
-            potential -= threshold;
+            cx.potential -= cx.threshold;
         }
         state = sanafe::FIRED;
         TRACE1("Neuron fired.\n");
     }
     // Check against reverse threshold
-    if (potential < reverse_threshold)
+    if (cx.potential < cx.reverse_threshold)
     {
-        if (reverse_reset_mode == sanafe::NEURON_RESET_SOFT)
+        if (cx.reverse_reset_mode == sanafe::NEURON_RESET_SOFT)
         {
-            potential -= reverse_threshold;
+            cx.potential -= cx.reverse_threshold;
         }
-        else if (reverse_reset_mode == sanafe::NEURON_RESET_HARD)
+        else if (cx.reverse_reset_mode == sanafe::NEURON_RESET_HARD)
         {
-            potential = reverse_reset;
+            cx.potential = cx.reverse_reset;
         }
-        else if (reverse_reset_mode == sanafe::NEURON_RESET_SATURATE)
+        else if (cx.reverse_reset_mode == sanafe::NEURON_RESET_SATURATE)
         {
-            potential = reverse_threshold;
+            cx.potential = cx.reverse_threshold;
         }
     }
 
-    ++timesteps_simulated;
+    ++(cx.timesteps_simulated);
     return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::TrueNorthModel::set_attributes(
+void sanafe::TrueNorthModel::set_attributes(const size_t neuron_address,
         const std::map<std::string, ModelParam> &attr)
 {
+    TrueNorthNeuron &n = neurons[neuron_address];
     for (const auto &a : attr)
     {
         const std::string &key = a.first;
@@ -335,94 +347,95 @@ void sanafe::TrueNorthModel::set_attributes(
 
         if (key == "threshold")
         {
-            threshold = static_cast<double>(value);
+            n.threshold = static_cast<double>(value);
         }
         else if (key == "reverse_threshold")
         {
-            reverse_threshold = static_cast<double>(value);
+            n.reverse_threshold = static_cast<double>(value);
         }
         else if (key == "reset")
         {
-            reset = static_cast<double>(value);
+            n.reset = static_cast<double>(value);
         }
         else if (key == "reverse_reset")
         {
-            reverse_reset = static_cast<double>(value);
+            n.reverse_reset = static_cast<double>(value);
         }
         else if (key == "reset_mode")
         {
             const std::string reset_mode_str = static_cast<std::string>(value);
-            reset_mode = model_parse_reset_mode(reset_mode_str);
+            n.reset_mode = model_parse_reset_mode(reset_mode_str);
         }
         else if (key == "reverse_reset_mode")
         {
             const std::string reverse_reset_mode_str =
                     static_cast<std::string>(value);
-            reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
+            n.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
         }
         else if (key == "leak")
         {
-            leak = static_cast<double>(value);
+            n.leak = static_cast<double>(value);
         }
         else if (key == "bias")
         {
-            bias = static_cast<double>(value);
+            n.bias = static_cast<double>(value);
         }
         else if (key == "force_soma_update")
         {
-            force_update = static_cast<bool>(value);
+            n.force_update = static_cast<bool>(value);
         }
         else if (key == "leak_towards_zero")
         {
-            leak_towards_zero = static_cast<bool>(value);
+            n.leak_towards_zero = static_cast<bool>(value);
         }
     }
 }
 
-sanafe::SomaModel::SomaModelResult sanafe::TrueNorthModel::update(
-        const std::optional<double> current_in)
+sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
+        const size_t neuron_address, const std::optional<double> current_in)
 {
     bool randomize_threshold;
     sanafe::NeuronStatus state = sanafe::IDLE;
+    TrueNorthNeuron &n = neurons[neuron_address];
 
-    if ((std::fabs(potential) > 0.0) || current_in.has_value() ||
-            (std::fabs(bias) > 0.0) || force_update)
+    if ((std::fabs(n.potential) > 0.0) || current_in.has_value() ||
+            (std::fabs(n.bias) > 0.0) || n.force_update)
     {
         // Neuron is turned on and potential write
         state = sanafe::UPDATED;
     }
 
     // Apply leak
-    if (leak_towards_zero)
+    if (n.leak_towards_zero)
     {
         // TODO: what happens if we're above zero but by less
         //  than the leak amount (for convergent), will we
         //  oscillate between the two? Does it matter
-        if (potential > 0.0)
+        if (n.potential > 0.0)
         {
             // TrueNorth uses additive leak
-            potential -= leak;
+            n.potential -= n.leak;
         }
-        else if (potential < 0.0)
+        else if (n.potential < 0.0)
         {
-            potential += leak;
+            n.potential += n.leak;
         }
         // else equals zero, so no leak is applied
     }
     else
     {
-        potential += leak;
+        n.potential += n.leak;
     }
 
-    potential += bias;
+    n.potential += n.bias;
 
     if (current_in.has_value())
     {
-        potential += current_in.value();
+        n.potential += current_in.value();
     }
     // Apply thresholding and reset
-    double v = potential;
-    randomize_threshold = (random_range_mask != 0);
+    double v = n.potential;
+    randomize_threshold = (n.random_range_mask != 0);
     if (randomize_threshold)
     {
         // rand() generates values using a Linear Feedback Shift Register (LFSR)
@@ -430,40 +443,40 @@ sanafe::SomaModel::SomaModelResult sanafe::TrueNorthModel::update(
         //  Checkers will complain this function is not very 'random'
         //  but here we care about emulating hardware behavior over randomness.
         // codechecker_suppress [cert-msc30-c, cert-msc50-cpp]
-        const unsigned int r = std::rand() & random_range_mask;
+        const unsigned int r = std::rand() & n.random_range_mask;
         v += static_cast<double>(r);
     }
     TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, threshold,
             reset_mode, reverse_threshold, reverse_reset_mode);
-    if (v >= threshold)
+    if (v >= n.threshold)
     {
-        if (reset_mode == NEURON_RESET_HARD)
+        if (n.reset_mode == NEURON_RESET_HARD)
         {
-            potential = reset;
+            n.potential = n.reset;
         }
-        else if (reset_mode == NEURON_RESET_SOFT)
+        else if (n.reset_mode == NEURON_RESET_SOFT)
         {
-            potential -= threshold;
+            n.potential -= n.threshold;
         }
-        else if (reset_mode == NEURON_RESET_SATURATE)
+        else if (n.reset_mode == NEURON_RESET_SATURATE)
         {
-            potential = threshold;
+            n.potential = n.threshold;
         }
         state = sanafe::FIRED;
     }
-    else if (v <= reverse_threshold)
+    else if (v <= n.reverse_threshold)
     {
-        if (reverse_reset_mode == NEURON_RESET_HARD)
+        if (n.reverse_reset_mode == NEURON_RESET_HARD)
         {
-            potential = reverse_reset;
+            n.potential = n.reverse_reset;
         }
-        else if (reverse_reset_mode == NEURON_RESET_SOFT)
+        else if (n.reverse_reset_mode == NEURON_RESET_SOFT)
         {
-            potential += reverse_threshold;
+            n.potential += n.reverse_threshold;
         }
-        else if (reverse_reset_mode == NEURON_RESET_SATURATE)
+        else if (n.reverse_reset_mode == NEURON_RESET_SATURATE)
         {
-            potential = reverse_threshold;
+            n.potential = n.reverse_threshold;
         }
         // No spike is generated
     }
@@ -471,7 +484,7 @@ sanafe::SomaModel::SomaModelResult sanafe::TrueNorthModel::update(
     return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::InputModel::set_attributes(
+void sanafe::InputModel::set_attributes(const size_t neuron_address,
         const std::map<std::string, ModelParam> &attr)
 {
     for (const auto &a : attr)
@@ -490,8 +503,8 @@ void sanafe::InputModel::set_attributes(
     }
 }
 
-sanafe::SomaModel::SomaModelResult sanafe::InputModel::update(
-        std::optional<double> current_in)
+sanafe::SomaUnit::SomaResult sanafe::InputModel::update(
+        const size_t neuron_address, std::optional<double> current_in)
 {
     // This models a dummy input node
     if (current_in.has_value())
@@ -543,47 +556,47 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
     return reset_mode;
 }
 
-std::shared_ptr<sanafe::SynapseModel> sanafe::model_get_synapse(
+std::shared_ptr<sanafe::SynapseUnit> sanafe::model_get_synapse(
         const std::string &model_name)
 {
     if (model_name == "current_based")
     {
-        return std::shared_ptr<SynapseModel>(new CurrentBasedSynapseModel());
+        return std::shared_ptr<SynapseUnit>(new CurrentBasedSynapseModel());
     }
     const std::string error =
             "Synapse model not supported (" + model_name + ")\n";
     throw std::invalid_argument(error);
 }
 
-std::shared_ptr<sanafe::DendriteModel> sanafe::model_get_dendrite(
+std::shared_ptr<sanafe::DendriteUnit> sanafe::model_get_dendrite(
         const std::string &model_name)
 {
-    if (model_name == "single_compartment")
+    if (model_name == "accumulator")
     {
-        return std::shared_ptr<DendriteModel>(new SingleCompartmentModel());
+        return std::shared_ptr<DendriteUnit>(new AccumulatorModel());
     }
     else if (model_name == "taps")
     {
-        return std::shared_ptr<DendriteModel>(new MultiTapModel1D());
+        return std::shared_ptr<DendriteUnit>(new MultiTapModel1D());
     }
 
     throw std::invalid_argument("Model not supported.");
 }
 
-std::shared_ptr<sanafe::SomaModel> sanafe::model_get_soma(
+std::shared_ptr<sanafe::SomaUnit> sanafe::model_get_soma(
         const std::string &model_name)
 {
     if (model_name == "input")
     {
-        return std::shared_ptr<SomaModel>(new InputModel());
+        return std::shared_ptr<SomaUnit>(new InputModel());
     }
     if (model_name == "leaky_integrate_fire")
     {
-        return std::shared_ptr<SomaModel>(new LoihiLifModel());
+        return std::shared_ptr<SomaUnit>(new LoihiLifModel());
     }
     else if (model_name == "truenorth")
     {
-        return std::shared_ptr<SomaModel>(new TrueNorthModel());
+        return std::shared_ptr<SomaUnit>(new TrueNorthModel());
     }
 
     throw std::invalid_argument("Model not supported.");

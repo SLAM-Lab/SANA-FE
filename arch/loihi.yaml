@@ -42,7 +42,7 @@ architecture:
                 latency_spike_out: 30.0e-9
             - name: loihi_stochastic_lif
               attributes:
-                model: stochastic_leaky_integrate_fire
+                model: leaky_integrate_fire
                 # Noise stream is based on Intel's proprietary data
                 #  TODO: support a LFSR based random number generator that can
                 #   replace this for the public version
@@ -73,7 +73,7 @@ architecture:
           dendrite:
           - name: loihi_dendrites
             attributes:
-              model: single_compartment
+              model: accumulator
               energy_update: 0.0
               latency_update: 0.0
           axon_out:

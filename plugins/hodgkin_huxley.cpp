@@ -17,7 +17,7 @@
 #include "../plugins.hpp"
 #include "../print.hpp"
 
-class HH : public sanafe::SomaModel
+class HH : public sanafe::SomaUnit
 {
     // HH specific
 public:
@@ -32,7 +32,8 @@ public:
     double dt;
 
     // main parameters
-    double V, prev_V; // Membrane potential
+    double V;
+    double prev_V; // Membrane potential
     double I; // Stimulation current per area
     double m; // m, n, h are coeff
     double n;
@@ -46,12 +47,17 @@ public:
     double beta_n;
     double beta_h;
 
-    double tau_m, tau_n, tau_h;
-    double pm, pn, ph;
-    double denominator, tau_V, Vinf;
+    double tau_m;
+    double tau_n;
+    double tau_h;
+    double pm;
+    double pn;
+    double ph;
+    double denominator;
+    double tau_V;
+    double Vinf;
 
     HH()
-            : SomaModel()
     {
         V = 0.0;
         C_m = 10.0; // Effective capacitance per area of membrane; default is 1
@@ -64,12 +70,13 @@ public:
         dt = 0.1;
     }
 
-    virtual double get_potential()
+    double get_potential(const size_t neuron_address)
     {
         return V;
     }
-    virtual void set_attributes(
-            const std::map<std::string, sanafe::ModelParam> &attributes)
+
+    void set_attributes(const size_t neuron_address,
+            const std::map<std::string, sanafe::ModelParam> &attributes) override
     {
         /*** Set attributes ***/
         for (auto &attribute_pair : attributes)
@@ -96,8 +103,8 @@ public:
         }
     }
 
-    sanafe::SomaModel::SomaModelResult update(
-            const std::optional<double> current_in)
+    sanafe::SomaUnit::SomaResult update(const size_t neuron_address,
+            const std::optional<double> current_in) override
     {
         sanafe::NeuronStatus status = sanafe::IDLE;
 
@@ -153,14 +160,8 @@ public:
 };
 
 // the Class factories
-extern "C" sanafe::SomaModel *create_HH()
+extern "C" sanafe::SomaUnit *create_HH()
 {
     TRACE1("Creating HH soma instance\n");
-    return (sanafe::SomaModel *) new HH();
+    return (sanafe::SomaUnit *) new HH();
 }
-
-// Memory Leak?
-//extern "C" void destroy_HH(sanafe::SomaModel *HH)
-//{
-//	delete HH;
-//}

@@ -315,11 +315,11 @@ void sanafe::sim_timestep(Timestep &ts, Architecture &arch, Network &net)
         {
             for (const auto &syn : c.synapse)
             {
-                ts.spike_count += syn.spikes_processed;
+                ts.spike_count += syn->spikes_processed;
             }
             for (const auto &soma : c.soma)
             {
-                ts.neurons_fired += soma.neurons_fired;
+                ts.neurons_fired += soma->neurons_fired;
             }
             for (const auto &axon_out : c.axon_out_hw)
             {
@@ -553,23 +553,23 @@ void sanafe::sim_reset_measurements(Network &net, Architecture &arch)
 
             for (auto &dendrite : c.dendrite)
             {
-                dendrite.energy = 0.0;
-                dendrite.time = 0.0;
+                dendrite->energy = 0.0;
+                dendrite->time = 0.0;
             }
 
             for (auto &syn : c.synapse)
             {
-                syn.energy = 0.0;
-                syn.time = 0.0;
-                syn.spikes_processed = 0;
+                syn->energy = 0.0;
+                syn->time = 0.0;
+                syn->spikes_processed = 0;
             }
 
             for (auto &soma : c.soma)
             {
-                soma.energy = 0.0;
-                soma.time = 0.0;
-                soma.neuron_updates = 0L;
-                soma.neurons_fired = 0L;
+                soma->energy = 0.0;
+                soma->time = 0.0;
+                soma->neuron_updates = 0L;
+                soma->neurons_fired = 0L;
             }
 
             for (auto &axon : c.axon_out_hw)
@@ -677,7 +677,7 @@ void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
         {
             if (neuron.log_potential)
             {
-                potential_trace_file << neuron.soma_model->get_potential();
+                potential_trace_file << neuron.soma_hw->get_potential(neuron.mapped_address);
                 potential_trace_file << ",";
                 potential_probe_count++;
             }

@@ -34,7 +34,7 @@ architecture:
           dendrite:
             - name: demo_dendrite
               attributes:
-                model: single_compartment
+                model: accumulator
                 energy_update: 0.0
                 latency_update: 0.0
                 force_update: true

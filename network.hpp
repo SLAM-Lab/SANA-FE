@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <variant>
 
-#include "models.hpp"
+//#include "models.hpp"
 #include "print.hpp"
 
 namespace sanafe
@@ -42,9 +42,6 @@ class Neuron;
 struct Connection;
 struct Synapse;
 // Models
-class SynapseModel;
-class SomaModel;
-class DendriteModel;
 struct ModelParam;
 
 struct NeuronTemplate;
@@ -86,11 +83,9 @@ public:
     std::string default_synapse_hw_name;
     std::string dendrite_hw_name;
 
-    std::shared_ptr<SomaModel> soma_model{nullptr};
-    std::shared_ptr<DendriteModel> dendrite_model{nullptr};
-
     std::string parent_group_id;
     size_t id{};
+    size_t mapped_address{};
     int spike_count{0};
     int maps_in_count{0};
     int maps_out_count{0};
@@ -165,7 +160,6 @@ struct Connection
 {
     std::map<std::string, ModelParam> synapse_params;
     std::map<std::string, ModelParam> dendrite_params;
-    std::shared_ptr<SynapseModel> synapse_model;
     Neuron *post_neuron;
     Neuron *pre_neuron;
     SynapseUnit *synapse_hw;

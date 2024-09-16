@@ -168,11 +168,11 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
     //  update filtered current and any other connection properties
     SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
-    con.synapse_model->set_time(ts.timestep);
+    con.synapse_hw->set_time(ts.timestep);
     Core &dest_core = *(con.post_neuron->core);
 
     auto [synaptic_current, simulated_energy, simulated_latency] =
-            con.synapse_model->update(true);
+            con.synapse_hw->update(con.synapse_address, true);
     if (con.synapse_hw->default_energy_process_spike.has_value())
     {
         simulated_energy = con.synapse_hw->default_energy_process_spike.value();
@@ -247,7 +247,7 @@ sanafe::pipeline_apply_default_dendrite_power_model(
 
 double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 {
-    n.dendrite_model->set_time(ts.timestep);
+    n.dendrite_hw->set_time(ts.timestep);
     TRACE2("Updating nid:%s dendritic current "
             "(last_updated:%d, ts:%ld)\n",
             n.id.c_str(), n.dendrite_last_updated, ts.timestep);
@@ -258,7 +258,7 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
         // Update the dendrite h/w at least once, even if there are no inputs.
         //  This might be required e.g., if there is a leak to apply
         auto [current, model_energy, model_latency] =
-                n.dendrite_model->update(std::nullopt);
+                n.dendrite_hw->update(n.mapped_address, std::nullopt);
         n.soma_input_charge = current;
         auto [energy, latency] = pipeline_apply_default_dendrite_power_model(
                 n, model_energy, model_latency);
@@ -271,7 +271,7 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
         for (const auto &synapse : n.dendrite_input_synapses)
         {
             auto [current, model_energy, model_latency] =
-                    n.dendrite_model->update(synapse);
+                    n.dendrite_hw->update(n.mapped_address, synapse);
             n.soma_input_charge = current;
             auto [energy, latency] =
                     pipeline_apply_default_dendrite_power_model(
@@ -292,7 +292,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 {
     TRACE1("nid:%s updating, current_in:%lf\n", n.id.c_str(),
             n.soma_input_charge);
-    n.soma_model->set_time(ts.timestep);
+    n.soma_hw->set_time(ts.timestep);
 
     std::optional<double> soma_current_in;
     if((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
@@ -302,7 +302,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
     }
 
     auto [neuron_status, simulated_energy, simulated_latency] =
-            n.soma_model->update(soma_current_in);
+            n.soma_hw->update(n.mapped_address, soma_current_in);
 
     if (n.soma_hw->default_energy_metrics.has_value())
     {

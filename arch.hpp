@@ -39,16 +39,13 @@ struct DendriteUnit;
 struct SomaUnit;
 struct AxonOutUnit;
 
-struct AxonInModel;
-class SynapseModel;
-class DendriteModel;
-class SomaModel;
-struct AxonOutModel;
-
 struct TilePowerMetrics;
 struct AxonOutPowerMetrics;
 struct CorePipelineConfiguration;
 struct NetworkOnChipConfiguration;
+
+struct AxonInModel;
+struct AxonOutModel;
 
 enum BufferPosition
 {
@@ -63,6 +60,118 @@ enum NoiseType
     NOISE_NONE = -1,
     NOISE_FILE_STREAM,
     // TODO: implement different random noise generators
+};
+
+struct ModelInfo
+{
+    std::map<std::string, ModelParam> model_parameters{};
+    std::optional<std::filesystem::path> plugin_library_path{};
+    std::string name;
+};
+
+enum NeuronResetModes
+{
+    NEURON_NO_RESET,
+    NEURON_RESET_SOFT,
+    NEURON_RESET_HARD,
+    NEURON_RESET_SATURATE,
+    NEURON_RESET_MODE_COUNT,
+};
+
+// An attribute can contain a scalar value, or either a list or named set of
+//  attributes i.e., attributes are recursively defined attributes. However,
+//  in C++, variants cannot be defined recursively.
+struct ModelParam
+{
+    operator bool() const
+    {
+        if (std::holds_alternative<bool>(value))
+        {
+            return std::get<bool>(value);
+        }
+        else if (std::holds_alternative<int>(value))
+        {
+            TRACE1("Warning: Casting integer value to bool type.\n");
+            return (std::get<int>(value) != 0);
+        }
+
+        std::string error = "Error: Attribute ";
+        if (name.has_value())
+        {
+            error += name.value();
+        }
+        error += " cannot be cast to a bool";
+        throw std::runtime_error(error);
+    }
+    operator int() const
+    {
+        return std::get<int>(value);
+    }
+    operator double() const
+    {
+        if (std::holds_alternative<double>(value))
+        {
+            return std::get<double>(value);
+        }
+        else if (std::holds_alternative<int>(value))
+        {
+            // Assume it is safe to convert from any integer to double
+            TRACE1("Warning: Casting integer value to double type.\n");
+            return static_cast<double>(std::get<int>(value));
+        }
+
+        std::string error = "Error: Attribute ";
+        if (name.has_value())
+        {
+            error += name.value();
+        }
+        error += " cannot be cast to a double";
+        throw std::runtime_error(error);
+    }
+
+    operator std::string() const
+    {
+        return std::get<std::string>(value);
+    }
+    template <typename T> operator std::vector<T>() const
+    {
+        std::vector<T> cast_vector;
+        const auto &value_vector = std::get<std::vector<ModelParam>>(value);
+        cast_vector.reserve(value_vector.size());
+
+        for (const auto &element : value_vector)
+        {
+            cast_vector.push_back(static_cast<T>(element));
+        }
+        return cast_vector;
+    }
+    template <typename T> operator std::map<std::string, ModelParam>() const
+    {
+        std::map<std::string, ModelParam> cast_map;
+        const auto &value_vector = std::get<std::vector<ModelParam>>(value);
+        for (const auto &element : value_vector)
+        {
+            cast_map[element.name.value()] = static_cast<T>(element);
+        }
+        return cast_map;
+    }
+    bool operator==(const ModelParam &rhs) const
+    {
+        return (value == rhs.value);
+    }
+
+    std::variant<bool, int, double, std::string, std::vector<ModelParam>> value;
+    std::optional<std::string> name;
+    // In C++17, we cannot use std::map (which would be the natural choice) with
+    //  incomplete types i.e., cannot use std::map in such a recursive
+    //  structure. Considering this, and the fact that performance is not as
+    //  important for this struct, label every attribute with a name and if the
+    //  user wants to use "map" style lookups e.g., foo = attribute["key"]
+    //  then support casting the struct to a std::map.
+    //  There have been other discussions on this topic e.g., for implementing
+    //  JSON and YAML parsers, but they end up either requiring Boost or other
+    //  dependencies, and / or rely on undefined C++ behavior and generally
+    //  require complex solutions.
 };
 
 class Architecture
@@ -186,7 +295,6 @@ public:
     explicit Tile(std::string name, size_t tile_id, const TilePowerMetrics &power_metrics);
     [[nodiscard]] int get_id() const { return id; }
     [[nodiscard]] std::string info() const;
-    //std::string description() const;
 };
 
 struct CoreAddress
@@ -200,9 +308,9 @@ class Core
 {
 public:
     std::vector<AxonInUnit> axon_in_hw;
-    std::vector<SynapseUnit> synapse;
-    std::vector<DendriteUnit> dendrite;
-    std::vector <SomaUnit> soma;
+    std::vector<std::shared_ptr<SynapseUnit>> synapse;
+    std::vector<std::shared_ptr<DendriteUnit>> dendrite;
+    std::vector<std::shared_ptr<SomaUnit>> soma;
     std::vector<AxonOutUnit> axon_out_hw;
 
     std::vector<Message *> messages_in;
@@ -232,59 +340,109 @@ public:
     [[nodiscard]] int get_id() const { return id; }
     [[nodiscard]] int get_offset() const { return offset; }
     [[nodiscard]] std::string info() const;
-    //std::string description() const;
 };
 
 struct AxonInUnit
 {
     std::string name;
-    CoreAddress parent_core_address;
     long int spike_messages_in{0L};
     double energy{0.0};
     double time{0.0};
     double energy_spike_message;
     double latency_spike_message;
 
-    explicit AxonInUnit(std::string axon_in_name, const CoreAddress &parent_core_address, const AxonInPowerMetrics &power_metrics);
-    //std::string description() const;
+    explicit AxonInUnit(std::string axon_in_name, const AxonInPowerMetrics &power_metrics);
 };
 
-struct SynapseUnit
+class SynapseUnit
 {
+public:
+    struct SynapseResult
+    {
+        double current;
+        std::optional<double> energy{std::nullopt};
+        std::optional<double> latency{std::nullopt};
+    };
+
     std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
-    CoreAddress parent_core_address;
     std::optional<double> default_energy_process_spike{std::nullopt};
     std::optional<double> default_latency_process_spike{std::nullopt};
 
     long int spikes_processed{0L};
     double energy{0.0};
     double time{0.0};
+    size_t mapped_connections{0UL};
 
-    explicit SynapseUnit(std::string synapse_name, const CoreAddress &parent_core, const ModelInfo &model_details);
-    //std::string description() const;
+    //explicit SynapseUnit(std::string synapse_name, const CoreAddress &parent_core, const ModelInfo &model_details);
+    SynapseUnit() = default;
+    SynapseUnit(const SynapseUnit &copy) = default;
+    SynapseUnit(SynapseUnit &&other) = default;
+    virtual ~SynapseUnit() = default;
+    SynapseUnit &operator=(const SynapseUnit &other) = default;
+    SynapseUnit &operator=(SynapseUnit &&other) = default;
+
+    virtual SynapseResult update(size_t synapse_address, bool read = false) = 0;
+    virtual void set_attributes(size_t synapse_address, const std::map<std::string, ModelParam> &attr) = 0;
+
+    // Additional helper functions
+    void set_time(const long int timestep)
+    {
+        simulation_time = timestep;
+    }
+    void configure(std::string synapse_name, const ModelInfo &model);
+
+protected:
+    long int simulation_time{0L};
 };
 
-struct DendriteUnit
+class DendriteUnit
 {
+public:
+    struct DendriteResult
+    {
+        double current;
+        std::optional<double> energy{std::nullopt};
+        std::optional<double> latency{std::nullopt};
+    };
+
     std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
     std::optional<double> default_energy_update{std::nullopt};
     std::optional<double> default_latency_update{std::nullopt};
-    CoreAddress parent_core_address;
     double energy{0.0};
     double time{0.0};
 
-    explicit DendriteUnit(std::string dendrite_name, const CoreAddress &parent_core, const ModelInfo &model_details);
-    //std::string description() const;
+    DendriteUnit(const DendriteUnit &copy) = default;
+    DendriteUnit(DendriteUnit &&other) = default;
+    virtual ~DendriteUnit() = default;
+    DendriteUnit &operator=(const DendriteUnit &other) = default;
+    DendriteUnit &operator=(DendriteUnit &&other) = default;
+
+    virtual void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attributes) = 0;
+    virtual DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) = 0;
+
+    // Additional helper functions
+    void set_time(const long int timestep)
+    {
+        simulation_time = timestep;
+    }
+    void configure(std::string dendrite_name, const ModelInfo &model_details);
+
+protected:
+    // Abstract base class; do not instantiate
+    DendriteUnit() = default;
+
+    long int simulation_time{0L};
 };
 
-struct SomaUnit
+class SomaUnit
 {
+public:
     struct SomaEnergyMetrics
     {
         double energy_update_neuron{0.0};
@@ -299,12 +457,39 @@ struct SomaUnit
         double latency_spike_out{0.0};
     };
 
+    struct SomaResult
+    {
+        NeuronStatus status;
+        std::optional<double> energy{std::nullopt};
+        std::optional<double> latency{std::nullopt};
+    };
+
+    //explicit SomaUnit(std::string soma_name, const CoreAddress &parent_core, const ModelInfo &model_details);
+    SomaUnit() = default;
+    SomaUnit(const SomaUnit &copy) = default;
+    SomaUnit(SomaUnit &&other) = default;
+    virtual ~SomaUnit() = default;
+    SomaUnit &operator=(const SomaUnit &other) = delete;
+    SomaUnit &operator=(SomaUnit &&other) = delete;
+
+    virtual SomaResult update(size_t neuron_address, std::optional<double> current_in) = 0;
+    virtual void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attributes) = 0;
+    virtual double get_potential(size_t neuron_address)
+    {
+        return 0.0;
+    }
+
+    void set_time(const long int timestep)
+    {
+        simulation_time = timestep;
+    }
+    void configure(const std::string &soma_name, const ModelInfo &model_details);
+
     std::map<std::string, ModelParam> model_parameters{};
     FILE *noise_stream{nullptr};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
-    CoreAddress parent_core_address;
     long int neuron_updates{0L};
     long int neurons_fired{0L};
     long int neuron_count{0L};
@@ -314,8 +499,8 @@ struct SomaUnit
     std::optional<SomaLatencyMetrics> default_latency_metrics;
     int noise_type{NOISE_NONE};
 
-    explicit SomaUnit(std::string soma_name, const CoreAddress &parent_core, const ModelInfo &model_details);
-    //std::string description() const;
+protected:
+    long int simulation_time{0L};
 };
 
 struct AxonOutUnit
@@ -323,7 +508,6 @@ struct AxonOutUnit
     // The axon output points to a number of axons, stored at the
     //  post-synaptic core. A neuron can point to a number of these
     std::string name;
-    CoreAddress parent_core_address;
     long int packets_out{0L};
     double energy{0.0};
     double time{0.0};

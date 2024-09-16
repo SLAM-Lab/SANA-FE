@@ -14,9 +14,9 @@
 #include "plugins.hpp"
 #include "print.hpp"
 
-using _create_synapse = sanafe::SynapseModel *();
-using _create_dendrite = sanafe::DendriteModel *();
-using _create_soma = sanafe::SomaModel *();
+using _create_synapse = sanafe::SynapseUnit *();
+using _create_dendrite = sanafe::DendriteUnit *();
+using _create_soma = sanafe::SomaUnit *();
 
 std::map<std::string, _create_synapse *> plugin_create_synapse;
 std::map<std::string, _create_dendrite *> plugin_create_dendrite;
@@ -120,7 +120,7 @@ void sanafe::plugin_init_soma(
     INFO("Loaded plugin symbols for %s.\n", model_name.c_str());
 }
 
-std::shared_ptr<sanafe::SynapseModel> sanafe::plugin_get_synapse(
+std::shared_ptr<sanafe::SynapseUnit> sanafe::plugin_get_synapse(
         const std::string &model_name,
         const std::filesystem::path &plugin_path)
 {
@@ -135,11 +135,11 @@ std::shared_ptr<sanafe::SynapseModel> sanafe::plugin_get_synapse(
         plugin_init_synapse(model_name, plugin_path);
     }
 
-    return std::shared_ptr<SynapseModel>(
+    return std::shared_ptr<SynapseUnit>(
             plugin_create_synapse[model_name]());
 }
 
-std::shared_ptr<sanafe::DendriteModel> sanafe::plugin_get_dendrite(
+std::shared_ptr<sanafe::DendriteUnit> sanafe::plugin_get_dendrite(
         const std::string &model_name, const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
@@ -153,11 +153,12 @@ std::shared_ptr<sanafe::DendriteModel> sanafe::plugin_get_dendrite(
         plugin_init_dendrite(model_name, plugin_path);
     }
 
-    return std::shared_ptr<DendriteModel>(plugin_create_dendrite[model_name]());
+    return std::shared_ptr<DendriteUnit>(plugin_create_dendrite[model_name]());
 }
 
-std::shared_ptr<sanafe::SomaModel> sanafe::plugin_get_soma(
-        const std::string &model_name, const std::filesystem::path &plugin_path)
+std::shared_ptr<sanafe::SomaUnit> sanafe::plugin_get_soma(
+        const std::string &model_name,
+        const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
     {
@@ -170,5 +171,5 @@ std::shared_ptr<sanafe::SomaModel> sanafe::plugin_get_soma(
         plugin_init_soma(model_name, plugin_path);
     }
 
-    return std::shared_ptr<SomaModel>(plugin_create_soma[model_name]());
+    return std::shared_ptr<SomaUnit>(plugin_create_soma[model_name]());
 }
