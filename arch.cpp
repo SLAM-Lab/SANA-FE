@@ -373,7 +373,7 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
     {
         const std::filesystem::path plugin_lib_path =
                 model_details.plugin_library_path.value();
-        INFO("Creating synapse from plugin: %s.\n", plugin_lib_path.c_str());
+        TRACE1("Creating synapse from plugin: %s.\n", plugin_lib_path.c_str());
         synapse.emplace_back(
                 plugin_get_synapse(model_details.name, plugin_lib_path));
     }
@@ -401,7 +401,7 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
     {
         const std::filesystem::path &plugin_library_path =
                 model.plugin_library_path.value();
-        INFO("Creating dendrite from plugin %s.\n",
+        TRACE1("Creating dendrite from plugin %s.\n",
                 plugin_library_path.c_str());
         dendrite.emplace_back(
                 plugin_get_dendrite(model.name, plugin_library_path));
@@ -591,6 +591,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     }
 
     n.core = this;
+    n.mapped_address = neurons.size();
     neurons.push_back(&n);
 
     if (neurons.size() > pipeline_config.max_neurons_supported)
@@ -675,7 +676,6 @@ void sanafe::Core::map_neuron(Neuron &n)
     const NeuronGroup &group = neuron_groups.at(n.parent_group_id);
     // First set the group's default attribute values, and then
     //  any defined by the neuron
-    n.mapped_address = n.soma_hw->neuron_count;
     n.soma_hw->set_attributes(n.mapped_address,
             group.default_neuron_config.soma_model_params);
     n.soma_hw->set_attributes(n.mapped_address, n.soma_model_params);

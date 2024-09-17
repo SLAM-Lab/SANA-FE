@@ -129,7 +129,7 @@ std::shared_ptr<sanafe::SynapseUnit> sanafe::plugin_get_synapse(
         throw std::runtime_error("No plugin path given.");
     }
 
-    INFO("Getting synapse:%s\n", model_name.c_str());
+    TRACE1("Getting synapse:%s\n", model_name.c_str());
     if (plugin_create_synapse.count(model_name) == 0)
     {
         plugin_init_synapse(model_name, plugin_path);
@@ -147,7 +147,7 @@ std::shared_ptr<sanafe::DendriteUnit> sanafe::plugin_get_dendrite(
         throw std::runtime_error("No plugin path given.");
     }
 
-    INFO("Getting dendrite:%s\n", model_name.c_str());
+    TRACE1("Getting dendrite:%s\n", model_name.c_str());
     if (plugin_create_dendrite.count(model_name) == 0)
     {
         plugin_init_dendrite(model_name, plugin_path);
@@ -165,7 +165,7 @@ std::shared_ptr<sanafe::SomaUnit> sanafe::plugin_get_soma(
         throw std::runtime_error("No plugin path given.");
     }
 
-    INFO("Getting soma:%s\n", model_name.c_str());
+    TRACE1("Getting soma:%s\n", model_name.c_str());
     if (plugin_create_soma.count(model_name) == 0)
     {
         plugin_init_soma(model_name, plugin_path);
