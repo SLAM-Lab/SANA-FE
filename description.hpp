@@ -60,6 +60,7 @@ void description_parse_neuron_section_yaml(const ryml::Parser &parser, ryml::Con
 // Neuron to Hardware Mapping
 void description_parse_mapping_section_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef mappings_node, Architecture &arch, Network &net);
 void description_parse_mapping(const ryml::Parser &parser, const ryml::ConstNodeRef mapping_info, Architecture &arch, Network &net);
+void description_parse_mapping_info(const ryml::Parser &parser, const ryml::ConstNodeRef info, Neuron &n, std::string &core_name);
 void description_parse_neuron(const std::string &id, const ryml::Parser &parser, const ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
 NeuronTemplate description_parse_neuron_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes, const NeuronTemplate &default_template = NeuronTemplate());
 void description_parse_edge(const std::string &description, const ryml::Parser &parser, const ryml::ConstNodeRef edge_node, Network &network);

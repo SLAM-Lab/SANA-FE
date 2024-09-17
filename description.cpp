@@ -1136,19 +1136,28 @@ void sanafe::description_parse_mapping_section_yaml(const ryml::Parser &parser,
                 parser, mappings_node);
     }
 
-    for (const auto &mappings : mappings_node)
+    for (const auto &mapping : mappings_node)
     {
-        if (!mappings.is_map())
+        if (!mapping.is_map())
         {
             throw DescriptionParsingError(
                     "Expected mapping to be defined in the format: "
-                    "<group>.<neuron>: {core: <tile>.<core>}",
-                    parser, mappings);
+                    "<group>.<neuron>: [<attributes>]",
+                    parser, mapping);
         }
 
-        for (const auto &mapping : mappings)
+        int entries = 0;
+        // Ordered mappings, so each list entry contains a mapping with a single
+        //  key. Only look up the first entry.
+        for (const auto &mapping_entry : mapping)
         {
-            description_parse_mapping(parser, mapping, arch, net);
+            description_parse_mapping(parser, mapping_entry, arch, net);
+            ++entries;
+            if (entries > 1)
+            {
+                throw DescriptionParsingError("Should be one entry per mapping",
+                        parser, mapping_entry);
+            }
         }
     }
 }
@@ -1156,15 +1165,6 @@ void sanafe::description_parse_mapping_section_yaml(const ryml::Parser &parser,
 void sanafe::description_parse_mapping(const ryml::Parser &parser,
         const ryml::ConstNodeRef mapping_info, Architecture &arch, Network &net)
 {
-    if (!mapping_info.is_map())
-    {
-        // TODO: allow sequences as well as mapping i.e., [core: 0.0]
-        throw DescriptionParsingError(
-                "Invalid mapping: mappings must be defined using a YAML map "
-                "<group>.<neuron>: core: <tile>.<core>",
-                parser, mapping_info);
-    }
-
     std::string neuron_address;
     mapping_info >> ryml::key(neuron_address);
     auto dot_pos = neuron_address.find_first_of('.');
@@ -1204,8 +1204,9 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
         }
         Neuron &neuron = group.neurons[neuron_id];
 
-        const auto core_address = description_required_field<std::string>(
-                parser, mapping_info, "core");
+        std::string core_address;
+        description_parse_mapping_info(
+                parser, mapping_info, neuron, core_address);
         const auto dot_pos = core_address.find('.');
 
         const size_t tile_id = std::stoull(core_address.substr(0, dot_pos));
@@ -1226,6 +1227,44 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
         Core &core = tile.cores[core_offset_within_tile];
         core.map_neuron(neuron);
     }
+}
+
+void sanafe::description_parse_mapping_info(const ryml::Parser &parser,
+        const ryml::ConstNodeRef info, Neuron &n, std::string &core_name)
+{
+    if (info.is_seq())
+    {
+        for (const auto &field : info)
+        {
+            description_parse_mapping_info(parser, field, n, core_name);
+        }
+    }
+    else if (!info.is_map())
+    {
+        throw DescriptionParsingError(
+                "Expected attributes to be map", parser, info);
+    }
+    else
+    {
+        if (!info.find_child("synapse").invalid())
+        {
+            info["synapse"] >> n.default_synapse_hw_name;
+        }
+        if (!info.find_child("dendrite").invalid())
+        {
+            info["dendrite"] >> n.dendrite_hw_name;
+        }
+        if (!info.find_child("soma").invalid())
+        {
+            info["soma"] >> n.soma_hw_name;
+        }
+        if (!info.find_child("core").invalid())
+        {
+            info["core"] >> core_name;
+        }
+    }
+
+    return;
 }
 
 std::map<std::string, sanafe::ModelParam>
