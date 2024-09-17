@@ -12,7 +12,7 @@ network:
     - name: inputs
       attributes: {soma_hw_name: dummy_input}
       neurons:
-        - 0: {spikes:  [0,0]}
+        - 0: {spikes: [0,0]}
         - 1: {}
         - 2: {spikes: [1,0]}
     - name: dendrite

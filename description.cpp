@@ -197,35 +197,52 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
 {
     auto dendrite_name = description_required_field<std::string>(
             parser, dendrite_node, "name");
-    const ryml::ConstNodeRef attributes =
-            dendrite_node.find_child("attributes");
-    if (attributes.invalid())
+    std::pair<int, int> dendrite_range = {0, 0};
+    if (dendrite_name.find("..") != std::string::npos)
     {
-        throw DescriptionParsingError(
-                "No attributes section defined", parser, dendrite_node);
+        dendrite_range = description_parse_range_yaml(dendrite_name);
     }
 
-    ModelInfo model_details;
-    model_details.name = description_required_field<std::string>(
-            parser, attributes, "model");
-    const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
-    if (!plugin_path_node.invalid())
+    for (int d = dendrite_range.first; d <= dendrite_range.second; ++d)
     {
-        if (plugin_path_node.has_val())
+        std::string name(dendrite_name);
+        if (dendrite_name.find("..") != std::string::npos)
         {
-            std::string plugin_path;
-            plugin_path_node >> plugin_path;
-            model_details.plugin_library_path = plugin_path;
+            name = dendrite_name.substr(0, dendrite_name.find('[')) + '[' +
+                    std::to_string(d) + ']';
         }
-        else
+        const ryml::ConstNodeRef attributes =
+                dendrite_node.find_child("attributes");
+        if (attributes.invalid())
         {
-            throw DescriptionParsingError("Expected plugin path to be string",
-                    parser, plugin_path_node);
+            throw DescriptionParsingError(
+                    "No attributes section defined", parser, dendrite_node);
         }
+
+        ModelInfo model_details;
+        model_details.name = description_required_field<std::string>(
+                parser, attributes, "model");
+        const ryml::ConstNodeRef plugin_path_node =
+                attributes.find_child("plugin");
+        if (!plugin_path_node.invalid())
+        {
+            if (plugin_path_node.has_val())
+            {
+                std::string plugin_path;
+                plugin_path_node >> plugin_path;
+                model_details.plugin_library_path = plugin_path;
+            }
+            else
+            {
+                throw DescriptionParsingError(
+                        "Expected plugin path to be string", parser,
+                        plugin_path_node);
+            }
+        }
+        model_details.model_parameters =
+                description_parse_model_parameters_yaml(parser, attributes);
+        parent_core.create_dendrite(name, model_details);
     }
-    model_details.model_parameters =
-            description_parse_model_parameters_yaml(parser, attributes);
-    parent_core.create_dendrite(dendrite_name, model_details);
 }
 
 void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
@@ -233,51 +250,69 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
 {
     auto soma_name =
             description_required_field<std::string>(parser, soma_node, "name");
-    const ryml::ConstNodeRef attributes = soma_node.find_child("attributes");
-    if (attributes.invalid())
+    std::pair<int, int> soma_range = {0, 0};
+    if (soma_name.find("..") != std::string::npos)
     {
-        throw DescriptionParsingError(
-                "No attributes section defined", parser, soma_node);
-    }
-    std::string model_str;
-
-    ModelInfo model_details;
-    model_details.name = description_required_field<std::string>(
-            parser, attributes, "model");
-    model_details.model_parameters =
-            description_parse_model_parameters_yaml(parser, attributes);
-    const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
-    if (!plugin_path_node.invalid())
-    {
-        if (plugin_path_node.has_val())
-        {
-            std::string plugin_path;
-            plugin_path_node >> plugin_path;
-            model_details.plugin_library_path = plugin_path;
-        }
-        else
-        {
-            throw DescriptionParsingError("Expected plugin path to be string",
-                    parser, plugin_path_node);
-        }
+        soma_range = description_parse_range_yaml(soma_name);
     }
 
-    if (!attributes.find_child("noise").invalid())
+    for (int s = soma_range.first; s <= soma_range.second; ++s)
     {
-        // TODO: support optional noise arg again alongside the plugin mechanism
-        /*
-        s.noise_type = NOISE_FILE_STREAM;
-        s.noise_stream = fopen(value_str.c_str(), "r");
-        TRACE1("Opening noise str: %s\n", value_str.c_str());
-        if (s.noise_stream == NULL)
+        std::string name(soma_name);
+        if (soma_name.find("..") != std::string::npos)
         {
-            INFO("Error: Failed to open noise stream: %s.\n",
-                value_str.c_str());
-            exit(1);
+            name = soma_name.substr(0, soma_name.find('[')) + '[' +
+                    std::to_string(s) + ']';
         }
-        */
+        const ryml::ConstNodeRef attributes =
+                soma_node.find_child("attributes");
+        if (attributes.invalid())
+        {
+            throw DescriptionParsingError(
+                    "No attributes section defined", parser, soma_node);
+        }
+        std::string model_str;
+
+        ModelInfo model_details;
+        model_details.name = description_required_field<std::string>(
+                parser, attributes, "model");
+        model_details.model_parameters =
+                description_parse_model_parameters_yaml(parser, attributes);
+        const ryml::ConstNodeRef plugin_path_node =
+                attributes.find_child("plugin");
+        if (!plugin_path_node.invalid())
+        {
+            if (plugin_path_node.has_val())
+            {
+                std::string plugin_path;
+                plugin_path_node >> plugin_path;
+                model_details.plugin_library_path = plugin_path;
+            }
+            else
+            {
+                throw DescriptionParsingError(
+                        "Expected plugin path to be string", parser,
+                        plugin_path_node);
+            }
+        }
+
+        if (!attributes.find_child("noise").invalid())
+        {
+            // TODO: support optional noise arg again alongside the plugin mechanism
+            /*
+            s.noise_type = NOISE_FILE_STREAM;
+            s.noise_stream = fopen(value_str.c_str(), "r");
+            TRACE1("Opening noise str: %s\n", value_str.c_str());
+            if (s.noise_stream == NULL)
+            {
+                INFO("Error: Failed to open noise stream: %s.\n",
+                    value_str.c_str());
+                exit(1);
+            }
+            */
+        }
+        parent_core.create_soma(name, model_details);
     }
-    parent_core.create_soma(std::move(soma_name), model_details);
 }
 
 void sanafe::description_parse_axon_out_section(const ryml::Parser &parser,

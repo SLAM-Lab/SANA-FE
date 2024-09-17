@@ -19,7 +19,7 @@ architecture:
         - name: core
           attributes:
             buffer_position: soma
-            max_neurons_supported: 1024
+            max_neurons_supported: 100
           axon_in:
             - name: axon_in
               attributes:
@@ -32,7 +32,7 @@ architecture:
                 energy_process_spike: 20.0e-12
                 latency_process_spike: 3.0e-9
           dendrite:
-            - name: dendrite
+            - name: dendrite[0..99]
               attributes:
                 energy_update: 0.0
                 latency_update: 0.0

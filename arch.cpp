@@ -422,20 +422,21 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
 sanafe::SomaUnit &sanafe::Core::create_soma(std::string name,
         const ModelInfo &model_details)
 {
-    INFO("New soma h/w unit created (%s)\n", name.c_str());
+    TRACE1("New soma h/w unit created (%s)\n", name.c_str());
 
     if (model_details.plugin_library_path.has_value())
     {
         // Use external plug-in
         auto &plugin_library_path = model_details.plugin_library_path.value();
-        INFO("Creating soma from plugin %s.\n", plugin_library_path.c_str());
+        TRACE1("Creating soma from plugin %s.\n", plugin_library_path.c_str());
         soma.emplace_back(plugin_get_soma(
                 model_details.name, plugin_library_path));
     }
     else
     {
         // Use built-in unit models
-        INFO("Creating soma built-in model %s.\n", model_details.name.c_str());
+        TRACE1("Creating soma built-in model %s.\n",
+                model_details.name.c_str());
         soma.emplace_back(model_get_soma(model_details.name));
     }
     auto &unit = soma.back();
