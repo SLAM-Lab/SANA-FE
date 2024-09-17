@@ -59,8 +59,8 @@ public:
     void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attr) override;
 
 private:
-    std::vector<double> accumulated_charges{std::vector<double>(loihi_max_compartments)};
-    std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments)};
+    std::vector<double> accumulated_charges{std::vector<double>(loihi_max_compartments, 0.0)};
+    std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
     double leak_decay{0.0};
 };
 
