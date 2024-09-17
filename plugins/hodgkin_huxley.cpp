@@ -78,7 +78,6 @@ public:
     void set_attributes(const size_t neuron_address,
             const std::map<std::string, sanafe::ModelParam> &attributes) override
     {
-        /*** Set attributes ***/
         for (auto &attribute_pair : attributes)
         {
             const std::string &key = attribute_pair.first;
