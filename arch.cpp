@@ -689,7 +689,6 @@ void sanafe::Core::map_neuron(Neuron &n)
     // Pass specific attributes for this neuron
     n.dendrite_hw->set_attributes(n.mapped_address,
             n.dendrite_model_params);
-
 }
 
 void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)

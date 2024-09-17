@@ -103,14 +103,16 @@ sanafe::Neuron::Neuron(const size_t neuron_id,
 
 void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
 {
-    // TODO: here we don't set the various simulator fields, e.g., log_spikes,
-    //  log_potential, force_soma_update and so on
-    // Make these fields <optional> so that they can be set and override the
-    //  group / neuron defaults
     soma_model_params.insert(attributes.soma_model_params.begin(),
             attributes.soma_model_params.end());
     dendrite_model_params.insert(attributes.dendrite_model_params.begin(),
             attributes.dendrite_model_params.end());
+
+    log_spikes = attributes.log_spikes;
+    log_potential = attributes.log_potential;
+    force_dendrite_update = attributes.force_dendrite_update;
+    force_soma_update = attributes.force_soma_update;
+    force_synapse_update = attributes.force_synapse_update;
 }
 
 std::string sanafe::Neuron::info() const

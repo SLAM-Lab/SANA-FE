@@ -19,6 +19,11 @@
 #include "pipeline.hpp"
 #include "print.hpp"
 
+// TODO: take multiple passes over the file, first to create all neuron groups
+//  and connections, then second to parse all the neuron and edge attribtues,
+//  forwarding these onto the models. This seems overall more sensible than
+//  storing a map of all parameters per hardware unit in every neuron
+
 sanafe::DescriptionParsingError::DescriptionParsingError(
         const std::string &error, const ryml::Parser &parser,
         const ryml::ConstNodeRef &node)
@@ -1830,8 +1835,6 @@ void sanafe::description_read_network_entry(
         net.create_neuron_group(neuron_group_id, neuron_count, neuron_config);
         break;
     case 'n': // Add neuron
-        // TODO: currently configure is broken and does not correctly set
-        //  simulator attributes such as log_spikes or force_soma_update
         neuron_ptr->set_attributes(neuron_config);
         break;
     case 'e':
