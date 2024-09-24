@@ -369,7 +369,6 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
                     for (int y_filter = 0; y_filter < convolution.kernel_height;
                             ++y_filter)
                     {
-                        //if not 0 <= (y_out * stride) + y_filter < input_height
                         const int y_position =
                                 (y_out * convolution.stride_height) + y_filter;
                         if ((y_position < 0) ||
@@ -380,7 +379,6 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
                         for (int x_filter = 0;
                                 x_filter < convolution.kernel_width; ++x_filter)
                         {
-                            //if not 0 <= x_out*stride + x_kernel < input_width
                             const int x_position =
                                     (x_out * convolution.stride_width) +
                                     x_filter;
@@ -401,7 +399,7 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
 
                             Neuron &source = neurons[source_idx];
 
-                            //weight = filters[y_kernel, x_kernel, c_in, c_out]
+                            // weight = kernels[y_kernel, x_kernel, c_in, c_out]
                             int filter_idx = y_filter *
                                     convolution.kernel_width *
                                     convolution.input_channels *
@@ -412,16 +410,22 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
                             filter_idx += c_in * output_channels;
                             filter_idx += c_out;
 
+                            // Create the connection
                             Connection &con = source.connect_to_neuron(target);
+
+                            // Set the attributes for this connection, using
+                            //  the list of attributes
                             for (auto &[key, attribute_list] : attribute_lists)
                             {
                                 if (attribute_list.size() <=
                                         static_cast<size_t>(filter_idx))
                                 {
-                                    INFO("Error: Not enough entries defined for attribute: %s\n",
+                                    INFO("Error: Not enough entries defined "
+                                         "for attribute: %s\n",
                                             key.c_str());
                                     throw std::invalid_argument(
-                                            "Not enough entries defined for attribute");
+                                            "Not enough entries defined "
+                                            "for attribute");
                                 }
                                 const ModelParam &attribute =
                                         attribute_list[filter_idx];
@@ -434,7 +438,7 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
                                     con.dendrite_params[key] = attribute;
                                 }
                             }
-                            INFO("%s.%zu -> %s.%zu (w:%d)\n",
+                            TRACE1("%s.%zu -> %s.%zu (w:%d)\n",
                                     source.parent_group_id.c_str(), source.id,
                                     target.parent_group_id.c_str(), target.id,
                                     (int) con.synapse_params["weight"]);
