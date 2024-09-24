@@ -45,8 +45,13 @@ struct Synapse;
 struct ModelParam;
 
 struct NeuronTemplate;
-
-enum NeuronStatus: int { INVALID_NEURON_STATE, IDLE, UPDATED, FIRED };
+enum NeuronStatus : int
+{
+    INVALID_NEURON_STATE,
+    IDLE,
+    UPDATED,
+    FIRED
+};
 
 struct NeuronTemplate
 {
@@ -62,6 +67,18 @@ struct NeuronTemplate
     bool force_soma_update;
 
     explicit NeuronTemplate(std::string soma_hw_name = "", std::string default_synapse_hw_name = "", std::string dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_synapse_update = false, bool force_dendrite_update = false, bool force_soma_update = false);
+};
+
+struct Conv2DParameters
+{
+    int input_width{};
+    int input_height{};
+    int input_channels{};
+    int kernel_width{};
+    int kernel_height{};
+    int kernel_count{1};
+    int stride_width{1};
+    int stride_height{1};
 };
 
 class Neuron
@@ -124,7 +141,9 @@ public:
     explicit NeuronGroup(const std::string group_name, Network &parent_net, size_t neuron_count, const NeuronTemplate &default_config);
 
     //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
-    //void connect_neurons(NeuronGroup &dest_group, const std::vector<std::pair<int, int> > &src_dest_id_pairs, const std::map<std::string, std::vector<std::any>> &attr_lists);
+    //void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists);
+    void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_target_id_pairs);
+    void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const Conv2DParameters &convolution);
     [[nodiscard]] std::string info() const;
     //std::string description() const;
 };
@@ -183,7 +202,7 @@ struct Synapse
 struct NeuronAddress
 {
     std::string group_name{};
-    size_t neuron_id{};
+    std::optional<size_t> neuron_id{std::nullopt};
 };
 
 // Alternative ModelParameter implementations. Keep for now.. maybe find

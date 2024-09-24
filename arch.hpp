@@ -79,8 +79,8 @@ enum NeuronResetModes
 };
 
 // An attribute can contain a scalar value, or either a list or named set of
-//  attributes i.e., attributes are recursively defined attributes. However,
-//  in C++, variants cannot be defined recursively.
+//  attributes i.e., attributes can be recursively defined. However,
+//  in C++, variants cannot be defined recursively, so create this new class.
 struct ModelParam
 {
     operator bool() const
@@ -160,8 +160,6 @@ struct ModelParam
         return (value == rhs.value);
     }
 
-    std::variant<bool, int, double, std::string, std::vector<ModelParam>> value;
-    std::optional<std::string> name;
     // In C++17, we cannot use std::map (which would be the natural choice) with
     //  incomplete types i.e., cannot use std::map in such a recursive
     //  structure. Considering this, and the fact that performance is not as
@@ -172,6 +170,13 @@ struct ModelParam
     //  JSON and YAML parsers, but they end up either requiring Boost or other
     //  dependencies, and / or rely on undefined C++ behavior and generally
     //  require complex solutions.
+    std::variant<bool, int, double, std::string, std::vector<ModelParam>> value;
+    std::optional<std::string> name;
+
+    // Filters control which hardware units can receive this parameter
+    bool forward_to_synapse{true};
+    bool forward_to_dendrite{true};
+    bool forward_to_soma{true};
 };
 
 class Architecture
@@ -190,8 +195,6 @@ public:
     Tile &create_tile(std::string name, const TilePowerMetrics &power_metrics);
     Core &create_core(std::string name, size_t parent_tile_id, const CorePipelineConfiguration &pipeline_config);
     [[nodiscard]] std::string info() const;
-    //std::string description() const;
-    //void save_arch_description(const std::filesystem::path &path);
 };
 
 Architecture load_arch(const std::filesystem::path &path);

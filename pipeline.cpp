@@ -290,9 +290,8 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 
 double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 {
-    INFO("nid:%s.%lu updating, current_in:%lf (ts:%lu)\n",
+    TRACE1("nid:%s.%lu updating, current_in:%lf (ts:%lu)\n",
             n.parent_group_id.c_str(), n.id, n.soma_input_charge, ts.timestep);
-    INFO("hw name: %s\n", n.soma_hw->name.c_str());
     n.soma_hw->set_time(ts.timestep);
 
     std::optional<double> soma_current_in;

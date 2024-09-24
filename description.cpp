@@ -976,17 +976,27 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
     //  'soma' keys
     if (!attributes.find_child("dendrite").invalid())
     {
-        auto dendrite_params = description_parse_model_parameters_yaml(
+        auto dendrite_parameters = description_parse_model_parameters_yaml(
                 parser, attributes["dendrite"]);
+        for (auto &[key, param] : dendrite_parameters)
+        {
+            param.forward_to_synapse = false;
+            param.forward_to_soma = false;
+        }
         neuron_template.dendrite_model_params.insert(
-                dendrite_params.begin(), dendrite_params.end());
+                dendrite_parameters.begin(), dendrite_parameters.end());
     }
     if (!attributes.find_child("soma").invalid())
     {
-        auto soma_params = description_parse_model_parameters_yaml(
+        auto soma_parameters = description_parse_model_parameters_yaml(
                 parser, attributes["soma"]);
+        for (auto &[key, parameter] : soma_parameters)
+        {
+            parameter.forward_to_synapse = false;
+            parameter.forward_to_dendrite = false;
+        }
         neuron_template.soma_model_params.insert(
-                soma_params.begin(), soma_params.end());
+                soma_parameters.begin(), soma_parameters.end());
     }
 
     return neuron_template;
@@ -1021,22 +1031,35 @@ sanafe::description_parse_edge_description(const std::string_view &description)
 
     const auto source_dot_pos = source_part.find('.');
     const auto target_dot_pos = target_part.find('.');
-    if ((source_dot_pos == std::string::npos) ||
-            (target_dot_pos == std::string::npos))
+
+    const bool source_neuron_defined = (source_dot_pos != std::string::npos);
+    const bool target_neuron_defined = (target_dot_pos != std::string::npos);
+    if (source_neuron_defined && !target_neuron_defined)
     {
         throw std::runtime_error(
-                "Edge is not formatted correctly: " + std::string(description));
+            "No target neuron defined in edge:" + std::string(description));
+    }
+    else if (target_neuron_defined && !source_neuron_defined)
+    {
+        throw std::runtime_error(
+            "No target neuron defined in edge:" + std::string(description));
     }
 
     NeuronAddress source;
     source.group_name = source_part.substr(0, source_dot_pos);
-    source.neuron_id =
-            std::stoull(std::string(source_part.substr(source_dot_pos + 1)));
+    if (source_neuron_defined)
+    {
+        source.neuron_id = std::stoull(
+                std::string(source_part.substr(source_dot_pos + 1)));
+    }
 
     NeuronAddress target;
     target.group_name = target_part.substr(0, target_dot_pos);
-    target.neuron_id =
-            std::stoull(std::string(target_part.substr(target_dot_pos + 1)));
+    if (target_neuron_defined)
+    {
+        target.neuron_id = std::stoull(
+                std::string(target_part.substr(target_dot_pos + 1)));
+    }
 
     return std::make_tuple(source, target);
 }
@@ -1046,24 +1069,43 @@ void sanafe::description_parse_edge(const std::string &description,
         Network &net)
 {
     // Description has format src_group.src_neuron -> tgt_group.tgt_neuron
-    auto [source_address, target_address] =
+    const auto [source_address, target_address] =
             description_parse_edge_description(description);
 
+    const bool is_hyper_edge = !source_address.neuron_id.has_value();
+    if (is_hyper_edge)
+    {
+        description_parse_hyperedge(
+                source_address, target_address, parser, attributes_node, net);
+    }
+    else
+    {
+        description_parse_neuron_connection(
+                source_address, target_address, parser, attributes_node, net);
+    }
+}
+
+void sanafe::description_parse_neuron_connection(
+        const NeuronAddress &source_address,
+        const NeuronAddress &target_address, const ryml::Parser &parser,
+        const ryml::ConstNodeRef attributes_node, Network &net)
+{
     if (net.groups.find(source_address.group_name) == net.groups.end())
     {
         const std::string error =
                 "Invalid source neuron group:" + source_address.group_name;
         throw DescriptionParsingError(error, parser, attributes_node);
     }
-    NeuronGroup &src_group = net.groups.at(source_address.group_name);
-    if (source_address.neuron_id >= src_group.neurons.size())
+    NeuronGroup &source_group = net.groups.at(source_address.group_name);
+    if (source_address.neuron_id >= source_group.neurons.size())
     {
         const std::string error =
                 "Invalid source neuron id: " + source_address.group_name + "." +
-                std::to_string(source_address.neuron_id);
+                std::to_string(source_address.neuron_id.value());
         throw DescriptionParsingError(error, parser, attributes_node);
     }
-    Neuron &src_neuron = src_group.neurons[source_address.neuron_id];
+    Neuron &source_neuron =
+            source_group.neurons[source_address.neuron_id.value()];
 
     if (net.groups.find(target_address.group_name) == net.groups.end())
     {
@@ -1071,32 +1113,167 @@ void sanafe::description_parse_edge(const std::string &description,
                 "Invalid target neuron group:" + target_address.group_name;
         throw DescriptionParsingError(error, parser, attributes_node);
     }
-    NeuronGroup &dst_group = net.groups.at(target_address.group_name);
+    NeuronGroup &target_group = net.groups.at(target_address.group_name);
 
-    if (target_address.neuron_id >= dst_group.neurons.size())
+    if (target_address.neuron_id >= target_group.neurons.size())
     {
         const std::string error =
                 "Invalid target neuron id: " + target_address.group_name + "." +
-                std::to_string(target_address.neuron_id);
+                std::to_string(target_address.neuron_id.value());
         throw DescriptionParsingError(error, parser, attributes_node);
     }
-    Neuron &dst_neuron = dst_group.neurons.at(target_address.neuron_id);
+    Neuron &target_neuron =
+            target_group.neurons.at(target_address.neuron_id.value());
 
-    Connection &con = src_neuron.connect_to_neuron(dst_neuron);
-    // TODO: create a ConnectionTemplate? and pass this when connecting two
-    //  neurons instead. The problem with using a reference is when the vector
-    //  of connections expands, any references may become invalidated...
-    description_parse_edge_attributes(con, parser, attributes_node);
+    Connection &con = source_neuron.connect_to_neuron(target_neuron);
+    description_parse_connection_attributes(con, parser, attributes_node);
 }
 
-void sanafe::description_parse_edge_attributes(Connection &con,
+void sanafe::description_parse_hyperedge(
+        const NeuronAddress &source_address,
+        const NeuronAddress &target_address, const ryml::Parser &parser,
+        const ryml::ConstNodeRef hyperedge_node, Network &net)
+{
+    if (net.groups.find(source_address.group_name) == net.groups.end())
+    {
+        const std::string error =
+                "Invalid source neuron group:" + source_address.group_name;
+        throw DescriptionParsingError(error, parser, hyperedge_node);
+    }
+    NeuronGroup &source_group = net.groups.at(source_address.group_name);
+
+    if (net.groups.find(target_address.group_name) == net.groups.end())
+    {
+        const std::string error =
+                "Invalid target neuron group:" + target_address.group_name;
+        throw DescriptionParsingError(error, parser, hyperedge_node);
+    }
+
+    NeuronGroup &target_group = net.groups.at(target_address.group_name);
+
+    // First parse the lists of attributes, this is common for all hyperedge
+    //  connectivity
+    const auto type = description_required_field<std::string>(
+            parser, hyperedge_node, "type");
+
+    std::map<std::string, std::vector<ModelParam>> attribute_lists{};
+    if (type == "conv2d")
+    {
+        Conv2DParameters convolution{};
+        for (const auto &attribute : hyperedge_node.children())
+        {
+            if (attribute.key() == "input_height")
+            {
+                attribute >> convolution.input_height;
+            }
+            else if (attribute.key() == "input_width")
+            {
+                attribute >> convolution.input_width;
+            }
+            else if (attribute.key() == "input_channels")
+            {
+                attribute >> convolution.input_channels;
+            }
+            else if (attribute.key() == "kernel_width")
+            {
+                attribute >> convolution.kernel_width;
+            }
+            else if (attribute.key() == "kernel_height")
+            {
+                attribute >> convolution.kernel_height;
+            }
+            else if (attribute.key() == "kernel_count")
+            {
+                attribute >> convolution.kernel_count;
+            }
+            else if (attribute.key() == "stride_width")
+            {
+                attribute >> convolution.stride_width;
+            }
+            else if (attribute.key() == "stride_height")
+            {
+                attribute >> convolution.stride_height;
+            }
+            else if (attribute.key() == "synapse")
+            {
+                for (const auto &synapse_param_node : attribute)
+                {
+                    // TODO: refactor
+                    std::vector<ModelParam> attribute_list;
+                    for (const auto &model_param_node : synapse_param_node)
+                    {
+                        ModelParam value = description_parse_parameter_yaml(
+                                parser, model_param_node);
+                        value.forward_to_dendrite = false;
+                        value.forward_to_soma = false;
+                        attribute_list.push_back(value);
+                    }
+                    std::string attribute_name;
+                    synapse_param_node >> ryml::key(attribute_name);
+                    attribute_lists[attribute_name] = attribute_list;
+                }
+            }
+            else if (attribute.key() == "dendrite")
+            {
+                for (const auto &dendrite_param_node : attribute)
+                {
+                    // TODO: refactor
+                    std::vector<ModelParam> attribute_list;
+                    for (const auto &model_param_node : dendrite_param_node)
+                    {
+                        ModelParam value = description_parse_parameter_yaml(
+                                parser, model_param_node);
+                        value.forward_to_synapse = false;
+                        value.forward_to_soma = false;
+                        attribute_list.push_back(value);
+                    }
+                    std::string attribute_name;
+                    dendrite_param_node >> ryml::key(attribute_name);
+                    attribute_lists[attribute_name] = attribute_list;
+                }
+            }
+            else if (attribute.key() != "type")
+            {
+                // TODO: refactor
+                std::vector<ModelParam> attribute_list;
+                for (const auto &model_param_node : attribute)
+                {
+                    ModelParam value = description_parse_parameter_yaml(
+                            parser, model_param_node);
+                    attribute_list.push_back(value);
+                }
+                std::string attribute_name;
+                attribute >> ryml::key(attribute_name);
+                attribute_lists[attribute_name] = attribute_list;
+            }
+        }
+
+        source_group.connect_neurons_conv2d(
+                target_group, attribute_lists, convolution);
+    }
+    else if (type == "sparse")
+    {
+
+    }
+    else if (type == "dense")
+    {
+
+    }
+    else
+    {
+        const std::string error = "Invalid hyperedge type: " + type;
+        throw DescriptionParsingError(error, parser, hyperedge_node);
+    }
+}
+
+void sanafe::description_parse_connection_attributes(Connection &con,
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node)
 {
     if (attributes_node.is_seq())
     {
         for (const auto &attribute : attributes_node)
         {
-            description_parse_edge_attributes(con, parser, attribute);
+            description_parse_connection_attributes(con, parser, attribute);
         }
 
         return;
@@ -1106,11 +1283,21 @@ void sanafe::description_parse_edge_attributes(Connection &con,
     {
         con.synapse_params = description_parse_model_parameters_yaml(
                 parser, attributes_node["synapse"]);
+        for (auto &[key, param] : con.synapse_params)
+        {
+            param.forward_to_dendrite = false;
+            param.forward_to_soma = false;
+        }
     }
     if (!attributes_node.find_child("dendrite").invalid())
     {
         con.dendrite_params = description_parse_model_parameters_yaml(
                 parser, attributes_node["dendrite"]);
+        for (auto &[key, param] : con.dendrite_params)
+        {
+            param.forward_to_synapse = false;
+            param.forward_to_soma = false;
+        }
     }
 
     const auto shared_model_params =

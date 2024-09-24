@@ -64,7 +64,9 @@ void description_parse_mapping_info(const ryml::Parser &parser, const ryml::Cons
 void description_parse_neuron(const std::string &id, const ryml::Parser &parser, const ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
 NeuronTemplate description_parse_neuron_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes, const NeuronTemplate &default_template = NeuronTemplate());
 void description_parse_edge(const std::string &description, const ryml::Parser &parser, const ryml::ConstNodeRef edge_node, Network &network);
-void description_parse_edge_attributes(Connection &con, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node);
+void description_parse_neuron_connection(const NeuronAddress &source_address, const NeuronAddress &dest_address, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node, Network &net);
+void description_parse_hyperedge(const NeuronAddress &source_address, const NeuronAddress &dest_address, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node, Network &net);
+void description_parse_connection_attributes(Connection &con, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node);
 std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description);
 
 // Helper functions
