@@ -23,10 +23,10 @@
 #include "print.hpp"
 
 sanafe::NeuronTemplate::NeuronTemplate(std::string soma_hw_name,
-        std::string default_synapse_hw_name,
-        std::string dendrite_hw_name, const bool log_spikes,
-        const bool log_potential, const bool force_synapse_update,
-        const bool force_dendrite_update, const bool force_soma_update)
+        std::string default_synapse_hw_name, std::string dendrite_hw_name,
+        const bool log_spikes, const bool log_potential,
+        const bool force_synapse_update, const bool force_dendrite_update,
+        const bool force_soma_update)
         : soma_hw_name(std::move(soma_hw_name))
         , default_synapse_hw_name(std::move(default_synapse_hw_name))
         , dendrite_hw_name(std::move(dendrite_hw_name))
@@ -62,8 +62,9 @@ std::string sanafe::Connection::description() const
 }
 */
 
-sanafe::NeuronGroup::NeuronGroup(const std::string group_name, Network &parent_net,
-        const size_t neuron_count, const NeuronTemplate &default_config)
+sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
+        Network &parent_net, const size_t neuron_count,
+        const NeuronTemplate &default_config)
         : default_neuron_config(default_config)
         , parent_net(&parent_net)
         , name(std::move(group_name))
@@ -76,9 +77,8 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name, Network &parent_n
     }
 }
 
-sanafe::Neuron::Neuron(const size_t neuron_id,
-        Network &parent_net, const std::string parent_group_id,
-        const NeuronTemplate &config)
+sanafe::Neuron::Neuron(const size_t neuron_id, Network &parent_net,
+        const std::string parent_group_id, const NeuronTemplate &config)
         : parent_net(&parent_net)
         , soma_hw_name(config.soma_hw_name)
         , default_synapse_hw_name(config.default_synapse_hw_name)
@@ -188,9 +188,11 @@ sanafe::Connection &sanafe::Neuron::connect_to_neuron(Neuron &dest)
         con.synapse_hw_name = default_synapse_hw_name;
     }
 
-    TRACE1("\tAdded con %s.%s->%s.%s (w:%lf)\n", con.pre_neuron->parent_group_id.c_str(),
-            con.pre_neuron->id.c_str(), con.post_neuron->parent_group_id.c_str(),
-            con.post_neuron->id.c_str(), static_cast<double>(con.synapse_params["w"]));
+    TRACE1("\tAdded con %s.%s->%s.%s (w:%lf)\n",
+            con.pre_neuron->parent_group_id.c_str(), con.pre_neuron->id.c_str(),
+            con.post_neuron->parent_group_id.c_str(),
+            con.post_neuron->id.c_str(),
+            static_cast<double>(con.synapse_params["w"]));
 
     return con;
 }
@@ -252,9 +254,9 @@ void sanafe::Network::check_mapped() const
 
 void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
         const std::map<std::string, std::vector<ModelParam>> &attribute_lists,
-        const std::vector<std::pair<size_t, size_t>> &source_target_id_pairs)
+        const std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
 {
-    for (auto [source_id, target_id] : source_target_id_pairs)
+    for (auto [source_id, dest_id] : source_dest_id_pairs)
     {
         TRACE2("Connecting neurons, neurons.size=%lu\n", neurons.size());
         if (source_id >= neurons.size())
@@ -263,26 +265,26 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
                     neurons.size());
             throw std::invalid_argument("Error: src id is out of range.");
         }
-        if (target_id >= dest_group.neurons.size())
+        if (dest_id >= dest_group.neurons.size())
         {
-            INFO("dest_id:%zu out of range (0 <= id <= %zu).\n", target_id,
+            INFO("dest_id:%zu out of range (0 <= id <= %zu).\n", dest_id,
                     dest_group.neurons.size());
             throw std::invalid_argument("Error: dest nid is out of range.");
         }
 
         Neuron &source = neurons[source_id];
-        Neuron &target = dest_group.neurons[target_id];
-        Connection &con = source.connect_to_neuron(target);
+        Neuron &dest = dest_group.neurons[dest_id];
+        Connection &con = source.connect_to_neuron(dest);
 
         // Create attributes map for this neuron
         std::map<std::string, ModelParam> attributes;
         for (auto &[key, value_list] : attribute_lists)
         {
-            if (value_list.size() != source_target_id_pairs.size())
+            if (value_list.size() != source_dest_id_pairs.size())
             {
                 INFO("Error: Length of attribute list != "
                      "number of defined edges. (%zu!=%zu).\n",
-                        value_list.size(), source_target_id_pairs.size());
+                        value_list.size(), source_dest_id_pairs.size());
                 throw std::invalid_argument(
                         "Error: Length of attribute list != "
                         "number of defined edges.");
@@ -297,7 +299,7 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
     }
 }
 
-void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
+void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
         const std::map<std::string, std::vector<ModelParam>> &attribute_lists,
         const Conv2DParameters &convolution)
 {
@@ -338,16 +340,16 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
         const std::string error = "Expected " +
                 std::to_string(expected_output_size) +
                 " neurons in source group for convolution but there are " +
-                std::to_string(target_group.neurons.size()) + " neurons.\n";
+                std::to_string(dest_group.neurons.size()) + " neurons.\n";
         INFO("Error: %s", error.c_str());
         throw std::invalid_argument(error);
     }
-    if (expected_output_size != target_group.neurons.size())
+    if (expected_output_size != dest_group.neurons.size())
     {
         const std::string error = "Expected " +
                 std::to_string(expected_output_size) +
-                " neurons in target group for convolution but there are " +
-                std::to_string(target_group.neurons.size()) + " neurons.\n";
+                " neurons in dest group for convolution but there are " +
+                std::to_string(dest_group.neurons.size()) + " neurons.\n";
         INFO("Error: %s", error.c_str());
         throw std::invalid_argument(error);
     }
@@ -359,11 +361,11 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
         {
             for (int x_out = 0; x_out < output_width; ++x_out)
             {
-                int target_idx = c_out * output_width * output_height;
-                target_idx += y_out * output_width;
-                target_idx += x_out;
+                int dest_idx = c_out * output_width * output_height;
+                dest_idx += y_out * output_width;
+                dest_idx += x_out;
 
-                Neuron &target = target_group.neurons[target_idx];
+                Neuron &dest = dest_group.neurons[dest_idx];
                 for (int c_in = 0; c_in < convolution.input_channels; ++c_in)
                 {
                     for (int y_filter = 0; y_filter < convolution.kernel_height;
@@ -392,7 +394,7 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
                             int source_idx = c_in * convolution.input_width *
                                     convolution.input_height;
                             source_idx += ((y_out * convolution.stride_height) +
-                                               y_filter) *
+                                                  y_filter) *
                                     convolution.input_width;
                             source_idx += ((x_out * convolution.stride_width) +
                                     x_filter);
@@ -411,7 +413,7 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
                             filter_idx += c_out;
 
                             // Create the connection
-                            Connection &con = source.connect_to_neuron(target);
+                            Connection &con = source.connect_to_neuron(dest);
 
                             // Set the attributes for this connection, using
                             //  the list of attributes
@@ -438,9 +440,9 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
                                     con.dendrite_params[key] = attribute;
                                 }
                             }
-                            TRACE1("%s.%zu -> %s.%zu (w:%d)\n",
+                            TRACE1("%s.%zu->%s.%zu w=%d\n",
                                     source.parent_group_id.c_str(), source.id,
-                                    target.parent_group_id.c_str(), target.id,
+                                    dest.parent_group_id.c_str(), dest.id,
                                     (int) con.synapse_params["weight"]);
                         }
                     }
@@ -449,7 +451,57 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &target_group,
         }
     }
 
-    //input_layer.connect_neurons(output_layer, connections, {"w": weights})
+    // TODO: hack, remove
+    /*
+    for (auto &n : neurons)
+    {
+        for (auto &con : n.connections_out)
+        {
+            printf("e %s.%zu->%s.%zu w=%0.1lf\n",
+                    con.pre_neuron->parent_group_id.c_str(), con.pre_neuron->id,
+                    con.post_neuron->parent_group_id.c_str(),
+                    con.post_neuron->id, (double) con.synapse_params["weight"]);
+        }
+    }
+    */
+}
+
+void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
+        const std::map<std::string, std::vector<ModelParam>> &attribute_lists)
+{
+    for (size_t source_index = 0; source_index < neurons.size(); ++source_index)
+    {
+        Neuron &source = neurons[source_index];
+
+        for (size_t dest_index = 0; dest_index < dest_group.neurons.size();
+                ++dest_index)
+        {
+            Neuron &dest = neurons[dest_index];
+            const size_t list_index =
+                    (source_index * dest_group.neurons.size()) + dest_index;
+            Connection &con = source.connect_to_neuron(dest);
+            for (auto &[key, attribute_list] : attribute_lists)
+            {
+                if (attribute_list.size() <= list_index)
+                {
+                    INFO("Error: Not enough entries defined "
+                         "for attribute: %s\n",
+                            key.c_str());
+                    throw std::invalid_argument("Not enough entries defined "
+                                                "for attribute");
+                }
+                const ModelParam &attribute = attribute_list[list_index];
+                if (attribute.forward_to_synapse)
+                {
+                    con.synapse_params[key] = attribute;
+                }
+                if (attribute.forward_to_dendrite)
+                {
+                    con.dendrite_params[key] = attribute;
+                }
+            }
+        }
+    }
 }
 
 /*

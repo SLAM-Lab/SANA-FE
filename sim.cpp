@@ -3,11 +3,6 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 //  sim.cpp
-//
-// TODO: implement dense and sparse hyperedges
-// TODO: get python interface working again
-// TODO: change models.set_attributes() to just set one model parameter at a time
-// TODO: add models.reset() so we can clear model state
 #include <cassert>
 #include <cmath>
 #include <cstdio>

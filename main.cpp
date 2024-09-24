@@ -148,3 +148,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 }
+
+// Project TODOs and wishlist roughly in priority order
+//
+// TODO: get python interface working again
+// TODO: implement sparse hyperedges
+// TODO: change models.set_attributes() to just set one model parameter at a time
+// TODO: add models.reset() so we can clear model state

@@ -1251,11 +1251,68 @@ void sanafe::description_parse_hyperedge(
         source_group.connect_neurons_conv2d(
                 target_group, attribute_lists, convolution);
     }
-    else if (type == "sparse")
-    {
-
-    }
     else if (type == "dense")
+    {
+        for (const auto &attribute : hyperedge_node.children())
+        {
+            // TODO: refactor
+            if (attribute.key() == "synapse")
+            {
+                for (const auto &synapse_param_node : attribute)
+                {
+                    // TODO: refactor
+                    std::vector<ModelParam> attribute_list;
+                    for (const auto &model_param_node : synapse_param_node)
+                    {
+                        ModelParam value = description_parse_parameter_yaml(
+                                parser, model_param_node);
+                        value.forward_to_dendrite = false;
+                        value.forward_to_soma = false;
+                        attribute_list.push_back(value);
+                    }
+                    std::string attribute_name;
+                    synapse_param_node >> ryml::key(attribute_name);
+                    attribute_lists[attribute_name] = attribute_list;
+                }
+            }
+            else if (attribute.key() == "dendrite")
+            {
+                for (const auto &dendrite_param_node : attribute)
+                {
+                    // TODO: refactor
+                    std::vector<ModelParam> attribute_list;
+                    for (const auto &model_param_node : dendrite_param_node)
+                    {
+                        ModelParam value = description_parse_parameter_yaml(
+                                parser, model_param_node);
+                        value.forward_to_synapse = false;
+                        value.forward_to_soma = false;
+                        attribute_list.push_back(value);
+                    }
+                    std::string attribute_name;
+                    dendrite_param_node >> ryml::key(attribute_name);
+                    attribute_lists[attribute_name] = attribute_list;
+                }
+            }
+            else if (attribute.key() != "type")
+            {
+                // TODO: refactor
+                std::vector<ModelParam> attribute_list;
+                for (const auto &model_param_node : attribute)
+                {
+                    ModelParam value = description_parse_parameter_yaml(
+                            parser, model_param_node);
+                    attribute_list.push_back(value);
+                }
+                std::string attribute_name;
+                attribute >> ryml::key(attribute_name);
+                attribute_lists[attribute_name] = attribute_list;
+            }
+        }
+        source_group.connect_neurons_dense(
+                target_group, attribute_lists);
+    }
+    else if (type == "sparse")
     {
 
     }
