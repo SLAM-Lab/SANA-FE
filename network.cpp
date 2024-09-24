@@ -476,7 +476,7 @@ void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
         for (size_t dest_index = 0; dest_index < dest_group.neurons.size();
                 ++dest_index)
         {
-            Neuron &dest = neurons[dest_index];
+            Neuron &dest = dest_group.neurons[dest_index];
             const size_t list_index =
                     (source_index * dest_group.neurons.size()) + dest_index;
             Connection &con = source.connect_to_neuron(dest);
