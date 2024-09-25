@@ -18,63 +18,13 @@
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
+// TODO: support conv, dense and sparse hyperedges here too
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         const pybind11::dict &dictionary, const bool forward_to_synapse = true,
         const bool forward_to_dendrite = true,
         const bool forward_to_soma = false);
 sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value);
-//std::vector<std::string> pylist_to_str_vec(const pybind11::iterable &value);
 pybind11::dict run_data_to_dict(const sanafe::RunData &run);
-
-//void py_connect_neurons(sanafe::NeuronGroup *self,
-//       sanafe::NeuronGroup &dest_group,
-//       const std::vector<std::pair<int, int>> &src_dest_id_pairs,
-//      const pybind11::dict &vals);
-
-/*
-std::vector<std::string> pylist_to_str_vec(const pybind11::iterable &value)
-{
-    // Convert any iterable python object e.g., a list or tuple, to a
-    //  C++ vector of strings. This can then be used by the kernel.
-    std::vector<std::string> value_vec_str;
-
-    for (auto iter = pybind11::iter(value);
-            iter != pybind11::iterator::sentinel(); ++iter)
-    {
-        value_vec_str.push_back(
-                pyobject_to_str(pybind11::cast<pybind11::object>(*iter)));
-    }
-
-    return value_vec_str;
-}
-
-std::map<std::string, std::vector<std::string>> pylist_or_object_to_str_vec(
-        const size_t count, const pybind11::dict &vals)
-{
-    std::map<std::string, std::vector<std::string>> attr_lists;
-    for (auto &v : dictionary)
-    {
-        const std::string key = pybind11::cast<std::string>(v.first);
-        if (!pybind11::isinstance<pybind11::iterable>(v.second))
-        {
-            // Only a single value was defined for this attribute,
-            //  this should be duplicated for all connections.
-            //  First get the number of new connections to create
-            std::vector<std::string> vec(count,
-                    pyobject_to_str(
-                            pybind11::cast<pybind11::object>(v.second)));
-            attr_lists[key] = vec;
-        }
-        else
-        {
-            attr_lists[key] = pylist_to_str_vec(
-                    pybind11::cast<pybind11::iterable>(v.second));
-        }
-    }
-
-    return attr_lists;
-}
-*/
 
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         const pybind11::dict &dictionary, const bool forward_to_synapse ,
@@ -98,6 +48,7 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         parameter.forward_to_synapse = forward_to_synapse;
         parameter.forward_to_dendrite = forward_to_dendrite;
         parameter.forward_to_soma = forward_to_soma;
+        parameter.name = key;
         map[key] = parameter;
         TRACE1_PYBIND("Set map[%s]=%s\n", key.c_str(), map[key].c_str());
         INFO("Set map[%s]\n", key.c_str());
@@ -130,7 +81,28 @@ sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
         parameter.value = pybind11::cast<float>(value);
         TRACE1_PYBIND("Converted float to str:%s\n", value_str.c_str());
     }
-    // TODO: parse complex parameters e.g., lists and dicts
+    else if (pybind11::isinstance<pybind11::dict>(value))
+    {
+        std::vector<sanafe::ModelParam> model_parameters;
+        for (auto item : pybind11::cast<pybind11::dict>(value))
+        {
+            sanafe::ModelParam param = pyobject_to_model_parameter(
+                    pybind11::cast<pybind11::object>(item.second));
+            param.name = pybind11::cast<std::string>(item.first);
+        }
+        parameter.value = model_parameters;
+    }
+    else if (pybind11::isinstance<pybind11::iterable>(value))
+    {
+        std::vector<sanafe::ModelParam> list;
+        for (auto iter = pybind11::iter(value);
+            iter != pybind11::iterator::sentinel(); ++iter)
+        {
+            list.push_back(pyobject_to_model_parameter(
+                    pybind11::cast<pybind11::object>(*iter)));
+        }
+        parameter.value = list;
+    }
     else
     {
         throw std::invalid_argument("Error: dict has unsupported type");
@@ -227,7 +199,7 @@ PYBIND11_MODULE(sanafe, m)
                     pybind11::return_value_policy::reference_internal,
                     pybind11::arg("group_name"),
                     pybind11::arg("neuron_count"),
-                    pybind11::arg("model_parameters"),
+                    pybind11::arg("model_parameters") = pybind11::none(),
                     pybind11::arg("default_synapse_hw_name") = "",
                     pybind11::arg("default_dendrite_hw_name") = "",
                     pybind11::arg("force_dendrite_update") = false,
@@ -246,17 +218,6 @@ PYBIND11_MODULE(sanafe, m)
             //                const pybind11::iterable &values) {
             //            return self->set_attribute_multiple(
             //                    attr_name, pylist_to_str_vec(values));
-            //        })
-            //.def("connect_neurons",
-            //        [](sanafe::NeuronGroup *self,
-            //                sanafe::NeuronGroup &dest_group,
-            //                const std::vector<std::pair<int, int>>
-            //                        &src_dest_id_pairs,
-            //                const pybind11::dict &attr) {
-            //            return self->connect_neurons(dest_group,
-            //                    src_dest_id_pairs,
-            //                    pylist_or_object_to_str_vec(
-            //                            src_dest_id_pairs.size(), attr));
             //        })
             .def("get_id", &sanafe::NeuronGroup::get_id)
             .def_property(
@@ -326,7 +287,7 @@ PYBIND11_MODULE(sanafe, m)
                     pybind11::arg("name"), pybind11::arg("address"),
                     pybind11::arg("pipeline"))
             .def("__repr__", &sanafe::Core::info)
-            // TODO: re-support building cores and adding hardware units
+            // TODO: adding hardware units
             /*
             .def(
                     "create_axon_in",
