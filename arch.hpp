@@ -59,7 +59,6 @@ enum NoiseType
 {
     NOISE_NONE = -1,
     NOISE_FILE_STREAM,
-    // TODO: implement different random noise generators
 };
 
 struct ModelInfo

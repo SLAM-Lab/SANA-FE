@@ -119,7 +119,7 @@ std::string sanafe::Neuron::info() const
 {
     std::ostringstream ss;
     ss << "sanafe::Neuron(nid=" << parent_group_id << '.' << id;
-    ss << " connections_out=" << connections_out.size();
+    ss << " connections_out=" << connections_out.size() << ")";
     //ss << " attributes={" << print_format_attributes(attributes) << "})";
     return ss.str();
 }
