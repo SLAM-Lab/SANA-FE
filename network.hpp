@@ -56,16 +56,14 @@ struct NeuronTemplate
 {
     std::map<std::string, ModelParam> soma_model_params;
     std::map<std::string, ModelParam> dendrite_model_params;
-    std::string soma_hw_name;
-    std::string default_synapse_hw_name;
-    std::string dendrite_hw_name;
-    bool log_spikes;
-    bool log_potential;
-    bool force_synapse_update;
-    bool force_dendrite_update;
-    bool force_soma_update;
-
-    explicit NeuronTemplate(std::string soma_hw_name = "", std::string default_synapse_hw_name = "", std::string dendrite_hw_name = "", bool log_spikes = false, bool log_potential = false, bool force_synapse_update = false, bool force_dendrite_update = false, bool force_soma_update = false);
+    std::string soma_hw_name{""};
+    std::string default_synapse_hw_name{""};
+    std::string dendrite_hw_name{""};
+    bool log_spikes{false};
+    bool log_potential{false};
+    bool force_synapse_update{false};
+    bool force_dendrite_update{false};
+    bool force_soma_update{false};
 };
 
 struct Conv2DParameters

@@ -22,22 +22,6 @@
 #include "network.hpp"
 #include "print.hpp"
 
-sanafe::NeuronTemplate::NeuronTemplate(std::string soma_hw_name,
-        std::string default_synapse_hw_name, std::string dendrite_hw_name,
-        const bool log_spikes, const bool log_potential,
-        const bool force_synapse_update, const bool force_dendrite_update,
-        const bool force_soma_update)
-        : soma_hw_name(std::move(soma_hw_name))
-        , default_synapse_hw_name(std::move(default_synapse_hw_name))
-        , dendrite_hw_name(std::move(dendrite_hw_name))
-        , log_spikes(log_spikes)
-        , log_potential(log_potential)
-        , force_synapse_update(force_synapse_update)
-        , force_dendrite_update(force_dendrite_update)
-        , force_soma_update(force_soma_update)
-{
-}
-
 sanafe::Connection::Connection(const int connection_id)
         : post_neuron(nullptr)
         , pre_neuron(nullptr)
@@ -103,16 +87,72 @@ sanafe::Neuron::Neuron(const size_t neuron_id, Network &parent_net,
 
 void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
 {
-    soma_model_params.insert(attributes.soma_model_params.begin(),
-            attributes.soma_model_params.end());
-    dendrite_model_params.insert(attributes.dendrite_model_params.begin(),
-            attributes.dendrite_model_params.end());
-
+    // TODO: make NeuronTemplate into NeuronParameters and make each field optional
     log_spikes = attributes.log_spikes;
     log_potential = attributes.log_potential;
     force_dendrite_update = attributes.force_dendrite_update;
     force_soma_update = attributes.force_soma_update;
     force_synapse_update = attributes.force_synapse_update;
+
+    // TODO
+    for (auto &[key, param] : attributes.soma_model_params)
+    {
+        if (param.forward_to_dendrite)
+        {
+            if (dendrite_hw != nullptr)
+            {
+                dendrite_hw->set_attribute(mapped_address, key, param);
+            }
+            soma_model_params.insert(attributes.soma_model_params.begin(),
+                    attributes.soma_model_params.end());
+        }
+        if (param.forward_to_soma)
+        {
+            if (soma_hw != nullptr)
+            {
+                soma_hw->set_attribute(mapped_address, key, param);
+            }
+            // TODO: enable and disable recording attributes
+            //  This can be automatically disabled when running in kernel mode
+            //   and loading from description file.
+            //  This can automatically be enabled when operating via the Python
+            //   interface, since in that mode it might be useful to make the
+            //   network saveable
+            soma_model_params.insert(attributes.soma_model_params.begin(),
+                    attributes.soma_model_params.end());
+        }
+    }
+
+    // TODO: remove the separate soma and dendrite parameters, now its supported
+    //  by just one
+    for (auto &[key, param] : attributes.dendrite_model_params)
+    {
+        if (param.forward_to_soma)
+        {
+            if (param.forward_to_dendrite)
+            {
+                if (dendrite_hw != nullptr)
+                {
+                    dendrite_hw->set_attribute(mapped_address, key, param);
+                }
+                soma_model_params.insert(attributes.soma_model_params.begin(),
+                        attributes.soma_model_params.end());
+            }
+            if (soma_hw != nullptr)
+            {
+                soma_hw->set_attribute(mapped_address, key, param);
+            }
+            // TODO: enable and disable recording attributes
+            //  This can be automatically disabled when running in kernel mode
+            //   and loading from description file.
+            //  This can automatically be enabled when operating via the Python
+            //   interface, since in that mode it might be useful to make the
+            //   network saveable
+            soma_model_params.insert(attributes.soma_model_params.begin(),
+                    attributes.soma_model_params.end());
+        }
+
+    }
 }
 
 std::string sanafe::Neuron::info() const

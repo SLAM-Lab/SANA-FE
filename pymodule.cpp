@@ -18,7 +18,9 @@
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
-// TODO: support conv, dense and sparse hyperedges here too
+// TODO: support conv, dense and sparse hyperedges here
+// TODO: support set_attributes for neurons and for groups
+
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         const pybind11::dict &dictionary, const bool forward_to_synapse = true,
         const bool forward_to_dendrite = true,
