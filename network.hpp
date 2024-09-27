@@ -87,7 +87,7 @@ public:
     std::map<std::string, ModelParam> dendrite_model_params;
 
     // Mapped hardware
-    Network *parent_net{nullptr};
+    Network &parent_net;
     Core *core{nullptr};
     Core *post_synaptic_cores{nullptr};
     DendriteUnit *dendrite_hw{nullptr};
@@ -130,7 +130,7 @@ public:
     //  parameters. All neurons must be based on the same neuron model.
     std::vector<Neuron> neurons;
     NeuronTemplate default_neuron_config;
-    Network *parent_net{nullptr};
+    Network &parent_net;
     std::string name;
     size_t order_created{0};
     size_t position_defined{0};
@@ -150,6 +150,8 @@ class Network
 public:
     std::unordered_map<std::string, NeuronGroup> groups;
     std::string name;
+    bool record_attributes{true};
+
     explicit Network(std::string net_name = "") : name(std::move(net_name)) {};
     ~Network() = default;
     Network(Network &&) = default;

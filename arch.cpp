@@ -674,8 +674,7 @@ void sanafe::Core::map_neuron(Neuron &n)
     TRACE1("Soma hw name: %s", soma_hw_name.c_str());
     assert(n.soma_hw != nullptr);
 
-    assert(n.parent_net != nullptr);
-    const auto &neuron_groups = n.parent_net->groups;
+    const auto &neuron_groups = n.parent_net.groups;
     const NeuronGroup &group = neuron_groups.at(n.parent_group_id);
     // First set the group's default attribute values, and then
     //  any defined by the neuron

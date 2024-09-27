@@ -50,7 +50,7 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
         Network &parent_net, const size_t neuron_count,
         const NeuronTemplate &default_config)
         : default_neuron_config(default_config)
-        , parent_net(&parent_net)
+        , parent_net(parent_net)
         , name(std::move(group_name))
 {
     neurons.reserve(neuron_count);
@@ -63,7 +63,7 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
 
 sanafe::Neuron::Neuron(const size_t neuron_id, Network &parent_net,
         const std::string parent_group_id, const NeuronTemplate &config)
-        : parent_net(&parent_net)
+        : parent_net(parent_net)
         , soma_hw_name(config.soma_hw_name)
         , default_synapse_hw_name(config.default_synapse_hw_name)
         , dendrite_hw_name(config.dendrite_hw_name)
@@ -94,7 +94,8 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
     force_soma_update = attributes.force_soma_update;
     force_synapse_update = attributes.force_synapse_update;
 
-    // TODO
+    // TODO: remove the separate soma and dendrite parameters, now its supported
+    //  by just one
     for (auto &[key, param] : attributes.soma_model_params)
     {
         if (param.forward_to_dendrite)
@@ -103,8 +104,12 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
             {
                 dendrite_hw->set_attribute(mapped_address, key, param);
             }
-            soma_model_params.insert(attributes.soma_model_params.begin(),
-                    attributes.soma_model_params.end());
+            if (parent_net.record_attributes)
+            {
+                dendrite_model_params.insert(
+                        attributes.soma_model_params.begin(),
+                        attributes.soma_model_params.end());
+            }
         }
         if (param.forward_to_soma)
         {
@@ -112,14 +117,11 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
             {
                 soma_hw->set_attribute(mapped_address, key, param);
             }
-            // TODO: enable and disable recording attributes
-            //  This can be automatically disabled when running in kernel mode
-            //   and loading from description file.
-            //  This can automatically be enabled when operating via the Python
-            //   interface, since in that mode it might be useful to make the
-            //   network saveable
-            soma_model_params.insert(attributes.soma_model_params.begin(),
-                    attributes.soma_model_params.end());
+            if (parent_net.record_attributes)
+            {
+                soma_model_params.insert(attributes.soma_model_params.begin(),
+                        attributes.soma_model_params.end());
+            }
         }
     }
 
@@ -127,31 +129,31 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
     //  by just one
     for (auto &[key, param] : attributes.dendrite_model_params)
     {
-        if (param.forward_to_soma)
+        if (param.forward_to_dendrite)
         {
-            if (param.forward_to_dendrite)
+            if (dendrite_hw != nullptr)
             {
-                if (dendrite_hw != nullptr)
-                {
-                    dendrite_hw->set_attribute(mapped_address, key, param);
-                }
-                soma_model_params.insert(attributes.soma_model_params.begin(),
+                dendrite_hw->set_attribute(mapped_address, key, param);
+            }
+            if (parent_net.record_attributes)
+            {
+                dendrite_model_params.insert(
+                        attributes.soma_model_params.begin(),
                         attributes.soma_model_params.end());
             }
+        }
+        if (param.forward_to_soma)
+        {
             if (soma_hw != nullptr)
             {
                 soma_hw->set_attribute(mapped_address, key, param);
             }
-            // TODO: enable and disable recording attributes
-            //  This can be automatically disabled when running in kernel mode
-            //   and loading from description file.
-            //  This can automatically be enabled when operating via the Python
-            //   interface, since in that mode it might be useful to make the
-            //   network saveable
-            soma_model_params.insert(attributes.soma_model_params.begin(),
-                    attributes.soma_model_params.end());
+            if (parent_net.record_attributes)
+            {
+                soma_model_params.insert(attributes.soma_model_params.begin(),
+                        attributes.soma_model_params.end());
+            }
         }
-
     }
 }
 
