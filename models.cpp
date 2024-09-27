@@ -21,9 +21,9 @@ sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
     return {0.0, std::nullopt, std::nullopt};
 }
 
-void sanafe::CurrentBasedSynapseModel::set_attributes(
+void sanafe::CurrentBasedSynapseModel::set_attribute(
         const size_t synapse_address,
-        const std::map<std::string, ModelParam> &attr)
+        const std::string &param_name, const ModelParam &param)
 {
     if (weights.size() <= synapse_address)
     {
@@ -31,14 +31,9 @@ void sanafe::CurrentBasedSynapseModel::set_attributes(
         weights.resize(std::max(weights.size() * 2, synapse_address + 1));
     }
 
-    for (const auto &a : attr)
+    if ((param_name == "w") || (param_name == "weight"))
     {
-        const std::string &key = a.first;
-        const ModelParam &value = a.second;
-        if ((key == "w") || (key == "weight"))
-        {
-            weights[synapse_address] = static_cast<double>(value);
-        }
+        weights[synapse_address] = static_cast<double>(param);
     }
 
     min_synaptic_resolution = (1.0 / weight_bits);
@@ -64,17 +59,12 @@ sanafe::AccumulatorModel::update(
     return {accumulated_charges[neuron_address], std::nullopt, std::nullopt};
 }
 
-void sanafe::AccumulatorModel::set_attributes(const size_t neuron_address,
-        const std::map<std::string, ModelParam> &attr)
+void sanafe::AccumulatorModel::set_attribute(const size_t neuron_address,
+        const std::string &param_name, const ModelParam &param)
 {
-    for (const auto &a : attr)
+    if (param_name == "dendrite_leak_decay")
     {
-        const std::string &key = a.first;
-        const ModelParam &value = a.second;
-        if (key == "dendrite_leak_decay")
-        {
-            leak_decay = static_cast<double>(value);
-        }
+        leak_decay = static_cast<double>(param);
     }
 }
 
@@ -138,17 +128,17 @@ sanafe::DendriteUnit::DendriteResult sanafe::MultiTapModel1D::update(
     return {tap_voltages[0], std::nullopt, std::nullopt};
 }
 
-void sanafe::MultiTapModel1D::set_attributes(const size_t neuron_address,
-        const std::map<std::string, ModelParam> &attr)
+void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
+        const std::string &param_name, const ModelParam &param)
 {
-    if (attr.find("taps") != attr.end())
+    if (param_name == "taps")
     {
         if (tap_voltages.size() > 1)
         {
             INFO("Warning: Redefining number of taps, constants might be "
                  "wrong.\n");
         }
-        const size_t n_taps = static_cast<int>(attr.at("taps"));
+        const size_t n_taps = static_cast<int>(param);
         if (n_taps == 0)
         {
             throw std::invalid_argument("Error: Number of taps must be > 0\n");
@@ -158,93 +148,83 @@ void sanafe::MultiTapModel1D::set_attributes(const size_t neuron_address,
         time_constants.resize(n_taps);
         space_constants.resize(n_taps - 1);
     }
-
-    for (const auto &a : attr)
+    else if (param_name == "time_constants")
     {
-        const std::string &key = a.first;
-        const ModelParam &params = a.second;
-
-        if (key == "time_constants")
+        time_constants = static_cast<std::vector<double>>(param);
+        const size_t n_taps = tap_voltages.size();
+        if (time_constants.size() != n_taps)
         {
-            time_constants = static_cast<std::vector<double>>(params);
-            const size_t n_taps = tap_voltages.size();
-            if (time_constants.size() != n_taps)
-            {
-                std::string error = "Error: Expected " +
-                        std::to_string(n_taps) + " but received " +
-                        std::to_string(time_constants.size()) +
-                        "time constants.";
-                throw std::invalid_argument(error);
-            }
+            std::string error = "Error: Expected " +
+                    std::to_string(n_taps) + " but received " +
+                    std::to_string(time_constants.size()) +
+                    "time constants.";
+            throw std::invalid_argument(error);
         }
-        else if (key == "space_constants")
+    }
+    else if (param_name == "space_constants")
+    {
+        space_constants = static_cast<std::vector<double>>(param);
+        const size_t n_taps = tap_voltages.size();
+        if (space_constants.size() != (n_taps - 1))
         {
-            space_constants = static_cast<std::vector<double>>(params);
-            const size_t n_taps = tap_voltages.size();
-            if (space_constants.size() != (n_taps - 1))
-            {
-                std::string error = "Error: Expected " +
-                        std::to_string(n_taps - 1) + " but received " +
-                        std::to_string(time_constants.size()) +
-                        "time constants.";
-                throw std::invalid_argument(error);
-            }
+            std::string error = "Error: Expected " +
+                    std::to_string(n_taps - 1) + " but received " +
+                    std::to_string(time_constants.size()) +
+                    "time constants.";
+            throw std::invalid_argument(error);
         }
-        else if (key != "taps")
-        {
-            INFO("Warning: attribute '%s' not recognized.\n", key.c_str());
-        }
+    }
+    else
+    {
+        INFO("Warning: attribute '%s' not recognized.\n", param_name.c_str());
     }
 }
 
 // **** Soma models ****
-void sanafe::LoihiLifModel::set_attributes(
-        const size_t neuron_address, const std::map<std::string, ModelParam> &attributes)
+void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
+        const std::string &param_name, const ModelParam &param)
 {
     LoihiCompartment &cx = compartments[neuron_address];
-    for (const auto &attribute_pair : attributes)
+
+    if (param_name == "threshold")
     {
-        const std::string &key = attribute_pair.first;
-        const ModelParam &param = attribute_pair.second;
-        if (key == "threshold")
-        {
-            cx.threshold = static_cast<double>(param);
-        }
-        else if (key == "reverse_threshold")
-        {
-            cx.reverse_threshold = static_cast<double>(param);
-        }
-        else if (key == "reset")
-        {
-            cx.reset = static_cast<double>(param);
-        }
-        else if (key == "reverse_reset")
-        {
-            cx.reverse_reset = static_cast<double>(param);
-        }
-        else if (key == "reset_mode")
-        {
-            const std::string reset_mode_str = static_cast<std::string>(param);
-            cx.reset_mode = model_parse_reset_mode(reset_mode_str);
-        }
-        else if (key == "reverse_reset_mode")
-        {
-            const std::string reverse_reset_mode_str =
-                    static_cast<std::string>(param);
-            cx.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
-        }
-        else if (key == "leak_decay")
-        {
-            cx.leak_decay = static_cast<double>(param);
-        }
-        else if (key == "bias")
-        {
-            cx.bias = static_cast<double>(param);
-        }
-        else if ((key == "force_update") || (key == "force_soma_update"))
-        {
-            cx.force_update = static_cast<bool>(param);
-        }
+        cx.threshold = static_cast<double>(param);
+    }
+    else if (param_name == "reverse_threshold")
+    {
+        cx.reverse_threshold = static_cast<double>(param);
+    }
+    else if (param_name == "reset")
+    {
+        cx.reset = static_cast<double>(param);
+    }
+    else if (param_name == "reverse_reset")
+    {
+        cx.reverse_reset = static_cast<double>(param);
+    }
+    else if (param_name == "reset_mode")
+    {
+        const std::string reset_mode_str = static_cast<std::string>(param);
+        cx.reset_mode = model_parse_reset_mode(reset_mode_str);
+    }
+    else if (param_name == "reverse_reset_mode")
+    {
+        const std::string reverse_reset_mode_str =
+                static_cast<std::string>(param);
+        cx.reverse_reset_mode =
+                model_parse_reset_mode(reverse_reset_mode_str);
+    }
+    else if (param_name == "leak_decay")
+    {
+        cx.leak_decay = static_cast<double>(param);
+    }
+    else if (param_name == "bias")
+    {
+        cx.bias = static_cast<double>(param);
+    }
+    else if ((param_name == "force_update") || (param_name == "force_soma_update"))
+    {
+        cx.force_update = static_cast<bool>(param);
     }
 }
 
@@ -336,58 +316,52 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
     return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::TrueNorthModel::set_attributes(const size_t neuron_address,
-        const std::map<std::string, ModelParam> &attr)
+void sanafe::TrueNorthModel::set_attribute(const size_t neuron_address,
+        const std::string &param_name, const ModelParam &param)
 {
     TrueNorthNeuron &n = neurons[neuron_address];
-    for (const auto &a : attr)
+    if (param_name == "threshold")
     {
-        const std::string &key = a.first;
-        const ModelParam &value = a.second;
-
-        if (key == "threshold")
-        {
-            n.threshold = static_cast<double>(value);
-        }
-        else if (key == "reverse_threshold")
-        {
-            n.reverse_threshold = static_cast<double>(value);
-        }
-        else if (key == "reset")
-        {
-            n.reset = static_cast<double>(value);
-        }
-        else if (key == "reverse_reset")
-        {
-            n.reverse_reset = static_cast<double>(value);
-        }
-        else if (key == "reset_mode")
-        {
-            const std::string reset_mode_str = static_cast<std::string>(value);
-            n.reset_mode = model_parse_reset_mode(reset_mode_str);
-        }
-        else if (key == "reverse_reset_mode")
-        {
-            const std::string reverse_reset_mode_str =
-                    static_cast<std::string>(value);
-            n.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
-        }
-        else if (key == "leak")
-        {
-            n.leak = static_cast<double>(value);
-        }
-        else if (key == "bias")
-        {
-            n.bias = static_cast<double>(value);
-        }
-        else if (key == "force_soma_update")
-        {
-            n.force_update = static_cast<bool>(value);
-        }
-        else if (key == "leak_towards_zero")
-        {
-            n.leak_towards_zero = static_cast<bool>(value);
-        }
+        n.threshold = static_cast<double>(param);
+    }
+    else if (param_name == "reverse_threshold")
+    {
+        n.reverse_threshold = static_cast<double>(param);
+    }
+    else if (param_name == "reset")
+    {
+        n.reset = static_cast<double>(param);
+    }
+    else if (param_name == "reverse_reset")
+    {
+        n.reverse_reset = static_cast<double>(param);
+    }
+    else if (param_name == "reset_mode")
+    {
+        const std::string reset_mode_str = static_cast<std::string>(param);
+        n.reset_mode = model_parse_reset_mode(reset_mode_str);
+    }
+    else if (param_name == "reverse_reset_mode")
+    {
+        const std::string reverse_reset_mode_str =
+                static_cast<std::string>(param);
+        n.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
+    }
+    else if (param_name == "leak")
+    {
+        n.leak = static_cast<double>(param);
+    }
+    else if (param_name == "bias")
+    {
+        n.bias = static_cast<double>(param);
+    }
+    else if (param_name == "force_soma_update")
+    {
+        n.force_update = static_cast<bool>(param);
+    }
+    else if (param_name == "leak_towards_zero")
+    {
+        n.leak_towards_zero = static_cast<bool>(param);
     }
 }
 
@@ -484,22 +458,17 @@ sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
     return {state, std::nullopt, std::nullopt};
 }
 
-void sanafe::InputModel::set_attributes(const size_t neuron_address,
-        const std::map<std::string, ModelParam> &attr)
+void sanafe::InputModel::set_attribute(const size_t neuron_address,
+        const std::string &param_name, const ModelParam &param)
 {
-    for (const auto &a : attr)
+    if (param_name == "spikes")
     {
-        const std::string &key = a.first;
-        const ModelParam &value = a.second;
-        if (key == "spikes")
-        {
-            spikes = static_cast<std::vector<bool>>(value);
-            curr_spike = spikes.begin();
-        }
-        else if (key == "poisson")
-        {
-            poisson_probability = static_cast<double>(value);
-        }
+        spikes = static_cast<std::vector<bool>>(param);
+        curr_spike = spikes.begin();
+    }
+    else if (param_name == "poisson")
+    {
+        poisson_probability = static_cast<double>(param);
     }
 }
 

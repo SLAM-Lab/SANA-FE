@@ -10,7 +10,6 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
-#include <map>
 
 #include "../arch.hpp"
 #include "../models.hpp"
@@ -75,30 +74,25 @@ public:
         return V;
     }
 
-    void set_attributes(const size_t neuron_address,
-            const std::map<std::string, sanafe::ModelParam> &attributes) override
+    void set_attribute(const size_t neuron_address,
+            const std::string &param_name,
+            const sanafe::ModelParam &param) override
     {
-        for (auto &attribute_pair : attributes)
+        if (param_name == "m")
         {
-            const std::string &key = attribute_pair.first;
-            const sanafe::ModelParam &param = attribute_pair.second;
-
-            if (key == "m")
-            {
-                m = static_cast<double>(param);
-            }
-            else if (key == "n")
-            {
-                n = static_cast<double>(param);
-            }
-            else if (key == "h")
-            {
-                h = static_cast<double>(param);
-            }
-            else if (key == "current")
-            {
-                I = static_cast<double>(param);
-            }
+            m = static_cast<double>(param);
+        }
+        else if (param_name == "n")
+        {
+            n = static_cast<double>(param);
+        }
+        else if (param_name == "h")
+        {
+            h = static_cast<double>(param);
+        }
+        else if (param_name == "current")
+        {
+            I = static_cast<double>(param);
         }
     }
 

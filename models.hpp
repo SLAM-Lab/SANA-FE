@@ -37,7 +37,7 @@ public:
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
     SynapseResult update(size_t synapse_address, bool read) override;
-    void set_attributes(size_t synapse_address, const std::map<std::string, ModelParam> &attr) override;
+    void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
 
 private:
     std::vector<double> weights{};
@@ -56,7 +56,7 @@ public:
     AccumulatorModel &operator=(AccumulatorModel &&other) = default;
 
     DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
-    void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attr) override;
+    void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
 
 private:
     std::vector<double> accumulated_charges{std::vector<double>(loihi_max_compartments, 0.0)};
@@ -75,7 +75,7 @@ public:
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
     DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
-    void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attr) override;
+    void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
 
 private:
     // Modeling a 1D dendrite with taps
@@ -96,7 +96,7 @@ public:
     LoihiLifModel &operator=(const LoihiLifModel &other) = delete;
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
-    void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attr) override;
+    void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     SomaResult update(size_t neuron_address, std::optional<double> current_in) override;
     double get_potential(const size_t neuron_address) override
     {
@@ -133,7 +133,7 @@ public:
     TrueNorthModel &operator=(const TrueNorthModel &other) = delete;
     TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
 
-    void set_attributes(const size_t neuron_address, const std::map<std::string, ModelParam> &attr) override;
+    void set_attribute(const size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     SomaResult update(const size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
     double get_potential(const size_t neuron_address) override
     {
@@ -171,7 +171,7 @@ public:
     InputModel &operator=(const InputModel &other) = delete;
     InputModel &operator=(InputModel &&other) = delete;
 
-    void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attr) override;
+    void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     SomaResult update(size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
 
 private:

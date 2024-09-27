@@ -570,9 +570,12 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
             }
         }
 
-        curr_connection.synapse_hw->set_attributes(
-                curr_connection.synapse_address,
-                curr_connection.synapse_params);
+        for (auto &name_value_pair : curr_connection.synapse_params)
+        {
+            curr_connection.synapse_hw->set_attribute(
+                    curr_connection.synapse_address, name_value_pair.first,
+                    name_value_pair.second);
+        }
         curr_connection.synapse_hw->mapped_connections++;
     }
     TRACE1("Finished mapping connections to hardware for nid:%s.%zu.\n",
@@ -676,19 +679,36 @@ void sanafe::Core::map_neuron(Neuron &n)
     const NeuronGroup &group = neuron_groups.at(n.parent_group_id);
     // First set the group's default attribute values, and then
     //  any defined by the neuron
-    n.soma_hw->set_attributes(n.mapped_address,
-            group.default_neuron_config.soma_model_params);
-    n.soma_hw->set_attributes(n.mapped_address, n.soma_model_params);
+    for (auto &name_attribute_pair :
+            group.default_neuron_config.soma_model_params)
+    {
+        n.soma_hw->set_attribute(n.mapped_address, name_attribute_pair.first,
+                name_attribute_pair.second);
+    }
+    for (auto &name_attribute_pair : n.soma_model_params)
+    {
+        // Pass specific attributes for this neuron
+        n.soma_hw->set_attribute(n.mapped_address, name_attribute_pair.first,
+                name_attribute_pair.second);
+    }
     n.soma_hw->neuron_count++;
 
     // Setup the dendrite model
     TRACE1("Dendrite hw name: %s", dendrite_hw_name.c_str());
     // Pass global attributes from the group
-    n.dendrite_hw->set_attributes(n.mapped_address,
-            group.default_neuron_config.dendrite_model_params);
-    // Pass specific attributes for this neuron
-    n.dendrite_hw->set_attributes(n.mapped_address,
-            n.dendrite_model_params);
+
+    for (auto &name_attribute_pair :
+            group.default_neuron_config.dendrite_model_params)
+    {
+        n.dendrite_hw->set_attribute(n.mapped_address,
+                name_attribute_pair.first, name_attribute_pair.second);
+    }
+    for (auto &name_attribute_pair : n.dendrite_model_params)
+    {
+        // Pass specific attributes for this neuron
+        n.dendrite_hw->set_attribute(n.mapped_address,
+                name_attribute_pair.first, name_attribute_pair.second);
+    }
 }
 
 void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)

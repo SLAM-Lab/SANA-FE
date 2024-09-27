@@ -387,7 +387,7 @@ public:
     SynapseUnit &operator=(SynapseUnit &&other) = default;
 
     virtual SynapseResult update(size_t synapse_address, bool read = false) = 0;
-    virtual void set_attributes(size_t synapse_address, const std::map<std::string, ModelParam> &attr) = 0;
+    virtual void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) = 0;
 
     // Additional helper functions
     void set_time(const long int timestep)
@@ -425,7 +425,7 @@ public:
     DendriteUnit &operator=(const DendriteUnit &other) = default;
     DendriteUnit &operator=(DendriteUnit &&other) = default;
 
-    virtual void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attributes) = 0;
+    virtual void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) = 0;
     virtual DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) = 0;
 
     // Additional helper functions
@@ -475,7 +475,7 @@ public:
     SomaUnit &operator=(SomaUnit &&other) = delete;
 
     virtual SomaResult update(size_t neuron_address, std::optional<double> current_in) = 0;
-    virtual void set_attributes(size_t neuron_address, const std::map<std::string, ModelParam> &attributes) = 0;
+    virtual void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) = 0;
     virtual double get_potential(size_t neuron_address)
     {
         return 0.0;
