@@ -22,12 +22,12 @@ sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attribute(
-        const size_t synapse_address,
-        const std::string &param_name, const ModelParam &param)
+        const size_t synapse_address, const std::string &param_name,
+        const ModelParam &param)
 {
     if (weights.size() <= synapse_address)
     {
-        TRACE1("Resizing weights to: %lu\n", synapse_address+1);
+        TRACE1("Resizing weights to: %lu\n", synapse_address + 1);
         weights.resize(std::max(weights.size() * 2, synapse_address + 1));
     }
 
@@ -40,8 +40,7 @@ void sanafe::CurrentBasedSynapseModel::set_attribute(
 }
 
 // *** Dendrite models ***
-sanafe::DendriteUnit::DendriteResult
-sanafe::AccumulatorModel::update(
+sanafe::DendriteUnit::DendriteResult sanafe::AccumulatorModel::update(
         const size_t neuron_address, const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated[neuron_address] < simulation_time)
@@ -154,9 +153,8 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
         const size_t n_taps = tap_voltages.size();
         if (time_constants.size() != n_taps)
         {
-            std::string error = "Error: Expected " +
-                    std::to_string(n_taps) + " but received " +
-                    std::to_string(time_constants.size()) +
+            std::string error = "Error: Expected " + std::to_string(n_taps) +
+                    " but received " + std::to_string(time_constants.size()) +
                     "time constants.";
             throw std::invalid_argument(error);
         }
@@ -169,8 +167,7 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
         {
             std::string error = "Error: Expected " +
                     std::to_string(n_taps - 1) + " but received " +
-                    std::to_string(time_constants.size()) +
-                    "time constants.";
+                    std::to_string(time_constants.size()) + "time constants.";
             throw std::invalid_argument(error);
         }
     }
@@ -211,8 +208,7 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     {
         const std::string reverse_reset_mode_str =
                 static_cast<std::string>(param);
-        cx.reverse_reset_mode =
-                model_parse_reset_mode(reverse_reset_mode_str);
+        cx.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
     }
     else if (param_name == "leak_decay")
     {
@@ -222,7 +218,8 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     {
         cx.bias = static_cast<double>(param);
     }
-    else if ((param_name == "force_update") || (param_name == "force_soma_update"))
+    else if ((param_name == "force_update") ||
+            (param_name == "force_soma_update"))
     {
         cx.force_update = static_cast<bool>(param);
     }

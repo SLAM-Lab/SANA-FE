@@ -198,8 +198,8 @@ sanafe::Architecture sanafe::load_arch(const std::filesystem::path &path)
     return arch;
 }
 
-sanafe::AxonInUnit::AxonInUnit(std::string axon_in_name,
-        const AxonInPowerMetrics &power_metrics)
+sanafe::AxonInUnit::AxonInUnit(
+        std::string axon_in_name, const AxonInPowerMetrics &power_metrics)
         : name(std::move(axon_in_name))
         , energy_spike_message(power_metrics.energy_message_in)
         , latency_spike_message(power_metrics.latency_message_in)
@@ -226,8 +226,8 @@ void sanafe::SynapseUnit::configure(
     }
 }
 
-void sanafe::DendriteUnit::configure(std::string dendrite_name,
-        const ModelInfo &model_details)
+void sanafe::DendriteUnit::configure(
+        std::string dendrite_name, const ModelInfo &model_details)
 {
     model_parameters = model_details.model_parameters;
     plugin_lib = model_details.plugin_library_path;
@@ -245,8 +245,8 @@ void sanafe::DendriteUnit::configure(std::string dendrite_name,
     }
 }
 
-void sanafe::SomaUnit::configure(const std::string &soma_name,
-        const ModelInfo &model_details)
+void sanafe::SomaUnit::configure(
+        const std::string &soma_name, const ModelInfo &model_details)
 {
     model_parameters = model_details.model_parameters;
     plugin_lib = model_details.plugin_library_path;
@@ -358,8 +358,7 @@ std::string sanafe::Core::info() const
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(
         const std::string &name, const AxonInPowerMetrics &power_metrics)
 {
-    axon_in_hw.emplace_back(
-            AxonInUnit(name, power_metrics));
+    axon_in_hw.emplace_back(AxonInUnit(name, power_metrics));
     AxonInUnit &new_axon_in_hw_unit = axon_in_hw.back();
 
     return new_axon_in_hw_unit;
@@ -392,8 +391,8 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
     return *new_unit;
 }
 
-sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
-        const ModelInfo &model)
+sanafe::DendriteUnit &sanafe::Core::create_dendrite(
+        const std::string &name, const ModelInfo &model)
 {
     TRACE1("New dendrite h/w unit created\n");
 
@@ -419,8 +418,8 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(const std::string &name,
     return *unit;
 }
 
-sanafe::SomaUnit &sanafe::Core::create_soma(std::string name,
-        const ModelInfo &model_details)
+sanafe::SomaUnit &sanafe::Core::create_soma(
+        std::string name, const ModelInfo &model_details)
 {
     TRACE1("New soma h/w unit created (%s)\n", name.c_str());
 
@@ -429,8 +428,8 @@ sanafe::SomaUnit &sanafe::Core::create_soma(std::string name,
         // Use external plug-in
         auto &plugin_library_path = model_details.plugin_library_path.value();
         TRACE1("Creating soma from plugin %s.\n", plugin_library_path.c_str());
-        soma.emplace_back(plugin_get_soma(
-                model_details.name, plugin_library_path));
+        soma.emplace_back(
+                plugin_get_soma(model_details.name, plugin_library_path));
     }
     else
     {
@@ -445,12 +444,12 @@ sanafe::SomaUnit &sanafe::Core::create_soma(std::string name,
     return *unit;
 }
 
-sanafe::AxonOutUnit &sanafe::Core::create_axon_out(const std::string &name,
-        const AxonOutPowerMetrics &power_metrics)
+sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
+        const std::string &name, const AxonOutPowerMetrics &power_metrics)
 {
     const CoreAddress parent_core_address = {parent_tile_id, offset, id};
-    axon_out_hw.emplace_back(AxonOutUnit(
-            name, parent_core_address, power_metrics));
+    axon_out_hw.emplace_back(
+            AxonOutUnit(name, parent_core_address, power_metrics));
     TRACE1("New axon out h/w unit created (c:%d.%d)\n",
             parent_core_address.parent_tile_id,
             parent_core_address.offset_within_tile);
@@ -699,12 +698,12 @@ void sanafe::Core::map_neuron(Neuron &n)
         if (name_attribute_pair.second.forward_to_dendrite)
         {
             n.dendrite_hw->set_attribute(n.mapped_address,
-                name_attribute_pair.first, name_attribute_pair.second);
+                    name_attribute_pair.first, name_attribute_pair.second);
         }
         if (name_attribute_pair.second.forward_to_soma)
         {
             n.soma_hw->set_attribute(n.mapped_address,
-                name_attribute_pair.first, name_attribute_pair.second);
+                    name_attribute_pair.first, name_attribute_pair.second);
         }
     }
     n.soma_hw->neuron_count++;

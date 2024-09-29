@@ -151,7 +151,10 @@ int main(int argc, char *argv[])
 
 // Project TODOs and wishlist roughly in priority order
 //
-// TODO: get python interface working again
-// TODO: implement sparse hyperedges
-// TODO: change models.set_attributes() to just set one model parameter at a time
+// ** New features **
+// TODO: update tutorial to use Jupyter notebook
 // TODO: add models.reset() so we can clear model state
+//
+// ** Refactor and optimizing existing features **
+// TODO: Parse model parameters after mapping, in two-pass approach
+// TODO: Make the model parameter maps optional, revert to dendrite/soma maps

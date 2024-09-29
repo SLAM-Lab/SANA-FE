@@ -22,7 +22,7 @@ void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
     // Older versions of OpenMP don't support range-based for loops yet...
     // TODO: Figure a way so that the timestep and Architecture structs aren't
     //  shared between threads (dangerous)
-//#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
+    //#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
@@ -61,7 +61,7 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
     // Now process all messages at receiving cores
     auto cores = arch.cores();
     // Older versions of OpenMP don't support range-based for loops yet...
-//#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
+    //#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
@@ -213,8 +213,7 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
     return simulated_latency.value();
 }
 
-std::pair<double, double>
-sanafe::pipeline_apply_default_dendrite_power_model(
+std::pair<double, double> sanafe::pipeline_apply_default_dendrite_power_model(
         Neuron &n, std::optional<double> energy, std::optional<double> latency)
 {
     // Apply default energy and latency metrics if set
@@ -249,7 +248,7 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
 {
     n.dendrite_hw->set_time(ts.timestep);
     TRACE2("Updating nid:%s dendritic current "
-            "(last_updated:%d, ts:%ld)\n",
+           "(last_updated:%d, ts:%ld)\n",
             n.id.c_str(), n.dendrite_last_updated, ts.timestep);
 
     double total_latency{0.0};
@@ -295,7 +294,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
     n.soma_hw->set_time(ts.timestep);
 
     std::optional<double> soma_current_in;
-    if((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
+    if ((n.spike_count > 0) || (std::fabs(n.soma_input_charge) > 0.0))
     {
         soma_current_in = n.soma_input_charge;
         n.soma_input_charge = 0.0;

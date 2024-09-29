@@ -30,8 +30,7 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run);
 
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         const pybind11::dict &dictionary, const bool forward_to_synapse,
-        const bool forward_to_dendrite,
-        const bool forward_to_soma)
+        const bool forward_to_dendrite, const bool forward_to_soma)
 {
     // Convert a Python dict to a set of C++ attribute strings,
     //  ready to be used by the kernel
@@ -98,7 +97,7 @@ sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
     {
         std::vector<sanafe::ModelParam> list;
         for (auto iter = pybind11::iter(value);
-            iter != pybind11::iterator::sentinel(); ++iter)
+                iter != pybind11::iterator::sentinel(); ++iter)
         {
             list.push_back(pyobject_to_model_parameter(
                     pybind11::cast<pybind11::object>(*iter)));
@@ -148,8 +147,8 @@ sanafe::NeuronGroup pycreate_neuron_group(sanafe::Network *self,
             pydict_to_model_parameters(model_dict);
     default_neuron_config.model_parameters = model_parameters;
 
-    return self->create_neuron_group(group_name,
-            neuron_count, default_neuron_config);
+    return self->create_neuron_group(
+            group_name, neuron_count, default_neuron_config);
 }
 
 std::unique_ptr<sanafe::Neuron> pycreate_neuron(size_t neuron_id,
@@ -235,8 +234,7 @@ PYBIND11_MODULE(sanafe, m)
             .def("__repr__", &sanafe::Network::info)
             .def("create_neuron_group", &pycreate_neuron_group,
                     pybind11::return_value_policy::reference_internal,
-                    pybind11::arg("group_name"),
-                    pybind11::arg("neuron_count"),
+                    pybind11::arg("group_name"), pybind11::arg("neuron_count"),
                     pybind11::arg("model_parameters") = pybind11::dict(),
                     pybind11::arg("default_synapse_hw_name") = "",
                     pybind11::arg("default_dendrite_hw_name") = "",
@@ -245,8 +243,7 @@ PYBIND11_MODULE(sanafe, m)
                     pybind11::arg("force_soma_update") = false,
                     pybind11::arg("log_potential") = false,
                     pybind11::arg("log_spikes") = false,
-                    pybind11::arg("soma_hw_name") = ""
-            )
+                    pybind11::arg("soma_hw_name") = "")
             .def_readwrite("groups", &sanafe::Network::groups);
 
     pybind11::class_<sanafe::NeuronGroup>(m, "NeuronGroup")
@@ -260,7 +257,7 @@ PYBIND11_MODULE(sanafe, m)
                     },
                     nullptr); // Read-only property
 
-            pybind11::class_<sanafe::Neuron>(m, "Neuron")
+    pybind11::class_<sanafe::Neuron>(m, "Neuron")
             .def(pybind11::init(&pycreate_neuron), pybind11::arg("neuron_id"),
                     pybind11::arg("parent_net"),
                     pybind11::arg("parent_group_id"),
