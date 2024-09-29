@@ -474,7 +474,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
 sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
-    CorePipelineConfiguration pipeline_config;
+    CorePipelineConfiguration pipeline_config{};
 
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
             description_required_field<std::string>(
@@ -930,38 +930,51 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
 
     if (!attributes.find_child("log_potential").invalid())
     {
-        attributes["log_potential"] >> neuron_template.log_potential;
+        bool log_potential;
+        attributes["log_potential"] >> log_potential;
+        neuron_template.log_potential = log_potential;
     }
     if (!attributes.find_child("log_spikes").invalid())
     {
-        attributes["log_spikes"] >> neuron_template.log_spikes;
+        bool log_spikes;
+        attributes["log_spikes"] >> log_spikes;
+        neuron_template.log_spikes = log_spikes;
     }
     if (!attributes.find_child("force_synapse_update").invalid())
     {
-        attributes["force_synapse_update"] >>
-                neuron_template.force_synapse_update;
+        bool force_synapse_update;
+        attributes["force_synapse_update"] >> force_synapse_update;
+        neuron_template.force_synapse_update = force_synapse_update;
     }
     if (!attributes.find_child("force_dendrite_update").invalid())
     {
-        attributes["force_dendrite_update"] >>
-                neuron_template.force_dendrite_update;
+        bool force_dendrite_update;
+        attributes["force_dendrite_update"] >> force_dendrite_update;
+        neuron_template.force_dendrite_update = force_dendrite_update;
     }
     if (!attributes.find_child("force_soma_update").invalid())
     {
-        attributes["force_soma_update"] >> neuron_template.force_soma_update;
+        bool force_soma_update;
+        attributes["force_soma_update"] >> force_soma_update;
+        neuron_template.force_soma_update = force_soma_update;
     }
     if (!attributes.find_child("synapse_hw_name").invalid())
     {
-        attributes["synapse_hw_name"] >>
-                neuron_template.default_synapse_hw_name;
+        std::string synapse_hw_name;
+        attributes["synapse_hw_name"] >> synapse_hw_name;
+        neuron_template.default_synapse_hw_name = synapse_hw_name;
     }
     if (!attributes.find_child("dendrite_hw_name").invalid())
     {
-        attributes["dendrite_hw_name"] >> neuron_template.dendrite_hw_name;
+        std::string dendrite_hw_name;
+        attributes["dendrite_hw_name"] >> dendrite_hw_name;
+        neuron_template.dendrite_hw_name = dendrite_hw_name;
     }
     if (!attributes.find_child("soma_hw_name").invalid())
     {
-        attributes["soma_hw_name"] >> neuron_template.soma_hw_name;
+        std::string soma_hw_name;
+        attributes["soma_hw_name"] >> soma_hw_name;
+        neuron_template.soma_hw_name = soma_hw_name;
     }
 
     // Parse and add shared parameters, which are defined alongside attributes
@@ -969,11 +982,11 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
             description_parse_model_parameters_yaml(parser, attributes);
     for (auto &[key, parameter] : model_params)
     {
-        neuron_template.dendrite_model_params.insert({key, parameter});
-        neuron_template.soma_model_params.insert({key, parameter});
+        parameter.forward_to_dendrite = true;
+        parameter.forward_to_soma = true;
+        neuron_template.model_parameters[key] = parameter;
     }
-    // Parse and add unit specific model parameters defined under 'dendrite' or
-    //  'soma' keys
+    // Parse h/w unit specific model parameters
     if (!attributes.find_child("dendrite").invalid())
     {
         auto dendrite_parameters = description_parse_model_parameters_yaml(
@@ -982,9 +995,8 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
         {
             param.forward_to_synapse = false;
             param.forward_to_soma = false;
+            neuron_template.model_parameters[key] = param;
         }
-        neuron_template.dendrite_model_params.insert(
-                dendrite_parameters.begin(), dendrite_parameters.end());
     }
     if (!attributes.find_child("soma").invalid())
     {
@@ -994,9 +1006,8 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
         {
             parameter.forward_to_synapse = false;
             parameter.forward_to_dendrite = false;
+            neuron_template.model_parameters[key] = parameter;
         }
-        neuron_template.soma_model_params.insert(
-                soma_parameters.begin(), soma_parameters.end());
     }
 
     return neuron_template;
@@ -1338,22 +1349,24 @@ void sanafe::description_parse_connection_attributes(Connection &con,
 
     if (!attributes_node.find_child("synapse").invalid())
     {
-        con.synapse_params = description_parse_model_parameters_yaml(
+        auto synapse_parameters = description_parse_model_parameters_yaml(
                 parser, attributes_node["synapse"]);
-        for (auto &[key, param] : con.synapse_params)
+        for (auto &[key, param] : synapse_parameters)
         {
             param.forward_to_dendrite = false;
             param.forward_to_soma = false;
+            con.synapse_params[key] = param;
         }
     }
     if (!attributes_node.find_child("dendrite").invalid())
     {
-        con.dendrite_params = description_parse_model_parameters_yaml(
+        auto dendrite_params = description_parse_model_parameters_yaml(
                 parser, attributes_node["dendrite"]);
-        for (auto &[key, param] : con.dendrite_params)
+        for (auto &[key, param] : dendrite_params)
         {
             param.forward_to_synapse = false;
             param.forward_to_soma = false;
+            con.dendrite_params[key] = param;
         }
     }
 
@@ -1363,8 +1376,8 @@ void sanafe::description_parse_connection_attributes(Connection &con,
     {
         if ((key != "synapse") && (key != "dendrite") && (key != "soma"))
         {
-            con.synapse_params.insert({key, parameter});
-            con.dendrite_params.insert({key, parameter});
+            con.synapse_params[key] = parameter;
+            con.dendrite_params[key] = parameter;
         }
     }
 }
@@ -2071,8 +2084,7 @@ void sanafe::description_read_network_entry(
     }
 
     // Process the entry
-    neuron_config.dendrite_model_params = params;
-    neuron_config.soma_model_params = params;
+    neuron_config.model_parameters = params;
     switch (entry_type)
     {
     case 'g': // Add neuron group
@@ -2085,8 +2097,8 @@ void sanafe::description_read_network_entry(
     {
         assert(neuron_ptr != nullptr);
         Connection &con = neuron_ptr->connect_to_neuron(*dest_ptr);
-        con.dendrite_params = params;
         con.synapse_params = params;
+        con.dendrite_params = params;
     }
         break;
     case '&': // Map neuron to hardware

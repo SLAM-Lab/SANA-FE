@@ -572,9 +572,12 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 
         for (auto &name_value_pair : curr_connection.synapse_params)
         {
-            curr_connection.synapse_hw->set_attribute(
-                    curr_connection.synapse_address, name_value_pair.first,
-                    name_value_pair.second);
+            if (name_value_pair.second.forward_to_synapse)
+            {
+                curr_connection.synapse_hw->set_attribute(
+                        curr_connection.synapse_address, name_value_pair.first,
+                        name_value_pair.second);
+            }
         }
         curr_connection.synapse_hw->mapped_connections++;
     }
@@ -661,7 +664,6 @@ void sanafe::Core::map_neuron(Neuron &n)
         }
     }
 
-    // TODO: support multiple axon outputs
     if (axon_out_hw.empty())
     {
         INFO("Error: No axon out units defined for cid:%zu\n", id);
@@ -679,35 +681,33 @@ void sanafe::Core::map_neuron(Neuron &n)
     // First set the group's default attribute values, and then
     //  any defined by the neuron
     for (auto &name_attribute_pair :
-            group.default_neuron_config.soma_model_params)
+            group.default_neuron_config.model_parameters)
     {
-        n.soma_hw->set_attribute(n.mapped_address, name_attribute_pair.first,
-                name_attribute_pair.second);
+        if (name_attribute_pair.second.forward_to_dendrite)
+        {
+            n.dendrite_hw->set_attribute(n.mapped_address,
+                    name_attribute_pair.first, name_attribute_pair.second);
+        }
+        if (name_attribute_pair.second.forward_to_soma)
+        {
+            n.soma_hw->set_attribute(n.mapped_address,
+                    name_attribute_pair.first, name_attribute_pair.second);
+        }
     }
-    for (auto &name_attribute_pair : n.soma_model_params)
+    for (auto &name_attribute_pair : n.model_parameters)
     {
-        // Pass specific attributes for this neuron
-        n.soma_hw->set_attribute(n.mapped_address, name_attribute_pair.first,
-                name_attribute_pair.second);
+        if (name_attribute_pair.second.forward_to_dendrite)
+        {
+            n.dendrite_hw->set_attribute(n.mapped_address,
+                name_attribute_pair.first, name_attribute_pair.second);
+        }
+        if (name_attribute_pair.second.forward_to_soma)
+        {
+            n.soma_hw->set_attribute(n.mapped_address,
+                name_attribute_pair.first, name_attribute_pair.second);
+        }
     }
     n.soma_hw->neuron_count++;
-
-    // Setup the dendrite model
-    TRACE1("Dendrite hw name: %s", dendrite_hw_name.c_str());
-    // Pass global attributes from the group
-
-    for (auto &name_attribute_pair :
-            group.default_neuron_config.dendrite_model_params)
-    {
-        n.dendrite_hw->set_attribute(n.mapped_address,
-                name_attribute_pair.first, name_attribute_pair.second);
-    }
-    for (auto &name_attribute_pair : n.dendrite_model_params)
-    {
-        // Pass specific attributes for this neuron
-        n.dendrite_hw->set_attribute(n.mapped_address,
-                name_attribute_pair.first, name_attribute_pair.second);
-    }
 }
 
 void sanafe::arch_allocate_axon(Neuron &pre_neuron, Core &post_core)

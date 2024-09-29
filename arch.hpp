@@ -321,9 +321,9 @@ public:
     std::vector<Connection *> connections_in;
     std::vector<AxonOutModel> axons_out;
 
-    std::list<BufferPosition> neuron_processing_units;
-    std::list<BufferPosition> message_processing_units;
-    CorePipelineConfiguration pipeline_config;
+    std::list<BufferPosition> neuron_processing_units{};
+    std::list<BufferPosition> message_processing_units{};
+    CorePipelineConfiguration pipeline_config{};
     std::string name;
     double energy{0.0};
     double next_message_generation_delay{0.0};

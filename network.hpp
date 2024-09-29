@@ -54,16 +54,15 @@ enum NeuronStatus : int
 
 struct NeuronTemplate
 {
-    std::map<std::string, ModelParam> soma_model_params;
-    std::map<std::string, ModelParam> dendrite_model_params;
-    std::string soma_hw_name{""};
-    std::string default_synapse_hw_name{""};
-    std::string dendrite_hw_name{""};
-    bool log_spikes{false};
-    bool log_potential{false};
-    bool force_synapse_update{false};
-    bool force_dendrite_update{false};
-    bool force_soma_update{false};
+    std::map<std::string, ModelParam> model_parameters;
+    std::optional<std::string> soma_hw_name{};
+    std::optional<std::string> default_synapse_hw_name{};
+    std::optional<std::string> dendrite_hw_name{};
+    std::optional<bool> log_spikes{};
+    std::optional<bool> log_potential{};
+    std::optional<bool> force_synapse_update{};
+    std::optional<bool> force_dendrite_update{};
+    std::optional<bool> force_soma_update{};
 };
 
 struct Conv2DParameters
@@ -83,8 +82,7 @@ class Neuron
 public:
     std::vector<Connection> connections_out;
     std::vector<int> axon_out_addresses;
-    std::map<std::string, ModelParam> soma_model_params;
-    std::map<std::string, ModelParam> dendrite_model_params;
+    std::map<std::string, ModelParam> model_parameters;
 
     // Mapped hardware
     Network &parent_net;
@@ -93,9 +91,9 @@ public:
     DendriteUnit *dendrite_hw{nullptr};
     SomaUnit *soma_hw{nullptr};
     AxonOutUnit *axon_out_hw{nullptr};
-    std::string soma_hw_name;
-    std::string default_synapse_hw_name;
-    std::string dendrite_hw_name;
+    std::string soma_hw_name{};
+    std::string default_synapse_hw_name{};
+    std::string dendrite_hw_name{};
 
     std::string parent_group_id;
     size_t id{};
@@ -104,11 +102,11 @@ public:
     int maps_in_count{0};
     int maps_out_count{0};
     NeuronStatus status{sanafe::IDLE};
-    bool force_synapse_update;
-    bool force_dendrite_update;
-    bool force_soma_update;
-    bool log_spikes;
-    bool log_potential;
+    bool force_synapse_update{false};
+    bool force_dendrite_update{false};
+    bool force_soma_update{false};
+    bool log_spikes{false};
+    bool log_potential{false};
 
     // Inputs to H/W units
     std::vector<Synapse> dendrite_input_synapses;
@@ -137,7 +135,6 @@ public:
     [[nodiscard]] std::string get_id() const { return name; }
     explicit NeuronGroup(const std::string group_name, Network &parent_net, size_t neuron_count, const NeuronTemplate &default_config);
 
-    //void set_attribute_multiple(const std::string &attr, const std::vector<std::any> &values);
     void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists);
     void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
     void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const Conv2DParameters &convolution);

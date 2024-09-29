@@ -64,95 +64,48 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
 sanafe::Neuron::Neuron(const size_t neuron_id, Network &parent_net,
         const std::string parent_group_id, const NeuronTemplate &config)
         : parent_net(parent_net)
-        , soma_hw_name(config.soma_hw_name)
-        , default_synapse_hw_name(config.default_synapse_hw_name)
-        , dendrite_hw_name(config.dendrite_hw_name)
         , parent_group_id(std::move(parent_group_id))
         , id(neuron_id)
-        , force_synapse_update(config.force_synapse_update)
-        , force_dendrite_update(config.force_dendrite_update)
-        , force_soma_update(config.force_soma_update)
-        , log_spikes(config.log_spikes)
-        , log_potential(config.log_potential)
 {
-    soma_hw_name = config.soma_hw_name;
-    default_synapse_hw_name = config.default_synapse_hw_name;
-    dendrite_hw_name = config.dendrite_hw_name;
-
-    soma_model_params.insert(
-            config.soma_model_params.begin(), config.soma_model_params.end());
-    dendrite_model_params.insert(config.dendrite_model_params.begin(),
-            config.dendrite_model_params.end());
+    set_attributes(config);
 }
 
 void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
 {
-    // TODO: make NeuronTemplate into NeuronParameters and make each field optional
-    log_spikes = attributes.log_spikes;
-    log_potential = attributes.log_potential;
-    force_dendrite_update = attributes.force_dendrite_update;
-    force_soma_update = attributes.force_soma_update;
-    force_synapse_update = attributes.force_synapse_update;
-
-    // TODO: remove the separate soma and dendrite parameters, now its supported
-    //  by just one
-    for (auto &[key, param] : attributes.soma_model_params)
+    if (attributes.log_spikes.has_value())
     {
-        if (param.forward_to_dendrite)
-        {
-            if (dendrite_hw != nullptr)
-            {
-                dendrite_hw->set_attribute(mapped_address, key, param);
-            }
-            if (parent_net.record_attributes)
-            {
-                dendrite_model_params.insert(
-                        attributes.soma_model_params.begin(),
-                        attributes.soma_model_params.end());
-            }
-        }
-        if (param.forward_to_soma)
-        {
-            if (soma_hw != nullptr)
-            {
-                soma_hw->set_attribute(mapped_address, key, param);
-            }
-            if (parent_net.record_attributes)
-            {
-                soma_model_params.insert(attributes.soma_model_params.begin(),
-                        attributes.soma_model_params.end());
-            }
-        }
+        log_spikes = attributes.log_spikes.value();
+    }
+    if (attributes.log_potential.has_value())
+    {
+        log_potential = attributes.log_potential.value();
+    }
+    if (attributes.force_dendrite_update)
+    {
+        force_dendrite_update = attributes.force_dendrite_update.value();
+    }
+    if (attributes.force_soma_update.has_value())
+    {
+        force_soma_update = attributes.force_soma_update.value();
+    }
+    if (attributes.force_synapse_update)
+    {
+        force_synapse_update = attributes.force_synapse_update.value();
     }
 
-    // TODO: remove the separate soma and dendrite parameters, now its supported
-    //  by just one
-    for (auto &[key, param] : attributes.dendrite_model_params)
+    for (auto &[key, param] : attributes.model_parameters)
     {
-        if (param.forward_to_dendrite)
+        if (param.forward_to_dendrite && (dendrite_hw != nullptr))
         {
-            if (dendrite_hw != nullptr)
-            {
-                dendrite_hw->set_attribute(mapped_address, key, param);
-            }
-            if (parent_net.record_attributes)
-            {
-                dendrite_model_params.insert(
-                        attributes.soma_model_params.begin(),
-                        attributes.soma_model_params.end());
-            }
+            dendrite_hw->set_attribute(mapped_address, key, param);
         }
-        if (param.forward_to_soma)
+        if (param.forward_to_soma && (soma_hw != nullptr))
         {
-            if (soma_hw != nullptr)
-            {
-                soma_hw->set_attribute(mapped_address, key, param);
-            }
-            if (parent_net.record_attributes)
-            {
-                soma_model_params.insert(attributes.soma_model_params.begin(),
-                        attributes.soma_model_params.end());
-            }
+            soma_hw->set_attribute(mapped_address, key, param);
+        }
+        if (parent_net.record_attributes)
+        {
+            model_parameters[key] = param;
         }
     }
 }
@@ -336,8 +289,8 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
 
         // TODO: create a set attributes function for the connection that
         //  filters when forwarding to hardware unit
-        con.dendrite_params = attributes;
         con.synapse_params = attributes;
+        con.dendrite_params = attributes;
     }
 }
 
@@ -473,13 +426,13 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
                                 }
                                 const ModelParam &attribute =
                                         attribute_list[filter_idx];
-                                if (attribute.forward_to_synapse)
-                                {
-                                    con.synapse_params[key] = attribute;
-                                }
                                 if (attribute.forward_to_dendrite)
                                 {
                                     con.dendrite_params[key] = attribute;
+                                }
+                                if (attribute.forward_to_synapse)
+                                {
+                                    con.synapse_params[key] = attribute;
                                 }
                             }
                             TRACE1("%s.%zu->%s.%zu w=%d\n",
@@ -580,28 +533,5 @@ void sanafe::Network::save_netlist(
     }
 
     return;
-}
-*/
-
-// Reimplement setting functions for multiple neurons and edges
-/*
-void sanafe::NeuronGroup::set_attribute_multiple(
-        const std::string &attr, const std::vector<std::string> &values)
-{
-    if (values.size() != neurons.size())
-    {
-        INFO("Error: Attribute values must be defined for all neurons "
-             "(%lu!=%lu).\n",
-                attr.size(), neurons.size());
-    }
-    size_t nid = 0;
-    std::map<std::string, std::string> map;
-    for (const std::string &v : values)
-    {
-        auto &n = neurons[nid];
-        map[attr] = v;
-        n.set_attributes(map);
-        nid++;
-    }
 }
 */
