@@ -121,8 +121,7 @@ void sanafe::plugin_init_soma(
 }
 
 std::shared_ptr<sanafe::SynapseUnit> sanafe::plugin_get_synapse(
-        const std::string &model_name,
-        const std::filesystem::path &plugin_path)
+        const std::string &model_name, const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
     {
@@ -135,8 +134,7 @@ std::shared_ptr<sanafe::SynapseUnit> sanafe::plugin_get_synapse(
         plugin_init_synapse(model_name, plugin_path);
     }
 
-    return std::shared_ptr<SynapseUnit>(
-            plugin_create_synapse[model_name]());
+    return std::shared_ptr<SynapseUnit>(plugin_create_synapse[model_name]());
 }
 
 std::shared_ptr<sanafe::DendriteUnit> sanafe::plugin_get_dendrite(
@@ -157,8 +155,7 @@ std::shared_ptr<sanafe::DendriteUnit> sanafe::plugin_get_dendrite(
 }
 
 std::shared_ptr<sanafe::SomaUnit> sanafe::plugin_get_soma(
-        const std::string &model_name,
-        const std::filesystem::path &plugin_path)
+        const std::string &model_name, const std::filesystem::path &plugin_path)
 {
     if (plugin_path.empty())
     {
