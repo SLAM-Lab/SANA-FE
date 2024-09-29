@@ -13,6 +13,7 @@
 
 #include "arch.hpp"
 #include "network.hpp"
+#include "pipeline.hpp"
 #include "print.hpp"
 #include "sim.hpp"
 
@@ -172,6 +173,75 @@ std::unique_ptr<sanafe::Neuron> pycreate_neuron(size_t neuron_id,
             neuron_id, parent_net, parent_group_id, neuron_config);
 }
 
+sanafe::Tile &pycreate_tile(sanafe::Architecture *self, std::string name,
+        double energy_north_hop, double latency_north_hop,
+        double energy_east_hop, double latency_east_hop,
+        double energy_south_hop, double latency_south_hop,
+        double energy_west_hop, double latency_west_hop)
+{
+    sanafe::TilePowerMetrics tile_power_metrics{};
+    tile_power_metrics.energy_north_hop = energy_north_hop;
+    tile_power_metrics.latency_north_hop = latency_north_hop;
+    tile_power_metrics.energy_east_hop = energy_east_hop;
+    tile_power_metrics.latency_east_hop = latency_east_hop;
+    tile_power_metrics.energy_south_hop = energy_south_hop;
+    tile_power_metrics.latency_south_hop = latency_south_hop;
+    tile_power_metrics.energy_west_hop = energy_west_hop;
+    tile_power_metrics.latency_west_hop = latency_west_hop;
+
+    return self->create_tile(name, tile_power_metrics);
+}
+
+std::unique_ptr<sanafe::Tile> pyconstruct_tile(std::string name, size_t tile_id,
+        double energy_north_hop, double latency_north_hop,
+        double energy_east_hop, double latency_east_hop,
+        double energy_south_hop, double latency_south_hop,
+        double energy_west_hop, double latency_west_hop)
+{
+    sanafe::TilePowerMetrics tile_power_metrics{};
+    tile_power_metrics.energy_north_hop = energy_north_hop;
+    tile_power_metrics.latency_north_hop = latency_north_hop;
+    tile_power_metrics.energy_east_hop = energy_east_hop;
+    tile_power_metrics.latency_east_hop = latency_east_hop;
+    tile_power_metrics.energy_south_hop = energy_south_hop;
+    tile_power_metrics.latency_south_hop = latency_south_hop;
+    tile_power_metrics.energy_west_hop = energy_west_hop;
+    tile_power_metrics.latency_west_hop = latency_west_hop;
+
+    return std::make_unique<sanafe::Tile>(name, tile_id, tile_power_metrics);
+}
+
+std::unique_ptr<sanafe::Core> pyconstruct_core(std::string name,
+        size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
+        std::string buffer_position, size_t max_neurons_supported)
+{
+    sanafe::CorePipelineConfiguration pipeline_config{};
+
+    pipeline_config.buffer_position =
+            sanafe::pipeline_parse_buffer_pos_str(buffer_position);
+    pipeline_config.max_neurons_supported = max_neurons_supported;
+
+    sanafe::CoreAddress core_address{};
+    core_address.parent_tile_id = parent_tile_id;
+    core_address.offset_within_tile = offset_within_tile;
+    core_address.id = core_id;
+
+    return std::make_unique<sanafe::Core>(name, core_address, pipeline_config);
+}
+
+sanafe::Core &pycreate_core(sanafe::Architecture *self, std::string name,
+        size_t parent_tile_id, std::string buffer_position,
+        size_t max_neurons_supported)
+{
+    sanafe::CorePipelineConfiguration pipeline_config{};
+
+    pipeline_config.buffer_position =
+            sanafe::pipeline_parse_buffer_pos_str(buffer_position);
+    pipeline_config.max_neurons_supported = max_neurons_supported;
+
+    return self->create_core(name, parent_tile_id, pipeline_config);
+}
+
 void pyset_attributes(sanafe::Neuron *self,
         std::optional<std::string> soma_hw_name,
         std::optional<std::string> default_synapse_hw_name,
@@ -290,7 +360,9 @@ PYBIND11_MODULE(sanafe, m)
                         {
                             attr = pybind11::dict();
                         }
-                        sanafe::Connection &con = self->connect_to_neuron(dest);
+                        const size_t con_idx = self->connect_to_neuron(dest);
+                        sanafe::Connection &con =
+                                self->connections_out[con_idx];
                         const auto parameters =
                                 pydict_to_model_parameters(attr.value());
                         for (auto &[key, parameter] : parameters)
@@ -305,37 +377,57 @@ PYBIND11_MODULE(sanafe, m)
                             }
                         }
 
-                        return con;
+                        return con_idx;
                     })
             .def("get_id", &sanafe::Neuron::get_id);
-
-    pybind11::class_<sanafe::CoreAddress>(m, "CoreAddress")
-            .def(pybind11::init<size_t, size_t, size_t>(), pybind11::arg("id"),
-                    pybind11::arg("parent_tile_id"),
-                    pybind11::arg("offset_within_tile"));
 
     pybind11::class_<sanafe::Architecture>(m, "Architecture")
             .def(pybind11::init<std::string,
                     sanafe::NetworkOnChipConfiguration>())
             .def("__repr__", &sanafe::Architecture::info)
-            // TODO: support programming new architectures from python again
-            //.def("create_tile", &sanafe::Architecture::create_tile,
-            //        pybind11::return_value_policy::reference_internal)
-            //.def("create_core", &sanafe::Architecture::create_core,
-            //        pybind11::return_value_policy::reference_internal)
+            .def("create_tile", &pycreate_tile,
+                    pybind11::return_value_policy::reference_internal,
+                    pybind11::arg("name"),
+                    pybind11::arg("energy_north_hop") = 0.0,
+                    pybind11::arg("latency_north_hop") = 0.0,
+                    pybind11::arg("energy_east_hop") = 0.0,
+                    pybind11::arg("latency_east_hop") = 0.0,
+                    pybind11::arg("energy_south_hop") = 0.0,
+                    pybind11::arg("latency_south_hop") = 0.0,
+                    pybind11::arg("energy_west_hop") = 0.0,
+                    pybind11::arg("latency_west_hop") = 0.0)
+            .def("create_core", &pycreate_core, pybind11::arg("name"),
+                    pybind11::arg("parent_tile_id"),
+                    pybind11::arg("buffer_position") =
+                            sanafe::BUFFER_BEFORE_SOMA_UNIT,
+                    pybind11::arg("max_neurons_supported") =
+                            sanafe::default_max_neurons,
+                    pybind11::return_value_policy::reference_internal)
             .def_readwrite("tiles", &sanafe::Architecture::tiles);
 
     pybind11::class_<sanafe::Tile>(m, "Tile")
-            .def(pybind11::init<const std::string, int,
-                    sanafe::TilePowerMetrics>())
+            .def(pybind11::init(&pyconstruct_tile), pybind11::arg("name"),
+                    pybind11::arg("id"),
+                    pybind11::arg("energy_north_hop") = 0.0,
+                    pybind11::arg("latency_north_hop") = 0.0,
+                    pybind11::arg("energy_east_hop") = 0.0,
+                    pybind11::arg("latency_east_hop") = 0.0,
+                    pybind11::arg("energy_south_hop") = 0.0,
+                    pybind11::arg("latency_south_hop") = 0.0,
+                    pybind11::arg("energy_west_hop") = 0.0,
+                    pybind11::arg("latency_west_hop") = 0.0)
             .def("get_id", &sanafe::Tile::get_id)
             .def_readwrite("cores", &sanafe::Tile::cores);
 
     pybind11::class_<sanafe::Core, std::shared_ptr<sanafe::Core>>(m, "Core")
-            .def(pybind11::init<const std::string, const sanafe::CoreAddress &,
-                         const sanafe::CorePipelineConfiguration>(),
-                    pybind11::arg("name"), pybind11::arg("address"),
-                    pybind11::arg("pipeline"))
+            .def(pybind11::init(&pyconstruct_core), pybind11::arg("name"),
+                    pybind11::arg("parent_tile_id"),
+                    pybind11::arg("offset_within_tile"),
+                    pybind11::arg("core_id"),
+                    pybind11::arg("buffer_position") =
+                            sanafe::BUFFER_BEFORE_SOMA_UNIT,
+                    pybind11::arg("max_neurons_supported") =
+                            sanafe::default_max_neurons)
             .def("__repr__", &sanafe::Core::info)
             // TODO: adding hardware units
             /*

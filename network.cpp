@@ -168,7 +168,7 @@ std::string sanafe::NeuronGroup::info() const
     return ss.str();
 }
 
-sanafe::Connection &sanafe::Neuron::connect_to_neuron(Neuron &dest)
+size_t sanafe::Neuron::connect_to_neuron(Neuron &dest)
 {
     connections_out.emplace_back(Connection(connections_out.size()));
     Connection &con = connections_out.back();
@@ -189,7 +189,7 @@ sanafe::Connection &sanafe::Neuron::connect_to_neuron(Neuron &dest)
             con.post_neuron->id.c_str(),
             static_cast<double>(con.synapse_params["w"]));
 
-    return con;
+    return con.id;
 }
 
 sanafe::Network sanafe::load_net(const std::filesystem::path &path,
@@ -269,7 +269,8 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
 
         Neuron &source = neurons[source_id];
         Neuron &dest = dest_group.neurons[dest_id];
-        Connection &con = source.connect_to_neuron(dest);
+        size_t connection_idx = source.connect_to_neuron(dest);
+        Connection &con = source.connections_out[connection_idx];
 
         // Create attributes map for this neuron
         std::map<std::string, ModelParam> attributes;
@@ -287,8 +288,6 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
             attributes[key] = value_list[source_id];
         }
 
-        // TODO: create a set attributes function for the connection that
-        //  filters when forwarding to hardware unit
         con.synapse_params = attributes;
         con.dendrite_params = attributes;
     }
@@ -408,7 +407,9 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
                             filter_idx += c_out;
 
                             // Create the connection
-                            Connection &con = source.connect_to_neuron(dest);
+                            const size_t con_idx =
+                                    source.connect_to_neuron(dest);
+                            Connection &con = source.connections_out[con_idx];
 
                             // Set the attributes for this connection, using
                             //  the list of attributes
@@ -474,7 +475,8 @@ void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
             Neuron &dest = dest_group.neurons[dest_index];
             const size_t list_index =
                     (source_index * dest_group.neurons.size()) + dest_index;
-            Connection &con = source.connect_to_neuron(dest);
+            const size_t con_idx = source.connect_to_neuron(dest);
+            Connection &con = source.connections_out[con_idx];
             for (auto &[key, attribute_list] : attribute_lists)
             {
                 if (attribute_list.size() <= list_index)

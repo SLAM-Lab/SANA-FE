@@ -1136,7 +1136,8 @@ void sanafe::description_parse_neuron_connection(
     Neuron &target_neuron =
             target_group.neurons.at(target_address.neuron_id.value());
 
-    Connection &con = source_neuron.connect_to_neuron(target_neuron);
+    const size_t con_idx = source_neuron.connect_to_neuron(target_neuron);
+    Connection &con = source_neuron.connections_out[con_idx];
     description_parse_connection_attributes(con, parser, attributes_node);
 }
 
@@ -2096,7 +2097,8 @@ void sanafe::description_read_network_entry(
     case 'e':
     {
         assert(neuron_ptr != nullptr);
-        Connection &con = neuron_ptr->connect_to_neuron(*dest_ptr);
+        const size_t idx = neuron_ptr->connect_to_neuron(*dest_ptr);
+        Connection &con = neuron_ptr->connections_out[idx];
         con.synapse_params = params;
         con.dendrite_params = params;
     }

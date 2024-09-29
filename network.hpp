@@ -116,7 +116,7 @@ public:
     explicit Neuron(size_t neuron_id, Network &parent_net, const std::string parent_group_id, const NeuronTemplate &config);
     [[nodiscard]] size_t get_id() const { return id; }
     void set_attributes(const NeuronTemplate &attributes);
-    Connection &connect_to_neuron(Neuron &dest);
+    size_t connect_to_neuron(Neuron &dest);
     [[nodiscard]] std::string info() const;
     //std::string description(const bool write_mapping=true) const;
 };
