@@ -19,7 +19,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <unordered_map>
 #include <variant>
 
 #include "print.hpp"
@@ -145,7 +144,7 @@ public:
 class Network
 {
 public:
-    std::unordered_map<std::string, NeuronGroup> groups;
+    std::map<std::string, NeuronGroup> groups;
     std::string name;
     bool record_attributes{true};
 

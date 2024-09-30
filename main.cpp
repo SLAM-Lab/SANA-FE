@@ -154,7 +154,9 @@ int main(int argc, char *argv[])
 // ** New features **
 // TODO: update tutorial to use Jupyter notebook
 // TODO: add models.reset() so we can clear model state
+// TODO: implement pipeline h/w units in pybind e.g., soma, dendrite
 //
 // ** Refactor and optimizing existing features **
 // TODO: Parse model parameters after mapping, in two-pass approach
-// TODO: Make the model parameter maps optional, revert to dendrite/soma maps
+// TODO: Make the model parameter maps optional, revert to dendrite/soma/shared
+//  maps

@@ -6,6 +6,7 @@
 #include <any>
 #include <map>
 #include <sstream>
+#include <unordered_map>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -53,7 +54,6 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         parameter.name = key;
         map[key] = parameter;
         TRACE1_PYBIND("Set map[%s]=%s\n", key.c_str(), map[key].c_str());
-        INFO("Set map[%s]\n", key.c_str());
     }
     TRACE1_PYBIND("Converted map.size()=%zu\n", map.size());
 
@@ -127,7 +127,7 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run)
     return run_data_dict;
 }
 
-sanafe::NeuronGroup pycreate_neuron_group(sanafe::Network *self,
+sanafe::NeuronGroup &pycreate_neuron_group(sanafe::Network *self,
         const std::string &group_name, const int neuron_count,
         pybind11::dict &model_dict, std::string default_synapse_hw_name,
         std::string dendrite_hw_name, bool force_dendrite_update,
@@ -299,6 +299,14 @@ PYBIND11_MODULE(sanafe, m)
     pybind11::register_exception<std::invalid_argument>(
             m, "KernelInvalidArgument");
 
+    pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
+            .value("BUFFER_BEFORE_DENDRITE_UNIT",
+                    sanafe::BUFFER_BEFORE_DENDRITE_UNIT)
+            .value("BUFFER_BEFORE_SOMA_UNIT", sanafe::BUFFER_BEFORE_SOMA_UNIT)
+            .value("BUFFER_BEFORE_AXON_OUT_UNIT",
+                    sanafe::BUFFER_BEFORE_AXON_OUT_UNIT)
+            .value("BUFFER_POSITIONS", sanafe::BUFFER_POSITIONS);
+
     pybind11::class_<sanafe::Network>(m, "Network")
             .def(pybind11::init<>())
             .def("__repr__", &sanafe::Network::info)
@@ -314,19 +322,57 @@ PYBIND11_MODULE(sanafe, m)
                     pybind11::arg("log_potential") = false,
                     pybind11::arg("log_spikes") = false,
                     pybind11::arg("soma_hw_name") = "")
-            .def_readwrite("groups", &sanafe::Network::groups);
+            //.def_readwrite("groups", &sanafe::Network::groups);
+            .def_property(
+                    "groups",
+                    [](sanafe::Network &self) -> std::map<std::string,
+                                                      sanafe::NeuronGroup> & {
+                        return self.groups;
+                    },
+                    nullptr, pybind11::return_value_policy::reference_internal)
+            .def(
+                    "__getitem__",
+                    [](sanafe::Network &self,
+                            std::string g) -> sanafe::NeuronGroup & {
+                        if (self.groups.find(g) == self.groups.end())
+                        {
+                            throw pybind11::index_error();
+                        }
+                        return self.groups.at(g);
+                    },
+                    pybind11::return_value_policy::reference_internal);
 
     pybind11::class_<sanafe::NeuronGroup>(m, "NeuronGroup")
             .def("__repr__", &sanafe::NeuronGroup::info)
             .def("get_id", &sanafe::NeuronGroup::get_id)
-            .def_property(
-                    "neurons",
-                    [](sanafe::NeuronGroup &self)
-                            -> std::vector<sanafe::Neuron> & {
-                        return self.neurons;
+            //.def_readwrite("neurons", &sanafe::NeuronGroup::neurons);
+            .def_property("neurons",
+                    pybind11::cpp_function(
+                            [](sanafe::NeuronGroup &self)
+                                    -> std::vector<sanafe::Neuron> & {
+                                return self.neurons;
+                            },
+                            pybind11::return_value_policy::reference_internal),
+                    nullptr) // Read-only property
+            .def(
+                    "__getitem__",
+                    [](sanafe::NeuronGroup &self,
+                            size_t i) -> sanafe::Neuron & {
+                        if (i >= self.neurons.size())
+                        {
+                            throw pybind11::index_error();
+                        }
+                        return self.neurons[i];
                     },
-                    nullptr); // Read-only property
-
+                    pybind11::return_value_policy::reference_internal)
+            .def(
+                    "__iter__",
+                    [](sanafe::NeuronGroup &self) {
+                        return pybind11::make_iterator(self.neurons.begin(),
+                                self.neurons.end(),
+                                pybind11::return_value_policy::reference_internal);
+                    },
+                    pybind11::keep_alive<0, 1>());
     pybind11::class_<sanafe::Neuron>(m, "Neuron")
             .def(pybind11::init(&pycreate_neuron), pybind11::arg("neuron_id"),
                     pybind11::arg("parent_net"),
@@ -341,6 +387,7 @@ PYBIND11_MODULE(sanafe, m)
                     pybind11::arg("soma_hw_name") = "")
             .def("__repr__", &sanafe::Neuron::info)
             .def("set_attributes", &pyset_attributes,
+                    pybind11::return_value_policy::reference_internal,
                     pybind11::arg("soma_hw_name") = pybind11::none(),
                     pybind11::arg("default_synapse_hw_name") = pybind11::none(),
                     pybind11::arg("dendrite_hw_name") = pybind11::none(),
@@ -378,8 +425,9 @@ PYBIND11_MODULE(sanafe, m)
                         }
 
                         return con_idx;
-                    })
-            .def("get_id", &sanafe::Neuron::get_id);
+                    }, pybind11::return_value_policy::reference_internal)
+            .def("get_id", &sanafe::Neuron::get_id,
+                    pybind11::return_value_policy::reference_internal);
 
     pybind11::class_<sanafe::Architecture>(m, "Architecture")
             .def(pybind11::init<std::string,
@@ -496,7 +544,6 @@ PYBIND11_MODULE(sanafe, m)
 
     //pybind11::class_<sanafe::AxonOutUnit>(m, "AxonOutUnit")
     //        .def(pybind11::init<std::string>());
-
     pybind11::class_<sanafe::Simulation>(m, "Simulation")
             .def(pybind11::init<sanafe::Architecture &, sanafe::Network &,
                          std::string, bool, bool, bool, bool>(),

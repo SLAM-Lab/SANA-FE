@@ -586,7 +586,10 @@ void sanafe::arch_map_neuron_connections(Neuron &pre_neuron)
 
 void sanafe::Core::map_neuron(Neuron &n)
 {
-    //INFO("Mapping nid:%s to core: %zu\n", n.id.c_str(), id);
+    INFO("Mapping nid:%s.%zu to core: %zu\n", n.parent_group_id.c_str(), n.id,
+            this->id);
+    INFO("Mapping nid:%p\n", (void *) &n);
+
     // Map the neuron to hardware units
     if (n.core != nullptr)
     {

@@ -47,7 +47,7 @@ struct NetworkOnChipConfiguration;
 struct AxonInModel;
 struct AxonOutModel;
 
-enum BufferPosition
+enum BufferPosition : int
 {
     BUFFER_BEFORE_DENDRITE_UNIT,
     BUFFER_BEFORE_SOMA_UNIT,

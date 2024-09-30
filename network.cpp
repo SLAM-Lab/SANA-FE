@@ -239,9 +239,10 @@ void sanafe::Network::check_mapped() const
         {
             if (neuron.core == nullptr)
             {
-                INFO("Error: Neuron %s.%zu not mapped to H/W.\n",
-                        group.name.c_str(), neuron.id);
-                throw std::runtime_error("Error: Neuron isn't mapped");
+                INFO("neuron in sanafe: %p\n", (void *) &neuron);
+                std::string error = "Error: Neuron " + group.name + "." +
+                        std::to_string(neuron.id) + " not mapped to H/W.\n";
+                throw std::runtime_error(error);
             }
         }
     }
