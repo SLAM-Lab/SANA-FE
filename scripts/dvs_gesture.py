@@ -19,10 +19,8 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
-
 sys.path.insert(0, PROJECT_DIR)
-import sanafecpp as kernel
-import utils as sf
+import sanafe
 
 ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net"
@@ -32,7 +30,8 @@ SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
 SIM_ENERGY_DATA_FILENAME = "sim_gesture_32x32_energy.csv"
 
 #NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
-NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
+NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_sep30")
+#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
 DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
@@ -55,6 +54,7 @@ def parse_stats(stats):
     analysis["times"] = stats.loc[:, "sim_time"]
     analysis["total_energy"] = sum(stats.loc[:, "total_energy"])
 
+    print("Finished parsing statistics")
     return analysis
 
 
@@ -109,8 +109,8 @@ if __name__ == "__main__":
     energies = np.array(())
     hops = np.array(())
     timesteps = 128
-    frames = 100
-    #frames = 1
+    #frames = 100
+    frames = 1
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
@@ -155,9 +155,10 @@ if __name__ == "__main__":
 
             # Use a pre-generated network for a realistic use case i.e.
             #  dvs-gesture
-            arch = kernel.load_arch(ARCH_PATH)
-            net = sf.load_net(GENERATED_NETWORK_PATH, arch)
-            sim = kernel.Simulation(arch, net, record_perf=True)
+            arch = sanafe.load_arch(ARCH_PATH)
+            net = sanafe.load_net(GENERATED_NETWORK_PATH, arch,
+                                  use_netlist_format=True)
+            sim = sanafe.Simulation(arch, net, record_perf=True)
             sim.run(timesteps)
             # Parse the detailed perf statistics
             print("Reading performance data")
@@ -176,6 +177,7 @@ if __name__ == "__main__":
                 with open(SIM_ENERGY_DATA_PATH, "a") as energy_file:
                     np.savetxt(SIM_ENERGY_DATA_PATH, energies,
                                delimiter=",")
+            print("Finished running experiments")
 
     if plot_experiments:
         """
@@ -194,11 +196,12 @@ if __name__ == "__main__":
         if experiment == "time":
             plt.rcParams.update({'font.size': 6, 'lines.markersize': 4})
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
-            #hops = np.loadtxt("hops.csv", delimiter=",")
+            print("Reading Loihi data")
             loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
-            #hops_data = pd.read_csv("hops.csv")
+            print("Reading simulated data")
             event_based_data = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "noc", "dvs", "event_based_latencies.csv"))
 
+            print("Preprocessing data")
             #loihi_times = np.array(loihi_data.loc[:, "spiking"] / 1.0e6)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
             event_based_times = np.array(event_based_data.loc[:, :])
@@ -213,7 +216,6 @@ if __name__ == "__main__":
             #loihi_times = np.delete(loihi_times,
             #                list(range(timesteps, timesteps*frames, timesteps)))
 
-
             total_times = np.zeros(frames)
             total_hops = np.zeros(frames)
             loihi_total_times = np.zeros(frames)
@@ -223,7 +225,8 @@ if __name__ == "__main__":
                 #loihi_total_times[i] = np.sum(loihi_times[i*(timesteps-1):(i+1)*(timesteps-1)])
                 loihi_total_times[i] = np.sum(loihi_times[0:timesteps, i])
 
-            #"""
+            """
+            print("Creating plots")
             plt.figure(figsize=(7, 8))
             plt.subplot(311)
             FRAMES = 1
@@ -255,9 +258,10 @@ if __name__ == "__main__":
             #print("diff = {}".format(
             #    analysis["fired"] - np.array(fired_count[0:timesteps])))
             plt.savefig("runs/dvs/dvs_gesture_sim_time_stats.pdf")
-            #"""
+            """
 
             # Plot the latency
+            print("Plotting latency")
             times = np.loadtxt(SIM_TIME_DATA_PATH, delimiter=",")
             loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
@@ -317,6 +321,7 @@ if __name__ == "__main__":
             plt.savefig("runs/dvs/dvs_gesture_sim_correlation.png")
 
             # Calculate total error
+            print("Calculating errors")
             relative_error = np.abs(loihi_total_times - total_times) / loihi_total_times
             mean_error = np.sum(relative_error) / len(relative_error)
             print("Time Absolute Mean error: {0} ({1} %)".format(mean_error, mean_error * 100))
@@ -324,6 +329,9 @@ if __name__ == "__main__":
             total_error =  (np.sum(loihi_total_times) - np.sum(total_times)) / np.sum(loihi_total_times)
             print("Time Total error: {0} ({1} %)".format(total_error, total_error * 100))
 
+            print("Showing plots")
+            plt.show()
+            print("Time simulations finished")
             """
             plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
             # Figure out how many neurons fired in the Loihi data
@@ -384,7 +392,8 @@ if __name__ == "__main__":
         """
         exit()
         # These experiments not used for now
-        # Plot the potential probes from simulation
+        # Plot the potential probes from simulationm this was used to compared
+        #  simulated functional behavior against actual
         layers = ("inputs", "0Conv2D_15x15x16", "1Conv2D_13x13x32",
                 "2Conv2D_11x11x64", "3Conv2D_9x9x11", "5Dense_11")
         layer_sizes = (1024, 3600, 5408, 7744, 891, 11)
