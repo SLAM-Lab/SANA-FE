@@ -16,6 +16,7 @@ sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
 {
     if (read)
     {
+        TRACE1("w:%lf\n", weights[synapse_address]);
         return {weights[synapse_address], std::nullopt, std::nullopt};
     }
     return {0.0, std::nullopt, std::nullopt};
@@ -27,12 +28,14 @@ void sanafe::CurrentBasedSynapseModel::set_attribute(
 {
     if (weights.size() <= synapse_address)
     {
-        TRACE1("Resizing weights to: %lu\n", synapse_address + 1);
+        TRACE1("Resizing weights to: %zu\n", synapse_address + 1);
         weights.resize(std::max(weights.size() * 2, synapse_address + 1));
     }
 
     if ((param_name == "w") || (param_name == "weight"))
     {
+        TRACE1("Setting weight at address:%zu = %lf\n", synapse_address,
+                static_cast<double>(param));
         weights[synapse_address] = static_cast<double>(param);
     }
 

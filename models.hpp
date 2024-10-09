@@ -13,7 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "arch.hpp"
+#include "hardware.hpp"
+#include "sim.hpp"
 #include "print.hpp"
 
 namespace sanafe

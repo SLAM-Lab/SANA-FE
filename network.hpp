@@ -34,11 +34,12 @@ struct DendriteUnit;
 struct SomaUnit;
 struct AxonOutUnit;
 // Network
-class Network;
+class SpikingNetwork;
 class NeuronGroup;
 class Neuron;
 struct Connection;
 struct Synapse;
+struct NeuronAddress;
 // Models
 struct ModelParam;
 
@@ -64,6 +65,12 @@ struct NeuronTemplate
     std::optional<bool> force_soma_update{};
 };
 
+struct NeuronAddress
+{
+    std::string group_name{};
+    std::optional<size_t> neuron_id{std::nullopt};
+};
+
 struct Conv2DParameters
 {
     int input_width{};
@@ -79,79 +86,58 @@ struct Conv2DParameters
 class Neuron
 {
 public:
-    std::vector<Connection> connections_out;
-    std::vector<int> axon_out_addresses;
+    std::vector<Connection> edges_out;
     std::map<std::string, ModelParam> model_parameters;
-
-    // Mapped hardware
-    Network &parent_net;
-    Core *core{nullptr};
-    Core *post_synaptic_cores{nullptr};
-    DendriteUnit *dendrite_hw{nullptr};
-    SomaUnit *soma_hw{nullptr};
-    AxonOutUnit *axon_out_hw{nullptr};
     std::string soma_hw_name{};
     std::string default_synapse_hw_name{};
     std::string dendrite_hw_name{};
-
     std::string parent_group_id;
+    SpikingNetwork &parent_net;
     size_t id{};
-    size_t mapped_address{};
-    int spike_count{0};
-    int maps_in_count{0};
-    int maps_out_count{0};
-    NeuronStatus status{sanafe::IDLE};
+    size_t core_id{};
+    size_t mapping_order{};
+    // Optionally set flags for updating and traces
     bool force_synapse_update{false};
     bool force_dendrite_update{false};
     bool force_soma_update{false};
     bool log_spikes{false};
     bool log_potential{false};
 
-    // Inputs to H/W units
-    std::vector<Synapse> dendrite_input_synapses;
-    double soma_input_charge{0.0};
-    bool axon_out_input_spike{false};
-
-    explicit Neuron(size_t neuron_id, Network &parent_net, const std::string parent_group_id, const NeuronTemplate &config);
+    explicit Neuron(size_t neuron_id, SpikingNetwork &net, const std::string parent_group_id, const NeuronTemplate &config);
     [[nodiscard]] size_t get_id() const { return id; }
-    void set_attributes(const NeuronTemplate &attributes);
     size_t connect_to_neuron(Neuron &dest);
+    void map_to_core(size_t core_id);
+    void set_attributes(const NeuronTemplate &attributes);
     [[nodiscard]] std::string info() const;
-    //std::string description(const bool write_mapping=true) const;
 };
 
 class NeuronGroup
 {
 public:
-    // A neuron group is a collection of neurons that share common
-    //  parameters. All neurons must be based on the same neuron model.
+    // A neuron group is a collection of neurons that share common parameters
     std::vector<Neuron> neurons;
     NeuronTemplate default_neuron_config;
-    Network &parent_net;
     std::string name;
-    size_t order_created{0};
-    size_t position_defined{0};
     [[nodiscard]] std::string get_id() const { return name; }
-    explicit NeuronGroup(const std::string group_name, Network &parent_net, size_t neuron_count, const NeuronTemplate &default_config);
+    explicit NeuronGroup(const std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronTemplate &default_config);
 
     void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists);
     void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
     void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const Conv2DParameters &convolution);
     [[nodiscard]] std::string info() const;
-    //std::string description() const;
 };
 
-class Network
+class SpikingNetwork
 {
 public:
     std::map<std::string, NeuronGroup> groups;
     std::string name;
     bool record_attributes{true};
 
-    explicit Network(std::string net_name = "") : name(std::move(net_name)) {};
-    ~Network() = default;
-    Network(Network &&) = default;
-    Network &operator=(Network &&) = default;
+    explicit SpikingNetwork(std::string net_name = "") : name(std::move(net_name)) {};
+    ~SpikingNetwork() = default;
+    SpikingNetwork(SpikingNetwork &&) = default;
+    SpikingNetwork &operator=(SpikingNetwork &&) = default;
     // Do *NOT* allow Network objects to be copied
     //  This is because Neuron objects link back to their parent Network
     //  (and need to be aware of the parent NeuronGroup). Linking to parent
@@ -159,43 +145,34 @@ public:
     //  by avoiding duplication of shared attributes.
     //  If the Network was moved or copied, all parent links in Neurons
     //  would be invalid.
-    Network(const Network &) = delete;
-    Network &operator=(const Network &) = delete;
+    SpikingNetwork(const SpikingNetwork &) = delete;
+    SpikingNetwork &operator=(const SpikingNetwork &) = delete;
 
     NeuronGroup &create_neuron_group(const std::string name, size_t neuron_count, const NeuronTemplate &default_config);
     [[nodiscard]] std::string info() const;
     //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
     void check_mapped() const;
-};
+    size_t update_mapping_count();
 
-Network load_net(const std::filesystem::path &path, Architecture &arch, bool use_netlist_format = false);
+private:
+    size_t mapping_count{0};
+};
 
 struct Connection
 {
     std::map<std::string, ModelParam> synapse_params;
     std::map<std::string, ModelParam> dendrite_params;
-    Neuron *post_neuron;
-    Neuron *pre_neuron;
-    SynapseUnit *synapse_hw;
-    std::string synapse_hw_name;
-    size_t synapse_address{0UL};
+    std::string synapse_hw_name{};
+    NeuronAddress pre_neuron{};
+    NeuronAddress post_neuron{};
     int id;
 
-    explicit Connection(int connection_id);
-    //std::string description() const;
+    Connection(size_t id) : id(id) {}
 };
 
-struct Synapse
-{
-    double current;
-    Connection &con;
-};
+SpikingNetwork load_net(const std::filesystem::path &path, Architecture &arch, bool use_netlist_format = false);
 
-struct NeuronAddress
-{
-    std::string group_name{};
-    std::optional<size_t> neuron_id{std::nullopt};
-};
+
 
 // Alternative ModelParameter implementations. Keep for now.. maybe find
 //  somewhere better for this

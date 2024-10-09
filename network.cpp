@@ -18,60 +18,59 @@
 
 #include "arch.hpp"
 #include "description.hpp"
-//#include "models.hpp"
 #include "network.hpp"
 #include "print.hpp"
 
-sanafe::Connection::Connection(const int connection_id)
-        : post_neuron(nullptr)
-        , pre_neuron(nullptr)
-        , synapse_hw(nullptr)
-        , id(connection_id)
-{
-}
-
-/*
-std::string sanafe::Connection::description() const
-{
-    assert(pre_neuron != nullptr);
-    assert(post_neuron != nullptr);
-
-    std::ostringstream ss;
-    ss << pre_neuron->parent_group_id << '.' << pre_neuron->id;
-    ss << "->";
-    ss << post_neuron->parent_group_id << '.' << post_neuron->id;
-    ss << print_format_attributes(attributes) << std::endl;
-    ;
-    return ss.str();
-}
-*/
-
 sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
-        Network &parent_net, const size_t neuron_count,
+        SpikingNetwork &net,
+        const size_t neuron_count,
         const NeuronTemplate &default_config)
         : default_neuron_config(default_config)
-        , parent_net(parent_net)
         , name(std::move(group_name))
 {
     neurons.reserve(neuron_count);
     for (size_t nid = 0; nid < neuron_count; nid++)
     {
         neurons.emplace_back(
-                Neuron(nid, parent_net, group_name, default_config));
+                Neuron(nid, net, group_name, default_config));
     }
 }
 
-sanafe::Neuron::Neuron(const size_t neuron_id, Network &parent_net,
+sanafe::Neuron::Neuron(const size_t neuron_id,
+        SpikingNetwork &net,
         const std::string parent_group_id, const NeuronTemplate &config)
-        : parent_net(parent_net)
-        , parent_group_id(std::move(parent_group_id))
+        : parent_group_id(std::move(parent_group_id))
+        , parent_net(net)
         , id(neuron_id)
+        , mapping_order(neuron_id)
 {
     set_attributes(config);
 }
 
+void sanafe::Neuron::map_to_core(const size_t core_id)
+{
+    this->core_id = core_id;
+    mapping_order = parent_net.update_mapping_count();
+    TRACE1("Mapping order for nid:%s.%zu = %zu\n", parent_group_id.c_str(), id,
+            mapping_order);
+
+    return;
+}
+
 void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
 {
+    if (attributes.default_synapse_hw_name.has_value())
+    {
+        default_synapse_hw_name = attributes.default_synapse_hw_name.value();
+    }
+    if (attributes.dendrite_hw_name.has_value())
+    {
+        dendrite_hw_name = attributes.dendrite_hw_name.value();
+    }
+    if (attributes.soma_hw_name.has_value())
+    {
+        soma_hw_name = attributes.soma_hw_name.value();
+    }
     if (attributes.log_spikes.has_value())
     {
         log_spikes = attributes.log_spikes.value();
@@ -95,14 +94,6 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
 
     for (auto &[key, param] : attributes.model_parameters)
     {
-        if (param.forward_to_dendrite && (dendrite_hw != nullptr))
-        {
-            dendrite_hw->set_attribute(mapped_address, key, param);
-        }
-        if (param.forward_to_soma && (soma_hw != nullptr))
-        {
-            soma_hw->set_attribute(mapped_address, key, param);
-        }
         if (parent_net.record_attributes)
         {
             model_parameters[key] = param;
@@ -114,29 +105,12 @@ std::string sanafe::Neuron::info() const
 {
     std::ostringstream ss;
     ss << "sanafe::Neuron(nid=" << parent_group_id << '.' << id;
-    ss << " connections_out=" << connections_out.size() << ")";
+    ss << " edges_out=" << edges_out.size() << ")";
     //ss << " attributes={" << print_format_attributes(attributes) << "})";
     return ss.str();
 }
 
-/*
-std::string sanafe::Neuron::description(const bool write_mapping) const
-{
-    std::ostringstream ss;
-    ss << "n " << parent_group_id << '.' << id;
-    ss << print_format_attributes(attributes);
-    ss << std::endl;
-    if (write_mapping && (core != nullptr))
-    {
-        ss << "& " << parent_group_id << '.' << id;
-        ss << '@' << core->parent_tile_id << '.' << core->id;
-        ss << std::endl;
-    }
-    return ss.str();
-}
-*/
-
-sanafe::NeuronGroup &sanafe::Network::create_neuron_group(
+sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
         const std::string name, const size_t neuron_count,
         const NeuronTemplate &default_config)
 {
@@ -148,15 +122,11 @@ sanafe::NeuronGroup &sanafe::Network::create_neuron_group(
     return groups.at(name);
 }
 
-/*
-std::string sanafe::NeuronGroup::description() const
+size_t sanafe::SpikingNetwork::update_mapping_count()
 {
-    std::ostringstream ss;
-    ss << "g " << neurons.size();
-    ss << print_format_attributes(default_attributes) << std::endl;
-    return ss.str();
+    ++mapping_count;
+    return mapping_count;
 }
-*/
 
 std::string sanafe::NeuronGroup::info() const
 {
@@ -170,17 +140,19 @@ std::string sanafe::NeuronGroup::info() const
 
 size_t sanafe::Neuron::connect_to_neuron(Neuron &dest)
 {
-    connections_out.emplace_back(Connection(connections_out.size()));
-    Connection &con = connections_out.back();
-    con.pre_neuron = this;
-    con.post_neuron = &dest;
+    edges_out.emplace_back(edges_out.size());
+    Connection &edge = edges_out.back();
+    edge.pre_neuron.neuron_id = this->id;
+    edge.pre_neuron.group_name = this->parent_group_id;
+    edge.post_neuron.neuron_id = dest.id;
+    edge.post_neuron.group_name = dest.parent_group_id;
     //if (synapse_hw_name.has_value())
     //{
     //    con.synapse_hw_name = synapse_hw_name.value();
     //}
     //else
     {
-        con.synapse_hw_name = default_synapse_hw_name;
+        edge.synapse_hw_name = dest.default_synapse_hw_name;
     }
 
     TRACE1("\tAdded con %s.%s->%s.%s (w:%lf)\n",
@@ -189,10 +161,10 @@ size_t sanafe::Neuron::connect_to_neuron(Neuron &dest)
             con.post_neuron->id.c_str(),
             static_cast<double>(con.synapse_params["w"]));
 
-    return con.id;
+    return edge.id;
 }
 
-sanafe::Network sanafe::load_net(const std::filesystem::path &path,
+sanafe::SpikingNetwork sanafe::load_net(const std::filesystem::path &path,
         Architecture &arch, const bool use_netlist_format)
 {
     std::ifstream network_fp;
@@ -205,7 +177,7 @@ sanafe::Network sanafe::load_net(const std::filesystem::path &path,
         throw std::invalid_argument(error);
     }
 
-    Network net;
+    SpikingNetwork net;
     if (use_netlist_format)
     {
         INFO("Loading network from netlist file (legacy): %s\n", path.c_str());
@@ -223,12 +195,16 @@ sanafe::Network sanafe::load_net(const std::filesystem::path &path,
     return net;
 }
 
-std::string sanafe::Network::info() const
+std::string sanafe::SpikingNetwork::info() const
 {
     return "sanafe::Network(groups=" + std::to_string(groups.size()) + ")";
 }
 
-void sanafe::Network::check_mapped() const
+// TODO: change this function to map network to hardware
+//  First, map every group and neuron onto the hardware. Any unmapped neurons can raise an error
+//  Second, map all edges as connections on the hardware
+/*
+void sanafe::SpikingNetwork::check_mapped() const
 {
     // Check that all network neurons are mapped to a physical core
     //  If a neuron is not, print an error message and stop the simulation
@@ -247,6 +223,7 @@ void sanafe::Network::check_mapped() const
         }
     }
 }
+*/
 
 void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
         const std::map<std::string, std::vector<ModelParam>> &attribute_lists,
@@ -271,7 +248,7 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
         Neuron &source = neurons[source_id];
         Neuron &dest = dest_group.neurons[dest_id];
         size_t connection_idx = source.connect_to_neuron(dest);
-        Connection &con = source.connections_out[connection_idx];
+        Connection &con = source.edges_out[connection_idx];
 
         // Create attributes map for this neuron
         std::map<std::string, ModelParam> attributes;
@@ -410,7 +387,7 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
                             // Create the connection
                             const size_t con_idx =
                                     source.connect_to_neuron(dest);
-                            Connection &con = source.connections_out[con_idx];
+                            Connection &con = source.edges_out[con_idx];
 
                             // Set the attributes for this connection, using
                             //  the list of attributes
@@ -477,7 +454,7 @@ void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
             const size_t list_index =
                     (source_index * dest_group.neurons.size()) + dest_index;
             const size_t con_idx = source.connect_to_neuron(dest);
-            Connection &con = source.connections_out[con_idx];
+            Connection &con = source.edges_out[con_idx];
             for (auto &[key, attribute_list] : attribute_lists)
             {
                 if (attribute_list.size() <= list_index)

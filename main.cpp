@@ -94,12 +94,13 @@ int main(int argc, char *argv[])
         sanafe::Architecture arch =
                 sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
         INFO("Architecture initialized.\n");
-        sanafe::Network net = sanafe::load_net(
+        sanafe::SpikingNetwork net = sanafe::load_net(
                 argv[sanafe::NETWORK_FILENAME], arch, use_netlist_format);
         INFO("Network initialized.\n");
 
-        sanafe::Simulation sim(arch, net, output_dir, record_spikes,
+        sanafe::SpikingHardware hw(arch, output_dir, record_spikes,
                 record_potentials, record_perf, record_messages);
+        hw.load(net);
 
         long int timesteps;
         try
@@ -121,12 +122,11 @@ int main(int argc, char *argv[])
 
         // Step simulation
         INFO("Running simulation.\n");
-        sim.run(timesteps);
+        const auto run_data = hw.sim(timesteps);
 
         INFO("***** Run Summary *****\n");
-        const auto run_data = sim.get_run_summary();
         sim_output_run_summary(output_dir, run_data);
-        double average_power = sim.get_power();
+        double average_power = hw.get_power();
         INFO("Average power consumption: %f W.\n", average_power);
         INFO("Run finished.\n");
 

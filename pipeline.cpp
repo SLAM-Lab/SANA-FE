@@ -15,35 +15,33 @@
 #include "print.hpp"
 #include "sim.hpp"
 
-void sanafe::pipeline_process_neurons(Timestep &ts, Architecture &arch)
+void sanafe::pipeline_process_neurons(Timestep &ts, SpikingHardware &hw)
 {
-    auto cores = arch.cores();
+    auto cores = hw.cores();
 
     // Older versions of OpenMP don't support range-based for loops yet...
-    // TODO: Figure a way so that the timestep and Architecture structs aren't
-    //  shared between threads (dangerous)
     //#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
         Core &core = cores[idx];
-        for (Neuron *n : core.neurons)
+        for (MappedNeuron &n : core.neurons)
         {
-            pipeline_process_neuron(ts, arch, *n);
+            pipeline_process_neuron(ts, hw, n);
         }
 
         if (core.next_message_generation_delay != 0.0)
         {
             // This message accounts for any remaining neuron processing
-            const Neuron &last_neuron = *(core.neurons.back());
-            Message placeholder(arch, last_neuron, ts.timestep);
+            const MappedNeuron &last_neuron = core.neurons.back();
+            Message placeholder(hw, last_neuron, ts.timestep);
             placeholder.generation_delay = core.next_message_generation_delay;
             ts.messages[core.id].push_back(placeholder);
         }
     }
 }
 
-void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
+void sanafe::pipeline_process_messages(Timestep &ts, SpikingHardware &hw)
 {
     // Assign outgoing spike messages to their respective destination
     //  cores, and calculate network costs
@@ -53,13 +51,13 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
         {
             if (!m.placeholder)
             {
-                pipeline_receive_message(arch, m);
+                pipeline_receive_message(hw, m);
             }
         }
     }
 
     // Now process all messages at receiving cores
-    auto cores = arch.cores();
+    auto cores = hw.cores();
     // Older versions of OpenMP don't support range-based for loops yet...
     //#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
     // codechecker_suppress [modernize-loop-convert]
@@ -75,12 +73,12 @@ void sanafe::pipeline_process_messages(Timestep &ts, Architecture &arch)
     }
 }
 
-void sanafe::pipeline_receive_message(Architecture &arch, Message &m)
+void sanafe::pipeline_receive_message(SpikingHardware &hw, Message &m)
 {
     assert(static_cast<size_t>(m.src_tile_id) < arch.tiles.size());
     assert(static_cast<size_t>(m.dest_tile_id) < arch.tiles.size());
-    const Tile &src_tile = arch.tiles[m.src_tile_id];
-    Tile &dest_tile = arch.tiles[m.dest_tile_id];
+    const Tile &src_tile = hw.tiles[m.src_tile_id];
+    Tile &dest_tile = hw.tiles[m.dest_tile_id];
     m.network_delay = sim_estimate_network_costs(src_tile, dest_tile);
     m.hops = abs_diff(src_tile.x, dest_tile.x) +
             abs_diff(src_tile.y, dest_tile.y);
@@ -90,7 +88,7 @@ void sanafe::pipeline_receive_message(Architecture &arch, Message &m)
 }
 
 void sanafe::pipeline_process_neuron(
-        Timestep &ts, const Architecture &arch, Neuron &n)
+        Timestep &ts, const SpikingHardware &arch, MappedNeuron &n)
 {
     SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
     double neuron_processing_latency = 0.0;
@@ -129,7 +127,7 @@ double sanafe::pipeline_process_message(
     const AxonInModel &axon_in = core.axons_in[m.dest_axon_id];
     for (const int synapse_address : axon_in.synapse_addresses)
     {
-        Connection &con = *(core.connections_in[synapse_address]);
+        MappedConnection &con = *(core.connections_in[synapse_address]);
         message_processing_latency += pipeline_process_synapse(ts, con);
         if (core.pipeline_config.buffer_position == BUFFER_BEFORE_DENDRITE_UNIT)
         {
@@ -137,7 +135,7 @@ double sanafe::pipeline_process_message(
         }
         // In certain pipeline configurations, every synaptic lookup requires
         //  updates to the dendrite and/or soma units as well
-        Neuron &n = *(con.post_neuron);
+        MappedNeuron &n = *(con.post_neuron);
         message_processing_latency += pipeline_process_dendrite(ts, n);
 
         if (core.pipeline_config.buffer_position == BUFFER_BEFORE_SOMA_UNIT)
@@ -162,7 +160,7 @@ double sanafe::pipeline_process_axon_in(Core &core, const Message &m)
     return axon_unit.latency_spike_message;
 }
 
-double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
+double sanafe::pipeline_process_synapse(const Timestep &ts, MappedConnection &con)
 {
     // Update all synapses to different neurons in one core. If a synaptic
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
@@ -214,7 +212,7 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, Connection &con)
 }
 
 std::pair<double, double> sanafe::pipeline_apply_default_dendrite_power_model(
-        Neuron &n, std::optional<double> energy, std::optional<double> latency)
+        MappedNeuron &n, std::optional<double> energy, std::optional<double> latency)
 {
     // Apply default energy and latency metrics if set
     if (n.dendrite_hw->default_energy_update.has_value())
@@ -244,7 +242,7 @@ std::pair<double, double> sanafe::pipeline_apply_default_dendrite_power_model(
     return {energy.value(), latency.value()};
 }
 
-double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
+double sanafe::pipeline_process_dendrite(const Timestep &ts, MappedNeuron &n)
 {
     n.dendrite_hw->set_time(ts.timestep);
     TRACE2("Updating nid:%s dendritic current "
@@ -287,7 +285,7 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, Neuron &n)
     return total_latency;
 }
 
-double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
+double sanafe::pipeline_process_soma(const Timestep &ts, MappedNeuron &n)
 {
     TRACE1("nid:%s.%lu updating, current_in:%lf (ts:%lu)\n",
             n.parent_group_id.c_str(), n.id, n.soma_input_charge, ts.timestep);
@@ -316,7 +314,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 
     if (neuron_status == INVALID_NEURON_STATE)
     {
-        std::string error = "Soma model for nid: " + n.parent_group_id + "." +
+        std::string error = "Soma model for nid: " + n.parent_group_name + "." +
                 std::to_string(n.id) + " returned invalid state.\n";
         throw std::runtime_error(error);
     }
@@ -374,7 +372,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, Neuron &n)
 }
 
 double sanafe::pipeline_process_axon_out(
-        Timestep &ts, const Architecture &arch, Neuron &n)
+        Timestep &ts, const SpikingHardware &hw, MappedNeuron &n)
 {
     if (!n.axon_out_input_spike)
     {
@@ -386,7 +384,7 @@ double sanafe::pipeline_process_axon_out(
             n.axon_out_addresses.size());
     for (const int axon_address : n.axon_out_addresses)
     {
-        Message m(arch, n, ts.timestep, axon_address);
+        Message m(hw, n, ts.timestep, axon_address);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
 

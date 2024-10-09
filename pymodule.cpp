@@ -127,7 +127,7 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run)
     return run_data_dict;
 }
 
-sanafe::NeuronGroup &pycreate_neuron_group(sanafe::Network *self,
+sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
         const std::string &group_name, const int neuron_count,
         pybind11::dict &model_dict, std::string default_synapse_hw_name,
         std::string dendrite_hw_name, bool force_dendrite_update,
@@ -153,7 +153,7 @@ sanafe::NeuronGroup &pycreate_neuron_group(sanafe::Network *self,
 }
 
 std::unique_ptr<sanafe::Neuron> pycreate_neuron(size_t neuron_id,
-        sanafe::Network &parent_net, std::string parent_group_id,
+        sanafe::SpikingNetwork &parent_net, std::string parent_group_id,
         std::string soma_hw_name, std::string default_synapse_hw_name,
         std::string dendrite_hw_name, bool log_spikes, bool log_potential,
         bool force_synapse_update, bool force_dendrite_update,
@@ -307,7 +307,7 @@ PYBIND11_MODULE(sanafe, m)
                     sanafe::BUFFER_BEFORE_AXON_OUT_UNIT)
             .value("BUFFER_POSITIONS", sanafe::BUFFER_POSITIONS);
 
-    pybind11::class_<sanafe::Network>(m, "Network")
+    pybind11::class_<sanafe::SpikingNetwork>(m, "Network")
             .def(pybind11::init<>())
             .def("__repr__", &sanafe::Network::info)
             .def("create_neuron_group", &pycreate_neuron_group,

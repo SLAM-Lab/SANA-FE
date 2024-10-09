@@ -17,11 +17,10 @@
 #include <iterator>
 #include <vector>
 
-#include "arch.hpp"
 #include "network.hpp"
 #include "print.hpp"
 #include "schedule.hpp"
-#include "sim.hpp" // For sim_message_fifo
+#include "sim.hpp"
 
 sanafe::NocInfo::NocInfo(const int width, const int height,
         const int core_count, const size_t max_cores_per_tile)
