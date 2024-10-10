@@ -12,6 +12,15 @@
 namespace sanafe
 {
 // Forward declarations
+class SpikingHardware;
+class Tile;
+class Core;
+struct AxonInUnit;
+struct SynapseUnit;
+struct DendriteUnit;
+struct SomaUnit;
+struct AxonOutUnit;
+
 struct AxonInModel;
 struct AxonOutModel;
 struct MappedNeuron;

@@ -31,15 +31,6 @@ class Neuron;
 struct MappedConnection;
 struct Message;
 
-class SpikingHardware;
-class Tile;
-class Core;
-struct AxonInUnit;
-struct SynapseUnit;
-struct DendriteUnit;
-struct SomaUnit;
-struct AxonOutUnit;
-
 struct TileConfiguration;
 struct CoreConfiguration;
 struct AxonInConfiguration;
