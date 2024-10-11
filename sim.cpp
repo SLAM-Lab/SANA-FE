@@ -56,11 +56,13 @@ sanafe::SpikingHardware::SpikingHardware(const Architecture &arch,
             {
                 hardware_core.create_axon_in(axon_config);
             }
-            for (const SynapseConfiguration &synapse_config : core_config.synapses)
+            for (const SynapseConfiguration &synapse_config :
+                    core_config.synapses)
             {
                 hardware_core.create_synapse(synapse_config);
             }
-            for (const DendriteConfiguration &dendrite_config : core_config.dendrites)
+            for (const DendriteConfiguration &dendrite_config :
+                    core_config.dendrites)
             {
                 hardware_core.create_dendrite(dendrite_config);
             }
@@ -68,7 +70,7 @@ sanafe::SpikingHardware::SpikingHardware(const Architecture &arch,
             {
                 hardware_core.create_soma(soma_config);
             }
-            for (const AxonOutConfiguration axon_config : core_config.axon_out)
+            for (const AxonOutConfiguration &axon_config : core_config.axon_out)
             {
                 hardware_core.create_axon_out(axon_config);
             }
