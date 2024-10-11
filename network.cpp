@@ -47,9 +47,9 @@ sanafe::Neuron::Neuron(const size_t neuron_id,
     set_attributes(config);
 }
 
-void sanafe::Neuron::map_to_core(const size_t core_id)
+void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
 {
-    this->core_id = core_id;
+    this->core_id = core.address.id;
     mapping_order = parent_net.update_mapping_count();
     TRACE1("Mapping order for nid:%s.%zu = %zu\n", parent_group_id.c_str(), id,
             mapping_order);
@@ -91,14 +91,6 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
     {
         force_synapse_update = attributes.force_synapse_update.value();
     }
-
-    for (auto &[key, param] : attributes.model_parameters)
-    {
-        if (parent_net.record_attributes)
-        {
-            model_parameters[key] = param;
-        }
-    }
 }
 
 std::string sanafe::Neuron::info() const
@@ -116,7 +108,7 @@ sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
 {
     groups.emplace(
             name, NeuronGroup(name, *this, neuron_count, default_config));
-    INFO("Created neuron group gid:%s with %zu neurons\n", name.c_str(),
+    TRACE1("Created neuron group gid:%s with %zu neurons\n", name.c_str(),
             neuron_count);
 
     return groups.at(name);

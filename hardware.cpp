@@ -125,7 +125,7 @@ sanafe::MappedNeuron &sanafe::Core::map_neuron(const Neuron &neuron)
     // TODO: we need to insert the neuron according to its mapped order...
     // TODO: we need to do this stuff last... we need to insert all neurons first
     //  the sort on mapped order
-    TRACE1("Mapping nid:%s.%zu to core: %zu\n", neuron.parent_group_id.c_str(),
+    INFO("Mapping nid:%s.%zu to core: %zu\n", neuron.parent_group_id.c_str(),
             neuron.id, id);
 
     if (neurons.size() >= pipeline_config.max_neurons_supported)
@@ -415,6 +415,8 @@ void sanafe::MappedNeuron::set_attributes(const NeuronTemplate &attributes)
 
     for (auto &[key, param] : attributes.model_parameters)
     {
+        INFO("Forwarding param: %s (dendrite:%d soma:%d)\n", key.c_str(),
+                param.forward_to_dendrite, param.forward_to_soma);
         if (param.forward_to_dendrite && (dendrite_hw != nullptr))
         {
             dendrite_hw->set_attribute(mapped_address, key, param);

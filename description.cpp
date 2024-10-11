@@ -1460,7 +1460,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
                     "Core ID >= core count", parser, mapping_info);
         }
         CoreConfiguration &core = tile.cores[core_offset_within_tile];
-        neuron.map_to_core(core.address.id);
+        neuron.map_to_core(core);
     }
 }
 
@@ -2073,7 +2073,7 @@ void sanafe::description_read_network_entry(
     }
     break;
     case '&': // Map neuron to hardware
-        neuron_ptr->map_to_core(core_ptr->address.id);
+        neuron_ptr->map_to_core(*core_ptr);
         break;
     default:
         break;

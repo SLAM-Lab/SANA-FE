@@ -27,7 +27,7 @@
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         const pybind11::dict &dictionary, const bool forward_to_synapse = true,
         const bool forward_to_dendrite = true,
-        const bool forward_to_soma = false);
+        const bool forward_to_soma = true);
 sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value);
 pybind11::dict run_data_to_dict(const sanafe::RunData &run);
 
@@ -40,10 +40,9 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
     std::map<std::string, sanafe::ModelParam> map;
     for (const auto &key_value_pair : dictionary)
     {
-        TRACE1_PYBIND("Adding dict val: dict['%s']\n",
-                pybind11::cast<std::string>(v.first).c_str());
         const std::string key =
                 pybind11::cast<std::string>(key_value_pair.first);
+        TRACE1_PYBIND("Adding dict val: dict['%s']\n", key.c_str());
 
         pybind11::object value =
                 pybind11::cast<pybind11::object>(key_value_pair.second);
@@ -54,7 +53,6 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         parameter.forward_to_soma = forward_to_soma;
         parameter.name = key;
         map[key] = parameter;
-        TRACE1_PYBIND("Set map[%s]=%s\n", key.c_str(), map[key].c_str());
     }
     TRACE1_PYBIND("Converted map.size()=%zu\n", map.size());
 
@@ -432,6 +430,7 @@ PYBIND11_MODULE(sanafe, m)
                         return con_idx;
                     },
                     pybind11::return_value_policy::reference_internal)
+            .def("map_to_core", &sanafe::Neuron::map_to_core)
             .def("get_id", &sanafe::Neuron::get_id,
                     pybind11::return_value_policy::reference_internal);
 

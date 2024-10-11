@@ -220,12 +220,15 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     else if (param_name == "bias")
     {
         cx.bias = static_cast<double>(param);
+        INFO("setting bias of %zu=%lf\n", neuron_address, cx.bias);
     }
     else if ((param_name == "force_update") ||
             (param_name == "force_soma_update"))
     {
         cx.force_update = static_cast<bool>(param);
     }
+
+    INFO("Set param: %s\n", param_name.c_str());
 }
 
 sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(

@@ -28,11 +28,7 @@ namespace sanafe
 // Forward declarations
 // Architecture
 class Architecture;
-class Core;
-struct SynapseUnit;
-struct DendriteUnit;
-struct SomaUnit;
-struct AxonOutUnit;
+struct CoreConfiguration;
 // Network
 class SpikingNetwork;
 class NeuronGroup;
@@ -106,7 +102,7 @@ public:
     explicit Neuron(size_t neuron_id, SpikingNetwork &net, const std::string parent_group_id, const NeuronTemplate &config);
     [[nodiscard]] size_t get_id() const { return id; }
     size_t connect_to_neuron(Neuron &dest);
-    void map_to_core(size_t core_id);
+    void map_to_core(const CoreConfiguration &core);
     void set_attributes(const NeuronTemplate &attributes);
     [[nodiscard]] std::string info() const;
 };
@@ -132,7 +128,6 @@ class SpikingNetwork
 public:
     std::map<std::string, NeuronGroup> groups;
     std::string name;
-    bool record_attributes{true};
 
     explicit SpikingNetwork(std::string net_name = "") : name(std::move(net_name)) {};
     ~SpikingNetwork() = default;

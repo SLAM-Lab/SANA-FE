@@ -6,6 +6,8 @@
 namespace sanafe
 {
 class SpikingHardware;
+class Core;
+
 struct Timestep;
 struct MappedNeuron;
 struct Message;
