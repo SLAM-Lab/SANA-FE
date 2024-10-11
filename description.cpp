@@ -937,7 +937,6 @@ sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
         std::string synapse_hw_name;
         attributes["synapse_hw_name"] >> synapse_hw_name;
         neuron_template.default_synapse_hw_name = synapse_hw_name;
-        INFO("synapse_hw_name:%s\n", synapse_hw_name.c_str());
     }
     if (!attributes.find_child("dendrite_hw_name").invalid())
     {
