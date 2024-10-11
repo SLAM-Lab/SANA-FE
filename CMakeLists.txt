@@ -10,6 +10,10 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+if(POLICY CMP0148)
+  cmake_policy(SET CMP0148 NEW)
+endif()
+
 project(sana-fe)
 
 add_compile_options(
@@ -28,7 +32,10 @@ execute_process(
 
 add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
-find_package(PythonLibs REQUIRED)
+# Find Python using the new FindPython module
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+# Old version used PythonLibs
+##find_package(PythonLibs REQUIRED)
 find_package(OpenMP REQUIRED)
 
 ############## rapid-yaml
