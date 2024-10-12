@@ -3,8 +3,9 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(PYTHON_BUILD_ENABLED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
+set(STANDALONE_BUILD_ENABLED ON)
+set(PYTHON_BUILD_ENABLED OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -12,6 +13,14 @@ endif()
 
 if(POLICY CMP0148)
   cmake_policy(SET CMP0148 NEW)
+endif()
+
+# Ensure that at least one build target is enabled
+if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED)
+    message(
+        FATAL_ERROR
+        "No build target enabled: Either STANDALONE_BUILD_ENABLED or PYTHON_BUILD_ENABLED must be ON."
+    )
 endif()
 
 project(sana-fe)
@@ -89,17 +98,14 @@ target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
 endif()
 
-#include(CMakePrintHelpers)
+if(STANDALONE_BUILD_ENABLED)
 add_executable(sim "${SRC_DIR}/main.cpp")
-#cmake_print_variables(SOURCE_FILES)
 list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
-#cmake_print_variables(SOURCE_FILES)
 target_sources(sim PRIVATE ${SOURCE_FILES})
-
-if(PYTHON_BUILD_ENABLED)
-target_link_libraries(sim PRIVATE ${PYTHON_LIBRARIES})
 endif()
-#end of PyBind specific
+
+if(STANDALONE_BUILD_ENABLED)
 target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(sim PUBLIC ryml::ryml)
 target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})
+endif()

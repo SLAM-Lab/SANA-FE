@@ -2,6 +2,8 @@ runs/*
 debug/
 release/
 etc/
+dist/
+sanafe.egg-info/
 tutorial/dvs_challenge.net
 *.swp
 *.yaml

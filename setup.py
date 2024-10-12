@@ -30,10 +30,26 @@ class CMakeBuild(build_ext):
         print("Current directory:", os.getcwd())
         print("Source directory:", ext.sourcedir)
         print("External directory:", extdir)
-        print(f"pybind directory: {pybind11.get_cmake_dir()}")
+        print(f"PyBind11 directory: {pybind11.get_cmake_dir()}")
+
+        jobs = os.getenv('CMAKE_BUILD_PARALLEL_LEVEL', '1')  # Default to single-threaded build
+        # Check for -j option
+        if '-j' in sys.argv:
+            # Find the index of '-j' and get the following number
+            try:
+                jobs_index = sys.argv.index('-j') + 1
+                jobs = int(sys.argv[jobs_index])
+                # Remove -j option and the following value from sys.argv
+                sys.argv.pop(jobs_index)
+                sys.argv.pop(jobs_index - 1)
+            except (IndexError, ValueError):
+                print("Warning: -j option requires a positive integer argument, using default number of threads.")
+
         cmake_args = ["-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
                       "-DPYTHON_EXECUTABLE=" + sys.executable,
-                      f"-DPyBind11_DIR={pybind11.get_cmake_dir()}"]
+                      f"-DPyBind11_DIR={pybind11.get_cmake_dir()}",
+                      f"-DCMAKE_BUILD_PARALLEL_LEVEL={jobs}",
+                      "-DSTANDALONE_BUILD_ENABLED=OFF"]
         cfg = "Debug" if self.debug else "Release"
         build_args = ["--config", cfg]
 
@@ -41,10 +57,8 @@ class CMakeBuild(build_ext):
             cmake_args += [f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"]
             if sys.maxsize > 2**32:
                 cmake_args += ["-A", "x64"]
-            build_args += ["--", "/m"]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-            build_args += ["--", "-j2"]
 
         env = os.environ.copy()
         env["CXXFLAGS"] = "{} -DVERSION_INFO=\\'{}\\'".format(env.get("CXXFLAGS", ""),
@@ -69,9 +83,5 @@ setup(
     install_requires=["pybind11>=2.6.0"],
     setup_requires=["pybind11>=2.6.0"],
     python_requires=">=3.6",
-    #packages=["sanafe"],
-    #package_dir={"sanafe": "."}
     packages=find_packages()
-    #package_data={"": ["__init__.py"]},
-    #include_package_data=True,
 )
