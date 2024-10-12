@@ -20,8 +20,18 @@ add_compile_options(
     -Wall -pedantic -Werror -g -fopenmp -fPIC
 )
 
-file (GLOB SOURCE_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.cpp")
-file (GLOB HEADER_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hpp")
+include(CMakePrintHelpers)
+
+set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+cmake_print_variables(SRC_DIR)
+file (GLOB SOURCE_FILES "${SRC_DIR}/*.cpp")
+file (GLOB HEADER_FILES "${SRC_DIR}/*.hpp")
+
+cmake_print_variables(SOURCE_FILES)
+cmake_print_variables(HEADER_FILES)
+
+#file (GLOB SOURCE_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.cpp")
+#file (GLOB HEADER_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hpp")
 
 # Get the latest commit hash
 execute_process(
@@ -80,14 +90,11 @@ target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
 endif()
 
 #include(CMakePrintHelpers)
-add_executable(sim main.cpp)
+add_executable(sim "${SRC_DIR}/main.cpp")
 #cmake_print_variables(SOURCE_FILES)
 list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
 #cmake_print_variables(SOURCE_FILES)
-target_sources(
-    sim
-    PRIVATE ${SOURCE_FILES}
-)
+target_sources(sim PRIVATE ${SOURCE_FILES})
 
 if(PYTHON_BUILD_ENABLED)
 target_link_libraries(sim PRIVATE ${PYTHON_LIBRARIES})

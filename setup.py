@@ -69,6 +69,8 @@ setup(
     install_requires=["pybind11>=2.6.0"],
     setup_requires=["pybind11>=2.6.0"],
     python_requires=">=3.6",
-    include_package_data=True,
-    package_data={"": ["__init__.py"]},
+    packages=["sanafe"],
+    package_dir={"sanafe": "."}
+    #package_data={"": ["__init__.py"]},
+    #include_package_data=True,
 )

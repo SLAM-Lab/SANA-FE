@@ -1,2 +1,2 @@
 # Import kernel structs under top-level
-from sanafe import *
+from sanafe.sanafecpp import *
