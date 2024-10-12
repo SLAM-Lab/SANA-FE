@@ -10,7 +10,7 @@ from distutils.version import LooseVersion
 import pybind11
 
 class CMakeExtension(Extension):
-    def __init__(self, name, sourcedir=''):
+    def __init__(self, name, sourcedir=""):
         Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
@@ -69,4 +69,6 @@ setup(
     install_requires=["pybind11>=2.6.0"],
     setup_requires=["pybind11>=2.6.0"],
     python_requires=">=3.6",
+    include_package_data=True,
+    package_data={"": ["__init__.py"]},
 )
