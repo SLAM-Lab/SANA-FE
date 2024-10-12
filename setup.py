@@ -63,7 +63,7 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/SLAM-Lab/SANA-FE",
-    ext_modules=[CMakeExtension("sanafe.cpp_module")],
+    ext_modules=[CMakeExtension("sanafe")],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
     install_requires=["pybind11>=2.6.0"],
