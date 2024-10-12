@@ -4,8 +4,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
-set(STANDALONE_BUILD_ENABLED ON)
-set(PYTHON_BUILD_ENABLED OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -13,6 +11,15 @@ endif()
 
 if(POLICY CMP0148)
   cmake_policy(SET CMP0148 NEW)
+endif()
+
+# Set which targets to make, between a standalone executable and a Python lib
+if (NOT DEFINED STANDALONE_BUILD_ENABLED)
+set(STANDALONE_BUILD_ENABLED ON)
+endif()
+
+if (NOT DEFINED PYTHON_BUILD_ENABLED)
+set(PYTHON_BUILD_ENABLED ON)
 endif()
 
 # Ensure that at least one build target is enabled
