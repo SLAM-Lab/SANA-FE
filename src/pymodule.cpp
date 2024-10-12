@@ -279,7 +279,7 @@ void pyset_attributes(sanafe::Neuron *self,
     return;
 }
 
-PYBIND11_MODULE(sanafe, m)
+PYBIND11_MODULE(sanafecpp, m)
 {
     m.doc() = R"pbdoc(
     SANA-FE Kernel Module

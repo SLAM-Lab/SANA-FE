@@ -1,4 +1,4 @@
 include CMakeLists.txt
-    include src/*.cpp
-    include src/*.hpp
+include src/*.cpp
+include src/*.hpp
 __init__.py

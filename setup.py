@@ -4,7 +4,7 @@ import sys
 import platform
 import subprocess
 
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 import pybind11
@@ -69,8 +69,9 @@ setup(
     install_requires=["pybind11>=2.6.0"],
     setup_requires=["pybind11>=2.6.0"],
     python_requires=">=3.6",
-    packages=["sanafe"],
-    package_dir={"sanafe": "."}
+    #packages=["sanafe"],
+    #package_dir={"sanafe": "."}
+    packages=find_packages()
     #package_data={"": ["__init__.py"]},
     #include_package_data=True,
 )

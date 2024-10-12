@@ -79,14 +79,14 @@ include_directories(${PYTHON_INCLUDE_DIRS})
 if(PYTHON_BUILD_ENABLED)
 find_package(pybind11 CONFIG)
 pybind11_add_module(
-    sanafe
+    sanafecpp
 	${SOURCE_FILES}
 )
-target_link_libraries(sanafe PRIVATE ${PYTHON_LIBRARIES})
-target_link_libraries(sanafe PRIVATE pybind11::pybind11)
-target_link_libraries(sanafe PUBLIC ryml::ryml)
-target_link_libraries(sanafe PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
+target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
+target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
+target_link_libraries(sanafecpp PUBLIC ryml::ryml)
+target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
 endif()
 
 #include(CMakePrintHelpers)
