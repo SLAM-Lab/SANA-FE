@@ -2,7 +2,13 @@
 
 Presentation slides (and additional files) can also be found at:
 https://drive.google.com/drive/folders/1GzjXAFouakm3b6GcFIHsw67H8t6l3BtY?usp=sharing
-As of Apr 2024.
+As of Oct 2024.
+
+Note: This tutorial was presented at NICE Apr 2024, ICONS Aug 2024 and ESWEEK
+Sep 2024. It used an older version of SANA-FE (v1), and is based on a Docker
+image (described below). There is now a newer version of SANA-FE (v2), which
+has more features and an updated tutorial (which is similar but uses a
+Jupyter-notebook). See the updated tutorial here.
 
 ## Docker Setup ##
 
