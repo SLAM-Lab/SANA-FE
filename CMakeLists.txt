@@ -15,11 +15,11 @@ endif()
 
 # Set which targets to make, between a standalone executable and a Python lib
 if (NOT DEFINED STANDALONE_BUILD_ENABLED)
-set(STANDALONE_BUILD_ENABLED ON)
+    set(STANDALONE_BUILD_ENABLED ON)
 endif()
 
 if (NOT DEFINED PYTHON_BUILD_ENABLED)
-set(PYTHON_BUILD_ENABLED ON)
+    set(PYTHON_BUILD_ENABLED ON)
 endif()
 
 # Ensure that at least one build target is enabled
@@ -91,18 +91,32 @@ set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 
 include_directories(${PYTHON_INCLUDE_DIRS})
 
+include(CMakePrintHelpers)
+cmake_print_variables(PyBind11_DIR)
+
 # PyBind specific
 if(PYTHON_BUILD_ENABLED)
-find_package(pybind11 CONFIG)
-pybind11_add_module(
-    sanafecpp
-	${SOURCE_FILES}
-)
-target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
-target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
-target_link_libraries(sanafecpp PUBLIC ryml::ryml)
-target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
+    find_package(pybind11 CONFIG)
+    if(NOT pybind11_FOUND)
+        message("PyBind11 not found, trying to set PYBIND_CMAKE_DIR using Python")
+        execute_process(
+            COMMAND "${PYTHON_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
+            OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        cmake_print_variables(PYBIND11_CMAKE_DIR)
+        set(pybind11_DIR ${PYBIND11_CMAKE_DIR})
+        find_package(pybind11 CONFIG REQUIRED)
+    endif()
+    pybind11_add_module(
+        sanafecpp
+        ${SOURCE_FILES}
+    )
+    target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
+    target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
+    target_link_libraries(sanafecpp PUBLIC ryml::ryml)
+    target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
 endif()
 
 if(STANDALONE_BUILD_ENABLED)
