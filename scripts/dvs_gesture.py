@@ -93,7 +93,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -321,9 +321,9 @@ if __name__ == "__main__":
             #plt.yticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
             plt.ylabel("Measured Latency ($\mu$s)")
             plt.xlabel("Simulated Latency ($\mu$s)")
-            plt.xlim((10, 30))
+            plt.xlim((10, 23))
             plt.ylim((10, 30))
-            plt.xticks(np.arange(10, 31, 10))
+            plt.xticks(np.arange(10, 23, 10))
             plt.yticks(np.arange(10, 31, 10))
             plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_correlation.pdf")
@@ -351,6 +351,7 @@ if __name__ == "__main__":
                 analysis["fired"] - np.array(fired_count[0:timesteps])))
             plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
             """
+            plt.show()
 
         if experiment == "energy":
             plt.rcParams.update({'font.size': 6, 'lines.markersize': 2})
@@ -434,4 +435,4 @@ if __name__ == "__main__":
         #print("Percentage of time used for only network: {0}".format(
         #      network_percentage))
 
-        #plt.show()
+        plt.show()
