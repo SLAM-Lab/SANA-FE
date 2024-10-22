@@ -104,7 +104,14 @@ void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
                 std::vector<MappedNeuron *>(group.neurons.size(), nullptr);
         for (const Neuron &neuron : group.neurons)
         {
-            Core &mapped_core = list_of_cores[neuron.core_id];
+            if (!neuron.core_id.has_value())
+            {
+                std::string error = "Neuron: " + neuron.parent_group_id + "." +
+                    std::to_string(neuron.id) + " not mapped.";
+                INFO("%s", error.c_str());
+                throw std::runtime_error(error);
+            }
+            Core &mapped_core = list_of_cores[neuron.core_id.value()];
             mapped_core.map_neuron(neuron);
         }
     }

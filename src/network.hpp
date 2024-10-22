@@ -90,7 +90,7 @@ public:
     std::string parent_group_id;
     SpikingNetwork &parent_net;
     size_t id{};
-    size_t core_id{};
+    std::optional<size_t> core_id{std::nullopt};
     size_t mapping_order{};
     // Optionally set flags for updating and traces
     bool force_synapse_update{false};

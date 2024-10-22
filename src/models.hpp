@@ -120,7 +120,7 @@ public:
     };
 
 private:
-    std::vector<LoihiCompartment> compartments{1024};
+    std::vector<LoihiCompartment> compartments{loihi_max_compartments};
 };
 
 constexpr int truenorth_max_neurons{4096};
