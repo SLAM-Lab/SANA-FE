@@ -91,6 +91,9 @@ void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
     {
         force_synapse_update = attributes.force_synapse_update.value();
     }
+
+    model_parameters.insert(attributes.model_parameters.begin(),
+            attributes.model_parameters.end());
 }
 
 std::string sanafe::Neuron::info() const
