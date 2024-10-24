@@ -90,7 +90,7 @@ struct ModelParam
         }
         if (std::holds_alternative<int>(value))
         {
-            TRACE1("Warning: Casting integer value to bool type.\n");
+            TRACE1(ARCH, "Warning: Casting integer value to bool type.\n");
             return (std::get<int>(value) != 0);
         }
 
@@ -115,7 +115,7 @@ struct ModelParam
         if (std::holds_alternative<int>(value))
         {
             // Assume it is safe to convert from any integer to double
-            TRACE1("Warning: Casting integer value to double type.\n");
+            TRACE1(ARCH, "Warning: Casting integer value to double type.\n");
             return static_cast<double>(std::get<int>(value));
         }
 

@@ -18,9 +18,9 @@ std::string print_float(const double val);
 std::string print_int(const long int val);
 }
 
-// DEBUG and TRACE print with source annotations, TRACE is only enabled for
-//  verbose debug printing.
-#define INFO(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
+
+//#define INFO(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
+/*
 #ifdef DEBUG
 #define TRACE1_PYBIND(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
 #define SIM_TRACE1(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
@@ -35,5 +35,69 @@ std::string print_int(const long int val);
 #define TRACE2(...) do {} while (0)
 #define TRACE3(...) do {} while (0)
 #endif
+*/
+
+// DEBUG and TRACE<n> print with source annotations, TRACE<n> levels offer more
+//  detailed and verbose output for debugging. If you want to add a new category
+//  for tracing you must follow the following steps:
+//  1) Below, add your new category macro e.g., #define DEBUG_CATEGORY_FOO <N+1>
+//  2) In CMakeLists.txt, set the default debug level for the new category
+//  3) In CMakeLists.txt, add the new category to the validation loop, which
+//      adds a compiler flag for each category i.e., add your category inside
+//      foreach(category <append to this list>)
+
+// Define categories
+#define DEBUG_CATEGORY_SIM 0
+#define DEBUG_CATEGORY_ARCH 1
+#define DEBUG_CATEGORY_NET 2
+#define DEBUG_CATEGORY_PYMODULE 3
+#define DEBUG_CATEGORY_DESCRIPTION 4
+#define DEBUG_CATEGORY_MODELS 5
+#define DEBUG_CATEGORY_HW 6
+#define DEBUG_CATEGORY_PIPELINE 7
+#define DEBUG_CATEGORY_SCHEDULER 8
+#define DEBUG_CATEGORY_PLUGINS 9
+
+// Default debug levels; CMake can override these later
+#define DEBUG_LEVEL_ARCH 0
+#define DEBUG_LEVEL_NET 0
+#define DEBUG_LEVEL_PYMODULE 0
+#define DEBUG_LEVEL_DESCRIPTION 0
+#define DEBUG_LEVEL_MODELS 0
+#define DEBUG_LEVEL_HW 0
+#define DEBUG_LEVEL_PIPELINE 0
+#define DEBUG_LEVEL_PLUGINS 0
+#define DEBUG_LEVEL_SCHEDULER 0
+#define DEBUG_LEVEL_SIM 0
+
+// INFO prints are always enabled
+#define INFO(...) do { \
+    fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
+    fprintf(stdout, __VA_ARGS__); \
+} while (0)
+
+// TRACE1 enabled if category debug level >= 1
+#define TRACE1(category, ...) do { \
+    if (DEBUG_LEVEL_##category >= 1) { \
+        fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
+        fprintf(stdout, __VA_ARGS__); \
+    } \
+} while (0)
+
+// TRACE2 enabled if category debug level >= 2
+#define TRACE2(category, ...) do { \
+    if (DEBUG_LEVEL_##category >= 2) { \
+        fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
+        fprintf(stdout, __VA_ARGS__); \
+    } \
+} while (0)
+
+// TRACE3 enabled if category debug level >= 3
+#define TRACE3(category, ...) do { \
+    if (DEBUG_LEVEL_##category >= 3) { \
+        fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
+        fprintf(stdout, __VA_ARGS__); \
+    } \
+} while (0)
 
 #endif

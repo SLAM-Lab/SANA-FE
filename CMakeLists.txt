@@ -36,9 +36,58 @@ add_compile_options(
     -Wall -pedantic -Werror -g -fopenmp -fPIC
 )
 
-include(CMakePrintHelpers)
+# Set default debug levels for tracing
+if(NOT DEFINED DEBUG_LEVEL_ARCH)
+    set(DEBUG_LEVEL_ARCH 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_DESCRIPTION)
+    set(DEBUG_LEVEL_DESCRIPTION 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_HW)
+    set(DEBUG_LEVEL_HW 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_MODELS)
+    set(DEBUG_LEVEL_MODELS 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_NET)
+    set(DEBUG_LEVEL_NET 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_PIPELINE)
+    set(DEBUG_LEVEL_PIPELINE 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_PLUGINS)
+    set(DEBUG_LEVEL_PLUGINS 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_PYMODULE)
+    set(DEBUG_LEVEL_PYMODULE 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_SIM)
+    set(DEBUG_LEVEL_SIM 0)
+endif()
+
+if(NOT DEFINED DEBUG_LEVEL_SCHEDULER)
+    set(DEBUG_LEVEL_SCHEDULER 0)
+endif()
+
+# Validate debug levels
+foreach(category ARCH DESCRIPTION HW MODELS NET PIPELINE PLUGINS PYMODULE SIM SCHEDULER)
+    if(NOT DEBUG_LEVEL_${category} MATCHES "^[0-3]$")
+        message(FATAL_ERROR "DEBUG_LEVEL_${category} must be between 0 and 3")
+    endif()
+    # Add compile definitions for each category
+    add_compile_definitions(DEBUG_LEVEL_${category}=${DEBUG_LEVEL_${category}})
+endforeach()
 
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+include(CMakePrintHelpers)
 cmake_print_variables(SRC_DIR)
 file (GLOB SOURCE_FILES "${SRC_DIR}/*.cpp")
 file (GLOB HEADER_FILES "${SRC_DIR}/*.hpp")

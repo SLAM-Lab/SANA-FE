@@ -24,6 +24,7 @@
 // TODO: support conv, dense and sparse hyperedges here
 // TODO: support set_attributes for neurons and for groups
 
+// Forward declarations
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         const pybind11::dict &dictionary, const bool forward_to_synapse = true,
         const bool forward_to_dendrite = true,
@@ -42,7 +43,7 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
     {
         const std::string key =
                 pybind11::cast<std::string>(key_value_pair.first);
-        TRACE1_PYBIND("Adding dict val: dict['%s']\n", key.c_str());
+        INFO("Adding dict val: dict['%s']\n", key.c_str());
 
         pybind11::object value =
                 pybind11::cast<pybind11::object>(key_value_pair.second);
@@ -54,7 +55,7 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         parameter.name = key;
         map[key] = parameter;
     }
-    TRACE1_PYBIND("Converted map.size()=%zu\n", map.size());
+    INFO("Converted map.size()=%zu\n", map.size());
 
     return map;
 }
@@ -70,17 +71,20 @@ sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
     if (pybind11::isinstance<pybind11::str>(value))
     {
         parameter.value = pybind11::cast<std::string>(value);
-        TRACE1_PYBIND("Converted str to str:%s\n", value_str.c_str());
+        TRACE1(PYMODULE, "Converted str to parameter\n");
     }
     else if (pybind11::isinstance<pybind11::int_>(value))
     {
         parameter.value = pybind11::cast<int>(value);
-        TRACE1_PYBIND("Converted int to str:%s\n", value_str.c_str());
+        TRACE1(PYMODULE, "Converted int to parameter\n");
     }
-    else if (pybind11::isinstance<pybind11::float_>(value))
+    else if (pybind11::detail::make_caster<float>().load(value, true))
     {
+        // Value can be successfully cast to a float e.g., a float or a NumPy
+        //  float32 scalar. This was chosen to be more flexible than checking
+        //  against the built-in float_ type
         parameter.value = pybind11::cast<float>(value);
-        TRACE1_PYBIND("Converted float to str:%s\n", value_str.c_str());
+        TRACE1(PYMODULE, "Converted float to parameter\n");
     }
     else if (pybind11::isinstance<pybind11::dict>(value))
     {
@@ -274,6 +278,11 @@ void pyset_attributes(sanafe::Neuron *self,
             soma_specific_parameters, false, false, true);
     neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
 
+    INFO("Setting neuron attributes\n");
+    for (auto &[key, value] : neuron_template.model_parameters)
+    {
+        INFO("key: %s\n", key.c_str());
+    }
     self->set_attributes(neuron_template);
 
     return;

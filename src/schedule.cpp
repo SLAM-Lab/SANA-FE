@@ -1,4 +1,3 @@
-
 // Copyright (c) 2024 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
@@ -61,7 +60,7 @@ double sanafe::schedule_messages(
 
     priority = schedule_init_timing_priority(messages_sent_per_core);
     last_timestamp = 0.0;
-    SIM_TRACE1("Scheduling global order of messages.\n");
+    TRACE1(SCHEDULER, "Scheduling global order of messages.\n");
 
     // Each core has a queue of received messages. A structure tracks how
     //  many in-flight messages are in the NoC and occupy each tile. We
@@ -85,10 +84,10 @@ double sanafe::schedule_messages(
         //  from a src neuron to a dest neuron
         if (!m.placeholder)
         {
-            TRACE1("Processing message for nid:%d.%d\n",
-                    m.src_neuron->parent_group_id, m.src_neuron->id);
-            TRACE1("Send delay:%e\n", m.generation_delay);
-            TRACE1("Receive delay:%e\n", m.receive_delay);
+            TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
+                    m.src_neuron_group_id.c_str(), m.src_neuron_id);
+            TRACE1(SCHEDULER, "Send delay:%e\n", m.generation_delay);
+            TRACE1(SCHEDULER, "Receive delay:%e\n", m.receive_delay);
             const int dest_core = m.dest_core_id;
             // Figure out if we are able to send a message into the
             //  network i.e., is the route to the dest core
@@ -116,8 +115,8 @@ double sanafe::schedule_messages(
 
             double network_delay = messages_along_route *
                     noc.mean_in_flight_receive_delay / (m.hops + 1.0);
-            TRACE1("Path capacity:%zu messages:%lf delay:%e\n", path_capacity,
-                    messages_along_route, network_delay);
+            TRACE1(SCHEDULER, "Path capacity:%zu messages:%lf delay:%e\n",
+                    path_capacity, messages_along_route, network_delay);
 
             const double earliest_received_time =
                     m.sent_timestamp + fmax(m.network_delay, network_delay);
@@ -146,7 +145,7 @@ double sanafe::schedule_messages(
         }
         else
         {
-            TRACE1("\tCore finished simulating\n");
+            TRACE1(SCHEDULER, "\tCore finished simulating\n");
         }
 
 #ifdef DEBUG
@@ -161,9 +160,9 @@ double sanafe::schedule_messages(
         INFO("***\n");
 #endif
 
-        TRACE1("Priority size:%zu\n", priority.size());
+        TRACE1(SCHEDULER, "Priority size:%zu\n", priority.size());
     }
-    TRACE1("Scheduler finished.\n");
+    TRACE1(SCHEDULER, "Scheduler finished.\n");
 
     return last_timestamp;
 }
@@ -407,7 +406,7 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
     // Create the priority queue of messages
     MessagePriorityQueue priority;
 
-    TRACE1("Initializing priority queue.\n");
+    TRACE1(SCHEDULER, "Initializing priority queue.\n");
     for (auto &q : message_queues_per_core)
     {
         // For each per-core queue, get the first message for that core
@@ -421,7 +420,7 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
         }
         else
         {
-            TRACE1("No messages for core %d\n", i);
+            TRACE1(SCHEDULER, "No messages for core\n");
         }
     }
 

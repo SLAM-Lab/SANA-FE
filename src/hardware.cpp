@@ -214,7 +214,7 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(
         const AxonInConfiguration &config)
 {
     axon_in_hw.emplace_back(config);
-    TRACE1("New axon in h/w unit created (%d.%d)\n", parent_tile_id, id);
+    TRACE1(HW, "New axon in h/w unit created (%zu.%zu)\n", parent_tile_id, id);
 
     return axon_in_hw.back();
 }
@@ -227,21 +227,22 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
     {
         const std::filesystem::path plugin_lib_path =
                 config.model_info.plugin_library_path.value();
-        TRACE1("Creating synapse from plugin: %s.\n", plugin_lib_path.c_str());
+        TRACE1(HW, "Creating synapse from plugin: %s.\n",
+                plugin_lib_path.c_str());
         synapse.emplace_back(
                 plugin_get_synapse(config.model_info.name, plugin_lib_path));
     }
     else
     {
         // Use built in models
-        TRACE1("Creating synapse built-in model %s.\n",
-                curr_connection.synapse_hw->model.c_str());
+        TRACE1(HW, "Creating synapse built-in model %s.\n",
+                config.model_info.name.c_str());
         synapse.emplace_back(model_get_synapse(config.model_info.name));
     }
 
     auto &new_unit = synapse.back();
     new_unit->configure(config.name, config.model_info);
-    TRACE1("New synapse h/w unit created\n");
+    TRACE1(HW, "New synapse h/w unit created\n");
 
     return *new_unit;
 }
@@ -249,13 +250,13 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(
         const DendriteConfiguration &config)
 {
-    TRACE1("New dendrite h/w unit created\n");
+    TRACE1(HW, "New dendrite h/w unit created\n");
 
     if (config.model_info.plugin_library_path.has_value())
     {
         const std::filesystem::path &plugin_library_path =
                 config.model_info.plugin_library_path.value();
-        TRACE1("Creating dendrite from plugin %s.\n",
+        TRACE1(HW, "Creating dendrite from plugin %s.\n",
                 plugin_library_path.c_str());
         dendrite.emplace_back(plugin_get_dendrite(
                 config.model_info.name, plugin_library_path));
@@ -263,8 +264,8 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(
     else
     {
         // Use built in models
-        TRACE1("Creating dendrite built-in model %s.\n",
-                n.dendrite_hw->model.c_str());
+        TRACE1(HW, "Creating dendrite built-in model %s.\n",
+                config.model_info.name.c_str());
         dendrite.emplace_back(model_get_dendrite(config.model_info.name));
     }
 
@@ -275,22 +276,23 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(
 
 sanafe::SomaUnit &sanafe::Core::create_soma(const SomaConfiguration &config)
 {
-    TRACE1("New soma h/w unit created (%s)\n", config.name.c_str());
+    TRACE1(HW, "New soma h/w unit created (%s)\n", config.name.c_str());
 
     if (config.model_info.plugin_library_path.has_value())
     {
         // Use external plug-in
         auto &plugin_library_path =
                 config.model_info.plugin_library_path.value();
-        TRACE1("Creating soma from plugin %s.\n", plugin_library_path.c_str());
+        TRACE1(HW, "Creating soma from plugin %s.\n",
+                plugin_library_path.c_str());
         soma.emplace_back(
                 plugin_get_soma(config.model_info.name, plugin_library_path));
     }
     else
     {
         // Use built-in unit models
-        TRACE1("Creating soma built-in model %s.\n",
-                model_details.name.c_str());
+        TRACE1(HW, "Creating soma built-in model %s.\n",
+                config.model_info.name.c_str());
         soma.emplace_back(model_get_soma(config.model_info.name));
     }
     auto &unit = soma.back();
@@ -303,7 +305,8 @@ sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
         const AxonOutConfiguration &config)
 {
     axon_out_hw.emplace_back(config);
-    TRACE1("New axon out h/w unit created: (%d.%d)\n", parent_tile_id, id);
+    TRACE1(HW, "New axon out h/w unit created: (%zu.%zu)\n", parent_tile_id,
+            id);
 
     return axon_out_hw.back();
 }

@@ -280,7 +280,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
             /*
             s.noise_type = NOISE_FILE_STREAM;
             s.noise_stream = fopen(value_str.c_str(), "r");
-            TRACE1("Opening noise str: %s\n", value_str.c_str());
+            TRACE1(DESCRIPTION, "Opening noise str: %s\n", value_str.c_str());
             if (s.noise_stream == NULL)
             {
                 INFO("Error: Failed to open noise stream: %s.\n",
@@ -770,13 +770,13 @@ void sanafe::description_parse_group(const ryml::Parser &parser,
     NeuronTemplate default_neuron_config{};
     if (!neuron_group_node.find_child("attributes").invalid())
     {
-        TRACE1("Parsing neuron group attributes\n");
+        TRACE1(DESCRIPTION, "Parsing neuron group attributes\n");
         default_neuron_config = description_parse_neuron_attributes_yaml(
                 parser, neuron_group_node["attributes"]);
     }
     NeuronGroup &group = net.create_neuron_group(
             group_name, neuron_count, default_neuron_config);
-    TRACE1("Parsing neuron section\n");
+    TRACE1(DESCRIPTION, "Parsing neuron section\n");
     description_parse_neuron_section_yaml(parser, neurons_node, group);
 }
 
@@ -863,7 +863,7 @@ void sanafe::description_parse_neuron(const std::string &id,
         NeuronGroup &neuron_group)
 {
     std::pair<size_t, size_t> range;
-    TRACE1("Parsing neuron(s): %s\n", id.c_str());
+    TRACE1(DESCRIPTION, "Parsing neuron(s): %s\n", id.c_str());
     const NeuronTemplate config = description_parse_neuron_attributes_yaml(
             parser, attributes, neuron_group.default_neuron_config);
     const bool is_range = (id.find("..") != std::string::npos);
@@ -1664,7 +1664,7 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
     {
         throw std::runtime_error("Invalid range string");
     }
-    TRACE1("Range: %zu to %zu\n", first, last);
+    TRACE1(DESCRIPTION, "Range: %zu to %zu\n", first, last);
     if (first > last)
     {
         throw std::runtime_error("Invalid range; first > last");
@@ -1691,16 +1691,18 @@ sanafe::SpikingNetwork sanafe::description_parse_network_file_netlist(
     int line_number = 1;
     while (std::getline(fp, line))
     {
-        TRACE1("Parsing line: %s\n", line.c_str());
+        TRACE1(DESCRIPTION, "Parsing line: %s\n", line.c_str());
         description_get_fields(fields, line);
 
-        TRACE1("%ld fields.\n", fields.size());
-#ifdef DEBUG
-        for (auto f : fields)
+        TRACE1(DESCRIPTION, "%ld fields.\n", fields.size());
+
+        if (DEBUG_LEVEL_DESCRIPTION > 0)
         {
-            TRACE1("\tField:%s\n", f.c_str());
+            for (auto f : fields)
+            {
+                fprintf(stdout, "\tField:%s\n", std::string(f).c_str());
+            }
         }
-#endif
         if (fields.size() > 0)
         {
             description_read_network_entry(fields, arch, net, line_number);
@@ -1779,7 +1781,7 @@ std::tuple<std::string, size_t, std::string, size_t> sanafe::parse_edge_field(
     // i.e. Connection: e group.neuron->group.neuron:compartment <attributes>
     //   Note that the destination compartment is optional (default=0)
     // Split the source and destination neuron addresses
-    TRACE1("Parsing edge.\n");
+    TRACE1(DESCRIPTION, "Parsing edge.\n");
     const auto pos = edge_field.find("->");
     if (pos == std::string_view::npos)
     {
@@ -1848,7 +1850,7 @@ void sanafe::description_read_network_entry(
     if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#') ||
             (entry_type == '\r'))
     {
-        TRACE1("Warning: No entry, skipping line %d\n", line_number);
+        TRACE1(DESCRIPTION, "Warning: No entry, skipping line %d\n", line_number);
         return;
     }
 
@@ -1907,7 +1909,8 @@ void sanafe::description_read_network_entry(
         }
         NeuronGroup &dest_group = net.groups.at(dest_group_id);
 
-        TRACE1("Parsed neuron gid:%lu nid:%lu\n", dest_group_id, neuron_id);
+        TRACE1(DESCRIPTION, "Parsed neuron gid:%s nid:%lu\n",
+                dest_group_id.c_str(), neuron_id);
         if (dest_neuron_id >= dest_group.neurons.size())
         {
             INFO("Error: Line %d: Trying to access neuron "
@@ -1943,7 +1946,8 @@ void sanafe::description_read_network_entry(
             throw std::invalid_argument("Invalid group id");
         }
         NeuronGroup &group = net.groups.at(neuron_group_id);
-        TRACE1("Parsed neuron gid:%lu nid:%lu\n", neuron_group_id, neuron_id);
+        TRACE1(DESCRIPTION, "Parsed neuron gid:%s nid:%lu\n",
+                neuron_group_id.c_str(), neuron_id);
         if (neuron_set)
         {
             if (neuron_id >= group.neurons.size())
@@ -1967,7 +1971,8 @@ void sanafe::description_read_network_entry(
     std::map<std::string, ModelParam> params{};
     for (size_t i = 2; i < fields.size(); i++)
     {
-        TRACE1("Parsing field:%s\n", fields[i].c_str());
+        TRACE1(DESCRIPTION, "Parsing field:%s\n",
+                std::string(fields[i]).c_str());
 
         if ((fields[i].length() < 3))
         {

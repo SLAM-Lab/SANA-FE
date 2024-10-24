@@ -51,12 +51,14 @@ void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
 {
     this->core_id = core.address.id;
     mapping_order = parent_net.update_mapping_count();
-    TRACE1("Mapping order for nid:%s.%zu = %zu\n", parent_group_id.c_str(), id,
+    TRACE1(NET, "Mapping order for nid:%s.%zu = %zu\n", parent_group_id.c_str(), id,
             mapping_order);
 
     return;
 }
 
+// TODO: it's confusing with set_attributes and setting the model parameters
+//  in this way.. and possibly overkill with all this code. 
 void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
 {
     if (attributes.default_synapse_hw_name.has_value())
@@ -111,7 +113,7 @@ sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
 {
     groups.emplace(
             name, NeuronGroup(name, *this, neuron_count, default_config));
-    TRACE1("Created neuron group gid:%s with %zu neurons\n", name.c_str(),
+    TRACE1(NET, "Created neuron group gid:%s with %zu neurons\n", name.c_str(),
             neuron_count);
 
     return groups.at(name);
@@ -150,11 +152,11 @@ size_t sanafe::Neuron::connect_to_neuron(Neuron &dest)
         edge.synapse_hw_name = dest.default_synapse_hw_name;
     }
 
-    TRACE1("\tAdded con %s.%s->%s.%s (w:%lf)\n",
-            con.pre_neuron->parent_group_id.c_str(), con.pre_neuron->id.c_str(),
-            con.post_neuron->parent_group_id.c_str(),
-            con.post_neuron->id.c_str(),
-            static_cast<double>(con.synapse_params["w"]));
+    TRACE1(NET, "\tAdded con %s.%zu->%s.%zu\n",
+            edge.pre_neuron.group_name.c_str(),
+            edge.pre_neuron.neuron_id.value(),
+            edge.post_neuron.group_name.c_str(),
+            edge.post_neuron.neuron_id.value());
 
     return edge.id;
 }
@@ -226,7 +228,7 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
 {
     for (auto [source_id, dest_id] : source_dest_id_pairs)
     {
-        TRACE2("Connecting neurons, neurons.size=%lu\n", neurons.size());
+        TRACE2(NET, "Connecting neurons, neurons.size=%lu\n", neurons.size());
         if (source_id >= neurons.size())
         {
             INFO("source_id:%zu out of range (0 <= id <= %zu).\n", source_id,
@@ -409,7 +411,7 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
                                     con.synapse_params[key] = attribute;
                                 }
                             }
-                            TRACE1("%s.%zu->%s.%zu w=%d\n",
+                            TRACE1(NET, "%s.%zu->%s.%zu w=%d\n",
                                     source.parent_group_id.c_str(), source.id,
                                     dest.parent_group_id.c_str(), dest.id,
                                     (int) con.synapse_params["weight"]);

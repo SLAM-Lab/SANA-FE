@@ -64,7 +64,7 @@ void sanafe::pipeline_process_messages(Timestep &ts, SpikingHardware &hw)
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
         Core &core = cores[idx];
-        TRACE1("Processing %zu message(s) for cid:%zu\n",
+        TRACE1(PIPELINE, "Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
         for (auto *m : core.messages_in)
         {
@@ -90,7 +90,8 @@ void sanafe::pipeline_receive_message(SpikingHardware &hw, Message &m)
 void sanafe::pipeline_process_neuron(
         Timestep &ts, const SpikingHardware &arch, MappedNeuron &n)
 {
-    SIM_TRACE1("Processing neuron: %d.%d\n", n.id, n.parent_group_id);
+    TRACE1(PIPELINE, "Processing neuron: %s.%zu\n", n.parent_group_name.c_str(),
+            n.id);
     double neuron_processing_latency = 0.0;
 
     // Update any H/W following the time-step buffer in pipeline order
@@ -120,7 +121,7 @@ double sanafe::pipeline_process_message(
 {
     // Simulate message m in the message processing pipeline. The message is
     //  sequentially handled by units up to the time-step buffer
-    SIM_TRACE1("Receiving message for cid:%d\n", c.id);
+    TRACE1(PIPELINE, "Receiving message for cid:%zu\n", core.id);
     double message_processing_latency = pipeline_process_axon_in(core, m);
 
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
@@ -160,12 +161,14 @@ double sanafe::pipeline_process_axon_in(Core &core, const Message &m)
     return axon_unit.latency_spike_message;
 }
 
-double sanafe::pipeline_process_synapse(const Timestep &ts, MappedConnection &con)
+double sanafe::pipeline_process_synapse(
+        const Timestep &ts, MappedConnection &con)
 {
     // Update all synapses to different neurons in one core. If a synaptic
     //  lookup, read and accumulate the synaptic weights. Otherwise, just
     //  update filtered current and any other connection properties
-    SIM_TRACE1("Updating synapses for (cid:%d)\n", c.id);
+    TRACE1(PIPELINE, "Updating synapses for (cid:%zu)\n",
+            con.pre_neuron->core->id);
     con.synapse_hw->set_time(ts.timestep);
     Core &dest_core = *(con.post_neuron->core);
 
@@ -187,10 +190,10 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, MappedConnection &co
     con.post_neuron->spike_count++;
     assert(con.synapse_hw != nullptr);
     con.synapse_hw->spikes_processed++;
-    SIM_TRACE1("(nid:%s.%s->nid:%s.%s) con->current:%lf\n",
-            con.pre_neuron->parent_group_id.c_str(), con.pre_neuron->id.c_str(),
-            con.post_neuron->parent_group_id.c_str(),
-            con.post_neuron->id.c_str(), con.current);
+    TRACE1(PIPELINE, "(nid:%s.%zu->nid:%s.%zu) current:%lf\n",
+            con.pre_neuron->parent_group_name.c_str(), con.pre_neuron->id,
+            con.post_neuron->parent_group_name.c_str(), con.post_neuron->id,
+            synaptic_current);
 
     // Check that both the energy and latency costs have been set, either within
     //  the synapse h/w model, or by default metrics
@@ -212,7 +215,8 @@ double sanafe::pipeline_process_synapse(const Timestep &ts, MappedConnection &co
 }
 
 std::pair<double, double> sanafe::pipeline_apply_default_dendrite_power_model(
-        MappedNeuron &n, std::optional<double> energy, std::optional<double> latency)
+        MappedNeuron &n, std::optional<double> energy,
+        std::optional<double> latency)
 {
     // Apply default energy and latency metrics if set
     if (n.dendrite_hw->default_energy_update.has_value())
@@ -245,9 +249,7 @@ std::pair<double, double> sanafe::pipeline_apply_default_dendrite_power_model(
 double sanafe::pipeline_process_dendrite(const Timestep &ts, MappedNeuron &n)
 {
     n.dendrite_hw->set_time(ts.timestep);
-    TRACE2("Updating nid:%s dendritic current "
-           "(last_updated:%d, ts:%ld)\n",
-            n.id.c_str(), n.dendrite_last_updated, ts.timestep);
+    TRACE2(PIPELINE, "Updating nid:%zu (ts:%ld)\n", n.id, ts.timestep);
 
     double total_latency{0.0};
     if (n.dendrite_input_synapses.empty())
@@ -280,15 +282,16 @@ double sanafe::pipeline_process_dendrite(const Timestep &ts, MappedNeuron &n)
     }
 
     // Finally, send dendritic current to the soma
-    TRACE2("nid:%s updating dendrite, soma_input_charge:%lf\n", n.id.c_str(),
+    TRACE2(PIPELINE, "nid:%zu updating dendrite, soma_input_charge:%lf\n", n.id,
             n.soma_input_charge);
     return total_latency;
 }
 
 double sanafe::pipeline_process_soma(const Timestep &ts, MappedNeuron &n)
 {
-    TRACE1("nid:%s.%lu updating, current_in:%lf (ts:%lu)\n",
-            n.parent_group_id.c_str(), n.id, n.soma_input_charge, ts.timestep);
+    TRACE1(PIPELINE, "nid:%s.%zu updating, current_in:%lf (ts:%lu)\n",
+            n.parent_group_name.c_str(), n.id, n.soma_input_charge,
+            ts.timestep);
     n.soma_hw->set_time(ts.timestep);
 
     std::optional<double> soma_current_in;
@@ -349,11 +352,12 @@ double sanafe::pipeline_process_soma(const Timestep &ts, MappedNeuron &n)
 
         n.soma_hw->neurons_fired++;
         n.axon_out_input_spike = true;
-        SIM_TRACE1("Neuron %d.%d fired\n", n.parent_group_id, n.id);
+        TRACE1(PIPELINE, "Neuron %s.%zu fired\n", n.parent_group_name.c_str(),
+                n.id);
     }
 
     n.status = neuron_status;
-    SIM_TRACE1("neuron status:%d\n", n.status);
+    TRACE1(PIPELINE, "neuron status:%d\n", n.status);
 
     // Check that both the energy and latency costs have been set, either within
     //  the synapse h/w model, or by default metrics
@@ -379,9 +383,8 @@ double sanafe::pipeline_process_axon_out(
         return 0.0;
     }
 
-    TRACE1("nid:%s.%s sending spike message to %zu axons out\n",
-            n.parent_group_id.c_str(), n.id.c_str(),
-            n.axon_out_addresses.size());
+    TRACE1(PIPELINE, "nid:%s.%zu sending spike message to %zu axons out\n",
+            n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const int axon_address : n.axon_out_addresses)
     {
         Message m(hw, n, ts.timestep, axon_address);

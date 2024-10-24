@@ -147,7 +147,7 @@ sanafe::CoreConfiguration &sanafe::Architecture::create_core(std::string name,
     //  structures to track spike messages and congestion in the NoC
     max_cores_per_tile =
             std::max<size_t>(max_cores_per_tile, offset_within_tile + 1);
-    TRACE1("Core created id:%zu.%zu.\n", parent_tile_id, new_core_id);
+    TRACE1(ARCH, "Core created id:%zu.%zu.\n", parent_tile_id, new_core_id);
     CoreConfiguration &new_core = parent_tile.cores[offset_within_tile];
 
     return new_core;

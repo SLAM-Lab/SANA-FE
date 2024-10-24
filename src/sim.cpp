@@ -18,9 +18,9 @@
 #include <vector>
 
 #include "arch.hpp"
+#include "hardware.hpp"
 #include "models.hpp"
 #include "network.hpp"
-#include "hardware.hpp"
 #include "pipeline.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
@@ -107,7 +107,7 @@ void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
             if (!neuron.core_id.has_value())
             {
                 std::string error = "Neuron: " + neuron.parent_group_id + "." +
-                    std::to_string(neuron.id) + " not mapped.";
+                        std::to_string(neuron.id) + " not mapped.";
                 INFO("%s", error.c_str());
                 throw std::runtime_error(error);
             }
@@ -140,7 +140,8 @@ void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
                         net.groups.at(mapped.parent_group_name);
                 const Neuron &neuron = group.neurons[mapped.id];
 
-                for (auto &[name, param] : group.default_neuron_config.model_parameters)
+                for (auto &[name, param] :
+                        group.default_neuron_config.model_parameters)
                 {
                     INFO("Setting group parameter:%s\n", name.c_str());
                 }
@@ -165,12 +166,13 @@ void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
                 neuron_specific_config.soma_hw_name = neuron.soma_hw_name;
                 neuron_specific_config.model_parameters =
                         neuron.model_parameters;
-                mapped.set_attributes(neuron_specific_config);
-                mapped_neuron_groups[group.name][neuron.id] = &mapped;
-                for (auto &[name, param] : group.default_neuron_config.model_parameters)
+                for (auto &[name, param] :
+                        neuron_specific_config.model_parameters)
                 {
                     INFO("Setting neuron parameter:%s\n", name.c_str());
                 }
+                mapped.set_attributes(neuron_specific_config);
+                mapped_neuron_groups[group.name][neuron.id] = &mapped;
 
                 INFO("Set attributes of nid:%s.%zu at address cid:%zu[%zu]\n",
                         neuron.parent_group_id.c_str(), neuron.id, core.id,
@@ -238,8 +240,7 @@ sanafe::MappedConnection &sanafe::SpikingHardware::map_connection(
     auto list_of_cores = cores();
 
     auto &pre_group = mapped_neuron_groups.at(con.pre_neuron.group_name);
-    MappedNeuron &pre_neuron =
-            *(pre_group[con.pre_neuron.neuron_id.value()]);
+    MappedNeuron &pre_neuron = *(pre_group[con.pre_neuron.neuron_id.value()]);
 
     auto &post_group = mapped_neuron_groups.at(con.post_neuron.group_name);
     MappedNeuron &post_neuron =
@@ -280,7 +281,7 @@ sanafe::MappedConnection &sanafe::SpikingHardware::map_connection(
 
 void sanafe::SpikingHardware::map_axons()
 {
-    TRACE1("Creating all connection maps.\n");
+    TRACE1(SIM, "Creating all connection maps.\n");
     for (Tile &tile : tiles)
     {
         for (Core &core : tile.cores)
@@ -292,7 +293,7 @@ void sanafe::SpikingHardware::map_axons()
         }
     }
 
-    TRACE1("Finished creating connection maps.\n");
+    TRACE1(SIM, "Finished creating connection maps.\n");
     sim_print_axon_summary(*this);
 }
 
@@ -396,7 +397,7 @@ sanafe::Timestep sanafe::SpikingHardware::step()
     constexpr double ns_in_second = 1.0e9;
     wall_time +=
             (double) ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / ns_in_second);
-    SIM_TRACE1("Time-step took: %fs.\n",
+    TRACE1(SIM, "Time-step took: %fs.\n",
             static_cast<double>(
                     ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / ns_in_second)));
 
@@ -566,7 +567,7 @@ void sanafe::sim_timestep(Timestep &ts, SpikingHardware &hw)
         }
     }
 
-    SIM_TRACE1("Spikes sent: %ld\n", ts.spike_count);
+    TRACE1(SIM, "Spikes sent: %ld\n", ts.spike_count);
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
@@ -613,11 +614,10 @@ double sanafe::sim_estimate_network_costs(const Tile &src, Tile &dest)
 
     dest.hops += (x_hops + y_hops);
     dest.messages_received++;
-    SIM_TRACE1("xhops:%ld yhops%ld total hops:%ld latency:%e\n", x_hops, y_hops,
-            x_hops + y_hops, network_latency);
+    TRACE1(SIM, "xhops:%ld yhops%ld total hops:%ld latency:%e\n", x_hops,
+            y_hops, x_hops + y_hops, network_latency);
     return network_latency;
 }
-
 
 // TODO: reimplement noise generation from file in C++
 /*
@@ -649,7 +649,7 @@ double sanafe::sim_generate_noise(Neuron *n)
 		if (result != NULL)
 		{
 			const int ret = sscanf(noise_str, "%d", &noise_val);
-			TRACE2("noise val:%d\n", noise_val);
+			TRACE2(SIM, "noise val:%d\n", noise_val);
 
 			if (ret < 1)
 			{
@@ -693,7 +693,7 @@ double sanafe::sim_calculate_energy(const SpikingHardware &hw)
         total_hop_energy +=
                 (static_cast<double>(t.north_hops) * t.energy_north_hop);
         network_energy += total_hop_energy;
-        TRACE1("east:%ld west:%ld north:%ld south:%ld\n", t.east_hops,
+        TRACE1(SIM, "east:%ld west:%ld north:%ld south:%ld\n", t.east_hops,
                 t.west_hops, t.north_hops, t.south_hops);
 
         for (const auto &c : t.cores)
@@ -703,8 +703,8 @@ double sanafe::sim_calculate_energy(const SpikingHardware &hw)
             {
                 axon_in_energy += static_cast<double>(axon.spike_messages_in) *
                         axon.energy_spike_message;
-                TRACE1("spikes in: %ld, energy:%e\n", axon.spike_messages_in,
-                        axon.energy_spike_message);
+                TRACE1(SIM, "spikes in: %ld, energy:%e\n",
+                        axon.spike_messages_in, axon.energy_spike_message);
             }
             // TODO: fix energy and latency for individual units
             /*
@@ -712,7 +712,7 @@ double sanafe::sim_calculate_energy(const SpikingHardware &hw)
             {
                 synapse_energy += static_cast<double>(syn.spikes_processed) *
                         syn.energy_spike_op;
-                TRACE1("synapse processed: %ld, energy:%e\n",
+                TRACE1(SIM, "synapse processed: %ld, energy:%e\n",
                         syn.spikes_processed, syn.energy_spike_op);
             }
             for (const auto &soma : c.soma)
@@ -723,7 +723,7 @@ double sanafe::sim_calculate_energy(const SpikingHardware &hw)
                         soma.energy_update_neuron;
                 soma_energy += static_cast<double>(soma.neurons_fired) *
                         soma.energy_spiking;
-                TRACE1("neurons:%ld updates:%ld, spiking:%ld\n",
+                TRACE1(SIM, "neurons:%ld updates:%ld, spiking:%ld\n",
                         soma.neuron_count, soma.neuron_updates,
                         soma.neurons_fired);
             }
@@ -732,7 +732,7 @@ double sanafe::sim_calculate_energy(const SpikingHardware &hw)
             {
                 axon_out_energy += static_cast<double>(axon.packets_out) *
                         axon.energy_access;
-                TRACE1("packets: %ld, energy:%e\n", axon.packets_out,
+                TRACE1(SIM, "packets: %ld, energy:%e\n", axon.packets_out,
                         axon.energy_access);
             }
         }
@@ -743,13 +743,13 @@ double sanafe::sim_calculate_energy(const SpikingHardware &hw)
     total_energy = model_simulated_energy + axon_in_energy + synapse_energy +
             soma_energy + axon_out_energy + network_energy;
 
-    TRACE1("model_simulated_energy:%e\n", model_simulated_energy);
-    TRACE1("axon_in_energy:%e\n", axon_in_energy);
-    TRACE1("synapse_energy:%e\n", synapse_energy);
-    TRACE1("soma_energy:%e\n", soma_energy);
-    TRACE1("axon_out_energy:%e\n", axon_out_energy);
-    TRACE1("network_energy:%e\n", network_energy);
-    TRACE1("total:%e\n", total_energy);
+    TRACE1(SIM, "model_simulated_energy:%e\n", model_simulated_energy);
+    TRACE1(SIM, "axon_in_energy:%e\n", axon_in_energy);
+    TRACE1(SIM, "synapse_energy:%e\n", synapse_energy);
+    TRACE1(SIM, "soma_energy:%e\n", soma_energy);
+    TRACE1(SIM, "axon_out_energy:%e\n", axon_out_energy);
+    TRACE1(SIM, "network_energy:%e\n", network_energy);
+    TRACE1(SIM, "total:%e\n", total_energy);
 
     return total_energy;
 }
@@ -760,42 +760,43 @@ void sanafe::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     assert(pre_neuron.core != nullptr);
 
     // Figure out the unique set of cores that this neuron broadcasts to
-    TRACE1("Counting connections for neuron nid:%s\n", pre_neuron.id.c_str());
+    TRACE1(SIM, "Counting connections for neuron nid:%zu\n", pre_neuron.id);
     std::set<Core *> cores_out;
     for (MappedConnection &curr_connection : pre_neuron.connections_out)
     {
-        TRACE1("Looking at connection id: %d\n", curr_connection.id);
+        TRACE1(SIM, "Looking at connection id: %d\n", curr_connection.id);
         Core *dest_core = curr_connection.post_neuron->core;
         cores_out.insert(dest_core);
-        TRACE1("Connected to dest core: %zu\n", dest_core->id);
+        TRACE1(SIM, "Connected to dest core: %zu\n", dest_core->id);
     }
 
-    TRACE1("Creating connections for neuron nid:%s to %zu core(s)\n",
-            pre_neuron.id.c_str(), cores_out.size());
+    TRACE1(SIM, "Creating connections for neuron nid:%zu to %zu core(s)\n",
+            pre_neuron.id, cores_out.size());
     for (Core *dest_core : cores_out)
     {
         // Create the axon, and add it to both the destination and
         //  source cores
         sim_allocate_axon(pre_neuron, *dest_core);
     }
-    TRACE3("Counted all maps for nid:%s count: %d\n", pre_neuron.id.c_str());
+    TRACE3(SIM, "Allocated all axons for nid:%zu count: %d\n", pre_neuron.id,
+            pre_neuron.maps_out_count);
 
     for (MappedConnection &curr_connection : pre_neuron.connections_out)
     {
         // Add every connection to the axon. Also link to the map in the
         //  post synaptic core / neuron
         Core &post_core = *(curr_connection.post_neuron->core);
-        TRACE1("Adding connection:%d\n", curr_connection.id);
+        TRACE1(SIM, "Adding connection:%d\n", curr_connection.id);
         sim_add_connection_to_axon(curr_connection, post_core);
     }
-    TRACE1("Finished mapping connections to hardware for nid:%s.%zu.\n",
-            pre_neuron.parent_group_id.c_str(), pre_neuron.id);
+    TRACE1(SIM, "Finished mapping connections to hardware for nid:%s.%zu.\n",
+            pre_neuron.parent_group_name.c_str(), pre_neuron.id);
 }
 
 void sanafe::sim_add_connection_to_axon(MappedConnection &con, Core &post_core)
 {
     // Add a given connection to the axon in the post-synaptic core
-    TRACE3("Adding to connection to axon:%zu\n",
+    TRACE3(SIM, "Adding to connection to axon:%zu\n",
             post_core.axons_out.size() - 1);
 
     post_core.connections_in.push_back(&con);
@@ -820,11 +821,14 @@ void sanafe::sim_print_axon_summary(SpikingHardware &hw)
             bool core_used = false;
             for (size_t k = 0; k < core.neurons.size(); k++)
             {
-#ifdef DEBUG
-                Neuron *n = c->neurons[k];
-                TRACE2("\tnid:%s.%s ", n->group->id.c_str(), n->id.c_str());
-                TRACE2("i:%d o:%d\n", n->maps_in_count, n->maps_out_count);
-#endif
+                if (DEBUG_LEVEL_SIM >= 2)
+                {
+                    MappedNeuron &n = core.neurons[k];
+                    TRACE2(SIM, "\tnid:%s.%zu ", n.parent_group_name.c_str(),
+                            n.id);
+                    TRACE2(SIM, "i:%d o:%d\n", n.maps_in_count,
+                            n.maps_out_count);
+                }
                 core_used = true;
             }
 
@@ -843,7 +847,6 @@ void sanafe::sim_print_axon_summary(SpikingHardware &hw)
             static_cast<double>(out_count) / hw.core_count);
 }
 
-
 void sanafe::sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core)
 {
     // Create a new input axon at a receiving (destination) core
@@ -852,13 +855,13 @@ void sanafe::sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core)
 
     Core &pre_core = *(pre_neuron.core);
 
-    TRACE3("Adding connection to core.\n");
+    TRACE3(SIM, "Adding connection to core.\n");
     // Allocate the axon and its connections at the post-synaptic core
     post_core.axons_in.emplace_back(AxonInModel());
     const size_t new_axon_in_address = post_core.axons_in.size() - 1;
 
     // Add the axon at the sending, pre-synaptic core
-    TRACE1("Axon in address:%zu for core:%zu.%zu\n", new_axon_in_address,
+    TRACE1(SIM, "Axon in address:%zu for core:%zu.%zu\n", new_axon_in_address,
             post_core.parent_tile_id, post_core.id);
     AxonOutModel out;
     out.dest_axon_id = new_axon_in_address;
@@ -870,8 +873,8 @@ void sanafe::sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core)
 
     // Then add the output axon to the sending pre-synaptic neuron
     pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
-    TRACE1("nid:%s.%zu cid:%zu.%zu added one output axon address %zu.\n",
-            pre_neuron.parent_group_id.c_str(), pre_neuron.id.c_str(),
+    TRACE1(SIM, "nid:%s.%zu cid:%zu.%zu added one output axon address %zu.\n",
+            pre_neuron.parent_group_name.c_str(), pre_neuron.id,
             pre_core.parent_tile_id, pre_core.offset, new_axon_out_address);
 }
 
@@ -954,7 +957,7 @@ void sanafe::sim_trace_write_potential_header(
     //  probed
     assert(potential_trace_file.is_open());
     potential_trace_file << "timestep,";
-    for (const auto &[group_name, group_neurons]: hw.mapped_neuron_groups)
+    for (const auto &[group_name, group_neurons] : hw.mapped_neuron_groups)
     {
         for (const MappedNeuron *neuron : group_neurons)
         {
@@ -1023,7 +1026,7 @@ void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
     // Each line of this csv file is the potential of all probed neurons for
     //  one time-step
     assert(potential_trace_file.is_open());
-    SIM_TRACE1("Recording potential for timestep: %d\n", timestep);
+    TRACE1(SIM, "Recording potential for timestep: %ld\n", timestep);
     potential_trace_file << timestep << ",";
 
     long int potential_probe_count = 0;
@@ -1109,7 +1112,7 @@ timespec sanafe::calculate_elapsed_time(
 double sim_calculate_time(const Architecture *const arch)
 {
 	Core *c = n->core;
-	SIM_TRACE1("nid:%d sending spike(s).\n", n->id);
+	TRACE1(SIM, "nid:%d sending spike(s).\n", n->id);
 	int core_id = n->core->id;
 
 

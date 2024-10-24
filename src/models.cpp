@@ -16,7 +16,7 @@ sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
 {
     if (read)
     {
-        TRACE1("w:%lf\n", weights[synapse_address]);
+        TRACE1(MODELS, "w:%lf\n", weights[synapse_address]);
         return {weights[synapse_address], std::nullopt, std::nullopt};
     }
     return {0.0, std::nullopt, std::nullopt};
@@ -28,13 +28,13 @@ void sanafe::CurrentBasedSynapseModel::set_attribute(
 {
     if (weights.size() <= synapse_address)
     {
-        TRACE1("Resizing weights to: %zu\n", synapse_address + 1);
+        TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
         weights.resize(std::max(weights.size() * 2, synapse_address + 1));
     }
 
     if ((param_name == "w") || (param_name == "weight"))
     {
-        TRACE1("Setting weight at address:%zu = %lf\n", synapse_address,
+        TRACE1(MODELS, "Setting weight at address:%zu = %lf\n", synapse_address,
                 static_cast<double>(param));
         weights[synapse_address] = static_cast<double>(param);
     }
@@ -249,8 +249,8 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
 
     // Calculate the change in potential since the last update e.g.
     //  integate inputs and apply any potential leak
-    TRACE1("Updating potential (nid:%d.%d), before:%lf\n", group_id, neuron_id,
-            potential);
+    TRACE1(MODELS, "Updating potential (cx:%zu), before:%lf\n",
+            neuron_address, cx.potential);
     sanafe::NeuronStatus state = sanafe::IDLE;
     // Update soma, if there are any received spikes, there is a non-zero
     //  bias or we force the neuron to update every time-step
@@ -274,15 +274,15 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
     }
     */
     // Add the synaptic / dendrite current to the potential
-    TRACE1("bias:%lf potential before:%lf\n", bias, potential);
+    TRACE1(MODELS, "bias:%lf potential before:%lf\n", cx.bias, cx.potential);
     cx.potential += cx.bias;
 
     if (current_in.has_value())
     {
         cx.potential += current_in.value();
     }
-    TRACE1("Updating potential (nid:%d.%d), after:%lf\n", group_id, neuron_id,
-            potential);
+    TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n",
+            neuron_address, cx.potential);
 
     // Check against threshold potential (for spiking)
     if (cx.potential > cx.threshold)
@@ -296,7 +296,7 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
             cx.potential -= cx.threshold;
         }
         state = sanafe::FIRED;
-        TRACE1("Neuron fired.\n");
+        TRACE1(MODELS, "Neuron fired.\n");
     }
     // Check against reverse threshold
     if (cx.potential < cx.reverse_threshold)
@@ -423,8 +423,8 @@ sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
         const unsigned int r = std::rand() & n.random_range_mask;
         v += static_cast<double>(r);
     }
-    TRACE2("v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, threshold,
-            reset_mode, reverse_threshold, reverse_reset_mode);
+    TRACE2(MODELS, "v:%lf +vth:%lf mode:%d -vth:%lf mode:%d\n", v, n.threshold,
+            n.reset_mode, n.reverse_threshold, n.reverse_reset_mode);
     if (v >= n.threshold)
     {
         if (n.reset_mode == NEURON_RESET_HARD)
@@ -457,13 +457,14 @@ sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
         }
         // No spike is generated
     }
-    TRACE2("potential:%lf threshold %lf\n", potential, threshold);
+    TRACE2(MODELS, "potential:%lf threshold %lf\n", n.potential, n.threshold);
     return {state, std::nullopt, std::nullopt};
 }
 
 void sanafe::InputModel::set_attribute(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
+    INFO("Setting attribtue:%s\n", param_name.c_str());
     if (param_name == "spikes")
     {
         spikes = static_cast<std::vector<bool>>(param);
@@ -472,6 +473,7 @@ void sanafe::InputModel::set_attribute(const size_t neuron_address,
     else if (param_name == "poisson")
     {
         poisson_probability = static_cast<double>(param);
+        INFO("Setting poisson probability: %lf\n", poisson_probability);
     }
 }
 
@@ -494,6 +496,7 @@ sanafe::SomaUnit::SomaResult sanafe::InputModel::update(
     if (poisson_probability > uniform_distribution(gen))
     {
         send_spike = true;
+        INFO("Randomly generating spike (Poisson).\n");
     }
 
     const NeuronStatus status = send_spike ? FIRED : IDLE;
