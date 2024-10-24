@@ -220,7 +220,7 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     else if (param_name == "bias")
     {
         cx.bias = static_cast<double>(param);
-        INFO("setting bias of %zu=%lf\n", neuron_address, cx.bias);
+        TRACE2(MODELS, "setting bias of %zu=%lf\n", neuron_address, cx.bias);
     }
     else if ((param_name == "force_update") ||
             (param_name == "force_soma_update"))
@@ -228,7 +228,7 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
         cx.force_update = static_cast<bool>(param);
     }
 
-    INFO("Set param: %s\n", param_name.c_str());
+    TRACE1(MODELS, "Set parameter: %s\n", param_name.c_str());
 }
 
 sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
@@ -464,7 +464,7 @@ sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
 void sanafe::InputModel::set_attribute(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
-    INFO("Setting attribtue:%s\n", param_name.c_str());
+    TRACE1(MODELS, "Setting attribtue:%s\n", param_name.c_str());
     if (param_name == "spikes")
     {
         spikes = static_cast<std::vector<bool>>(param);
@@ -473,7 +473,8 @@ void sanafe::InputModel::set_attribute(const size_t neuron_address,
     else if (param_name == "poisson")
     {
         poisson_probability = static_cast<double>(param);
-        INFO("Setting poisson probability: %lf\n", poisson_probability);
+        TRACE2(MODELS, "Setting poisson probability: %lf\n",
+                poisson_probability);
     }
 }
 
@@ -496,7 +497,7 @@ sanafe::SomaUnit::SomaResult sanafe::InputModel::update(
     if (poisson_probability > uniform_distribution(gen))
     {
         send_spike = true;
-        INFO("Randomly generating spike (Poisson).\n");
+        TRACE2(MODELS, "Randomly generating spike (Poisson).\n");
     }
 
     const NeuronStatus status = send_spike ? FIRED : IDLE;

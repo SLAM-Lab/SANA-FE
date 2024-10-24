@@ -22,7 +22,6 @@
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
 // TODO: support conv, dense and sparse hyperedges here
-// TODO: support set_attributes for neurons and for groups
 
 // Forward declarations
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
@@ -43,7 +42,7 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
     {
         const std::string key =
                 pybind11::cast<std::string>(key_value_pair.first);
-        INFO("Adding dict val: dict['%s']\n", key.c_str());
+        TRACE1(PYMODULE, "Adding dict val: dict['%s']\n", key.c_str());
 
         pybind11::object value =
                 pybind11::cast<pybind11::object>(key_value_pair.second);
@@ -55,7 +54,7 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         parameter.name = key;
         map[key] = parameter;
     }
-    INFO("Converted map.size()=%zu\n", map.size());
+    TRACE1(PYMODULE, "Converted map.size()=%zu\n", map.size());
 
     return map;
 }
@@ -278,10 +277,13 @@ void pyset_attributes(sanafe::Neuron *self,
             soma_specific_parameters, false, false, true);
     neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
 
-    INFO("Setting neuron attributes\n");
-    for (auto &[key, value] : neuron_template.model_parameters)
+    TRACE1(PYMODULE, "Setting neuron attributes\n");
+    if (DEBUG_LEVEL_PYMODULE > 0)
     {
-        INFO("key: %s\n", key.c_str());
+        for (auto &[key, value] : neuron_template.model_parameters)
+        {
+                TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
+        }
     }
     self->set_attributes(neuron_template);
 

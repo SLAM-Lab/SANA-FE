@@ -143,7 +143,7 @@ void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
                 for (auto &[name, param] :
                         group.default_neuron_config.model_parameters)
                 {
-                    INFO("Setting group parameter:%s\n", name.c_str());
+                    TRACE2(SIM, "Setting group parameter:%s\n", name.c_str());
                 }
 
                 mapped.set_attributes(group.default_neuron_config);
@@ -169,12 +169,13 @@ void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
                 for (auto &[name, param] :
                         neuron_specific_config.model_parameters)
                 {
-                    INFO("Setting neuron parameter:%s\n", name.c_str());
+                    TRACE2(SIM, "Setting neuron parameter:%s\n", name.c_str());
                 }
                 mapped.set_attributes(neuron_specific_config);
                 mapped_neuron_groups[group.name][neuron.id] = &mapped;
 
-                INFO("Set attributes of nid:%s.%zu at address cid:%zu[%zu]\n",
+                TRACE1(SIM,
+                        "Set attributes of nid:%s.%zu at address cid:%zu[%zu]\n",
                         neuron.parent_group_id.c_str(), neuron.id, core.id,
                         address);
             }
@@ -337,7 +338,8 @@ sanafe::RunData sanafe::SpikingHardware::sim(
             INFO("*** Time-step %ld ***\n", timestep);
         }
         const Timestep ts = step();
-        INFO("neurons fired: %zu\n", ts.neurons_fired);
+        TRACE1(SIM, "Neurons fired in ts:%ld: %zu\n", timestep,
+                ts.neurons_fired);
         rd.energy += ts.energy;
         rd.sim_time += ts.sim_time;
         rd.spikes += ts.spike_count;
