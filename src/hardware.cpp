@@ -311,7 +311,7 @@ sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
     return axon_out_hw.back();
 }
 
-sanafe::Message::Message(const SpikingHardware &hw, const MappedNeuron &n,
+sanafe::Message::Message(const SpikingChip &hw, const MappedNeuron &n,
         const long int timestep)
         : timestep(timestep)
         , src_neuron_id(n.id)
@@ -329,7 +329,7 @@ sanafe::Message::Message(const SpikingHardware &hw, const MappedNeuron &n,
     src_core_offset = src_core.offset;
 }
 
-sanafe::Message::Message(const SpikingHardware &hw, const MappedNeuron &n,
+sanafe::Message::Message(const SpikingChip &hw, const MappedNeuron &n,
         const long int timestep, const int axon_address)
         : Message(hw, n, timestep)
 {

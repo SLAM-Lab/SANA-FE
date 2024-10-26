@@ -48,20 +48,20 @@ struct AxonOutModel;
 enum BufferPosition : int;
 
 const long int default_heartbeat_timesteps = 100L;
-class SpikingHardware
+class SpikingChip
 {
 public:
     std::vector<Tile> tiles{};
     // Keep a reference to the different neuron groups mapped to the H/W
     std::map<std::string, std::vector<MappedNeuron *>> mapped_neuron_groups{};
 
-    SpikingHardware(const Architecture &arch, const std::filesystem::path &output_dir = ".", bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false);
-    ~SpikingHardware();
+    SpikingChip(const Architecture &arch, const std::filesystem::path &output_dir = ".", bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false);
+    ~SpikingChip();
     // Do not allow copying
-    SpikingHardware(const SpikingHardware &copy) = delete;
-    SpikingHardware(SpikingHardware &&other) = delete;
-    SpikingHardware &operator=(const SpikingHardware &copy) = delete;
-    SpikingHardware &operator=(SpikingHardware &&other) = delete;
+    SpikingChip(const SpikingChip &copy) = delete;
+    SpikingChip(SpikingChip &&other) = delete;
+    SpikingChip &operator=(const SpikingChip &copy) = delete;
+    SpikingChip &operator=(SpikingChip &&other) = delete;
     RunData sim(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps);
     void load(const SpikingNetwork &net);
     double get_power() const;
@@ -130,28 +130,28 @@ struct Timestep
     Timestep(long int ts, int core_count);
 };
 
-void sim_timestep(Timestep &ts, SpikingHardware &hw);
+void sim_timestep(Timestep &ts, SpikingChip &hw);
 double sim_estimate_network_costs(const Tile &src, Tile &dest);
-void sim_reset_measurements(SpikingHardware &hw);
-double sim_calculate_energy(const SpikingHardware &hw);
+void sim_reset_measurements(SpikingChip &hw);
+double sim_calculate_energy(const SpikingChip &hw);
 
 std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
 std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
-std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir, const SpikingHardware &hw);
+std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir, const SpikingChip &hw);
 std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
 void sim_trace_write_spike_header(std::ofstream &spike_trace_file);
-void sim_trace_write_potential_header(std::ofstream &potential_trace_file, const SpikingHardware &hw);
+void sim_trace_write_potential_header(std::ofstream &potential_trace_file, const SpikingChip &hw);
 void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
 void sim_trace_write_message_header(std::ofstream &message_trace_file);
-void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps, const SpikingHardware &hw);
-void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep, const SpikingHardware &hw);
+void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps, const SpikingChip &hw);
+void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep, const SpikingChip &hw);
 void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
 void sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts);
 
 void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data);
 void sim_format_run_summary(std::ostream &out, const RunData &run_data);
 
-void sim_print_axon_summary(SpikingHardware &hw);
+void sim_print_axon_summary(SpikingChip &hw);
 void sim_create_neuron_axons(MappedNeuron &pre_neuron);
 void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
 void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);

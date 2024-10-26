@@ -51,7 +51,7 @@ sanafe::Architecture::cores()
 }
 
 std::vector<std::reference_wrapper<sanafe::Core>>
-sanafe::SpikingHardware::cores()
+sanafe::SpikingChip::cores()
 {
     std::vector<std::reference_wrapper<Core>> all_cores_in_hw;
 

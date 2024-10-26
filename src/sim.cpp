@@ -27,7 +27,7 @@
 #include "schedule.hpp"
 #include "sim.hpp"
 
-sanafe::SpikingHardware::SpikingHardware(const Architecture &arch,
+sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         const std::filesystem::path &output_dir, const bool record_spikes,
         const bool record_potentials, const bool record_perf,
         const bool record_messages)
@@ -78,7 +78,7 @@ sanafe::SpikingHardware::SpikingHardware(const Architecture &arch,
     }
 }
 
-sanafe::SpikingHardware::~SpikingHardware()
+sanafe::SpikingChip::~SpikingChip()
 {
     // Close any open trace files
     spike_trace.close();
@@ -87,13 +87,13 @@ sanafe::SpikingHardware::~SpikingHardware()
     message_trace.close();
 }
 
-void sanafe::SpikingHardware::load(const SpikingNetwork &net)
+void sanafe::SpikingChip::load(const SpikingNetwork &net)
 {
     map_neurons(net);
     map_connections(net);
 }
 
-void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
+void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
 {
     auto list_of_cores = cores();
     // 1) map neurons to core
@@ -183,7 +183,7 @@ void sanafe::SpikingHardware::map_neurons(const SpikingNetwork &net)
     }
 }
 
-void sanafe::SpikingHardware::map_connections(const SpikingNetwork &net)
+void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
 {
     for (const auto &[name, group] : net.groups)
     {
@@ -235,7 +235,7 @@ void sanafe::SpikingHardware::map_connections(const SpikingNetwork &net)
     return;
 }
 
-sanafe::MappedConnection &sanafe::SpikingHardware::map_connection(
+sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
         const Connection &con)
 {
     auto list_of_cores = cores();
@@ -280,7 +280,7 @@ sanafe::MappedConnection &sanafe::SpikingHardware::map_connection(
     return mapped_con;
 }
 
-void sanafe::SpikingHardware::map_axons()
+void sanafe::SpikingChip::map_axons()
 {
     TRACE1(SIM, "Creating all connection maps.\n");
     for (Tile &tile : tiles)
@@ -304,7 +304,7 @@ sanafe::RunData::RunData(const long int start, const long int steps)
 {
 }
 
-sanafe::RunData sanafe::SpikingHardware::sim(
+sanafe::RunData sanafe::SpikingChip::sim(
         const long int timesteps, const long int heartbeat)
 {
     RunData rd((total_timesteps + 1), timesteps);
@@ -351,7 +351,7 @@ sanafe::RunData sanafe::SpikingHardware::sim(
     return rd;
 }
 
-sanafe::Timestep sanafe::SpikingHardware::step()
+sanafe::Timestep sanafe::SpikingChip::step()
 {
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
@@ -406,7 +406,7 @@ sanafe::Timestep sanafe::SpikingHardware::step()
     return ts;
 }
 
-void sanafe::SpikingHardware::reset()
+void sanafe::SpikingChip::reset()
 {
     for (auto &[group_name, neurons] : mapped_neuron_groups)
     {
@@ -418,7 +418,7 @@ void sanafe::SpikingHardware::reset()
     }
 }
 
-double sanafe::SpikingHardware::get_power() const
+double sanafe::SpikingChip::get_power() const
 {
     double power; // Watts
     if (total_sim_time > 0.0)
@@ -434,7 +434,7 @@ double sanafe::SpikingHardware::get_power() const
     return power;
 }
 
-sanafe::RunData sanafe::SpikingHardware::get_run_summary() const
+sanafe::RunData sanafe::SpikingChip::get_run_summary() const
 {
     // Store the summary data in a string to string mapping
     RunData run_data(0, total_timesteps);
@@ -497,7 +497,7 @@ std::ofstream sanafe::sim_trace_open_spike_trace(
 }
 
 std::ofstream sanafe::sim_trace_open_potential_trace(
-        const std::filesystem::path &out_dir, const SpikingHardware &hw)
+        const std::filesystem::path &out_dir, const SpikingChip &hw)
 {
     const std::filesystem::path potential_path = out_dir / "potential.csv";
     std::ofstream potential_file(potential_path);
@@ -540,7 +540,7 @@ std::ofstream sanafe::sim_trace_open_message_trace(
     return message_file;
 }
 
-void sanafe::sim_timestep(Timestep &ts, SpikingHardware &hw)
+void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw)
 {
     Scheduler scheduler;
 
@@ -685,7 +685,7 @@ double sanafe::sim_generate_noise(Neuron *n)
 }
 */
 
-double sanafe::sim_calculate_energy(const SpikingHardware &hw)
+double sanafe::sim_calculate_energy(const SpikingChip &hw)
 {
     // Returns the total energy across the design, for this timestep
     double total_energy{0.0};
@@ -821,7 +821,7 @@ void sanafe::sim_add_connection_to_axon(MappedConnection &con, Core &post_core)
     last_added_target_axon.synapse_addresses.push_back(con.synapse_address);
 }
 
-void sanafe::sim_print_axon_summary(SpikingHardware &hw)
+void sanafe::sim_print_axon_summary(SpikingChip &hw)
 {
     int in_count = 0;
     int out_count = 0;
@@ -892,7 +892,7 @@ void sanafe::sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core)
             pre_core.parent_tile_id, pre_core.offset, new_axon_out_address);
 }
 
-void sanafe::sim_reset_measurements(SpikingHardware &hw)
+void sanafe::sim_reset_measurements(SpikingChip &hw)
 {
     // Reset any energy, time latency or other measurements of network
     //  hardware
@@ -965,7 +965,7 @@ void sanafe::sim_trace_write_spike_header(std::ofstream &spike_trace_file)
 }
 
 void sanafe::sim_trace_write_potential_header(
-        std::ofstream &potential_trace_file, const SpikingHardware &hw)
+        std::ofstream &potential_trace_file, const SpikingChip &hw)
 {
     // Write csv header for probe outputs - record which neurons have been
     //  probed
@@ -1014,7 +1014,7 @@ void sanafe::sim_trace_write_message_header(std::ofstream &message_trace_file)
 }
 
 void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
-        const long int timestep, const SpikingHardware &hw)
+        const long int timestep, const SpikingChip &hw)
 {
     // A trace of all spikes that are generated
     assert(spike_trace_file.is_open());
@@ -1035,7 +1035,7 @@ void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
 }
 
 void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
-        const long int timestep, const SpikingHardware &hw)
+        const long int timestep, const SpikingChip &hw)
 {
     // Each line of this csv file is the potential of all probed neurons for
     //  one time-step

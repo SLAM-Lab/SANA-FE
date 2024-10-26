@@ -15,7 +15,7 @@
 #include "print.hpp"
 #include "sim.hpp"
 
-void sanafe::pipeline_process_neurons(Timestep &ts, SpikingHardware &hw)
+void sanafe::pipeline_process_neurons(Timestep &ts, SpikingChip &hw)
 {
     auto cores = hw.cores();
 
@@ -41,7 +41,7 @@ void sanafe::pipeline_process_neurons(Timestep &ts, SpikingHardware &hw)
     }
 }
 
-void sanafe::pipeline_process_messages(Timestep &ts, SpikingHardware &hw)
+void sanafe::pipeline_process_messages(Timestep &ts, SpikingChip &hw)
 {
     // Assign outgoing spike messages to their respective destination
     //  cores, and calculate network costs
@@ -73,7 +73,7 @@ void sanafe::pipeline_process_messages(Timestep &ts, SpikingHardware &hw)
     }
 }
 
-void sanafe::pipeline_receive_message(SpikingHardware &hw, Message &m)
+void sanafe::pipeline_receive_message(SpikingChip &hw, Message &m)
 {
     assert(static_cast<size_t>(m.src_tile_id) < arch.tiles.size());
     assert(static_cast<size_t>(m.dest_tile_id) < arch.tiles.size());
@@ -88,7 +88,7 @@ void sanafe::pipeline_receive_message(SpikingHardware &hw, Message &m)
 }
 
 void sanafe::pipeline_process_neuron(
-        Timestep &ts, const SpikingHardware &arch, MappedNeuron &n)
+        Timestep &ts, const SpikingChip &arch, MappedNeuron &n)
 {
     TRACE1(PIPELINE, "Processing neuron: %s.%zu\n", n.parent_group_name.c_str(),
             n.id);
@@ -376,7 +376,7 @@ double sanafe::pipeline_process_soma(const Timestep &ts, MappedNeuron &n)
 }
 
 double sanafe::pipeline_process_axon_out(
-        Timestep &ts, const SpikingHardware &hw, MappedNeuron &n)
+        Timestep &ts, const SpikingChip &hw, MappedNeuron &n)
 {
     if (!n.axon_out_input_spike)
     {

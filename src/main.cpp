@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
                 argv[sanafe::NETWORK_FILENAME], arch, use_netlist_format);
         INFO("Network initialized.\n");
 
-        sanafe::SpikingHardware hw(arch, output_dir, record_spikes,
+        sanafe::SpikingChip hw(arch, output_dir, record_spikes,
                 record_potentials, record_perf, record_messages);
         hw.load(net);
 

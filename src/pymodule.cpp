@@ -594,7 +594,7 @@ PYBIND11_MODULE(sanafecpp, m)
 
     //pybind11::class_<sanafe::AxonOutUnit>(m, "AxonOutUnit")
     //        .def(pybind11::init<std::string>());
-    pybind11::class_<sanafe::SpikingHardware>(m, "SpikingHardware")
+    pybind11::class_<sanafe::SpikingChip>(m, "SpikingHardware")
             .def_property(
                     "mapped_neuron_groups",
                     [](sanafe::SpikingHardware &self)

@@ -12,7 +12,7 @@
 namespace sanafe
 {
 // Forward declarations
-class SpikingHardware;
+class SpikingChip;
 class Tile;
 class Core;
 struct AxonInUnit;
@@ -112,8 +112,8 @@ struct Message
     bool placeholder{true};
     bool in_noc{false};
 
-    explicit Message(const SpikingHardware &hw, const MappedNeuron &n, long int timestep);
-    explicit Message(const SpikingHardware &hw, const MappedNeuron &n, long int timestep, int axon_address);
+    explicit Message(const SpikingChip &hw, const MappedNeuron &n, long int timestep);
+    explicit Message(const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
 };
 
 struct AxonInUnit
