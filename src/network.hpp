@@ -21,7 +21,9 @@
 #include <optional>
 #include <variant>
 
+#include "param.hpp"
 #include "print.hpp"
+#include "sim.hpp"
 
 namespace sanafe
 {
@@ -40,13 +42,6 @@ struct NeuronAddress;
 struct ModelParam;
 
 struct NeuronTemplate;
-enum NeuronStatus : int
-{
-    INVALID_NEURON_STATE,
-    IDLE,
-    UPDATED,
-    FIRED
-};
 
 struct NeuronTemplate
 {

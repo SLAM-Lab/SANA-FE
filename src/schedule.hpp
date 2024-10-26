@@ -9,7 +9,7 @@
 #include <functional> // For std::reference_wrapper
 #include <queue>
 #include <vector>
-#include "hardware.hpp"
+#include "sim.hpp"
 
 namespace sanafe
 {

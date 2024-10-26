@@ -13,7 +13,6 @@
 #include <string>
 #include <vector>
 
-#include "hardware.hpp"
 #include "sim.hpp"
 #include "print.hpp"
 

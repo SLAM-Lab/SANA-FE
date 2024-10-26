@@ -47,16 +47,14 @@ std::string print_int(const long int val);
 //      foreach(category <append to this list>)
 
 // Define categories
-#define DEBUG_CATEGORY_SIM 0
+#define DEBUG_CATEGORY_CHIP 0
 #define DEBUG_CATEGORY_ARCH 1
 #define DEBUG_CATEGORY_NET 2
 #define DEBUG_CATEGORY_PYMODULE 3
 #define DEBUG_CATEGORY_DESCRIPTION 4
 #define DEBUG_CATEGORY_MODELS 5
-#define DEBUG_CATEGORY_HW 6
-#define DEBUG_CATEGORY_PIPELINE 7
-#define DEBUG_CATEGORY_SCHEDULER 8
-#define DEBUG_CATEGORY_PLUGINS 9
+#define DEBUG_CATEGORY_SCHEDULER 6
+#define DEBUG_CATEGORY_PLUGINS 7
 
 // Default debug levels; CMake can override these later
 #ifndef DEBUG_LEVEL_ARCH
@@ -74,20 +72,14 @@ std::string print_int(const long int val);
 #ifndef DEBUG_LEVEL_MODELS
 #define DEBUG_LEVEL_MODELS 0
 #endif
-#ifndef DEBUG_LEVEL_HW
-#define DEBUG_LEVEL_HW 0
-#endif
-#ifndef DEBUG_LEVEL_PIPELINE
-#define DEBUG_LEVEL_PIPELINE 0
-#endif
 #ifndef DEBUG_LEVEL_PLUGINS
 #define DEBUG_LEVEL_PLUGINS 0
 #endif
 #ifndef DEBUG_LEVEL_SCHEDULER
 #define DEBUG_LEVEL_SCHEDULER_0
 #endif
-#ifndef DEBUG_LEVEL_SIM
-#define DEBUG_LEVEL_SIM 0
+#ifndef DEBUG_LEVEL_CHIP
+#define DEBUG_LEVEL_CHIP 0
 #endif
 
 // INFO prints are always enabled

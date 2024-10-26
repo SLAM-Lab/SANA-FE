@@ -16,8 +16,8 @@
 #include "arch.hpp"
 #include "description.hpp"
 #include "network.hpp"
-#include "pipeline.hpp"
 #include "print.hpp"
+#include "sim.hpp"
 
 // TODO: create an option where we can directly construct the mapped network on
 //  the hardware, without creating an intermediate abstract spiking network

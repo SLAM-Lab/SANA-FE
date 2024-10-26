@@ -5,12 +5,13 @@
 #include <vector>
 
 #include "description.hpp"
-#include "models.hpp"
 #include "network.hpp"
+#include "models.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
+#include "sim.hpp"
 
-// *** Synapse models ***
+// *** Synapse hardware unit models ***
 sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
@@ -180,7 +181,7 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
     }
 }
 
-// **** Soma models ****
+// **** Soma hardware unit models ****
 void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {

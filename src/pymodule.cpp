@@ -13,9 +13,7 @@
 #include <pybind11/stl/filesystem.h>
 
 #include "arch.hpp"
-#include "hardware.hpp"
 #include "network.hpp"
-#include "pipeline.hpp"
 #include "print.hpp"
 #include "sim.hpp"
 
@@ -594,10 +592,10 @@ PYBIND11_MODULE(sanafecpp, m)
 
     //pybind11::class_<sanafe::AxonOutUnit>(m, "AxonOutUnit")
     //        .def(pybind11::init<std::string>());
-    pybind11::class_<sanafe::SpikingChip>(m, "SpikingHardware")
+    pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
             .def_property(
                     "mapped_neuron_groups",
-                    [](sanafe::SpikingHardware &self)
+                    [](sanafe::SpikingChip &self)
                             -> std::map<std::string,
                                     std::vector<sanafe::MappedNeuron *>> & {
                         return self.mapped_neuron_groups;
@@ -610,21 +608,21 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("record_potentials") = false,
                     pybind11::arg("record_perf") = false,
                     pybind11::arg("record_messages") = false)
-            .def("load", &sanafe::SpikingHardware::load)
+            .def("load", &sanafe::SpikingChip::load)
             .def(
                     "sim",
-                    [](sanafe::SpikingHardware *self, const long int timesteps,
+                    [](sanafe::SpikingChip *self, const long int timesteps,
                             const long int heartbeat) {
                         return run_data_to_dict(
                                 self->sim(timesteps, heartbeat));
                     },
                     pybind11::arg("timesteps") = 1,
                     pybind11::arg("heartbeat") = 100)
-            .def("get_power", &sanafe::SpikingHardware::get_power)
-            .def("get_run_summary", [](sanafe::SpikingHardware *self) {
+            .def("get_power", &sanafe::SpikingChip::get_power)
+            .def("get_run_summary", [](sanafe::SpikingChip *self) {
                 return run_data_to_dict(self->get_run_summary());
             })
-            .def("reset", &sanafe::SpikingHardware::reset);
+            .def("reset", &sanafe::SpikingChip::reset);
     pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
             .def("set_attributes", &pyset_attributes_mapped,
                     pybind11::arg("model_parameters") = pybind11::dict(),
