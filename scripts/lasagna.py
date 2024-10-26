@@ -100,7 +100,7 @@ for src in range(0, hidden_neurons):
 
 # Run a simulation
 print("Building h/w")
-hw = sanafe.SpikingHardware(arch, record_spikes=True, record_potentials=True)
+hw = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
 hw.load(network)
 print(f"Running simulation for {timesteps} timesteps")
 
