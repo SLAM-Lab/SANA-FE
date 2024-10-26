@@ -59,16 +59,36 @@ std::string print_int(const long int val);
 #define DEBUG_CATEGORY_PLUGINS 9
 
 // Default debug levels; CMake can override these later
+#ifndef DEBUG_LEVEL_ARCH
 #define DEBUG_LEVEL_ARCH 0
+#endif
+#ifndef DEBUG_LEVEL_NET
 #define DEBUG_LEVEL_NET 0
+#endif
+#ifndef DEBUG_LEVEL_PYMODULE
 #define DEBUG_LEVEL_PYMODULE 0
+#endif
+#ifndef DEBUG_LEVEL_DESCRIPTION
 #define DEBUG_LEVEL_DESCRIPTION 0
+#endif
+#ifndef DEBUG_LEVEL_MODELS
 #define DEBUG_LEVEL_MODELS 0
+#endif
+#ifndef DEBUG_LEVEL_HW
 #define DEBUG_LEVEL_HW 0
+#endif
+#ifndef DEBUG_LEVEL_PIPELINE
 #define DEBUG_LEVEL_PIPELINE 0
+#endif
+#ifndef DEBUG_LEVEL_PLUGINS
 #define DEBUG_LEVEL_PLUGINS 0
-#define DEBUG_LEVEL_SCHEDULER 0
+#endif
+#ifndef DEBUG_LEVEL_SCHEDULER
+#define DEBUG_LEVEL_SCHEDULER_0
+#endif
+#ifndef DEBUG_LEVEL_SIM
 #define DEBUG_LEVEL_SIM 0
+#endif
 
 // INFO prints are always enabled
 #define INFO(...) do { \
