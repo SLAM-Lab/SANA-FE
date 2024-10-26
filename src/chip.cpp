@@ -23,7 +23,7 @@
 #include "plugins.hpp"
 #include "print.hpp"
 #include "schedule.hpp"
-#include "sim.hpp"
+#include "chip.hpp"
 
 sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         const std::filesystem::path &output_dir, const bool record_spikes,

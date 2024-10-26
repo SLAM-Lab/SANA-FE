@@ -25,7 +25,7 @@
 #include "network.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
-#include "sim.hpp"
+#include "chip.hpp"
 
 sanafe::Architecture::Architecture(
         std::string name, const NetworkOnChipConfiguration &noc)

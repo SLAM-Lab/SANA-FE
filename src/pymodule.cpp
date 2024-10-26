@@ -15,7 +15,7 @@
 #include "arch.hpp"
 #include "network.hpp"
 #include "print.hpp"
-#include "sim.hpp"
+#include "chip.hpp"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 

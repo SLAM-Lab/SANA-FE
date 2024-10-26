@@ -9,7 +9,7 @@
 #include "models.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
-#include "sim.hpp"
+#include "chip.hpp"
 
 // *** Synapse hardware unit models ***
 sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(

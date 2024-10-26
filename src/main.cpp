@@ -17,7 +17,7 @@
 #include "models.hpp"
 #include "network.hpp"
 #include "print.hpp"
-#include "sim.hpp"
+#include "chip.hpp"
 
 int main(int argc, char *argv[])
 {

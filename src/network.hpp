@@ -23,7 +23,7 @@
 
 #include "param.hpp"
 #include "print.hpp"
-#include "sim.hpp"
+#include "chip.hpp"
 
 namespace sanafe
 {
