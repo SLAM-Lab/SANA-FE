@@ -248,15 +248,10 @@ public:
 
     virtual SomaResult update(size_t neuron_address, std::optional<double> current_in) = 0;
     virtual void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) = 0;
-    virtual double get_potential(size_t neuron_address)
-    {
-        return 0.0;
-    }
+    virtual double get_potential(size_t neuron_address) { return 0.0; }
+    virtual void reset() { return; }
 
-    void set_time(const long int timestep)
-    {
-        simulation_time = timestep;
-    }
+    void set_time(const long int timestep) { simulation_time = timestep; }
     void configure(const std::string &soma_name, const ModelInfo &model_details);
 
     std::map<std::string, ModelParam> model_parameters{};

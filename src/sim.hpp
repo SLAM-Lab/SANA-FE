@@ -66,6 +66,7 @@ public:
     void load(const SpikingNetwork &net);
     double get_power() const;
     RunData get_run_summary() const;
+    void reset();
 
     std::vector<std::reference_wrapper<Core>> cores();
 

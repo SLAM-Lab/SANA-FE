@@ -406,6 +406,18 @@ sanafe::Timestep sanafe::SpikingHardware::step()
     return ts;
 }
 
+void sanafe::SpikingHardware::reset()
+{
+    for (auto &[group_name, neurons] : mapped_neuron_groups)
+    {
+        for (MappedNeuron *neuron : neurons)
+        {
+            // TODO: reset all h/w units, axon, synapse and dendrite too
+            neuron->soma_hw->reset();
+        }
+    }
+}
+
 double sanafe::SpikingHardware::get_power() const
 {
     double power; // Watts

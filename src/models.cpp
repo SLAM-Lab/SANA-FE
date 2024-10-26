@@ -464,7 +464,7 @@ sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
 void sanafe::InputModel::set_attribute(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
-    TRACE1(MODELS, "Setting attribtue:%s\n", param_name.c_str());
+    TRACE1(MODELS, "Setting attribute:%s\n", param_name.c_str());
     if (param_name == "spikes")
     {
         spikes = static_cast<std::vector<bool>>(param);
