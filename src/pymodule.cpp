@@ -134,7 +134,7 @@ sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
         bool force_soma_update, bool force_synapse_update, bool log_potential,
         bool log_spikes, std::string soma_hw_name)
 {
-    sanafe::NeuronTemplate default_neuron_config;
+    sanafe::NeuronConfiguration default_neuron_config;
     default_neuron_config.default_synapse_hw_name = default_synapse_hw_name;
     default_neuron_config.dendrite_hw_name = dendrite_hw_name;
     default_neuron_config.force_dendrite_update = force_dendrite_update;
@@ -159,7 +159,7 @@ std::unique_ptr<sanafe::Neuron> pycreate_neuron(size_t neuron_id,
         bool force_synapse_update, bool force_dendrite_update,
         bool force_soma_update)
 {
-    sanafe::NeuronTemplate neuron_config;
+    sanafe::NeuronConfiguration neuron_config;
     neuron_config.soma_hw_name = soma_hw_name;
     neuron_config.default_synapse_hw_name = default_synapse_hw_name;
     neuron_config.dendrite_hw_name = dendrite_hw_name;
@@ -247,7 +247,7 @@ sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
 // For now support setting attributes of both Neuron and MappedNeuron
 // TODO: in the future, how I handle these may change (might simplify the Neuron
 //  struct)
-void pyset_attributes(sanafe::Neuron *self,
+void pyconfigure(sanafe::Neuron *self,
         std::optional<std::string> soma_hw_name,
         std::optional<std::string> default_synapse_hw_name,
         std::optional<std::string> dendrite_hw_name,
@@ -258,7 +258,7 @@ void pyset_attributes(sanafe::Neuron *self,
         pybind11::dict dendrite_specific_parameters,
         pybind11::dict soma_specific_parameters)
 {
-    sanafe::NeuronTemplate neuron_template{};
+    sanafe::NeuronConfiguration neuron_template{};
 
     neuron_template.soma_hw_name = soma_hw_name;
     neuron_template.default_synapse_hw_name = default_synapse_hw_name;
@@ -286,42 +286,36 @@ void pyset_attributes(sanafe::Neuron *self,
                 TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
         }
     }
-    self->set_attributes(neuron_template);
+    self->configure(neuron_template);
 
     return;
 }
 
-void pyset_attributes_mapped(sanafe::MappedNeuron *self,
+void pyconfigure_models(sanafe::MappedNeuron *self,
         pybind11::dict model_parameters,
         pybind11::dict dendrite_specific_parameters,
         pybind11::dict soma_specific_parameters)
 {
-    sanafe::NeuronTemplate neuron_template{};
-
-    // Most neuron attributes cannot be set dynamically. Only forward model
-    //  parameters
-    // TODO: reorg how we deal with NeuronTemplates, Neuron, and MappedNeuron
-    //  to hopefully simplify this and setting neuron simulator attributes and
-    //  model parameters
+    std::map<std::string, sanafe::ModelParam> converted_parameters;
 
     auto parsed = pydict_to_model_parameters(model_parameters);
-    neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
+    converted_parameters.insert(parsed.begin(), parsed.end());
     parsed = pydict_to_model_parameters(
             dendrite_specific_parameters, false, true, false);
-    neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
+    converted_parameters.insert(parsed.begin(), parsed.end());
     parsed = pydict_to_model_parameters(
             soma_specific_parameters, false, false, true);
-    neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
+    converted_parameters.insert(parsed.begin(), parsed.end());
 
     TRACE1(PYMODULE, "Setting neuron attributes\n");
     if (DEBUG_LEVEL_PYMODULE > 0)
     {
-        for (auto &[key, value] : neuron_template.model_parameters)
+        for (auto &[key, value] : converted_parameters)
         {
                 TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
         }
     }
-    self->set_attributes(neuron_template);
+    self->configure_models(converted_parameters);
 
     return;
 }
@@ -435,7 +429,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("log_spikes") = false,
                     pybind11::arg("soma_hw_name") = "")
             .def("__repr__", &sanafe::Neuron::info)
-            .def("set_attributes", &pyset_attributes,
+            .def("configure", &pyconfigure,
                     pybind11::arg("soma_hw_name") = pybind11::none(),
                     pybind11::arg("default_synapse_hw_name") = pybind11::none(),
                     pybind11::arg("dendrite_hw_name") = pybind11::none(),
@@ -624,7 +618,7 @@ PYBIND11_MODULE(sanafecpp, m)
             })
             .def("reset", &sanafe::SpikingChip::reset);
     pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
-            .def("set_attributes", &pyset_attributes_mapped,
+            .def("configure_models", &pyconfigure_models,
                     pybind11::arg("model_parameters") = pybind11::dict(),
                     pybind11::arg("soma_parameters") = pybind11::dict(),
                     pybind11::arg("dendrite_parameters") = pybind11::dict());

@@ -41,9 +41,7 @@ struct NeuronAddress;
 // Models
 struct ModelParam;
 
-struct NeuronTemplate;
-
-struct NeuronTemplate
+struct NeuronConfiguration
 {
     std::map<std::string, ModelParam> model_parameters;
     std::optional<std::string> soma_hw_name{};
@@ -94,11 +92,11 @@ public:
     bool log_spikes{false};
     bool log_potential{false};
 
-    explicit Neuron(size_t neuron_id, SpikingNetwork &net, const std::string parent_group_id, const NeuronTemplate &config);
+    explicit Neuron(size_t neuron_id, SpikingNetwork &net, const std::string parent_group_id, const NeuronConfiguration &config);
     [[nodiscard]] size_t get_id() const { return id; }
     size_t connect_to_neuron(Neuron &dest);
     void map_to_core(const CoreConfiguration &core);
-    void set_attributes(const NeuronTemplate &attributes);
+    void configure(const NeuronConfiguration &attributes);
     [[nodiscard]] std::string info() const;
 };
 
@@ -107,10 +105,10 @@ class NeuronGroup
 public:
     // A neuron group is a collection of neurons that share common parameters
     std::vector<Neuron> neurons;
-    NeuronTemplate default_neuron_config;
+    NeuronConfiguration default_neuron_config;
     std::string name;
     [[nodiscard]] std::string get_id() const { return name; }
-    explicit NeuronGroup(const std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronTemplate &default_config);
+    explicit NeuronGroup(const std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronConfiguration &default_config);
 
     void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists);
     void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
@@ -138,12 +136,11 @@ public:
     SpikingNetwork(const SpikingNetwork &) = delete;
     SpikingNetwork &operator=(const SpikingNetwork &) = delete;
 
-    NeuronGroup &create_neuron_group(const std::string name, size_t neuron_count, const NeuronTemplate &default_config);
+    NeuronGroup &create_neuron_group(const std::string name, size_t neuron_count, const NeuronConfiguration &default_config);
     [[nodiscard]] std::string info() const;
     //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
-    void check_mapped() const;
-    size_t update_mapping_count();
 
+    size_t update_mapping_count();
 private:
     size_t mapping_count{0};
 };

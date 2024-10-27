@@ -2,7 +2,7 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
-//  sim.cpp
+//  chip.cpp
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -93,90 +93,53 @@ void sanafe::SpikingChip::load(const SpikingNetwork &net)
 
 void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
 {
-    auto list_of_cores = cores();
-    // 1) map neurons to core
-    // 2) set core execution order and attributes
+    std::vector<const Neuron *> neurons_in_mapped_order;
+
+    // Figure out which order to map the neurons in to hardware
     for (const auto &[name, group] : net.groups)
     {
         mapped_neuron_groups[name] =
                 std::vector<MappedNeuron *>(group.neurons.size(), nullptr);
         for (const Neuron &neuron : group.neurons)
         {
-            if (!neuron.core_id.has_value())
-            {
-                std::string error = "Neuron: " + neuron.parent_group_id + "." +
-                        std::to_string(neuron.id) + " not mapped.";
-                INFO("%s", error.c_str());
-                throw std::runtime_error(error);
-            }
-            Core &mapped_core = list_of_cores[neuron.core_id.value()];
-            mapped_core.map_neuron(neuron);
+            neurons_in_mapped_order.push_back(&neuron);
         }
     }
+    INFO("Total neurons to map: %zu\n", neurons_in_mapped_order.size());
 
-    // Sort the neurons based on their mapped priority
-    for (Tile &tile : tiles)
+    std::sort(neurons_in_mapped_order.begin(), neurons_in_mapped_order.end(),
+            [](const Neuron *const a, const Neuron *const b) {
+                return a->mapping_order < b->mapping_order;
+            });
+
+    auto list_of_cores = cores();
+    // Map all neurons in order
+    for (const Neuron *neuron : neurons_in_mapped_order)
     {
-        for (Core &core : tile.cores)
+        if (!neuron->core_id.has_value())
         {
-            // TODO: it might be easier to temporarily reconstruct the mapping
-            //  order in the spiking network, and actually just map them in
-            //  order, rather than this complex 3-stage approach
-            // Sort by mapping order, where a lower mapping order
-            //  indicates the neuron should appear earlier in the vector
-            std::sort(core.neurons.begin(), core.neurons.end(),
-                    [](const MappedNeuron &a, const MappedNeuron &b) {
-                        return a.mapping_order < b.mapping_order;
-                    });
-            // Store indexes inside all mapped neurons to allow us to
-            //  interface with the hardware models
-            for (size_t address = 0; address < core.neurons.size(); ++address)
-            {
-                MappedNeuron &mapped = core.neurons[address];
-                mapped.mapped_address = address;
-                const NeuronGroup &group =
-                        net.groups.at(mapped.parent_group_name);
-                const Neuron &neuron = group.neurons[mapped.id];
+            std::string error = "Neuron: " + neuron->parent_group_id + "." +
+                    std::to_string(neuron->id) + " not mapped.";
+            INFO("%s", error.c_str());
+            throw std::runtime_error(error);
+        }
+        TRACE1(CHIP, "Mapping neuron %s.%zu to core:%zu\n",
+                neuron->parent_group_id.c_str(), neuron->id,
+                neuron->core_id.value());
+        Core &mapped_core = list_of_cores[neuron->core_id.value()];
+        mapped_core.map_neuron(*neuron);
+    }
 
-                for (auto &[name, param] :
-                        group.default_neuron_config.model_parameters)
-                {
-                    TRACE2(CHIP, "Setting group parameter:%s\n", name.c_str());
-                }
-
-                mapped.set_attributes(group.default_neuron_config);
-
-                // TODO: Neuron object should keep this NeuronTemplate intact
-                // Set attributes for this neuron
-                NeuronTemplate neuron_specific_config;
-                neuron_specific_config.default_synapse_hw_name =
-                        neuron.default_synapse_hw_name;
-                neuron_specific_config.dendrite_hw_name =
-                        neuron.dendrite_hw_name;
-                neuron_specific_config.force_dendrite_update =
-                        neuron.force_dendrite_update;
-                neuron_specific_config.force_synapse_update =
-                        neuron.force_synapse_update;
-                neuron_specific_config.force_soma_update =
-                        neuron.force_soma_update;
-                neuron_specific_config.log_potential = neuron.log_potential;
-                neuron_specific_config.log_spikes = neuron.log_spikes;
-                neuron_specific_config.soma_hw_name = neuron.soma_hw_name;
-                neuron_specific_config.model_parameters =
-                        neuron.model_parameters;
-                for (auto &[name, param] :
-                        neuron_specific_config.model_parameters)
-                {
-                    TRACE2(CHIP, "Setting neuron parameter:%s\n", name.c_str());
-                }
-                mapped.set_attributes(neuron_specific_config);
-                mapped_neuron_groups[group.name][neuron.id] = &mapped;
-
-                TRACE1(CHIP,
-                        "Set attributes of nid:%s.%zu at address cid:%zu[%zu]\n",
-                        neuron.parent_group_id.c_str(), neuron.id, core.id,
-                        address);
-            }
+    // Now that we mapped all neurons, index them using their group and neuron
+    //  IDs so that we can easily connect neurons to each other later.
+    //  Note we don't do this in the loop above because the vector will be
+    //   changing sizes dynamically as we map.
+    for (Core &core : list_of_cores)
+    {
+        for (MappedNeuron &mapped_neuron : core.neurons)
+        {
+            mapped_neuron_groups[mapped_neuron.parent_group_name]
+                                [mapped_neuron.id] = &mapped_neuron;
         }
     }
 }
@@ -438,7 +401,7 @@ void sanafe::pipeline_process_neurons(Timestep &ts, SpikingChip &hw)
     auto cores = hw.cores();
 
     // Older versions of OpenMP don't support range-based for loops yet...
-    //#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
+#pragma omp parallel for schedule(dynamic)
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
@@ -477,7 +440,7 @@ void sanafe::pipeline_process_messages(Timestep &ts, SpikingChip &hw)
     // Now process all messages at receiving cores
     auto cores = hw.cores();
     // Older versions of OpenMP don't support range-based for loops yet...
-    //#pragma omp parallel for schedule(dynamic) default(none) shared(cores, ts, arch)
+#pragma omp parallel for schedule(dynamic)
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
@@ -865,6 +828,20 @@ sanafe::RunData sanafe::SpikingChip::get_run_summary() const
     return run_data;
 }
 
+std::vector<std::reference_wrapper<sanafe::Core>>
+sanafe::SpikingChip::cores()
+{
+    std::vector<std::reference_wrapper<Core>> all_cores_in_hw;
+
+    for (Tile &tile : tiles)
+    {
+        std::copy(tile.cores.begin(), tile.cores.end(),
+                std::back_inserter(all_cores_in_hw));
+    }
+
+    return all_cores_in_hw;
+}
+
 sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
         : name(config.name)
         , energy_spike_message(config.metrics.energy_message_in)
@@ -982,13 +959,10 @@ sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
 {
 }
 
-sanafe::MappedNeuron &sanafe::Core::map_neuron(const Neuron &neuron)
+void sanafe::Core::map_neuron(const Neuron &neuron_to_map)
 {
-    // TODO: we need to insert the neuron according to its mapped order...
-    // TODO: we need to do this stuff last... we need to insert all neurons first
-    //  the sort on mapped order
     TRACE1(CHIP, "Mapping nid:%s.%zu to core: %zu\n",
-            neuron.parent_group_id.c_str(), neuron.id, id);
+            neuron_to_map.parent_group_id.c_str(), neuron_to_map.id, id);
 
     if (neurons.size() >= pipeline_config.max_neurons_supported)
     {
@@ -996,13 +970,6 @@ sanafe::MappedNeuron &sanafe::Core::map_neuron(const Neuron &neuron)
                 pipeline_config.max_neurons_supported);
         throw std::runtime_error("Error: Exceeded maximum neurons per core.");
     }
-
-    // Map the neuron to hardware units
-    neurons.emplace_back(neuron.id, neuron.mapping_order);
-    MappedNeuron &mapped = neurons.back();
-
-    mapped.parent_group_name = neuron.parent_group_id;
-    mapped.core = this;
 
     // Map neuron model to dendrite and soma hardware units in this core.
     //  Search through all models implemented by this core and return the
@@ -1013,15 +980,15 @@ sanafe::MappedNeuron &sanafe::Core::map_neuron(const Neuron &neuron)
         INFO("Error: No dendrite units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No dendrite units defined");
     }
-    mapped.dendrite_hw = dendrite[0].get();
-    if (neuron.dendrite_hw_name.length() > 0)
+    DendriteUnit *mapped_dendrite = dendrite[0].get();
+    if (neuron_to_map.dendrite_hw_name.length() > 0)
     {
         bool dendrite_found = false;
         for (auto &dendrite_hw : dendrite)
         {
-            if (neuron.dendrite_hw_name == dendrite_hw->name)
+            if (neuron_to_map.dendrite_hw_name == dendrite_hw->name)
             {
-                mapped.dendrite_hw = dendrite_hw.get();
+                mapped_dendrite = dendrite_hw.get();
                 dendrite_found = true;
             }
         }
@@ -1029,7 +996,7 @@ sanafe::MappedNeuron &sanafe::Core::map_neuron(const Neuron &neuron)
         {
             INFO("Error: Could not map neuron nid:%zu (hw:%s) "
                  "to any dendrite h/w.\n",
-                    neuron.id, neuron.dendrite_hw_name.c_str());
+                    neuron_to_map.id, neuron_to_map.dendrite_hw_name.c_str());
             throw std::runtime_error(
                     "Error: Could not map neuron to dendrite h/w");
         }
@@ -1040,15 +1007,15 @@ sanafe::MappedNeuron &sanafe::Core::map_neuron(const Neuron &neuron)
         INFO("Error: No soma units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No soma units defined");
     }
-    mapped.soma_hw = soma[0].get();
-    if (neuron.soma_hw_name.length() > 0)
+    SomaUnit *mapped_soma = soma[0].get();
+    if (neuron_to_map.soma_hw_name.length() > 0)
     {
         bool soma_found = false;
         for (auto &soma_hw : soma)
         {
-            if (neuron.soma_hw_name == soma_hw->name)
+            if (neuron_to_map.soma_hw_name == soma_hw->name)
             {
-                mapped.soma_hw = soma_hw.get();
+                mapped_soma = soma_hw.get();
                 soma_found = true;
             }
         }
@@ -1056,20 +1023,25 @@ sanafe::MappedNeuron &sanafe::Core::map_neuron(const Neuron &neuron)
         {
             INFO("Error: Could not map neuron nid:%zu (hw:%s) "
                  "to any soma h/w.\n",
-                    neuron.id, neuron.soma_hw_name.c_str());
+                    neuron_to_map.id, neuron_to_map.soma_hw_name.c_str());
             throw std::runtime_error("Error: Could not map neuron to soma h/w");
         }
     }
+    mapped_soma->neuron_count++;
 
     if (axon_out_hw.empty())
     {
         INFO("Error: No axon out units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No axon out units defined");
     }
-    mapped.axon_out_hw = &(axon_out_hw[0]);
-    mapped.soma_hw->neuron_count++;
+    AxonOutUnit *mapped_axon_out = &(axon_out_hw[0]);
 
-    return mapped;
+    // Map the neuron to the core and its hardware units
+    const size_t address = neurons.size();
+    neurons.emplace_back(neuron_to_map, this, address, mapped_dendrite,
+            mapped_soma, mapped_axon_out);
+
+    return;
 }
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(
@@ -1256,30 +1228,32 @@ sanafe::MappedConnection::MappedConnection(const int connection_id)
 {
 }
 
-void sanafe::MappedNeuron::set_attributes(const NeuronTemplate &attributes)
-{
-    if (attributes.log_spikes.has_value())
-    {
-        log_spikes = attributes.log_spikes.value();
-    }
-    if (attributes.log_potential.has_value())
-    {
-        log_potential = attributes.log_potential.value();
-    }
-    if (attributes.force_dendrite_update)
-    {
-        force_dendrite_update = attributes.force_dendrite_update.value();
-    }
-    if (attributes.force_soma_update.has_value())
-    {
-        force_soma_update = attributes.force_soma_update.value();
-    }
-    if (attributes.force_synapse_update)
-    {
-        force_synapse_update = attributes.force_synapse_update.value();
-    }
+sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
+        Core *mapped_core, const size_t address,
+        DendriteUnit *mapped_dendrite, SomaUnit *mapped_soma,
+        AxonOutUnit *mapped_axon_out)
+        : parent_group_name{neuron_to_map.parent_group_id}
+        , id(neuron_to_map.id)
+        , core(mapped_core)
+        , dendrite_hw(mapped_dendrite)
+        , soma_hw(mapped_soma)
+        , axon_out_hw(mapped_axon_out)
+        , mapped_address(address)
+        , mapping_order{neuron_to_map.mapping_order}
+        , force_synapse_update{neuron_to_map.force_synapse_update}
+        , force_dendrite_update{neuron_to_map.force_dendrite_update}
+        , force_soma_update{neuron_to_map.force_soma_update}
+        , log_spikes{neuron_to_map.log_spikes}
+        , log_potential{neuron_to_map.log_potential}
 
-    for (auto &[key, param] : attributes.model_parameters)
+{
+    configure_models(neuron_to_map.model_parameters);
+}
+
+void sanafe::MappedNeuron::configure_models(
+        const std::map<std::string, sanafe::ModelParam> &model_parameters)
+{
+    for (auto &[key, param] : model_parameters)
     {
         TRACE2(CHIP, "Forwarding param: %s (dendrite:%d soma:%d)\n",
                 key.c_str(), param.forward_to_dendrite, param.forward_to_soma);
@@ -1344,7 +1318,7 @@ std::ofstream sanafe::sim_trace_open_spike_trace(
 std::ofstream sanafe::sim_trace_open_potential_trace(
         const std::filesystem::path &out_dir, const SpikingChip &hw)
 {
-    const std::filesystem::path potential_path = out_dir / "potential.csv";
+    const std::filesystem::path potential_path = out_dir / "potentials.csv";
     std::ofstream potential_file(potential_path);
 
     if (!potential_file.is_open())

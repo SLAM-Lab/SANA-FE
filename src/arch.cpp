@@ -50,20 +50,6 @@ sanafe::Architecture::cores()
     return all_cores_in_arch;
 }
 
-std::vector<std::reference_wrapper<sanafe::Core>>
-sanafe::SpikingChip::cores()
-{
-    std::vector<std::reference_wrapper<Core>> all_cores_in_hw;
-
-    for (Tile &tile : tiles)
-    {
-        std::copy(tile.cores.begin(), tile.cores.end(),
-                std::back_inserter(all_cores_in_hw));
-    }
-
-    return all_cores_in_hw;
-}
-
 std::string sanafe::Architecture::info() const
 {
     std::ostringstream ss;

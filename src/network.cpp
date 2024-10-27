@@ -24,7 +24,7 @@
 sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
         SpikingNetwork &net,
         const size_t neuron_count,
-        const NeuronTemplate &default_config)
+        const NeuronConfiguration &default_config)
         : default_neuron_config(default_config)
         , name(std::move(group_name))
 {
@@ -38,13 +38,12 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
 
 sanafe::Neuron::Neuron(const size_t neuron_id,
         SpikingNetwork &net,
-        const std::string parent_group_id, const NeuronTemplate &config)
+        const std::string parent_group_id, const NeuronConfiguration &config)
         : parent_group_id(std::move(parent_group_id))
         , parent_net(net)
         , id(neuron_id)
-        , mapping_order(neuron_id)
 {
-    set_attributes(config);
+    configure(config);
 }
 
 void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
@@ -57,45 +56,43 @@ void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
     return;
 }
 
-// TODO: it's confusing with set_attributes and setting the model parameters
-//  in this way.. and possibly overkill with all this code. 
-void sanafe::Neuron::set_attributes(const NeuronTemplate &attributes)
+void sanafe::Neuron::configure(const NeuronConfiguration &config)
 {
-    if (attributes.default_synapse_hw_name.has_value())
+    if (config.default_synapse_hw_name.has_value())
     {
-        default_synapse_hw_name = attributes.default_synapse_hw_name.value();
+        default_synapse_hw_name = config.default_synapse_hw_name.value();
     }
-    if (attributes.dendrite_hw_name.has_value())
+    if (config.dendrite_hw_name.has_value())
     {
-        dendrite_hw_name = attributes.dendrite_hw_name.value();
+        dendrite_hw_name = config.dendrite_hw_name.value();
     }
-    if (attributes.soma_hw_name.has_value())
+    if (config.soma_hw_name.has_value())
     {
-        soma_hw_name = attributes.soma_hw_name.value();
+        soma_hw_name = config.soma_hw_name.value();
     }
-    if (attributes.log_spikes.has_value())
+    if (config.log_spikes.has_value())
     {
-        log_spikes = attributes.log_spikes.value();
+        log_spikes = config.log_spikes.value();
     }
-    if (attributes.log_potential.has_value())
+    if (config.log_potential.has_value())
     {
-        log_potential = attributes.log_potential.value();
+        log_potential = config.log_potential.value();
     }
-    if (attributes.force_dendrite_update)
+    if (config.force_dendrite_update)
     {
-        force_dendrite_update = attributes.force_dendrite_update.value();
+        force_dendrite_update = config.force_dendrite_update.value();
     }
-    if (attributes.force_soma_update.has_value())
+    if (config.force_soma_update.has_value())
     {
-        force_soma_update = attributes.force_soma_update.value();
+        force_soma_update = config.force_soma_update.value();
     }
-    if (attributes.force_synapse_update)
+    if (config.force_synapse_update)
     {
-        force_synapse_update = attributes.force_synapse_update.value();
+        force_synapse_update = config.force_synapse_update.value();
     }
 
-    model_parameters.insert(attributes.model_parameters.begin(),
-            attributes.model_parameters.end());
+    model_parameters.insert(config.model_parameters.begin(),
+            config.model_parameters.end());
 }
 
 std::string sanafe::Neuron::info() const
@@ -109,7 +106,7 @@ std::string sanafe::Neuron::info() const
 
 sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
         const std::string name, const size_t neuron_count,
-        const NeuronTemplate &default_config)
+        const NeuronConfiguration &default_config)
 {
     groups.emplace(
             name, NeuronGroup(name, *this, neuron_count, default_config));

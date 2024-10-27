@@ -48,7 +48,7 @@ struct Connection;
 struct MappedNeuron;
 struct MappedConnection;
 struct Synapse;
-struct NeuronTemplate;
+struct NeuronConfiguration;
 struct ModelInfo;
 
 class Tile;
@@ -179,7 +179,7 @@ struct MappedNeuron
     SomaUnit *soma_hw{nullptr};
     AxonOutUnit *axon_out_hw{nullptr};
 
-    size_t mapped_address{};
+    size_t mapped_address{-1ULL};
     size_t mapping_order;
     int spike_count{0};
     int maps_in_count{0};
@@ -198,9 +198,8 @@ struct MappedNeuron
     double soma_input_charge{0.0};
     bool axon_out_input_spike{false};
 
-    void set_attributes(const NeuronTemplate &attributes);
-    MappedNeuron(size_t id, size_t mapping_order) : id(id), mapping_order{mapping_order} {}
-    // TODO: allow user to manually set mapping order
+    void configure_models(const std::map<std::string, ModelParam> &model_parameters);
+    MappedNeuron(const Neuron &neuron_to_map, Core *mapped_core, const size_t address, DendriteUnit *mapped_dendrite, SomaUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
 };
 
 struct Synapse
@@ -439,7 +438,7 @@ public:
     int message_count{0};
 
     explicit Core(const CoreConfiguration &config);
-    MappedNeuron &map_neuron(const Neuron &n);
+    void map_neuron(const Neuron &n);
     AxonInUnit &create_axon_in(const AxonInConfiguration &config);
     SynapseUnit &create_synapse(const SynapseConfiguration &config);
     DendriteUnit &create_dendrite(const DendriteConfiguration &config);

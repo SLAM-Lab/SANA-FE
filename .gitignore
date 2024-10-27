@@ -15,7 +15,7 @@ tutorial/dvs_challenge.net
 *.pdf
 perf.csv
 messages.csv
-potential.csv
+potentials.csv
 spikes.csv
 .vscode
 .codechecker

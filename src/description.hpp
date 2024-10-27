@@ -62,7 +62,7 @@ void description_parse_mapping_section_yaml(const ryml::Parser &parser, const ry
 void description_parse_mapping(const ryml::Parser &parser, const ryml::ConstNodeRef mapping_info, Architecture &arch, SpikingNetwork &net);
 void description_parse_mapping_info(const ryml::Parser &parser, const ryml::ConstNodeRef info, Neuron &n, std::string &core_name);
 void description_parse_neuron(const std::string &id, const ryml::Parser &parser, const ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
-NeuronTemplate description_parse_neuron_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes, const NeuronTemplate &default_template = NeuronTemplate());
+NeuronConfiguration description_parse_neuron_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes, const NeuronConfiguration &default_template = NeuronConfiguration());
 void description_parse_edge(const std::string &description, const ryml::Parser &parser, const ryml::ConstNodeRef edge_node, SpikingNetwork &network);
 void description_parse_neuron_connection(const NeuronAddress &source_address, const NeuronAddress &dest_address, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node, SpikingNetwork &net);
 void description_parse_hyperedge(const NeuronAddress &source_address, const NeuronAddress &dest_address, const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node, SpikingNetwork &net);

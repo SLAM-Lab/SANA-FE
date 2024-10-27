@@ -58,29 +58,26 @@ out_layer = network.create_neuron_group("out", out_neurons, soma_hw_name="soma")
 
 analog_neurons = True
 for id, neuron in enumerate(in_layer.neurons):
-    neuron.set_attributes(soma_hw_name=f"input[{id}]",
-                          log_spikes=True)
+    neuron.configure(soma_hw_name=f"input[{id}]",
+                            log_spikes=True)
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 for id, neuron in enumerate(hidden_layer.neurons):
-    neuron.set_attributes(soma_hw_name=f"loihi", log_spikes=True,
-                          model_parameters={"threshold": 1.0, "leak_decay": 0.85})
+    neuron.configure(soma_hw_name=f"loihi", log_spikes=True,
+                     model_parameters={"threshold": 1.0, "leak_decay": 0.85})
     if analog_neurons:
-        neuron.set_attributes(soma_hw_name=f"analog_lif[{id}]", log_spikes=True)
+        neuron.configure(soma_hw_name=f"analog_lif[{id}]", log_spikes=True)
     else:
         neuron.map_to_core(arch.tiles[0].cores[0])
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 for id, neuron in enumerate(out_layer.neurons):
     if analog_neurons:
-        neuron.set_attributes(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
-                              log_spikes=True,
-                              log_potential=True)
+        neuron.configure(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
+                         log_spikes=True, log_potential=True)
     else:
-        neuron.set_attributes(soma_hw_name=f"loihi",
-                              log_spikes=True,
-                              log_potential=True,
-                              model_parameters={"threshold": 1.0, "leak_decay": 0.85})
+        neuron.configure(soma_hw_name=f"loihi", log_spikes=True,
+                         log_potential=True, model_parameters={"threshold": 1.0, "leak_decay": 0.85})
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 # Connect neurons in both layers
@@ -236,7 +233,7 @@ ax_digits.set_ylim(0, display_height)
 # Plot the output neuron potentials
 ax_potentials = fig.add_subplot(gs[1])
 ax_potentials.set_xlim((0, total_timesteps))
-potentials_df = pd.read_csv("potential.csv")
+potentials_df = pd.read_csv("potentials.csv")
 potentials_df.plot(x="timestep", y=["neuron out.0", "neuron out.1", "neuron out.2", "neuron out.3", "neuron out.4", "neuron out.5", "neuron out.6", "neuron out.7", "neuron out.8", "neuron out.9"], ax=ax_potentials)
 # Add vertical lines to show digit presentation boundaries
 for i in range(num_inputs + 1):

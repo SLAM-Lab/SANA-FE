@@ -176,20 +176,20 @@ Therefore, two traces will be generated: `spikes.csv` and `potential.csv`.
 
     python3 sim.py -s -v -o tutorial tutorial/arch.yaml tutorial/snn.net 10
     cat tutorial/spikes.csv
-    cat tutorial/potential.csv
+    cat tutorial/potentials.csv
 
 Every line in the spike trace (`tutorial/spikes.csv`) has the format:
 
     <neuron>,<timestep spiked>
 
-The potential trace (`tutorial/potential.csv`) has a column per probe and
+The potential trace (`tutorial/potentials.csv`) has a column per probe and
 one line per time-step i.e.:
 
     <neuron 0, timestep 0>,<neuron 1, timestep 0>
     <neuron 0, timestep 1>,<neuron 1, timestep 1>
     ...
 
-Try visualizing `potential.csv` by plotting the dynamics of neurons 0.0 and
+Try visualizing `potentials.csv` by plotting the dynamics of neurons 0.0 and
 0.1 for 10 simulated timesteps, using your preferred plotting application.
 
 Next, run the same simulation but with message and performance traces

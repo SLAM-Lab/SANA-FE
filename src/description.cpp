@@ -767,7 +767,7 @@ void sanafe::description_parse_group(const ryml::Parser &parser,
     const auto &neurons_node = neuron_group_node["neurons"];
     const size_t neuron_count = description_count_neurons(parser, neurons_node);
 
-    NeuronTemplate default_neuron_config{};
+    NeuronConfiguration default_neuron_config{};
     if (!neuron_group_node.find_child("attributes").invalid())
     {
         TRACE1(DESCRIPTION, "Parsing neuron group attributes\n");
@@ -864,7 +864,7 @@ void sanafe::description_parse_neuron(const std::string &id,
 {
     std::pair<size_t, size_t> range;
     TRACE1(DESCRIPTION, "Parsing neuron(s): %s\n", id.c_str());
-    const NeuronTemplate config = description_parse_neuron_attributes_yaml(
+    const NeuronConfiguration config = description_parse_neuron_attributes_yaml(
             parser, attributes, neuron_group.default_neuron_config);
     const bool is_range = (id.find("..") != std::string::npos);
     if (is_range)
@@ -874,22 +874,22 @@ void sanafe::description_parse_neuron(const std::string &id,
                 ++instance)
         {
             Neuron &n = neuron_group.neurons[instance];
-            n.set_attributes(config);
+            n.configure(config);
         }
     }
     else
     {
         const size_t nid = std::stoull(id);
         Neuron &n = neuron_group.neurons[nid];
-        n.set_attributes(config);
+        n.configure(config);
     }
 }
 
-sanafe::NeuronTemplate sanafe::description_parse_neuron_attributes_yaml(
+sanafe::NeuronConfiguration sanafe::description_parse_neuron_attributes_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes,
-        const NeuronTemplate &default_template)
+        const NeuronConfiguration &default_template)
 {
-    NeuronTemplate neuron_template = default_template;
+    NeuronConfiguration neuron_template = default_template;
 
     if (attributes.is_seq())
     {
@@ -2023,7 +2023,7 @@ void sanafe::description_read_network_entry(
         params.insert({key, parameter});
     }
 
-    NeuronTemplate neuron_config{};
+    NeuronConfiguration neuron_config{};
     if (group_set)
     {
         NeuronGroup &group = net.groups.at(neuron_group_id);
@@ -2067,7 +2067,7 @@ void sanafe::description_read_network_entry(
         net.create_neuron_group(neuron_group_id, neuron_count, neuron_config);
         break;
     case 'n': // Add neuron
-        neuron_ptr->set_attributes(neuron_config);
+        neuron_ptr->configure(neuron_config);
         break;
     case 'e': {
         assert(neuron_ptr != nullptr);
