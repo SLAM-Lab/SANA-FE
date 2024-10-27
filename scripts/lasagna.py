@@ -43,7 +43,7 @@ in_neurons = mnist_weights["fc1.weight"].shape[1]
 hidden_neurons = mnist_weights["fc1.weight"].shape[0]
 out_neurons = mnist_weights["fc2.weight"].shape[0]
 
-#"""
+"""
 # Load the LASAGNA architecture with analog neurons
 arch = sanafe.load_arch("/home/james/code/lasagne/lasagne.yaml")
 
@@ -97,7 +97,8 @@ for src in range(0, hidden_neurons):
 
 # Run a simulation
 print("Building h/w")
-hw = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
+hw = sanafe.SpikingChip(arch, record_spikes=True,
+                        record_potentials=True, record_perf=True)
 hw.load(network)
 print(f"Running simulation for {timesteps} timesteps")
 
@@ -109,11 +110,12 @@ for input in range(0, num_inputs):
     #plt.imshow(mnist_input.reshape(28, 28), cmap="gray")
     #plt.colorbar()
     for id, mapped_neuron in enumerate(mapped_inputs):
-        mapped_neuron.set_attributes(model_parameters={"poisson": mnist_input[id]})
+        mapped_neuron.configure_models(
+            model_parameters={"poisson": mnist_input[id]})
     results = hw.sim(timesteps)
     print(results)
     hw.reset()
-#"""
+"""
 
 # Read in simulation results
 with open("spikes.csv") as spike_csv:
@@ -144,7 +146,7 @@ print(f"Spike counts per class:{counts}")
 # 2) Create a raster plot of all spikes
 from matplotlib.gridspec import GridSpec
 fig = plt.figure(figsize=(12.0, 8.0))
-gs = GridSpec(2, 1, height_ratios=[1, 4], hspace=0.3)
+gs = GridSpec(4, 1, height_ratios=[2, 4, 4, 4], hspace=0.1)
 
 # Top subplot for MNIST digits
 ax_digits = fig.add_subplot(gs[0])
@@ -158,7 +160,7 @@ num_digits = len(mnist_inputs)
 
 # Create a blank canvas for all digits
 total_timesteps = timesteps * num_inputs
-display_height = 8  # Adjust this factor to change digit height
+display_height = 20  # Adjust this factor to change digit height
 
 # Place each digit at its corresponding time position
 for i, digit in enumerate(mnist_inputs[0:num_inputs, :]):
@@ -172,7 +174,7 @@ for i, digit in enumerate(mnist_inputs[0:num_inputs, :]):
 # Display the digits
 ax_digits.set_xlim(0, total_timesteps)
 ax_digits.set_ylim(0, display_height)
-ax_digits.set_title('Input MNIST Digits')
+ax_digits.set_title('Analog Neurons Classifying MNIST')
 
 ax_spikes = fig.add_subplot(gs[1])
 ax_spikes.set_xlim((0, total_timesteps))
@@ -200,47 +202,58 @@ for neuron_id in range(0, out_neurons):
 # Add vertical lines to show digit presentation boundaries
 for i in range(num_inputs + 1):
     ax_spikes.axvline(x=i * time_per_digit, color='gray', linestyle='--', alpha=0.3)
-
-ax_spikes.set_xlabel("Time-step")
 ax_spikes.set_ylabel("Neuron")
-plt.savefig("runs/lasagna/raster.png")
-
-# 3) Create a potential plot of the output layer
-fig = plt.figure(figsize=(12.0, 8.0))
-gs = GridSpec(2, 1, height_ratios=[1, 4], hspace=0.3)
-
-# Top subplot for MNIST digits
-ax_digits = fig.add_subplot(gs[0])
-ax_digits.set_xticks([])
-ax_digits.set_yticks([])
-
-
-# Create a blank canvas for all digits
-display_height = 8  # Adjust this factor to change digit height
-
-# Place each digit at its corresponding time position
-for i, digit in enumerate(mnist_inputs[0:num_inputs, :]):
-    start_time = i * time_per_digit
-    # Calculate extent for each digit: [left, right, bottom, top]
-    # Width of each digit display is set to match the time window
-    digit_extent = [start_time, start_time + time_per_digit, 0, display_height]
-    ax_digits.imshow(digit.reshape(digit_width, digit_width),
-                     cmap='gray', aspect='auto', extent=digit_extent)
-
-ax_digits.set_xlim(0, total_timesteps)
-ax_digits.set_ylim(0, display_height)
+ax_spikes.set_xticks([])
 
 # Plot the output neuron potentials
-ax_potentials = fig.add_subplot(gs[1])
+ax_potentials = fig.add_subplot(gs[2])
 ax_potentials.set_xlim((0, total_timesteps))
 potentials_df = pd.read_csv("potentials.csv")
 potentials_df.plot(x="timestep", y=["neuron out.0", "neuron out.1", "neuron out.2", "neuron out.3", "neuron out.4", "neuron out.5", "neuron out.6", "neuron out.7", "neuron out.8", "neuron out.9"], ax=ax_potentials)
 # Add vertical lines to show digit presentation boundaries
 for i in range(num_inputs + 1):
     ax_potentials.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
+ax_potentials.set_ylabel("Membrane Potentials (V)")
+ax_potentials.set_xticks([])
+ax_potentials.set_xlabel("")
 
-# 4) Create a combined raster/potential plot of the hidden and output layers
+ax_perf = fig.add_subplot(gs[3])
+ax_perf.set_xlim((0, total_timesteps))
+perf_df = pd.read_csv("perf.csv")
+perf_df["total_energy_pj"] = perf_df["total_energy"] * 1.0e12
+perf_df.plot(x="timestep", y=["total_energy_pj"], ax=ax_perf)
+for i in range(num_inputs + 1):
+    ax_perf.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
+ax_perf.set_ylabel("Energy (pJ)")
+ax_perf.get_legend().remove()
 
+ax_perf.set_xlabel("Time-step")
+plt.savefig("runs/lasagna/raster.png")
+
+# 3) Create a potential plot of the output layer
+#fig = plt.figure(figsize=(12.0, 8.0))
+#gs = GridSpec(2, 1, height_ratios=[1, 4], hspace=0.3)
+
+# Top subplot for MNIST digits
+#ax_digits = fig.add_subplot(gs[0])
+#ax_digits.set_xticks([])
+#ax_digits.set_yticks([])
+
+
+# Create a blank canvas for all digits
+#display_height = 8  # Adjust this factor to change digit height
+
+# Place each digit at its corresponding time position
+#for i, digit in enumerate(mnist_inputs[0:num_inputs, :]):
+#    start_time = i * time_per_digit
+#    # Calculate extent for each digit: [left, right, bottom, top]
+#    # Width of each digit display is set to match the time window
+#    digit_extent = [start_time, start_time + time_per_digit, 0, display_height]
+#    ax_digits.imshow(digit.reshape(digit_width, digit_width),
+                     #cmap='gray', aspect='auto', extent=digit_extent)
+
+#ax_digits.set_xlim(0, total_timesteps)
+#ax_digits.set_ylim(0, display_height)
 
 print("Finished.")
 plt.show()
