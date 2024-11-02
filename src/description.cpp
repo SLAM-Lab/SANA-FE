@@ -1348,6 +1348,7 @@ void sanafe::description_parse_edge_attributes(Connection &edge,
     {
         if ((key != "synapse") && (key != "dendrite") && (key != "soma"))
         {
+            TRACE2(DESCRIPTION, "Adding con parameter:%s\n", key.c_str());
             edge.synapse_params[key] = parameter;
             edge.dendrite_params[key] = parameter;
         }
