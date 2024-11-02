@@ -138,7 +138,10 @@ cmake_print_variables(PyBind11_DIR)
 # PyBind specific
 if(PYTHON_BUILD_ENABLED)
     find_package(pybind11 CONFIG)
-    if(NOT pybind11_FOUND)
+    if (NOT PYTHON_EXECUTABLE)
+        set(PYTHON_EXECUTABLE "python3")
+    endif()
+    if(NOT pybind11_FOUND OR pybind11_FOUND STREQUAL "0")
         message("PyBind11 not found, trying to set PYBIND_CMAKE_DIR using Python")
         execute_process(
             COMMAND "${PYTHON_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
