@@ -105,6 +105,7 @@ public:
 
     struct LoihiCompartment
     {
+        std::vector<double> biases{};
         bool force_update{false};
         long int timesteps_simulated{0L};
         int reset_mode{NEURON_RESET_HARD};
@@ -181,6 +182,7 @@ private:
     std::random_device rd;
     std::mt19937 gen{rd()};
     double poisson_probability{0.0};
+    double rate{0.0};
     bool send_spike{false};
 };
 

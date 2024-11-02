@@ -8,12 +8,12 @@
 #include <sstream>
 #include <vector>
 
+#include "chip.hpp"
 #include "description.hpp"
-#include "network.hpp"
 #include "models.hpp"
+#include "network.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
-#include "chip.hpp"
 
 // *** Synapse hardware unit models ***
 sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
@@ -82,6 +82,16 @@ sanafe::DendriteUnit::DendriteResult sanafe::MultiTapModel1D::update(
     {
         ++timesteps_simulated;
         const size_t taps = tap_voltages.size();
+
+        TRACE1(MODELS, "***\n");
+        TRACE1(MODELS, "Tap voltages before update for address:%zu\n",
+                neuron_address);
+        for (size_t i = 0; i < tap_voltages.size(); i++)
+        {
+            TRACE1(MODELS, "\tv[%zu]: %lf\n", i, tap_voltages[i]);
+        }
+        TRACE1(MODELS, "^^^\n");
+
         for (size_t t = 0; t < taps; t++)
         {
             next_voltages[t] = tap_voltages[t] * time_constants[t];
@@ -108,28 +118,31 @@ sanafe::DendriteUnit::DendriteResult sanafe::MultiTapModel1D::update(
         {
             tap_voltages[t] = next_voltages[t];
         }
-
-        INFO("***\n");
-        for (size_t i = 0; i < tap_voltages.size(); i++)
-        {
-            printf("\tv[%zu]: %lf\n", i, tap_voltages[i]);
-        }
-        INFO("***\n");
     }
 
     if (synapse_in.has_value())
     {
         const Synapse &syn = synapse_in.value();
-        int compartment = 0;
-        const auto &tap = syn.con.dendrite_params.find("tap");
-        if (tap != syn.con.dendrite_params.end())
+        const auto &tap_info = syn.con.dendrite_params.find("tap");
+        int tap = 0;
+        if (tap_info != syn.con.dendrite_params.end())
         {
-            compartment = static_cast<int>(tap->second);
+            tap = static_cast<int>(tap_info->second);
         }
-        assert(compartment >= 0);
-        assert((size_t) compartment < tap_voltages.size());
-        tap_voltages[compartment] += synapse_in.value().current;
+        assert(tap >= 0);
+        assert((size_t) tap < tap_voltages.size());
+        tap_voltages[tap] += synapse_in.value().current;
+        TRACE2(MODELS, "Adding current:%lf to tap %d (con:%d addr:%zu)\n",
+                syn.current, tap, syn.con.id, syn.con.synapse_address);
     }
+
+    TRACE1(MODELS, "Tap voltages after update for address:%zu\n",
+            neuron_address);
+    for (size_t i = 0; i < tap_voltages.size(); i++)
+    {
+        TRACE1(MODELS, "\tv[%zu]: %lf\n", i, tap_voltages[i]);
+    }
+    TRACE1(MODELS, "***\n");
 
     // Return current for most proximal tap (which is always the first tap)
     return {tap_voltages[0], std::nullopt, std::nullopt};
@@ -140,15 +153,15 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
 {
     if (param_name == "taps")
     {
-        if (tap_voltages.size() > 1)
-        {
-            INFO("Warning: Redefining number of taps, constants might be "
-                 "wrong.\n");
-        }
         const size_t n_taps = static_cast<int>(param);
         if (n_taps == 0)
         {
             throw std::invalid_argument("Error: Number of taps must be > 0\n");
+        }
+        if (tap_voltages.size() > n_taps)
+        {
+            INFO("Warning: Reducing number of taps, constants might be "
+                 "wrong.\n");
         }
         tap_voltages.resize(n_taps);
         next_voltages.resize(n_taps);
@@ -158,25 +171,39 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
     else if (param_name == "time_constants")
     {
         time_constants = static_cast<std::vector<double>>(param);
-        const size_t n_taps = tap_voltages.size();
-        if (time_constants.size() != n_taps)
+        const size_t n_taps = time_constants.size();
+        if (time_constants.size() < n_taps)
         {
             std::string error = "Error: Expected " + std::to_string(n_taps) +
                     " but received " + std::to_string(time_constants.size()) +
                     "time constants.";
             throw std::invalid_argument(error);
         }
+        else if (time_constants.size() > n_taps)
+        {
+            // Extend the other defined constants
+            tap_voltages.resize(n_taps);
+            next_voltages.resize(n_taps);
+            space_constants.resize(n_taps - 1);
+        }
     }
     else if (param_name == "space_constants")
     {
         space_constants = static_cast<std::vector<double>>(param);
-        const size_t n_taps = tap_voltages.size();
-        if (space_constants.size() != (n_taps - 1))
+        const size_t n_taps = space_constants.size() + 1;
+        if (space_constants.size() < (n_taps - 1))
         {
             std::string error = "Error: Expected " +
                     std::to_string(n_taps - 1) + " but received " +
                     std::to_string(time_constants.size()) + "time constants.";
             throw std::invalid_argument(error);
+        }
+        else if (space_constants.size() > (n_taps - 1))
+        {
+            // Extend the other defined constants
+            tap_voltages.resize(n_taps);
+            next_voltages.resize(n_taps);
+            time_constants.resize(n_taps);
         }
     }
     else
@@ -225,7 +252,12 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     else if (param_name == "bias")
     {
         cx.bias = static_cast<double>(param);
-        TRACE2(MODELS, "setting bias of %zu=%lf\n", neuron_address, cx.bias);
+        TRACE2(MODELS, "Setting bias of %zu=%lf\n", neuron_address, cx.bias);
+    }
+    else if (param_name == "biases")
+    {
+        cx.biases = static_cast<std::vector<double>>(param);
+        std::reverse(cx.biases.begin(), cx.biases.end());
     }
     else if ((param_name == "force_update") ||
             (param_name == "force_soma_update"))
@@ -254,9 +286,14 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
 
     // Calculate the change in potential since the last update e.g.
     //  integate inputs and apply any potential leak
-    TRACE1(MODELS, "Updating potential (cx:%zu), before:%lf\n",
-            neuron_address, cx.potential);
+    TRACE1(MODELS, "Updating potential (cx:%zu), before:%lf\n", neuron_address,
+            cx.potential);
     sanafe::NeuronStatus state = sanafe::IDLE;
+    if (!cx.biases.empty())
+    {
+        cx.bias = cx.biases.back();
+        cx.biases.pop_back();
+    }
     // Update soma, if there are any received spikes, there is a non-zero
     //  bias or we force the neuron to update every time-step
     if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
@@ -286,8 +323,8 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
     {
         cx.potential += current_in.value();
     }
-    TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n",
-            neuron_address, cx.potential);
+    TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n", neuron_address,
+            cx.potential);
 
     // Check against threshold potential (for spiking)
     if (cx.potential > cx.threshold)
@@ -478,8 +515,13 @@ void sanafe::InputModel::set_attribute(const size_t neuron_address,
     else if (param_name == "poisson")
     {
         poisson_probability = static_cast<double>(param);
-        TRACE2(MODELS, "Setting poisson probability: %lf\n",
+        TRACE2(MODELS, "Setting poisson probability:%lf\n",
                 poisson_probability);
+    }
+    else if (param_name == "rate")
+    {
+        rate = static_cast<double>(param);
+        TRACE2(MODELS, "Setting rate probability:%lf\n", rate);
     }
 }
 
@@ -505,7 +547,15 @@ sanafe::SomaUnit::SomaResult sanafe::InputModel::update(
         TRACE2(MODELS, "Randomly generating spike (Poisson).\n");
     }
 
-    const NeuronStatus status = send_spike ? FIRED : IDLE;
+    TRACE1(MODELS, "Simulation time:%ld\n", simulation_time);
+    if ((rate > 0.0) &&
+            ((simulation_time % static_cast<long int>(1.0 / rate)) == 0))
+    {
+        send_spike = true;
+        TRACE2(MODELS, "Randomly generating spikes (rate).\n");
+    }
+
+        const NeuronStatus status = send_spike ? FIRED : IDLE;
     return {status, std::nullopt, std::nullopt};
 }
 
