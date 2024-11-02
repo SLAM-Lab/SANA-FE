@@ -212,6 +212,18 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
     }
 }
 
+void sanafe::MultiTapModel1D::reset()
+{
+    const size_t n_taps = tap_voltages.size();
+    for (size_t tap = 0; tap < n_taps; ++tap)
+    {
+        tap_voltages[tap] = 0.0;
+        next_voltages[tap] = 0.0;
+    }
+
+    return;
+}
+
 // **** Soma hardware unit models ****
 void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
@@ -359,6 +371,16 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
 
     ++(cx.timesteps_simulated);
     return {state, std::nullopt, std::nullopt};
+}
+
+void sanafe::LoihiLifModel::reset()
+{
+    for (LoihiCompartment &cx : compartments)
+    {
+        cx.potential = 0.0;
+    }
+
+    return;
 }
 
 void sanafe::TrueNorthModel::set_attribute(const size_t neuron_address,
@@ -523,6 +545,16 @@ void sanafe::InputModel::set_attribute(const size_t neuron_address,
         rate = static_cast<double>(param);
         TRACE2(MODELS, "Setting rate probability:%lf\n", rate);
     }
+}
+
+void sanafe::TrueNorthModel::reset()
+{
+    for (TrueNorthNeuron &neuron : neurons)
+    {
+        neuron.potential = 0.0;
+    }
+
+    return;
 }
 
 sanafe::SomaUnit::SomaResult sanafe::InputModel::update(

@@ -56,6 +56,7 @@ public:
     AccumulatorModel &operator=(AccumulatorModel &&other) = default;
 
     DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
+    void reset() override { return; }
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
 
 private:
@@ -76,6 +77,7 @@ public:
 
     DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
+    void reset() override;
 
 private:
     // Modeling a 1D dendrite with taps
@@ -98,6 +100,7 @@ public:
 
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     SomaResult update(size_t neuron_address, std::optional<double> current_in) override;
+    void reset() override;
     double get_potential(const size_t neuron_address) override
     {
         return compartments[neuron_address].potential;
@@ -136,6 +139,7 @@ public:
 
     void set_attribute(const size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     SomaResult update(const size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
+    void reset() override;
     double get_potential(const size_t neuron_address) override
     {
         return neurons[neuron_address].potential;
@@ -174,6 +178,7 @@ public:
 
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     SomaResult update(size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
+    void reset() override { send_spike = false; return; }
 
 private:
     std::vector<bool> spikes{};

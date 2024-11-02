@@ -18,12 +18,12 @@
 #include <vector>
 
 #include "arch.hpp"
+#include "chip.hpp"
 #include "models.hpp"
 #include "network.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
 #include "schedule.hpp"
-#include "chip.hpp"
 
 sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         const std::filesystem::path &output_dir, const bool record_spikes,
@@ -375,7 +375,13 @@ void sanafe::SpikingChip::reset()
         for (MappedNeuron *neuron : neurons)
         {
             // TODO: reset all h/w units, axon, synapse and dendrite too
+            neuron->dendrite_hw->reset();
             neuron->soma_hw->reset();
+
+            neuron->status = IDLE;
+            neuron->dendrite_input_synapses.clear();
+            neuron->soma_input_charge = 0.0;
+            neuron->axon_out_input_spike = false;
         }
     }
 }
@@ -477,20 +483,34 @@ void sanafe::pipeline_process_neuron(
     double neuron_processing_latency = 0.0;
 
     // Update any H/W following the time-step buffer in pipeline order
-    if ((n.core->pipeline_config.buffer_position <=
-                BUFFER_BEFORE_DENDRITE_UNIT) ||
-            n.force_dendrite_update)
+    if (n.core->pipeline_config.buffer_position <=
+                BUFFER_BEFORE_DENDRITE_UNIT)
     {
         neuron_processing_latency += pipeline_process_dendrite(ts, n);
     }
-    if ((n.core->pipeline_config.buffer_position <= BUFFER_BEFORE_SOMA_UNIT) ||
-            n.force_soma_update)
+    if (n.core->pipeline_config.buffer_position <= BUFFER_BEFORE_SOMA_UNIT)
     {
         neuron_processing_latency += pipeline_process_soma(ts, n);
     }
     if (n.core->pipeline_config.buffer_position <= BUFFER_BEFORE_AXON_OUT_UNIT)
     {
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
+    }
+
+    // Hardware before the time-step buffer may also need to be updated every
+    //  time-step. For example, if a leak has to be applied every time-step.
+    //  Do this after normal neuron processing has finished
+    // TODO: move this into the message receiving loops somehow
+    if ((n.core->pipeline_config.buffer_position >
+                BUFFER_BEFORE_DENDRITE_UNIT) &&
+            n.force_dendrite_update)
+    {
+        neuron_processing_latency += pipeline_process_dendrite(ts, n);
+    }
+    if (n.core->pipeline_config.buffer_position > BUFFER_BEFORE_SOMA_UNIT &&
+            n.force_soma_update)
+    {
+        neuron_processing_latency += pipeline_process_soma(ts, n);
     }
 
     // Account for latencies and reset counters
@@ -829,8 +849,7 @@ sanafe::RunData sanafe::SpikingChip::get_run_summary() const
     return run_data;
 }
 
-std::vector<std::reference_wrapper<sanafe::Core>>
-sanafe::SpikingChip::cores()
+std::vector<std::reference_wrapper<sanafe::Core>> sanafe::SpikingChip::cores()
 {
     std::vector<std::reference_wrapper<Core>> all_cores_in_hw;
 
@@ -1230,9 +1249,8 @@ sanafe::MappedConnection::MappedConnection(const int connection_id)
 }
 
 sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
-        Core *mapped_core, const size_t address,
-        DendriteUnit *mapped_dendrite, SomaUnit *mapped_soma,
-        AxonOutUnit *mapped_axon_out)
+        Core *mapped_core, const size_t address, DendriteUnit *mapped_dendrite,
+        SomaUnit *mapped_soma, AxonOutUnit *mapped_axon_out)
         : parent_group_name{neuron_to_map.parent_group_id}
         , id(neuron_to_map.id)
         , core(mapped_core)
