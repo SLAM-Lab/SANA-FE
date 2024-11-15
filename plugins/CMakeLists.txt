@@ -9,6 +9,6 @@ set(CMAKE_BUILD_TYPE Shared)
 
 add_compile_options(-Wall -pedantic -Werror -g)
 add_library(hodgkin_huxley SHARED "hodgkin_huxley")
-target_include_directories(hodgkin_huxley PRIVATE .)
+target_include_directories(hodgkin_huxley PRIVATE ../src)
 #target_sources(hodgkinhuxley PRIVATE "hodgkin_huxley")
 target_link_libraries(hodgkin_huxley PRIVATE ${CMAKE_DL_LIBS})

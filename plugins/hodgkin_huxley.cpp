@@ -11,10 +11,12 @@
 #include <cstring>
 #include <iostream>
 
-#include "../arch.hpp"
-#include "../models.hpp"
-#include "../plugins.hpp"
-#include "../print.hpp"
+
+
+#include "arch.hpp"
+#include "models.hpp"
+#include "plugins.hpp"
+#include "print.hpp"
 
 class HH : public sanafe::SomaUnit
 {
@@ -69,9 +71,29 @@ public:
         dt = 0.1;
     }
 
-    double get_potential(const size_t neuron_address)
+    double get_potential(const size_t neuron_address) override
     {
         return V;
+    }
+
+    void reset() override
+    {
+        prev_V = 0.0;
+        V = 0.0;
+        m = 0.0;
+        n = 0.0;
+        h = 0.0;
+        tau_n = 0.0;
+        tau_m = 0.0;
+        tau_h = 0.0;
+        pm = 0.0;
+        pn = 0.0;
+        ph = 0.0;
+        denominator = 0.0;
+        tau_V = 0.0;
+        Vinf = 0.0;
+
+        return;
     }
 
     void set_attribute(const size_t neuron_address,
@@ -103,7 +125,7 @@ public:
 
         // Calculate the change in potential since the last update e.g.
         //  integate inputs and apply any potential leak
-        TRACE1("Updating potential, before:%f\n", V);
+        TRACE1(MODELS, "Updating potential, before:%f\n", V);
 
         alpha_n = (0.01 * (V + 55)) / (1 - exp(-0.1 * (V + 55)));
         alpha_m = (0.1 * (V + 40)) / (1 - exp(-0.1 * (V + 40)));
@@ -155,6 +177,6 @@ public:
 // the Class factories
 extern "C" sanafe::SomaUnit *create_HH()
 {
-    TRACE1("Creating HH soma instance\n");
+    TRACE1(MODELS, "Creating HH soma instance\n");
     return (sanafe::SomaUnit *) new HH();
 }
