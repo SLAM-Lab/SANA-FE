@@ -873,14 +873,14 @@ void sanafe::description_parse_neuron(const std::string &id,
         for (size_t instance = range.first; instance <= range.second;
                 ++instance)
         {
-            Neuron &n = neuron_group.neurons[instance];
+            Neuron &n = neuron_group.neurons.at(instance);
             n.configure(config);
         }
     }
     else
     {
         const size_t nid = std::stoull(id);
-        Neuron &n = neuron_group.neurons[nid];
+        Neuron &n = neuron_group.neurons.at(nid);
         n.configure(config);
     }
 }
