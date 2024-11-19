@@ -449,9 +449,6 @@ sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
     // Apply leak
     if (n.leak_towards_zero)
     {
-        // TODO: what happens if we're above zero but by less
-        //  than the leak amount (for convergent), will we
-        //  oscillate between the two? Does it matter
         if (n.potential > 0.0)
         {
             // TrueNorth uses additive leak

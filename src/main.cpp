@@ -151,12 +151,18 @@ int main(int argc, char *argv[])
 
 // Project TODOs and wishlist roughly in priority order
 //
-// ** New features **
-// TODO: update tutorial to use Jupyter notebook
-// TODO: add models.reset() so we can clear model state
-// TODO: implement pipeline h/w units in pybind e.g., soma, dendrite
-//
+// ** New simulator features **
+// TODO: output detailed energy and latency breakdowns in the perf trace
+// TODO: implement pipeline h/w unit creation in pybind e.g., soma, dendrite
+// TODO: reimplement noise for Loihi soma model
+// TODO: support hyperedges in Python interface
+// TODO: support concise mappings in description format, including group mappings
+
 // ** Refactor and optimizing existing features **
 // TODO: Parse model parameters after mapping, in two-pass approach
-// TODO: Make the model parameter maps optional, revert to dendrite/soma/shared
-//  maps
+// TODO: Improve plug-in documentation
+//
+// ** Misc **
+// TODO: update tutorials to use Jupyter notebook
+// TODO: update Latin Squares and randomized experiments for SANA-FEv2
+// TODO: connect SANA-FE to a cycle-accurate NoC model (Booksim)

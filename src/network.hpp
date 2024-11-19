@@ -43,7 +43,7 @@ struct ModelParam;
 
 struct NeuronConfiguration
 {
-    std::map<std::string, ModelParam> model_parameters;
+    std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::string> soma_hw_name{};
     std::optional<std::string> default_synapse_hw_name{};
     std::optional<std::string> dendrite_hw_name{};
