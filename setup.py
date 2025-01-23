@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import sysconfig
 import platform
 import subprocess
 
@@ -45,7 +46,10 @@ class CMakeBuild(build_ext):
 
         cmake_args = ["-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
                       "-DPYTHON_EXECUTABLE=" + sys.executable,
-                      "-DSTANDALONE_BUILD_ENABLED=OFF"]
+                      "-DPYTHON_INCLUDE_DIRS=" + sysconfig.get_path('include'),
+                      "-DSTANDALONE_BUILD_ENABLED=OFF",
+                      "-DPYTHON_FROM_SETUP=ON"]
+        print(f"CMake Arguments: {cmake_args}")
         cfg = "Debug" if self.debug else "Release"
         build_args = ["--config", cfg]
 
