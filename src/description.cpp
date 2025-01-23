@@ -6,6 +6,7 @@
 #include <numeric> // For std::accumulate
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>

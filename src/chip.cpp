@@ -159,6 +159,9 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
 
     // TODO: it makes sense to build the axons as we go, rather than
     //  running in another loop, refactor and restructure this
+    // TODO: however, map_axons assumes that connections in are fixed and
+    //  determined; if we resize these vectors, the references become
+    //  invalidated
     map_axons();
 
     // Set each connection attribute
@@ -889,6 +892,13 @@ void sanafe::SynapseUnit::configure(
     }
 }
 
+void sanafe::SynapseUnit::add_connection(MappedConnection &con)
+{
+    // TODO: this is wasteful storing every synapse twice, once in the neuron
+    //  and again in the synapse h/w unit
+    mapped_connections_in.push_back(&con);
+}
+
 void sanafe::DendriteUnit::configure(
         std::string dendrite_name, const ModelInfo &model_details)
 {
@@ -915,6 +925,7 @@ void sanafe::SomaUnit::configure(
     plugin_lib = model_details.plugin_library_path;
     name = soma_name;
     model = model_details.name;
+
     auto key_exists = [this](const std::string &key) {
         return model_parameters.find(key) != model_parameters.end();
     };
@@ -1151,6 +1162,7 @@ sanafe::SomaUnit &sanafe::Core::create_soma(const SomaConfiguration &config)
         soma.emplace_back(model_get_soma(config.model_info.name));
     }
     auto &unit = soma.back();
+    //INFO("Model created, now configuring\n");
     unit->configure(config.name, config.model_info);
 
     return *unit;
@@ -1397,6 +1409,7 @@ void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw)
     scheduler.max_cores_per_tile = hw.max_cores_per_tile;
 
     ts.sim_time = schedule_messages(ts.messages, scheduler);
+    //ts.sim_time = schedule_messages_simple(ts.messages, scheduler);
     ts.energy = sim_calculate_energy(hw);
 
     for (auto &tile : hw.tiles)
@@ -1651,8 +1664,20 @@ void sanafe::sim_add_connection_to_axon(MappedConnection &con, Core &post_core)
     TRACE3(CHIP, "Adding to connection to axon:%zu\n",
             post_core.axons_out.size() - 1);
 
+    // TODO: this is difficult because we don't want to duplicate all the stored
+    //  information about synapses twice. However, the connection info may be
+    //  useful to the synaptic model when creating the synapses. We can't really
+    //  store pointers to the connections because this array will grow as we map
+    //  connections and invalidate references.. we also have the challenge of
+    //  referencing synapses with a single address value.. what does this mean
+    //  with multiple synapse hw elements. unless maybe we leave the lines below
+    //  here and go back to pointers again.
+    //
+    // TODO: these 3 lines should be moved to where we map the connection to h/w
+    //  I think
     post_core.connections_in.push_back(&con);
     con.synapse_address = post_core.connections_in.size() - 1;
+    con.synapse_hw->add_connection(con);
 
     // Access the most recently created axon in for the post-synaptic core
     AxonInModel &last_added_target_axon = post_core.axons_in.back();

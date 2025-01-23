@@ -53,11 +53,11 @@ struct ModelInfo;
 
 class Tile;
 class Core;
-struct AxonInUnit;
-struct AxonOutUnit;
-struct SynapseUnit;
-struct DendriteUnit;
-struct SomaUnit;
+class AxonInUnit;
+class AxonOutUnit;
+class SynapseUnit;
+class DendriteUnit;
+class SomaUnit;
 
 struct AxonInModel;
 struct AxonOutModel;
@@ -70,7 +70,7 @@ enum NeuronStatus : int
     FIRED
 };
 
-const long int default_heartbeat_timesteps = 100L;
+constexpr long int default_heartbeat_timesteps = 100L;
 class SpikingChip
 {
 public:
@@ -241,8 +241,9 @@ struct Message
     explicit Message(const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
 };
 
-struct AxonInUnit
+class AxonInUnit
 {
+public:
     std::string name;
     long int spike_messages_in{0L};
     double energy{0.0};
@@ -273,7 +274,6 @@ public:
     long int spikes_processed{0L};
     double energy{0.0};
     double time{0.0};
-    size_t mapped_connections{0UL};
 
     //explicit SynapseUnit(std::string synapse_name, const CoreAddress &parent_core, const ModelInfo &model_details);
     SynapseUnit() = default;
@@ -292,8 +292,11 @@ public:
         simulation_time = timestep;
     }
     void configure(std::string synapse_name, const ModelInfo &model);
+    void add_connection(MappedConnection &con);
 
 protected:
+    // TODO: a lot of duplication here, is there a better way?
+    std::vector<MappedConnection *> mapped_connections_in{};
     long int simulation_time{0L};
 };
 
@@ -397,8 +400,9 @@ protected:
     long int simulation_time{0L};
 };
 
-struct AxonOutUnit
+class AxonOutUnit
 {
+public:
     // The axon output points to a number of axons, stored at the
     //  post-synaptic core. A neuron can point to a number of these
     std::string name;

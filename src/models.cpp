@@ -47,6 +47,86 @@ void sanafe::CurrentBasedSynapseModel::set_attribute(
     min_synaptic_resolution = (1.0 / weight_bits);
 }
 
+sanafe::SynapseUnit::SynapseResult sanafe::LoihiSynapseModel::update(
+        const size_t synapse_address, const bool read)
+{
+    constexpr size_t max_parallel_accesses = 4;
+    double latency = 0.0;
+    if (read)
+    {
+        // TODO: this assumes there is only one synapse hw unit per core.. the
+        //  address doesn't work if there are multiple
+        const MappedConnection *new_connection =
+                mapped_connections_in.at(synapse_address);
+        //INFO("dest:%zu w:%lf\n", new_connection->post_neuron->mapped_address, weights[synapse_address]);
+
+        if (!concurrent_accesses.empty())
+        {
+            size_t first_access_address =
+                    concurrent_accesses[0]->synapse_address;
+            //INFO("first access address:%zu\n", first_access_address);
+            const MappedConnection *first_connection =
+                    mapped_connections_in.at(first_access_address);
+            bool positive_weights = (weights.at(first_access_address) > 0.0);
+            bool synapse_is_positive = weights.at(synapse_address) > 0.0;
+            if (concurrent_accesses.size() >= max_parallel_accesses)
+            {
+                concurrent_accesses.clear();
+            }
+            // else if (!mixed_sign_mode && (positive_mode != synapse_is_positive))
+            else if (positive_weights != synapse_is_positive)
+            {
+                concurrent_accesses.clear();
+            }
+            else if (first_connection->pre_neuron != new_connection->pre_neuron)
+            {
+                concurrent_accesses.clear();
+            }
+        }
+
+        bool is_first_access = concurrent_accesses.empty();
+        if (is_first_access)
+        {
+            // TODO: here read from a user defined latency cost
+            latency = 10.8e-9;
+        }
+        concurrent_accesses.push_back(new_connection);
+
+        //for (size_t i = 0; i < concurrent_accesses.size(); ++i)
+        //{
+        //    INFO("concurrent[%zu]=%zu\n", i, concurrent_accesses[i]->synapse_address);
+        //}
+        //INFO("***\n");
+
+        TRACE1(MODELS, "w:%lf\n", weights[synapse_address]);
+        return {weights[synapse_address], std::nullopt, latency};
+    }
+    return {0.0, std::nullopt, latency};
+}
+
+void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
+        const std::string &param_name, const ModelParam &param)
+{
+    if (weights.size() <= synapse_address)
+    {
+        TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
+        weights.resize(std::max(weights.size() * 2, synapse_address + 1));
+    }
+
+    if ((param_name == "w") || (param_name == "weight"))
+    {
+        TRACE1(MODELS, "Setting weight at address:%zu = %lf\n", synapse_address,
+                static_cast<double>(param));
+        weights[synapse_address] = static_cast<double>(param);
+    }
+    else if (param_name == "mixed")
+    {
+        mixed_sign_mode = static_cast<bool>(param);
+    }
+
+    min_synaptic_resolution = (1.0 / weight_bits);
+}
+
 // *** Dendrite models ***
 sanafe::DendriteUnit::DendriteResult sanafe::AccumulatorModel::update(
         const size_t neuron_address, const std::optional<Synapse> synapse_in)
@@ -315,7 +395,11 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
         state = sanafe::UPDATED;
     }
 
+    // TODO: remove hack, put into snn description
+    cx.leak_decay = 4095.0 / 4096.0;
     cx.potential *= cx.leak_decay;
+    // TODO: remove hack to apply quantization
+    cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
     // Add randomized noise to potential if enabled
     /*
     if (noise_type == NOISE_FILE_STREAM)
@@ -529,6 +613,7 @@ void sanafe::InputModel::set_attribute(const size_t neuron_address,
     if (param_name == "spikes")
     {
         spikes = static_cast<std::vector<bool>>(param);
+        TRACE1(MODELS, "Setting input spike train (len:%zu)\n", spikes.size());
         curr_spike = spikes.begin();
     }
     else if (param_name == "poisson")
@@ -622,6 +707,10 @@ std::shared_ptr<sanafe::SynapseUnit> sanafe::model_get_synapse(
     if (model_name == "current_based")
     {
         return std::shared_ptr<SynapseUnit>(new CurrentBasedSynapseModel());
+    }
+    else if (model_name == "loihi")
+    {
+        return std::shared_ptr<SynapseUnit>(new LoihiSynapseModel());
     }
     const std::string error =
             "Synapse model not supported (" + model_name + ")\n";

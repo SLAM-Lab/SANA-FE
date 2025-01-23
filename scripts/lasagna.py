@@ -16,6 +16,7 @@ except ImportError:
     # Not installed, fall-back to local build
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+    print(f"Project dir: {PROJECT_DIR}")
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
 
@@ -43,9 +44,9 @@ in_neurons = mnist_weights["fc1.weight"].shape[1]
 hidden_neurons = mnist_weights["fc1.weight"].shape[0]
 out_neurons = mnist_weights["fc2.weight"].shape[0]
 
-"""
+#"""
 # Load the LASAGNA architecture with analog neurons
-arch = sanafe.load_arch("/home/james/code/lasagne/lasagne.yaml")
+arch = sanafe.load_arch("/home/james/code/lasagna/lasagna.yaml")
 
 print("Creating network in SANA-FE")
 network = sanafe.Network()
@@ -115,7 +116,7 @@ for input in range(0, num_inputs):
     results = hw.sim(timesteps)
     print(results)
     hw.reset()
-"""
+#"""
 
 # Read in simulation results
 with open("spikes.csv") as spike_csv:

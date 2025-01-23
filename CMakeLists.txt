@@ -4,6 +4,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -87,9 +90,6 @@ file (GLOB HEADER_FILES "${SRC_DIR}/*.hpp")
 cmake_print_variables(SOURCE_FILES)
 cmake_print_variables(HEADER_FILES)
 
-#file (GLOB SOURCE_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.cpp")
-#file (GLOB HEADER_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.hpp")
-
 # Get the latest commit hash
 execute_process(
     COMMAND git rev-parse HEAD
@@ -103,6 +103,7 @@ add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 # Old version used PythonLibs
 ##find_package(PythonLibs REQUIRED)
+# TODO: reenable OpenMP for clang and gcc
 find_package(OpenMP REQUIRED)
 
 ############## rapid-yaml

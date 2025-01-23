@@ -30,8 +30,35 @@ sanafe::NocInfo::NocInfo(const int width, const int height,
 {
 }
 
-double sanafe::schedule_messages(
+double sanafe::schedule_messages_simple(
         std::vector<std::list<Message>> &messages, const Scheduler &scheduler)
+{
+    const size_t cores = messages.size();
+    std::vector<double> neuron_processing_latencies(cores, 0.0);
+    std::vector<double> message_processing_latencies(cores, 0.0);
+    for (size_t sending_core = 0; sending_core < messages.size();
+            ++sending_core)
+    {
+        std::list<Message> &q = messages[sending_core];
+        for (Message &m : q)
+        {
+            neuron_processing_latencies[sending_core] += m.generation_delay;
+            message_processing_latencies[m.dest_core_id] += m.receive_delay;
+        }
+    }
+
+    double max_message_processing =
+            *std::max_element(message_processing_latencies.begin(),
+                    message_processing_latencies.end());
+    double max_neuron_processing =
+            *std::max_element(neuron_processing_latencies.begin(),
+                    neuron_processing_latencies.end());
+    return std::max(max_message_processing, max_neuron_processing);
+}
+
+double sanafe::schedule_messages(
+                std::vector<std::list<Message>> &messages,
+                const Scheduler &scheduler)
 {
     // Schedule the global order of messages. Takes a vector containing
     //  a list of messages per core, and scheduler parameters (mostly
@@ -68,12 +95,29 @@ double sanafe::schedule_messages(
     //  the point of sending, and the average processing delay of
     //  all of those messages. When a message is added or removed from the
     //  NoC we update the average counts.
+    //int last_rx_core = -1;
+    //int last_tx_core = -1;
+    //bool last_rx = true;
     while (!priority.empty())
     {
         // Get the core's queue with the earliest simulation time
         Message &m = priority.top();
         priority.pop();
         last_timestamp = fmax(last_timestamp, m.sent_timestamp);
+
+        // TODO: HACK remove
+        /*
+        if (!m.placeholder)
+        {
+            last_rx_core = m.dest_core_id;
+            last_rx = true;
+        }
+        else
+        {
+            last_tx_core = m.src_core_id;
+            last_rx = false;
+        }
+        */
 
         // Update the Network-on-Chip state
         schedule_update_noc(m.sent_timestamp, noc);
@@ -163,6 +207,7 @@ double sanafe::schedule_messages(
         TRACE1(SCHEDULER, "Priority size:%zu\n", priority.size());
     }
     TRACE1(SCHEDULER, "Scheduler finished.\n");
+    //INFO("last rx:%d tx:%d t:%e rx:%d\n", last_rx_core, last_tx_core, last_timestamp, last_rx);
 
     return last_timestamp;
 }

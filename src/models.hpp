@@ -45,6 +45,27 @@ private:
     int weight_bits{default_weight_bits};
 };
 
+class LoihiSynapseModel : public SynapseUnit
+{
+public:
+    LoihiSynapseModel() = default;
+    LoihiSynapseModel(const LoihiSynapseModel &copy) = default;
+    LoihiSynapseModel(LoihiSynapseModel &&other) = default;
+    ~LoihiSynapseModel() override = default;
+    LoihiSynapseModel &operator=(const LoihiSynapseModel &other) = default;
+    LoihiSynapseModel &operator=(LoihiSynapseModel &&other) = default;
+
+    SynapseResult update(size_t synapse_address, bool read) override;
+    void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
+
+private:
+    std::vector<double> weights{};
+    std::vector<const MappedConnection *> concurrent_accesses{};
+    double min_synaptic_resolution{0.0};
+    int weight_bits{default_weight_bits};
+    bool mixed_sign_mode{true};
+};
+
 class AccumulatorModel : public DendriteUnit
 {
 public:
@@ -170,8 +191,8 @@ class InputModel : public SomaUnit
 {
 public:
     InputModel() = default;
-    InputModel(const InputModel &copy) = default;
-    InputModel(InputModel &&other) = default;
+    InputModel(const InputModel &copy) = delete; // Because of random_device
+    InputModel(InputModel &&other) = delete; // Because of random_device
     ~InputModel() override = default;
     InputModel &operator=(const InputModel &other) = delete;
     InputModel &operator=(InputModel &&other) = delete;
