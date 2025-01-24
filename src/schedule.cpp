@@ -10,6 +10,7 @@
 //  network delays accurately, keep track of predicted NoC state by counting
 //  the numbers of messages that are travelling through routes / flows at
 //  different times
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <functional> // For std::reference_wrapper
