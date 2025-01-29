@@ -427,6 +427,7 @@ void sanafe::pipeline_process_neurons(Timestep &ts, SpikingChip &hw)
             const MappedNeuron &last_neuron = core.neurons.back();
             Message placeholder(hw, last_neuron, ts.timestep);
             placeholder.generation_delay = core.next_message_generation_delay;
+            // Create a dummy placeholder message
             ts.messages[core.id].push_back(placeholder);
         }
     }
@@ -500,9 +501,10 @@ void sanafe::pipeline_process_neuron(
         neuron_processing_latency += pipeline_process_axon_out(ts, arch, n);
     }
 
-    // Hardware before the time-step buffer may also need to be updated every
-    //  time-step. For example, if a leak has to be applied every time-step.
-    //  Do this after normal neuron processing has finished
+    // Hardware before the time-step buffer in the message processing pipeline
+    //  may also need to be updated every time-step. For example, if a leak has
+    //  to be applied every time-step. Do this after neuron processing has
+    //  finished
     // TODO: move this into the message receiving loops somehow
     if ((n.core->pipeline_config.buffer_position >
                 BUFFER_BEFORE_DENDRITE_UNIT) &&

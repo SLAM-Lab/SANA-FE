@@ -165,4 +165,3 @@ int main(int argc, char *argv[])
 // ** Misc **
 // TODO: update tutorials to use Jupyter notebook
 // TODO: update Latin Squares and randomized experiments for SANA-FEv2
-// TODO: connect SANA-FE to a cycle-accurate NoC model (Booksim)

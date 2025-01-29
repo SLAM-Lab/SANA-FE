@@ -244,9 +244,6 @@ sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
     return self->create_core(name, parent_tile_id, pipeline_config);
 }
 
-// For now support setting attributes of both Neuron and MappedNeuron
-// TODO: in the future, how I handle these may change (might simplify the Neuron
-//  struct)
 void pyconfigure(sanafe::Neuron *self,
         std::optional<std::string> soma_hw_name,
         std::optional<std::string> default_synapse_hw_name,

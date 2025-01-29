@@ -2,6 +2,7 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
+//
 // arch.hpp: Create a neuromorphic design based on a set of commands
 //  In this simulator an architecture is a represented as a set of different
 //  hardware blocks. The design (chip) is a set of tiles, connected by NoC
@@ -53,6 +54,7 @@ enum BufferPosition : int
     BUFFER_BEFORE_SOMA_UNIT,
     BUFFER_BEFORE_AXON_OUT_UNIT,
     BUFFER_POSITIONS,
+    // TODO: add BUFFER_IN_DENDRITE_UNIT, BUFFER_IN_SOMA_UNIT in between these entries...
 };
 
 struct ModelInfo
@@ -172,6 +174,8 @@ struct AxonInConfiguration
     AxonInConfiguration(const AxonInPowerMetrics &metrics, std::string name) : metrics(metrics), name(name) {}
 };
 
+// TODO: this struct is redundantly nested - just have ModelConfiguration or UnitConfiguration which contains
+//  the name and is common to synapse, dendrite and soma units (or combined units)?
 struct SynapseConfiguration
 {
     ModelInfo model_info;
