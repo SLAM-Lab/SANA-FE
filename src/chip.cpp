@@ -934,7 +934,7 @@ void sanafe::SynapseUnit::add_connection(MappedConnection &con)
 {
     // TODO: this is wasteful storing every synapse twice, once in the neuron
     //  and again in the synapse h/w unit
-    mapped_connections_in.push_back(&con);
+    //mapped_connections_in.push_back(&con);
 }
 
 void sanafe::DendriteUnit::configure(
@@ -957,7 +957,7 @@ void sanafe::DendriteUnit::configure(
 }
 
 void sanafe::SomaUnit::configure(
-        const std::string &soma_name, const ModelInfo &model_details)
+        std::string soma_name, const ModelInfo &model_details)
 {
     model_parameters = model_details.model_parameters;
     plugin_lib = model_details.plugin_library_path;

@@ -16,7 +16,7 @@
 #include "print.hpp"
 
 // *** Synapse hardware unit models ***
-sanafe::SynapseUnit::SynapseResult sanafe::CurrentBasedSynapseModel::update(
+sanafe::SynapseResult sanafe::CurrentBasedSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
     if (read)
@@ -47,7 +47,7 @@ void sanafe::CurrentBasedSynapseModel::set_attribute(
     min_synaptic_resolution = (1.0 / weight_bits);
 }
 
-sanafe::SynapseUnit::SynapseResult sanafe::LoihiSynapseModel::update(
+sanafe::SynapseResult sanafe::LoihiSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
     // TODO: not sure if I should model the parallel synaptic pipeline
@@ -182,7 +182,7 @@ void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
 }
 
 // *** Dendrite models ***
-sanafe::DendriteUnit::DendriteResult sanafe::AccumulatorModel::update(
+sanafe::DendriteResult sanafe::AccumulatorModel::update(
         const size_t neuron_address, const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated[neuron_address] < simulation_time)
@@ -209,7 +209,7 @@ void sanafe::AccumulatorModel::set_attribute(const size_t neuron_address,
     }
 }
 
-sanafe::DendriteUnit::DendriteResult sanafe::MultiTapModel1D::update(
+sanafe::DendriteResult sanafe::MultiTapModel1D::update(
         const size_t neuron_address, const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated < simulation_time)
@@ -418,7 +418,7 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     TRACE1(MODELS, "Set parameter: %s\n", param_name.c_str());
 }
 
-sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
+sanafe::SomaResult sanafe::LoihiLifModel::update(
         const size_t neuron_address, const std::optional<double> current_in)
 {
     LoihiCompartment &cx = compartments[neuron_address];
@@ -577,7 +577,7 @@ void sanafe::TrueNorthModel::set_attribute(const size_t neuron_address,
     }
 }
 
-sanafe::SomaUnit::SomaResult sanafe::TrueNorthModel::update(
+sanafe::SomaResult sanafe::TrueNorthModel::update(
         const size_t neuron_address, const std::optional<double> current_in)
 {
     bool randomize_threshold;
@@ -700,7 +700,7 @@ void sanafe::TrueNorthModel::reset()
     return;
 }
 
-sanafe::SomaUnit::SomaResult sanafe::InputModel::update(
+sanafe::SomaResult sanafe::InputModel::update(
         const size_t neuron_address, std::optional<double> current_in)
 {
     // This models a dummy input node

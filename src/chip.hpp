@@ -245,6 +245,41 @@ struct Message
     explicit Message(const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
 };
 
+struct SynapseResult
+{
+    double current;
+    std::optional<double> energy{std::nullopt};
+    std::optional<double> latency{std::nullopt};
+};
+
+struct DendriteResult
+{
+    double current;
+    std::optional<double> energy{std::nullopt};
+    std::optional<double> latency{std::nullopt};
+};
+
+struct SomaResult
+{
+    NeuronStatus status;
+    std::optional<double> energy{std::nullopt};
+    std::optional<double> latency{std::nullopt};
+};
+
+struct SomaEnergyMetrics
+{
+    double energy_update_neuron{0.0};
+    double energy_access_neuron{0.0};
+    double energy_spike_out{0.0};
+};
+
+struct SomaLatencyMetrics
+{
+    double latency_update_neuron{0.0};
+    double latency_access_neuron{0.0};
+    double latency_spike_out{0.0};
+};
+
 class AxonInUnit
 {
 public:
@@ -258,30 +293,31 @@ public:
     explicit AxonInUnit(const AxonInConfiguration &config);
 };
 
-class SynapseUnit
+class PipelineUnit
 {
 public:
-    struct SynapseResult
-    {
-        double current;
-        std::optional<double> energy{std::nullopt};
-        std::optional<double> latency{std::nullopt};
-    };
+    virtual void set_attribute(size_t address, const std::string &param_name, const ModelParam &param) = 0;
+    virtual void reset() = 0;
+    virtual void configure(std::string unit_name, const ModelInfo &model) = 0;
+
+    void set_time(const long int timestep) { simulation_time = timestep; }
 
     std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
-    std::optional<double> default_energy_process_spike{std::nullopt};
-    std::optional<double> default_latency_process_spike{std::nullopt};
-
-    long int spikes_processed{0L};
-    size_t host_core_id{};
     double energy{0.0};
     double time{0.0};
 
-    //explicit SynapseUnit(std::string synapse_name, const CoreAddress &parent_core, const ModelInfo &model_details);
-    SynapseUnit() = default;
+protected:
+    long int simulation_time{0L};
+};
+
+class SynapseUnit : public PipelineUnit
+{
+public:
+    long int spikes_processed{0L};
+
     SynapseUnit(const SynapseUnit &copy) = default;
     SynapseUnit(SynapseUnit &&other) = default;
     virtual ~SynapseUnit() = default;
@@ -289,93 +325,48 @@ public:
     SynapseUnit &operator=(SynapseUnit &&other) = default;
 
     virtual SynapseResult update(size_t synapse_address, bool read = false) = 0;
-    virtual void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) = 0;
-    virtual void reset() {};
-    virtual double weight(int address) { return -1.0; } // TODO: remove HACK
 
     // Additional helper functions
-    void set_time(const long int timestep)
-    {
-        simulation_time = timestep;
-    }
-    void configure(std::string synapse_name, const ModelInfo &model, size_t core_id);
+    void configure(std::string synapse_name, const ModelInfo &model) override;
     void add_connection(MappedConnection &con);
+    void reset() override {};
+
+    std::optional<double> default_energy_process_spike{std::nullopt};
+    std::optional<double> default_latency_process_spike{std::nullopt};
 
 protected:
+    // Abstract base class; do not instantiate
+    SynapseUnit() = default;
+
     // TODO: a lot of duplication here, is there a better way?
     std::vector<MappedConnection *> mapped_connections_in{};
-    long int simulation_time{0L};
 };
 
-class DendriteUnit
+class DendriteUnit : public PipelineUnit
 {
 public:
-    struct DendriteResult
-    {
-        double current;
-        std::optional<double> energy{std::nullopt};
-        std::optional<double> latency{std::nullopt};
-    };
-
-    std::map<std::string, ModelParam> model_parameters{};
-    std::optional<std::filesystem::path> plugin_lib{std::nullopt};
-    std::string name;
-    std::string model;
-    std::optional<double> default_energy_update{std::nullopt};
-    std::optional<double> default_latency_update{std::nullopt};
-    double energy{0.0};
-    double time{0.0};
-
     DendriteUnit(const DendriteUnit &copy) = default;
     DendriteUnit(DendriteUnit &&other) = default;
     virtual ~DendriteUnit() = default;
     DendriteUnit &operator=(const DendriteUnit &other) = default;
     DendriteUnit &operator=(DendriteUnit &&other) = default;
 
-    virtual void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) = 0;
     virtual DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) = 0;
-    virtual void reset() = 0;
 
     // Additional helper functions
-    void set_time(const long int timestep)
-    {
-        simulation_time = timestep;
-    }
-    void configure(std::string dendrite_name, const ModelInfo &model_details);
+    void configure(std::string dendrite_name, const ModelInfo &model_details) override;
+
+    std::optional<double> default_energy_update{std::nullopt};
+    std::optional<double> default_latency_update{std::nullopt};
 
 protected:
     // Abstract base class; do not instantiate
     DendriteUnit() = default;
-
-    long int simulation_time{0L};
 };
 
-class SomaUnit
+class SomaUnit : public PipelineUnit
 {
 public:
-    struct SomaEnergyMetrics
-    {
-        double energy_update_neuron{0.0};
-        double energy_access_neuron{0.0};
-        double energy_spike_out{0.0};
-    };
-
-    struct SomaLatencyMetrics
-    {
-        double latency_update_neuron{0.0};
-        double latency_access_neuron{0.0};
-        double latency_spike_out{0.0};
-    };
-
-    struct SomaResult
-    {
-        NeuronStatus status;
-        std::optional<double> energy{std::nullopt};
-        std::optional<double> latency{std::nullopt};
-    };
-
-    //explicit SomaUnit(std::string soma_name, const CoreAddress &parent_core, const ModelInfo &model_details);
-    SomaUnit() = default;
     SomaUnit(const SomaUnit &copy) = default;
     SomaUnit(SomaUnit &&other) = default;
     virtual ~SomaUnit() = default;
@@ -383,28 +374,20 @@ public:
     SomaUnit &operator=(SomaUnit &&other) = delete;
 
     virtual SomaResult update(size_t neuron_address, std::optional<double> current_in) = 0;
-    virtual void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) = 0;
     virtual double get_potential(size_t neuron_address) { return 0.0; }
-    virtual void reset() = 0;
 
-    void set_time(const long int timestep) { simulation_time = timestep; }
-    void configure(const std::string &soma_name, const ModelInfo &model_details);
+    void configure(std::string soma_name, const ModelInfo &model_details) override;
 
-    std::map<std::string, ModelParam> model_parameters{};
-    FILE *noise_stream{nullptr};
-    std::optional<std::filesystem::path> plugin_lib{std::nullopt};
-    std::string name;
-    std::string model;
+    //FILE *noise_stream{nullptr};
     long int neuron_updates{0L};
     long int neurons_fired{0L};
     long int neuron_count{0L};
-    double energy{0.0};
-    double time{0.0};
     std::optional<SomaEnergyMetrics> default_energy_metrics;
     std::optional<SomaLatencyMetrics> default_latency_metrics;
 
 protected:
-    long int simulation_time{0L};
+    // Abstract base class; do not instantiate
+    SomaUnit() = default;
 };
 
 class AxonOutUnit
