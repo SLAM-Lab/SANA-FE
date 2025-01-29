@@ -35,9 +35,7 @@ struct Message;
 struct TileConfiguration;
 struct CoreConfiguration;
 struct AxonInConfiguration;
-struct SynapseConfiguration;
-struct DendriteConfiguration;
-struct SomaConfiguration;
+struct PipelineUnitConfiguration;
 struct AxonOutConfiguration;
 struct TilePowerMetrics;
 struct AxonInPowerMetrics;
@@ -146,15 +144,15 @@ struct CoreConfiguration
     CoreAddress address{};
 
     std::vector<AxonInConfiguration> axon_in;
-    std::vector<SynapseConfiguration> synapses;
-    std::vector<DendriteConfiguration> dendrites;
-    std::vector<SomaConfiguration> somas;
+    std::vector<PipelineUnitConfiguration> synapses;
+    std::vector<PipelineUnitConfiguration> dendrites;
+    std::vector<PipelineUnitConfiguration> somas;
     std::vector<AxonOutConfiguration> axon_out;
 
     AxonInConfiguration &create_axon_in(const std::string &name, const AxonInPowerMetrics &power_metrics);
-    SynapseConfiguration &create_synapse(const std::string &name, const ModelInfo &model_details);
-    DendriteConfiguration &create_dendrite(const std::string &name, const ModelInfo &model_details);
-    SomaConfiguration &create_soma(std::string name, const ModelInfo &model_details);
+    PipelineUnitConfiguration &create_synapse(const std::string &name, const ModelInfo &model_details);
+    PipelineUnitConfiguration &create_dendrite(const std::string &name, const ModelInfo &model_details);
+    PipelineUnitConfiguration &create_soma(std::string name, const ModelInfo &model_details);
     AxonOutConfiguration &create_axon_out(const std::string &name, const AxonOutPowerMetrics &power_metrics);
 
     CoreConfiguration(std::string name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
@@ -176,26 +174,14 @@ struct AxonInConfiguration
 
 // TODO: this struct is redundantly nested - just have ModelConfiguration or UnitConfiguration which contains
 //  the name and is common to synapse, dendrite and soma units (or combined units)?
-struct SynapseConfiguration
+struct PipelineUnitConfiguration
 {
     ModelInfo model_info;
     std::string name;
-    SynapseConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(name) {}
-};
-
-struct DendriteConfiguration
-{
-    ModelInfo model_info;
-    std::string name;
-    DendriteConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(name) {}
-
-};
-
-struct SomaConfiguration
-{
-    ModelInfo model_info;
-    std::string name;
-    SomaConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(name) {}
+    size_t tile_id;
+    size_t core_offset;
+    size_t core_id;
+    PipelineUnitConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(name) {}
 };
 
 struct AxonOutPowerMetrics

@@ -155,29 +155,29 @@ sanafe::AxonInConfiguration &sanafe::CoreConfiguration::create_axon_in(
     return new_axon;
 }
 
-sanafe::SynapseConfiguration &sanafe::CoreConfiguration::create_synapse(
+sanafe::PipelineUnitConfiguration &sanafe::CoreConfiguration::create_synapse(
         const std::string &name, const ModelInfo &model_details)
 {
     synapses.emplace_back(model_details, name);
-    SynapseConfiguration &new_synapse = synapses.back();
+    PipelineUnitConfiguration &new_synapse = synapses.back();
 
     return new_synapse;
 }
 
-sanafe::DendriteConfiguration &sanafe::CoreConfiguration::create_dendrite(
+sanafe::PipelineUnitConfiguration &sanafe::CoreConfiguration::create_dendrite(
         const std::string &name, const ModelInfo &model_details)
 {
     dendrites.emplace_back(model_details, name);
-    DendriteConfiguration &new_dendrite = dendrites.back();
+    PipelineUnitConfiguration &new_dendrite = dendrites.back();
 
     return new_dendrite;
 }
 
-sanafe::SomaConfiguration &sanafe::CoreConfiguration::create_soma(
+sanafe::PipelineUnitConfiguration &sanafe::CoreConfiguration::create_soma(
         std::string name, const ModelInfo &model_details)
 {
     somas.emplace_back(model_details, name);
-    SomaConfiguration &new_soma = somas.back();
+    PipelineUnitConfiguration &new_soma = somas.back();
 
     return new_soma;
 }

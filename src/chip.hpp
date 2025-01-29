@@ -36,9 +36,7 @@ struct TileConfiguration;
 struct CoreConfiguration;
 struct CorePipelineConfiguration;
 struct AxonInConfiguration;
-struct SynapseConfiguration;
-struct DendriteConfiguration;
-struct SomaConfiguration;
+struct PipelineUnitConfiguration;
 struct AxonOutConfiguration;
 
 class SpikingNetwork;
@@ -454,9 +452,9 @@ public:
     explicit Core(const CoreConfiguration &config);
     void map_neuron(const Neuron &n);
     AxonInUnit &create_axon_in(const AxonInConfiguration &config);
-    SynapseUnit &create_synapse(const SynapseConfiguration &config);
-    DendriteUnit &create_dendrite(const DendriteConfiguration &config);
-    SomaUnit &create_soma(const SomaConfiguration &config);
+    SynapseUnit &create_synapse(const PipelineUnitConfiguration &config);
+    DendriteUnit &create_dendrite(const PipelineUnitConfiguration &config);
+    SomaUnit &create_soma(const PipelineUnitConfiguration &config);
     AxonOutUnit &create_axon_out(const AxonOutConfiguration &config);
     [[nodiscard]] int get_id() const { return id; }
     [[nodiscard]] int get_offset() const { return offset; }

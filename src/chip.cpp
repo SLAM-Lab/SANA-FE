@@ -54,17 +54,18 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
             {
                 hardware_core.create_axon_in(axon_config);
             }
-            for (const SynapseConfiguration &synapse_config :
+            for (const PipelineUnitConfiguration &synapse_config :
                     core_config.synapses)
             {
                 hardware_core.create_synapse(synapse_config);
             }
-            for (const DendriteConfiguration &dendrite_config :
+            for (const PipelineUnitConfiguration &dendrite_config :
                     core_config.dendrites)
             {
                 hardware_core.create_dendrite(dendrite_config);
             }
-            for (const SomaConfiguration &soma_config : core_config.somas)
+            for (const PipelineUnitConfiguration &soma_config :
+                    core_config.somas)
             {
                 hardware_core.create_soma(soma_config);
             }
@@ -1123,7 +1124,7 @@ sanafe::AxonInUnit &sanafe::Core::create_axon_in(
 }
 
 sanafe::SynapseUnit &sanafe::Core::create_synapse(
-        const SynapseConfiguration &config)
+        const PipelineUnitConfiguration &config)
 {
     // Create the synapse model
     if (config.model_info.plugin_library_path.has_value())
@@ -1151,7 +1152,7 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
 }
 
 sanafe::DendriteUnit &sanafe::Core::create_dendrite(
-        const DendriteConfiguration &config)
+        const PipelineUnitConfiguration &config)
 {
     TRACE1(CHIP, "New dendrite h/w unit created\n");
 
@@ -1177,7 +1178,8 @@ sanafe::DendriteUnit &sanafe::Core::create_dendrite(
     return *unit;
 }
 
-sanafe::SomaUnit &sanafe::Core::create_soma(const SomaConfiguration &config)
+sanafe::SomaUnit &sanafe::Core::create_soma(
+        const PipelineUnitConfiguration &config)
 {
     TRACE1(CHIP, "New soma h/w unit created (%s)\n", config.name.c_str());
 
