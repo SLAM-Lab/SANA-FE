@@ -390,6 +390,8 @@ protected:
     SomaUnit() = default;
 };
 
+// TODO: combined pipeline units
+
 class AxonOutUnit
 {
 public:

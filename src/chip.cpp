@@ -934,7 +934,7 @@ void sanafe::SynapseUnit::add_connection(MappedConnection &con)
 {
     // TODO: this is wasteful storing every synapse twice, once in the neuron
     //  and again in the synapse h/w unit
-    //mapped_connections_in.push_back(&con);
+    mapped_connections_in.push_back(&con);
 }
 
 void sanafe::DendriteUnit::configure(
