@@ -5,6 +5,7 @@ import sys
 import dill
 import numpy as np
 import pandas as pd
+from torchvision import datasets
 
 import matplotlib.pyplot as plt
 
@@ -20,8 +21,8 @@ except ImportError:
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
 
-timesteps = 25
-num_inputs = 10
+timesteps = 100
+num_inputs = 1000
 print("Loading models")
 mnist_model = torch.load(
         os.path.join(PROJECT_DIR, "etc", "mnist.pt"),
@@ -64,7 +65,7 @@ for id, neuron in enumerate(in_layer.neurons):
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 for id, neuron in enumerate(hidden_layer.neurons):
-    neuron.configure(soma_hw_name=f"loihi", log_spikes=True,
+    neuron.configure(soma_hw_name=f"loihi", log_spikes=True, log_potential=True,
                      model_parameters={"threshold": 1.0, "leak_decay": 0.85})
     if analog_neurons:
         neuron.configure(soma_hw_name=f"analog_lif[{id}]", log_spikes=True)
@@ -82,17 +83,18 @@ for id, neuron in enumerate(out_layer.neurons):
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 # Connect neurons in both layers
+min_weight = 1.0e-3
 for src in range(0, in_neurons):
     for dst in range(0, hidden_neurons):
         weight = mnist_weights["fc1.weight"][dst, src]
-        if weight > 0.0:
+        if abs(weight) > min_weight:
             network.groups["in"].neurons[src].connect_to_neuron(
                 network.groups["hidden"].neurons[dst], {"weight": weight})
 
 for src in range(0, hidden_neurons):
     for dst in range(0, out_neurons):
         weight = mnist_weights["fc2.weight"][dst, src]
-        if weight > 0.0:
+        if abs(weight) > 0.0:
             network.groups["hidden"].neurons[src].connect_to_neuron(
                 network.groups["out"].neurons[dst], {"weight": weight})
 
@@ -140,9 +142,27 @@ with open("spikes.csv") as spike_csv:
         else:
             print(f"Warning: Group {group_name} not recognized!")
 
-# 1) Count the total output spikes TODO: update now we have multiple input sequences
-counts = [sum(spikes) for spikes in out_spikes]
-print(f"Spike counts per class:{counts}")
+test_dataset = datasets.MNIST(root="./runs/lasagna/data", train=False, download=True)
+labels = test_dataset.targets
+
+# 1) Count the total output spikes
+counts = np.zeros((out_neurons, num_inputs), dtype=int)
+for digit, spikes in enumerate(out_spikes):
+    for spike_timestep in spikes:
+        input_idx = (spike_timestep - 1) // timesteps
+        assert(input_idx < num_inputs)
+        counts[digit, input_idx] += 1
+
+correct = 0
+for i in range(0, num_inputs):
+    print(f"Spike counts per class for inference of digit:{counts[:, i]} "
+          f"out:{np.argmax(counts[:, i])} actual:{labels[i]}")
+    if np.argmax(counts[:, i]) == labels[i]:
+        correct += 1
+
+accuracy = (correct / num_inputs) * 100
+print(f"Accuracy: {accuracy}%")
+exit()
 
 # 2) Create a raster plot of all spikes
 from matplotlib.gridspec import GridSpec
