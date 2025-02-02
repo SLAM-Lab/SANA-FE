@@ -7,6 +7,15 @@ Simulating Advanced Neuromorphic Architectures for Fast Exploration (SANA-FE)
 
 A framework to model energy and performance of neuromorphic hardware.
 
+# Reference
+
+We hope that you find this project useful. If you use SANA-FE in your work,
+please cite:
+J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
+"SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
+in IEEE Transactions on Computer-Aided Design of Integrated Circuits and
+Systems, doi: 10.1109/TCAD.2025.3537971.
+
 # To Build
 
 This project uses CMake as its build system and dependency manager. To setup
