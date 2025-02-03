@@ -272,6 +272,7 @@ public:
     std::optional<double> default_latency_process_spike{std::nullopt};
 
     long int spikes_processed{0L};
+    size_t host_core_id{};
     double energy{0.0};
     double time{0.0};
 
@@ -285,13 +286,14 @@ public:
 
     virtual SynapseResult update(size_t synapse_address, bool read = false) = 0;
     virtual void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) = 0;
+    virtual void reset() {}; // TODO: make virtual
 
     // Additional helper functions
     void set_time(const long int timestep)
     {
         simulation_time = timestep;
     }
-    void configure(std::string synapse_name, const ModelInfo &model);
+    void configure(std::string synapse_name, const ModelInfo &model, size_t core_id);
     void add_connection(MappedConnection &con);
 
 protected:

@@ -533,6 +533,11 @@ double sanafe::pipeline_process_message(
 
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
     const AxonInModel &axon_in = core.axons_in[m.dest_axon_id];
+    if (core.id == 31)
+    {
+        //INFO("Accessing %zu synapses\n", axon_in.synapse_addresses.size());
+    }
+
     for (const int synapse_address : axon_in.synapse_addresses)
     {
         MappedConnection &con = *(core.connections_in[synapse_address]);
@@ -875,11 +880,13 @@ sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
 }
 
 void sanafe::SynapseUnit::configure(
-        std::string synapse_name, const ModelInfo &model)
+        std::string synapse_name, const ModelInfo &model, size_t core_id)
 {
     model_parameters = model.model_parameters;
     plugin_lib = model.plugin_library_path;
     name = synapse_name;
+    // TODO: figure a clean way of doing this
+    host_core_id = core_id;
 
     if (model_parameters.find("energy_process_spike") != model_parameters.end())
     {
@@ -1109,7 +1116,7 @@ sanafe::SynapseUnit &sanafe::Core::create_synapse(
     }
 
     auto &new_unit = synapse.back();
-    new_unit->configure(config.name, config.model_info);
+    new_unit->configure(config.name, config.model_info, id);
     TRACE1(CHIP, "New synapse h/w unit created\n");
 
     return *new_unit;

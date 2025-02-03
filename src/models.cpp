@@ -60,35 +60,56 @@ sanafe::SynapseUnit::SynapseResult sanafe::LoihiSynapseModel::update(
                 mapped_connections_in.at(synapse_address);
         //INFO("dest:%zu w:%lf\n", new_connection->post_neuron->mapped_address, weights[synapse_address]);
 
+        // TODO: a vector is overkill - I think we just need to remember the previous
+        //  access!
         if (!concurrent_accesses.empty())
         {
             size_t first_access_address =
                     concurrent_accesses[0]->synapse_address;
-            //INFO("first access address:%zu\n", first_access_address);
+            ////INFO("first access address:%zu\n", first_access_address);
             const MappedConnection *first_connection =
                     mapped_connections_in.at(first_access_address);
             bool positive_weights = (weights.at(first_access_address) > 0.0);
             bool synapse_is_positive = weights.at(synapse_address) > 0.0;
             if (concurrent_accesses.size() >= max_parallel_accesses)
             {
+                if (host_core_id == 31)
+                {
+                    //INFO("Memory accesses (full):%zu\n", concurrent_accesses.size());
+                }
                 concurrent_accesses.clear();
             }
             // else if (!mixed_sign_mode && (positive_mode != synapse_is_positive))
+            ///*
             else if (positive_weights != synapse_is_positive)
             {
+                if (host_core_id == 31)
+                {
+                    //INFO("Memory accesses (sign change):%zu\n", concurrent_accesses.size());
+                }
                 concurrent_accesses.clear();
             }
+            //*/
             else if (first_connection->pre_neuron != new_connection->pre_neuron)
+            {
+                if (host_core_id == 31)
+                {
+                    //INFO("Memory accesses (change in neuron):%zu\n", concurrent_accesses.size());
+                }
+                concurrent_accesses.clear();
+            }
+            else if (first_connection->post_neuron->mapped_address > new_connection->post_neuron->mapped_address)
             {
                 concurrent_accesses.clear();
             }
+            //*/
         }
 
         bool is_first_access = concurrent_accesses.empty();
         if (is_first_access)
         {
             // TODO: here read from a user defined latency cost
-            latency = 10.8e-9;
+            latency += 1.0 * 10.8e-9;
         }
         concurrent_accesses.push_back(new_connection);
 
@@ -102,6 +123,13 @@ sanafe::SynapseUnit::SynapseResult sanafe::LoihiSynapseModel::update(
         return {weights[synapse_address], std::nullopt, latency};
     }
     return {0.0, std::nullopt, latency};
+}
+
+void sanafe::LoihiSynapseModel::reset()
+{
+    concurrent_accesses.clear();
+
+    return;
 }
 
 void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,

@@ -94,7 +94,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -109,8 +109,8 @@ if __name__ == "__main__":
     energies = np.array(())
     hops = np.array(())
     timesteps = 128
-    #frames = 100
-    frames = 1
+    frames = 100
+    #frames = 1
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
@@ -138,47 +138,58 @@ if __name__ == "__main__":
         elif experiment == "time":
             open(SIM_TIME_DATA_PATH, "w")
 
-        for inputs in range(0, frames):
+        input_filename = os.path.join(NETWORK_DIR, "inputs0.net")
+        input_csv_filename = os.path.join(NETWORK_DIR, "inputs.csv")
+        with open(input_filename, "r") as input_file:
+            input_data = input_file.read()
+        with open(input_csv_filename, "r") as input_csv:
+            inputs = np.loadtxt(input_csv, delimiter=",", skiprows=1)
+
+        # First create the network file from the inputs and SNN
+        data = (group_data + "\n" + input_data + "\n" + snn_data + "\n" +
+                mapping_data)
+        with open(GENERATED_NETWORK_PATH, "w") as network_file:
+            network_file.write(data)
+
+        # Use a pre-generated network for a realistic use case i.e.
+        #  dvs-gesture
+        arch = sanafe.load_arch(ARCH_PATH)
+        net = sanafe.load_net(GENERATED_NETWORK_PATH, arch,
+                                use_netlist_format=True)
+        chip = sanafe.SpikingChip(arch, record_perf=True)
+        chip.load(net)
+
         #for inputs in range(0, 1):
         #for inputs in range(1, 2):
         #for inputs in range(50, frames):
-            print(f"Running for input: {inputs}")
-            # First create the network file from the inputs and SNN
-            input_filename = os.path.join(NETWORK_DIR, f"inputs{inputs}.net")
-            with open(input_filename, "r") as input_file:
-                input_data = input_file.read()
-
-            data = (group_data + "\n" + input_data + "\n" + snn_data + "\n" +
-                    mapping_data)
-            with open(GENERATED_NETWORK_PATH, "w") as network_file:
-                network_file.write(data)
-
-            # Use a pre-generated network for a realistic use case i.e.
-            #  dvs-gesture
-            arch = sanafe.load_arch(ARCH_PATH)
-            net = sanafe.load_net(GENERATED_NETWORK_PATH, arch,
-                                  use_netlist_format=True)
-            chip = sanafe.SpikingChip(arch, record_perf=True)
-            chip.load(net)
+        for frame in range(0, frames):
+            print(f"Running for input: {frame}")
+            dvs_inputs = inputs[frame, :]
+            mapped_inputs = chip.mapped_neuron_groups["0"]
+            for id, mapped_neuron in enumerate(mapped_inputs):
+                mapped_neuron.configure_models(
+                    model_parameters={"bias": dvs_inputs[id]})
             chip.sim(timesteps)
-            # Parse the detailed perf statistics
-            print("Reading performance data")
-            stats = pd.read_csv(os.path.join(PROJECT_DIR, "perf.csv"))
-            analysis = parse_stats(stats)
-            times = np.append(times, analysis["times"])
-            energies = np.append(energies, analysis["total_energy"] / timesteps)
-            hops = np.append(hops, analysis["hops"])
+            chip.reset()
 
-            #with open("hops.csv", "a") as hops_file:
-            #    np.savetxt("hops.csv", hops, delimiter=",")
-            if experiment == "time":
-                with open(SIM_TIME_DATA_PATH, "a") as time_file:
-                    np.savetxt(SIM_TIME_DATA_PATH, times, delimiter=",")
-            else:  # energy
-                with open(SIM_ENERGY_DATA_PATH, "a") as energy_file:
-                    np.savetxt(SIM_ENERGY_DATA_PATH, energies,
-                               delimiter=",")
-            print("Finished running experiments")
+        # Parse the detailed perf statistics
+        print("Reading performance data")
+        stats = pd.read_csv(os.path.join(PROJECT_DIR, "perf.csv"))
+        analysis = parse_stats(stats)
+        times = np.append(times, analysis["times"])
+        energies = np.append(energies, analysis["total_energy"] / timesteps)
+        hops = np.append(hops, analysis["hops"])
+
+        #with open("hops.csv", "a") as hops_file:
+        #    np.savetxt("hops.csv", hops, delimiter=",")
+        if experiment == "time":
+            with open(SIM_TIME_DATA_PATH, "a") as time_file:
+                np.savetxt(SIM_TIME_DATA_PATH, times, delimiter=",")
+        else:  # energy
+            with open(SIM_ENERGY_DATA_PATH, "a") as energy_file:
+                np.savetxt(SIM_ENERGY_DATA_PATH, energies,
+                            delimiter=",")
+        print("Finished running experiments")
 
     if plot_experiments:
         """

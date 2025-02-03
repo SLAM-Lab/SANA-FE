@@ -57,6 +57,7 @@ public:
 
     SynapseResult update(size_t synapse_address, bool read) override;
     void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
+    void reset() override;
 
 private:
     std::vector<double> weights{};
