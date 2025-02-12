@@ -65,21 +65,38 @@ sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
     //  does enforce a representation that will always be possible to save
     //  and load (and be reproducible)
     sanafe::ModelParam parameter;
-    if (pybind11::isinstance<pybind11::str>(value))
+    bool is_int{false};
+    bool is_float{false};
+    bool is_string = pybind11::isinstance<pybind11::str>(value);
+
+    bool is_numpy = pybind11::hasattr(value, "dtype");
+    if (is_numpy)
+    {
+        auto dtype = value.attr("dtype");
+        std::string code = dtype.attr("kind").cast<std::string>();
+        is_int = (code == "i" || code == "u");
+        is_float = (code == "f");
+    }
+    else
+    {
+        is_int = pybind11::isinstance<pybind11::int_>(value);
+        is_float = pybind11::isinstance<pybind11::float_>(value);
+        //is_float = pybind11::detail::make_caster<float>().load(value, true)
+    }
+
+    // Now check against each type and make the appropriate cast
+    if (is_string)
     {
         parameter.value = pybind11::cast<std::string>(value);
         TRACE1(PYMODULE, "Converted str to parameter\n");
     }
-    else if (pybind11::isinstance<pybind11::int_>(value))
+    else if (is_int)
     {
         parameter.value = pybind11::cast<int>(value);
         TRACE1(PYMODULE, "Converted int to parameter\n");
     }
-    else if (pybind11::detail::make_caster<float>().load(value, true))
+    else if (is_float)
     {
-        // Value can be successfully cast to a float e.g., a float or a NumPy
-        //  float32 scalar. This was chosen to be more flexible than checking
-        //  against the built-in float_ type
         parameter.value = pybind11::cast<float>(value);
         TRACE1(PYMODULE, "Converted float to parameter\n");
     }
