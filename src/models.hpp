@@ -206,8 +206,11 @@ private:
     std::vector<bool> spikes{};
     std::vector<bool>::const_iterator curr_spike{spikes.begin()};
     std::uniform_real_distribution<double> uniform_distribution{0.0, 1.0};
-    std::random_device rd;
-    std::mt19937 gen{rd()};
+    // Intentionally use a fixed seed to get deterministic results across runs
+    // To truly randomize, use:
+    //std::random_device rd;
+    //std::mt19937 gen{rd()};
+    std::mt19937 gen{1};
     double poisson_probability{0.0};
     double rate{0.0};
     bool send_spike{false};
