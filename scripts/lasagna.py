@@ -5,7 +5,10 @@ import sys
 import dill
 import numpy as np
 import pandas as pd
+
 from torchvision import datasets
+import tonic
+import tonic.transforms as transforms
 
 import matplotlib.pyplot as plt
 
@@ -21,30 +24,76 @@ except ImportError:
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
 
-timesteps = 100
-num_inputs = 1000
-print("Loading models")
-mnist_model = torch.load(
-        os.path.join(PROJECT_DIR, "etc", "mnist.pt"),
-        pickle_module=dill,
-        map_location=torch.device("cpu"))
-spiking_digits_model = torch.load(
-        os.path.join(PROJECT_DIR, "etc", "spiking_digits.pt"),
-        pickle_module=dill,
-        map_location=torch.device("cpu"))
-mnist_weights = {}
-for param_name, param in mnist_model.named_parameters():
-    mnist_weights[param_name] = param.detach().numpy()
+#dataset = "mnist"
+dataset = "shd"
+analog_neurons = True
 
-mnist_inputs = np.loadtxt(os.path.join(PROJECT_DIR, "etc", "mnist.csv"),
+if dataset == "mnist":
+    timesteps = 100
+    num_inputs = 10000
+elif dataset == "shd":
+    timesteps = None
+    num_inputs = 100
+    #num_inputs = 2264
+
+print("Loading models")
+weights = {}
+if dataset == "mnist":
+    # Load the MNIST network
+    mnist_model = torch.load(
+            os.path.join(PROJECT_DIR, "etc", "mnist.pt"),
+            pickle_module=dill,
+            map_location=torch.device("cpu"))
+    for param_name, param in mnist_model.named_parameters():
+        weights[param_name] = param.detach().numpy()
+
+    # Load the MNIST test inputs which were stored during training in a CSV file
+    inputs = np.loadtxt(os.path.join(PROJECT_DIR, "etc", "mnist.csv"),
                           delimiter=',')
-#spiking_digits_inputs = np.loadtxt(os.path.join(PROJECT_DIR, "etc", "spiking_digits.npz"))
+    # I didn't store the labels during training, so load these from the original
+    #  dataset
+    # TODO: scrap the csv and just use this for inputs too..
+    test_dataset = datasets.MNIST(root="./runs/lasagna/data", train=False,
+                                  download=True)
+    labels = test_dataset.targets
+elif dataset == "shd":
+    # Load the Spiking Digits network
+    spiking_digits_model = torch.load(
+            os.path.join(PROJECT_DIR, "etc", "spiking_digits.pt"),
+            pickle_module=dill,
+            map_location=torch.device("cpu"))
+    weights = {}
+    for param_name, param in spiking_digits_model.named_parameters():
+        weights[param_name] = param.detach().numpy()
+    # Load the spiking digits test inputs from the raw dataset, applying the
+    #  same transformations as the training scripts
+    frame_transform = transforms.Compose([
+        transforms.Downsample(spatial_factor=0.1),
+        transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
+    ])
+    testset = tonic.datasets.SHD(save_to=os.path.join(PROJECT_DIR, "runs", "lasagna", "data"),
+                                 transform=frame_transform, train=False)
+    dataloader = torch.utils.data.DataLoader(testset, batch_size=1)
+
+    inputs = []
+    labels = []
+    count = 0
+    for input_frame, label in dataloader:
+        input_frame = input_frame.cpu()
+        label = label.cpu()
+        inputs.append(input_frame.numpy())
+        labels.append(int(label))
+        count += 1
+        if count >= num_inputs:
+            break
 
 # PyTorch stores weights in an array with dims (num out x num in)
-in_neurons = mnist_weights["fc1.weight"].shape[1]
-hidden_neurons = mnist_weights["fc1.weight"].shape[0]
-out_neurons = mnist_weights["fc2.weight"].shape[0]
+in_neurons = weights["fc1.weight"].shape[1]
+hidden_neurons = weights["fc1.weight"].shape[0]
+out_neurons = weights["fc2.weight"].shape[0]
 
+
+print(f"in:{in_neurons}, hidden:{hidden_neurons}, out:{out_neurons}")
 #"""
 # Load the LASAGNA architecture with analog neurons
 arch = sanafe.load_arch("/home/james/code/lasagna/lasagna.yaml")
@@ -58,7 +107,6 @@ hidden_layer = network.create_neuron_group("hidden", hidden_neurons,
                                            soma_hw_name="soma")
 out_layer = network.create_neuron_group("out", out_neurons, soma_hw_name="soma")
 
-analog_neurons = True
 for id, neuron in enumerate(in_layer.neurons):
     neuron.configure(soma_hw_name=f"input[{id}]",
                             log_spikes=True)
@@ -66,7 +114,7 @@ for id, neuron in enumerate(in_layer.neurons):
 
 for id, neuron in enumerate(hidden_layer.neurons):
     neuron.configure(soma_hw_name=f"loihi", log_spikes=True, log_potential=True,
-                     model_parameters={"threshold": 1.0, "leak_decay": 0.85})
+                     model_parameters={"threshold": 1.0, "leak_decay": 0.85, "reset_mode": "hard"})
     if analog_neurons:
         neuron.configure(soma_hw_name=f"analog_lif[{id}]", log_spikes=True)
     else:
@@ -78,22 +126,24 @@ for id, neuron in enumerate(out_layer.neurons):
         neuron.configure(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
                          log_spikes=True, log_potential=True)
     else:
-        neuron.configure(soma_hw_name=f"loihi", log_spikes=True,
-                         log_potential=True, model_parameters={"threshold": 1.0, "leak_decay": 0.85})
+        neuron.configure(soma_hw_name=f"loihi",
+                         log_spikes=True,
+                         log_potential=True,
+                         model_parameters={"threshold": 1.0, "leak_decay": 0.85, "reset_mode": "hard"})
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 # Connect neurons in both layers
 min_weight = 1.0e-3
 for src in range(0, in_neurons):
     for dst in range(0, hidden_neurons):
-        weight = mnist_weights["fc1.weight"][dst, src]
+        weight = weights["fc1.weight"][dst, src]
         if abs(weight) > min_weight:
             network.groups["in"].neurons[src].connect_to_neuron(
                 network.groups["hidden"].neurons[dst], {"weight": weight})
 
 for src in range(0, hidden_neurons):
     for dst in range(0, out_neurons):
-        weight = mnist_weights["fc2.weight"][dst, src]
+        weight = weights["fc2.weight"][dst, src]
         if abs(weight) > 0.0:
             network.groups["hidden"].neurons[src].connect_to_neuron(
                 network.groups["out"].neurons[dst], {"weight": weight})
@@ -105,20 +155,35 @@ hw = sanafe.SpikingChip(arch, record_spikes=True,
 hw.load(network)
 print(f"Running simulation for {timesteps} timesteps")
 
+timesteps_per_input = []
 mapped_inputs = hw.mapped_neuron_groups["in"]
 for input in range(0, num_inputs):
     print(f"Simulating input: {input}")
-    mnist_input = mnist_inputs[input, :]
-    #plt.figure()
-    #plt.imshow(mnist_input.reshape(28, 28), cmap="gray")
-    #plt.colorbar()
-    for id, mapped_neuron in enumerate(mapped_inputs):
-        mapped_neuron.configure_models(
-            model_parameters={"poisson": mnist_input[id]})
+
+    if dataset == "mnist":
+        mnist_input = inputs[input, :]
+        for id, mapped_neuron in enumerate(mapped_inputs):
+            mapped_neuron.configure_models(
+                model_parameters={"poisson": mnist_input[id]})
+    elif dataset == "shd":
+        spiking_digit_input = inputs[input].squeeze()
+        for id, mapped_neuron in enumerate(mapped_inputs):
+            spiketrain = list(spiking_digit_input[:, id])
+            mapped_neuron.configure_models(
+                model_parameters={"spikes": spiketrain})
+        timesteps = len(spiketrain)
+
     results = hw.sim(timesteps)
+    timesteps_per_input.append(timesteps)
     print(results)
     hw.reset()
 #"""
+
+# Create an array tracking the input corresponding to each timestep
+timestep_inputs = []
+for t, steps in enumerate(timesteps_per_input):
+    timestep_inputs.extend([t,]*steps)
+timestep_inputs = np.array(timestep_inputs)
 
 # Read in simulation results
 with open("spikes.csv") as spike_csv:
@@ -142,14 +207,13 @@ with open("spikes.csv") as spike_csv:
         else:
             print(f"Warning: Group {group_name} not recognized!")
 
-test_dataset = datasets.MNIST(root="./runs/lasagna/data", train=False, download=True)
-labels = test_dataset.targets
 
 # 1) Count the total output spikes
 counts = np.zeros((out_neurons, num_inputs), dtype=int)
 for digit, spikes in enumerate(out_spikes):
     for spike_timestep in spikes:
-        input_idx = (spike_timestep - 1) // timesteps
+        # input_idx = (spike_timestep - 1) // timesteps
+        input_idx = timestep_inputs[spike_timestep - 1]
         assert(input_idx < num_inputs)
         counts[digit, input_idx] += 1
 
