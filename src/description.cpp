@@ -160,7 +160,22 @@ void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
             parser, synapse_node, "name");
     auto model = description_parse_synapse_attributes_yaml(
             parser, synapse_node.find_child("attributes"));
-    parent_core.create_synapse(name, model);
+
+    bool hw_exists = false;
+    for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
+    {
+        if (hw.name == name)
+        {
+            hw_exists = true;
+            hw.implements_synapse = true;
+            break;
+        }
+    }
+    if (!hw_exists)
+    {
+        PipelineUnitConfiguration &synapse = parent_core.create_hw(name, model);
+        synapse.implements_synapse = true;
+    }
 }
 
 sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
@@ -224,7 +239,23 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
         }
         model_details.model_parameters =
                 description_parse_model_parameters_yaml(parser, attributes);
-        parent_core.create_dendrite(name, model_details);
+
+        bool hw_exists = false;
+        for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
+        {
+            if (hw.name == name)
+            {
+                hw_exists = true;
+                hw.implements_dendrite = true;
+                break;
+            }
+        }
+        if (!hw_exists)
+        {
+            PipelineUnitConfiguration &dendrite =
+                    parent_core.create_hw(name, model_details);
+            dendrite.implements_dendrite = true;
+        }
     }
 }
 
@@ -294,7 +325,24 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
             }
             */
         }
-        parent_core.create_soma(name, model_details);
+        // TODO: search for the soma unit, if it already exists, say it
+        //  implements soma
+        bool hw_exists = false;
+        for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
+        {
+            if (hw.name == name)
+            {
+                hw_exists = true;
+                hw.implements_soma = true;
+                break;
+            }
+        }
+        if (!hw_exists)
+        {
+            PipelineUnitConfiguration &soma =
+            parent_core.create_hw(name, model_details);
+            soma.implements_soma = true;
+        }
     }
 }
 

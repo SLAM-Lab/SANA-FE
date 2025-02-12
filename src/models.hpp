@@ -26,7 +26,7 @@ enum NeuronStatus : int;
 constexpr int default_weight_bits = 8; // Based on real-world H/W e.g., Loihi
 constexpr int loihi_max_compartments{1024};
 
-class CurrentBasedSynapseModel : public SynapseUnit
+class CurrentBasedSynapseModel : public PipelineUnit
 {
 public:
     CurrentBasedSynapseModel() = default;
@@ -36,9 +36,9 @@ public:
     CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
-    SynapseResult update(size_t synapse_address, bool read) override;
+    PipelineResult update(size_t synapse_address, bool read) override;
     void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
-    double weight(int synapse_address) override { return weights[synapse_address]; } // TODO: remove
+    void reset() override;
 
 private:
     std::vector<double> weights{};
@@ -46,7 +46,7 @@ private:
     int weight_bits{default_weight_bits};
 };
 
-class LoihiSynapseModel : public SynapseUnit
+class LoihiSynapseModel : public PipelineUnit
 {
 public:
     LoihiSynapseModel() = default;
@@ -56,11 +56,9 @@ public:
     LoihiSynapseModel &operator=(const LoihiSynapseModel &other) = default;
     LoihiSynapseModel &operator=(LoihiSynapseModel &&other) = default;
 
-    SynapseResult update(size_t synapse_address, bool read) override;
+    PipelineResult update(size_t synapse_address, bool read) override;
     void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
-
-    double weight(int synapse_address) override  { return weights[synapse_address]; }; // TODO: remove
 
 private:
     std::vector<double> weights{};
@@ -72,7 +70,7 @@ private:
     bool mixed_sign_mode{true};
 };
 
-class AccumulatorModel : public DendriteUnit
+class AccumulatorModel : public PipelineUnit
 {
 public:
     AccumulatorModel() = default;
@@ -82,7 +80,7 @@ public:
     AccumulatorModel &operator=(const AccumulatorModel &other) = default;
     AccumulatorModel &operator=(AccumulatorModel &&other) = default;
 
-    DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
+    PipelineResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
     void reset() override { return; }
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
 
@@ -92,7 +90,7 @@ private:
     double leak_decay{0.0};
 };
 
-class MultiTapModel1D : public DendriteUnit
+class MultiTapModel1D : public PipelineUnit
 {
 public:
     MultiTapModel1D() = default;
@@ -102,7 +100,7 @@ public:
     MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
-    DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
+    PipelineResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
 
@@ -115,7 +113,7 @@ private:
     long int timesteps_simulated{0L};
 };
 
-class LoihiLifModel : public SomaUnit
+class LoihiLifModel : public PipelineUnit
 {
 public:
     LoihiLifModel() = default;
@@ -126,7 +124,7 @@ public:
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
-    SomaResult update(size_t neuron_address, std::optional<double> current_in) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in) override;
     void reset() override;
     double get_potential(const size_t neuron_address) override
     {
@@ -156,7 +154,7 @@ private:
 };
 
 constexpr int truenorth_max_neurons{4096};
-class TrueNorthModel : public SomaUnit
+class TrueNorthModel : public PipelineUnit
 {
 public:
     TrueNorthModel() = default;
@@ -167,7 +165,7 @@ public:
     TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
 
     void set_attribute(const size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
-    SomaResult update(const size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
+    PipelineResult update(const size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
     void reset() override;
     double get_potential(const size_t neuron_address) override
     {
@@ -195,7 +193,7 @@ private:
     std::vector<TrueNorthNeuron> neurons{truenorth_max_neurons};
 };
 
-class InputModel : public SomaUnit
+class InputModel : public PipelineUnit
 {
 public:
     InputModel() = default;
@@ -206,7 +204,7 @@ public:
     InputModel &operator=(InputModel &&other) = delete;
 
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
-    SomaResult update(size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
     void reset() override { send_spike = false; return; }
 
 private:
@@ -223,9 +221,7 @@ private:
     bool send_spike{false};
 };
 
-std::shared_ptr<SynapseUnit> model_get_synapse(const std::string &model_name);
-std::shared_ptr<DendriteUnit> model_get_dendrite(const std::string &model_name);
-std::shared_ptr<SomaUnit> model_get_soma(const std::string &model_name);
+std::shared_ptr<PipelineUnit> model_get_pipeline_unit(const std::string &model_name);
 NeuronResetModes model_parse_reset_mode(const std::string &str);
 }
 

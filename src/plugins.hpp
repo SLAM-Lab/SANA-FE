@@ -10,16 +10,10 @@
 
 namespace sanafe
 {
-class SynapseUnit;
-class DendriteUnit;
-class SomaUnit;
+class PipelineUnit;
 
-void plugin_init_synapse(const std::string &model_name, const std::filesystem::path &plugin_path);
-void plugin_init_dendrite(const std::string &model_name, const std::filesystem::path &plugin_path);
-void plugin_init_soma(const std::string &model_name, const std::filesystem::path &plugin_path);
-std::shared_ptr<SynapseUnit> plugin_get_synapse(const std::string &model_name, const std::filesystem::path &plugin_path);
-std::shared_ptr<DendriteUnit> plugin_get_dendrite(const std::string &model_name, const std::filesystem::path &plugin_path);
-std::shared_ptr<SomaUnit> plugin_get_soma(const std::string &model_name, const std::filesystem::path &plugin_path);
+void plugin_init_hw(const std::string &model_name, const std::filesystem::path &plugin_path);
+std::shared_ptr<PipelineUnit> plugin_get_hw(const std::string &model_name, const std::filesystem::path &plugin_path);
 }
 
 #endif

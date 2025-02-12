@@ -16,7 +16,7 @@
 #include "print.hpp"
 
 // *** Synapse hardware unit models ***
-sanafe::SynapseResult sanafe::CurrentBasedSynapseModel::update(
+sanafe::PipelineResult sanafe::CurrentBasedSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
     if (read)
@@ -47,7 +47,12 @@ void sanafe::CurrentBasedSynapseModel::set_attribute(
     min_synaptic_resolution = (1.0 / weight_bits);
 }
 
-sanafe::SynapseResult sanafe::LoihiSynapseModel::update(
+void sanafe::CurrentBasedSynapseModel::reset()
+{
+    return;
+}
+
+sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
     // TODO: not sure if I should model the parallel synaptic pipeline
@@ -56,60 +61,60 @@ sanafe::SynapseResult sanafe::LoihiSynapseModel::update(
     //  be nice
     // In a detailed model I could store all the types of synapses and then
     //  lookup synapses
-    constexpr size_t max_parallel_accesses = 4;
     double latency = 0.0;
     if (read)
     {
         // TODO: this assumes there is only one synapse hw unit per core.. the
         //  address doesn't work if there are multiple
         const MappedConnection *new_connection =
-                mapped_connections_in.at(synapse_address);
+                 mapped_connections_in.at(synapse_address);
         //INFO("dest:%zu w:%lf\n", new_connection->post_neuron->mapped_address, weights[synapse_address]);
 
         // TODO: a vector is overkill - I think we just need to remember the previous
         //  access!
-        if (!concurrent_accesses.empty())
-        {
-            size_t first_access_address =
-                    concurrent_accesses[0]->synapse_address;
-            ////INFO("first access address:%zu\n", first_access_address);
-            const MappedConnection *first_connection =
-                    mapped_connections_in.at(first_access_address);
-            bool positive_weights = (weights.at(first_access_address) > 0.0);
-            bool synapse_is_positive = weights.at(synapse_address) > 0.0;
-            if (concurrent_accesses.size() >= max_parallel_accesses)
-            {
-                if (host_core_id == 31)
-                {
-                    //INFO("Memory accesses (full):%zu\n", concurrent_accesses.size());
-                }
-                concurrent_accesses.clear();
-            }
-            // else if (!mixed_sign_mode && (positive_mode != synapse_is_positive))
-            ///*
-            else if (positive_weights != synapse_is_positive)
-            {
-                if (host_core_id == 31)
-                {
-                    //INFO("Memory accesses (sign change):%zu\n", concurrent_accesses.size());
-                }
-                concurrent_accesses.clear();
-            }
-            //*/
-            else if (first_connection->pre_neuron != new_connection->pre_neuron)
-            {
-                if (host_core_id == 31)
-                {
-                    //INFO("Memory accesses (change in neuron):%zu\n", concurrent_accesses.size());
-                }
-                concurrent_accesses.clear();
-            }
-            else if (first_connection->post_neuron->mapped_address > new_connection->post_neuron->mapped_address)
-            {
-                concurrent_accesses.clear();
-            }
-            //*/
-        }
+        // if (!concurrent_accesses.empty())
+        // {
+        //     size_t first_access_address =
+        //             concurrent_accesses[0]->synapse_address;
+        //     ////INFO("first access address:%zu\n", first_access_address);
+        //     const MappedConnection *first_connection =
+        //             mapped_connections_in.at(first_access_address);
+        //     bool positive_weights = (weights.at(first_access_address) > 0.0);
+        //     bool synapse_is_positive = weights.at(synapse_address) > 0.0;
+        //     /*
+        //     if (concurrent_accesses.size() >= max_parallel_accesses)
+        //     {
+        //         if (host_core_id == 31)
+        //         {
+        //             //INFO("Memory accesses (full):%zu\n", concurrent_accesses.size());
+        //         }
+        //         concurrent_accesses.clear();
+        //     }
+        //     // else if (!mixed_sign_mode && (positive_mode != synapse_is_positive))
+        //     ///*
+        //     else if (positive_weights != synapse_is_positive)
+        //     {
+        //         if (host_core_id == 31)
+        //         {
+        //             //INFO("Memory accesses (sign change):%zu\n", concurrent_accesses.size());
+        //         }
+        //         concurrent_accesses.clear();
+        //     }
+        //     //*/
+        //     else if (first_connection->pre_neuron != new_connection->pre_neuron)
+        //     {
+        //         if (host_core_id == 31)
+        //         {
+        //             //INFO("Memory accesses (change in neuron):%zu\n", concurrent_accesses.size());
+        //         }
+        //         concurrent_accesses.clear();
+        //     }
+        //     else if (first_connection->post_neuron->mapped_address > new_connection->post_neuron->mapped_address)
+        //     {
+        //         concurrent_accesses.clear();
+        //     }
+        //     //*/
+        // }
 
         bool is_first_access = concurrent_accesses.empty();
         if (is_first_access)
@@ -182,7 +187,7 @@ void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
 }
 
 // *** Dendrite models ***
-sanafe::DendriteResult sanafe::AccumulatorModel::update(
+sanafe::PipelineResult sanafe::AccumulatorModel::update(
         const size_t neuron_address, const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated[neuron_address] < simulation_time)
@@ -209,7 +214,7 @@ void sanafe::AccumulatorModel::set_attribute(const size_t neuron_address,
     }
 }
 
-sanafe::DendriteResult sanafe::MultiTapModel1D::update(
+sanafe::PipelineResult sanafe::MultiTapModel1D::update(
         const size_t neuron_address, const std::optional<Synapse> synapse_in)
 {
     while (timesteps_simulated < simulation_time)
@@ -418,7 +423,7 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     TRACE1(MODELS, "Set parameter: %s\n", param_name.c_str());
 }
 
-sanafe::SomaResult sanafe::LoihiLifModel::update(
+sanafe::PipelineResult sanafe::LoihiLifModel::update(
         const size_t neuron_address, const std::optional<double> current_in)
 {
     LoihiCompartment &cx = compartments[neuron_address];
@@ -577,7 +582,7 @@ void sanafe::TrueNorthModel::set_attribute(const size_t neuron_address,
     }
 }
 
-sanafe::SomaResult sanafe::TrueNorthModel::update(
+sanafe::PipelineResult sanafe::TrueNorthModel::update(
         const size_t neuron_address, const std::optional<double> current_in)
 {
     bool randomize_threshold;
@@ -700,7 +705,7 @@ void sanafe::TrueNorthModel::reset()
     return;
 }
 
-sanafe::SomaResult sanafe::InputModel::update(
+sanafe::PipelineResult sanafe::InputModel::update(
         const size_t neuron_address, std::optional<double> current_in)
 {
     // This models a dummy input node
@@ -762,52 +767,38 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
     return reset_mode;
 }
 
-std::shared_ptr<sanafe::SynapseUnit> sanafe::model_get_synapse(
+std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
         const std::string &model_name)
 {
     if (model_name == "current_based")
     {
-        return std::shared_ptr<SynapseUnit>(new CurrentBasedSynapseModel());
+        return std::shared_ptr<PipelineUnit>(new CurrentBasedSynapseModel());
     }
     else if (model_name == "loihi")
     {
-        return std::shared_ptr<SynapseUnit>(new LoihiSynapseModel());
+        return std::shared_ptr<PipelineUnit>(new LoihiSynapseModel());
     }
-    const std::string error =
-            "Synapse model not supported (" + model_name + ")\n";
-    throw std::invalid_argument(error);
-}
-
-std::shared_ptr<sanafe::DendriteUnit> sanafe::model_get_dendrite(
-        const std::string &model_name)
-{
-    if (model_name == "accumulator")
+    else if (model_name == "accumulator")
     {
-        return std::shared_ptr<DendriteUnit>(new AccumulatorModel());
+        return std::shared_ptr<PipelineUnit>(new AccumulatorModel());
     }
     else if (model_name == "taps")
     {
-        return std::shared_ptr<DendriteUnit>(new MultiTapModel1D());
+        return std::shared_ptr<PipelineUnit>(new MultiTapModel1D());
     }
-
-    throw std::invalid_argument("Model not supported.");
-}
-
-std::shared_ptr<sanafe::SomaUnit> sanafe::model_get_soma(
-        const std::string &model_name)
-{
     if (model_name == "input")
     {
-        return std::shared_ptr<SomaUnit>(new InputModel());
+        return std::shared_ptr<PipelineUnit>(new InputModel());
     }
     if (model_name == "leaky_integrate_fire")
     {
-        return std::shared_ptr<SomaUnit>(new LoihiLifModel());
+        return std::shared_ptr<PipelineUnit>(new LoihiLifModel());
     }
     else if (model_name == "truenorth")
     {
-        return std::shared_ptr<SomaUnit>(new TrueNorthModel());
+        return std::shared_ptr<PipelineUnit>(new TrueNorthModel());
     }
-
-    throw std::invalid_argument("Model not supported.");
+    const std::string error =
+            "Pipeline model not supported (" + model_name + ")\n";
+    throw std::invalid_argument(error);
 }

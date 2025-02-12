@@ -53,9 +53,7 @@ class Tile;
 class Core;
 class AxonInUnit;
 class AxonOutUnit;
-class SynapseUnit;
-class DendriteUnit;
-class SomaUnit;
+class PipelineUnit;
 
 struct AxonInModel;
 struct AxonOutModel;
@@ -162,7 +160,7 @@ struct MappedConnection
     std::map<std::string, ModelParam> dendrite_params{};
     MappedNeuron *post_neuron{nullptr};
     MappedNeuron *pre_neuron{nullptr};
-    SynapseUnit *synapse_hw{nullptr};
+    PipelineUnit *synapse_hw{nullptr};
     size_t synapse_address{0UL};
     int id;
 
@@ -179,8 +177,8 @@ struct MappedNeuron
     // Internal pointers to mapped hardware
     Core *core{nullptr};
     Core *post_synaptic_cores{nullptr};
-    DendriteUnit *dendrite_hw{nullptr};
-    SomaUnit *soma_hw{nullptr};
+    PipelineUnit *dendrite_hw{nullptr};
+    PipelineUnit *soma_hw{nullptr};
     AxonOutUnit *axon_out_hw{nullptr};
 
     size_t mapped_address{-1ULL};
@@ -203,7 +201,7 @@ struct MappedNeuron
     bool axon_out_input_spike{false};
 
     void configure_models(const std::map<std::string, ModelParam> &model_parameters);
-    MappedNeuron(const Neuron &neuron_to_map, Core *mapped_core, const size_t address, DendriteUnit *mapped_dendrite, SomaUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
+    MappedNeuron(const Neuron &neuron_to_map, Core *mapped_core, const size_t address, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
 };
 
 struct Synapse
@@ -245,23 +243,9 @@ struct Message
     explicit Message(const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
 };
 
-struct SynapseResult
+struct PipelineResult
 {
-    double current;
-    std::optional<double> energy{std::nullopt};
-    std::optional<double> latency{std::nullopt};
-};
-
-struct DendriteResult
-{
-    double current;
-    std::optional<double> energy{std::nullopt};
-    std::optional<double> latency{std::nullopt};
-};
-
-struct SomaResult
-{
-    NeuronStatus status;
+    std::variant<double, NeuronStatus> pipeline_output;
     std::optional<double> energy{std::nullopt};
     std::optional<double> latency{std::nullopt};
 };
@@ -296,101 +280,70 @@ public:
 class PipelineUnit
 {
 public:
+    PipelineUnit(const PipelineUnit &copy) = default;
+    PipelineUnit(PipelineUnit &&other) = default;
+    virtual ~PipelineUnit() = default;
+    PipelineUnit &operator=(const PipelineUnit &other) = default;
+    PipelineUnit &operator=(PipelineUnit &&other) = default;
+
+    // Virtual member functions
     virtual void set_attribute(size_t address, const std::string &param_name, const ModelParam &param) = 0;
     virtual void reset() = 0;
-    virtual void configure(std::string unit_name, const ModelInfo &model) = 0;
 
+    // The user of this class must implement the interface they wish to support
+    //  Depending on whether you want to support Synapse, Dendrite, Soma or a
+    //  combination of the three types in a PipelineUnit implementation
+    //
+    // If using synaptic inputs (address and read/update without read)
+    virtual PipelineResult update(size_t synapse_address, bool read = false) { throw std::logic_error("Error: Synapse input not implemented"); }
+    // If using dendritic inputs (address and synaptic information)
+    virtual PipelineResult update(size_t neuron_address, std::optional<Synapse> synapse_in) { throw std::logic_error("Error: Dendrite input not implemented"); }
+    // If using somatic inputs (address and current in)
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) { throw std::logic_error("Error: Soma input not implemented"); }
+
+    // Optional virtual functions that may be useful
+    virtual double get_potential(size_t neuron_address) { return 0.0; }
+
+    // Normal member functions
     void set_time(const long int timestep) { simulation_time = timestep; }
+    void add_connection(MappedConnection &con);
+    void configure(std::string unit_name, const ModelInfo &model);
+    double process_connection(const Timestep &ts, MappedConnection &con);
+    double process_neuron(const Timestep &ts, MappedNeuron &n);
 
+    // Model information
     std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
+
+    // Performance metrics
+    std::optional<double> default_energy_process_spike{std::nullopt};
+    std::optional<double> default_latency_process_spike{std::nullopt};
+    std::optional<double> default_energy_update{std::nullopt};
+    std::optional<double> default_latency_update{std::nullopt};
+    std::optional<SomaEnergyMetrics> default_soma_energy_metrics;
+    std::optional<SomaLatencyMetrics> default_soma_latency_metrics;
     double energy{0.0};
     double time{0.0};
 
-protected:
-    long int simulation_time{0L};
-};
-
-class SynapseUnit : public PipelineUnit
-{
-public:
+    // Performance counters
     long int spikes_processed{0L};
-
-    SynapseUnit(const SynapseUnit &copy) = default;
-    SynapseUnit(SynapseUnit &&other) = default;
-    virtual ~SynapseUnit() = default;
-    SynapseUnit &operator=(const SynapseUnit &other) = default;
-    SynapseUnit &operator=(SynapseUnit &&other) = default;
-
-    virtual SynapseResult update(size_t synapse_address, bool read = false) = 0;
-
-    // Additional helper functions
-    void configure(std::string synapse_name, const ModelInfo &model) override;
-    void add_connection(MappedConnection &con);
-    void reset() override {};
-
-    std::optional<double> default_energy_process_spike{std::nullopt};
-    std::optional<double> default_latency_process_spike{std::nullopt};
-
-protected:
-    // Abstract base class; do not instantiate
-    SynapseUnit() = default;
-
-    // TODO: a lot of duplication here, is there a better way?
-    std::vector<MappedConnection *> mapped_connections_in{};
-};
-
-class DendriteUnit : public PipelineUnit
-{
-public:
-    DendriteUnit(const DendriteUnit &copy) = default;
-    DendriteUnit(DendriteUnit &&other) = default;
-    virtual ~DendriteUnit() = default;
-    DendriteUnit &operator=(const DendriteUnit &other) = default;
-    DendriteUnit &operator=(DendriteUnit &&other) = default;
-
-    virtual DendriteResult update(size_t neuron_address, std::optional<Synapse> synapse_in) = 0;
-
-    // Additional helper functions
-    void configure(std::string dendrite_name, const ModelInfo &model_details) override;
-
-    std::optional<double> default_energy_update{std::nullopt};
-    std::optional<double> default_latency_update{std::nullopt};
-
-protected:
-    // Abstract base class; do not instantiate
-    DendriteUnit() = default;
-};
-
-class SomaUnit : public PipelineUnit
-{
-public:
-    SomaUnit(const SomaUnit &copy) = default;
-    SomaUnit(SomaUnit &&other) = default;
-    virtual ~SomaUnit() = default;
-    SomaUnit &operator=(const SomaUnit &other) = delete;
-    SomaUnit &operator=(SomaUnit &&other) = delete;
-
-    virtual SomaResult update(size_t neuron_address, std::optional<double> current_in) = 0;
-    virtual double get_potential(size_t neuron_address) { return 0.0; }
-
-    void configure(std::string soma_name, const ModelInfo &model_details) override;
-
-    //FILE *noise_stream{nullptr};
     long int neuron_updates{0L};
     long int neurons_fired{0L};
     long int neuron_count{0L};
-    std::optional<SomaEnergyMetrics> default_energy_metrics;
-    std::optional<SomaLatencyMetrics> default_latency_metrics;
+
+    // Implementation flags, set whichever to your derived unit supports 'true'
+    //  Note that a unit can support one or more of these
+    bool implements_synapse{false};
+    bool implements_dendrite{false};
+    bool implements_soma{false};
 
 protected:
-    // Abstract base class; do not instantiate
-    SomaUnit() = default;
+    long int simulation_time{0L};
+    std::vector<MappedConnection *> mapped_connections_in{};
+    PipelineUnit() = default;
 };
-
-// TODO: combined pipeline units
 
 class AxonOutUnit
 {
@@ -412,9 +365,7 @@ class Core
 {
 public:
     std::vector<AxonInUnit> axon_in_hw;
-    std::vector<std::shared_ptr<SynapseUnit>> synapse;
-    std::vector<std::shared_ptr<DendriteUnit>> dendrite;
-    std::vector<std::shared_ptr<SomaUnit>> soma;
+    std::vector<std::shared_ptr<PipelineUnit>> pipeline_hw;
     std::vector<AxonOutUnit> axon_out_hw;
 
     std::vector<Message *> messages_in;
@@ -437,9 +388,7 @@ public:
     explicit Core(const CoreConfiguration &config);
     void map_neuron(const Neuron &n);
     AxonInUnit &create_axon_in(const AxonInConfiguration &config);
-    SynapseUnit &create_synapse(const PipelineUnitConfiguration &config);
-    DendriteUnit &create_dendrite(const PipelineUnitConfiguration &config);
-    SomaUnit &create_soma(const PipelineUnitConfiguration &config);
+    PipelineUnit &create_pipeline_unit(const PipelineUnitConfiguration &config);
     AxonOutUnit &create_axon_out(const AxonOutConfiguration &config);
     [[nodiscard]] int get_id() const { return id; }
     [[nodiscard]] int get_offset() const { return offset; }

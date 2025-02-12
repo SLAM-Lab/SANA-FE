@@ -144,15 +144,11 @@ struct CoreConfiguration
     CoreAddress address{};
 
     std::vector<AxonInConfiguration> axon_in;
-    std::vector<PipelineUnitConfiguration> synapses;
-    std::vector<PipelineUnitConfiguration> dendrites;
-    std::vector<PipelineUnitConfiguration> somas;
+    std::vector<PipelineUnitConfiguration> pipeline_hw;
     std::vector<AxonOutConfiguration> axon_out;
 
     AxonInConfiguration &create_axon_in(const std::string &name, const AxonInPowerMetrics &power_metrics);
-    PipelineUnitConfiguration &create_synapse(const std::string &name, const ModelInfo &model_details);
-    PipelineUnitConfiguration &create_dendrite(const std::string &name, const ModelInfo &model_details);
-    PipelineUnitConfiguration &create_soma(std::string name, const ModelInfo &model_details);
+    PipelineUnitConfiguration &create_hw(const std::string &name, const ModelInfo &model_details);
     AxonOutConfiguration &create_axon_out(const std::string &name, const AxonOutPowerMetrics &power_metrics);
 
     CoreConfiguration(std::string name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
@@ -172,15 +168,16 @@ struct AxonInConfiguration
     AxonInConfiguration(const AxonInPowerMetrics &metrics, std::string name) : metrics(metrics), name(name) {}
 };
 
-// TODO: this struct is redundantly nested - just have ModelConfiguration or UnitConfiguration which contains
-//  the name and is common to synapse, dendrite and soma units (or combined units)?
 struct PipelineUnitConfiguration
 {
-    ModelInfo model_info;
-    std::string name;
-    size_t tile_id;
-    size_t core_offset;
-    size_t core_id;
+    ModelInfo model_info{};
+    std::string name{};
+    size_t tile_id{};
+    size_t core_offset{};
+    size_t core_id{};
+    bool implements_synapse{false};
+    bool implements_dendrite{false};
+    bool implements_soma{false};
     PipelineUnitConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(name) {}
 };
 
