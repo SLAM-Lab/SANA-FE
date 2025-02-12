@@ -1997,25 +1997,32 @@ void sanafe::description_read_network_entry(
         bool decoded_bool;
         parameter.name = key;
 
-        std::stringstream ss(value_str);
-        if (ss >> decoded_int)
+        std::stringstream int_ss(value_str);
+        std::stringstream float_ss(value_str);
+        std::stringstream bool_ss(value_str);
+        if ((int_ss >> decoded_int) && int_ss.eof())
         {
-            //INFO("Parsed integer: %d.\n", decoded_int);
+            TRACE1(DESCRIPTION, "Parsed integer: %d (%s).\n",
+                    decoded_int, key.c_str());
             parameter.value = decoded_int;
         }
-        else if (ss >> decoded_double)
+        else if ((float_ss >> decoded_double) && float_ss.eof())
         {
-            //INFO("Parsed float: %lf.\n", decoded_double);
+            TRACE1(DESCRIPTION, "Parsed float: %e (%s).\n",
+                    decoded_double, key.c_str());
+            //INFO("Parsed float: %e (%s).\n",
+            //        decoded_double, key.c_str());
             parameter.value = decoded_double;
         }
-        else if (ss >> decoded_bool)
+        else if ((bool_ss >> decoded_bool) && bool_ss.eof())
         {
-            //INFO("Parsed bool: %d.\n", decoded_bool);
+            TRACE1(DESCRIPTION, "Parsed bool: %d.\n", decoded_bool);
             parameter.value = decoded_bool;
         }
         else
         {
             // Parsed string
+            TRACE1(DESCRIPTION, "Parsed string: %s\n", value_str.c_str());
             parameter.value = std::string(value_str);
         }
 
