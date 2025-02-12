@@ -29,7 +29,8 @@ architecture:
             - name: loihi_in
               attributes:
                 energy_message_in: 0.0e-12
-                latency_message_in: 20.0e-9
+                #latency_message_in: 20.0e-9
+                latency_message_in: 0.0e-9
           soma:
             - name: loihi_lif
               attributes:
@@ -54,22 +55,38 @@ architecture:
                 latency_update_neuron: 3.7e-9
                 energy_spike_out: 69.3e-12
                 latency_spike_out: 30.0e-9
+            - name: loihi_inputs
+              attributes:
+                model: input
+                energy_access_neuron: 0.0
+                latency_access_neuron: 0.0
+                energy_update_neuron: 0.0
+                latency_update_neuron: 0.0
+                energy_spike_out: 0.0
+                latency_spike_out: 0.0
           synapse:
             - name: loihi_dense_synapse  # Use the name to link
               attributes:
+                # model: loihi
                 model: current_based
                 energy_process_spike: 35.5e-12
                 latency_process_spike: 4.0e-9
             - name: loihi_sparse_synapse
               attributes:
+                #model: loihi
                 model: current_based
                 energy_process_spike: 33.6e-12
                 latency_process_spike: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
-                model: current_based
+                model: loihi
+                #model: current_based
                 energy_process_spike: 24.0e-12
-                latency_process_spike: 3.1e-9
+                # Originally calibrated value
+                #latency_process_spike: 3.1e-9
+                # Experimentally chosen value, which seems more accurate with current network model
+                #latency_process_spike: 7.0e-9
+                #latency_process_spike: 9.0e-9
           dendrite:
           - name: loihi_dendrites
             attributes:

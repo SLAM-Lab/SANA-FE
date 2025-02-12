@@ -38,6 +38,7 @@ public:
 
     SynapseResult update(size_t synapse_address, bool read) override;
     void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
+    double weight(int synapse_address) override { return weights[synapse_address]; } // TODO: remove
 
 private:
     std::vector<double> weights{};
@@ -59,8 +60,12 @@ public:
     void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
 
+    double weight(int synapse_address) override  { return weights[synapse_address]; }; // TODO: remove
+
 private:
     std::vector<double> weights{};
+    std::vector<double> groups{};
+    std::vector<double> costs{};
     std::vector<const MappedConnection *> concurrent_accesses{};
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};

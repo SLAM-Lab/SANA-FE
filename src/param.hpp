@@ -28,13 +28,15 @@ struct ModelParam
             TRACE1(ARCH, "Warning: Casting integer value to bool type.\n");
             return (std::get<int>(value) != 0);
         }
+        INFO("index: %zu\n", value.index());
 
         std::string error = "Error: Attribute ";
         if (name.has_value())
         {
             error += name.value();
+            error += " ";
         }
-        error += " cannot be cast to a bool";
+        error += "cannot be cast to a bool ()";
         throw std::runtime_error(error);
     }
     operator int() const

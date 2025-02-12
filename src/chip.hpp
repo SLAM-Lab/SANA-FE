@@ -286,7 +286,8 @@ public:
 
     virtual SynapseResult update(size_t synapse_address, bool read = false) = 0;
     virtual void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) = 0;
-    virtual void reset() {}; // TODO: make virtual
+    virtual void reset() {};
+    virtual double weight(int address) { return -1.0; } // TODO: remove HACK
 
     // Additional helper functions
     void set_time(const long int timestep)

@@ -23,7 +23,8 @@ sys.path.insert(0, PROJECT_DIR)
 import sanafe
 
 ARCH_FILENAME = "loihi.yaml"
-NETWORK_FILENAME = "dvs_gesture_32x32.net"
+#NETWORK_FILENAME = "dvs_gesture_32x32.net"
+NETWORK_FILENAME = "dvs_gesture_32x32_tagged.net" # TODO: hacks
 LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
 SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
@@ -94,7 +95,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -109,8 +110,8 @@ if __name__ == "__main__":
     energies = np.array(())
     hops = np.array(())
     timesteps = 128
-    frames = 100
-    #frames = 1
+    #frames = 100
+    frames = 1
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
@@ -148,8 +149,10 @@ if __name__ == "__main__":
         # First create the network file from the inputs and SNN
         data = (group_data + "\n" + input_data + "\n" + snn_data + "\n" +
                 mapping_data)
-        with open(GENERATED_NETWORK_PATH, "w") as network_file:
-            network_file.write(data)
+        # TODO: clean up this first part of the script which is redundant now
+        #  basically
+        #with open(GENERATED_NETWORK_PATH, "w") as network_file:
+        #    network_file.write(data)
 
         # Use a pre-generated network for a realistic use case i.e.
         #  dvs-gesture
@@ -283,7 +286,6 @@ if __name__ == "__main__":
                 #loihi_total_times[i] = np.sum(loihi_times[i*(timesteps-1):(i+1)*(timesteps-1)])
                 loihi_total_times[i] = np.sum(loihi_times[0:timesteps-2, i])
 
-
             plt.figure(figsize=(7.0, 1.6))
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
             ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
@@ -305,6 +307,7 @@ if __name__ == "__main__":
             plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_time.pdf")
             plt.savefig("runs/dvs/dvs_gesture_sim_time.png")
+            print("saved")
 
             # Plot the correlation between simulated and measured time-step latency
             plt.figure(figsize=(1.5, 1.5))

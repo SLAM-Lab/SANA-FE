@@ -196,6 +196,33 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
         }
     }
 
+    // TODO: for debug, remove
+    /*
+    for (auto &t: tiles)
+    {
+        for (auto &c: t.cores)
+        {
+            INFO("**CORE:%zu**\n", c.id);
+            for (size_t axon_address = 0; axon_address < c.axons_in.size(); ++axon_address)
+            {
+                auto &axon = c.axons_in[axon_address];
+                INFO("AXON:%zu\n", axon_address);
+                for (int address: axon.synapse_addresses)
+                {
+                    auto &syn = c.connections_in[address];
+                    INFO("%d: %s.%zu->%s.%zu cx:%zu w:%d\n", address,
+                            syn->pre_neuron->parent_group_name.c_str(),
+                            syn->pre_neuron->id,
+                            syn->post_neuron->parent_group_name.c_str(),
+                            syn->post_neuron->id,
+                            syn->post_neuron->mapped_address,
+                            (int) syn->synapse_hw->weight(syn->synapse_address));
+                }
+            }
+        }
+    }
+    */
+
     return;
 }
 

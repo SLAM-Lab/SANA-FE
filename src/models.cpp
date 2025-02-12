@@ -109,7 +109,8 @@ sanafe::SynapseUnit::SynapseResult sanafe::LoihiSynapseModel::update(
         if (is_first_access)
         {
             // TODO: here read from a user defined latency cost
-            latency += 1.0 * 10.8e-9;
+            ////latency += 1.0 * 10.8e-9;
+            latency += 1.0 * 17.5e-9;
         }
         concurrent_accesses.push_back(new_connection);
 
@@ -120,9 +121,12 @@ sanafe::SynapseUnit::SynapseResult sanafe::LoihiSynapseModel::update(
         //INFO("***\n");
 
         TRACE1(MODELS, "w:%lf\n", weights[synapse_address]);
-        return {weights[synapse_address], std::nullopt, latency};
+        //return {weights[synapse_address], std::nullopt, latency};
+        //INFO("cost:%lf\n", costs[synapse_address]);
+        return {weights[synapse_address], std::nullopt, costs[synapse_address]};
     }
-    return {0.0, std::nullopt, latency};
+    //return {0.0, std::nullopt, latency};
+    return {0.0, std::nullopt, 0.0};
 }
 
 void sanafe::LoihiSynapseModel::reset()
@@ -140,6 +144,14 @@ void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
         TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
         weights.resize(std::max(weights.size() * 2, synapse_address + 1));
     }
+    if (costs.size() <= synapse_address)
+    {
+        costs.resize(synapse_address + 1, 0.0);
+    }
+    if (groups.size() <= synapse_address)
+    {
+        groups.resize(synapse_address + 1, -1);
+    }
 
     if ((param_name == "w") || (param_name == "weight"))
     {
@@ -150,6 +162,14 @@ void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
     else if (param_name == "mixed")
     {
         mixed_sign_mode = static_cast<bool>(param);
+    }
+    else if (param_name == "cost")
+    {
+        costs[synapse_address] = static_cast<double>(param);
+    }
+    else if (param_name == "g")
+    {
+        groups[synapse_address] = static_cast<int>(param);
     }
 
     min_synaptic_resolution = (1.0 / weight_bits);
@@ -424,10 +444,10 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
     }
 
     // TODO: remove hack, put into snn description
-    cx.leak_decay = 4095.0 / 4096.0;
+    // cx.leak_decay = 4095.0 / 4096.0;
     cx.potential *= cx.leak_decay;
     // TODO: remove hack to apply quantization
-    cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
+    //cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
     // Add randomized noise to potential if enabled
     /*
     if (noise_type == NOISE_FILE_STREAM)
