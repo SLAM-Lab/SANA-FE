@@ -484,11 +484,8 @@ void pipeline_receive_message(SpikingChip &arch, Message &m);
 double pipeline_process_message(const Timestep &ts, Core &c, Message &m);
 
 double pipeline_process_axon_in(Core &core, const Message &m);
-double pipeline_process_synapse(const Timestep &ts, MappedConnection &con);
-double pipeline_process_dendrite(const Timestep &ts, MappedNeuron &n);
-double pipeline_process_soma(const Timestep &ts, MappedNeuron &n);
 double pipeline_process_axon_out(Timestep &ts, const SpikingChip &arch, MappedNeuron &n);
-BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str);
+BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str, const bool buffer_inside_unit);
 
 std::pair<double, double> pipeline_apply_default_dendrite_power_model(MappedNeuron &n, std::optional<double> energy, std::optional<double> latency);
 

@@ -505,7 +505,9 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
 
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
             description_required_field<std::string>(
-                    parser, attributes, "buffer_position"));
+                    parser, attributes, "buffer_position"),
+            description_required_field<bool>(
+                        parser, attributes, "buffer_inside_unit"));
     pipeline_config.max_neurons_supported = description_required_field<int>(
             parser, attributes, "max_neurons_supported");
 

@@ -49,10 +49,11 @@ struct AxonOutModel;
 enum BufferPosition : int
 {
     BUFFER_BEFORE_DENDRITE_UNIT,
+    BUFFER_INSIDE_DENDRITE_UNIT,
     BUFFER_BEFORE_SOMA_UNIT,
+    BUFFER_INSIDE_SOMA_UNIT,
     BUFFER_BEFORE_AXON_OUT_UNIT,
     BUFFER_POSITIONS,
-    // TODO: add BUFFER_IN_DENDRITE_UNIT, BUFFER_IN_SOMA_UNIT in between these entries...
 };
 
 struct ModelInfo

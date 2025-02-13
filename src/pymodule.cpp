@@ -231,12 +231,12 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
 
 std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
         size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
-        std::string buffer_position, size_t max_neurons_supported)
+        std::string buffer_position, bool buffer_inside_unit, size_t max_neurons_supported)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
     pipeline_config.buffer_position =
-            sanafe::pipeline_parse_buffer_pos_str(buffer_position);
+            sanafe::pipeline_parse_buffer_pos_str(buffer_position, buffer_inside_unit);
     pipeline_config.max_neurons_supported = max_neurons_supported;
 
     sanafe::CoreAddress core_address{};
@@ -250,12 +250,12 @@ std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
 
 sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
         std::string name, size_t parent_tile_id, std::string buffer_position,
-        size_t max_neurons_supported)
+        bool buffer_inside_unit, size_t max_neurons_supported)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
-    pipeline_config.buffer_position =
-            sanafe::pipeline_parse_buffer_pos_str(buffer_position);
+    pipeline_config.buffer_position = sanafe::pipeline_parse_buffer_pos_str(
+            buffer_position, buffer_inside_unit);
     pipeline_config.max_neurons_supported = max_neurons_supported;
 
     return self->create_core(name, parent_tile_id, pipeline_config);
@@ -527,6 +527,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("parent_tile_id"),
                     pybind11::arg("buffer_position") =
                             sanafe::BUFFER_BEFORE_SOMA_UNIT,
+                    pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
                     pybind11::return_value_policy::reference_internal)
@@ -553,6 +554,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("core_id"),
                     pybind11::arg("buffer_position") =
                             sanafe::BUFFER_BEFORE_SOMA_UNIT,
+                    pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons);
     pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
