@@ -389,6 +389,10 @@ void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
     {
         cx.leak_decay = static_cast<double>(param);
     }
+    else if (param_name == "input_decay")
+    {
+        cx.input_decay = static_cast<double>(param);
+    }
     else if (param_name == "bias")
     {
         cx.bias = static_cast<double>(param);
@@ -445,6 +449,7 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
 
     // TODO: remove hack, put into snn description
     // cx.leak_decay = 4095.0 / 4096.0;
+    cx.input_current *= cx.input_decay;
     cx.potential *= cx.leak_decay;
     // TODO: remove hack to apply quantization
     //cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
@@ -465,8 +470,9 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
 
     if (current_in.has_value())
     {
-        cx.potential += current_in.value();
+        cx.input_current += current_in.value();
     }
+    cx.potential += cx.input_current;
     TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n", neuron_address,
             cx.potential);
 
@@ -509,6 +515,7 @@ void sanafe::LoihiLifModel::reset()
 {
     for (LoihiCompartment &cx : compartments)
     {
+        cx.input_current = 0.0;
         cx.potential = 0.0;
     }
 

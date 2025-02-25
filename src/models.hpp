@@ -140,8 +140,10 @@ public:
         long int timesteps_simulated{0L};
         int reset_mode{NEURON_RESET_HARD};
         int reverse_reset_mode{NEURON_NO_RESET};
+        double input_current{0.0};
         double potential{0.0};
         double leak_decay{1.0};
+        double input_decay{0.0};
         double bias{0.0};
         double threshold{0.0};
         double reverse_threshold{0.0};
