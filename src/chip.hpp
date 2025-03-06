@@ -186,6 +186,7 @@ struct MappedNeuron
     int spike_count{0};
     int maps_in_count{0};
     int maps_out_count{0};
+    NeuronStatus status{INVALID_NEURON_STATE};
 
     // Flags and traces
     bool force_synapse_update{false};
@@ -194,10 +195,7 @@ struct MappedNeuron
     bool log_spikes{false};
     bool log_potential{false};
 
-    // Inputs to H/W units
-    NeuronStatus status{sanafe::IDLE};
-    std::vector<Synapse> dendrite_input_synapses{};
-    double soma_input_charge{0.0};
+    // Track spikes
     bool axon_out_input_spike{false};
 
     void configure_models(const std::map<std::string, ModelParam> &model_parameters);
@@ -207,7 +205,7 @@ struct MappedNeuron
 struct Synapse
 {
     double current;
-    MappedConnection &con;
+    MappedConnection *con;
 };
 
 struct Message
@@ -245,7 +243,10 @@ struct Message
 
 struct PipelineResult
 {
-    std::variant<double, NeuronStatus> pipeline_output;
+    // Hardware outputs
+    std::optional<double> current{std::nullopt};
+    NeuronStatus status{INVALID_NEURON_STATE};
+    // Optionally simulate energy and/or latency
     std::optional<double> energy{std::nullopt};
     std::optional<double> latency{std::nullopt};
 };
@@ -290,26 +291,32 @@ public:
     virtual void set_attribute(size_t address, const std::string &param_name, const ModelParam &param) = 0;
     virtual void reset() = 0;
 
-    // The user of this class must implement the interface they wish to support
-    //  Depending on whether you want to support Synapse, Dendrite, Soma or a
-    //  combination of the three types in a PipelineUnit implementation
-    //
+    // The user of this class must implement the interfaces they wish to support
+    //  Depending on whether you want to support Synapse, Dendrite, Soma
+    //  operations, or a combination of the three.
     // If using synaptic inputs (address and read/update without read)
     virtual PipelineResult update(size_t synapse_address, bool read = false) { throw std::logic_error("Error: Synapse input not implemented"); }
     // If using dendritic inputs (address and synaptic information)
-    virtual PipelineResult update(size_t neuron_address, std::optional<Synapse> synapse_in) { throw std::logic_error("Error: Dendrite input not implemented"); }
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, MappedConnection *con) { throw std::logic_error("Error: Dendrite input not implemented"); }
     // If using somatic inputs (address and current in)
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) { throw std::logic_error("Error: Soma input not implemented"); }
 
-    // Optional virtual functions that may be useful
+    // Optional virtual functions
     virtual double get_potential(size_t neuron_address) { return 0.0; }
+    // TODO: is this the most user-friendly way of getting spiking behavior from a model, we have this info..
+    virtual NeuronStatus get_status(size_t neuron_address) { return INVALID_NEURON_STATE; }
 
     // Normal member functions
     void set_time(const long int timestep) { simulation_time = timestep; }
     void add_connection(MappedConnection &con);
     void configure(std::string unit_name, const ModelInfo &model);
-    double process_connection(const Timestep &ts, MappedConnection &con);
-    double process_neuron(const Timestep &ts, MappedNeuron &n);
+    //PipelineResult process_inputs(const Timestep &ts, MappedConnection &con);
+    //PipelineResult process_inputs(const Timestep &ts, MappedNeuron &n);
+
+    //PipelineResult process_input(const Timestep &ts, MappedConnection &con);
+    //PipelineResult process_input(const Timestep &ts, MappedNeuron &n, const std::optional<Synapse> input);
+    //PipelineResult process_input(const Timestep &ts, MappedNeuron &n, const double input);
+    PipelineResult process_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
     // Model information
     std::map<std::string, ModelParam> model_parameters{};
@@ -333,8 +340,8 @@ public:
     long int neurons_fired{0L};
     long int neuron_count{0L};
 
-    // Implementation flags, set whichever to your derived unit supports 'true'
-    //  Note that a unit can support one or more of these
+    // Implementation flags, set whichever operations your derived unit supports
+    //  to 'true'. Note that a hardware unit must support one or more of these
     bool implements_synapse{false};
     bool implements_dendrite{false};
     bool implements_soma{false};
@@ -343,6 +350,14 @@ protected:
     long int simulation_time{0L};
     std::vector<MappedConnection *> mapped_connections_in{};
     PipelineUnit() = default;
+
+private:
+    PipelineResult calculate_synapse_default_energy_latency(MappedConnection &con, const PipelineResult &simulation_result);
+    PipelineResult calculate_dendrite_default_energy_latency(MappedNeuron &n, const PipelineResult &simulation_result);
+    PipelineResult calculate_soma_default_energy_latency(MappedNeuron &n, const PipelineResult &simulation_result);
+    void update_soma_activity(MappedNeuron &n, const PipelineResult &simulation_result);
+
+    void check_outputs(const MappedNeuron &n, const PipelineResult &result);
 };
 
 class AxonOutUnit
@@ -373,6 +388,7 @@ public:
     std::vector<MappedNeuron> neurons;
     std::vector<MappedConnection *> connections_in;
     std::vector<AxonOutModel> axons_out;
+    std::vector<PipelineResult> timestep_buffer{};
 
     std::list<BufferPosition> neuron_processing_units{};
     std::list<BufferPosition> message_processing_units{};
@@ -476,18 +492,20 @@ void sim_create_neuron_axons(MappedNeuron &pre_neuron);
 void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
 void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);
 
-void pipeline_process_neurons(Timestep &ts, SpikingChip &hw);
-void pipeline_process_messages(Timestep &ts, SpikingChip &hw);
+void process_neurons(Timestep &ts, SpikingChip &hw);
+void process_messages(Timestep &ts, SpikingChip &hw);
 
-void pipeline_process_neuron(Timestep &ts, const SpikingChip &arch, MappedNeuron &n);
-void pipeline_receive_message(SpikingChip &arch, Message &m);
-double pipeline_process_message(const Timestep &ts, Core &c, Message &m);
+void process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n);
+void receive_message(SpikingChip &arch, Message &m);
+double process_message(Timestep &ts, Core &c, Message &m);
+
+PipelineResult execute_pipeline(const std::vector<PipelineUnit *> pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+std::vector<PipelineUnit *> get_neuron_processing_pipeline(MappedNeuron &n);
+std::vector<PipelineUnit *> get_message_processing_pipeline(MappedNeuron &n, MappedConnection &con);
 
 double pipeline_process_axon_in(Core &core, const Message &m);
-double pipeline_process_axon_out(Timestep &ts, const SpikingChip &arch, MappedNeuron &n);
+PipelineResult pipeline_process_axon_out(Timestep &ts, const SpikingChip &arch, MappedNeuron &n);
 BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str, const bool buffer_inside_unit);
-
-std::pair<double, double> pipeline_apply_default_dendrite_power_model(MappedNeuron &n, std::optional<double> energy, std::optional<double> latency);
 
 timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end);
 size_t abs_diff(size_t a, size_t b);

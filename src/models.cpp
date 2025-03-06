@@ -19,12 +19,17 @@
 sanafe::PipelineResult sanafe::CurrentBasedSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
+    PipelineResult output;
     if (read)
     {
         TRACE1(MODELS, "w:%lf\n", weights[synapse_address]);
-        return {weights[synapse_address], std::nullopt, std::nullopt};
+        output.current = weights[synapse_address];
     }
-    return {0.0, std::nullopt, std::nullopt};
+    else
+    {
+        output.current = 0.0;
+    }
+    return output;
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attribute(
@@ -53,7 +58,7 @@ void sanafe::CurrentBasedSynapseModel::reset()
 }
 
 sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
-        const size_t synapse_address, const bool read)
+    const size_t synapse_address, const bool read)
 {
     // TODO: not sure if I should model the parallel synaptic pipeline
     //  dynamically here, or if I should just tag the weight with a cost in the
@@ -61,60 +66,49 @@ sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
     //  be nice
     // In a detailed model I could store all the types of synapses and then
     //  lookup synapses
+    PipelineResult result{};
+    constexpr size_t max_parallel_accesses = 4;
     double latency = 0.0;
     if (read)
     {
         // TODO: this assumes there is only one synapse hw unit per core.. the
         //  address doesn't work if there are multiple
         const MappedConnection *new_connection =
-                 mapped_connections_in.at(synapse_address);
+                mapped_connections_in.at(synapse_address);
         //INFO("dest:%zu w:%lf\n", new_connection->post_neuron->mapped_address, weights[synapse_address]);
 
         // TODO: a vector is overkill - I think we just need to remember the previous
         //  access!
-        // if (!concurrent_accesses.empty())
-        // {
-        //     size_t first_access_address =
-        //             concurrent_accesses[0]->synapse_address;
-        //     ////INFO("first access address:%zu\n", first_access_address);
-        //     const MappedConnection *first_connection =
-        //             mapped_connections_in.at(first_access_address);
-        //     bool positive_weights = (weights.at(first_access_address) > 0.0);
-        //     bool synapse_is_positive = weights.at(synapse_address) > 0.0;
-        //     /*
-        //     if (concurrent_accesses.size() >= max_parallel_accesses)
-        //     {
-        //         if (host_core_id == 31)
-        //         {
-        //             //INFO("Memory accesses (full):%zu\n", concurrent_accesses.size());
-        //         }
-        //         concurrent_accesses.clear();
-        //     }
-        //     // else if (!mixed_sign_mode && (positive_mode != synapse_is_positive))
-        //     ///*
-        //     else if (positive_weights != synapse_is_positive)
-        //     {
-        //         if (host_core_id == 31)
-        //         {
-        //             //INFO("Memory accesses (sign change):%zu\n", concurrent_accesses.size());
-        //         }
-        //         concurrent_accesses.clear();
-        //     }
-        //     //*/
-        //     else if (first_connection->pre_neuron != new_connection->pre_neuron)
-        //     {
-        //         if (host_core_id == 31)
-        //         {
-        //             //INFO("Memory accesses (change in neuron):%zu\n", concurrent_accesses.size());
-        //         }
-        //         concurrent_accesses.clear();
-        //     }
-        //     else if (first_connection->post_neuron->mapped_address > new_connection->post_neuron->mapped_address)
-        //     {
-        //         concurrent_accesses.clear();
-        //     }
-        //     //*/
-        // }
+        if (!concurrent_accesses.empty())
+        {
+            size_t first_access_address =
+                    concurrent_accesses[0]->synapse_address;
+            ////INFO("first access address:%zu\n", first_access_address);
+            const MappedConnection *first_connection =
+                    mapped_connections_in.at(first_access_address);
+            bool positive_weights = (weights.at(first_access_address) > 0.0);
+            bool synapse_is_positive = weights.at(synapse_address) > 0.0;
+            if (concurrent_accesses.size() >= max_parallel_accesses)
+            {
+                concurrent_accesses.clear();
+            }
+            // else if (!mixed_sign_mode && (positive_mode != synapse_is_positive))
+            ///*
+            else if (positive_weights != synapse_is_positive)
+            {
+                concurrent_accesses.clear();
+            }
+            //*/
+            else if (first_connection->pre_neuron != new_connection->pre_neuron)
+            {
+                concurrent_accesses.clear();
+            }
+            else if (first_connection->post_neuron->mapped_address > new_connection->post_neuron->mapped_address)
+            {
+                concurrent_accesses.clear();
+            }
+            //*/
+        }
 
         bool is_first_access = concurrent_accesses.empty();
         if (is_first_access)
@@ -134,10 +128,14 @@ sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
         TRACE1(MODELS, "w:%lf\n", weights[synapse_address]);
         //return {weights[synapse_address], std::nullopt, latency};
         //INFO("cost:%lf\n", costs[synapse_address]);
-        return {weights[synapse_address], std::nullopt, costs[synapse_address]};
+        result.current = weights[synapse_address];
+        result.latency = costs[synapse_address];
+        return result;
     }
     //return {0.0, std::nullopt, latency};
-    return {0.0, std::nullopt, 0.0};
+    result.current = 0.0;
+    result.latency = 0.0;
+    return result;
 }
 
 void sanafe::LoihiSynapseModel::reset()
@@ -148,7 +146,7 @@ void sanafe::LoihiSynapseModel::reset()
 }
 
 void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
-        const std::string &param_name, const ModelParam &param)
+    const std::string &param_name, const ModelParam &param)
 {
     if (weights.size() <= synapse_address)
     {
@@ -186,23 +184,28 @@ void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
     min_synaptic_resolution = (1.0 / weight_bits);
 }
 
+
 // *** Dendrite models ***
 sanafe::PipelineResult sanafe::AccumulatorModel::update(
-        const size_t neuron_address, const std::optional<Synapse> synapse_in)
+        const size_t neuron_address, const std::optional<double> current,
+        MappedConnection *con)
 {
+    PipelineResult output;
+
     while (timesteps_simulated[neuron_address] < simulation_time)
     {
         // Apply leak for 1 or more timesteps
         ++(timesteps_simulated[neuron_address]);
         accumulated_charges[neuron_address] *= leak_decay;
     }
-    if (synapse_in.has_value())
+    if (current.has_value())
     {
         // Integrate input charges
-        accumulated_charges[neuron_address] += synapse_in.value().current;
+        accumulated_charges[neuron_address] += current.value();
     }
+    output.current = accumulated_charges[neuron_address];
 
-    return {accumulated_charges[neuron_address], std::nullopt, std::nullopt};
+    return output;
 }
 
 void sanafe::AccumulatorModel::set_attribute(const size_t neuron_address,
@@ -215,7 +218,8 @@ void sanafe::AccumulatorModel::set_attribute(const size_t neuron_address,
 }
 
 sanafe::PipelineResult sanafe::MultiTapModel1D::update(
-        const size_t neuron_address, const std::optional<Synapse> synapse_in)
+        const size_t neuron_address, const std::optional<double> current,
+        MappedConnection *con)
 {
     while (timesteps_simulated < simulation_time)
     {
@@ -259,20 +263,20 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(
         }
     }
 
-    if (synapse_in.has_value())
+    if (current.has_value())
     {
-        const Synapse &syn = synapse_in.value();
-        const auto &tap_info = syn.con.dendrite_params.find("tap");
+        //const Synapse &syn = synapse_in.value();
+        const auto &tap_info = con->dendrite_params.find("tap");
         int tap = 0;
-        if (tap_info != syn.con.dendrite_params.end())
+        if (tap_info != con->dendrite_params.end())
         {
             tap = static_cast<int>(tap_info->second);
         }
         assert(tap >= 0);
         assert((size_t) tap < tap_voltages.size());
-        tap_voltages[tap] += synapse_in.value().current;
+        tap_voltages[tap] += current.value();
         TRACE2(MODELS, "Adding current:%lf to tap %d (con:%d addr:%zu)\n",
-                syn.current, tap, syn.con.id, syn.con.synapse_address);
+                current.value(), tap, con->id, con->synapse_address);
     }
 
     TRACE1(MODELS, "Tap voltages after update for address:%zu\n",
@@ -284,7 +288,9 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(
     TRACE1(MODELS, "***\n");
 
     // Return current for most proximal tap (which is always the first tap)
-    return {tap_voltages[0], std::nullopt, std::nullopt};
+    PipelineResult output{};
+    output.current = tap_voltages[0];
+    return output;
 }
 
 void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
@@ -519,7 +525,9 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     }
 
     ++(cx.timesteps_simulated);
-    return {state, std::nullopt, std::nullopt};
+    PipelineResult output{};
+    output.status = state;
+    return output;
 }
 
 void sanafe::LoihiLifModel::reset()
@@ -669,7 +677,9 @@ sanafe::PipelineResult sanafe::TrueNorthModel::update(
         // No spike is generated
     }
     TRACE2(MODELS, "potential:%lf threshold %lf\n", n.potential, n.threshold);
-    return {state, std::nullopt, std::nullopt};
+    PipelineResult output{};
+    output.status = state;
+    return output;
 }
 
 void sanafe::InputModel::set_attribute(const size_t neuron_address,
@@ -735,8 +745,10 @@ sanafe::PipelineResult sanafe::InputModel::update(
         TRACE2(MODELS, "Randomly generating spikes (rate).\n");
     }
 
-        const NeuronStatus status = send_spike ? FIRED : IDLE;
-    return {status, std::nullopt, std::nullopt};
+    const NeuronStatus status = send_spike ? FIRED : IDLE;
+    PipelineResult output{};
+    output.status = status;
+    return output;
 }
 
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)

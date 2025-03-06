@@ -80,7 +80,7 @@ public:
     AccumulatorModel &operator=(const AccumulatorModel &other) = default;
     AccumulatorModel &operator=(AccumulatorModel &&other) = default;
 
-    PipelineResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current, MappedConnection *con) override;
     void reset() override { return; }
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
 
@@ -100,7 +100,7 @@ public:
     MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
-    PipelineResult update(size_t neuron_address, std::optional<Synapse> synapse_in) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current, MappedConnection *con) override;
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
 

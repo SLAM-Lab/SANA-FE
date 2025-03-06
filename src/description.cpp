@@ -325,8 +325,6 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
             }
             */
         }
-        // TODO: search for the soma unit, if it already exists, say it
-        //  implements soma
         bool hw_exists = false;
         for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
         {
@@ -503,11 +501,17 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
 {
     CorePipelineConfiguration pipeline_config{};
 
+    bool buffer_inside_unit = false;
+
+    ryml::ConstNodeRef buffer_inside_node =
+            attributes.find_child("buffer_inside_unit");
+    if (!buffer_inside_node.invalid())
+    {
+        buffer_inside_node >> buffer_inside_unit;
+    }
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
             description_required_field<std::string>(
-                    parser, attributes, "buffer_position"),
-            description_required_field<bool>(
-                        parser, attributes, "buffer_inside_unit"));
+                    parser, attributes, "buffer_position"), buffer_inside_unit);
     pipeline_config.max_neurons_supported = description_required_field<int>(
             parser, attributes, "max_neurons_supported");
 
