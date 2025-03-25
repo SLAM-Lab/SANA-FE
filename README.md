@@ -1,4 +1,4 @@
-Copyright (c) 2023 - The University of Texas at Austin
+Copyright (c) 2025 - The University of Texas at Austin
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
@@ -6,6 +6,15 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 Simulating Advanced Neuromorphic Architectures for Fast Exploration (SANA-FE)
 
 A framework to model energy and performance of neuromorphic hardware.
+
+# Reference
+
+We hope that you find this project useful. If you use SANA-FE in your work,
+please cite:
+J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
+"SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
+in IEEE Transactions on Computer-Aided Design of Integrated Circuits and
+Systems, doi: 10.1109/TCAD.2025.3537971.
 
 # To Build
 
