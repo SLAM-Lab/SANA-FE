@@ -23,16 +23,16 @@ sys.path.insert(0, PROJECT_DIR)
 import sanafe
 
 ARCH_FILENAME = "loihi.yaml"
-#NETWORK_FILENAME = "dvs_gesture_32x32.net"
-NETWORK_FILENAME = "dvs_gesture_32x32_tagged.net" # TODO: hacks
+NETWORK_FILENAME = "dvs_gesture_32x32.net"
+#NETWORK_FILENAME = "dvs_gesture_32x32_tagged.net" # TODO: hacks
 LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
 SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
 SIM_ENERGY_DATA_FILENAME = "sim_gesture_32x32_energy.csv"
 
 #NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_apr03")
-NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_sep30")
-#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
+#NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32_sep30")
+NETWORK_DIR = os.path.join(PROJECT_DIR, "runs", "dvs", "loihi_gesture_32x32")
 DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "dvs")
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
@@ -95,7 +95,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -110,8 +110,8 @@ if __name__ == "__main__":
     energies = np.array(())
     hops = np.array(())
     timesteps = 128
-    #frames = 100
-    frames = 1
+    frames = 100
+    #frames = 1
 
     loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
@@ -162,9 +162,9 @@ if __name__ == "__main__":
         chip = sanafe.SpikingChip(arch, record_perf=True)
         chip.load(net)
 
-        #for inputs in range(0, 1):
-        #for inputs in range(1, 2):
-        #for inputs in range(50, frames):
+        #for frame in range(0, 1):
+        ##for frame in range(1, 2):
+        ##for frame in range(50, frames):
         for frame in range(0, frames):
             print(f"Running for input: {frame}")
             dvs_inputs = inputs[frame, :]

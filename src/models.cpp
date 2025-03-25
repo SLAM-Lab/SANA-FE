@@ -447,12 +447,12 @@ sanafe::SomaUnit::SomaResult sanafe::LoihiLifModel::update(
         state = sanafe::UPDATED;
     }
 
-    // TODO: remove hack, put into snn description
-    // cx.leak_decay = 4095.0 / 4096.0;
     cx.input_current *= cx.input_decay;
+    // TODO: remove hack, put into snn description
+    cx.leak_decay = 4095.0 / 4096.0;
     cx.potential *= cx.leak_decay;
     // TODO: remove hack to apply quantization
-    //cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
+    cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
     // Add randomized noise to potential if enabled
     /*
     if (noise_type == NOISE_FILE_STREAM)
