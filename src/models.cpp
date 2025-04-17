@@ -50,6 +50,12 @@ void sanafe::CurrentBasedSynapseModel::set_attribute(
 sanafe::SynapseUnit::SynapseResult sanafe::LoihiSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
+    // TODO: not sure if I should model the parallel synaptic pipeline
+    //  dynamically here, or if I should just tag the weight with a cost in the
+    //  script and read it. Get this working for SANA-FE v2 though... would
+    //  be nice
+    // In a detailed model I could store all the types of synapses and then
+    //  lookup synapses
     constexpr size_t max_parallel_accesses = 4;
     double latency = 0.0;
     if (read)
@@ -163,7 +169,7 @@ void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
     {
         mixed_sign_mode = static_cast<bool>(param);
     }
-    else if (param_name == "cost")
+    else if (param_name == "latency")
     {
         costs[synapse_address] = static_cast<double>(param);
     }

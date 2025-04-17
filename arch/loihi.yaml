@@ -85,11 +85,8 @@ architecture:
                 # Originally calibrated value
                 #latency_process_spike: 3.1e-9
                 # Experimentally chosen value, which seems more accurate with current network model
-                #latency_process_spike: 7.0e-9
-                #latency_process_spike: 9.0e-9
-                #latency_process_spike: 4.7e-9
-                latency_process_spike: 4.0e-9  # Most accurate, almost 0 average error (MAPE:~6%)
-                #latency_process_spike: 3.1e-9
+                #latency_process_spike: 4.0e-9  # Most accurate, almost 0 average error (MAPE:~6%)
+                #latency_process_spike: 4.3e-9  # For 10 idx bits
           dendrite:
           - name: loihi_dendrites
             attributes:

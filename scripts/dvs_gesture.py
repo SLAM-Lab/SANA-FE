@@ -23,8 +23,8 @@ sys.path.insert(0, PROJECT_DIR)
 import sanafe
 
 ARCH_FILENAME = "loihi.yaml"
-NETWORK_FILENAME = "dvs_gesture_32x32.net"
-#NETWORK_FILENAME = "dvs_gesture_32x32_tagged.net" # TODO: hacks
+#NETWORK_FILENAME = "dvs_gesture_32x32.net"
+NETWORK_FILENAME = "dvs_gesture_32x32.net.tagged"
 LOIHI_TIME_DATA_FILENAME = "loihi_gesture_32x32_time.csv"
 LOIHI_ENERGY_DATA_FILENAME = "loihi_gesture_32x32_energy.csv"
 SIM_TIME_DATA_FILENAME = "sim_gesture_32x32_time.csv"
@@ -95,7 +95,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -118,20 +118,20 @@ if __name__ == "__main__":
         neurons = ""
         groups = ""
 
-        neuron_groups_filename = os.path.join(NETWORK_DIR, "neuron_groups.net")
-        with open(neuron_groups_filename, "r") as group_file:
-            group_data = group_file.read()
+        # neuron_groups_filename = os.path.join(NETWORK_DIR, "neuron_groups.net")
+        # with open(neuron_groups_filename, "r") as group_file:
+        #     group_data = group_file.read()
 
-        snn_filename = os.path.join(NETWORK_DIR, "dvs_gesture.net")
-        with open(snn_filename, "r") as snn_file:
-            snn_data = snn_file.read()
+        # snn_filename = os.path.join(NETWORK_DIR, "dvs_gesture.net")
+        # with open(snn_filename, "r") as snn_file:
+        #     snn_data = snn_file.read()
 
-        print("Reading mapping file")
-        mappings_filename = os.path.join(NETWORK_DIR, "mappings.net")
-        with open(mappings_filename, "r") as mappings_file:
-            mapping_data = mappings_file.read()
+        # print("Reading mapping file")
+        # mappings_filename = os.path.join(NETWORK_DIR, "mappings.net")
+        # with open(mappings_filename, "r") as mappings_file:
+        #     mapping_data = mappings_file.read()
 
-        print("Reading input file")
+        print("Reading input CSV file")
 
         # Clear the data files
         if experiment == "energy":
@@ -139,16 +139,16 @@ if __name__ == "__main__":
         elif experiment == "time":
             open(SIM_TIME_DATA_PATH, "w")
 
-        input_filename = os.path.join(NETWORK_DIR, "inputs0.net")
+        # input_filename = os.path.join(NETWORK_DIR, "inputs0.net")
         input_csv_filename = os.path.join(NETWORK_DIR, "inputs.csv")
-        with open(input_filename, "r") as input_file:
-            input_data = input_file.read()
+        # with open(input_filename, "r") as input_file:
+        #     input_data = input_file.read()
         with open(input_csv_filename, "r") as input_csv:
             inputs = np.loadtxt(input_csv, delimiter=",", skiprows=1)
 
         # First create the network file from the inputs and SNN
-        data = (group_data + "\n" + input_data + "\n" + snn_data + "\n" +
-                mapping_data)
+        # data = (group_data + "\n" + input_data + "\n" + snn_data + "\n" +
+        #         mapping_data)
         # TODO: clean up this first part of the script which is redundant now
         #  basically
         #with open(GENERATED_NETWORK_PATH, "w") as network_file:
