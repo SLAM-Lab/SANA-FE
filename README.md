@@ -65,11 +65,13 @@ after enabling traces globally, you will still have to create probes at the
 neuron level to get trace output.
 
 Flags:
-* `-v`: Enable potential (v) traces to `potential.csv`
-* `-s`: Enable spike traces to `spikes.csv`
-* `-p`: Record the simulated performance of each timestep to `perf.csv`
 * `-m`: Enable message traces to `messages.csv`
 * `-n`: Use the (legacy) netlist format for SNNs, instead of YAML.
+* `-p`: Record the simulated performance of each timestep to `perf.csv`
+* `-s`: Enable spike traces to `spikes.csv`
+* `-t`: Use a faster but less accurate analytical timing model instead of the
+default scheduler
+* `-v`: Enable potential (voltage) traces to `potential.csv`
 
 ## SNN Description
 
