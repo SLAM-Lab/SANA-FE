@@ -110,5 +110,6 @@ struct message_fifo *sim_pop_priority_queue(struct message_fifo **priority_queue
 void sim_message_fifo_push(struct message_fifo *queue, struct message *m);
 struct message *sim_message_fifo_pop(struct message_fifo *queue);
 
+double sim_calculate_latency_old(const struct architecture *const arch);
 
 #endif

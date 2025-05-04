@@ -32,8 +32,8 @@ import sim
 random.seed(1)
 
 #EXPERIMENT = "tiny"
-#EXPERIMENT = "full"
-EXPERIMENT = "extremes"
+EXPERIMENT = "full"
+#EXPERIMENT = "extremes"
 # Global experiment parameters
 NETWORK_PATH = os.path.join("runs", "random", EXPERIMENT)
 NETWORK_FILENAME = os.path.join(NETWORK_PATH, "random.net")
@@ -41,8 +41,8 @@ ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
-#TIMESTEPS = 100
-TIMESTEPS = 100000
+TIMESTEPS = 100
+#TIMESTEPS = 100000
 
 def create_random_network(cores, neurons_per_core, messages_per_neuron,
                           spikes_per_message):
@@ -115,7 +115,8 @@ def onpick(event, df):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    #run_experiments = False
+    run_experiments = True
     plot_experiments = True
     if run_experiments:
         with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),
@@ -233,6 +234,7 @@ if __name__ == "__main__":
 
         print(f"total latency error: {total_latency_error * 100.0}%")
         print(f"total energy error: {total_energy_error * 100.0}%")
+        plt.show()
 
 # The old code for another experiment, where we measure simulator performance
 #  across a range of SNNs. Currently just ignore all of this - I didn't figure

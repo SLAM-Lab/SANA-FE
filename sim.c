@@ -44,6 +44,7 @@ void sim_timestep(struct timestep *const ts,
 	s.noc_height = arch->noc_height;
 	s.buffer_size = arch->noc_buffer_size;
 	ts->sim_time = sim_schedule_messages(ts->message_queues, &s);
+	//ts->sim_time = sim_calculate_latency_old(arch);
 	// Performance statistics for this time step
 	ts->energy = sim_calculate_energy(arch);
 
@@ -203,9 +204,13 @@ void sim_receive_messages(struct timestep *const ts,
 					assert(pre_core != NULL);
 					struct tile *pre_tile = pre_core->t;
 					assert(pre_tile != NULL);
+
 					axon->message->network_delay =
 						sim_estimate_network_costs(
 							pre_tile, t);
+
+					pre_core->network_hop_latency +=
+						axon->message->network_delay;
 					axon->message->hops =
 						abs(pre_tile->x - t->x) +
 						abs(pre_tile->y - t->y);
@@ -1451,6 +1456,76 @@ double sim_calculate_energy(const struct architecture *const arch)
 	return total_energy;
 }
 
+double sim_calculate_latency_old(const struct architecture *const arch)
+{
+	// Returns the total energy across the design, for this timestep
+	// TODO: hacked for TCAD submission, not general to different pipelines
+	double synapse_latency, soma_latency, axon_out_latency;
+	double axon_in_latency, max_latency;
+	double tile_latencies[ARCH_MAX_TILES] = {0};
+
+	max_latency = 0.0;
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		const struct tile *t = &(arch->tiles[i]);
+
+		for (int j = 0; j < t->core_count; j++)
+		{
+			// TODO: hacked for TCAD submission
+			const struct core *c = &(t->cores[j]);
+			double core_latency;
+
+			axon_in_latency = c->axon_in.spike_messages_in *
+				c->axon_in.latency_spike_message;
+			TRACE1("spikes in: %ld, energy:%e\n",
+					c->axon_in.spike_messages_in,
+					c->axon_in.latency_spike_message);
+			synapse_latency = 0.0;
+			for (int k = 0; k < c->synapse_count; k++)
+			{
+				synapse_latency +=
+					c->synapse[k].spikes_processed *
+					c->synapse[k].latency_spike_op;
+				TRACE1("synapse processed: %ld, energy:%e\n",
+					c->synapse[k].spikes_processed,
+					c->synapse[k].latency_spike_op);
+			}
+			soma_latency = 0.0;
+			for (int k = 0; k < c->soma_count; k++)
+			{
+
+				soma_latency += c->soma[k].neuron_count *
+					c->soma[k].latency_access_neuron;
+				soma_latency += c->soma[k].neuron_updates *
+					c->soma[k].latency_update_neuron;
+				soma_latency += c->soma[k].neurons_fired *
+					c->soma[k].latency_spiking;
+				TRACE1("neurons:%ld updates:%ld, spiking:%ld\n",
+					c->soma[k].neuron_count,
+					c->soma[k].neuron_updates,
+					c->soma[k].neurons_fired);
+			}
+			axon_out_latency = 0.0;
+			axon_out_latency += c->axon_out.packets_out *
+				c->axon_out.latency_access;
+			TRACE1("packets: %ld, energy:%e\n",
+					c->axon_out.packets_out,
+					c->axon_out.energy_access);
+			core_latency = fmax(axon_in_latency + synapse_latency,
+					soma_latency + axon_out_latency +
+					c->network_hop_latency);
+			tile_latencies[i] = fmax(tile_latencies[i], core_latency);
+		}
+		assert(max_latency < 1);
+		max_latency = fmax(max_latency, tile_latencies[i]);
+	}
+
+	TRACE1("total:%e\n", max_latency);
+
+	return max_latency;
+}
+
+
 void sim_reset_measurements(struct network *net, struct architecture *arch)
 {
 	for (int i = 0; i < net->neuron_group_count; i++)
@@ -1494,6 +1569,7 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 			struct core *c = &(t->cores[j]);
 			// Reset core
 			c->energy = 0.0;
+			c->network_hop_latency = 0.0;
 			arch_init_message(&(c->next_message));
 
 			c->axon_in.spike_messages_in = 0L;

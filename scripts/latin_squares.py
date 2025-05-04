@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 import os
-import networkx as nx
+#import networkx as nx
 import time
 
 # SANA-FE libraries
@@ -182,7 +182,8 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    #run_experiments = False
+    run_experiments = True
     plot_experiment = True
 
     if run_experiments:
