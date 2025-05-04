@@ -197,6 +197,7 @@ struct core
 	char name[MAX_FIELD_LEN];
 	struct message next_message;  // Since last spike
 	double energy, latency_after_last_message;
+	double network_hop_latency;
 	int id, offset, buffer_pos, soma_count, synapse_count;
 	int neuron_count, message_count;
 	int curr_axon;
@@ -208,6 +209,7 @@ struct tile
 	struct tile *links[ARCH_MAX_LINKS];
 	char name[MAX_FIELD_LEN];
 	double energy;
+	double latency;
 	double energy_east_hop, latency_east_hop;
 	double energy_west_hop, latency_west_hop;
 	double energy_north_hop, latency_north_hop;

@@ -136,7 +136,7 @@ def plot_results():
     #df.plot.bar(rot=0, figsize=(3.5, 1.4), color=("#ff7f0e", "#1f77b4"))
 
     #fig = plt.figure(figsize=(3.5, 1.4))
-    fig = plt.figure(figsize=(3.7, 1.4))
+    fig = plt.figure(figsize=(3.7, 1.2))
     nemo_throughput = TIMESTEPS / times[:, 1]
     sanafe_throughput = TIMESTEPS / times[:, 0]
     bar1 = plt.bar(np.arange(entries) - 0.15, nemo_throughput, width=0.3)
@@ -162,12 +162,13 @@ def plot_results():
     ax.set_xticklabels(core_labels)
     #plt.xticks(rotation=30)
     #plt.ylabel("Run-time (s)")
-    plt.ylabel("Throughput (steps per s)")
+    plt.ylabel("Throughput (step/s)")
     #plt.yscale("log")
     #plt.minorticks_on()
+    plt.yticks((0, 5, 10, 15, 20, 25))
     plt.ylim((0, 25))
     ax.tick_params(axis='y', which='minor', labelbottom=False)
-    plt.tight_layout(pad=0.3)
+    plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.png"))
     plt.savefig(os.path.join(PROJECT_DIR, "runs", "nemo", "compare_sanafe_nemo.pdf"))
     return

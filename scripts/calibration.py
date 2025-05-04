@@ -10,7 +10,7 @@ Use several partitions of a small benchmark to calibrate
 the simulator.
 """
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 import csv
 from matplotlib import pyplot as plt
@@ -170,10 +170,10 @@ def run_spiking_experiment(mapping, max_size=30):
     with open("runs/sandia_data/weights_loihi.pkl", "rb") as weights_file:
         weights = pickle.load(weights_file)
 
-    #timesteps = 1
-    timesteps = 1e5
-    #for i in range(1, max_size):
-    for i in range(max_size-1, max_size):
+    timesteps = 1
+    #timesteps = 1e5
+    for i in range(1, max_size):
+    #for i in range(max_size-1, max_size):
         # Sweep across range of network sizes
         layer_neurons = i*i
         copy_network = (True if mapping == "split_2_diff_tiles" else False)
@@ -244,6 +244,9 @@ if __name__ == "__main__":
         with open("runs/calibration/sim_spiking.csv", "r") as spiking_csv:
             df = pd.read_csv(spiking_csv)
 
+        with open("runs/calibration/sim_spiking_metric_based.csv", "r") as spiking_csv:
+            df_metrics = pd.read_csv(spiking_csv)
+
         with open("runs/sandia_data/loihi_spiking.csv", "r") as spiking_csv:
             spiking_reader = csv.DictReader(spiking_csv)
             for row in spiking_reader:
@@ -294,12 +297,12 @@ if __name__ == "__main__":
         print(f"Abs Energy error %: {abs_energy_error*100}")
         print(f"Abs Latency error %: {abs_latency_error*100}")
 
-        plt.figure(figsize=(1.6, 1.6))
+        plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts[6:], np.array(loihi_energy_spikes[6:]) * 1.0e6, "-")
         plt.plot(neuron_counts[6:], np.array(spiking_energy[6:]) * 1.0e6, "ko",
                  fillstyle="none", mew=0.8)
         ax = plt.gca()
-        ax.set_box_aspect(1)
+        #ax.set_box_aspect(1)
         #plt.gca().set_aspect("equal", adjustable="box")
         plt.yscale("linear")
         plt.xscale("linear")
@@ -307,7 +310,7 @@ if __name__ == "__main__":
         plt.xlabel("Neurons")
         plt.minorticks_on()
         plt.xticks(np.arange(0, neuron_counts[-1]+1, 500))
-        plt.legend(("Measured", "Simulated"), fontsize=6)
+        plt.legend(("Measured", "SANA-FE"), fontsize=5)
         plt.tight_layout(pad=0.1)
         #ax.set_position(ax_pos)
         plt.savefig("runs/calibration/calibration_energy.pdf")
@@ -316,60 +319,71 @@ if __name__ == "__main__":
         plt.rcParams.update({'font.size': 6, 'lines.markersize': 3,})
         ## Plot the effect of cores blocking
         spiking_frame = df.loc[(df["mapping"] == "l2_split")]
+        metric_based_frame = df_metrics.loc[(df_metrics["mapping"] == "l2_split")]
 
-        plt.figure(figsize=(1.6, 1.6))
+        #plt.figure(figsize=(1.6, 1.6))
+        plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts[6:], np.array(loihi_times_spikes["l2_split"][6:]) * 1.0e3, "-")
         plt.plot(neuron_counts[6:], np.array(spiking_frame["time"][6:]) * 1.0e3, "ko",
                  fillstyle="none")
+        plt.plot(neuron_counts[6:], np.array(metric_based_frame["time"][6:]) *
+                 1.0e3, "kx")
 
         #plt.figure(figsize=(2.5, 2.5))
         #plt.plot(neuron_counts, np.array(cores_blocking["time"]) * 1.0e3, "-o")
         #plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-x")
         #plt.legend(("Simulated", "Measured on Loihi"))
 
-        plt.gca().set_box_aspect(1)
+        #plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"), fontsize=6)
-        plt.tight_layout(pad=0.3)
+        plt.legend(("Measured", "SANA-FE", "Analytical model"), fontsize=5)
+        plt.tight_layout(pad=0.1)
         plt.savefig("runs/calibration/calibration_time_partition_2.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_2.png")
 
         # Plot the effect of network tiles blocking
         spiking_frame = df.loc[(df["mapping"] == "split_4")]
+        metric_based_frame = df_metrics.loc[(df["mapping"] == "split_4")]
 
-        plt.figure(figsize=(1.6, 1.6))
+        #plt.figure(figsize=(1.6, 1.6))
+        plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["split_4"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
                  fillstyle="none")
-        plt.gca().set_box_aspect(1)
+        plt.plot(neuron_counts, np.array(metric_based_frame["time"]) * 1.0e3, "kx")
+        #plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"),
-                    fontsize=6)
-        plt.tight_layout(pad=0.3)
+        plt.legend(("Measured", "SANA-FE", "Analytical model"),
+                    fontsize=5)
+        plt.tight_layout(pad=0.1)
         plt.savefig("runs/calibration/calibration_time_partition_3.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_3.png")
 
         spiking_frame = df.loc[(df["mapping"] == "luke")]
-        plt.figure(figsize=(1.5, 1.5))
-        plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
+        metric_based_frame = df_metrics.loc[(df["mapping"] == "luke")]
+        plt.figure(figsize=(1.6, 1.5))
+        plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3,
+                 "-")
         plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
                  fillstyle="none")
-        plt.gca().set_box_aspect(1)
+        plt.plot(neuron_counts, np.array(metric_based_frame["time"]) * 1.0e3,
+                 "kx")
+        #plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"), fontsize=6)
-        plt.tight_layout(pad=0.3)
+        plt.legend(("Measured", "SANA-FE", "Analytical model"), fontsize=5)
+        plt.tight_layout(pad=0.1)
         plt.savefig("runs/calibration/calibration_time_partition_luke.pdf")
         plt.savefig("runs/calibration/calibration_time_partition_luke.png")
 
@@ -380,14 +394,25 @@ if __name__ == "__main__":
         plt.plot(neuron_counts[6:], np.array(loihi_times_spikes["split_4"][6:]) * 1.0e3, "-.")
 
         spiking_frame = df.loc[(df["mapping"] == "luke")]
+        spiking_frame_metrics = df_metrics.loc[(df["mapping"] == "luke")]
         plt.plot(neuron_counts[6:], np.array(spiking_frame["time"][6:]) * 1.0e3, "o",
                  fillstyle="none", mew=0.8, color="#1f77b4")
+        plt.plot(neuron_counts[6:], np.array(spiking_frame_metrics["time"][6:])
+                                             * 1.0e3, "x", color="#1f77b4")
         spiking_frame = df.loc[(df["mapping"] == "l2_split")]
+        spiking_frame_metrics = df_metrics.loc[(df["mapping"] == "l2_split")]
         plt.plot(neuron_counts[10:], np.array(spiking_frame["time"][10:]) * 1.0e3, "s",
                  fillstyle="none", mew=0.8, color="#ff7f0e")
+        plt.plot(neuron_counts[10:], np.array(spiking_frame_metrics["time"][10:]) * 1.0e3, "x",
+                 color="#ff7f0e")
+
         spiking_frame = df.loc[(df["mapping"] == "split_4")]
+        spiking_frame_metrics = df_metrics.loc[(df["mapping"] == "split_4")]
         plt.plot(neuron_counts[10:], np.array(spiking_frame["time"][10:]) * 1.0e3, "^",
                  fillstyle="none", mew=0.8, color="#2ca02c")
+        plt.plot(neuron_counts[10:], np.array(spiking_frame_metrics["time"][10:]) * 1.0e3, "+",
+                 color="#2ca02c")
+
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
@@ -399,3 +424,5 @@ if __name__ == "__main__":
         plt.tight_layout(pad=0.1)
         plt.savefig("runs/calibration/calibration_time.pdf")
         plt.savefig("runs/calibration/calibration_time.png")
+
+        plt.show()
