@@ -24,8 +24,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 
 sys.path.insert(0, PROJECT_DIR)
-import utils as sf
-import sanafecpp as kernel
+import sanafe
 
 MAX_TILES = 32
 MAX_CORES = 4
@@ -35,7 +34,7 @@ ARCH_FILENAME = "arch/loihi.yaml"
 def connected_layers(arch, weights, spiking=True, mapping="l2_split",
                      copy_network=False):
 
-    net = kernel.Network()
+    net = sanafe.Network()
     layer_neuron_count = len(weights)
     if spiking:  # always spike
         threshold = -1.0
@@ -74,7 +73,7 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
             "soma_hw_name": "loihi_lif",
             "synapse_hw_name": "loihi_dense_synapse",
         }
-        layer_1 = net.create_neuron_group(layer_neuron_count,
+        layer_1 = net.create_neuron_group("input", layer_neuron_count,
                                           layer1_attributes)
 
         neurons_per_core = [0, 0, 0, 0, 0]
@@ -121,7 +120,7 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
             # Add bias to force neuron to fire
             "bias": 1.0,
         }
-        layer_2 = net.create_neuron_group(layer_neuron_count,
+        layer_2 = net.create_neuron_group("output", layer_neuron_count,
                                           layer2_attributes)
 
         for src in layer_1.neurons:
@@ -132,19 +131,23 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
                     # Zero weights are pruned i.e. removed
                     src.connect_to_neuron(dest, { "weight": weight } )
 
-        # TODO: we have to map the neurons after defining them and their
-        #  connections. Add flags in the kernel to make sure this happens.
-        #  Currently when we save the net file this won't be adhered to.. do
-        #  we need to fix the save_net code or allow us to add connections
-        #  after mapping to cores
-        sf.map_neuron_group(layer_1, arch, layer1_mapping)
-        sf.map_neuron_group(layer_2, arch, layer2_mapping)
+        # Map neurons after creating SNN and connecting neurons
+        for n, neuron in enumerate(layer_1.neurons):
+            tile, core_offset = layer1_mapping[n]
+            core = arch.tiles[tile].cores[core_offset]
+            neuron.map_to_core(core)
+
+        for n, neuron in enumerate(layer_2.neurons):
+            tile, core_offset = layer2_mapping[n]
+            core = arch.tiles[tile].cores[core_offset]
+            neuron.map_to_core(core)
 
     return net
 
 
-def run_spiking_experiment(mapping, max_size=30):
-    with open(os.path.join(PROJECT_DIR, "runs", "sandia_data",
+def run_spiking_experiment(mapping, max_size=30, timing_model="simple",
+                           cycle_accurate_validation=False):
+    with open(os.path.join(PROJECT_DIR, "runs", "power", "sandia_data",
                            "weights_loihi.pkl"), "rb") as weights_file:
         weights = pickle.load(weights_file)
 
@@ -153,34 +156,59 @@ def run_spiking_experiment(mapping, max_size=30):
         # Sweep across range of network sizes
         layer_neurons = i*i
         copy_network = (True if mapping == "split_2_diff_tiles" else False)
-        arch = kernel.load_arch(ARCH_FILENAME)
+        arch = sanafe.load_arch(ARCH_FILENAME)
+        chip = sanafe.SpikingChip(arch, record_perf=True, record_messages=True)
 
         snn = connected_layers(arch, weights[i-1].transpose(), spiking=True,
                                mapping=mapping, copy_network=copy_network)
-        network_filename = os.path.join(PROJECT_DIR, "runs", "power", "snn",
-                                        f"connected_layers_N{layer_neurons}_map_{mapping}.net")
-        snn.save_net_description(network_filename)
+        #network_filename = os.path.join(PROJECT_DIR, "runs", "power", "snn",
+        #                                f"connected_layers_N{layer_neurons}_map_{mapping}.net")
+        #snn.save_net_description(network_filename)
+        chip.load(snn)
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
-        sim = kernel.Simulation(arch, snn)
-        results = sim.run(timesteps)
+        results = chip.sim(timesteps, timing_model=timing_model)
+        if cycle_accurate_validation:
+            booksim_cycles = run_cycle_accurate()
+        else:
+            booksim_cycles = None
 
         with open(os.path.join(PROJECT_DIR, "runs",
-                               "power", "sim_spiking.csv"),
+                               "power", f"sim_spiking_{timing_model}.csv"),
                   "a") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                             ("neuron_counts", "energy", "time",
-                                             "mapping"))
+                                             "cycles", "mapping"))
             neuron_counts = layer_neurons * 2
             if copy_network:
                 neuron_counts *= 2
             spiking_writer.writerow({"neuron_counts": neuron_counts,
                                       "time": results["sim_time"],
                                       "energy": results["energy"],
-                                      "mapping": mapping})
+                                      "cycles": booksim_cycles,
+                                      "mapping": mapping
+                                    })
             print(f"Run results:{results}")
 
     return
+
+
+def run_cycle_accurate():
+    import subprocess
+    # TODO: parameterize to not be as environment specific..
+    # Note: this assumes that there is a messages trace file generated
+    # TODO: add a sanity check that the trace file exists
+    print("Running cycle-accurate Booksim2 model")
+    result = subprocess.run(("/home/usr1/jboyle/neuro/booksim2/src/booksim",
+                             "/home/usr1/jboyle/neuro/sana-fe/scripts/booksim.config"),
+                             capture_output=True, text=True)
+    cycles = None
+    for line in result.stdout.split('\n'):
+        if "Time taken is" in line:
+            # Extract the number of cycles
+            cycles = int(line.split("is")[1].split()[0])
+
+    return cycles
 
 
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
@@ -194,15 +222,29 @@ if __name__ == "__main__":
 
     # This experiment looks at two fully connected layers, spiking
     if run_experiments:
+        # Reset and initialize the log files
         with open(os.path.join("runs", "power",
-                               "sim_spiking.csv"), "w") as spiking_csv:
+                               "sim_spiking_simple.csv"), "w") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                        ("neuron_counts", "energy", "time",
-                                        "mapping"))
+                                        "cycles", "mapping"))
             spiking_writer.writeheader()
+        with open(os.path.join("runs", "power",
+                               "sim_spiking_detailed.csv"), "w") as spiking_csv:
+            spiking_writer = csv.DictWriter(spiking_csv,
+                                       ("neuron_counts", "energy", "time",
+                                        "cycles", "mapping"))
+            spiking_writer.writeheader()
+
+        # Run experiments using both the simple analytical timing model, and the
+        #  detailed semi-analytical model
         for mapping in mappings:
-            run_spiking_experiment(mapping, max_size=30)
-        with open(os.path.join("runs", "sandia_data",
+            run_spiking_experiment(mapping, max_size=30, timing_model="simple",
+                                   cycle_accurate_validation=False)
+            run_spiking_experiment(mapping, max_size=30,
+                                   timing_model="detailed",
+                                   cycle_accurate_validation=True)
+        with open(os.path.join("runs", "power", "sandia_data",
                                "weights_loihi.pkl"), "rb") as weights_file:
             weights = pickle.load(weights_file)
 
@@ -220,10 +262,14 @@ if __name__ == "__main__":
 
         spiking_energy = []
         with open(os.path.join("runs", "power",
-                               "sim_spiking.csv"), "r") as spiking_csv:
+                               "sim_spiking_detailed.csv"), "r") as spiking_csv:
             df = pd.read_csv(spiking_csv)
 
-        with open(os.path.join("runs", "sandia_data",
+        with open(os.path.join("runs", "power",
+                               "sim_spiking_simple.csv"), "r") as spiking_csv:
+             df_analytical = pd.read_csv(spiking_csv)
+
+        with open(os.path.join("runs", "power", "sandia_data",
                                "loihi_spiking.csv"), "r") as spiking_csv:
             spiking_reader = csv.DictReader(spiking_csv)
             for row in spiking_reader:
@@ -238,6 +284,9 @@ if __name__ == "__main__":
         spiking_times = np.array(spiking_frame["time"])
         spiking_energy = np.array(spiking_frame["energy"])
         neuron_counts = np.array(spiking_frame["neuron_counts"])
+        cycles = np.array(spiking_frame["cycles"])
+        cycle_period = 1e-9
+        cycle_times = cycles * cycle_period
 
         plt.figure(figsize=(1.5, 1.5))
         plt.plot(neuron_counts[6:-7],
@@ -264,10 +313,12 @@ if __name__ == "__main__":
         print(energy_error)
         energy_error = np.mean(np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:]))
         latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:]) - spiking_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
+        cycle_latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:]) - cycle_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
         print(f"Energy error %: {energy_error*100}")
         print(f"Latency error %: {latency_error*100}")
+        print(f"Latency error (Booksim2) %: {cycle_latency_error*100}")
 
-        plt.figure(figsize=(1.6, 1.6))
+        plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts[6:], np.array(loihi_energy_spikes[6:]) * 1.0e6, "-")
         plt.plot(neuron_counts[6:], np.array(spiking_energy[6:]) * 1.0e6, "ko",
                  fillstyle="none", mew=0.8)
@@ -280,7 +331,7 @@ if __name__ == "__main__":
         plt.xlabel("Neurons")
         plt.minorticks_on()
         plt.xticks(np.arange(0, neuron_counts[-1]+1, 500))
-        plt.legend(("Measured", "Simulated"), fontsize=6)
+        plt.legend(("Measured", "SANA-FE"), fontsize=5)
         plt.tight_layout(pad=0.1)
         #ax.set_position(ax_pos)
         plt.savefig(os.path.join("runs", "power", "power_energy.pdf"))
@@ -289,10 +340,15 @@ if __name__ == "__main__":
         plt.rcParams.update({'font.size': 6, 'lines.markersize': 3,})
         ## Plot the effect of cores blocking
         spiking_frame = df.loc[(df["mapping"] == "l2_split")]
+        analytical_frame = df_analytical.loc[(df["mapping"] == "l2_split")]
 
-        plt.figure(figsize=(1.6, 1.6))
+        plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts[6:], np.array(loihi_times_spikes["l2_split"][6:]) * 1.0e3, "-")
         plt.plot(neuron_counts[6:], np.array(spiking_frame["time"][6:]) * 1.0e3, "ko",
+                 fillstyle="none")
+        plt.plot(neuron_counts[6:], np.array(spiking_frame["cycles"][6:]) * cycle_period * 1.0e3, "ks",
+                 fillstyle="none")
+        plt.plot(neuron_counts[6:], np.array(analytical_frame["time"][6:]) * 1.0e3, "kx",
                  fillstyle="none")
 
         #plt.figure(figsize=(2.5, 2.5))
@@ -306,43 +362,54 @@ if __name__ == "__main__":
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"), fontsize=6)
-        plt.tight_layout(pad=0.3)
+        plt.legend(("Measured", "SANA-FE", "Booksim2", "Analytical"), fontsize=5)
+        plt.tight_layout(pad=0.1)
         plt.savefig(os.path.join("runs", "power", "power_time_partition_2.pdf"))
         plt.savefig(os.path.join("runs", "power", "power_time_partition_2.png"))
 
         # Plot the effect of network tiles blocking
         spiking_frame = df.loc[(df["mapping"] == "split_4")]
+        analytical_frame = df_analytical.loc[(df["mapping"] == "split_4")]
+        cycle_frame = df.loc[(df["mapping"] == "split_4")]
 
-        plt.figure(figsize=(1.6, 1.6))
+        plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["split_4"]) * 1.0e3, "-")
+        plt.gca().set_box_aspect(1)
         plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
                  fillstyle="none")
-        plt.gca().set_box_aspect(1)
+        plt.plot(neuron_counts[6:], np.array(spiking_frame["cycles"][6:]) * cycle_period * 1.0e3, "ks",
+                 fillstyle="none")
+        plt.plot(neuron_counts, np.array(analytical_frame["time"]) * 1.0e3, "kx")
+
         plt.yscale("linear")
         plt.xscale("linear")
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"),
-                    fontsize=6)
-        plt.tight_layout(pad=0.3)
+        plt.legend(("Measured", "SANA-FE", "Booksim2", "Analytical"), fontsize=5)
+        plt.tight_layout(pad=0.1)
         plt.savefig(os.path.join("runs", "power", "power_time_partition_3.pdf"))
         plt.savefig(os.path.join("runs", "power", "power_time_partition_3.png"))
 
         spiking_frame = df.loc[(df["mapping"] == "luke")]
-        plt.figure(figsize=(1.5, 1.5))
+        analytical_frame = df_analytical.loc[(df["mapping"] == "luke")]
+        plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
                  fillstyle="none")
+        plt.plot(neuron_counts[6:], np.array(spiking_frame["cycles"][6:]) * cycle_period * 1.0e3, "ks",
+                 fillstyle="none")
+        plt.plot(neuron_counts, np.array(analytical_frame["time"]) * 1.0e3,
+                  "kx")
+
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")
         plt.ylabel("Time-step Latency (ms)")
         plt.xlabel("Neurons")
         plt.minorticks_on()
-        plt.legend(("Measured", "Simulated"), fontsize=6)
-        plt.tight_layout(pad=0.3)
+        plt.legend(("Measured", "SANA-FE", "Booksim2", "Analytical"), fontsize=5)
+        plt.tight_layout(pad=0.1)
         plt.savefig(os.path.join("runs", "power", "power_time_partition_luke.pdf"))
         plt.savefig(os.path.join("runs", "power", "power_time_partition_luke.png"))
 
@@ -353,14 +420,23 @@ if __name__ == "__main__":
         plt.plot(neuron_counts[6:], np.array(loihi_times_spikes["split_4"][6:]) * 1.0e3, "-.")
 
         spiking_frame = df.loc[(df["mapping"] == "luke")]
+        spiking_frame_metrics = df_analytical.loc[(df["mapping"] == "luke")]
         plt.plot(neuron_counts[6:], np.array(spiking_frame["time"][6:]) * 1.0e3, "o",
                  fillstyle="none", mew=0.8, color="#1f77b4")
+        plt.plot(neuron_counts[6:], np.array(spiking_frame_metrics["time"][6:])
+                    * 1.0e3, "x", color="#1f77b4")
         spiking_frame = df.loc[(df["mapping"] == "l2_split")]
+        spiking_frame_metrics = df_analytical.loc[(df["mapping"] == "l2_split")]
         plt.plot(neuron_counts[10:], np.array(spiking_frame["time"][10:]) * 1.0e3, "s",
                  fillstyle="none", mew=0.8, color="#ff7f0e")
+        plt.plot(neuron_counts[10:], np.array(spiking_frame_metrics["time"][10:]) * 1.0e3, "x",
+                  color="#ff7f0e")
         spiking_frame = df.loc[(df["mapping"] == "split_4")]
+        spiking_frame_metrics = df_analytical.loc[(df["mapping"] == "split_4")]
         plt.plot(neuron_counts[10:], np.array(spiking_frame["time"][10:]) * 1.0e3, "^",
                  fillstyle="none", mew=0.8, color="#2ca02c")
+        plt.plot(neuron_counts[10:], np.array(spiking_frame_metrics["time"][10:]) * 1.0e3, "+",
+                  color="#2ca02c")
         plt.gca().set_box_aspect(1)
         plt.yscale("linear")
         plt.xscale("linear")

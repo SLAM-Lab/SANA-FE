@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
     bool record_perf{false};
     bool record_messages{false};
     bool use_netlist_format{false};
+    bool use_simple_timing_model{false}; // Default is the detailed model
 
     while (argc > 2)
     {
@@ -50,7 +51,6 @@ int main(int argc, char *argv[])
                 output_dir = std::filesystem::path(argv[0]);
                 // TODO: fix this for C++
                 INFO("Writing output to %s\n", output_dir.c_str());
-                ;
                 break;
             }
 
@@ -65,6 +65,8 @@ int main(int argc, char *argv[])
             case 's':
                 record_spikes = true;
                 break;
+            case 't':
+                use_simple_timing_model = true;
             case 'v':
                 record_potentials = true;
                 break;
@@ -120,9 +122,15 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        // Step simulation
+        const long int heartbeat = 100L;
+        sanafe::TimingModel timing_model = sanafe::TIMING_MODEL_DETAILED;
+        if (use_simple_timing_model)
+        {
+            timing_model = sanafe::TIMING_MODEL_SIMPLE;
+        }
+
         INFO("Running simulation.\n");
-        const auto run_data = hw.sim(timesteps);
+        const auto run_data = hw.sim(timesteps, heartbeat, timing_model);
 
         INFO("***** Run Summary *****\n");
         sim_output_run_summary(output_dir, run_data);

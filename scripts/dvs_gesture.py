@@ -95,7 +95,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -158,7 +158,7 @@ if __name__ == "__main__":
         #  dvs-gesture
         arch = sanafe.load_arch(ARCH_PATH)
         net = sanafe.load_net(GENERATED_NETWORK_PATH, arch,
-                                use_netlist_format=True)
+                              use_netlist_format=True)
         chip = sanafe.SpikingChip(arch, record_perf=True)
         chip.load(net)
 

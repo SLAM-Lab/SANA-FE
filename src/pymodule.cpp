@@ -334,6 +334,26 @@ void pyconfigure_models(sanafe::MappedNeuron *self,
     return;
 }
 
+pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
+        const long int heartbeat, std::string timing_model_str)
+{
+    sanafe::TimingModel timing_model;
+    if (timing_model_str == "simple")
+    {
+        timing_model = sanafe::TIMING_MODEL_SIMPLE;
+    }
+    else if (timing_model_str == "detailed")
+    {
+        timing_model = sanafe::TIMING_MODEL_DETAILED;
+    }
+    else
+    {
+        throw std::invalid_argument("Error: unsupoorted timing model");
+    }
+
+    return run_data_to_dict(self->sim(timesteps, heartbeat, timing_model));
+}
+
 PYBIND11_MODULE(sanafecpp, m)
 {
     m.doc() = R"pbdoc(
@@ -535,71 +555,6 @@ PYBIND11_MODULE(sanafecpp, m)
                             sanafe::BUFFER_BEFORE_SOMA_UNIT,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons);
-            //.def("__repr__", &sanafe::CoreConfiguration::info)
-            // TODO: adding hardware units
-            /*
-            .def(
-                    "create_axon_in",
-                    [](sanafe::Core *self, const std::string &name,
-                            pybind11::dict &attr) {
-                        return self->create_axon_in(
-                                name, dict_to_str_map(attr));
-                    },
-                    pybind11::return_value_policy::reference_internal)
-            .def(
-                    "create_dendrite",
-                    [](sanafe::Core *self, const std::string &name,
-                            pybind11::dict &attr) {
-                        return self->create_dendrite(
-                                name, dict_to_str_map(attr));
-                    },
-                    pybind11::return_value_policy::reference_internal)
-            .def(
-                    "create_synapse",
-                    [](sanafe::Core *self, const std::string &name,
-                            pybind11::dict &attr) {
-                        return self->create_synapse(
-                                name, dict_to_str_map(attr));
-                    },
-                    pybind11::return_value_policy::reference_internal)
-            .def(
-                    "create_soma",
-                    [](sanafe::Core *self, const std::string &name,
-                            pybind11::dict &attr) {
-                        return self->create_soma(name, dict_to_str_map(attr));
-                    },
-                    pybind11::return_value_policy::reference_internal)
-            .def(
-                    "create_axon_out",
-                    [](sanafe::Core *self, const std::string &name,
-                            pybind11::dict &attr) {
-                        return self->create_axon_out(
-                                name, dict_to_str_map(attr));
-                    },
-                    pybind11::return_value_policy::reference_internal)
-            */
-    /*
-            .def_readwrite("axon_in_hw", &sanafe::Core::axon_in_hw)
-            .def_readwrite("synapse", &sanafe::Core::synapse)
-            .def_readwrite("dendrite", &sanafe::Core::dendrite)
-            .def_readwrite("soma", &sanafe::Core::soma)
-            .def_readwrite("axon_out_hw", &sanafe::Core::axon_out_hw);
-    */
-
-    //pybind11::class_<sanafe::AxonInUnit>(m, "AxonInUnit")
-    //        .def(pybind11::init<std::string>());
-
-    //pybind11::class_<sanafe::DendriteUnit>(m, "DendriteUnit")
-    //        .def(pybind11::init<std::string>());
-
-    //pybind11::class_<sanafe::SynapseUnit>(m, "SynapseUnit")
-    //        .def(pybind11::init<std::string>());
-
-    //pybind11::class_<sanafe::SomaUnit>(m, "SomaUnit")
-    //        .def(pybind11::init<std::string>());
-
-    //pybind11::class_<sanafe::AxonOutUnit>(m, "AxonOutUnit")
-    //        .def(pybind11::init<std::string>());
     pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
             .def_property(
                     "mapped_neuron_groups",
@@ -617,15 +572,10 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("record_perf") = false,
                     pybind11::arg("record_messages") = false)
             .def("load", &sanafe::SpikingChip::load)
-            .def(
-                    "sim",
-                    [](sanafe::SpikingChip *self, const long int timesteps,
-                            const long int heartbeat) {
-                        return run_data_to_dict(
-                                self->sim(timesteps, heartbeat));
-                    },
+            .def("sim", &pysim,
                     pybind11::arg("timesteps") = 1,
-                    pybind11::arg("heartbeat") = 100)
+                    pybind11::arg("heartbeat") = 100,
+                    pybind11::arg("timing_model") = "detailed")
             .def("get_power", &sanafe::SpikingChip::get_power)
             .def("get_run_summary", [](sanafe::SpikingChip *self) {
                 return run_data_to_dict(self->get_run_summary());

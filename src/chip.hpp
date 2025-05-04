@@ -70,6 +70,12 @@ enum NeuronStatus : int
     FIRED
 };
 
+enum TimingModel : int
+{
+    TIMING_MODEL_SIMPLE,
+    TIMING_MODEL_DETAILED
+};
+
 constexpr long int default_heartbeat_timesteps = 100L;
 class SpikingChip
 {
@@ -85,7 +91,7 @@ public:
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps);
+    RunData sim(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps, const TimingModel timing_model = TIMING_MODEL_DETAILED);
     void load(const SpikingNetwork &net);
     double get_power() const;
     RunData get_run_summary() const;
@@ -117,7 +123,7 @@ private:
     std::ofstream message_trace{};
     std::ofstream perf_trace{};
 
-    Timestep step();
+    Timestep step(TimingModel timing_model=TIMING_MODEL_DETAILED);
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
     MappedConnection &map_connection(const Connection &con);
@@ -512,7 +518,7 @@ struct AxonOutModel
     size_t src_neuron_id{};
 };
 
-void sim_timestep(Timestep &ts, SpikingChip &hw);
+void sim_timestep(Timestep &ts, SpikingChip &hw, const TimingModel timing_model = TIMING_MODEL_DETAILED);
 double sim_estimate_network_costs(const Tile &src, Tile &dest);
 void sim_reset_measurements(SpikingChip &hw);
 double sim_calculate_energy(const SpikingChip &hw);

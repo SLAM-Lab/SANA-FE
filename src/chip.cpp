@@ -297,7 +297,8 @@ sanafe::RunData::RunData(const long int start, const long int steps)
 }
 
 sanafe::RunData sanafe::SpikingChip::sim(
-        const long int timesteps, const long int heartbeat)
+        const long int timesteps, const long int heartbeat,
+        const TimingModel timing_model)
 {
     RunData rd((total_timesteps + 1), timesteps);
     if (total_timesteps <= 0)
@@ -329,7 +330,7 @@ sanafe::RunData sanafe::SpikingChip::sim(
             // Print a heart-beat message to show that the simulation is running
             INFO("*** Time-step %ld ***\n", timestep);
         }
-        const Timestep ts = step();
+        const Timestep ts = step(timing_model);
         TRACE1(CHIP, "Neurons fired in ts:%ld: %zu\n", timestep,
                 ts.neurons_fired);
         rd.energy += ts.energy;
@@ -343,7 +344,7 @@ sanafe::RunData sanafe::SpikingChip::sim(
     return rd;
 }
 
-sanafe::Timestep sanafe::SpikingChip::step()
+sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
 {
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
@@ -355,7 +356,7 @@ sanafe::Timestep sanafe::SpikingChip::step()
 
     // Run and measure the wall-clock time taken to run the simulation
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
-    sim_timestep(ts, *this);
+    sim_timestep(ts, *this, timing_model);
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
@@ -1426,7 +1427,8 @@ std::ofstream sanafe::sim_trace_open_message_trace(
     return message_file;
 }
 
-void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw)
+void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw,
+        const TimingModel timing_model)
 {
     Scheduler scheduler;
 
@@ -1444,8 +1446,16 @@ void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw)
     scheduler.core_count = hw.core_count;
     scheduler.max_cores_per_tile = hw.max_cores_per_tile;
 
-    ts.sim_time = schedule_messages(ts.messages, scheduler);
-    //ts.sim_time = schedule_messages_simple(ts.messages, scheduler);
+    if (timing_model == TIMING_MODEL_DETAILED)
+    {
+        INFO("Running detailed timing model...\n");
+        ts.sim_time = schedule_messages(ts.messages, scheduler);
+    }
+    else
+    {
+        INFO("Running simple timing model...\n");
+        ts.sim_time = schedule_messages_simple(ts.messages, scheduler);
+    }
     ts.energy = sim_calculate_energy(hw);
 
     for (auto &tile : hw.tiles)
@@ -1999,7 +2009,7 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.generation_delay << ",";
     message_trace_file << m.network_delay << ",";
     message_trace_file << m.receive_delay << ",";
-    message_trace_file << m.blocked_delay << ",";
+    message_trace_file << m.blocked_delay;
     message_trace_file << std::endl;
 }
 
