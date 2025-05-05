@@ -176,6 +176,13 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                                 mapped_con.synapse_address,
                                 name_value_pair.first, name_value_pair.second);
                     }
+                    if (name_value_pair.second.forward_to_dendrite)
+                    {
+                        MappedNeuron &n = *(mapped_con.post_neuron);
+                        n.dendrite_hw->set_attribute(
+                            mapped_con.synapse_address,
+                            name_value_pair.first, name_value_pair.second);
+                    }
                 }
             }
         }
@@ -521,10 +528,10 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
 void sanafe::process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n)
 {
     Core &c = *(n.core);
-
     bool simulate_buffer = (c.pipeline_config.buffer_position ==
                                    BUFFER_BEFORE_DENDRITE_UNIT) ||
             (c.pipeline_config.buffer_position == BUFFER_BEFORE_SOMA_UNIT);
+
     PipelineResult input{};
     if (simulate_buffer)
     {
@@ -535,8 +542,8 @@ void sanafe::process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n)
     PipelineResult pipeline_output = execute_pipeline(
             n.neuron_processing_pipeline, ts, n, std::nullopt, input);
     n.core->next_message_generation_delay += pipeline_output.latency.value();
-
     pipeline_process_axon_out(ts, hw, n);
+
     return;
 }
 
@@ -634,7 +641,8 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
     }
     else if (implements_dendrite) // Dendrite is input interface
     {
-        output = update(n.mapped_address, input.current, con.value());
+        output = update(
+                n.mapped_address, input.current, con.value()->synapse_address);
         output = calculate_dendrite_default_energy_latency(n, output);
     }
     else if (implements_soma) // Soma is input interface
@@ -1398,6 +1406,10 @@ void sanafe::sim_output_run_summary(
     }
 }
 
+#ifndef GIT_COMMIT
+#define GIT_COMMIT "git-hash-unknown"
+#endif
+
 void sanafe::sim_format_run_summary(std::ostream &out, const RunData &run_data)
 {
     out << "build_git_version: '" << GIT_COMMIT << "'" << std::endl;
@@ -1469,6 +1481,51 @@ std::ofstream sanafe::sim_trace_open_message_trace(
     return message_file;
 }
 
+void sanafe::forced_updates(const Timestep &ts, SpikingChip &hw)
+{
+    // You can optionally force a neuron to update its associated h/w
+    //  every time-step, regardless of whether it received inputs or not.
+    // Note that energy is accounted for, but latency is not considered here.
+    auto cores = hw.cores();
+    for (size_t idx = 0; idx < cores.size(); idx++)
+    {
+        Core &core = cores[idx];
+        for (MappedNeuron &n : core.neurons)
+        {
+            if (n.force_synapse_update)
+            {
+                for (MappedConnection &con : n.connections_out)
+                {
+                    con.synapse_hw->set_time(ts.timestep);
+                    PipelineResult result = con.synapse_hw->update(con.synapse_address);
+                    if (result.energy.has_value())
+                    {
+                        con.synapse_hw->energy += result.energy.value();
+                    }
+                    // Latency is not considered; as it isn't within
+                    //  either neuron processing or message processing
+                }
+            }
+            if (n.force_dendrite_update)
+            {
+                n.dendrite_hw->set_time(ts.timestep);
+                sanafe::PipelineResult result = n.dendrite_hw->update(
+                        n.mapped_address, std::nullopt, std::nullopt);
+                if (result.energy.has_value())
+                {
+                    n.dendrite_hw->energy += result.energy.value();
+                }
+                // Latency is not considered; as it isn't within
+                //  either neuron processing or message processing
+            }
+            // Note that soma updates will always be handed in the neuron
+            //  processing loop and so don't need to be supported here
+        }
+    }
+
+    return;
+}
+
 void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw,
         const TimingModel timing_model)
 {
@@ -1481,6 +1538,7 @@ void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw,
 
     process_neurons(ts, hw);
     process_messages(ts, hw);
+    forced_updates(ts, hw);
 
     scheduler.noc_width = hw.noc_width;
     scheduler.noc_height = hw.noc_height;

@@ -184,11 +184,10 @@ void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
     min_synaptic_resolution = (1.0 / weight_bits);
 }
 
-
 // *** Dendrite models ***
 sanafe::PipelineResult sanafe::AccumulatorModel::update(
-        const size_t neuron_address, const std::optional<double> current,
-        MappedConnection *con)
+        size_t neuron_address, std::optional<double> current,
+        std::optional<size_t> synapse_address)
 {
     PipelineResult output;
 
@@ -218,8 +217,8 @@ void sanafe::AccumulatorModel::set_attribute(const size_t neuron_address,
 }
 
 sanafe::PipelineResult sanafe::MultiTapModel1D::update(
-        const size_t neuron_address, const std::optional<double> current,
-        MappedConnection *con)
+        size_t neuron_address, std::optional<double> current,
+        std::optional<size_t> synapse_address)
 {
     while (timesteps_simulated < simulation_time)
     {
@@ -265,18 +264,20 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(
 
     if (current.has_value())
     {
-        //const Synapse &syn = synapse_in.value();
-        const auto &tap_info = con->dendrite_params.find("tap");
         int tap = 0;
-        if (tap_info != con->dendrite_params.end())
+        if (synapse_address.has_value() &&
+                synapse_address.value() < synapse_to_tap.size())
         {
-            tap = static_cast<int>(tap_info->second);
+            tap = synapse_to_tap[synapse_address.value()];
         }
-        assert(tap >= 0);
-        assert((size_t) tap < tap_voltages.size());
+        if((tap < 0) || (static_cast<size_t>(tap) >= tap_voltages.size()))
+        {
+            std::string error("Error: tap should be >= 0 and less than taps.\n");
+            throw std::logic_error(error);
+        }
         tap_voltages[tap] += current.value();
-        TRACE2(MODELS, "Adding current:%lf to tap %d (con:%d addr:%zu)\n",
-                current.value(), tap, con->id, con->synapse_address);
+        TRACE2(MODELS, "Adding current:%lf to tap %d\n",
+                current.value(), tap);
     }
 
     TRACE1(MODELS, "Tap voltages after update for address:%zu\n",
@@ -293,7 +294,7 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(
     return output;
 }
 
-void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
+void sanafe::MultiTapModel1D::set_attribute(const size_t address,
         const std::string &param_name, const ModelParam &param)
 {
     if (param_name == "taps")
@@ -350,6 +351,15 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t neuron_address,
             next_voltages.resize(n_taps);
             time_constants.resize(n_taps);
         }
+    }
+    else if (param_name == "tap")
+    {
+        // Each connection/synapse will specify a destination tap
+        if (synapse_to_tap.size() <= address)
+        {
+            synapse_to_tap.resize(address + 1, 0);
+        }
+        synapse_to_tap[address] = static_cast<int>(param);
     }
     else
     {

@@ -80,7 +80,7 @@ public:
     AccumulatorModel &operator=(const AccumulatorModel &other) = default;
     AccumulatorModel &operator=(AccumulatorModel &&other) = default;
 
-    PipelineResult update(size_t neuron_address, std::optional<double> current, MappedConnection *con) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
     void reset() override { return; }
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
 
@@ -100,8 +100,8 @@ public:
     MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
-    PipelineResult update(size_t neuron_address, std::optional<double> current, MappedConnection *con) override;
-    void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
+    void set_attribute(size_t address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
 
 private:
@@ -110,6 +110,7 @@ private:
     std::vector<double> next_voltages{std::vector<double>(1, 0.0)};
     std::vector<double> space_constants{std::vector<double>(0)};
     std::vector<double> time_constants{std::vector<double>(1, 0.0)};
+    std::vector<int> synapse_to_tap{};
     long int timesteps_simulated{0L};
 };
 

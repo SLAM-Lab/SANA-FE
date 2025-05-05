@@ -306,10 +306,10 @@ public:
     // The user of this class must implement the interfaces they wish to support
     //  Depending on whether you want to support Synapse, Dendrite, Soma
     //  operations, or a combination of the three.
-    // If using synaptic inputs (address and read/update without read)
+    // If using synaptic inputs (address and read vs. synapse update without read)
     virtual PipelineResult update(size_t synapse_address, bool read = false) { throw std::logic_error("Error: Synapse input not implemented"); }
-    // If using dendritic inputs (address and synaptic information)
-    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, MappedConnection *con) { throw std::logic_error("Error: Dendrite input not implemented"); }
+    // If using dendritic inputs (neuron address, synaptic current and synaptic address for additional info)
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) { throw std::logic_error("Error: Dendrite input not implemented"); }
     // If using somatic inputs (address and current in)
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) { throw std::logic_error("Error: Soma input not implemented"); }
 
@@ -506,6 +506,8 @@ void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);
 
 void process_neurons(Timestep &ts, SpikingChip &hw);
 void process_messages(Timestep &ts, SpikingChip &hw);
+void forced_updates(const Timestep &ts, SpikingChip &hw);
+
 
 void process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n);
 void receive_message(SpikingChip &arch, Message &m);
