@@ -161,7 +161,6 @@ int main(int argc, char *argv[])
 //
 // ** New simulator features **
 // TODO: output detailed energy and latency breakdowns in the perf trace
-// TODO: implement pipeline h/w unit creation in pybind e.g., soma, dendrite
 // TODO: reimplement noise for Loihi soma model
 // TODO: support hyperedges in Python interface
 // TODO: support concise mappings in description format, including group mappings

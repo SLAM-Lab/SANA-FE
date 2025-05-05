@@ -1106,6 +1106,14 @@ void sanafe::PipelineUnit::configure(
                 static_cast<double>(model_parameters["latency_spike_out"]);
         default_soma_latency_metrics = latency_metrics;
     }
+
+    // Finally, forward all parameters from the architecture description to the
+    //  model. This might be useful if you want to define any additional
+    //  model-specific attributes here, e.g., fault-rate or maximum memory size.
+    for (auto &[key, param] : model_parameters)
+    {
+        set_attribute(key, param);
+    }
 }
 
 void sanafe::PipelineUnit::add_connection(MappedConnection &con)
@@ -1364,11 +1372,11 @@ sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
         , log_potential{neuron_to_map.log_potential}
 
 {
-    configure_models(neuron_to_map.model_parameters);
+    set_model_attributes(neuron_to_map.model_parameters);
     build_neuron_processing_pipeline();
 }
 
-void sanafe::MappedNeuron::configure_models(
+void sanafe::MappedNeuron::set_model_attributes(
         const std::map<std::string, sanafe::ModelParam> &model_parameters)
 {
     for (auto &[key, param] : model_parameters)

@@ -208,7 +208,7 @@ public:
     MappedNeuron& operator=(const MappedNeuron& other) = default;
     MappedNeuron(MappedNeuron&& other) = default;
     MappedNeuron& operator=(MappedNeuron&& other) = default;
-    void configure_models(const std::map<std::string, ModelParam> &model_parameters);
+    void set_model_attributes(const std::map<std::string, ModelParam> &model_parameters);
 
 private:
     void build_neuron_processing_pipeline();
@@ -300,6 +300,7 @@ public:
     PipelineUnit &operator=(PipelineUnit &&other) = default;
 
     // Virtual member functions
+    virtual void set_attribute(const std::string &param_name, const ModelParam &param) = 0;
     virtual void set_attribute(size_t address, const std::string &param_name, const ModelParam &param) = 0;
     virtual void reset() = 0;
 

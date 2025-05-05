@@ -24,10 +24,6 @@
 #include "print.hpp"
 #include "chip.hpp"
 
-// TODO: create an option where we can directly construct the mapped network on
-//  the hardware, without creating an intermediate abstract spiking network
-//  This will save time and memory for the larger applications.
-
 sanafe::DescriptionParsingError::DescriptionParsingError(
         const std::string &error, const ryml::Parser &parser,
         const ryml::ConstNodeRef &node)

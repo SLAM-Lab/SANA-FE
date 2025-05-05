@@ -170,7 +170,7 @@ if __name__ == "__main__":
             dvs_inputs = inputs[frame, :]
             mapped_inputs = chip.mapped_neuron_groups["0"]
             for id, mapped_neuron in enumerate(mapped_inputs):
-                mapped_neuron.configure_models(
+                mapped_neuron.set_model_attributes(
                     model_parameters={"bias": dvs_inputs[id]})
             chip.sim(timesteps)
             chip.reset()

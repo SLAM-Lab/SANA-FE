@@ -37,6 +37,7 @@ public:
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
 
     PipelineResult update(size_t synapse_address, bool read) override;
+    void set_attribute(const std::string &param_name, const ModelParam &param) override {};
     void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
 
@@ -57,6 +58,7 @@ public:
     LoihiSynapseModel &operator=(LoihiSynapseModel &&other) = default;
 
     PipelineResult update(size_t synapse_address, bool read) override;
+    void set_attribute(const std::string &param_name, const ModelParam &param) override {};
     void set_attribute(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
 
@@ -82,6 +84,7 @@ public:
 
     PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
     void reset() override { return; }
+    void set_attribute(const std::string &param_name, const ModelParam &param) override {};
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
 
 private:
@@ -101,6 +104,7 @@ public:
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
 
     PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
+    void set_attribute(const std::string &param_name, const ModelParam &param) override {};
     void set_attribute(size_t address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
 
@@ -124,6 +128,7 @@ public:
     LoihiLifModel &operator=(const LoihiLifModel &other) = delete;
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
+    void set_attribute(const std::string &param_name, const ModelParam &param) override {};
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     PipelineResult update(size_t neuron_address, std::optional<double> current_in) override;
     void reset() override;
@@ -165,6 +170,7 @@ public:
     TrueNorthModel &operator=(const TrueNorthModel &other) = delete;
     TrueNorthModel &operator=(TrueNorthModel &&other) = delete;
 
+    void set_attribute(const std::string &param_name, const ModelParam &param) override {};
     void set_attribute(const size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     PipelineResult update(const size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
     void reset() override;
@@ -204,6 +210,7 @@ public:
     InputModel &operator=(const InputModel &other) = delete;
     InputModel &operator=(InputModel &&other) = delete;
 
+    void set_attribute(const std::string &param_name, const ModelParam &param) override {};
     void set_attribute(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     PipelineResult update(size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
     void reset() override { send_spike = false; return; }

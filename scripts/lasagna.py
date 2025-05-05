@@ -210,13 +210,13 @@ for input in range(num_inputs):
     if dataset == "mnist":
         mnist_input = inputs[input, :]
         for id, mapped_neuron in enumerate(mapped_inputs):
-            mapped_neuron.configure_models(
+            mapped_neuron.set_model_attributes(
                 model_parameters={"poisson": mnist_input[id]})
     elif dataset == "shd":
         spiking_digit_input = inputs[input].squeeze()
         for id, mapped_neuron in enumerate(mapped_inputs):
             spiketrain = list(spiking_digit_input[:, id])
-            mapped_neuron.configure_models(
+            mapped_neuron.set_model_attributes(
                 model_parameters={"spikes": spiketrain})
         timesteps = len(spiketrain)
     else:

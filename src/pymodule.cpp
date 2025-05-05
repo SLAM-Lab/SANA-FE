@@ -305,7 +305,7 @@ void pyconfigure(sanafe::Neuron *self,
     return;
 }
 
-void pyconfigure_models(sanafe::MappedNeuron *self,
+void pyset_model_attributes(sanafe::MappedNeuron *self,
         pybind11::dict model_parameters,
         pybind11::dict dendrite_specific_parameters,
         pybind11::dict soma_specific_parameters)
@@ -329,7 +329,7 @@ void pyconfigure_models(sanafe::MappedNeuron *self,
                 TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
         }
     }
-    self->configure_models(converted_parameters);
+    self->set_model_attributes(converted_parameters);
 
     return;
 }
@@ -584,7 +584,7 @@ PYBIND11_MODULE(sanafecpp, m)
             })
             .def("reset", &sanafe::SpikingChip::reset);
     pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
-            .def("configure_models", &pyconfigure_models,
+            .def("set_model_attributes", &pyset_model_attributes,
                     pybind11::arg("model_parameters") = pybind11::dict(),
                     pybind11::arg("soma_parameters") = pybind11::dict(),
                     pybind11::arg("dendrite_parameters") = pybind11::dict());
