@@ -204,7 +204,7 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
 
     // Map to synapse hardware unit
     Core &post_core = *(post_neuron.core);
-    //mapped_con.synapse_hw = post_core.pipeline_hw[0].get();
+    mapped_con.synapse_hw = post_core.pipeline_hw[0].get();
 
     bool choose_first_by_default = (con.synapse_hw_name.length() == 0);
     bool synapse_found = false;
@@ -227,6 +227,7 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
                 "Error: Could not map connection to synapse h/w");
     }
 
+    mapped_con.build_message_processing_pipeline();
     return mapped_con;
 }
 
@@ -477,56 +478,49 @@ void sanafe::receive_message(SpikingChip &hw, Message &m)
     core.messages_in.push_back(&m);
 }
 
-std::vector<sanafe::PipelineUnit *> sanafe::get_neuron_processing_pipeline(
-        MappedNeuron &n)
+void sanafe::MappedNeuron::build_neuron_processing_pipeline()
 {
-    std::vector<PipelineUnit *> pipeline{};
-    Core &mapped_core = *(n.core);
-
-    if (mapped_core.pipeline_config.buffer_position <=
+    if (core->pipeline_config.buffer_position <=
             BUFFER_INSIDE_DENDRITE_UNIT )
     {
-        pipeline.push_back(n.dendrite_hw);
+        neuron_processing_pipeline.push_back(dendrite_hw);
     }
-    if ((mapped_core.pipeline_config.buffer_position <=
+    if ((core->pipeline_config.buffer_position <=
                 BUFFER_INSIDE_SOMA_UNIT) &&
-            (n.soma_hw != n.dendrite_hw))
+            (soma_hw != dendrite_hw))
     {
-        pipeline.push_back(n.soma_hw);
+        neuron_processing_pipeline.push_back(soma_hw);
     }
-    return pipeline;
 }
 
-std::vector<sanafe::PipelineUnit *> sanafe::get_message_processing_pipeline(
-        MappedNeuron &n, MappedConnection &con)
+void sanafe::MappedConnection::build_message_processing_pipeline()
 {
-    std::vector<PipelineUnit *> pipeline{};
+    MappedNeuron &n = *post_neuron;
     Core &mapped_core = *(n.core);
 
     // We don't support putting the buffer inside or before the synapse unit, so
     //  unconditionally push the synapse h/w. This is because putting the buffer
     //  here could cause a spike sent that shouldn't be
-    pipeline.push_back(con.synapse_hw);
+    message_processing_pipeline.push_back(synapse_hw);
     if ((mapped_core.pipeline_config.buffer_position >
                     BUFFER_BEFORE_DENDRITE_UNIT) &&
-            (n.dendrite_hw != con.synapse_hw))
+            (n.dendrite_hw != synapse_hw))
     {
-        pipeline.push_back(n.dendrite_hw);
+        message_processing_pipeline.push_back(n.dendrite_hw);
     }
     if ((mapped_core.pipeline_config.buffer_position >
                 BUFFER_BEFORE_SOMA_UNIT) &&
             (n.soma_hw != n.dendrite_hw))
     {
-        pipeline.push_back(n.soma_hw);
+        message_processing_pipeline.push_back(n.soma_hw);
     }
 
-    return pipeline;
+    return;
 }
 
 void sanafe::process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n)
 {
     Core &c = *(n.core);
-    auto pipeline = get_neuron_processing_pipeline(n);
 
     bool simulate_buffer = (c.pipeline_config.buffer_position ==
                                    BUFFER_BEFORE_DENDRITE_UNIT) ||
@@ -538,8 +532,8 @@ void sanafe::process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n)
         input = c.timestep_buffer[n.mapped_address];
         c.timestep_buffer[n.mapped_address] = PipelineResult{};
     }
-    PipelineResult pipeline_output =
-            execute_pipeline(pipeline, ts, n, std::nullopt, input);
+    PipelineResult pipeline_output = execute_pipeline(
+            n.neuron_processing_pipeline, ts, n, std::nullopt, input);
     n.core->next_message_generation_delay += pipeline_output.latency.value();
 
     pipeline_process_axon_out(ts, hw, n);
@@ -585,9 +579,8 @@ double sanafe::process_message(Timestep &ts, Core &core, Message &m)
         //  outputs/inputs until we hit the time-step buffer, where outputs
         //  are stored as inputs ready for the next time-step
         MappedNeuron &n = *(con.post_neuron);
-        auto pipeline = get_message_processing_pipeline(n, con);
-        PipelineResult pipeline_output =
-                execute_pipeline(pipeline, ts, n, &con, empty_input);
+        PipelineResult pipeline_output = execute_pipeline(
+                con.message_processing_pipeline, ts, n, &con, empty_input);
         core.timestep_buffer[n.mapped_address] = pipeline_output;
         m.receive_delay += pipeline_output.latency.value();
     }
@@ -1364,6 +1357,7 @@ sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
 
 {
     configure_models(neuron_to_map.model_parameters);
+    build_neuron_processing_pipeline();
 }
 
 void sanafe::MappedNeuron::configure_models(

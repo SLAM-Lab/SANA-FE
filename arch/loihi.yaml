@@ -80,11 +80,11 @@ architecture:
                 latency_process_spike: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
-                model: loihi
-                #model: current_based
+                #model: loihi
+                model: current_based
                 energy_process_spike: 24.0e-12
                 # Originally calibrated value
-                #latency_process_spike: 3.1e-9
+                latency_process_spike: 3.1e-9
                 # Experimentally chosen value, which seems more accurate with
                 #  current network model. These aren't taken from calibration
                 #  so don't really mean anything

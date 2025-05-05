@@ -155,20 +155,24 @@ struct Timestep
     Timestep(long int ts, int core_count);
 };
 
-struct MappedConnection
+class MappedConnection
 {
+public:
     std::map<std::string, ModelParam> dendrite_params{};
     MappedNeuron *post_neuron{nullptr};
     MappedNeuron *pre_neuron{nullptr};
     PipelineUnit *synapse_hw{nullptr};
+    std::vector<PipelineUnit *> message_processing_pipeline{};
     size_t synapse_address{0UL};
     int id;
 
     explicit MappedConnection(int connection_id);
+    void build_message_processing_pipeline();
 };
 
-struct MappedNeuron
+class MappedNeuron
 {
+public:
     std::vector<MappedConnection> connections_out;
     std::vector<int> axon_out_addresses;
     std::string parent_group_name;
@@ -180,6 +184,7 @@ struct MappedNeuron
     PipelineUnit *dendrite_hw{nullptr};
     PipelineUnit *soma_hw{nullptr};
     AxonOutUnit *axon_out_hw{nullptr};
+    std::vector<PipelineUnit *> neuron_processing_pipeline{};
 
     size_t mapped_address{-1ULL};
     size_t mapping_order;
@@ -198,8 +203,15 @@ struct MappedNeuron
     // Track spikes
     bool axon_out_input_spike{false};
 
-    void configure_models(const std::map<std::string, ModelParam> &model_parameters);
     MappedNeuron(const Neuron &neuron_to_map, Core *mapped_core, const size_t address, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
+    MappedNeuron(const MappedNeuron &copy) = default;
+    MappedNeuron& operator=(const MappedNeuron& other) = default;
+    MappedNeuron(MappedNeuron&& other) = default;
+    MappedNeuron& operator=(MappedNeuron&& other) = default;
+    void configure_models(const std::map<std::string, ModelParam> &model_parameters);
+
+private:
+    void build_neuron_processing_pipeline();
 };
 
 struct Synapse
@@ -498,10 +510,7 @@ void process_messages(Timestep &ts, SpikingChip &hw);
 void process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n);
 void receive_message(SpikingChip &arch, Message &m);
 double process_message(Timestep &ts, Core &c, Message &m);
-
 PipelineResult execute_pipeline(const std::vector<PipelineUnit *> pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
-std::vector<PipelineUnit *> get_neuron_processing_pipeline(MappedNeuron &n);
-std::vector<PipelineUnit *> get_message_processing_pipeline(MappedNeuron &n, MappedConnection &con);
 
 double pipeline_process_axon_in(Core &core, const Message &m);
 PipelineResult pipeline_process_axon_out(Timestep &ts, const SpikingChip &arch, MappedNeuron &n);
