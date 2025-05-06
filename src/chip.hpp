@@ -532,7 +532,7 @@ void forced_updates(const Timestep &ts, SpikingChip &hw);
 void process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n);
 void receive_message(SpikingChip &arch, Message &m);
 double process_message(Timestep &ts, Core &c, Message &m);
-PipelineResult execute_pipeline(const std::vector<PipelineUnit *> pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
 double pipeline_process_axon_in(Core &core, const Message &m);
 PipelineResult pipeline_process_axon_out(Timestep &ts, const SpikingChip &arch, MappedNeuron &n);

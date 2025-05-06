@@ -410,7 +410,9 @@ void sanafe::process_neurons(Timestep &ts, SpikingChip &hw)
     auto cores = hw.cores();
 
     // Older versions of OpenMP don't support range-based for loops yet...
+#ifdef ENABLE_OPENMP
 #pragma omp parallel for schedule(dynamic)
+#endif
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
@@ -455,7 +457,9 @@ void sanafe::process_messages(Timestep &ts, SpikingChip &hw)
     // Now process all messages at receiving cores
     auto cores = hw.cores();
     // Older versions of OpenMP don't support range-based for loops yet...
+#ifdef ENABLE_OPENMP
 #pragma omp parallel for schedule(dynamic)
+#endif
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < cores.size(); idx++)
     {
@@ -596,7 +600,7 @@ double sanafe::process_message(Timestep &ts, Core &core, Message &m)
 }
 
 sanafe::PipelineResult sanafe::execute_pipeline(
-        const std::vector<PipelineUnit *> pipeline, Timestep &ts,
+        const std::vector<PipelineUnit *> &pipeline, Timestep &ts,
         MappedNeuron &n, std::optional<MappedConnection *> con,
         const PipelineResult &input)
 {
@@ -632,7 +636,9 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
     {
         if (!con.has_value())
         {
-            throw std::invalid_argument("No connection given.\n");
+            throw std::logic_error("Error: Pipeline error, didn't receive "
+                "synaptic connection info. Check that no h/w unit is being "
+                "invoked before this one in the pipeline.");
         }
         output = update(con.value()->synapse_address, true);
         output = calculate_synapse_default_energy_latency(
@@ -641,8 +647,13 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
     }
     else if (implements_dendrite) // Dendrite is input interface
     {
+        std::optional<size_t> synapse_address{std::nullopt};
+        if (con.has_value() && (con.value() != nullptr))
+        {
+            synapse_address = con.value()->synapse_address;
+        }
         output = update(
-                n.mapped_address, input.current, con.value()->synapse_address);
+                n.mapped_address, input.current, synapse_address);
         output = calculate_dendrite_default_energy_latency(n, output);
     }
     else if (implements_soma) // Soma is input interface

@@ -164,6 +164,18 @@ void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
         {
             hw_exists = true;
             hw.implements_synapse = true;
+            // Merge the parameters from all sections with the same name
+            //  and warn if the library is overwritten
+            hw.model_info.model_parameters.merge(model.model_parameters);
+            if (model.plugin_library_path.has_value())
+            {
+                if (hw.model_info.plugin_library_path.has_value() &&
+                        hw.model_info.plugin_library_path !=
+                                model.plugin_library_path)
+                    INFO("Warning: overwriting plugin path:%s\n",
+                            model.plugin_library_path.value().c_str());
+                hw.model_info.plugin_library_path = model.plugin_library_path;
+            }
             break;
         }
     }
@@ -224,6 +236,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
             {
                 std::string plugin_path;
                 plugin_path_node >> plugin_path;
+                INFO("Dendrite plugin path found: %s\n", plugin_path.c_str());
                 model_details.plugin_library_path = plugin_path;
             }
             else
@@ -243,7 +256,21 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
             {
                 hw_exists = true;
                 hw.implements_dendrite = true;
-                break;
+                // Merge the parameters from all sections with the same name
+                //  and warn if the library is overwritten
+                hw.model_info.model_parameters.merge(
+                        model_details.model_parameters);
+                if (model_details.plugin_library_path.has_value())
+                {
+                    if (hw.model_info.plugin_library_path.has_value() &&
+                            hw.model_info.plugin_library_path !=
+                                    model_details.plugin_library_path)
+                        INFO("Warning: overwriting plugin path:%s\n",
+                                model_details.plugin_library_path.value()
+                                        .c_str());
+                    hw.model_info.plugin_library_path =
+                            model_details.plugin_library_path;
+                }
             }
         }
         if (!hw_exists)
@@ -296,6 +323,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
             {
                 std::string plugin_path;
                 plugin_path_node >> plugin_path;
+                INFO("Soma plugin path found: %s\n", plugin_path.c_str());
                 model_details.plugin_library_path = plugin_path;
             }
             else
@@ -306,21 +334,6 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
             }
         }
 
-        if (!attributes.find_child("noise").invalid())
-        {
-            // TODO: support optional noise arg again alongside the plugin mechanism
-            /*
-            s.noise_type = NOISE_FILE_STREAM;
-            s.noise_stream = fopen(value_str.c_str(), "r");
-            TRACE1(DESCRIPTION, "Opening noise str: %s\n", value_str.c_str());
-            if (s.noise_stream == NULL)
-            {
-                INFO("Error: Failed to open noise stream: %s.\n",
-                    value_str.c_str());
-                exit(1);
-            }
-            */
-        }
         bool hw_exists = false;
         for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
         {
@@ -328,6 +341,21 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
             {
                 hw_exists = true;
                 hw.implements_soma = true;
+                // Merge the parameters from all sections with the same name
+                //  and warn if the library is overwritten
+                hw.model_info.model_parameters.merge(
+                    model_details.model_parameters);
+                if (model_details.plugin_library_path.has_value())
+                {
+                    if (hw.model_info.plugin_library_path.has_value() &&
+                            hw.model_info.plugin_library_path !=
+                                    model_details.plugin_library_path)
+                        INFO("Warning: overwriting plugin path:%s\n",
+                                model_details.plugin_library_path.value()
+                                        .c_str());
+                    hw.model_info.plugin_library_path =
+                            model_details.plugin_library_path;
+                }
                 break;
             }
         }
@@ -2164,3 +2192,20 @@ size_t sanafe::field_to_int(const std::string_view &field)
 
     return val;
 }
+
+/*
+
+       if (!attributes.find_child("noise").invalid())
+        {
+            // TODO: support optional noise arg again alongside the plugin mechanism
+            s.noise_type = NOISE_FILE_STREAM;
+            s.noise_stream = fopen(value_str.c_str(), "r");
+            TRACE1(DESCRIPTION, "Opening noise str: %s\n", value_str.c_str());
+            if (s.noise_stream == NULL)
+            {
+                INFO("Error: Failed to open noise stream: %s.\n",
+                    value_str.c_str());
+                exit(1);
+            }
+        }
+*/
