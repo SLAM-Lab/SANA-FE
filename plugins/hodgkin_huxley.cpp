@@ -3,8 +3,10 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // hodgkin_huxley.cpp
+//
 // Plugin implementation of the Hodgkin-Huxley neuron model. Implemented by
 //  Robin Sam.
+//
 // Model inspired by this paper: https://ieeexplore.ieee.org/document/9235538
 //  and this textbook: https://mrgreene09.github.io/computational-neuroscience-textbook
 #include <cmath>
@@ -94,6 +96,12 @@ public:
         return;
     }
 
+    void set_attribute(const std::string &param_name,
+            const sanafe::ModelParam &param)
+    {
+        return;
+    };
+
     void set_attribute(const size_t neuron_address,
             const std::string &param_name,
             const sanafe::ModelParam &param) override
@@ -116,7 +124,7 @@ public:
         }
     }
 
-    sanafe::SomaUnit::SomaResult update(const size_t neuron_address,
+    sanafe::PipelineResult update(const size_t neuron_address,
             const std::optional<double> current_in) override
     {
         sanafe::NeuronStatus status = sanafe::IDLE;
@@ -168,7 +176,7 @@ public:
 
         INFO("Updating potential, after:%f\n", V);
 
-        return {status, std::nullopt, std::nullopt};
+        return {std::nullopt, status, std::nullopt, std::nullopt};
     }
 };
 
