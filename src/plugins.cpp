@@ -24,7 +24,7 @@ void sanafe::plugin_init_hw(
     const std::string create = "create_" + model_name;
 
     // Load the soma library
-    INFO("Loading synapse plugin:%s\n", plugin_path.c_str());
+    INFO("Loading plugin:%s\n", plugin_path.c_str());
     void *hw = dlopen(plugin_path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
     if (hw == nullptr)
     {
@@ -58,7 +58,7 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::plugin_get_hw(
         throw std::runtime_error("No plugin path given.");
     }
 
-    TRACE1(PLUGINS, "Getting synapse:%s\n", model_name.c_str());
+    TRACE1(PLUGINS, "Getting model:%s\n", model_name.c_str());
     if (plugin_create_hw.count(model_name) == 0)
     {
         plugin_init_hw(model_name, plugin_path);
