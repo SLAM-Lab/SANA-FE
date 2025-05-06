@@ -32,7 +32,7 @@ sanafe::PipelineResult sanafe::CurrentBasedSynapseModel::update(
     return output;
 }
 
-void sanafe::CurrentBasedSynapseModel::set_attribute(
+void sanafe::CurrentBasedSynapseModel::set_attribute_edge(
         const size_t synapse_address, const std::string &param_name,
         const ModelParam &param)
 {
@@ -145,8 +145,9 @@ void sanafe::LoihiSynapseModel::reset()
     return;
 }
 
-void sanafe::LoihiSynapseModel::set_attribute(const size_t synapse_address,
-    const std::string &param_name, const ModelParam &param)
+void sanafe::LoihiSynapseModel::set_attribute_edge(
+        const size_t synapse_address, const std::string &param_name,
+        const ModelParam &param)
 {
     if (weights.size() <= synapse_address)
     {
@@ -207,7 +208,7 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(
     return output;
 }
 
-void sanafe::AccumulatorModel::set_attribute(const size_t neuron_address,
+void sanafe::AccumulatorModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
     if (param_name == "dendrite_leak_decay")
@@ -294,7 +295,7 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(
     return output;
 }
 
-void sanafe::MultiTapModel1D::set_attribute(const size_t address,
+void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t address,
         const std::string &param_name, const ModelParam &param)
 {
     if (param_name == "taps")
@@ -352,7 +353,16 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t address,
             time_constants.resize(n_taps);
         }
     }
-    else if (param_name == "tap")
+    else
+    {
+        INFO("Warning: attribute '%s' not recognized.\n", param_name.c_str());
+    }
+}
+
+void sanafe::MultiTapModel1D::set_attribute_edge(const size_t address,
+    const std::string &param_name, const ModelParam &param)
+{
+    if (param_name == "tap")
     {
         // Each connection/synapse will specify a destination tap
         if (synapse_to_tap.size() <= address)
@@ -360,10 +370,6 @@ void sanafe::MultiTapModel1D::set_attribute(const size_t address,
             synapse_to_tap.resize(address + 1, 0);
         }
         synapse_to_tap[address] = static_cast<int>(param);
-    }
-    else
-    {
-        INFO("Warning: attribute '%s' not recognized.\n", param_name.c_str());
     }
 }
 
@@ -380,7 +386,7 @@ void sanafe::MultiTapModel1D::reset()
 }
 
 // **** Soma hardware unit models ****
-void sanafe::LoihiLifModel::set_attribute(const size_t neuron_address,
+void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
     LoihiCompartment &cx = compartments[neuron_address];
@@ -551,7 +557,7 @@ void sanafe::LoihiLifModel::reset()
     return;
 }
 
-void sanafe::TrueNorthModel::set_attribute(const size_t neuron_address,
+void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
     TrueNorthNeuron &n = neurons[neuron_address];
@@ -692,7 +698,7 @@ sanafe::PipelineResult sanafe::TrueNorthModel::update(
     return output;
 }
 
-void sanafe::InputModel::set_attribute(const size_t neuron_address,
+void sanafe::InputModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
     TRACE1(MODELS, "Setting attribute:%s\n", param_name.c_str());

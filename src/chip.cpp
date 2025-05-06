@@ -172,14 +172,14 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                 {
                     if (name_value_pair.second.forward_to_synapse)
                     {
-                        mapped_con.synapse_hw->set_attribute(
+                        mapped_con.synapse_hw->set_attribute_edge(
                                 mapped_con.synapse_address,
                                 name_value_pair.first, name_value_pair.second);
                     }
                     if (name_value_pair.second.forward_to_dendrite)
                     {
                         MappedNeuron &n = *(mapped_con.post_neuron);
-                        n.dendrite_hw->set_attribute(
+                        n.dendrite_hw->set_attribute_edge(
                             mapped_con.synapse_address,
                             name_value_pair.first, name_value_pair.second);
                     }
@@ -1135,7 +1135,7 @@ void sanafe::PipelineUnit::configure(
     //  model-specific attributes here, e.g., fault-rate or maximum memory size.
     for (auto &[key, param] : model_parameters)
     {
-        set_attribute(key, param);
+        set_attribute_hw(key, param);
     }
 }
 
@@ -1408,11 +1408,11 @@ void sanafe::MappedNeuron::set_model_attributes(
                 key.c_str(), param.forward_to_dendrite, param.forward_to_soma);
         if (param.forward_to_dendrite && (dendrite_hw != nullptr))
         {
-            dendrite_hw->set_attribute(mapped_address, key, param);
+            dendrite_hw->set_attribute_neuron(mapped_address, key, param);
         }
         if (param.forward_to_soma && (soma_hw != nullptr))
         {
-            soma_hw->set_attribute(mapped_address, key, param);
+            soma_hw->set_attribute_neuron(mapped_address, key, param);
         }
     }
 }

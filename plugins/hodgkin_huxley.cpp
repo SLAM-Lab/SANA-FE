@@ -96,13 +96,13 @@ public:
         return;
     }
 
-    void set_attribute(const std::string &param_name,
+    void set_attribute_hw(const std::string &param_name,
             const sanafe::ModelParam &param)
     {
         return;
     };
 
-    void set_attribute(const size_t neuron_address,
+    void set_attribute_neuron(const size_t neuron_address,
             const std::string &param_name,
             const sanafe::ModelParam &param) override
     {
