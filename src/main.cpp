@@ -161,9 +161,9 @@ int main(int argc, char *argv[])
 //
 // ** New simulator features **
 // TODO: output detailed energy and latency breakdowns in the perf trace
-// TODO: reimplement noise for Loihi soma model
+// TODO: reimplement noise for Loihi soma model and update latin squares
 // TODO: support hyperedges in Python interface
-// TODO: support concise mappings in description format, including group mappings
+// TODO: support group mappings in description format
 
 // ** Refactor and optimizing existing features **
 // TODO: Parse model parameters after mapping, in two-pass approach
@@ -171,4 +171,3 @@ int main(int argc, char *argv[])
 //
 // ** Misc **
 // TODO: update tutorials to use Jupyter notebook
-// TODO: update Latin Squares and randomized experiments for SANA-FEv2

@@ -316,19 +316,11 @@ public:
 
     // Optional virtual functions
     virtual double get_potential(size_t neuron_address) { return 0.0; }
-    // TODO: is this the most user-friendly way of getting spiking behavior from a model, we have this info..
-    virtual NeuronStatus get_status(size_t neuron_address) { return INVALID_NEURON_STATE; }
 
     // Normal member functions
     void set_time(const long int timestep) { simulation_time = timestep; }
     void add_connection(MappedConnection &con);
     void configure(std::string unit_name, const ModelInfo &model);
-    //PipelineResult process_inputs(const Timestep &ts, MappedConnection &con);
-    //PipelineResult process_inputs(const Timestep &ts, MappedNeuron &n);
-
-    //PipelineResult process_input(const Timestep &ts, MappedConnection &con);
-    //PipelineResult process_input(const Timestep &ts, MappedNeuron &n, const std::optional<Synapse> input);
-    //PipelineResult process_input(const Timestep &ts, MappedNeuron &n, const double input);
     PipelineResult process_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
     // Model information
@@ -371,6 +363,33 @@ private:
     void update_soma_activity(MappedNeuron &n, const PipelineResult &simulation_result);
 
     void check_outputs(const MappedNeuron &n, const PipelineResult &result);
+};
+
+// Specific unit base classes, for the normal use case where the model
+//  implements only synaptic, dendritic or somatic functionality (and not a)
+//  combination
+class SynapseUnit : public PipelineUnit
+{
+public:
+    virtual PipelineResult update(size_t synapse_address, bool read = false) = 0;
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override final { throw std::logic_error("Error: Synapse H/W called with dendrite inputs"); }
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) override final { throw std::logic_error("Error: Synapse H/W called with soma inputs"); }
+};
+
+class DendriteUnit : public PipelineUnit
+{
+public:
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override = 0;
+    virtual PipelineResult update(size_t synapse_address, bool read = false) override final { throw std::logic_error("Error: Dendrite H/W called with synapse inputs"); }
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) override final { throw std::logic_error("Error: Dendrite H/W called with soma inputs"); }
+};
+
+class SomaUnit : public PipelineUnit
+{
+public:
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) = 0;
+    virtual PipelineResult update(size_t synapse_address, bool read = false) override final { throw std::logic_error("Error: Soma H/W called with synapse inputs"); }
+    virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override final { throw std::logic_error("Error: Soma H/W called with dendrite inputs"); }
 };
 
 class AxonOutUnit

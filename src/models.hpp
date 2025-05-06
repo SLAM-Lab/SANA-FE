@@ -26,7 +26,7 @@ enum NeuronStatus : int;
 constexpr int default_weight_bits = 8; // Based on real-world H/W e.g., Loihi
 constexpr int loihi_max_compartments{1024};
 
-class CurrentBasedSynapseModel : public PipelineUnit
+class CurrentBasedSynapseModel : public SynapseUnit
 {
 public:
     CurrentBasedSynapseModel() = default;
@@ -47,7 +47,7 @@ private:
     int weight_bits{default_weight_bits};
 };
 
-class LoihiSynapseModel : public PipelineUnit
+class LoihiSynapseModel : public SynapseUnit
 {
 public:
     LoihiSynapseModel() = default;
@@ -72,7 +72,7 @@ private:
     bool mixed_sign_mode{true};
 };
 
-class AccumulatorModel : public PipelineUnit
+class AccumulatorModel : public DendriteUnit
 {
 public:
     AccumulatorModel() = default;
@@ -93,7 +93,7 @@ private:
     double leak_decay{0.0};
 };
 
-class MultiTapModel1D : public PipelineUnit
+class MultiTapModel1D : public DendriteUnit
 {
 public:
     MultiTapModel1D() = default;
@@ -118,7 +118,7 @@ private:
     long int timesteps_simulated{0L};
 };
 
-class LoihiLifModel : public PipelineUnit
+class LoihiLifModel : public SomaUnit
 {
 public:
     LoihiLifModel() = default;
@@ -160,7 +160,7 @@ private:
 };
 
 constexpr int truenorth_max_neurons{4096};
-class TrueNorthModel : public PipelineUnit
+class TrueNorthModel : public SomaUnit
 {
 public:
     TrueNorthModel() = default;
@@ -200,7 +200,7 @@ private:
     std::vector<TrueNorthNeuron> neurons{truenorth_max_neurons};
 };
 
-class InputModel : public PipelineUnit
+class InputModel : public SomaUnit
 {
 public:
     InputModel() = default;
