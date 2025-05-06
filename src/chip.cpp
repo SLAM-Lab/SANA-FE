@@ -558,13 +558,13 @@ void sanafe::PipelineUnit::check_outputs(const MappedNeuron &n,
     //  process
     if (implements_soma && result.status == INVALID_NEURON_STATE)
     {
-        throw std::logic_error("Soma supported; should return valid "
+        throw std::logic_error("Soma output; should return valid "
                 "neuron state.\n");
     }
-    else if ((implements_synapse || implements_dendrite) &&
+    else if (!implements_soma && (implements_synapse || implements_dendrite) &&
             !result.current.has_value())
     {
-        throw std::logic_error("Synapse or dendrite implemented; should return "
+        throw std::logic_error("Synaptic or dendritic output; should return "
                                 "synaptic/dendritic current\n");
     }
 
@@ -641,8 +641,6 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
                 "invoked before this one in the pipeline.");
         }
         output = update(con.value()->synapse_address, true);
-        output = calculate_synapse_default_energy_latency(
-                *(con.value()), output);
         ++spikes_processed;
     }
     else if (implements_dendrite) // Dendrite is input interface
@@ -654,15 +652,29 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
         }
         output = update(
                 n.mapped_address, input.current, synapse_address);
-        output = calculate_dendrite_default_energy_latency(n, output);
     }
     else if (implements_soma) // Soma is input interface
     {
         output = update(n.mapped_address, input.current);
+    }
+
+    if (implements_soma) // Soma is output interface
+    {
         output = calculate_soma_default_energy_latency(n, output);
         update_soma_activity(n, output);
     }
+    else if (implements_dendrite) // Dendrite is output interface
+    {
+        output = calculate_dendrite_default_energy_latency(n, output);
+
+    }
+    else if (implements_synapse) // Synapse is output interface
+    {
+        output = calculate_synapse_default_energy_latency(
+            *(con.value()), output);
+    }
     check_outputs(n, output);
+
     energy += output.energy.value();
 
     return output;
