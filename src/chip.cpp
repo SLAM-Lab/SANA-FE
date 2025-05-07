@@ -558,13 +558,13 @@ void sanafe::PipelineUnit::check_outputs(const MappedNeuron &n,
     //  process
     if (implements_soma && result.status == INVALID_NEURON_STATE)
     {
-        throw std::logic_error("Soma output; should return valid "
+        throw std::runtime_error("Soma output; should return valid "
                 "neuron state.\n");
     }
     else if (!implements_soma && (implements_synapse || implements_dendrite) &&
             !result.current.has_value())
     {
-        throw std::logic_error("Synaptic or dendritic output; should return "
+        throw std::runtime_error("Synaptic or dendritic output; should return "
                                 "synaptic/dendritic current\n");
     }
 
@@ -666,7 +666,6 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
     else if (implements_dendrite) // Dendrite is output interface
     {
         output = calculate_dendrite_default_energy_latency(n, output);
-
     }
     else if (implements_synapse) // Synapse is output interface
     {

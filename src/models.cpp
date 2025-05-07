@@ -735,9 +735,13 @@ sanafe::PipelineResult sanafe::InputModel::update(
         const size_t neuron_address, std::optional<double> current_in)
 {
     // This models a dummy input node
-    if (current_in.has_value())
+    if (current_in.has_value() && (current_in.value() != 0.0))
     {
-        throw std::runtime_error("Error: Sending current to input node.\n");
+        std::string error = "Error: Current sent to input neuron which cannot "
+                            "be processed (" +
+                std::to_string(current_in.value()) + ")";
+        INFO("%s\n", error.c_str());
+        throw std::runtime_error(error);
     }
 
     bool send_spike = false;
