@@ -130,7 +130,7 @@ public:
     LoihiLifModel &operator=(const LoihiLifModel &other) = delete;
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;
 
-    void set_attribute_hw(const std::string &param_name, const ModelParam &param) override {};
+    void set_attribute_hw(const std::string &param_name, const ModelParam &param) override;
     void set_attribute_neuron(size_t neuron_address, const std::string &param_name, const ModelParam &param) override;
     PipelineResult update(size_t neuron_address, std::optional<double> current_in) override;
     void reset() override;
@@ -157,8 +157,18 @@ public:
         double reverse_reset{0.0};
     };
 
+    enum NoiseType
+    {
+        NOISE_NONE,
+        NOISE_FILE_STREAM,
+    };
+
 private:
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
+    NoiseType noise_type{NOISE_NONE};
+    std::ifstream noise_stream;
+
+    double loihi_generate_noise();
 };
 
 constexpr int truenorth_max_neurons{4096};

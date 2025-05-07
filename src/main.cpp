@@ -160,14 +160,12 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: output detailed energy and latency breakdowns in the perf trace
 // TODO: reimplement noise for Loihi soma model and update latin squares
+// TODO: output detailed energy and latency breakdowns in the perf trace
 // TODO: support hyperedges in Python interface
 // TODO: support group mappings in description format
-
-// ** Refactor and optimizing existing features **
-// TODO: Parse model parameters after mapping, in two-pass approach
-// TODO: Improve plug-in documentation
-//
+// TODO: support embedded yaml in the netlist format
+// TODO: support saving SNNs to yaml and netlist
 // ** Misc **
 // TODO: update tutorials to use Jupyter notebook
+// TODO: Improve plug-in documentation

@@ -386,6 +386,26 @@ void sanafe::MultiTapModel1D::reset()
 }
 
 // **** Soma hardware unit models ****
+void sanafe::LoihiLifModel::set_attribute_hw(
+        const std::string &param_name, const ModelParam &param)
+{
+    if (param_name == "noise")
+    {
+        std::string noise_filename = static_cast<std::string>(param);
+        noise_type = NOISE_FILE_STREAM;
+        noise_stream.open(noise_filename);
+        TRACE1(MODELS, "Opening noise str: %s\n", noise_filename.c_str());
+        if (!noise_stream.is_open())
+        {
+            INFO("Error: Failed to open noise stream: %s.\n",
+                    noise_filename.c_str());
+            throw std::runtime_error("Error: Failed to open noise stream");
+        }
+    }
+
+    return;
+}
+
 void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &param_name, const ModelParam &param)
 {
@@ -431,11 +451,6 @@ void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         cx.bias = static_cast<double>(param);
         TRACE2(MODELS, "Setting bias of %zu=%lf\n", neuron_address, cx.bias);
     }
-    else if (param_name == "biases")
-    {
-        cx.biases = static_cast<std::vector<double>>(param);
-        std::reverse(cx.biases.begin(), cx.biases.end());
-    }
     else if ((param_name == "force_update") ||
             (param_name == "force_soma_update"))
     {
@@ -466,11 +481,6 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     TRACE1(MODELS, "Updating potential (cx:%zu), before:%lf\n", neuron_address,
             cx.potential);
     sanafe::NeuronStatus state = sanafe::IDLE;
-    if (!cx.biases.empty())
-    {
-        cx.bias = cx.biases.back();
-        cx.biases.pop_back();
-    }
     // Update soma, if there are any received spikes, there is a non-zero
     //  bias or we force the neuron to update every time-step
     if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
@@ -481,22 +491,22 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     }
 
     cx.input_current *= cx.input_decay;
-    // TODO: remove hack, put into snn description
-    cx.leak_decay = 4095.0 / 4096.0;
+    // TODO: put leak decay into snn description for DVS gesture only
+    //  It still makes a very tiny difference overall, <1% difference in spiking
+    //  and energy/latency predictions! But is needed if we want spike exact
+    //  behaviour with dvs
+    //cx.leak_decay = 4095.0 / 4096.0;
     cx.potential *= cx.leak_decay;
-    // TODO: remove hack to apply quantization
+    // TODO: formalize quantization for Loihi and remove hack
+    //  Make sure we multiple all biases and thresholds by 64 in the snn
+    //  description for loihi benchmarks, it shouldn't be managed here
+    //  Again, this has a pretty tiny effect on simulator predictions
     cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
     // Add randomized noise to potential if enabled
-    /*
     if (noise_type == NOISE_FILE_STREAM)
     {
-        // TODO: fix noise generation. This depends on which core
-        //  is simulating the neuron. So somehow the neuron can still
-        //  need information about which core it is executing on
-        double random_potential = sim_generate_noise(n);
-        n->potential += random_potential;
+        cx.potential += loihi_generate_noise();
     }
-    */
     // Add the synaptic / dendrite current to the potential
     TRACE1(MODELS, "bias:%lf potential before:%lf\n", cx.bias, cx.potential);
     cx.potential += cx.bias;
@@ -555,6 +565,71 @@ void sanafe::LoihiLifModel::reset()
     }
 
     return;
+}
+
+double sanafe::LoihiLifModel::loihi_generate_noise()
+{
+	int random_val = 0;
+
+	if (noise_type == NOISE_FILE_STREAM)
+	{
+		// With a noise stream, we have a file containing a series of
+		//  random values. This is useful if we want to exactly
+		//  replicate h/w without knowing how the stream is generated.
+		//  We can record the random sequence and replicate it here
+		std::string noise_str;
+		// If we get to the end of the stream, by default reset it.
+		//  However, it is unlikely the stream will be correct at this
+		//  point
+        if (!noise_stream.is_open())
+		{
+			INFO("Error: Noise stream is not open.\n");
+			throw std::runtime_error("Noise stream is not open");
+		}
+
+        // Peek ahead to see if we're at the end of the file without consuming
+        if (noise_stream.eof() ||
+                (noise_stream.peek() == std::ifstream::traits_type::eof()))
+        {
+			INFO("Warning: At the end of the noise stream. "
+			     "Random values are unlikely to be correct.\n");
+			noise_stream.clear();
+            noise_stream.seekg(0, std::ios::beg);
+		}
+
+        if (std::getline(noise_stream, noise_str))
+        {
+            std::istringstream iss(noise_str);
+            if (!(iss >> random_val))
+            {
+                INFO("Error: invalid noise stream entry: %s.\n",
+                        noise_str.c_str());
+            }
+            else
+            {
+                TRACE2(MODELS, "noise val:%d\n", random_val);
+            }
+
+            TRACE2(MODELS, "Generated random val: %d\n", random_val);
+        }
+        else
+        {
+            INFO("Error: Couldn't read noise entry from file\n");
+            throw std::runtime_error("Couldn't read noise entry");
+        }
+	}
+    // else, don't generate any noise and return 0.0
+
+	// Get the number of noise bits required TODO: generalize
+	int sign_bit = random_val & 0x100;
+	random_val &= 0x7f; // TODO: hack, fixed for 8 bits
+	if (sign_bit)
+	{
+		// Sign extend
+		random_val |= ~(0x7f);
+	}
+
+	return static_cast<double>(random_val);
 }
 
 void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,

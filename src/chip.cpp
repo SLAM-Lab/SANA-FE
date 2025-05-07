@@ -1657,58 +1657,6 @@ double sanafe::sim_estimate_network_costs(const Tile &src, Tile &dest)
     return network_latency;
 }
 
-// TODO: reimplement noise generation from file in C++
-/*
-double sanafe::sim_generate_noise(Neuron *n)
-{
-	assert(n != NULL);
-	struct SomaUnit &soma_hw = *(n->soma_hw);
-	int noise_val = 0;
-
-	if (soma_hw.noise_type == NOISE_FILE_STREAM)
-	{
-		// With a noise stream, we have a file containing a series of
-		//  random values. This is useful if we want to exactly
-		//  replicate h/w without knowing how the stream is generated.
-		//  We can record the random sequence and replicate it here
-		std::string noise_str;
-		char *str = &(noise_str[0]);
-		// If we get to the end of the stream, by default reset it.
-		//  However, it is unlikely the stream will be correct at this
-		//  point
-		if (feof(soma_hw.noise_stream))
-		{
-			INFO("Warning: At the end of the noise stream. "
-			     "Random values are unlikely to be correct.\n");
-			fseek(soma_hw.noise_stream, 0, SEEK_SET);
-		}
-		char *result = fgets(
-			str, MAX_NOISE_FILE_ENTRY, soma_hw.noise_stream);
-		if (result != NULL)
-		{
-			const int ret = sscanf(noise_str, "%d", &noise_val);
-			TRACE2(CHIP, "noise val:%d\n", noise_val);
-
-			if (ret < 1)
-			{
-				INFO("Error: invalid noise stream entry.\n");
-			}
-		}
-	}
-
-	// Get the number of noise bits required TODO: generalize
-	int sign_bit = noise_val & 0x100;
-	noise_val &= 0x7f; // TODO: hack, fixed for 8 bits
-	if (sign_bit)
-	{
-		// Sign extend
-		noise_val |= ~(0x7f);
-	}
-
-	return (double) noise_val;
-}
-*/
-
 double sanafe::sim_calculate_energy(const SpikingChip &hw)
 {
     // Returns the total energy across the design, for this timestep

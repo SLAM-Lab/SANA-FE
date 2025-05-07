@@ -21,7 +21,7 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
-import utils
+import sanafe
 
 ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
@@ -33,13 +33,12 @@ TIMESTEPS = 10240
 def calculate_graph_index(N, row, col, digit):
     return ((row*N + col)*N) + digit
 
+"""
 def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
                  neurons_per_core=LOIHI_COMPARTMENTS):
+    # TODO: support this once I can save SNNs again!
     network = sim.Network(save_mappings=True)
     arch = sim.Architecture()
-    # TODO: fix this
-    #compartments = sim.init_compartments(tiles, cores_per_tile,
-    #                                     neurons_per_core)
     print(f"Creating WTA networks for {N} digits")
     #G = nx.DiGraph()
     #G.add_nodes_from(range(0, N**3))
@@ -110,6 +109,7 @@ def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
     network_filename = os.path.join("runs", "dse", f"latin_square_N{N}.net")
     network_path = os.path.join(PROJECT_DIR, network_filename)
     network.save(network_path)
+"""
 
 
 def plot_results(N, network_path):
@@ -120,11 +120,15 @@ def plot_results(N, network_path):
 
     # Now execute the network using SANA-FE and extract the spike timings
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
-    sim.run(arch_path, network_path, TIMESTEPS,
-            spike_trace=True, potential_trace=True)
+    arch = sanafe.load_arch(arch_path)
+    net = sanafe.load_net(network_path, arch, use_netlist_format=True)
+    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
+    chip.load(net)
+
+    chip.sim(TIMESTEPS)
 
     # Use spiking data to create the grid solution produced by the Loihi run
-    with open(os.path.join(PROJECT_DIR, "spikes.trace")) as spikes:
+    with open(os.path.join(PROJECT_DIR, "spikes.csv")) as spikes:
         reader = csv.reader(spikes)
         header = next(reader)
 
@@ -135,11 +139,11 @@ def plot_results(N, network_path):
             timestep = int(spike[1])
 
             digit = nid
-            col = gid % N
-            row = gid // N
-            assert(digit < N)
-            assert(col < N)
-            assert(r < N)
+            col = (gid-1) % N
+            row = (gid-1) // N
+            assert(0 <= digit < N)
+            assert(0 <= col < N)
+            assert(0 <= row < N)
             spike_counts[row][col][digit] += 1
 
     print(spike_counts)
@@ -157,17 +161,21 @@ def plot_results(N, network_path):
     plt.tight_layout()
     plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_square.png"))
 
-    df = pd.read_csv("potential.trace")
+    df = pd.read_csv("potentials.csv")
     plt.figure()
-    df.plot()
+    df.plot(x="timestep")
     plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_potentials.png"))
 
 
 def run_experiment(network_filename):
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     network_path = os.path.join(PROJECT_DIR, network_filename)
-    results = sim.run(arch_path, network_path, TIMESTEPS,
-                      spike_trace=False, potential_trace=False)
+
+    arch = sanafe.load_arch(arch_path)
+    net = sanafe.load_net(network_path, arch, use_netlist_format=True)
+    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
+    chip.load(net)
+    results = chip.sim(TIMESTEPS)
 
     return results
 
@@ -199,6 +207,7 @@ if __name__ == "__main__":
                               "a") as csv_file:
                         writer = csv.writer(csv_file)
                         writer.writerow(row)
+                    # plot_results(int(line["N"]), line["network"])
 
     if plot_experiment:
         sim_df = pd.read_csv(os.path.join(PROJECT_DIR,

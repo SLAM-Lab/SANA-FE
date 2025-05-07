@@ -2192,20 +2192,3 @@ size_t sanafe::field_to_int(const std::string_view &field)
 
     return val;
 }
-
-/*
-
-       if (!attributes.find_child("noise").invalid())
-        {
-            // TODO: support optional noise arg again alongside the plugin mechanism
-            s.noise_type = NOISE_FILE_STREAM;
-            s.noise_stream = fopen(value_str.c_str(), "r");
-            TRACE1(DESCRIPTION, "Opening noise str: %s\n", value_str.c_str());
-            if (s.noise_stream == NULL)
-            {
-                INFO("Error: Failed to open noise stream: %s.\n",
-                    value_str.c_str());
-                exit(1);
-            }
-        }
-*/
