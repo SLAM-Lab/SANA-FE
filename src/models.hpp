@@ -47,6 +47,7 @@ private:
     int weight_bits{default_weight_bits};
 };
 
+// More detailed Loihi-specific synapse model
 class LoihiSynapseModel : public SynapseUnit
 {
 public:
@@ -58,15 +59,18 @@ public:
     LoihiSynapseModel &operator=(LoihiSynapseModel &&other) = default;
 
     PipelineResult update(size_t synapse_address, bool read) override;
-    void set_attribute_hw(const std::string &param_name, const ModelParam &param) override {};
+    void set_attribute_hw(const std::string &param_name, const ModelParam &param) override;
     void set_attribute_edge(size_t synapse_address, const std::string &param_name, const ModelParam &param) override;
     void reset() override;
+    void map_connection(MappedConnection &con) override;
 
 private:
     std::vector<double> weights{};
     std::vector<double> groups{};
     std::vector<double> costs{};
-    std::vector<const MappedConnection *> concurrent_accesses{};
+    std::vector<std::pair<size_t, const MappedNeuron *const>> concurrent_accesses{};
+    std::map<size_t, const MappedNeuron *> synapse_to_pre_neuron{};
+    std::optional<double> concurrent_access_latency{std::nullopt};
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};
     bool mixed_sign_mode{true};

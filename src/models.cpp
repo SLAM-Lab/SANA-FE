@@ -60,87 +60,85 @@ void sanafe::CurrentBasedSynapseModel::reset()
 sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
     const size_t synapse_address, const bool read)
 {
-    // TODO: not sure if I should model the parallel synaptic pipeline
-    //  dynamically here, or if I should just tag the weight with a cost in the
-    //  script and read it. Get this working for SANA-FE v2 though... would
-    //  be nice
-    // In a detailed model I could store all the types of synapses and then
-    //  lookup synapses
+    // TODO: add lookup table with different synapse read costs?
+    // More detailed Loihi synaptic model
+    // Either use a latency cost per synapse from earlier conversion/mapping stages
+    //  (most detailed) e.g., using additional info from the Loihi synapse
+    //  compiler to tag each edge. Or, if this isn't available, use a slightly
+    //  more detailed h/w model that considers the parallel 4-way processing
+    //  in the synapse unit, noting that we only parallelize reads from a single
+    //  spike message
     PipelineResult result{};
     constexpr size_t max_parallel_accesses = 4;
     double latency = 0.0;
+
     if (read)
     {
-        // TODO: this assumes there is only one synapse hw unit per core.. the
-        //  address doesn't work if there are multiple
-        const MappedConnection *new_connection =
-                mapped_connections_in.at(synapse_address);
-        //INFO("dest:%zu w:%lf\n", new_connection->post_neuron->mapped_address, weights[synapse_address]);
+        const MappedNeuron *current_sending_neuron =
+                synapse_to_pre_neuron.at(synapse_address);
 
-        // TODO: a vector is overkill - I think we just need to remember the previous
-        //  access!
-        if (!concurrent_accesses.empty())
+        // Model the concurrent synaptic weights being access
+        if (concurrent_access_latency.has_value())
         {
-            size_t first_access_address =
-                    concurrent_accesses[0]->synapse_address;
-            ////INFO("first access address:%zu\n", first_access_address);
-            const MappedConnection *first_connection =
-                    mapped_connections_in.at(first_access_address);
-            bool positive_weights = (weights.at(first_access_address) > 0.0);
-            bool synapse_is_positive = weights.at(synapse_address) > 0.0;
-            if (concurrent_accesses.size() >= max_parallel_accesses)
+            if (!concurrent_accesses.empty())
             {
-                concurrent_accesses.clear();
+                const auto [first_access, first_sending_neuron] =
+                        concurrent_accesses.front();
+                TRACE2(MODELS, "first access address:%zu\n", first_access);
+                if (concurrent_accesses.size() >= max_parallel_accesses)
+                {
+                    concurrent_accesses.clear();
+                }
+                else if (first_sending_neuron != current_sending_neuron)
+                {
+                    concurrent_accesses.clear();
+                }
             }
-            // else if (!mixed_sign_mode && (positive_mode != synapse_is_positive))
-            ///*
-            else if (positive_weights != synapse_is_positive)
-            {
-                concurrent_accesses.clear();
-            }
-            //*/
-            else if (first_connection->pre_neuron != new_connection->pre_neuron)
-            {
-                concurrent_accesses.clear();
-            }
-            else if (first_connection->post_neuron->mapped_address > new_connection->post_neuron->mapped_address)
-            {
-                concurrent_accesses.clear();
-            }
-            //*/
-        }
 
-        bool is_first_access = concurrent_accesses.empty();
-        if (is_first_access)
+            bool is_first_access = concurrent_accesses.empty();
+            if (is_first_access)
+            {
+                latency = max_parallel_accesses *
+                        concurrent_access_latency.value();
+            }
+            else
+            {
+                latency = 0.0;
+            }
+            concurrent_accesses.push_back(
+                    std::make_pair(synapse_address, current_sending_neuron));
+        }
+        else // Used latency tagged cost in file
         {
-            // TODO: here read from a user defined latency cost
-            ////latency += 1.0 * 10.8e-9;
-            latency += 1.0 * 17.5e-9;
+            latency = costs[synapse_address];
         }
-        concurrent_accesses.push_back(new_connection);
-
-        //for (size_t i = 0; i < concurrent_accesses.size(); ++i)
-        //{
-        //    INFO("concurrent[%zu]=%zu\n", i, concurrent_accesses[i]->synapse_address);
-        //}
-        //INFO("***\n");
 
         TRACE1(MODELS, "w:%lf\n", weights[synapse_address]);
-        //return {weights[synapse_address], std::nullopt, latency};
-        //INFO("cost:%lf\n", costs[synapse_address]);
         result.current = weights[synapse_address];
-        result.latency = costs[synapse_address];
-        return result;
+        result.latency = latency;
     }
-    //return {0.0, std::nullopt, latency};
-    result.current = 0.0;
-    result.latency = 0.0;
+    else // No read, don't generate current but return 0 latency
+    {
+        result.latency = 0.0;
+    }
+
     return result;
 }
 
 void sanafe::LoihiSynapseModel::reset()
 {
     concurrent_accesses.clear();
+
+    return;
+}
+
+void sanafe::LoihiSynapseModel::set_attribute_hw(const std::string &param_name,
+    const ModelParam &param)
+{
+    if (param_name == "latency_concurrent_access")
+    {
+        concurrent_access_latency = static_cast<double>(param);
+    }
 
     return;
 }
@@ -183,6 +181,15 @@ void sanafe::LoihiSynapseModel::set_attribute_edge(
     }
 
     min_synaptic_resolution = (1.0 / weight_bits);
+    return;
+}
+
+void sanafe::LoihiSynapseModel::map_connection(MappedConnection &con)
+{
+    size_t synapse_address = con.synapse_address;
+    // Get unique identifier for spiking neuron
+    const MappedNeuron *pre_neuron = con.pre_neuron;
+    synapse_to_pre_neuron[synapse_address] = pre_neuron;
 }
 
 // *** Dendrite models ***

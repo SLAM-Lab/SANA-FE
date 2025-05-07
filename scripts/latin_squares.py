@@ -28,7 +28,9 @@ LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
 LOIHI_COMPARTMENTS = 1024
-TIMESTEPS = 10240
+#TIMESTEPS = 10
+TIMESTEPS = 1024
+#TIMESTEPS = 10240
 
 def calculate_graph_index(N, row, col, digit):
     return ((row*N + col)*N) + digit
@@ -167,16 +169,53 @@ def plot_results(N, network_path):
     plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_potentials.png"))
 
 
-def run_experiment(network_filename):
+def run_cycle_accurate(timesteps):
+    import subprocess
+    # TODO: parameterize to not be as environment specific..
+    # Note: this assumes that there is a messages trace file generated
+    # TODO: add a sanity check that the trace file exists
+    print("Running cycle-accurate Booksim2 model")
+    with open("messages.csv", "r") as messages_file:
+        df = pd.read_csv(messages_file, dtype={"src_hw": str, "dest_hw": str,
+                                               "src_neuron": str})
+
+    cycles_per_ts = []
+    for timestep in range(timesteps + 1):
+        filtered_df = df[df.iloc[:, 0] == timestep]
+        with open(f"messages_single_ts.csv", "w") as output_file:
+            filtered_df.to_csv(output_file, index=False)
+
+        result = subprocess.run(("/home/usr1/jboyle/neuro/booksim2/src/booksim",
+                                "/home/usr1/jboyle/neuro/sana-fe/scripts/booksim.config"),
+                                capture_output=True, text=True)
+
+        for line in result.stdout.split('\n'):
+            if "Time taken is" in line:
+                # Extract the number of cycles
+                cycles_per_ts.append(int(line.split("is")[1].split()[0]))
+
+    total_cycles = sum(cycles_per_ts)
+    print(f"Total booksim cycles:{total_cycles}")
+    return total_cycles
+
+
+def run_experiment(network_filename, cycle_accurate_validation=False):
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     network_path = os.path.join(PROJECT_DIR, network_filename)
 
     arch = sanafe.load_arch(arch_path)
     net = sanafe.load_net(network_path, arch, use_netlist_format=True)
-    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
+    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True,
+                              record_messages=True)
     chip.load(net)
     results = chip.sim(TIMESTEPS)
 
+    if cycle_accurate_validation:
+        booksim_cycles = run_cycle_accurate(TIMESTEPS)
+    else:
+        booksim_cycles = None
+
+    results["cycles"] = booksim_cycles
     return results
 
 
@@ -189,7 +228,7 @@ if __name__ == "__main__":
                            "loihi_latin.csv"))):
             with open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
                  "w") as latin_squares_file:
-                latin_squares_file.write("N,network,sim_energy,sim_latency\n")
+                latin_squares_file.write("N,network,sim_energy,sim_latency,cycles\n")
 
             with open(os.path.join(PROJECT_DIR, "runs", "latin",
                                     "loihi_latin.csv")) as latin_squares_file:
@@ -202,7 +241,11 @@ if __name__ == "__main__":
                     results = run_experiment(line["network"])
                     time = results["sim_time"] / TIMESTEPS
                     energy = results["energy"] / TIMESTEPS
-                    row = (line["N"], line["network"], energy, time)
+                    if results["cycles"] is not None:
+                        cycles = results["cycles"] / TIMESTEPS
+                    else:
+                        cycles = None
+                    row = (line["N"], line["network"], energy, time, cycles)
                     with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
                               "a") as csv_file:
                         writer = csv.writer(csv_file)
@@ -219,6 +262,7 @@ if __name__ == "__main__":
         loihi_energy = df["loihi_energy"].values * 1.0e6
         sim_latency = df["sim_latency"].values * 1.0e6
         loihi_latency = df["loihi_latency"].values * 1.0e6
+        booksim_latency = df["cycles"].values * 1.0e-9 * 1.0e6
 
         # Plot the simulated vs measured energy
         plt.rcParams.update({"font.size": 6, "lines.markersize": 5})
@@ -246,6 +290,7 @@ if __name__ == "__main__":
         plt.gca().set_box_aspect(1)
 
         plt.plot(sim_latency, loihi_latency, "x", mew=1.5)
+        plt.plot(booksim_latency, loihi_latency, "s", mew=1.5, markerfacecolor="none")
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")
         plt.xlabel("Simulated Latency ($\mu$s)")

@@ -31,6 +31,7 @@ architecture:
               attributes:
                 energy_message_in: 0.0e-12
                 #latency_message_in: 20.0e-9
+                #latency_message_in: 14.5e-9
                 latency_message_in: 0.0e-9
           soma:
             - name: loihi_lif
@@ -75,10 +76,11 @@ architecture:
                 latency_process_spike: 4.0e-9
             - name: loihi_sparse_synapse
               attributes:
-                #model: loihi
-                model: current_based
+                model: loihi
+                #model: current_based
                 energy_process_spike: 33.6e-12
-                latency_process_spike: 4.7e-9
+                #latency_process_spike: 4.7e-9
+                latency_concurrent_access: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
                 #model: loihi

@@ -25,8 +25,7 @@ import os
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, PROJECT_DIR)
-import utils
-import sanafecpp as kernel
+import sanafe
 
 # Use a dumb seed to get consistent results
 random.seed(1)
@@ -108,12 +107,12 @@ if __name__ == "__main__":
                 writer.writeheader()
 
             for line in reader:
-                arch = kernel.load_arch(ARCH_FILENAME)
-                net = kernel.Network()
+                arch = sanafe.load_arch(ARCH_FILENAME)
+                net = sanafe.load_net(line["network"], arch, use_netlist_format=True)
 
-                net.load_net(line["network"], arch)
-                sim = kernel.Simulation(arch, net, record_perf=True)
-                results = sim.run(TIMESTEPS)
+                chip = sanafe.SpikingChip(arch, record_perf=True)
+                chip.load(net)
+                results = chip.sim(TIMESTEPS)
                 print(results)
                 df = pd.read_csv("perf.csv")
                 line["total_spikes"] = df.loc[2, "fired"]

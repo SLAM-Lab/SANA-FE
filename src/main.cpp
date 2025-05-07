@@ -160,10 +160,12 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: reimplement noise for Loihi soma model and update latin squares
 // TODO: output detailed energy and latency breakdowns in the perf trace
 // TODO: support hyperedges in Python interface
 // TODO: support group mappings in description format
+// TODO: support unique message ids (mid) for every spike packet and also give
+//  neurons both unique nid across groups, and change the meaning of 'nid' to be
+//  group offset 'noffset'?
 // TODO: support embedded yaml in the netlist format
 // TODO: support saving SNNs to yaml and netlist
 // ** Misc **

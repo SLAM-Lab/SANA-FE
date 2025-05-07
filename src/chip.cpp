@@ -1138,13 +1138,6 @@ void sanafe::PipelineUnit::configure(
     }
 }
 
-void sanafe::PipelineUnit::add_connection(MappedConnection &con)
-{
-    // TODO: this is wasteful storing every synapse twice, once in the neuron
-    //  and again in the synapse h/w unit
-    mapped_connections_in.push_back(&con);
-}
-
 sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
         : name(std::move(config.name))
         , energy_access(config.metrics.energy_message_out)
@@ -1774,7 +1767,7 @@ void sanafe::sim_add_connection_to_axon(MappedConnection &con, Core &post_core)
     //  I think
     post_core.connections_in.push_back(&con);
     con.synapse_address = post_core.connections_in.size() - 1;
-    con.synapse_hw->add_connection(con);
+    con.synapse_hw->map_connection(con);
 
     // Access the most recently created axon in for the post-synaptic core
     AxonInModel &last_added_target_axon = post_core.axons_in.back();

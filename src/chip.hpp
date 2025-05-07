@@ -316,10 +316,10 @@ public:
     // If using somatic inputs (address and current in)
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) { throw std::logic_error("Error: Soma input not implemented"); }
     virtual double get_potential(size_t neuron_address) { return 0.0; }
+    virtual void map_connection(MappedConnection &con) {}
 
     // Normal member functions
     void set_time(const long int timestep) { simulation_time = timestep; }
-    void add_connection(MappedConnection &con);
     void configure(std::string unit_name, const ModelInfo &model);
     PipelineResult process_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
@@ -353,7 +353,6 @@ public:
 
 protected:
     long int simulation_time{0L};
-    std::vector<MappedConnection *> mapped_connections_in{};
     PipelineUnit() = default;
 
 private:
@@ -392,6 +391,7 @@ public:
     virtual PipelineResult update(size_t synapse_address, bool read = false) override final { throw std::logic_error("Error: Soma H/W called with synapse inputs"); }
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override final { throw std::logic_error("Error: Soma H/W called with dendrite inputs"); }
     virtual void set_attribute_edge(size_t synapse_address, const std::string &param_name, const ModelParam &param) override final {};
+    virtual void map_connection(MappedConnection &con) override final {};
 };
 
 class AxonOutUnit

@@ -169,7 +169,7 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple",
         print("Testing network with {0} neurons".format(2*layer_neurons))
         results = chip.sim(timesteps, timing_model=timing_model)
         if cycle_accurate_validation:
-            booksim_cycles = run_cycle_accurate()
+            booksim_cycles = run_cycle_accurate(timesteps)
         else:
             booksim_cycles = None
 
@@ -193,22 +193,34 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple",
     return
 
 
-def run_cycle_accurate():
+def run_cycle_accurate(timesteps):
     import subprocess
     # TODO: parameterize to not be as environment specific..
     # Note: this assumes that there is a messages trace file generated
     # TODO: add a sanity check that the trace file exists
     print("Running cycle-accurate Booksim2 model")
-    result = subprocess.run(("/home/usr1/jboyle/neuro/booksim2/src/booksim",
-                             "/home/usr1/jboyle/neuro/sana-fe/scripts/booksim.config"),
-                             capture_output=True, text=True)
-    cycles = None
-    for line in result.stdout.split('\n'):
-        if "Time taken is" in line:
-            # Extract the number of cycles
-            cycles = int(line.split("is")[1].split()[0])
+    with open("messages.csv", "r") as messages_file:
+        df = pd.read_csv(messages_file, dtype={"src_hw": str, "dest_hw": str,
+                                               "src_neuron": str})
 
-    return cycles
+    cycles_per_ts = []
+    for timestep in range(timesteps + 1):
+        filtered_df = df[df.iloc[:, 0] == timestep]
+        with open(f"messages_single_ts.csv", "w") as output_file:
+            filtered_df.to_csv(output_file, index=False)
+
+        result = subprocess.run(("/home/usr1/jboyle/neuro/booksim2/src/booksim",
+                                "/home/usr1/jboyle/neuro/sana-fe/scripts/booksim.config"),
+                                capture_output=True, text=True)
+
+        for line in result.stdout.split('\n'):
+            if "Time taken is" in line:
+                # Extract the number of cycles
+                cycles_per_ts.append(int(line.split("is")[1].split()[0]))
+
+    total_cycles = sum(cycles_per_ts)
+    print(f"Total booksim cycles:{total_cycles}")
+    return total_cycles
 
 
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
