@@ -30,8 +30,8 @@ architecture:
             - name: loihi_in
               attributes:
                 energy_message_in: 0.0e-12
+                #latency_message_in: 15.9e-9
                 #latency_message_in: 20.0e-9
-                #latency_message_in: 14.5e-9
                 latency_message_in: 0.0e-9
           soma:
             - name: loihi_lif

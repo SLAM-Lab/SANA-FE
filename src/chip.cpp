@@ -1436,9 +1436,9 @@ void sanafe::sim_output_run_summary(
 void sanafe::sim_format_run_summary(std::ostream &out, const RunData &run_data)
 {
     out << "build_git_version: '" << GIT_COMMIT << "'" << std::endl;
+    out << "timesteps_executed: " << run_data.timesteps_executed << std::endl;
     out << "energy: " << std::scientific << run_data.energy << std::endl;
-    out << "sim_time: " << std::scientific << run_data.sim_time;
-    out << std::endl;
+    out << "sim_time: " << std::scientific << run_data.sim_time << std::endl;
     out << "total_spikes: " << run_data.spikes << std::endl;
     out << "total_messages_sent: " << run_data.packets_sent << std::endl;
     out << "wall_time: " << std::fixed << run_data.wall_time << std::endl;
@@ -1928,6 +1928,7 @@ void sanafe::sim_trace_write_perf_header(std::ofstream &perf_trace_file)
     perf_trace_file << "fired,";
     perf_trace_file << "packets,";
     perf_trace_file << "hops,";
+    perf_trace_file << "spikes,";
     perf_trace_file << "sim_time,";
     perf_trace_file << "total_energy,";
     perf_trace_file << std::endl;
@@ -2001,15 +2002,17 @@ void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
     }
 }
 
-void sanafe::sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts)
+void sanafe::sim_trace_perf_log_timestep(
+        std::ofstream &perf_trace_file, const Timestep &ts)
 {
-    out << ts.timestep << ",";
-    out << ts.neurons_fired << ",";
-    out << ts.packets_sent << ",";
-    out << ts.total_hops << ",";
-    out << std::scientific << ts.sim_time << ",";
-    out << std::scientific << ts.energy << ",";
-    out << std::endl;
+    perf_trace_file << ts.timestep << ",";
+    perf_trace_file << ts.neurons_fired << ",";
+    perf_trace_file << ts.packets_sent << ",";
+    perf_trace_file << ts.total_hops << ",";
+    perf_trace_file << ts.spike_count << ",";
+    perf_trace_file << std::scientific << ts.sim_time << ",";
+    perf_trace_file << std::scientific << ts.energy << ",";
+    perf_trace_file << std::endl;
 }
 
 void sanafe::sim_trace_record_message(
