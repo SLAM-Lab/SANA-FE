@@ -11,6 +11,9 @@
 #include <filesystem> // For std::filesystem::path
 #include <optional>
 #include <string>
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 
 #include "arch.hpp"
 #include "description.hpp"
@@ -93,6 +96,16 @@ int main(int argc, char *argv[])
     // Read in program args, sanity check and parse inputs
     try
     {
+#ifndef GIT_COMMIT
+#define GIT_COMMIT "git-hash-unknown"
+#endif
+        INFO("Running SANA-FE simulation (build:%s)\n", GIT_COMMIT);
+#ifdef HAVE_OPENMP
+        const int nthreads = omp_get_num_procs();
+        INFO("OpenMP enabled, %d threads detected\n", nthreads);
+#else
+        INFO("No OpenMP multithreading enabled.\n");
+#endif
         sanafe::Architecture arch =
                 sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
         INFO("Architecture initialized.\n");

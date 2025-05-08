@@ -410,7 +410,7 @@ void sanafe::process_neurons(Timestep &ts, SpikingChip &hw)
     auto cores = hw.cores();
 
     // Older versions of OpenMP don't support range-based for loops yet...
-#ifdef ENABLE_OPENMP
+#ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     // codechecker_suppress [modernize-loop-convert]
@@ -457,7 +457,7 @@ void sanafe::process_messages(Timestep &ts, SpikingChip &hw)
     // Now process all messages at receiving cores
     auto cores = hw.cores();
     // Older versions of OpenMP don't support range-based for loops yet...
-#ifdef ENABLE_OPENMP
+#ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     // codechecker_suppress [modernize-loop-convert]
