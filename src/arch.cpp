@@ -76,8 +76,8 @@ sanafe::CoreConfiguration::CoreConfiguration(std::string name,
 {
 }
 
-sanafe::TileConfiguration &sanafe::Architecture::create_tile(
-        std::string name, const TilePowerMetrics &power_metrics)
+sanafe::TileConfiguration &sanafe::Architecture::create_tile(std::string name,
+        const TilePowerMetrics &power_metrics)
 {
     // Initialize a new tile given metrics by the user, and push it into the
     //  Architecture's list of tiles

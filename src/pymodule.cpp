@@ -132,10 +132,17 @@ sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
 
 pybind11::dict run_data_to_dict(const sanafe::RunData &run)
 {
+    pybind11::dict energy_dict;
+    energy_dict["total"] = run.total_energy;
+    energy_dict["synapse"] = run.synapse_energy;
+    energy_dict["dendrite"] = run.dendrite_energy;
+    energy_dict["soma"] = run.soma_energy;
+    energy_dict["network"] = run.network_energy;
+
     pybind11::dict run_data_dict;
     run_data_dict["timestep_start"] = run.timestep_start;
     run_data_dict["timesteps_executed"] = run.timesteps_executed;
-    run_data_dict["energy"] = run.energy;
+    run_data_dict["energy"] = energy_dict;
     run_data_dict["sim_time"] = run.sim_time;
     run_data_dict["spikes"] = run.spikes;
     run_data_dict["packets_sent"] = run.packets_sent;
@@ -194,7 +201,8 @@ sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
         std::string name, double energy_north_hop, double latency_north_hop,
         double energy_east_hop, double latency_east_hop,
         double energy_south_hop, double latency_south_hop,
-        double energy_west_hop, double latency_west_hop)
+        double energy_west_hop, double latency_west_hop, bool log_energy,
+        bool log_latency)
 {
     sanafe::TilePowerMetrics tile_power_metrics{};
     tile_power_metrics.energy_north_hop = energy_north_hop;
@@ -205,6 +213,8 @@ sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
     tile_power_metrics.latency_south_hop = latency_south_hop;
     tile_power_metrics.energy_west_hop = energy_west_hop;
     tile_power_metrics.latency_west_hop = latency_west_hop;
+    tile_power_metrics.log_energy = log_energy;
+    tile_power_metrics.log_latency = log_latency;
 
     return self->create_tile(name, tile_power_metrics);
 }
@@ -213,7 +223,8 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
         size_t tile_id, double energy_north_hop, double latency_north_hop,
         double energy_east_hop, double latency_east_hop,
         double energy_south_hop, double latency_south_hop,
-        double energy_west_hop, double latency_west_hop)
+        double energy_west_hop, double latency_west_hop, bool log_energy,
+        bool log_latency)
 {
     sanafe::TilePowerMetrics tile_power_metrics{};
     tile_power_metrics.energy_north_hop = energy_north_hop;
@@ -224,6 +235,8 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
     tile_power_metrics.latency_south_hop = latency_south_hop;
     tile_power_metrics.energy_west_hop = energy_west_hop;
     tile_power_metrics.latency_west_hop = latency_west_hop;
+    tile_power_metrics.log_energy = log_energy;
+    tile_power_metrics.log_latency = log_latency;
 
     return std::make_unique<sanafe::TileConfiguration>(
             name, tile_id, tile_power_metrics);
@@ -231,13 +244,16 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
 
 std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
         size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
-        std::string buffer_position, bool buffer_inside_unit, size_t max_neurons_supported)
+        std::string buffer_position, bool buffer_inside_unit,
+        size_t max_neurons_supported, bool log_energy, bool log_latency)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
     pipeline_config.buffer_position =
             sanafe::pipeline_parse_buffer_pos_str(buffer_position, buffer_inside_unit);
     pipeline_config.max_neurons_supported = max_neurons_supported;
+    pipeline_config.log_energy = log_energy;
+    pipeline_config.log_latency = log_latency;
 
     sanafe::CoreAddress core_address{};
     core_address.parent_tile_id = parent_tile_id;
@@ -250,13 +266,16 @@ std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
 
 sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
         std::string name, size_t parent_tile_id, std::string buffer_position,
-        bool buffer_inside_unit, size_t max_neurons_supported)
+        bool buffer_inside_unit, size_t max_neurons_supported, bool log_energy,
+        bool log_latency)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
     pipeline_config.buffer_position = sanafe::pipeline_parse_buffer_pos_str(
             buffer_position, buffer_inside_unit);
     pipeline_config.max_neurons_supported = max_neurons_supported;
+    pipeline_config.log_energy = log_energy;
+    pipeline_config.log_latency = log_latency;
 
     return self->create_core(name, parent_tile_id, pipeline_config);
 }
@@ -421,7 +440,6 @@ PYBIND11_MODULE(sanafecpp, m)
     pybind11::class_<sanafe::NeuronGroup>(m, "NeuronGroup")
             .def("__repr__", &sanafe::NeuronGroup::info)
             .def("get_id", &sanafe::NeuronGroup::get_id)
-            //.def_readwrite("neurons", &sanafe::NeuronGroup::neurons);
             .def_property("neurons",
                     pybind11::cpp_function(
                             [](sanafe::NeuronGroup &self)
@@ -522,7 +540,9 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("energy_south_hop") = 0.0,
                     pybind11::arg("latency_south_hop") = 0.0,
                     pybind11::arg("energy_west_hop") = 0.0,
-                    pybind11::arg("latency_west_hop") = 0.0)
+                    pybind11::arg("latency_west_hop") = 0.0,
+                    pybind11::arg("log_energy") = false,
+                    pybind11::arg("log_latency") = false)
             .def("create_core", &pycreate_core, pybind11::arg("name"),
                     pybind11::arg("parent_tile_id"),
                     pybind11::arg("buffer_position") =
@@ -530,6 +550,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
+                    pybind11::arg("log_energy") = false,
+                    pybind11::arg("log_latency") = false,
                     pybind11::return_value_policy::reference_internal)
             .def_readwrite("tiles", &sanafe::Architecture::tiles);
 
@@ -543,7 +565,9 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("energy_south_hop") = 0.0,
                     pybind11::arg("latency_south_hop") = 0.0,
                     pybind11::arg("energy_west_hop") = 0.0,
-                    pybind11::arg("latency_west_hop") = 0.0)
+                    pybind11::arg("latency_west_hop") = 0.0,
+                    pybind11::arg("log_energy") = false,
+                    pybind11::arg("log_latency") = false)
             .def_readwrite("cores", &sanafe::TileConfiguration::cores);
 
     pybind11::class_<sanafe::CoreConfiguration,
@@ -556,7 +580,9 @@ PYBIND11_MODULE(sanafecpp, m)
                             sanafe::BUFFER_BEFORE_SOMA_UNIT,
                     pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
-                            sanafe::default_max_neurons);
+                            sanafe::default_max_neurons,
+                    pybind11::arg("log_energy") = false,
+                    pybind11::arg("log_latency") = false);
     pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
             .def_property(
                     "mapped_neuron_groups",

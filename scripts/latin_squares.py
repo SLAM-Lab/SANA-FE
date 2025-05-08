@@ -240,7 +240,7 @@ if __name__ == "__main__":
                     #  on Loihi
                     results = run_experiment(line["network"])
                     time = results["sim_time"] / TIMESTEPS
-                    energy = results["energy"] / TIMESTEPS
+                    energy = results["energy"]["total"] / TIMESTEPS
                     if results["cycles"] is not None:
                         cycles = results["cycles"] / TIMESTEPS
                     else:

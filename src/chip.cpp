@@ -299,7 +299,11 @@ sanafe::RunData sanafe::SpikingChip::sim(
         const Timestep ts = step(timing_model);
         TRACE1(CHIP, "Neurons fired in ts:%ld: %zu\n", timestep,
                 ts.neurons_fired);
-        rd.energy += ts.energy;
+        rd.total_energy += ts.total_energy;
+        rd.synapse_energy += ts.synapse_energy;
+        rd.dendrite_energy += ts.dendrite_energy;
+        rd.soma_energy += ts.soma_energy;
+        rd.network_energy += ts.network_energy;
         rd.sim_time += ts.sim_time;
         rd.spikes += ts.spike_count;
         rd.packets_sent += ts.packets_sent;
@@ -326,7 +330,7 @@ sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
-    total_energy += ts.energy;
+    total_energy += ts.total_energy;
     total_sim_time += ts.sim_time;
     total_spikes += ts.spike_count;
     total_neurons_fired += ts.neurons_fired;
@@ -1014,12 +1018,18 @@ sanafe::RunData sanafe::SpikingChip::get_run_summary() const
     // Store the summary data in a string to string mapping
     RunData run_data(0, total_timesteps);
 
-    run_data.energy = total_energy;
-    run_data.sim_time = total_sim_time;
     run_data.spikes = total_spikes;
     run_data.packets_sent = total_messages_sent;
     run_data.wall_time = wall_time;
     run_data.neurons_fired = total_neurons_fired;
+
+    run_data.total_energy = total_energy;
+    run_data.synapse_energy = synapse_energy;
+    run_data.dendrite_energy = dendrite_energy;
+    run_data.soma_energy = soma_energy;
+    run_data.network_energy = network_energy;
+
+    run_data.sim_time = total_sim_time;
 
     return run_data;
 }
@@ -1435,14 +1445,20 @@ void sanafe::sim_output_run_summary(
 
 void sanafe::sim_format_run_summary(std::ostream &out, const RunData &run_data)
 {
-    out << "build_git_version: '" << GIT_COMMIT << "'" << std::endl;
-    out << "timesteps_executed: " << run_data.timesteps_executed << std::endl;
-    out << "energy: " << std::scientific << run_data.energy << std::endl;
-    out << "sim_time: " << std::scientific << run_data.sim_time << std::endl;
-    out << "total_spikes: " << run_data.spikes << std::endl;
-    out << "total_messages_sent: " << run_data.packets_sent << std::endl;
-    out << "wall_time: " << std::fixed << run_data.wall_time << std::endl;
-    out << "total_neurons_fired: " << run_data.neurons_fired << std::endl;
+    out << "build_git_version: '" << GIT_COMMIT << "'\n";
+    out << "timesteps_executed: " << run_data.timesteps_executed << "\n";
+    out << "total_spikes: " << run_data.spikes << "\n";
+    out << "total_messages_sent: " << run_data.packets_sent << "\n";
+    out << "wall_time: " << std::fixed << run_data.wall_time << "\n";
+    out << "total_neurons_fired: " << run_data.neurons_fired << "\n";
+    out << "sim_time: " << std::scientific << run_data.sim_time << "\n";
+    // Give a more detailed energy breakdown, as this is often useful
+    out << "energy:\n";
+    out << "  synapse:" << std::scientific << run_data.synapse_energy << "\n";
+    out << "  dendrite:" << std::scientific << run_data.dendrite_energy << "\n";
+    out << "  soma:" << std::scientific << run_data.soma_energy << "\n";
+    out << "  network: " << std::scientific << run_data.network_energy << "\n";
+    out << "  total: " << std::scientific << run_data.total_energy << "\n";
 }
 
 std::ofstream sanafe::sim_trace_open_spike_trace(
@@ -1579,7 +1595,7 @@ void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw,
         TRACE1(CHIP, "Running simple timing model\n");
         ts.sim_time = schedule_messages_simple(ts.messages, scheduler);
     }
-    ts.energy = sim_calculate_energy(hw);
+    sim_calculate_energy(hw, ts);
 
     for (auto &tile : hw.tiles)
     {
@@ -1650,14 +1666,18 @@ double sanafe::sim_estimate_network_costs(const Tile &src, Tile &dest)
     return network_latency;
 }
 
-double sanafe::sim_calculate_energy(const SpikingChip &hw)
+void sanafe::sim_calculate_energy(const SpikingChip &hw, Timestep &ts)
 {
     // Returns the total energy across the design, for this timestep
-    double network_energy{0.0};
+    ts.network_energy = 0.0;
+    ts.synapse_energy = 0.0;
+    ts.dendrite_energy = 0.0;
+    ts.soma_energy = 0.0;
+    ts.total_energy = 0.0;
+
     double axon_in_energy{0.0};
     double axon_out_energy{0.0};
-    double model_simulated_energy{0.0};
-    double total_energy{0.0};
+    double pipeline_energy{0.0};
 
     for (const auto &t : hw.tiles)
     {
@@ -1669,7 +1689,7 @@ double sanafe::sim_calculate_energy(const SpikingChip &hw)
                 (static_cast<double>(t.south_hops) * t.energy_south_hop);
         total_hop_energy +=
                 (static_cast<double>(t.north_hops) * t.energy_north_hop);
-        network_energy += total_hop_energy;
+        ts.network_energy += total_hop_energy;
         TRACE1(CHIP, "east:%ld west:%ld north:%ld south:%ld\n", t.east_hops,
                 t.west_hops, t.north_hops, t.south_hops);
 
@@ -1685,7 +1705,23 @@ double sanafe::sim_calculate_energy(const SpikingChip &hw)
 
             for (const auto &pipeline_unit : c.pipeline_hw)
             {
-                model_simulated_energy += pipeline_unit->energy;
+                // Separately track the total pipeline energy, as the same
+                //  energy values may be added to multiple categories, i.e., if
+                //  the pipeline h/w unit implements multiple functionality
+                pipeline_energy += pipeline_unit->energy;
+                if (pipeline_unit->implements_synapse)
+                {
+                    ts.synapse_energy += pipeline_unit->energy;
+                }
+                if (pipeline_unit->implements_dendrite)
+                {
+                    ts.dendrite_energy += pipeline_unit->energy;
+
+                }
+                if (pipeline_unit->implements_soma)
+                {
+                    ts.soma_energy += pipeline_unit->energy;
+                }
             }
 
             for (const auto &axon : c.axon_out_hw)
@@ -1696,17 +1732,18 @@ double sanafe::sim_calculate_energy(const SpikingChip &hw)
             }
         }
     }
+    // TODO: should I keep these network units separate from the NoC costs?
+    ts.network_energy += axon_in_energy;
+    ts.network_energy += axon_out_energy;
+    ts.total_energy = ts.network_energy + pipeline_energy;
 
-    total_energy = axon_in_energy + axon_out_energy + network_energy +
-            model_simulated_energy;
+    TRACE1(CHIP, "pipeline_energy:%e\n", pipeline_energy);
+    TRACE1(CHIP, "network_energy:%e\n", ts.network_energy);
+    TRACE1(CHIP, "\taxon_in_energy:%e\n", axon_in_energy);
+    TRACE1(CHIP, "\taxon_out_energy:%e\n", axon_out_energy);
+    INFO("total:%e\n", ts.total_energy);
 
-    TRACE1(CHIP, "model_simulated_energy:%e\n", model_simulated_energy);
-    TRACE1(CHIP, "axon_in_energy:%e\n", axon_in_energy);
-    TRACE1(CHIP, "axon_out_energy:%e\n", axon_out_energy);
-    TRACE1(CHIP, "network_energy:%e\n", network_energy);
-    TRACE1(CHIP, "total:%e\n", total_energy);
-
-    return total_energy;
+    return;
 }
 
 void sanafe::sim_create_neuron_axons(MappedNeuron &pre_neuron)
@@ -1924,6 +1961,7 @@ void sanafe::sim_trace_write_potential_header(
 void sanafe::sim_trace_write_perf_header(std::ofstream &perf_trace_file)
 {
     assert(perf_trace_file.is_open());
+    // Mandatory performance metrics
     perf_trace_file << "timestep,";
     perf_trace_file << "fired,";
     perf_trace_file << "packets,";
@@ -1931,6 +1969,12 @@ void sanafe::sim_trace_write_perf_header(std::ofstream &perf_trace_file)
     perf_trace_file << "spikes,";
     perf_trace_file << "sim_time,";
     perf_trace_file << "total_energy,";
+
+    // Optional performance metrics
+    // Now check for all the conditionally probed performance metrics
+    // TODO: doesn't this require us to store per time-step metrics for all
+    //  quantities that we track? maybe need to build a map.. or some system
+    //  to flexibly store and probe different stats
     perf_trace_file << std::endl;
 }
 
@@ -2011,7 +2055,7 @@ void sanafe::sim_trace_perf_log_timestep(
     perf_trace_file << ts.total_hops << ",";
     perf_trace_file << ts.spike_count << ",";
     perf_trace_file << std::scientific << ts.sim_time << ",";
-    perf_trace_file << std::scientific << ts.energy << ",";
+    perf_trace_file << std::scientific << ts.total_energy << ",";
     perf_trace_file << std::endl;
 }
 

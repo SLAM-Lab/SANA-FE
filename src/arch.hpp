@@ -61,6 +61,8 @@ struct ModelInfo
     std::map<std::string, ModelParam> model_parameters{};
     std::optional<std::filesystem::path> plugin_library_path{};
     std::string name;
+    bool log_energy{false};
+    bool log_latency{false};
 };
 
 enum NeuronResetModes
@@ -111,6 +113,8 @@ struct TilePowerMetrics
     double latency_south_hop{0.0};
     double energy_west_hop{0.0};
     double latency_west_hop{0.0};
+    bool log_energy{false};
+    bool log_latency{false};
 };
 
 struct TileConfiguration
@@ -129,6 +133,8 @@ struct CorePipelineConfiguration
 {
     BufferPosition buffer_position{BUFFER_BEFORE_SOMA_UNIT};
     size_t max_neurons_supported{default_max_neurons};
+    bool log_energy{false};
+    bool log_latency{false};
 };
 
 struct CoreAddress
@@ -179,6 +185,7 @@ struct PipelineUnitConfiguration
     bool implements_synapse{false};
     bool implements_dendrite{false};
     bool implements_soma{false};
+
     PipelineUnitConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(name) {}
 };
 

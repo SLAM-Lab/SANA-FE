@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 line["total_spikes"] = df.loc[2, "fired"]
                 #line["loihi_energy"] = float(line["loihi_energy"])
                 #line["loihi_latency"] = float(line["loihi_latency"])
-                line["sim_energy"] = results["energy"] / TIMESTEPS
+                line["sim_energy"] = results["energy"]["total"] / TIMESTEPS
                 line["sim_latency"] = results["sim_time"] / TIMESTEPS
                 print(line)
                 with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "a") as out_file:

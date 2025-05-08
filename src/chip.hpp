@@ -107,9 +107,15 @@ private:
     long int total_timesteps{0L};
     long int total_spikes{0L};
     long int total_messages_sent{0L};
-    double total_energy{0.0};
-    double total_sim_time{0.0};
     double wall_time{0.0};
+    double total_sim_time{0.0};
+    double total_energy{0.0};
+    double synapse_energy{0.0};
+    double dendrite_energy{0.0};
+    double soma_energy{0.0};
+    double network_energy{0.0};
+
+    // Flags and filestreams
     bool spike_trace_enabled{false};
     bool potential_trace_enabled{false};
     bool perf_trace_enabled{false};
@@ -128,14 +134,19 @@ private:
 
 struct RunData
 {
-    double energy{0.0};
-    double sim_time{0.0};
     double wall_time{0.0};
     long int spikes{0L};
     long int packets_sent{0L};
     long int neurons_fired{0L};
     long int timestep_start;
     long int timesteps_executed;
+
+    double total_energy{0.0};
+    double synapse_energy{0.0};
+    double dendrite_energy{0.0};
+    double soma_energy{0.0};
+    double network_energy{0.0};
+    double sim_time{0.0};
 
     RunData(long int start,  long int steps);
 };
@@ -149,7 +160,11 @@ struct Timestep
     long int total_hops{0L};
     long int packets_sent{0L};
     long int neurons_fired{0L};
-    double energy{0.0};
+    double total_energy{0.0};
+    double synapse_energy{0.0};
+    double dendrite_energy{0.0};
+    double soma_energy{0.0};
+    double network_energy{0.0};
     double sim_time{0.0};
 
     Timestep(long int ts, int core_count);
@@ -351,6 +366,10 @@ public:
     bool implements_dendrite{false};
     bool implements_soma{false};
 
+    // Performance monitoring flags
+    bool log_energy{false};
+    bool log_latency{false};
+
 protected:
     long int simulation_time{0L};
     PipelineUnit() = default;
@@ -434,6 +453,8 @@ public:
     size_t offset;
     size_t parent_tile_id;
     int message_count{0};
+    bool log_energy{false};
+    bool log_latency{false};
 
     explicit Core(const CoreConfiguration &config);
     void map_neuron(const Neuron &n);
@@ -469,6 +490,8 @@ public:
     size_t id;
     size_t x{0};
     size_t y{0};
+    bool log_energy{false};
+    bool log_latency{false};
 
     explicit Tile(const TileConfiguration &config);
     [[nodiscard]] int get_id() const { return id; }
@@ -503,7 +526,7 @@ struct AxonOutModel
 void sim_timestep(Timestep &ts, SpikingChip &hw, const TimingModel timing_model = TIMING_MODEL_DETAILED);
 double sim_estimate_network_costs(const Tile &src, Tile &dest);
 void sim_reset_measurements(SpikingChip &hw);
-double sim_calculate_energy(const SpikingChip &hw);
+void sim_calculate_energy(const SpikingChip &hw, Timestep &ts);
 
 std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
 std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);

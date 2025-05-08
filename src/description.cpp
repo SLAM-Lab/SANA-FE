@@ -195,6 +195,19 @@ sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
     model_details.model_parameters =
             description_parse_model_parameters_yaml(parser, attributes);
 
+    ryml::ConstNodeRef energy_node =
+            attributes.find_child("log_energy");
+    if (!energy_node.invalid())
+    {
+        energy_node >> model_details.log_energy;
+    }
+    ryml::ConstNodeRef latency_node =
+            attributes.find_child("log_latency");
+    if (!latency_node.invalid())
+    {
+        latency_node >> model_details.log_latency;
+    }
+
     return model_details;
 }
 
@@ -226,6 +239,16 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
         }
 
         ModelInfo model_details;
+        ryml::ConstNodeRef energy_node = attributes.find_child("log_energy");
+        if (!energy_node.invalid())
+        {
+            energy_node >> model_details.log_energy;
+        }
+        ryml::ConstNodeRef latency_node = attributes.find_child("log_latency");
+        if (!latency_node.invalid())
+        {
+            latency_node >> model_details.log_latency;
+        }
         model_details.name = description_required_field<std::string>(
                 parser, attributes, "model");
         const ryml::ConstNodeRef plugin_path_node =
@@ -313,6 +336,16 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         ModelInfo model_details;
         model_details.name = description_required_field<std::string>(
                 parser, attributes, "model");
+        ryml::ConstNodeRef energy_node = attributes.find_child("log_energy");
+        if (!energy_node.invalid())
+        {
+            energy_node >> model_details.log_energy;
+        }
+        ryml::ConstNodeRef latency_node = attributes.find_child("log_latency");
+        if (!latency_node.invalid())
+        {
+            latency_node >> model_details.log_latency;
+        }
         model_details.model_parameters =
                 description_parse_model_parameters_yaml(parser, attributes);
         const ryml::ConstNodeRef plugin_path_node =
@@ -533,6 +566,19 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
     {
         buffer_inside_node >> buffer_inside_unit;
     }
+    ryml::ConstNodeRef energy_node =
+            attributes.find_child("log_energy");
+    if (!energy_node.invalid())
+    {
+        energy_node >> pipeline_config.log_energy;
+    }
+    ryml::ConstNodeRef latency_node =
+            attributes.find_child("log_latency");
+    if (!latency_node.invalid())
+    {
+        latency_node >> pipeline_config.log_latency;
+    }
+
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
             description_required_field<std::string>(
                     parser, attributes, "buffer_position"), buffer_inside_unit);
@@ -567,6 +613,17 @@ sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
     tile_metrics.latency_west_hop = description_required_field<double>(
             parser, attributes, "latency_west_hop");
 
+    if (!attributes.find_child("log_energy").invalid())
+    {
+        ryml::ConstNodeRef energy = attributes["log_energy"];
+        energy >> tile_metrics.log_energy;
+    }
+    if (!attributes.find_child("log_latency").invalid())
+    {
+        ryml::ConstNodeRef latency = attributes["log_latency"];
+        latency >> tile_metrics.log_latency;
+    }
+
     return tile_metrics;
 }
 
@@ -589,7 +646,10 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
         const TilePowerMetrics power_metrics =
                 description_parse_tile_metrics_yaml(
                         parser, tile_node["attributes"]);
-        TileConfiguration &new_tile = arch.create_tile(name, power_metrics);
+
+        TileConfiguration &new_tile =
+                arch.create_tile(name, power_metrics);
+
         if (tile_node.find_child("core").invalid())
         {
             const std::string error = "No core section defined";
