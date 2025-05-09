@@ -19,10 +19,10 @@
 #include <ryml_std.hpp>
 
 #include "arch.hpp"
+#include "chip.hpp"
 #include "description.hpp"
 #include "network.hpp"
 #include "print.hpp"
-#include "chip.hpp"
 
 sanafe::DescriptionParsingError::DescriptionParsingError(
         const std::string &error, const ryml::Parser &parser,
@@ -195,14 +195,12 @@ sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
     model_details.model_parameters =
             description_parse_model_parameters_yaml(parser, attributes);
 
-    ryml::ConstNodeRef energy_node =
-            attributes.find_child("log_energy");
+    ryml::ConstNodeRef energy_node = attributes.find_child("log_energy");
     if (!energy_node.invalid())
     {
         energy_node >> model_details.log_energy;
     }
-    ryml::ConstNodeRef latency_node =
-            attributes.find_child("log_latency");
+    ryml::ConstNodeRef latency_node = attributes.find_child("log_latency");
     if (!latency_node.invalid())
     {
         latency_node >> model_details.log_latency;
@@ -377,7 +375,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
                 // Merge the parameters from all sections with the same name
                 //  and warn if the library is overwritten
                 hw.model_info.model_parameters.merge(
-                    model_details.model_parameters);
+                        model_details.model_parameters);
                 if (model_details.plugin_library_path.has_value())
                 {
                     if (hw.model_info.plugin_library_path.has_value() &&
@@ -395,7 +393,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         if (!hw_exists)
         {
             PipelineUnitConfiguration &soma =
-            parent_core.create_hw(name, model_details);
+                    parent_core.create_hw(name, model_details);
             soma.implements_soma = true;
         }
     }
@@ -566,14 +564,12 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
     {
         buffer_inside_node >> buffer_inside_unit;
     }
-    ryml::ConstNodeRef energy_node =
-            attributes.find_child("log_energy");
+    ryml::ConstNodeRef energy_node = attributes.find_child("log_energy");
     if (!energy_node.invalid())
     {
         energy_node >> pipeline_config.log_energy;
     }
-    ryml::ConstNodeRef latency_node =
-            attributes.find_child("log_latency");
+    ryml::ConstNodeRef latency_node = attributes.find_child("log_latency");
     if (!latency_node.invalid())
     {
         latency_node >> pipeline_config.log_latency;
@@ -581,7 +577,8 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
 
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
             description_required_field<std::string>(
-                    parser, attributes, "buffer_position"), buffer_inside_unit);
+                    parser, attributes, "buffer_position"),
+            buffer_inside_unit);
     pipeline_config.max_neurons_supported = description_required_field<int>(
             parser, attributes, "max_neurons_supported");
 
@@ -647,8 +644,7 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
                 description_parse_tile_metrics_yaml(
                         parser, tile_node["attributes"]);
 
-        TileConfiguration &new_tile =
-                arch.create_tile(name, power_metrics);
+        TileConfiguration &new_tile = arch.create_tile(name, power_metrics);
 
         if (tile_node.find_child("core").invalid())
         {
@@ -1546,48 +1542,62 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
 {
     std::string neuron_address;
     mapping_info >> ryml::key(neuron_address);
-    auto dot_pos = neuron_address.find_first_of('.');
+    const auto dot_pos = neuron_address.find_first_of('.');
+    const bool neuron_defined = dot_pos != std::string::npos;
 
     std::string group_name = neuron_address.substr(0, dot_pos);
-    std::string neuron_str = neuron_address.substr(dot_pos + 1);
-    if (net.groups.find(group_name) == net.groups.end())
-    {
-        std::string error = "Invalid neuron group:" + group_name;
-        throw DescriptionParsingError(error, parser, mapping_info);
-    }
-    //INFO("Mapping neuron: %s.%zu\n", group_name.c_str(), neuron_id);
     NeuronGroup &group = net.groups.at(group_name);
 
-    // TODO: support mapping neuron groups (i.e. no neuron field given)
-    // Parse range of neurons to map
     size_t start_id;
     size_t end_id;
-    if (neuron_str.find("..") != std::string::npos)
+    if (neuron_defined)
     {
-        std::tie(start_id, end_id) = description_parse_range_yaml(neuron_str);
+        std::string neuron_str = neuron_address.substr(dot_pos + 1);
+        if (net.groups.find(group_name) == net.groups.end())
+        {
+            std::string error = "Invalid neuron group:" + group_name;
+            throw DescriptionParsingError(error, parser, mapping_info);
+        }
+
+        if (neuron_str.find("..") != std::string::npos)
+        {
+            std::tie(start_id, end_id) =
+                    description_parse_range_yaml(neuron_str);
+        }
+        else
+        {
+            start_id = std::stoull(neuron_str);
+            end_id = start_id;
+        }
     }
     else
     {
-        start_id = std::stoull(neuron_str);
-        end_id = start_id;
+        // No neuron given so map all neurons in the group
+        start_id = 0UL;
+        assert(group.neurons.size() > 0);
+        end_id = group.neurons.size() - 1UL;
     }
-    for (size_t neuron_id = start_id; neuron_id <= end_id; ++neuron_id)
+
+    //INFO("Mapping neuron: %s.%zu\n", group_name.c_str(), neuron_id);
+    for (size_t neuron_offset = start_id; neuron_offset <= end_id;
+            ++neuron_offset)
     {
-        if (neuron_id >= group.neurons.size())
+        if (neuron_offset >= group.neurons.size())
         {
             std::string error = "Invalid neuron id: ";
             error += group_name;
             error += '.';
-            error += neuron_id;
+            error += neuron_offset;
             throw DescriptionParsingError(error, parser, mapping_info);
         }
-        Neuron &neuron = group.neurons[neuron_id];
 
+        // Get any mapping attributes or configuration
         std::string core_address;
-        description_parse_mapping_info(
-                parser, mapping_info, neuron, core_address);
-        const auto dot_pos = core_address.find('.');
+        Neuron &n = group.neurons[neuron_offset];
+        description_parse_mapping_info(parser, mapping_info, n, core_address);
 
+        // Get pointers to the h/w we're mapping to
+        const auto dot_pos = core_address.find('.');
         const size_t tile_id = std::stoull(core_address.substr(0, dot_pos));
         const size_t core_offset_within_tile =
                 std::stoull(core_address.substr(dot_pos + 1));
@@ -1604,7 +1614,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
                     "Core ID >= core count", parser, mapping_info);
         }
         CoreConfiguration &core = tile.cores[core_offset_within_tile];
-        neuron.map_to_core(core);
+        n.map_to_core(core);
     }
 }
 
@@ -1817,7 +1827,8 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
     return std::make_pair(first, last);
 }
 
-// Markdown (v1) network description format. Supported for back-compatability.
+// *****************************************************************************
+// Netlist (v1) SNN description format. Supported for back-compatability.
 //  This format is useful for extremely large network files, as parsing this
 //  simpler format requires less memory than YAML parsing.
 constexpr int default_line_len = 4096;
@@ -1921,7 +1932,7 @@ std::tuple<std::string, size_t, std::string, size_t> sanafe::parse_edge_field(
         const std::string_view &edge_field)
 {
     // Edge description entries support two formats, to represent
-    //  neuron-neuron connections and compartment-compartment branches
+    //  neuron-neuron connections
     // i.e. Connection: e group.neuron->group.neuron:compartment <attributes>
     //   Note that the destination compartment is optional (default=0)
     // Split the source and destination neuron addresses
@@ -1988,13 +1999,19 @@ void sanafe::description_read_network_entry(
     bool group_set;
     bool neuron_set;
 
+    // TODO: support optional neuron fields for edges and mappings i.e. support
+    //  group mappings and hyper edges. Also backsupport support inline YAML as
+    //  part of this. This will make the legacy format as flexible/powerful as
+    //  the new YAML format
+
     assert(fields.size() > 0);
     const char entry_type = fields[0][0];
     // Sanity check input
     if ((entry_type == '\0') || (entry_type == '\n') || (entry_type == '#') ||
             (entry_type == '\r'))
     {
-        TRACE1(DESCRIPTION, "Warning: No entry, skipping line %d\n", line_number);
+        TRACE1(DESCRIPTION, "Warning: No entry, skipping line %d\n",
+                line_number);
         return;
     }
 
@@ -2140,14 +2157,14 @@ void sanafe::description_read_network_entry(
         std::stringstream bool_ss(value_str);
         if ((int_ss >> decoded_int) && int_ss.eof())
         {
-            TRACE1(DESCRIPTION, "Parsed integer: %d (%s).\n",
-                    decoded_int, key.c_str());
+            TRACE1(DESCRIPTION, "Parsed integer: %d (%s).\n", decoded_int,
+                    key.c_str());
             parameter.value = decoded_int;
         }
         else if ((float_ss >> decoded_double) && float_ss.eof())
         {
-            TRACE1(DESCRIPTION, "Parsed float: %e (%s).\n",
-                    decoded_double, key.c_str());
+            TRACE1(DESCRIPTION, "Parsed float: %e (%s).\n", decoded_double,
+                    key.c_str());
             //INFO("Parsed float: %e (%s).\n",
             //        decoded_double, key.c_str());
             parameter.value = decoded_double;

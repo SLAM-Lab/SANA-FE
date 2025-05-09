@@ -1,21 +1,20 @@
 network:
   name: example
   groups:
-    - name: 0
+    - name: in
       attributes: [log_spikes: true, threshold: 1.0]
       neurons:
         - 0: [log_potential: true, bias: 1.0]
         - 1..2
-    - name: 1
+    - name: out
       attributes: [log_spikes: true, threshold: 2.0, soma_hw_name: demo_soma_alt]
       neurons:
         - 0..2: [bias: 1.0]
   edges:
-    - 0.0 -> 1.0: [weight: -1.0]
-    - 0.1 -> 1.2: [weight: -2.0]
-    - 0.2 -> 1.2: [weight: 3.0]
+    - in.0 -> out.0: [weight: -1.0]
+    - in.1 -> out.2: [weight: -2.0]
+    - in.2 -> out.2: [weight: 3.0]
 mappings:
-  - 0.0..1: [core: 0.0]
-  - 0.2: [core: 0.1]
-  - 1.0..1: [core: 0.0]
-  - 1.2: [core: 0.1]
+  - in: [core: 0.0]
+  - out.0..1: [core: 0.0]
+  - out.2: [core: 0.1]
