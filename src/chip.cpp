@@ -115,15 +115,16 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         if (!neuron->core_id.has_value())
         {
             std::string error = "Neuron: " + neuron->parent_group_id + "." +
-                    std::to_string(neuron->id) + " not mapped.";
+                    std::to_string(neuron->offset) + " not mapped.";
             INFO("%s", error.c_str());
             throw std::runtime_error(error);
         }
         TRACE1(CHIP, "Mapping neuron %s.%zu to core:%zu\n",
-                neuron->parent_group_id.c_str(), neuron->id,
+                neuron->parent_group_id.c_str(), neuron->offset,
                 neuron->core_id.value());
         Core &mapped_core = list_of_cores[neuron->core_id.value()];
-        mapped_core.map_neuron(*neuron);
+        mapped_core.map_neuron(*neuron, total_neurons_mapped);
+        ++total_neurons_mapped;
     }
 
     // Now that we mapped all neurons, index them using their group and neuron
@@ -135,7 +136,7 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         for (MappedNeuron &mapped_neuron : core.neurons)
         {
             mapped_neuron_groups[mapped_neuron.parent_group_name]
-                                [mapped_neuron.id] = &mapped_neuron;
+                                [mapped_neuron.offset] = &mapped_neuron;
         }
     }
 }
@@ -197,11 +198,12 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
     auto list_of_cores = cores();
 
     auto &pre_group = mapped_neuron_groups.at(con.pre_neuron.group_name);
-    MappedNeuron &pre_neuron = *(pre_group[con.pre_neuron.neuron_id.value()]);
+    MappedNeuron &pre_neuron =
+            *(pre_group[con.pre_neuron.neuron_offset.value()]);
 
     auto &post_group = mapped_neuron_groups.at(con.post_neuron.group_name);
     MappedNeuron &post_neuron =
-            *(post_group[con.post_neuron.neuron_id.value()]);
+            *(post_group[con.post_neuron.neuron_offset.value()]);
 
     pre_neuron.connections_out.emplace_back(pre_neuron.connections_out.size());
     MappedConnection &mapped_con = pre_neuron.connections_out.back();
@@ -339,7 +341,8 @@ sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
     total_sim_time += ts.sim_time;
     total_spikes += ts.spike_count;
     total_neurons_fired += ts.neurons_fired;
-    total_messages_sent += ts.packets_sent;
+    // The total_messages_sent is incremented during the simulation since it's
+    //  used to calculate the mid, so nothing needs to be done here
     if (spike_trace_enabled)
     {
         sim_trace_record_spikes(spike_trace, total_timesteps);
@@ -440,7 +443,8 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
         if (placeholder_event)
         {
             const MappedNeuron &last_neuron = core.neurons.back();
-            Message placeholder(*this, last_neuron, ts.timestep);
+            Message placeholder(
+                    placeholder_mid, *this, last_neuron, ts.timestep);
             placeholder.generation_delay = core.next_message_generation_delay;
             // Create a dummy placeholder message
             ts.messages[core.id].push_back(placeholder);
@@ -955,7 +959,7 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
             n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const int axon_address : n.axon_out_addresses)
     {
-        Message m(*this, n, ts.timestep, axon_address);
+        Message m(total_messages_sent, *this, n, ts.timestep, axon_address);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
         axon_out_hw.energy += axon_out_hw.energy_access;
@@ -965,7 +969,8 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         n.core->next_message_generation_delay = 0.0;
 
         ts.messages[n.core->id].push_back(m);
-        axon_out_hw.packets_out++;
+        ++axon_out_hw.packets_out;
+        ++total_messages_sent;
 
         axon_result.energy.value() += axon_out_hw.energy_access;
         axon_result.latency.value() += axon_out_hw.latency_access;
@@ -1169,10 +1174,11 @@ sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
 {
 }
 
-void sanafe::Core::map_neuron(const Neuron &neuron_to_map)
+void sanafe::Core::map_neuron(
+        const Neuron &neuron_to_map, const size_t neuron_id)
 {
     TRACE1(CHIP, "Mapping nid:%s.%zu to core: %zu\n",
-            neuron_to_map.parent_group_id.c_str(), neuron_to_map.id, id);
+            neuron_to_map.parent_group_id.c_str(), neuron_to_map.offset, id);
 
     if (neurons.size() >= pipeline_config.max_neurons_supported)
     {
@@ -1210,7 +1216,7 @@ void sanafe::Core::map_neuron(const Neuron &neuron_to_map)
     {
         INFO("Error: Could not map neuron nid:%zu (hw:%s) "
              "to any dendrite h/w.\n",
-                neuron_to_map.id, neuron_to_map.dendrite_hw_name.c_str());
+                neuron_to_map.offset, neuron_to_map.dendrite_hw_name.c_str());
         throw std::runtime_error("Error: Could not map neuron to dendrite h/w");
     }
 
@@ -1233,7 +1239,7 @@ void sanafe::Core::map_neuron(const Neuron &neuron_to_map)
     {
         INFO("Error: Could not map neuron nid:%zu (hw:%s) "
              "to any soma h/w.\n",
-                neuron_to_map.id, neuron_to_map.soma_hw_name.c_str());
+                neuron_to_map.offset, neuron_to_map.soma_hw_name.c_str());
         throw std::runtime_error("Error: Could not map neuron to soma h/w");
     }
     mapped_soma->neuron_count++;
@@ -1247,8 +1253,8 @@ void sanafe::Core::map_neuron(const Neuron &neuron_to_map)
 
     // Map the neuron to the core and its hardware units
     const size_t address = neurons.size();
-    neurons.emplace_back(neuron_to_map, this, address, mapped_dendrite,
-            mapped_soma, mapped_axon_out);
+    neurons.emplace_back(neuron_to_map, this, neuron_id, address,
+            mapped_dendrite, mapped_soma, mapped_axon_out);
 
     return;
 }
@@ -1309,9 +1315,10 @@ sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
     return axon_out_hw.back();
 }
 
-sanafe::Message::Message(
-        const SpikingChip &hw, const MappedNeuron &n, const long int timestep)
+sanafe::Message::Message(const long int id, const SpikingChip &hw,
+        const MappedNeuron &n, const long int timestep)
         : timestep(timestep)
+        , mid(id)
         , src_neuron_id(n.id)
         , src_neuron_group_id(n.parent_group_name)
 {
@@ -1327,9 +1334,9 @@ sanafe::Message::Message(
     src_core_offset = src_core.offset;
 }
 
-sanafe::Message::Message(const SpikingChip &hw, const MappedNeuron &n,
-        const long int timestep, const int axon_address)
-        : Message(hw, n, timestep)
+sanafe::Message::Message(const long int id, const SpikingChip &hw,
+        const MappedNeuron &n, const long int timestep, const int axon_address)
+        : Message(id, hw, n, timestep)
 {
     const Core &src_core = *(n.core);
     const AxonOutModel &src_axon = src_core.axons_out[axon_address];
@@ -1397,21 +1404,23 @@ sanafe::MappedConnection::MappedConnection(const int connection_id)
 }
 
 sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
-        Core *mapped_core, const size_t address, PipelineUnit *mapped_dendrite,
-        PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out)
-        : parent_group_name{neuron_to_map.parent_group_id}
-        , id(neuron_to_map.id)
+        Core *mapped_core, const size_t nid, const size_t mapped_address,
+        PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma,
+        AxonOutUnit *mapped_axon_out)
+        : parent_group_name(neuron_to_map.parent_group_id)
+        , offset(neuron_to_map.offset)
+        , id(nid)
         , core(mapped_core)
         , dendrite_hw(mapped_dendrite)
         , soma_hw(mapped_soma)
         , axon_out_hw(mapped_axon_out)
-        , mapped_address(address)
-        , mapping_order{neuron_to_map.mapping_order}
-        , force_synapse_update{neuron_to_map.force_synapse_update}
-        , force_dendrite_update{neuron_to_map.force_dendrite_update}
-        , force_soma_update{neuron_to_map.force_soma_update}
-        , log_spikes{neuron_to_map.log_spikes}
-        , log_potential{neuron_to_map.log_potential}
+        , mapped_address(mapped_address)
+        , mapping_order(neuron_to_map.mapping_order)
+        , force_synapse_update(neuron_to_map.force_synapse_update)
+        , force_dendrite_update(neuron_to_map.force_dendrite_update)
+        , force_soma_update(neuron_to_map.force_soma_update)
+        , log_spikes(neuron_to_map.log_spikes)
+        , log_potential(neuron_to_map.log_potential)
 
 {
     set_model_attributes(neuron_to_map.model_parameters);
@@ -2066,6 +2075,7 @@ void sanafe::SpikingChip::sim_trace_write_message_header(
 {
     assert(message_trace_file.is_open());
     message_trace_file << "timestep,";
+    message_trace_file << "mid,";
     message_trace_file << "src_neuron,";
     message_trace_file << "src_hw,";
     message_trace_file << "dest_hw,";
@@ -2156,6 +2166,7 @@ void sanafe::SpikingChip::sim_trace_record_message(
 {
     assert(message_trace_file.is_open());
     message_trace_file << m.timestep << ",";
+    message_trace_file << m.mid << ",";
     message_trace_file << m.src_neuron_group_id << ".";
     message_trace_file << m.src_neuron_id << ",";
     message_trace_file << m.src_tile_id << "." << m.src_core_offset << ",";

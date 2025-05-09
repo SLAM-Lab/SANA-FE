@@ -173,12 +173,8 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: output detailed energy and latency breakdowns in the perf trace
 // TODO: support hyperedges in Python interface
 // TODO: support group mappings in description format
-// TODO: support unique message ids (mid) for every spike packet and also give
-//  neurons both unique nid across groups, and change the meaning of 'nid' to be
-//  group offset 'noffset'?
 // TODO: integrate Booksim2 as a 'cycle' accurate modeling option
 // TODO: support saving SNNs to yaml and netlist
 // TODO: support embedded yaml in the netlist format

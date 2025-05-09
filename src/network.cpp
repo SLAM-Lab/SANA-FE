@@ -22,26 +22,25 @@
 #include "print.hpp"
 
 sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
-        SpikingNetwork &net,
-        const size_t neuron_count,
+        SpikingNetwork &net, const size_t neuron_count,
         const NeuronConfiguration &default_config)
         : default_neuron_config(default_config)
         , name(std::move(group_name))
 {
     neurons.reserve(neuron_count);
-    for (size_t nid = 0; nid < neuron_count; nid++)
+    for (size_t neuron_offset = 0; neuron_offset < neuron_count;
+            ++neuron_offset)
     {
         neurons.emplace_back(
-                Neuron(nid, net, group_name, default_config));
+                Neuron(neuron_offset, net, group_name, default_config));
     }
 }
 
-sanafe::Neuron::Neuron(const size_t neuron_id,
-        SpikingNetwork &net,
+sanafe::Neuron::Neuron(const size_t neuron_offset, SpikingNetwork &net,
         const std::string parent_group_id, const NeuronConfiguration &config)
         : parent_group_id(std::move(parent_group_id))
         , parent_net(net)
-        , id(neuron_id)
+        , offset(neuron_offset)
 {
     configure(config);
 }
@@ -50,8 +49,8 @@ void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
 {
     this->core_id = core.address.id;
     mapping_order = parent_net.update_mapping_count();
-    TRACE1(NET, "Mapping order for nid:%s.%zu = %zu\n", parent_group_id.c_str(), id,
-            mapping_order);
+    TRACE1(NET, "Mapping order for nid:%s.%zu = %zu\n", parent_group_id.c_str(),
+            offset, mapping_order);
 
     return;
 }
@@ -91,14 +90,14 @@ void sanafe::Neuron::configure(const NeuronConfiguration &config)
         force_synapse_update = config.force_synapse_update.value();
     }
 
-    model_parameters.insert(config.model_parameters.begin(),
-            config.model_parameters.end());
+    model_parameters.insert(
+            config.model_parameters.begin(), config.model_parameters.end());
 }
 
 std::string sanafe::Neuron::info() const
 {
     std::ostringstream ss;
-    ss << "sanafe::Neuron(nid=" << parent_group_id << '.' << id;
+    ss << "sanafe::Neuron(nid=" << parent_group_id << '.' << offset;
     ss << " edges_out=" << edges_out.size() << ")";
     //ss << " attributes={" << print_format_attributes(attributes) << "})";
     return ss.str();
@@ -136,9 +135,9 @@ size_t sanafe::Neuron::connect_to_neuron(Neuron &dest)
 {
     edges_out.emplace_back(edges_out.size());
     Connection &edge = edges_out.back();
-    edge.pre_neuron.neuron_id = this->id;
+    edge.pre_neuron.neuron_offset = this->offset;
     edge.pre_neuron.group_name = this->parent_group_id;
-    edge.post_neuron.neuron_id = dest.id;
+    edge.post_neuron.neuron_offset = dest.offset;
     edge.post_neuron.group_name = dest.parent_group_id;
     //if (synapse_hw_name.has_value())
     //{
@@ -151,9 +150,9 @@ size_t sanafe::Neuron::connect_to_neuron(Neuron &dest)
 
     TRACE1(NET, "\tAdded con %s.%zu->%s.%zu\n",
             edge.pre_neuron.group_name.c_str(),
-            edge.pre_neuron.neuron_id.value(),
+            edge.pre_neuron.neuron_offset.value(),
             edge.post_neuron.group_name.c_str(),
-            edge.post_neuron.neuron_id.value());
+            edge.post_neuron.neuron_offset.value());
 
     return edge.id;
 }
@@ -409,8 +408,9 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
                                 }
                             }
                             TRACE1(NET, "%s.%zu->%s.%zu w=%d\n",
-                                    source.parent_group_id.c_str(), source.id,
-                                    dest.parent_group_id.c_str(), dest.id,
+                                    source.parent_group_id.c_str(),
+                                    source.offset, dest.parent_group_id.c_str(),
+                                    dest.offset,
                                     (int) con.synapse_params["weight"]);
                         }
                     }

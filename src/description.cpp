@@ -1177,7 +1177,7 @@ sanafe::description_parse_edge_description(const std::string_view &description)
     source.group_name = source_part.substr(0, source_dot_pos);
     if (source_neuron_defined)
     {
-        source.neuron_id = std::stoull(
+        source.neuron_offset = std::stoull(
                 std::string(source_part.substr(source_dot_pos + 1)));
     }
 
@@ -1185,7 +1185,7 @@ sanafe::description_parse_edge_description(const std::string_view &description)
     target.group_name = target_part.substr(0, target_dot_pos);
     if (target_neuron_defined)
     {
-        target.neuron_id = std::stoull(
+        target.neuron_offset = std::stoull(
                 std::string(target_part.substr(target_dot_pos + 1)));
     }
 
@@ -1200,7 +1200,7 @@ void sanafe::description_parse_edge(const std::string &description,
     const auto [source_address, target_address] =
             description_parse_edge_description(description);
 
-    const bool is_hyper_edge = !source_address.neuron_id.has_value();
+    const bool is_hyper_edge = !source_address.neuron_offset.has_value();
     if (is_hyper_edge)
     {
         description_parse_hyperedge(
@@ -1225,15 +1225,15 @@ void sanafe::description_parse_neuron_connection(
         throw DescriptionParsingError(error, parser, attributes_node);
     }
     NeuronGroup &source_group = net.groups.at(source_address.group_name);
-    if (source_address.neuron_id >= source_group.neurons.size())
+    if (source_address.neuron_offset >= source_group.neurons.size())
     {
         const std::string error =
                 "Invalid source neuron id: " + source_address.group_name + "." +
-                std::to_string(source_address.neuron_id.value());
+                std::to_string(source_address.neuron_offset.value());
         throw DescriptionParsingError(error, parser, attributes_node);
     }
     Neuron &source_neuron =
-            source_group.neurons[source_address.neuron_id.value()];
+            source_group.neurons[source_address.neuron_offset.value()];
 
     if (net.groups.find(target_address.group_name) == net.groups.end())
     {
@@ -1243,15 +1243,15 @@ void sanafe::description_parse_neuron_connection(
     }
     NeuronGroup &target_group = net.groups.at(target_address.group_name);
 
-    if (target_address.neuron_id >= target_group.neurons.size())
+    if (target_address.neuron_offset >= target_group.neurons.size())
     {
         const std::string error =
                 "Invalid target neuron id: " + target_address.group_name + "." +
-                std::to_string(target_address.neuron_id.value());
+                std::to_string(target_address.neuron_offset.value());
         throw DescriptionParsingError(error, parser, attributes_node);
     }
     Neuron &target_neuron =
-            target_group.neurons.at(target_address.neuron_id.value());
+            target_group.neurons.at(target_address.neuron_offset.value());
 
     const size_t edge_idx = source_neuron.connect_to_neuron(target_neuron);
     Connection &edge = source_neuron.edges_out[edge_idx];

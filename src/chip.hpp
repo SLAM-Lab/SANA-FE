@@ -95,7 +95,6 @@ public:
     void sim_output_run_summary(const std::filesystem::path &output_dir) const;
     void reset();
 
-
     std::vector<std::reference_wrapper<Core>> cores();
 
     size_t core_count{0UL};
@@ -106,6 +105,7 @@ public:
 
 private:
     std::string out_dir;
+    size_t total_neurons_mapped{0UL};
     long int total_neurons_fired{0L};
     long int total_timesteps{0L};
     long int total_spikes{0L};
@@ -233,6 +233,7 @@ public:
     std::vector<MappedConnection> connections_out;
     std::vector<int> axon_out_addresses;
     std::string parent_group_name;
+    size_t offset;
     size_t id;
 
     // Internal pointers to mapped hardware
@@ -260,7 +261,7 @@ public:
     // Track spikes
     bool axon_out_input_spike{false};
 
-    MappedNeuron(const Neuron &neuron_to_map, Core *mapped_core, const size_t address, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
+    MappedNeuron(const Neuron &neuron_to_map, Core *mapped_core, const size_t nid, const size_t mapped_address, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
     MappedNeuron(const MappedNeuron &copy) = default;
     MappedNeuron& operator=(const MappedNeuron& other) = default;
     MappedNeuron(MappedNeuron&& other) = default;
@@ -277,6 +278,7 @@ struct Synapse
     MappedConnection *con;
 };
 
+constexpr long int placeholder_mid = -1UL; // An invalid message id for placeholders
 struct Message
 {
     double generation_delay{0.0};
@@ -287,6 +289,7 @@ struct Message
     double received_timestamp{-std::numeric_limits<double>::infinity()};
     double processed_timestamp{-std::numeric_limits<double>::infinity()};
     long int timestep;
+    const long int mid;
     int spikes{0};
     size_t hops{0UL};
     size_t src_neuron_id;
@@ -306,8 +309,8 @@ struct Message
     bool placeholder{true};
     bool in_noc{false};
 
-    explicit Message(const SpikingChip &hw, const MappedNeuron &n, long int timestep);
-    explicit Message(const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
+    explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep);
+    explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
 };
 
 struct PipelineResult
@@ -499,7 +502,7 @@ public:
     bool log_latency{false};
 
     explicit Core(const CoreConfiguration &config);
-    void map_neuron(const Neuron &n);
+    void map_neuron(const Neuron &n, const size_t neuron_id);
     AxonInUnit &create_axon_in(const AxonInConfiguration &config);
     PipelineUnit &create_pipeline_unit(const PipelineUnitConfiguration &config);
     AxonOutUnit &create_axon_out(const AxonOutConfiguration &config);

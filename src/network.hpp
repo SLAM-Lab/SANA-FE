@@ -57,7 +57,7 @@ struct NeuronConfiguration
 struct NeuronAddress
 {
     std::string group_name{};
-    std::optional<size_t> neuron_id{std::nullopt};
+    std::optional<size_t> neuron_offset{std::nullopt};
 };
 
 struct Conv2DParameters
@@ -82,7 +82,7 @@ public:
     std::string dendrite_hw_name{};
     std::string parent_group_id;
     SpikingNetwork &parent_net;
-    size_t id{};
+    size_t offset{};
     std::optional<size_t> core_id{std::nullopt};
     size_t mapping_order{};
     // Optionally set flags for updating and traces
@@ -92,8 +92,8 @@ public:
     bool log_spikes{false};
     bool log_potential{false};
 
-    explicit Neuron(size_t neuron_id, SpikingNetwork &net, const std::string parent_group_id, const NeuronConfiguration &config);
-    [[nodiscard]] size_t get_id() const { return id; }
+    explicit Neuron(size_t neuron_offset, SpikingNetwork &net, const std::string parent_group_id, const NeuronConfiguration &config);
+    [[nodiscard]] size_t get_id() const { return offset; }
     size_t connect_to_neuron(Neuron &dest);
     void map_to_core(const CoreConfiguration &core);
     void configure(const NeuronConfiguration &attributes);
