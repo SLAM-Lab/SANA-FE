@@ -180,8 +180,8 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                     {
                         MappedNeuron &n = *(mapped_con.post_neuron);
                         n.dendrite_hw->set_attribute_edge(
-                            mapped_con.synapse_address,
-                            name_value_pair.first, name_value_pair.second);
+                                mapped_con.synapse_address,
+                                name_value_pair.first, name_value_pair.second);
                     }
                 }
             }
@@ -253,7 +253,7 @@ void sanafe::SpikingChip::map_axons()
     }
 
     TRACE1(CHIP, "Finished creating connection maps.\n");
-    sim_print_axon_summary(*this);
+    sim_print_axon_summary();
 }
 
 sanafe::RunData::RunData(const long int start, const long int steps)
@@ -262,9 +262,8 @@ sanafe::RunData::RunData(const long int start, const long int steps)
 {
 }
 
-sanafe::RunData sanafe::SpikingChip::sim(
-        const long int timesteps, const long int heartbeat,
-        const TimingModel timing_model)
+sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
+        const long int heartbeat, const TimingModel timing_model)
 {
     RunData rd((total_timesteps + 1), timesteps);
     if (total_timesteps <= 0)
@@ -277,7 +276,7 @@ sanafe::RunData sanafe::SpikingChip::sim(
         }
         if (potential_trace_enabled)
         {
-            potential_trace = sim_trace_open_potential_trace(out_dir, *this);
+            potential_trace = sim_trace_open_potential_trace(out_dir);
         }
         if (perf_trace_enabled)
         {
@@ -326,26 +325,32 @@ sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
 
     // Run and measure the wall-clock time taken to run the simulation
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
-    sim_timestep(ts, *this, timing_model);
+    sim_timestep(ts, timing_model);
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
+    // Update global chip performance counters
     total_energy += ts.total_energy;
+    synapse_energy += ts.synapse_energy;
+    dendrite_energy += ts.dendrite_energy;
+    soma_energy += ts.soma_energy;
+    network_energy += ts.network_energy;
+
     total_sim_time += ts.sim_time;
     total_spikes += ts.spike_count;
     total_neurons_fired += ts.neurons_fired;
     total_messages_sent += ts.packets_sent;
     if (spike_trace_enabled)
     {
-        sim_trace_record_spikes(spike_trace, total_timesteps, *this);
+        sim_trace_record_spikes(spike_trace, total_timesteps);
     }
     if (potential_trace_enabled)
     {
-        sim_trace_record_potentials(potential_trace, total_timesteps, *this);
+        sim_trace_record_potentials(potential_trace, total_timesteps);
     }
     if (perf_trace_enabled)
     {
-        sim_trace_perf_log_timestep(perf_trace, ts);
+        sim_trace_record_perf(perf_trace, ts);
     }
     if (message_trace_enabled)
     {
@@ -409,25 +414,25 @@ double sanafe::SpikingChip::get_power() const
 }
 
 // Pipeline modeling
-void sanafe::process_neurons(Timestep &ts, SpikingChip &hw)
+void sanafe::SpikingChip::process_neurons(Timestep &ts)
 {
-    auto cores = hw.cores();
+    auto core_list = cores();
 
     // Older versions of OpenMP don't support range-based for loops yet...
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     // codechecker_suppress [modernize-loop-convert]
-    for (size_t idx = 0; idx < cores.size(); idx++)
+    for (size_t idx = 0; idx < core_list.size(); idx++)
     {
-        Core &core = cores[idx];
+        Core &core = core_list[idx];
         if (core.pipeline_config.buffer_position < BUFFER_BEFORE_DENDRITE_UNIT)
         {
             throw std::logic_error("Error: Buffer must be after synaptic h/w");
         }
         for (MappedNeuron &n : core.neurons)
         {
-            process_neuron(ts, hw, n);
+            process_neuron(ts, n);
         }
 
         // Account for any remaining neuron processing
@@ -435,7 +440,7 @@ void sanafe::process_neurons(Timestep &ts, SpikingChip &hw)
         if (placeholder_event)
         {
             const MappedNeuron &last_neuron = core.neurons.back();
-            Message placeholder(hw, last_neuron, ts.timestep);
+            Message placeholder(*this, last_neuron, ts.timestep);
             placeholder.generation_delay = core.next_message_generation_delay;
             // Create a dummy placeholder message
             ts.messages[core.id].push_back(placeholder);
@@ -443,7 +448,7 @@ void sanafe::process_neurons(Timestep &ts, SpikingChip &hw)
     }
 }
 
-void sanafe::process_messages(Timestep &ts, SpikingChip &hw)
+void sanafe::SpikingChip::process_messages(Timestep &ts)
 {
     // Assign outgoing spike messages to their respective destination
     //  cores, and calculate network costs
@@ -453,21 +458,21 @@ void sanafe::process_messages(Timestep &ts, SpikingChip &hw)
         {
             if (!m.placeholder)
             {
-                receive_message(hw, m);
+                receive_message(m);
             }
         }
     }
 
     // Now process all messages at receiving cores
-    auto cores = hw.cores();
+    auto core_list = cores();
     // Older versions of OpenMP don't support range-based for loops yet...
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     // codechecker_suppress [modernize-loop-convert]
-    for (size_t idx = 0; idx < cores.size(); idx++)
+    for (size_t idx = 0; idx < core_list.size(); idx++)
     {
-        Core &core = cores[idx];
+        Core &core = core_list[idx];
         TRACE1(CHIP, "Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
         for (auto *m : core.messages_in)
@@ -477,13 +482,13 @@ void sanafe::process_messages(Timestep &ts, SpikingChip &hw)
     }
 }
 
-void sanafe::receive_message(SpikingChip &hw, Message &m)
+void sanafe::SpikingChip::receive_message(Message &m)
 {
-    assert(static_cast<size_t>(m.src_tile_id) < hw.tiles.size());
-    assert(static_cast<size_t>(m.dest_tile_id) < hw.tiles.size());
+    assert(static_cast<size_t>(m.src_tile_id) < tiles.size());
+    assert(static_cast<size_t>(m.dest_tile_id) < tiles.size());
 
-    const Tile &src_tile = hw.tiles[m.src_tile_id];
-    Tile &dest_tile = hw.tiles[m.dest_tile_id];
+    const Tile &src_tile = tiles[m.src_tile_id];
+    Tile &dest_tile = tiles[m.dest_tile_id];
 
     m.network_delay = sim_estimate_network_costs(src_tile, dest_tile);
     m.hops = abs_diff(src_tile.x, dest_tile.x) +
@@ -495,13 +500,11 @@ void sanafe::receive_message(SpikingChip &hw, Message &m)
 
 void sanafe::MappedNeuron::build_neuron_processing_pipeline()
 {
-    if (core->pipeline_config.buffer_position <=
-            BUFFER_INSIDE_DENDRITE_UNIT )
+    if (core->pipeline_config.buffer_position <= BUFFER_INSIDE_DENDRITE_UNIT)
     {
         neuron_processing_pipeline.push_back(dendrite_hw);
     }
-    if ((core->pipeline_config.buffer_position <=
-                BUFFER_INSIDE_SOMA_UNIT) &&
+    if ((core->pipeline_config.buffer_position <= BUFFER_INSIDE_SOMA_UNIT) &&
             (soma_hw != dendrite_hw))
     {
         neuron_processing_pipeline.push_back(soma_hw);
@@ -518,7 +521,7 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
     //  here could cause a spike sent that shouldn't be
     message_processing_pipeline.push_back(synapse_hw);
     if ((mapped_core.pipeline_config.buffer_position >
-                    BUFFER_BEFORE_DENDRITE_UNIT) &&
+                BUFFER_BEFORE_DENDRITE_UNIT) &&
             (n.dendrite_hw != synapse_hw))
     {
         message_processing_pipeline.push_back(n.dendrite_hw);
@@ -533,7 +536,7 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
     return;
 }
 
-void sanafe::process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n)
+void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 {
     Core &c = *(n.core);
     bool simulate_buffer = (c.pipeline_config.buffer_position ==
@@ -550,32 +553,33 @@ void sanafe::process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n)
     PipelineResult pipeline_output = execute_pipeline(
             n.neuron_processing_pipeline, ts, n, std::nullopt, input);
     n.core->next_message_generation_delay += pipeline_output.latency.value();
-    pipeline_process_axon_out(ts, hw, n);
+    pipeline_process_axon_out(ts, n);
 
     return;
 }
 
-void sanafe::PipelineUnit::check_outputs(const MappedNeuron &n,
-        const PipelineResult &result)
+void sanafe::PipelineUnit::check_outputs(
+        const MappedNeuron &n, const PipelineResult &result)
 {
     // Check the hw returns a valid value for the next unit or network to
     //  process
     if (implements_soma && result.status == INVALID_NEURON_STATE)
     {
         throw std::runtime_error("Soma output; should return valid "
-                "neuron state.\n");
+                                 "neuron state.\n");
     }
     else if (!implements_soma && (implements_synapse || implements_dendrite) &&
             !result.current.has_value())
     {
         throw std::runtime_error("Synaptic or dendritic output; should return "
-                                "synaptic/dendritic current\n");
+                                 "synaptic/dendritic current\n");
     }
 
     return;
 }
 
-double sanafe::process_message(Timestep &ts, Core &core, Message &m)
+double sanafe::SpikingChip::process_message(
+        Timestep &ts, Core &core, Message &m)
 {
     double message_processing_latency = pipeline_process_axon_in(core, m);
 
@@ -603,7 +607,7 @@ double sanafe::process_message(Timestep &ts, Core &core, Message &m)
     return message_processing_latency;
 }
 
-sanafe::PipelineResult sanafe::execute_pipeline(
+sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
         const std::vector<PipelineUnit *> &pipeline, Timestep &ts,
         MappedNeuron &n, std::optional<MappedConnection *> con,
         const PipelineResult &input)
@@ -640,9 +644,10 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
     {
         if (!con.has_value())
         {
-            throw std::logic_error("Error: Pipeline error, didn't receive "
-                "synaptic connection info. Check that no h/w unit is being "
-                "invoked before this one in the pipeline.");
+            throw std::logic_error(
+                    "Error: Pipeline error, didn't receive "
+                    "synaptic connection info. Check that no h/w unit is being "
+                    "invoked before this one in the pipeline.");
         }
         output = update(con.value()->synapse_address, true);
         ++spikes_processed;
@@ -654,8 +659,7 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
         {
             synapse_address = con.value()->synapse_address;
         }
-        output = update(
-                n.mapped_address, input.current, synapse_address);
+        output = update(n.mapped_address, input.current, synapse_address);
     }
     else if (implements_soma) // Soma is input interface
     {
@@ -674,7 +678,7 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
     else if (implements_synapse) // Synapse is output interface
     {
         output = calculate_synapse_default_energy_latency(
-            *(con.value()), output);
+                *(con.value()), output);
     }
     check_outputs(n, output);
 
@@ -683,7 +687,8 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
     return output;
 }
 
-double sanafe::pipeline_process_axon_in(Core &core, const Message &m)
+double sanafe::SpikingChip::pipeline_process_axon_in(
+        Core &core, const Message &m)
 {
     assert(m.dest_axon_hw >= 0);
     assert(static_cast<size_t>(m.dest_axon_hw) < core.axon_in_hw.size());
@@ -730,9 +735,10 @@ sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
     {
         if (simulation_result.latency.has_value())
         {
-            std::string error("Error: Synapse unit simulates latency and also has "
-                              "default latency metrics set. Remove the default "
-                              "metric from the architecture description.");
+            std::string error(
+                    "Error: Synapse unit simulates latency and also has "
+                    "default latency metrics set. Remove the default "
+                    "metric from the architecture description.");
             throw std::logic_error(error);
         }
         updated_result.latency =
@@ -741,9 +747,10 @@ sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
 
     if (!updated_result.energy.has_value())
     {
-        std::string error("Error: Synapse unit does not simulate energy or provide "
-                          "a default energy cost in the architecture "
-                          "description.");
+        std::string error(
+                "Error: Synapse unit does not simulate energy or provide "
+                "a default energy cost in the architecture "
+                "description.");
         throw std::logic_error(error);
     }
     if (!updated_result.latency.has_value())
@@ -801,9 +808,10 @@ sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
 
     if (!updated_result.energy.has_value())
     {
-        std::string error("Error: Dendrite unit does not simulate energy or provide "
-                          "a default energy cost in the architecture "
-                          "description.");
+        std::string error(
+                "Error: Dendrite unit does not simulate energy or provide "
+                "a default energy cost in the architecture "
+                "description.");
         throw std::logic_error(error);
     }
     if (!updated_result.latency.has_value())
@@ -817,7 +825,8 @@ sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
     return updated_result;
 }
 
-sanafe::PipelineResult sanafe::PipelineUnit::calculate_soma_default_energy_latency(
+sanafe::PipelineResult
+sanafe::PipelineUnit::calculate_soma_default_energy_latency(
         MappedNeuron &n, const PipelineResult &simulation_result)
 {
     PipelineResult updated_result{simulation_result};
@@ -825,10 +834,12 @@ sanafe::PipelineResult sanafe::PipelineUnit::calculate_soma_default_energy_laten
     bool energy_simulated = simulation_result.energy.has_value();
     bool latency_simulated = simulation_result.latency.has_value();
 
-    bool soma_energy_metrics_set = n.soma_hw->default_soma_energy_metrics.has_value();
+    bool soma_energy_metrics_set =
+            n.soma_hw->default_soma_energy_metrics.has_value();
     if (energy_simulated && soma_energy_metrics_set)
     {
-        std::string error("Error: Soma unit simulates energy and also has "
+        std::string error(
+                "Error: Soma unit simulates energy and also has "
                 "default energy metrics set. Remove the default energy metrics "
                 "from the architecture description.");
         throw std::logic_error(error);
@@ -839,10 +850,12 @@ sanafe::PipelineResult sanafe::PipelineUnit::calculate_soma_default_energy_laten
                 n.soma_hw->default_soma_energy_metrics->energy_access_neuron;
     }
 
-    bool soma_latency_metrics_set = n.soma_hw->default_soma_energy_metrics.has_value();
+    bool soma_latency_metrics_set =
+            n.soma_hw->default_soma_energy_metrics.has_value();
     if (latency_simulated && soma_latency_metrics_set)
     {
-        std::string error("Error: Soma unit simulates latency and also has "
+        std::string error(
+                "Error: Soma unit simulates latency and also has "
                 "default energy costs set. Remove the default latency metrics "
                 "from the architecture description");
         throw std::logic_error(error);
@@ -851,13 +864,14 @@ sanafe::PipelineResult sanafe::PipelineUnit::calculate_soma_default_energy_laten
     {
         if (simulation_result.latency.has_value())
         {
-            std::string error("Error: Soma unit simulates energy and also has "
-                "default energy costs set. Remove default energy costs from the "
-                "architecture description.");
+            std::string error(
+                    "Error: Soma unit simulates energy and also has "
+                    "default energy costs set. Remove default energy costs from the "
+                    "architecture description.");
             throw std::logic_error(error);
         }
-        updated_result.latency = n.soma_hw->default_soma_latency_metrics
-                                            ->latency_access_neuron;
+        updated_result.latency =
+                n.soma_hw->default_soma_latency_metrics->latency_access_neuron;
     }
 
     if ((simulation_result.status == sanafe::UPDATED) ||
@@ -866,8 +880,7 @@ sanafe::PipelineResult sanafe::PipelineUnit::calculate_soma_default_energy_laten
         if (n.soma_hw->default_soma_energy_metrics.has_value())
         {
             updated_result.energy.value() +=
-                    n.soma_hw->default_soma_energy_metrics
-                            ->energy_update_neuron;
+                    n.soma_hw->default_soma_energy_metrics->energy_update_neuron;
         }
         if (n.soma_hw->default_soma_latency_metrics.has_value())
         {
@@ -886,8 +899,7 @@ sanafe::PipelineResult sanafe::PipelineUnit::calculate_soma_default_energy_laten
         if (n.soma_hw->default_soma_latency_metrics.has_value())
         {
             updated_result.latency.value() +=
-                    n.soma_hw->default_soma_latency_metrics
-                            ->latency_spike_out;
+                    n.soma_hw->default_soma_latency_metrics->latency_spike_out;
         }
     }
 
@@ -910,10 +922,10 @@ sanafe::PipelineResult sanafe::PipelineUnit::calculate_soma_default_energy_laten
 }
 
 void sanafe::PipelineUnit::update_soma_activity(
-    MappedNeuron &n, const PipelineResult &simulation_result)
+        MappedNeuron &n, const PipelineResult &simulation_result)
 {
     if ((simulation_result.status == sanafe::UPDATED) ||
-        (simulation_result.status == sanafe::FIRED))
+            (simulation_result.status == sanafe::FIRED))
     {
         n.soma_hw->neuron_updates++;
 
@@ -927,8 +939,8 @@ void sanafe::PipelineUnit::update_soma_activity(
     }
 }
 
-sanafe::PipelineResult sanafe::pipeline_process_axon_out(
-        Timestep &ts, const SpikingChip &hw, MappedNeuron &n)
+sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
+        Timestep &ts, MappedNeuron &n)
 {
     PipelineResult axon_result{};
     axon_result.latency = 0.0;
@@ -943,7 +955,7 @@ sanafe::PipelineResult sanafe::pipeline_process_axon_out(
             n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const int axon_address : n.axon_out_addresses)
     {
-        Message m(hw, n, ts.timestep, axon_address);
+        Message m(*this, n, ts.timestep, axon_address);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
         axon_out_hw.energy += axon_out_hw.energy_access;
@@ -1060,6 +1072,8 @@ void sanafe::PipelineUnit::configure(
     model_parameters = model.model_parameters;
     plugin_lib = model.plugin_library_path;
     name = unit_name;
+    log_energy = model.log_energy;
+    log_latency = model.log_latency;
 
     if (model_parameters.find("energy_process_spike") != model_parameters.end())
     {
@@ -1331,7 +1345,6 @@ sanafe::Message::Message(const SpikingChip &hw, const MappedNeuron &n,
     dest_core_id = dest_core.id;
     dest_core_offset = dest_core.offset;
     dest_axon_id = src_axon.dest_axon_id;
-    // TODO: support multiple axon output units, included in the synapse
     dest_axon_hw = 0;
 }
 
@@ -1348,6 +1361,8 @@ sanafe::Tile::Tile(const TileConfiguration &config)
         , id(config.id)
         , x(config.x)
         , y(config.y)
+        , log_energy(config.power_metrics.log_energy)
+        , log_latency(config.power_metrics.log_latency)
 {
 }
 
@@ -1366,6 +1381,8 @@ sanafe::Core::Core(const CoreConfiguration &config)
         , id(config.address.id)
         , offset(config.address.offset_within_tile)
         , parent_tile_id(config.address.parent_tile_id)
+        , log_energy(config.pipeline.log_energy)
+        , log_latency(config.pipeline.log_latency)
 
 {
     timestep_buffer.resize(pipeline_config.max_neurons_supported);
@@ -1419,9 +1436,10 @@ void sanafe::MappedNeuron::set_model_attributes(
     }
 }
 
-void sanafe::sim_output_run_summary(
-        const std::filesystem::path &output_dir, const RunData &run_data)
+void sanafe::SpikingChip::sim_output_run_summary(
+        const std::filesystem::path &output_dir) const
 {
+    const RunData run_data = get_run_summary();
     // Summarize and output the run data using a YAML format to the console
     sim_format_run_summary(std::cout, run_data);
 
@@ -1443,7 +1461,8 @@ void sanafe::sim_output_run_summary(
 #define GIT_COMMIT "git-hash-unknown"
 #endif
 
-void sanafe::sim_format_run_summary(std::ostream &out, const RunData &run_data)
+void sanafe::SpikingChip::sim_format_run_summary(
+        std::ostream &out, const RunData &run_data) const
 {
     out << "build_git_version: '" << GIT_COMMIT << "'\n";
     out << "timesteps_executed: " << run_data.timesteps_executed << "\n";
@@ -1461,7 +1480,7 @@ void sanafe::sim_format_run_summary(std::ostream &out, const RunData &run_data)
     out << "  total: " << std::scientific << run_data.total_energy << "\n";
 }
 
-std::ofstream sanafe::sim_trace_open_spike_trace(
+std::ofstream sanafe::SpikingChip::sim_trace_open_spike_trace(
         const std::filesystem::path &out_dir)
 {
     const std::filesystem::path spike_path = out_dir / "spikes.csv";
@@ -1476,8 +1495,8 @@ std::ofstream sanafe::sim_trace_open_spike_trace(
     return spike_file;
 }
 
-std::ofstream sanafe::sim_trace_open_potential_trace(
-        const std::filesystem::path &out_dir, const SpikingChip &hw)
+std::ofstream sanafe::SpikingChip::sim_trace_open_potential_trace(
+        const std::filesystem::path &out_dir)
 {
     const std::filesystem::path potential_path = out_dir / "potentials.csv";
     std::ofstream potential_file(potential_path);
@@ -1487,11 +1506,11 @@ std::ofstream sanafe::sim_trace_open_potential_trace(
         throw std::runtime_error(
                 "Error: Couldn't open trace file for writing.");
     }
-    sim_trace_write_potential_header(potential_file, hw);
+    sim_trace_write_potential_header(potential_file);
     return potential_file;
 }
 
-std::ofstream sanafe::sim_trace_open_perf_trace(
+std::ofstream sanafe::SpikingChip::sim_trace_open_perf_trace(
         const std::filesystem::path &out_dir)
 {
     const std::filesystem::path perf_path = out_dir / "perf.csv";
@@ -1506,7 +1525,7 @@ std::ofstream sanafe::sim_trace_open_perf_trace(
     return perf_file;
 }
 
-std::ofstream sanafe::sim_trace_open_message_trace(
+std::ofstream sanafe::SpikingChip::sim_trace_open_message_trace(
         const std::filesystem::path &out_dir)
 {
     const std::filesystem::path message_path = out_dir / "messages.csv";
@@ -1520,15 +1539,15 @@ std::ofstream sanafe::sim_trace_open_message_trace(
     return message_file;
 }
 
-void sanafe::forced_updates(const Timestep &ts, SpikingChip &hw)
+void sanafe::SpikingChip::forced_updates(const Timestep &ts)
 {
     // You can optionally force a neuron to update its associated h/w
     //  every time-step, regardless of whether it received inputs or not.
     // Note that energy is accounted for, but latency is not considered here.
-    auto cores = hw.cores();
-    for (size_t idx = 0; idx < cores.size(); idx++)
+    auto core_list = cores();
+    for (size_t idx = 0; idx < core_list.size(); idx++)
     {
-        Core &core = cores[idx];
+        Core &core = core_list[idx];
         for (MappedNeuron &n : core.neurons)
         {
             if (n.force_synapse_update)
@@ -1536,7 +1555,8 @@ void sanafe::forced_updates(const Timestep &ts, SpikingChip &hw)
                 for (MappedConnection &con : n.connections_out)
                 {
                     con.synapse_hw->set_time(ts.timestep);
-                    PipelineResult result = con.synapse_hw->update(con.synapse_address);
+                    PipelineResult result =
+                            con.synapse_hw->update(con.synapse_address);
                     if (result.energy.has_value())
                     {
                         con.synapse_hw->energy += result.energy.value();
@@ -1565,25 +1585,25 @@ void sanafe::forced_updates(const Timestep &ts, SpikingChip &hw)
     return;
 }
 
-void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw,
-        const TimingModel timing_model)
+void sanafe::SpikingChip::sim_timestep(
+        Timestep &ts, const TimingModel timing_model)
 {
     Scheduler scheduler;
 
     // Start the next time-step, clear all buffers
-    assert(hw.core_count > 0);
-    ts = Timestep(ts.timestep, hw.core_count);
-    sim_reset_measurements(hw);
+    assert(core_count > 0);
+    ts = Timestep(ts.timestep, core_count);
+    sim_reset_measurements();
 
-    process_neurons(ts, hw);
-    process_messages(ts, hw);
-    forced_updates(ts, hw);
+    process_neurons(ts);
+    process_messages(ts);
+    forced_updates(ts);
 
-    scheduler.noc_width = hw.noc_width;
-    scheduler.noc_height = hw.noc_height;
-    scheduler.buffer_size = hw.noc_buffer_size;
-    scheduler.core_count = hw.core_count;
-    scheduler.max_cores_per_tile = hw.max_cores_per_tile;
+    scheduler.noc_width = noc_width;
+    scheduler.noc_height = noc_height;
+    scheduler.buffer_size = noc_buffer_size;
+    scheduler.core_count = core_count;
+    scheduler.max_cores_per_tile = max_cores_per_tile;
 
     if (timing_model == TIMING_MODEL_DETAILED)
     {
@@ -1595,9 +1615,9 @@ void sanafe::sim_timestep(Timestep &ts, SpikingChip &hw,
         TRACE1(CHIP, "Running simple timing model\n");
         ts.sim_time = schedule_messages_simple(ts.messages, scheduler);
     }
-    sim_calculate_energy(hw, ts);
+    sim_calculate_energy(ts);
 
-    for (auto &tile : hw.tiles)
+    for (auto &tile : tiles)
     {
         ts.total_hops += tile.hops;
         for (auto &c : tile.cores)
@@ -1623,7 +1643,8 @@ sanafe::Timestep::Timestep(const long int ts, const int core_count)
 {
 }
 
-double sanafe::sim_estimate_network_costs(const Tile &src, Tile &dest)
+double sanafe::SpikingChip::sim_estimate_network_costs(
+        const Tile &src, Tile &dest)
 {
     double network_latency;
     long int x_hops;
@@ -1666,7 +1687,7 @@ double sanafe::sim_estimate_network_costs(const Tile &src, Tile &dest)
     return network_latency;
 }
 
-void sanafe::sim_calculate_energy(const SpikingChip &hw, Timestep &ts)
+void sanafe::SpikingChip::sim_calculate_energy(Timestep &ts)
 {
     // Returns the total energy across the design, for this timestep
     ts.network_energy = 0.0;
@@ -1677,9 +1698,9 @@ void sanafe::sim_calculate_energy(const SpikingChip &hw, Timestep &ts)
 
     double axon_in_energy{0.0};
     double axon_out_energy{0.0};
-    double pipeline_energy{0.0};
+    double total_pipeline_energy{0.0};
 
-    for (const auto &t : hw.tiles)
+    for (auto &t : tiles)
     {
         double total_hop_energy =
                 (static_cast<double>(t.east_hops) * t.energy_east_hop);
@@ -1689,26 +1710,29 @@ void sanafe::sim_calculate_energy(const SpikingChip &hw, Timestep &ts)
                 (static_cast<double>(t.south_hops) * t.energy_south_hop);
         total_hop_energy +=
                 (static_cast<double>(t.north_hops) * t.energy_north_hop);
+        t.energy = total_hop_energy;
         ts.network_energy += total_hop_energy;
         TRACE1(CHIP, "east:%ld west:%ld north:%ld south:%ld\n", t.east_hops,
                 t.west_hops, t.north_hops, t.south_hops);
 
-        for (const auto &c : t.cores)
+        for (auto &c : t.cores)
         {
             for (const auto &axon : c.axon_in_hw)
             {
-                axon_in_energy += static_cast<double>(axon.spike_messages_in) *
+                axon_in_energy = static_cast<double>(axon.spike_messages_in) *
                         axon.energy_spike_message;
                 TRACE1(CHIP, "spikes in: %ld, energy:%e\n",
                         axon.spike_messages_in, axon.energy_spike_message);
             }
 
-            for (const auto &pipeline_unit : c.pipeline_hw)
+            double pipeline_energy{0.0};
+            for (auto &pipeline_unit : c.pipeline_hw)
             {
                 // Separately track the total pipeline energy, as the same
                 //  energy values may be added to multiple categories, i.e., if
                 //  the pipeline h/w unit implements multiple functionality
                 pipeline_energy += pipeline_unit->energy;
+
                 if (pipeline_unit->implements_synapse)
                 {
                     ts.synapse_energy += pipeline_unit->energy;
@@ -1716,7 +1740,6 @@ void sanafe::sim_calculate_energy(const SpikingChip &hw, Timestep &ts)
                 if (pipeline_unit->implements_dendrite)
                 {
                     ts.dendrite_energy += pipeline_unit->energy;
-
                 }
                 if (pipeline_unit->implements_soma)
                 {
@@ -1726,27 +1749,32 @@ void sanafe::sim_calculate_energy(const SpikingChip &hw, Timestep &ts)
 
             for (const auto &axon : c.axon_out_hw)
             {
-                axon_out_energy += axon.energy;
+                axon_out_energy = axon.energy;
                 TRACE1(CHIP, "packets: %ld, energy per packet:%e\n",
                         axon.packets_out, axon.energy_access);
             }
+
+            c.energy = pipeline_energy + axon_in_energy + axon_out_energy;
+            t.energy += c.energy;
+            ts.network_energy += axon_in_energy;
+            ts.network_energy += axon_out_energy;
+            total_pipeline_energy += pipeline_energy;
         }
     }
-    // TODO: should I keep these network units separate from the NoC costs?
-    ts.network_energy += axon_in_energy;
-    ts.network_energy += axon_out_energy;
-    ts.total_energy = ts.network_energy + pipeline_energy;
 
-    TRACE1(CHIP, "pipeline_energy:%e\n", pipeline_energy);
-    TRACE1(CHIP, "network_energy:%e\n", ts.network_energy);
+    // TODO: should I keep these network units separate from the NoC costs?
+    ts.total_energy = ts.network_energy + total_pipeline_energy;
+
+    TRACE1(CHIP, "total_energy:%e\n", ts.total_energy);
+    TRACE1(CHIP, "\tpipeline_energy:%e\n", total_pipeline_energy);
+    TRACE1(CHIP, "\tnetwork_energy:%e\n", ts.network_energy);
     TRACE1(CHIP, "\taxon_in_energy:%e\n", axon_in_energy);
     TRACE1(CHIP, "\taxon_out_energy:%e\n", axon_out_energy);
-    INFO("total:%e\n", ts.total_energy);
 
     return;
 }
 
-void sanafe::sim_create_neuron_axons(MappedNeuron &pre_neuron)
+void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
 {
     // Setup the connections between neurons and map them to hardware
     assert(pre_neuron.core != nullptr);
@@ -1785,7 +1813,8 @@ void sanafe::sim_create_neuron_axons(MappedNeuron &pre_neuron)
             pre_neuron.parent_group_name.c_str(), pre_neuron.id);
 }
 
-void sanafe::sim_add_connection_to_axon(MappedConnection &con, Core &post_core)
+void sanafe::SpikingChip::sim_add_connection_to_axon(
+        MappedConnection &con, Core &post_core)
 {
     // Add a given connection to the axon in the post-synaptic core
     TRACE3(CHIP, "Adding to connection to axon:%zu\n",
@@ -1811,13 +1840,13 @@ void sanafe::sim_add_connection_to_axon(MappedConnection &con, Core &post_core)
     last_added_target_axon.synapse_addresses.push_back(con.synapse_address);
 }
 
-void sanafe::sim_print_axon_summary(SpikingChip &hw)
+void sanafe::SpikingChip::sim_print_axon_summary()
 {
     int in_count = 0;
     int out_count = 0;
 
     INFO("** Mapping summary **\n");
-    for (Tile &tile : hw.tiles)
+    for (Tile &tile : tiles)
     {
         // For debug only, print the axon maps
         for (Core &core : tile.cores)
@@ -1843,14 +1872,15 @@ void sanafe::sim_print_axon_summary(SpikingChip &hw)
             }
         }
     }
-    INFO("Total cores: %zu\n", hw.core_count);
+    INFO("Total cores: %zu\n", core_count);
     INFO("Average in map count: %lf\n",
-            static_cast<double>(in_count) / hw.core_count);
+            static_cast<double>(in_count) / core_count);
     INFO("Average out map count: %lf\n",
-            static_cast<double>(out_count) / hw.core_count);
+            static_cast<double>(out_count) / core_count);
 }
 
-void sanafe::sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core)
+void sanafe::SpikingChip::sim_allocate_axon(
+        MappedNeuron &pre_neuron, Core &post_core)
 {
     // Create a new input axon at a receiving (destination) core
     //  Then create the output axon at the sending core. Finally
@@ -1881,11 +1911,11 @@ void sanafe::sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core)
             pre_core.parent_tile_id, pre_core.offset, new_axon_out_address);
 }
 
-void sanafe::sim_reset_measurements(SpikingChip &hw)
+void sanafe::SpikingChip::sim_reset_measurements()
 {
     // Reset any energy, time latency or other measurements of network
     //  hardware
-    for (auto &t : hw.tiles)
+    for (auto &t : tiles)
     {
         // Reset tile
         t.energy = 0.0;
@@ -1929,22 +1959,25 @@ void sanafe::sim_reset_measurements(SpikingChip &hw)
             c.messages_in = std::vector<Message *>();
         }
     }
+
+    return;
 }
 
-void sanafe::sim_trace_write_spike_header(std::ofstream &spike_trace_file)
+void sanafe::SpikingChip::sim_trace_write_spike_header(
+        std::ofstream &spike_trace_file)
 {
     assert(spike_trace_file.is_open());
     spike_trace_file << "neuron,timestep" << std::endl;
 }
 
-void sanafe::sim_trace_write_potential_header(
-        std::ofstream &potential_trace_file, const SpikingChip &hw)
+void sanafe::SpikingChip::sim_trace_write_potential_header(
+        std::ofstream &potential_trace_file)
 {
     // Write csv header for probe outputs - record which neurons have been
     //  probed
     assert(potential_trace_file.is_open());
     potential_trace_file << "timestep,";
-    for (const auto &[group_name, group_neurons] : hw.mapped_neuron_groups)
+    for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
         for (const MappedNeuron *neuron : group_neurons)
         {
@@ -1958,27 +1991,78 @@ void sanafe::sim_trace_write_potential_header(
     potential_trace_file << std::endl;
 }
 
-void sanafe::sim_trace_write_perf_header(std::ofstream &perf_trace_file)
+std::map<std::string, double>
+sanafe::SpikingChip::sim_trace_get_optional_traces()
+{
+    std::map<std::string, double> optional_perf_traces{};
+    for (const Tile &t : tiles)
+    {
+        if (t.log_energy)
+        {
+            optional_perf_traces[t.name + ".energy"] = t.energy;
+        }
+        if (t.log_latency)
+        {
+            optional_perf_traces[t.name + ".latency"] = 0.0; // TODO
+        }
+        for (const Core &c : t.cores)
+        {
+            if (c.log_energy)
+            {
+                optional_perf_traces[t.name + "." + c.name + ".energy"] =
+                        c.energy;
+            }
+            if (c.log_latency)
+            {
+                // TODO
+                optional_perf_traces[t.name + "." + c.name + ".latency"] = 0.0;
+            }
+
+            for (const auto hw : c.pipeline_hw)
+            {
+                if (hw->log_energy)
+                {
+                    optional_perf_traces[t.name + "." + c.name + "." +
+                            hw->name + ".energy"] = hw->energy;
+                }
+                if (hw->log_latency)
+                {
+                    optional_perf_traces[t.name + "." + c.name + "." +
+                            hw->name + ".latency"] = 0.0; // TODO
+                }
+            }
+        }
+    }
+
+    return optional_perf_traces;
+}
+
+void sanafe::SpikingChip::sim_trace_write_perf_header(
+        std::ofstream &perf_trace_file)
 {
     assert(perf_trace_file.is_open());
-    // Mandatory performance metrics
     perf_trace_file << "timestep,";
+
+    // Mandatory performance metrics
     perf_trace_file << "fired,";
     perf_trace_file << "packets,";
     perf_trace_file << "hops,";
     perf_trace_file << "spikes,";
     perf_trace_file << "sim_time,";
-    perf_trace_file << "total_energy,";
+    perf_trace_file << "total_energy";
 
     // Optional performance metrics
-    // Now check for all the conditionally probed performance metrics
-    // TODO: doesn't this require us to store per time-step metrics for all
-    //  quantities that we track? maybe need to build a map.. or some system
-    //  to flexibly store and probe different stats
-    perf_trace_file << std::endl;
+    std::map<std::string, double> optional_perf_traces =
+            sim_trace_get_optional_traces();
+    for (auto &[name, trace] : optional_perf_traces)
+    {
+        perf_trace_file <<  "," << name;
+    }
+    perf_trace_file << "\n";
 }
 
-void sanafe::sim_trace_write_message_header(std::ofstream &message_trace_file)
+void sanafe::SpikingChip::sim_trace_write_message_header(
+        std::ofstream &message_trace_file)
 {
     assert(message_trace_file.is_open());
     message_trace_file << "timestep,";
@@ -1994,13 +2078,13 @@ void sanafe::sim_trace_write_message_header(std::ofstream &message_trace_file)
     message_trace_file << std::endl;
 }
 
-void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
-        const long int timestep, const SpikingChip &hw)
+void sanafe::SpikingChip::sim_trace_record_spikes(
+        std::ofstream &spike_trace_file, const long int timestep)
 {
     // A trace of all spikes that are generated
     assert(spike_trace_file.is_open());
 
-    for (const auto &[group_name, group_neurons] : hw.mapped_neuron_groups)
+    for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
         for (const MappedNeuron *neuron : group_neurons)
         {
@@ -2015,8 +2099,8 @@ void sanafe::sim_trace_record_spikes(std::ofstream &spike_trace_file,
     }
 }
 
-void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
-        const long int timestep, const SpikingChip &hw)
+void sanafe::SpikingChip::sim_trace_record_potentials(
+        std::ofstream &potential_trace_file, const long int timestep)
 {
     // Each line of this csv file is the potential of all probed neurons for
     //  one time-step
@@ -2025,7 +2109,7 @@ void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
     potential_trace_file << timestep << ",";
 
     long int potential_probe_count = 0;
-    for (const auto &[group_name, group_neurons] : hw.mapped_neuron_groups)
+    for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
         for (const MappedNeuron *neuron : group_neurons)
         {
@@ -2046,20 +2130,28 @@ void sanafe::sim_trace_record_potentials(std::ofstream &potential_trace_file,
     }
 }
 
-void sanafe::sim_trace_perf_log_timestep(
+void sanafe::SpikingChip::sim_trace_record_perf(
         std::ofstream &perf_trace_file, const Timestep &ts)
 {
     perf_trace_file << ts.timestep << ",";
+    // Start with the mandatory counters and traces
     perf_trace_file << ts.neurons_fired << ",";
     perf_trace_file << ts.packets_sent << ",";
     perf_trace_file << ts.total_hops << ",";
     perf_trace_file << ts.spike_count << ",";
     perf_trace_file << std::scientific << ts.sim_time << ",";
-    perf_trace_file << std::scientific << ts.total_energy << ",";
-    perf_trace_file << std::endl;
+    perf_trace_file << std::scientific << ts.total_energy;
+    // Finish with the optional traces, which can be enabled or disabled per
+    //  tile, core, or pipeline h/w unit
+    const auto optional_perf_traces = sim_trace_get_optional_traces();
+    for (auto &[name, trace] : optional_perf_traces)
+    {
+        perf_trace_file << "," << std::scientific << trace;
+    }
+    perf_trace_file << "\n";
 }
 
-void sanafe::sim_trace_record_message(
+void sanafe::SpikingChip::sim_trace_record_message(
         std::ofstream &message_trace_file, const Message &m)
 {
     assert(message_trace_file.is_open());

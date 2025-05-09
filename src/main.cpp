@@ -143,10 +143,10 @@ int main(int argc, char *argv[])
         }
 
         INFO("Running simulation.\n");
-        const auto run_data = hw.sim(timesteps, heartbeat, timing_model);
+        hw.sim(timesteps, heartbeat, timing_model);
 
         INFO("***** Run Summary *****\n");
-        sim_output_run_summary(output_dir, run_data);
+        hw.sim_output_run_summary(output_dir);
         double average_power = hw.get_power();
         INFO("Average power consumption: %f W.\n", average_power);
         INFO("Run finished.\n");
@@ -180,8 +180,8 @@ int main(int argc, char *argv[])
 //  neurons both unique nid across groups, and change the meaning of 'nid' to be
 //  group offset 'noffset'?
 // TODO: integrate Booksim2 as a 'cycle' accurate modeling option
-// TODO: support embedded yaml in the netlist format
 // TODO: support saving SNNs to yaml and netlist
+// TODO: support embedded yaml in the netlist format
 // ** Misc **
 // TODO: update tutorials to use Jupyter notebook
 // TODO: Improve plug-in documentation

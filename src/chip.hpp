@@ -48,6 +48,7 @@ struct MappedConnection;
 struct Synapse;
 struct NeuronConfiguration;
 struct ModelInfo;
+struct PipelineResult;
 
 class Tile;
 class Core;
@@ -91,7 +92,9 @@ public:
     void load(const SpikingNetwork &net);
     double get_power() const;
     RunData get_run_summary() const;
+    void sim_output_run_summary(const std::filesystem::path &output_dir) const;
     void reset();
+
 
     std::vector<std::reference_wrapper<Core>> cores();
 
@@ -130,6 +133,44 @@ private:
     void map_connections(const SpikingNetwork &net);
     MappedConnection &map_connection(const Connection &con);
     void map_axons();
+    void sim_reset_measurements();
+    void sim_timestep(Timestep &ts, const TimingModel timing_model = TIMING_MODEL_DETAILED);
+    double sim_estimate_network_costs(const Tile &src, Tile &dest);
+    void sim_calculate_energy(Timestep &ts);
+
+    void sim_format_run_summary(std::ostream &out, const RunData &run_data) const;
+
+    void sim_print_axon_summary();
+    void sim_create_neuron_axons(MappedNeuron &pre_neuron);
+    void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
+    void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);
+
+    void process_neurons(Timestep &ts);
+    void process_messages(Timestep &ts);
+    void forced_updates(const Timestep &ts);
+
+
+    void process_neuron(Timestep &ts, MappedNeuron &n);
+    void receive_message(Message &m);
+    double process_message(Timestep &ts, Core &c, Message &m);
+    PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+
+    double pipeline_process_axon_in(Core &core, const Message &m);
+    PipelineResult pipeline_process_axon_out(Timestep &ts, MappedNeuron &n);
+
+    std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
+    std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
+    std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir);
+    std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
+    void sim_trace_write_spike_header(std::ofstream &spike_trace_file);
+    void sim_trace_write_potential_header(std::ofstream &potential_trace_file);
+    void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
+    void sim_trace_write_message_header(std::ofstream &message_trace_file);
+    void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps);
+    void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep);
+    void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
+    void sim_trace_record_perf(std::ofstream &out, const Timestep &ts);
+    std::map<std::string, double> sim_trace_get_optional_traces();
 };
 
 struct RunData
@@ -160,6 +201,7 @@ struct Timestep
     long int total_hops{0L};
     long int packets_sent{0L};
     long int neurons_fired{0L};
+
     double total_energy{0.0};
     double synapse_energy{0.0};
     double dendrite_energy{0.0};
@@ -523,48 +565,9 @@ struct AxonOutModel
     size_t src_neuron_id{};
 };
 
-void sim_timestep(Timestep &ts, SpikingChip &hw, const TimingModel timing_model = TIMING_MODEL_DETAILED);
-double sim_estimate_network_costs(const Tile &src, Tile &dest);
-void sim_reset_measurements(SpikingChip &hw);
-void sim_calculate_energy(const SpikingChip &hw, Timestep &ts);
-
-std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
-std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
-std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir, const SpikingChip &hw);
-std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
-void sim_trace_write_spike_header(std::ofstream &spike_trace_file);
-void sim_trace_write_potential_header(std::ofstream &potential_trace_file, const SpikingChip &hw);
-void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
-void sim_trace_write_message_header(std::ofstream &message_trace_file);
-void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps, const SpikingChip &hw);
-void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep, const SpikingChip &hw);
-void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
-void sim_trace_perf_log_timestep(std::ofstream &out, const Timestep &ts);
-
-void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data);
-void sim_format_run_summary(std::ostream &out, const RunData &run_data);
-
-void sim_print_axon_summary(SpikingChip &hw);
-void sim_create_neuron_axons(MappedNeuron &pre_neuron);
-void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
-void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);
-
-void process_neurons(Timestep &ts, SpikingChip &hw);
-void process_messages(Timestep &ts, SpikingChip &hw);
-void forced_updates(const Timestep &ts, SpikingChip &hw);
-
-
-void process_neuron(Timestep &ts, SpikingChip &hw, MappedNeuron &n);
-void receive_message(SpikingChip &arch, Message &m);
-double process_message(Timestep &ts, Core &c, Message &m);
-PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
-
-double pipeline_process_axon_in(Core &core, const Message &m);
-PipelineResult pipeline_process_axon_out(Timestep &ts, const SpikingChip &arch, MappedNeuron &n);
-BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str, const bool buffer_inside_unit);
-
 timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end);
 size_t abs_diff(size_t a, size_t b);
+BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str, const bool buffer_inside_unit);
 }
 
 #endif
