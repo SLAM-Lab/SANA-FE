@@ -74,7 +74,7 @@ sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
 
     if (read)
     {
-        const MappedNeuron *current_sending_neuron =
+        const size_t current_sending_neuron =
                 synapse_to_pre_neuron.at(synapse_address);
 
         // Model the concurrent synaptic weights being access
@@ -189,7 +189,7 @@ void sanafe::LoihiSynapseModel::map_connection(MappedConnection &con)
     size_t synapse_address = con.synapse_address;
     // Get unique identifier for spiking neuron
     const MappedNeuron *pre_neuron = con.pre_neuron;
-    synapse_to_pre_neuron[synapse_address] = pre_neuron;
+    synapse_to_pre_neuron[synapse_address] = pre_neuron->id;
 }
 
 // *** Dendrite models ***

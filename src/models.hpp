@@ -68,8 +68,8 @@ private:
     std::vector<double> weights{};
     std::vector<double> groups{};
     std::vector<double> costs{};
-    std::vector<std::pair<size_t, const MappedNeuron *const>> concurrent_accesses{};
-    std::map<size_t, const MappedNeuron *> synapse_to_pre_neuron{};
+    std::vector<std::pair<size_t, size_t>> concurrent_accesses{};
+    std::map<size_t, size_t> synapse_to_pre_neuron{};
     std::optional<double> concurrent_access_latency{std::nullopt};
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};
