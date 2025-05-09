@@ -173,11 +173,10 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: support hyperedges in Python interface
 // TODO: support group mappings in description format
 // TODO: integrate Booksim2 as a 'cycle' accurate modeling option
 // TODO: support saving SNNs to yaml and netlist
-// TODO: support embedded yaml in the netlist format
+// TODO: support reading embedded yaml in the netlist format
 // ** Misc **
 // TODO: update tutorials to use Jupyter notebook
 // TODO: Improve plug-in documentation

@@ -13,6 +13,7 @@ tutorial/dvs_challenge.net
 *.o
 *.so
 *.pdf
+*.pyc
 perf.csv
 messages.csv
 messages_single_ts.csv

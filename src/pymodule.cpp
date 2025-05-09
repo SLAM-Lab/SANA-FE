@@ -19,8 +19,6 @@
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
-// TODO: support conv, dense and sparse hyperedges here
-
 // Forward declarations
 std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
         const pybind11::dict &dictionary, const bool forward_to_synapse = true,
@@ -54,6 +52,35 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
     }
     TRACE1(PYMODULE, "Converted map.size()=%zu\n", map.size());
 
+    return map;
+}
+
+std::map<std::string, std::vector<sanafe::ModelParam>>
+pydict_to_attribute_lists(pybind11::dict attributes)
+{
+    std::map<std::string, std::vector<sanafe::ModelParam>> map{};
+
+    for (const auto &key_value_pair : attributes)
+    {
+        const std::string attribute_name =
+                pybind11::cast<std::string>(key_value_pair.first);
+        if (!pybind11::isinstance<pybind11::iterable>(key_value_pair.second))
+        {
+             std::string error("Error: Each attribute must be provided as a "
+                    "1D list/array of values. Multi-dimensional arrays must be "
+                    "flattened in C-order and storing channels as the last dim");
+            INFO("%s\n", error.c_str());
+            throw std::invalid_argument(error);
+        }
+
+        map[attribute_name] = std::vector<sanafe::ModelParam>();
+        for (auto iter = pybind11::iter(key_value_pair.second);
+            iter != pybind11::iterator::sentinel(); ++iter)
+        {
+            map[attribute_name].push_back(pyobject_to_model_parameter(
+                    pybind11::cast<pybind11::object>(*iter)));
+        }
+    }
     return map;
 }
 
@@ -128,6 +155,81 @@ sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
     }
 
     return parameter;
+}
+void pyconnect_neurons_sparse(sanafe::NeuronGroup *self,
+        sanafe::NeuronGroup &dest_group,
+        const pybind11::dict attributes, const pybind11::list &src_dest_id_pairs)
+{
+    const std::map<std::string, std::vector<sanafe::ModelParam>>
+            attribute_lists = pydict_to_attribute_lists(attributes);
+
+    // Convert python list of tuples to SANA-FE format
+    if (!pybind11::isinstance<pybind11::iterable>(src_dest_id_pairs))
+    {
+        std::string error("Error: must provide connectivity as a list of "
+            "source/destination pairs, providing the offsets within the "
+            "groups.");
+        INFO("%s\n", error.c_str());
+        throw std::invalid_argument(error);
+    }
+
+    std::vector<std::pair<size_t, size_t>> src_dest_id_pairs_vec{};
+    for (auto iter = pybind11::iter(src_dest_id_pairs);
+        iter != pybind11::iterator::sentinel(); ++iter)
+    {
+        if (!pybind11::isinstance<pybind11::iterable>(*iter))
+        {
+            std::string error("Error: each entry in the src/dest id list must be a 2-tuple, "
+                "representing the neuron's offsets within the src and dest neuron groups");
+            INFO("%s\n", error.c_str());
+            throw pybind11::value_error(error);
+        }
+
+        pybind11::sequence seq = pybind11::cast<pybind11::sequence>(*iter);
+        if (seq.size() != 2)
+        {
+            throw pybind11::value_error("Expected a 2-tuple");
+        }
+        const size_t src = pybind11::cast<size_t>(seq[0]);
+        const size_t dest = pybind11::cast<size_t>(seq[1]);
+        src_dest_id_pairs_vec.push_back(std::make_pair(src, dest));
+    }
+
+    self->connect_neurons_sparse(dest_group, attribute_lists, src_dest_id_pairs_vec);
+    return;
+}
+
+void pyconnect_neurons_conv2d(sanafe::NeuronGroup *self,
+        sanafe::NeuronGroup &dest_group,
+        const pybind11::dict attributes,
+        int input_width, int input_height, int input_channels, int kernel_width,
+        int kernel_height, int kernel_count, int stride_width,
+        int stride_height)
+{
+    const std::map<std::string, std::vector<sanafe::ModelParam>>
+            attribute_lists = pydict_to_attribute_lists(attributes);
+    sanafe::Conv2DParameters config{};
+    config.input_width = input_width;
+    config.input_height = input_height;
+    config.input_channels = input_channels;
+
+    config.kernel_width = kernel_width;
+    config.kernel_height = kernel_height;
+    config.kernel_count = kernel_count;
+
+    self->connect_neurons_conv2d(dest_group, attribute_lists, config);
+    return;
+}
+
+void pyconnect_neurons_dense(sanafe::NeuronGroup *self,
+        sanafe::NeuronGroup &dest_group,
+        const pybind11::dict attributes)
+{
+    const std::map<std::string, std::vector<sanafe::ModelParam>>
+            attribute_lists = pydict_to_attribute_lists(attributes);
+
+    self->connect_neurons_dense(dest_group, attribute_lists);
+    return;
 }
 
 pybind11::dict run_data_to_dict(const sanafe::RunData &run)
@@ -440,6 +542,19 @@ PYBIND11_MODULE(sanafecpp, m)
     pybind11::class_<sanafe::NeuronGroup>(m, "NeuronGroup")
             .def("__repr__", &sanafe::NeuronGroup::info)
             .def("get_id", &sanafe::NeuronGroup::get_id)
+            .def("connect_neurons_dense", &pyconnect_neurons_dense)
+            .def("connect_neurons_sparse", &pyconnect_neurons_sparse)
+            .def("connect_neurons_conv2d", &pyconnect_neurons_conv2d,
+                pybind11::arg("dest_group"),
+                pybind11::arg("attributes"),
+                pybind11::arg("input_width"),
+                pybind11::arg("input_height"),
+                pybind11::arg("input_channels"),
+                pybind11::arg("kernel_width"),
+                pybind11::arg("kernel_height"),
+                pybind11::arg("kernel_count") = 1,
+                pybind11::arg("stride_width") = 1,
+                pybind11::arg("stride_height") = 1)
             .def_property("neurons",
                     pybind11::cpp_function(
                             [](sanafe::NeuronGroup &self)

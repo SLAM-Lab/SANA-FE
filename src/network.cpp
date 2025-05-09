@@ -268,13 +268,15 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
         const std::map<std::string, std::vector<ModelParam>> &attribute_lists,
         const Conv2DParameters &convolution)
 {
-    // Only support channel last storage
+    // Only support channels-last storage for now
+    //  Also inputs must be flattened (C-style) to 1D arrays
     // TODO:There are two things I need to consider -
     //  1) is the order that we map to the neurons i.e. how do we flatten
-    //  the two layers from 3d/4d tensors down to 1d. This affects how to calculate the src and dest index
-    //  2) is how we represent the filter/kernel attributes in the description file. Maybe its easier
-    //    not to store it flattened for the user. In sana-fe we can assume a
-    //    internal representation like here.
+    //  the two layers from 3d/4d tensors down to 1d. This affects how to
+    //  calculate the src and dest index
+    //  2) is how we represent the filter/kernel attributes in the description
+    //    file. Maybe its easier not to store it flattened for the user. In
+    //    sana-fe we can assume a internal representation like here.
     //
     // TODO: This code is based on the SNNToolbox. Confusingly,
     //  by default, the SNNToolbox uses channels_last (tensorflow default)
