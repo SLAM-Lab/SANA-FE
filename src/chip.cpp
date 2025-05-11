@@ -17,6 +17,8 @@
 #include <sstream>
 #include <vector>
 
+#include <booksim_lib.hpp>
+
 #include "arch.hpp"
 #include "chip.hpp"
 #include "models.hpp"
@@ -25,10 +27,14 @@
 #include "print.hpp"
 #include "schedule.hpp"
 
-// TODO: store message and neuron processing pipelines along with each neuron
-//  and connection, to avoid building the vector every time we update hw
-// TODO: change the dendrite interface to avoid parsing every time we receive a
-//  spike. We should just send the synaptic address to the dendrite hw...
+// Track the number of SpikingChips current instantiated, only as a safety
+//  mechanism for cycle-accurate runs (Booksim2): We throw an error
+//  at launch for cycle-accurate runs when multiple SANA-FE simulations are
+//  active, as Booksim2 stores a bunch of global state and weird things will
+//  happen if we access the library across multiple threads or simulations.
+//  If I get time to better encapsulate the Booksim2 library, this check
+//  will no longer be needed...
+std::atomic<int> sanafe::SpikingChip::chip_count = 0;
 
 sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         const std::filesystem::path &output_dir, const bool record_spikes,
@@ -70,6 +76,15 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
             }
         }
     }
+
+    char arg1[] = "booksim";
+    char arg2[] = "/home/usr1/jboyle/neuro/sana-fe/scripts/booksim.config";
+    char *argv[] = {arg1, arg2};
+    // TODO: only initialize the library the first time we run. Maybe better
+    //  separate library initialization with loading the config and setting up
+    //  things
+    booksim_config = booksim_init(2, (char **) argv);
+    chip_count++;
 }
 
 sanafe::SpikingChip::~SpikingChip()
@@ -79,6 +94,8 @@ sanafe::SpikingChip::~SpikingChip()
     potential_trace.close();
     perf_trace.close();
     message_trace.close();
+
+    chip_count--;
 }
 
 void sanafe::SpikingChip::load(const SpikingNetwork &net)
@@ -1614,16 +1631,41 @@ void sanafe::SpikingChip::sim_timestep(
     scheduler.core_count = core_count;
     scheduler.max_cores_per_tile = max_cores_per_tile;
 
-    if (timing_model == TIMING_MODEL_DETAILED)
-    {
-        TRACE1(CHIP, "Running detailed timing model\n");
-        ts.sim_time = schedule_messages(ts.messages, scheduler);
-    }
-    else
+    // TODO: remove
+    if (timing_model == TIMING_MODEL_SIMPLE)
     {
         TRACE1(CHIP, "Running simple timing model\n");
         ts.sim_time = schedule_messages_simple(ts.messages, scheduler);
     }
+    else if (timing_model == TIMING_MODEL_DETAILED)
+    {
+        TRACE1(CHIP, "Running detailed timing model\n");
+        ts.sim_time = schedule_messages(ts.messages, scheduler);
+    }
+    else if (timing_model == TIMING_MODEL_CYCLE_ACCURATE)
+    {
+        TRACE1(CHIP, "Running cycle-accurate timing model\n");
+        // TODO: pass all the message information to booksim directly, rather
+        //  than passing it via a file
+        if (chip_count > 1)
+        {
+            INFO("Error: Cannot run multiple simultaneous cycle-accurate "
+                 "simulations. The Booksim2 library does not support "
+                 "concurrent runs as it has a lot of global state. For now "
+                 "it's simplest to just not allow for concurrent runs. If you "
+                 "need to simulate in parallel, launch separate SANA-FE "
+                 "processes.");
+            throw std::runtime_error(
+                    "Error: Cannot run multiple simultaneous cycle-accurate simulations.");
+        }
+        booksim_run(booksim_config);
+    }
+    else
+    {
+        INFO("Error: Timing model:%d not recognized\n", timing_model);
+        throw std::invalid_argument("Timing model not recognized");
+    }
+
     sim_calculate_energy(ts);
 
     for (auto &tile : tiles)

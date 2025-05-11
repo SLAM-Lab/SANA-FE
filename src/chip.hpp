@@ -13,6 +13,7 @@
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
+#include <atomic>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -20,6 +21,8 @@
 #include <memory>
 #include <queue>
 #include <variant>
+
+#include <booksim_config.hpp>
 
 #include "arch.hpp"
 #include "print.hpp"
@@ -69,8 +72,9 @@ enum NeuronStatus : int
 
 enum TimingModel : int
 {
-    TIMING_MODEL_SIMPLE,
-    TIMING_MODEL_DETAILED
+    TIMING_MODEL_SIMPLE, // analytical model
+    TIMING_MODEL_DETAILED, // semi-analytical model
+    TIMING_MODEL_CYCLE_ACCURATE, // Booksim2 simulator
 };
 
 constexpr long int default_heartbeat_timesteps = 100L;
@@ -104,6 +108,7 @@ public:
     int max_cores_per_tile{0};
 
 private:
+    BookSimConfig booksim_config{};
     std::string out_dir;
     size_t total_neurons_mapped{0UL};
     long int total_neurons_fired{0L};
@@ -117,6 +122,8 @@ private:
     double dendrite_energy{0.0};
     double soma_energy{0.0};
     double network_energy{0.0};
+
+    static std::atomic<int> chip_count;
 
     // Flags and filestreams
     bool spike_trace_enabled{false};

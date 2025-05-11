@@ -143,6 +143,18 @@ FetchContent_MakeAvailable(ryml)
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 ##### END OF rapid-yaml
 
+############## booksim2
+project(booksim2-quickstart LANGUAGES CXX)
+FetchContent_Declare(booksim
+    GIT_REPOSITORY https://github.com/SLAM-Lab/booksim2-sanafe.git
+    GIT_TAG "main"
+    GIT_SHALLOW FALSE
+    SOURCE_SUBDIR src
+)
+FetchContent_MakeAvailable(booksim)
+
+#### END of booksim2
+
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 include(CMakePrintHelpers)
@@ -173,6 +185,7 @@ if(PYTHON_BUILD_ENABLED)
     target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
     target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
     target_link_libraries(sanafecpp PUBLIC ryml::ryml)
+    target_link_libraries(sanafecpp PUBLIC booksim)
     target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
     if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
         target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
@@ -186,6 +199,7 @@ if(STANDALONE_BUILD_ENABLED)
     target_sources(sim PRIVATE ${SOURCE_FILES})
 
     target_link_libraries(sim PUBLIC ryml::ryml)
+    target_link_libraries(sim PUBLIC booksim)
     target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})
     if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
         target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)

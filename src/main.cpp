@@ -15,6 +15,8 @@
 #include <omp.h>
 #endif
 
+#include <booksim_lib.hpp>
+
 #include "arch.hpp"
 #include "description.hpp"
 #include "models.hpp"
@@ -40,7 +42,12 @@ int main(int argc, char *argv[])
     bool record_perf{false};
     bool record_messages{false};
     bool use_netlist_format{false};
-    bool use_simple_timing_model{false}; // Default is the detailed model
+    // Select the timing model on the command line. The default is the
+    //  detailed build-in timing model (using a scheduler). Select only one of
+    //  these two flags to enable either the simple analytical timing model or
+    //  an external cycle-accurate timing model (Booksim2).
+    sanafe::TimingModel timing_model = sanafe::TIMING_MODEL_DETAILED;
+    std::string timing_model_str = "detailed";
 
     while (argc > 2)
     {
@@ -52,11 +59,9 @@ int main(int argc, char *argv[])
                 argc--;
                 argv++;
                 output_dir = std::filesystem::path(argv[0]);
-                // TODO: fix this for C++
                 INFO("Writing output to %s\n", output_dir.c_str());
                 break;
             }
-
             case 'm':
                 record_messages = true;
                 break;
@@ -69,7 +74,10 @@ int main(int argc, char *argv[])
                 record_spikes = true;
                 break;
             case 't':
-                use_simple_timing_model = true;
+                argc--;
+                argv++;
+                timing_model_str = std::string(argv[0]);
+                break;
             case 'v':
                 record_potentials = true;
                 break;
@@ -91,6 +99,25 @@ int main(int argc, char *argv[])
     {
         INFO("Usage: ./sim [-psvmo] <arch description> <network description> <timesteps>\n");
         return 0;
+    }
+
+    if (timing_model_str == "simple")
+    {
+        timing_model = sanafe::TIMING_MODEL_SIMPLE;
+    }
+    else if (timing_model_str == "detailed")
+    {
+        timing_model = sanafe::TIMING_MODEL_DETAILED;
+
+    }
+    else if (timing_model_str == "cycle")
+    {
+        timing_model = sanafe::TIMING_MODEL_CYCLE_ACCURATE;
+    }
+    else
+    {
+        INFO("Error: Timing model %s not recognized.\n",
+                timing_model_str.c_str());
     }
 
     // Read in program args, sanity check and parse inputs
@@ -136,14 +163,11 @@ int main(int argc, char *argv[])
         }
 
         const long int heartbeat = 100L;
-        sanafe::TimingModel timing_model = sanafe::TIMING_MODEL_DETAILED;
-        if (use_simple_timing_model)
-        {
-            timing_model = sanafe::TIMING_MODEL_SIMPLE;
-        }
-
         INFO("Running simulation.\n");
         hw.sim(timesteps, heartbeat, timing_model);
+
+        INFO("Closing Booksim2 library\n");
+        booksim_close();
 
         INFO("***** Run Summary *****\n");
         hw.sim_output_run_summary(output_dir);
@@ -174,8 +198,9 @@ int main(int argc, char *argv[])
 //
 // ** New simulator features **
 // TODO: integrate Booksim2 as a 'cycle' accurate modeling option
-// TODO: support saving SNNs to yaml and netlist
-// TODO: extend the old netlist format to support embedded YAML, group mappings, and hyperedges
+// TODO: support saving SNNs to yaml and netlist formats
+// TODO: extend the old netlist format to support embedded YAML, group mappings,
+//  and hyperedges
 // ** Misc **
 // TODO: update tutorials to use Jupyter notebook
 // TODO: Improve plug-in documentation
