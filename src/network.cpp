@@ -475,13 +475,24 @@ void sanafe::SpikingNetwork::save_netlist(
 
     INFO("saving mappings\n");
     // Save all mappings
-    // TODO: preserve the original mapping order
+    std::vector<std::reference_wrapper<const Neuron>> all_neurons;
+
+    // Collect all neurons from all groups
     for (const auto &group : groups)
     {
-        for (const Neuron &n : group.second.neurons)
-        {
-            out << description_mapping_to_netlist(n, group_name_to_id) << "\n";
-        }
+        const auto &neurons = group.second.neurons;
+        all_neurons.insert(all_neurons.end(), neurons.begin(), neurons.end());
+    }
+
+    // Sort by mapping_order
+    std::sort(all_neurons.begin(), all_neurons.end(),
+            [](const Neuron &a, const Neuron &b) {
+                return a.mapping_order < b.mapping_order;
+            });
+
+    for (const Neuron &n : all_neurons)
+    {
+        out << description_mapping_to_netlist(n, group_name_to_id) << "\n";
     }
 
     return;
