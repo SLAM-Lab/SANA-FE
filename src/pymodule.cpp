@@ -546,7 +546,7 @@ PYBIND11_MODULE(sanafecpp, m)
 
     pybind11::class_<sanafe::NeuronGroup>(m, "NeuronGroup")
             .def("__repr__", &sanafe::NeuronGroup::info)
-            .def("get_id", &sanafe::NeuronGroup::get_id)
+            .def("get_name", &sanafe::NeuronGroup::get_name)
             .def("connect_neurons_dense", &pyconnect_neurons_dense)
             .def("connect_neurons_sparse", &pyconnect_neurons_sparse)
             .def("connect_neurons_conv2d", &pyconnect_neurons_conv2d,

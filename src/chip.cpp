@@ -131,13 +131,13 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
     {
         if (!neuron->core_address.has_value())
         {
-            std::string error = "Neuron: " + neuron->parent_group_id + "." +
+            std::string error = "Neuron: " + neuron->parent_group_name + "." +
                     std::to_string(neuron->offset) + " not mapped.";
             INFO("%s", error.c_str());
             throw std::runtime_error(error);
         }
         TRACE1(CHIP, "Mapping neuron %s.%zu to core:%zu\n",
-                neuron->parent_group_id.c_str(), neuron->offset,
+                neuron->parent_group_name.c_str(), neuron->offset,
                 neuron->core_address.value().id);
         Core &mapped_core = list_of_cores[neuron->core_address.value().id];
         mapped_core.map_neuron(*neuron, total_neurons_mapped);
@@ -1195,7 +1195,7 @@ void sanafe::Core::map_neuron(
         const Neuron &neuron_to_map, const size_t neuron_id)
 {
     TRACE1(CHIP, "Mapping nid:%s.%zu to core: %zu\n",
-            neuron_to_map.parent_group_id.c_str(), neuron_to_map.offset, id);
+            neuron_to_map.parent_group_name.c_str(), neuron_to_map.offset, id);
 
     if (neurons.size() >= pipeline_config.max_neurons_supported)
     {
@@ -1424,7 +1424,7 @@ sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
         Core *mapped_core, const size_t nid, const size_t mapped_address,
         PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma,
         AxonOutUnit *mapped_axon_out)
-        : parent_group_name(neuron_to_map.parent_group_id)
+        : parent_group_name(neuron_to_map.parent_group_name)
         , offset(neuron_to_map.offset)
         , id(nid)
         , core(mapped_core)

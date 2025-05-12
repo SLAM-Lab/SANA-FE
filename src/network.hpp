@@ -80,7 +80,7 @@ public:
     std::string soma_hw_name{};
     std::string default_synapse_hw_name{};
     std::string dendrite_hw_name{};
-    std::string parent_group_id;
+    std::string parent_group_name;
     SpikingNetwork &parent_net;
     size_t offset{};
     std::optional<CoreAddress> core_address{std::nullopt};
@@ -98,8 +98,6 @@ public:
     void map_to_core(const CoreConfiguration &core);
     void configure(const NeuronConfiguration &attributes);
     [[nodiscard]] std::string info() const;
-    std::string netlist_neuron() const;
-    std::string netlist_mapping() const;
 };
 
 class NeuronGroup
@@ -109,14 +107,14 @@ public:
     std::vector<Neuron> neurons;
     NeuronConfiguration default_neuron_config;
     std::string name;
-    [[nodiscard]] std::string get_id() const { return name; }
+
+    [[nodiscard]] std::string get_name() const { return name; }
     explicit NeuronGroup(const std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronConfiguration &default_config);
 
     void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists);
     void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
     void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const Conv2DParameters &convolution);
     [[nodiscard]] std::string info() const;
-    std::string netlist() const;
 };
 
 class SpikingNetwork
@@ -159,7 +157,6 @@ struct Connection
     int id;
 
     Connection(size_t id) : id(id) {}
-    std::string netlist() const;
 };
 
 SpikingNetwork load_net(const std::filesystem::path &path, Architecture &arch, bool use_netlist_format = false);

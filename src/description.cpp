@@ -2255,6 +2255,202 @@ void sanafe::description_read_network_entry(
     return;
 }
 
+std::string sanafe::description_group_to_netlist(const NeuronGroup &group)
+{
+    // TODO: support embedded YAML when model params isn't a simple scalar
+    // TODO: support paramaters specific to certain h/w units
+    std::string entry = "g " + std::to_string(group.neurons.size());
+
+    if (group.default_neuron_config.default_synapse_hw_name.has_value() &&
+            !group.default_neuron_config.default_synapse_hw_name.value().empty())
+    {
+        entry += " synapse_hw_name=" +
+                group.default_neuron_config.default_synapse_hw_name.value();
+    }
+    if (group.default_neuron_config.dendrite_hw_name.has_value() &&
+            !group.default_neuron_config.dendrite_hw_name.value().empty())
+    {
+        entry += " dendrite_hw_name=" +
+                group.default_neuron_config.dendrite_hw_name.value();
+    }
+    if (group.default_neuron_config.force_dendrite_update.has_value() &&
+            group.default_neuron_config.force_dendrite_update.value())
+    {
+        entry += " force_dendrite_update=" +
+                std::to_string(group.default_neuron_config.force_dendrite_update
+                                .value());
+    }
+    if (group.default_neuron_config.force_soma_update.has_value() &&
+            group.default_neuron_config.force_soma_update.value())
+    {
+        entry += " force_soma_update=" +
+                std::to_string(
+                        group.default_neuron_config.force_soma_update.value());
+    }
+    if (group.default_neuron_config.force_synapse_update.has_value() &&
+            group.default_neuron_config.force_synapse_update.value())
+    {
+        entry += " force_synapse_update=" +
+                std::to_string(group.default_neuron_config.force_synapse_update
+                                .value());
+    }
+    if (group.default_neuron_config.log_potential.has_value() &&
+            group.default_neuron_config.log_potential.value())
+    {
+        entry += " log_potential=" +
+                std::to_string(
+                        group.default_neuron_config.log_potential.value());
+    }
+    if (group.default_neuron_config.log_spikes.has_value() &&
+            group.default_neuron_config.log_spikes.value())
+    {
+        entry += " log_spikes=" +
+                std::to_string(group.default_neuron_config.log_spikes.value());
+    }
+    if (group.default_neuron_config.soma_hw_name.has_value() &&
+            !group.default_neuron_config.soma_hw_name.value().empty())
+    {
+        entry += " soma_hw_name=" +
+                group.default_neuron_config.soma_hw_name.value();
+    }
+
+    TRACE2(NET, "saving attributes\n");
+    for (auto attribute : group.default_neuron_config.model_parameters)
+    {
+        TRACE2(NET, "saving attribute %s\n", attribute.first.c_str());
+        entry += " " + attribute.first + "=" + attribute.second.print();
+    }
+
+    return entry;
+}
+
+std::string sanafe::description_neuron_to_netlist(const Neuron &neuron,
+        const std::map<std::string, size_t> group_name_to_id)
+{
+    // TODO: support embedded YAML when model params isn't a simple scalar
+    // TODO: support paramaters specific to certain h/w units
+    const NeuronGroup &parent_group =
+            neuron.parent_net.groups.at(neuron.parent_group_name);
+
+    size_t group_id = group_name_to_id.at(parent_group.name);
+    std::string entry = "n " + std::to_string(group_id) + "." +
+            std::to_string(neuron.offset);
+
+    // Output if the neuron variable is defined and unique for the group i.e.,
+    //  hasn't already been defined as a group-level parameter
+    if (!neuron.soma_hw_name.empty() &&
+            (!parent_group.default_neuron_config.soma_hw_name.has_value() ||
+                    (parent_group.default_neuron_config.soma_hw_name.value() !=
+                            neuron.soma_hw_name)))
+    {
+        entry += " soma_hw_name=" + neuron.soma_hw_name;
+    }
+    if (!neuron.default_synapse_hw_name.empty() &&
+            (!parent_group.default_neuron_config.default_synapse_hw_name
+                            .has_value() ||
+                    (parent_group.default_neuron_config.default_synapse_hw_name
+                                    .value() != neuron.default_synapse_hw_name)))
+    {
+        entry += " synapse_hw_name=" + neuron.default_synapse_hw_name;
+    }
+    if (!neuron.dendrite_hw_name.empty() &&
+            (!parent_group.default_neuron_config.dendrite_hw_name.has_value() &&
+                    (parent_group.default_neuron_config.dendrite_hw_name
+                                    .value() != neuron.dendrite_hw_name)))
+    {
+        entry += " dendrite_hw_name=" + neuron.dendrite_hw_name;
+    }
+    if (neuron.force_synapse_update &&
+            (!parent_group.default_neuron_config.force_synapse_update
+                            .has_value() ||
+                    (parent_group.default_neuron_config.force_synapse_update
+                                    .value() != neuron.force_synapse_update)))
+    {
+        entry += " force_synapse_update=" +
+                std::to_string(neuron.force_synapse_update);
+    }
+    if (neuron.force_dendrite_update &&
+            (!parent_group.default_neuron_config.force_synapse_update
+                            .has_value() ||
+                    (parent_group.default_neuron_config.force_synapse_update
+                                    .value() != neuron.force_synapse_update)))
+    {
+        entry += " force_dendrite_update=" +
+                std::to_string(neuron.force_dendrite_update);
+    }
+    if (neuron.force_soma_update &&
+            (!parent_group.default_neuron_config.force_soma_update.has_value() ||
+                    (parent_group.default_neuron_config.force_soma_update
+                                    .value() != neuron.force_soma_update)))
+    {
+        entry += " force_soma_update=" +
+                std::to_string(neuron.force_soma_update);
+    }
+    if (neuron.log_spikes &&
+            (!parent_group.default_neuron_config.log_spikes.has_value() ||
+                    (parent_group.default_neuron_config.log_spikes.value() !=
+                            neuron.log_spikes)))
+    {
+        entry += " log_spikes=" + std::to_string(neuron.log_spikes);
+    }
+    if (neuron.log_potential &&
+            (!parent_group.default_neuron_config.log_potential.has_value() ||
+                    (parent_group.default_neuron_config.log_potential.value() !=
+                            neuron.log_potential)))
+    {
+        entry += "log_potential=" + std::to_string(neuron.log_potential) + " ";
+    }
+
+    for (auto attribute : neuron.model_parameters)
+    {
+        entry += " " + attribute.first + "=" + attribute.second.print();
+    }
+
+    return entry;
+}
+
+std::string sanafe::description_mapping_to_netlist(const Neuron &neuron,
+        const std::map<std::string, size_t> group_name_to_id)
+{
+    std::string entry{};
+
+    if (neuron.core_address.has_value())
+    {
+        const CoreAddress &address = neuron.core_address.value();
+        size_t group_id = group_name_to_id.at(neuron.parent_group_name);
+        entry = "& " + std::to_string(group_id) + "." +
+                std::to_string(neuron.offset) + "@" +
+                std::to_string(address.parent_tile_id) + "." +
+                std::to_string(address.offset_within_tile);
+    }
+    else
+    {
+        TRACE1(NET, "No mapping defined\n");
+    }
+    return entry;
+}
+
+std::string sanafe::description_connection_to_netlist(const Connection &con,
+        const std::map<std::string, size_t> group_name_to_id)
+{
+    // TODO: support hyperedges
+    // TODO: support embedded YAML when modelparams isn't a simple scalar
+    // TODO: support paramaters specific to only synapse or dendrite h/w
+    size_t src_group_id = group_name_to_id.at(con.pre_neuron.group_name);
+    size_t dest_group_id = group_name_to_id.at(con.post_neuron.group_name);
+    std::string entry = "e " + std::to_string(src_group_id) + "." +
+            std::to_string(con.pre_neuron.neuron_offset.value()) + "->" +
+            std::to_string(dest_group_id) + "." +
+            std::to_string(con.post_neuron.neuron_offset.value());
+
+    for (auto attribute : con.synapse_params)
+    {
+        entry += " " + attribute.first + "=" + attribute.second.print();
+    }
+
+    return entry;
+}
+
 size_t sanafe::field_to_int(const std::string_view &field)
 {
     size_t val = 0;

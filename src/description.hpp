@@ -87,7 +87,10 @@ std::pair<size_t, size_t> parse_core_field(const std::string_view &core_field);
 std::tuple<std::string, size_t, std::string, size_t> parse_edge_field(const std::string_view &edge_field);
 std::tuple<std::string, size_t, size_t, size_t> parse_mapping_field(const std::string_view &mapping_field);
 void description_read_network_entry(const std::vector<std::string_view> &fields, Architecture &arch, SpikingNetwork &net, const int line_number);
-
+std::string description_group_to_netlist(const NeuronGroup &group);
+std::string description_neuron_to_netlist(const Neuron &neuron, const std::map<std::string, size_t> group_name_to_id);
+std::string description_mapping_to_netlist(const Neuron &neuron, const std::map<std::string, size_t> group_name_to_id);
+std::string description_connection_to_netlist(const Connection &con, const std::map<std::string, size_t> group_name_to_id);
 }
 
 #endif
