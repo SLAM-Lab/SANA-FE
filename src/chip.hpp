@@ -22,7 +22,7 @@
 #include <queue>
 #include <variant>
 
-#include <booksim_config.hpp>
+struct BookSimConfig;
 
 #include "arch.hpp"
 #include "print.hpp"
@@ -108,7 +108,7 @@ public:
     int max_cores_per_tile{0};
 
 private:
-    BookSimConfig booksim_config{};
+    std::unique_ptr<BookSimConfig> booksim_config{};
     std::string out_dir;
     size_t total_neurons_mapped{0UL};
     long int total_neurons_fired{0L};

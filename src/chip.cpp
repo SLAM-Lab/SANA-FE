@@ -79,7 +79,11 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
 
     const std::vector<std::string> booksim_config_vec(
             std::begin(booksim_config_str), std::end(booksim_config_str));
-    booksim_config = booksim_load_config(booksim_config_vec);
+    BookSimConfig new_config = booksim_load_config(booksim_config_vec);
+    // Use a unique_ptr for the config so that we don't need to include Booksim
+    //  library in the header (meaning that plugins using chip.hpp don't need to
+    //  also include this library)
+    booksim_config = std::make_unique<BookSimConfig>(new_config);
     chip_count++;
 }
 
@@ -1653,7 +1657,7 @@ void sanafe::SpikingChip::sim_timestep(
                     "simulations.");
         }
         ts.sim_time =
-                schedule_messages_cycle_accurate(ts.messages, booksim_config);
+                schedule_messages_cycle_accurate(ts.messages, *booksim_config);
     }
     else
     {

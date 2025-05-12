@@ -199,7 +199,9 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: support saving SNNs to yaml and netlist formats
+// TODO: support saving SNNs/mappings to yaml and netlist formats
+//  * SNNs can save either netlists or YAML descriptions
+//  * SpikingChip can save its mapping, either to netlist or append to YAML
 // TODO: extend the old netlist format to support embedded YAML, group mappings,
 //  and hyperedges
 // ** Misc **
