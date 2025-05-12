@@ -523,7 +523,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("log_potential") = false,
                     pybind11::arg("log_spikes") = false,
                     pybind11::arg("soma_hw_name") = "")
-            //.def_readwrite("groups", &sanafe::Network::groups);
+            .def("save", &sanafe::SpikingNetwork::save)
+            .def("save_netlist", &sanafe::SpikingNetwork::save_netlist)
             .def_property(
                     "groups",
                     [](sanafe::SpikingNetwork &self)

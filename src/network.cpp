@@ -36,6 +36,72 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
     }
 }
 
+std::string sanafe::NeuronGroup::netlist() const
+{
+    // TODO: support embedded YAML when model params isn't a simple scalar
+    // TODO: support paramaters specific to certain h/w units
+    std::string entry = "g " + name + " " + std::to_string(neurons.size());
+
+    if (default_neuron_config.default_synapse_hw_name.has_value() &&
+            !default_neuron_config.default_synapse_hw_name.value().empty())
+    {
+        entry += " synapse_hw_name=" +
+                default_neuron_config.default_synapse_hw_name.value();
+    }
+    if (default_neuron_config.dendrite_hw_name.has_value() &&
+            !default_neuron_config.dendrite_hw_name.value().empty())
+    {
+        entry += " dendrite_hw_name=" +
+                default_neuron_config.dendrite_hw_name.value();
+    }
+    if (default_neuron_config.force_dendrite_update.has_value() &&
+            default_neuron_config.force_dendrite_update.value())
+    {
+        entry += " force_dendrite_update=" +
+                std::to_string(
+                        default_neuron_config.force_dendrite_update.value());
+    }
+    if (default_neuron_config.force_soma_update.has_value() &&
+            default_neuron_config.force_soma_update.value())
+    {
+        entry += " force_soma_update=" +
+                std::to_string(default_neuron_config.force_soma_update.value());
+    }
+    if (default_neuron_config.force_synapse_update.has_value() &&
+            default_neuron_config.force_synapse_update.value())
+    {
+        entry += " force_synapse_update=" +
+                std::to_string(
+                        default_neuron_config.force_synapse_update.value());
+    }
+    if (default_neuron_config.log_potential.has_value() &&
+            default_neuron_config.log_potential.value())
+    {
+        entry += " log_potential=" +
+                std::to_string(default_neuron_config.log_potential.value());
+    }
+    if (default_neuron_config.log_spikes.has_value() &&
+            default_neuron_config.log_spikes.value())
+    {
+        entry += " log_spikes=" +
+                std::to_string(default_neuron_config.log_spikes.value());
+    }
+    if (default_neuron_config.soma_hw_name.has_value() &&
+            !default_neuron_config.soma_hw_name.value().empty())
+    {
+        entry += " soma_hw_name=" + default_neuron_config.soma_hw_name.value();
+    }
+
+    TRACE2(NET, "saving attributes\n");
+    for (auto attribute : default_neuron_config.model_parameters)
+    {
+        TRACE2(NET, "saving attribute %s\n", attribute.first.c_str());
+        entry += " " + attribute.first + "=" + attribute.second.print();
+    }
+
+    return entry;
+}
+
 sanafe::Neuron::Neuron(const size_t neuron_offset, SpikingNetwork &net,
         const std::string parent_group_id, const NeuronConfiguration &config)
         : parent_group_id(std::move(parent_group_id))
@@ -47,7 +113,7 @@ sanafe::Neuron::Neuron(const size_t neuron_offset, SpikingNetwork &net,
 
 void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
 {
-    this->core_id = core.address.id;
+    this->core_address = core.address;
     mapping_order = parent_net.update_mapping_count();
     TRACE1(NET, "Mapping order for nid:%s.%zu = %zu\n", parent_group_id.c_str(),
             offset, mapping_order);
@@ -103,6 +169,103 @@ std::string sanafe::Neuron::info() const
     return ss.str();
 }
 
+std::string sanafe::Neuron::netlist_neuron() const
+{
+    // TODO: support embedded YAML when model params isn't a simple scalar
+    // TODO: support paramaters specific to certain h/w units
+    std::string entry = "n " + parent_group_id + "." + std::to_string(offset);
+    const NeuronGroup &parent_group = parent_net.groups.at(parent_group_id);
+
+    // Output if the neuron variable is defined and unique for the group i.e.,
+    //  hasn't already been defined as a group-level parameter
+    if (!soma_hw_name.empty() &&
+            (!parent_group.default_neuron_config.soma_hw_name.has_value() ||
+                    (parent_group.default_neuron_config.soma_hw_name.value() !=
+                            soma_hw_name)))
+    {
+        entry += " soma_hw_name=" + soma_hw_name;
+    }
+    if (!default_synapse_hw_name.empty() &&
+            (!parent_group.default_neuron_config.default_synapse_hw_name
+                            .has_value() ||
+                    (parent_group.default_neuron_config.default_synapse_hw_name
+                                    .value() != default_synapse_hw_name)))
+    {
+        entry += " synapse_hw_name=" + default_synapse_hw_name;
+    }
+    if (!dendrite_hw_name.empty() &&
+            (!parent_group.default_neuron_config.dendrite_hw_name.has_value() &&
+                    (parent_group.default_neuron_config.dendrite_hw_name
+                                    .value() != dendrite_hw_name)))
+    {
+        entry += " dendrite_hw_name=" + dendrite_hw_name;
+    }
+    if (force_synapse_update &&
+            (!parent_group.default_neuron_config.force_synapse_update
+                            .has_value() ||
+                    (parent_group.default_neuron_config.force_synapse_update
+                                    .value() != force_synapse_update)))
+    {
+        entry +=
+                " force_synapse_update=" + std::to_string(force_synapse_update);
+    }
+    if (force_dendrite_update &&
+            (!parent_group.default_neuron_config.force_synapse_update
+                            .has_value() ||
+                    (parent_group.default_neuron_config.force_synapse_update
+                                    .value() != force_synapse_update)))
+    {
+        entry += " force_dendrite_update=" +
+                std::to_string(force_dendrite_update);
+    }
+    if (force_soma_update &&
+            (!parent_group.default_neuron_config.force_soma_update.has_value() ||
+                    (parent_group.default_neuron_config.force_soma_update
+                                    .value() != force_soma_update)))
+    {
+        entry += " force_soma_update=" + std::to_string(force_soma_update);
+    }
+    if (log_spikes &&
+            (!parent_group.default_neuron_config.log_spikes.has_value() ||
+                    (parent_group.default_neuron_config.log_spikes.value() !=
+                            log_spikes)))
+    {
+        entry += " log_spikes=" + std::to_string(log_spikes);
+    }
+    if (log_potential &&
+            (!parent_group.default_neuron_config.log_potential.has_value() ||
+                    (parent_group.default_neuron_config.log_potential.value() !=
+                            log_potential)))
+    {
+        entry += "log_potential=" + std::to_string(log_potential) + " ";
+    }
+
+    for (auto attribute : model_parameters)
+    {
+        entry += " " + attribute.first + "=" + attribute.second.print();
+    }
+
+    return entry;
+}
+
+std::string sanafe::Neuron::netlist_mapping() const
+{
+    std::string entry{};
+
+    if (core_address.has_value())
+    {
+        const CoreAddress &address = core_address.value();
+        entry = "& " + parent_group_id + "." + std::to_string(offset) + "@" +
+                std::to_string(address.parent_tile_id) + "." +
+                std::to_string(address.offset_within_tile);
+    }
+    else
+    {
+        TRACE1(NET, "No mapping defined\n");
+    }
+    return entry;
+}
+
 sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
         const std::string name, const size_t neuron_count,
         const NeuronConfiguration &default_config)
@@ -139,14 +302,7 @@ size_t sanafe::Neuron::connect_to_neuron(Neuron &dest)
     edge.pre_neuron.group_name = this->parent_group_id;
     edge.post_neuron.neuron_offset = dest.offset;
     edge.post_neuron.group_name = dest.parent_group_id;
-    //if (synapse_hw_name.has_value())
-    //{
-    //    con.synapse_hw_name = synapse_hw_name.value();
-    //}
-    //else
-    {
-        edge.synapse_hw_name = dest.default_synapse_hw_name;
-    }
+    edge.synapse_hw_name = dest.default_synapse_hw_name;
 
     TRACE1(NET, "\tAdded con %s.%zu->%s.%zu\n",
             edge.pre_neuron.group_name.c_str(),
@@ -192,31 +348,6 @@ std::string sanafe::SpikingNetwork::info() const
 {
     return "sanafe::Network(groups=" + std::to_string(groups.size()) + ")";
 }
-
-// TODO: change this function to map network to hardware
-//  First, map every group and neuron onto the hardware. Any unmapped neurons can raise an error
-//  Second, map all edges as connections on the hardware
-/*
-void sanafe::SpikingNetwork::check_mapped() const
-{
-    // Check that all network neurons are mapped to a physical core
-    //  If a neuron is not, print an error message and stop the simulation
-    for (const auto &group_entry : groups)
-    {
-        const NeuronGroup &group = group_entry.second;
-        for (const auto &neuron : group.neurons)
-        {
-            if (neuron.core == nullptr)
-            {
-                INFO("neuron in sanafe: %p\n", (void *) &neuron);
-                std::string error = "Error: Neuron " + group.name + "." +
-                        std::to_string(neuron.id) + " not mapped to H/W.\n";
-                throw std::runtime_error(error);
-            }
-        }
-    }
-}
-*/
 
 void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
         const std::map<std::string, std::vector<ModelParam>> &attribute_lists,
@@ -420,20 +551,6 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
             }
         }
     }
-
-    // TODO: hack, remove
-    /*
-    for (auto &n : neurons)
-    {
-        for (auto &con : n.connections_out)
-        {
-            printf("e %s.%zu->%s.%zu w=%0.1lf\n",
-                    con.pre_neuron->parent_group_id.c_str(), con.pre_neuron->id,
-                    con.post_neuron->parent_group_id.c_str(),
-                    con.post_neuron->id, (double) con.synapse_params["weight"]);
-        }
-    }
-    */
 }
 
 void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
@@ -475,9 +592,26 @@ void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
     }
 }
 
-/*
-void sanafe::Network::save_netlist(
-        const std::filesystem::path &path, const bool save_mapping) const
+std::string sanafe::Connection::netlist() const
+{
+    // TODO: support hyperedges
+    // TODO: support embedded YAML when modelparams isn't a simple scalar
+    // TODO: support paramaters specific to only synapse or dendrite h/w
+    std::string entry = "e " + pre_neuron.group_name + "." +
+            std::to_string(pre_neuron.neuron_offset.value()) + "->" +
+            post_neuron.group_name + "." +
+            std::to_string(post_neuron.neuron_offset.value());
+
+    for (auto attribute : synapse_params)
+    {
+        entry += " " + attribute.first + "=" + attribute.second.print();
+    }
+
+    return entry;
+}
+
+void sanafe::SpikingNetwork::save_netlist(
+        const std::filesystem::path &path) const
 {
     std::ofstream out(path);
     if (!out.is_open())
@@ -488,26 +622,50 @@ void sanafe::Network::save_netlist(
     }
 
     // Save all groups first
+    INFO("saving groups\n");
     for (const auto &group : groups)
     {
-        out << group->description();
+        INFO("saving group:%s\n", group.first.c_str());
+        out << group.second.netlist() << "\n";
     }
 
     // Now save all neurons and connections
+    INFO("saving neurons\n");
     for (const auto &group : groups)
     {
-        for (const Neuron &n : group->neurons)
+        for (const Neuron &n : group.second.neurons)
         {
             // Save neuron description
-            out << n.description(save_mapping);
+            out << n.netlist_neuron() << "\n";
             // Save all edges for this neuron
-            for (const Connection &con : n.connections_out)
+            for (const Connection &con : n.edges_out)
             {
-                out << con.description();
+                out << con.netlist() << "\n";
             }
+        }
+    }
+
+    INFO("saving mappings\n");
+    // Save all mappings
+    // TODO: preserve the original mapping order
+    for (const auto &group : groups)
+    {
+        for (const Neuron &n : group.second.neurons)
+        {
+            out << n.netlist_mapping() << "\n";
         }
     }
 
     return;
 }
-*/
+
+void sanafe::SpikingNetwork::save(
+        const std::filesystem::path &path, const bool use_netlist_format) const
+{
+    if (use_netlist_format)
+    {
+        save_netlist(path);
+    }
+
+    return;
+}

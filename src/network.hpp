@@ -83,7 +83,7 @@ public:
     std::string parent_group_id;
     SpikingNetwork &parent_net;
     size_t offset{};
-    std::optional<size_t> core_id{std::nullopt};
+    std::optional<CoreAddress> core_address{std::nullopt};
     size_t mapping_order{};
     // Optionally set flags for updating and traces
     bool force_synapse_update{false};
@@ -98,6 +98,8 @@ public:
     void map_to_core(const CoreConfiguration &core);
     void configure(const NeuronConfiguration &attributes);
     [[nodiscard]] std::string info() const;
+    std::string netlist_neuron() const;
+    std::string netlist_mapping() const;
 };
 
 class NeuronGroup
@@ -114,6 +116,7 @@ public:
     void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
     void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const Conv2DParameters &convolution);
     [[nodiscard]] std::string info() const;
+    std::string netlist() const;
 };
 
 class SpikingNetwork
@@ -138,7 +141,8 @@ public:
 
     NeuronGroup &create_neuron_group(const std::string name, size_t neuron_count, const NeuronConfiguration &default_config);
     [[nodiscard]] std::string info() const;
-    //void save_net_description(const std::filesystem::path &path, const bool save_mapping=true) const;
+    void save_netlist(const std::filesystem::path &path) const;
+    void save(const std::filesystem::path &path, const bool use_netlist_format = false) const;
 
     size_t update_mapping_count();
 private:
@@ -155,63 +159,10 @@ struct Connection
     int id;
 
     Connection(size_t id) : id(id) {}
+    std::string netlist() const;
 };
 
 SpikingNetwork load_net(const std::filesystem::path &path, Architecture &arch, bool use_netlist_format = false);
-
-
-
-// Alternative ModelParameter implementations. Keep for now.. maybe find
-//  somewhere better for this
-// Simpler NeuronAttribute implementation that supports one level of lists
-//  This is basically just a specialization of the variant class
-//using NeuronAttribute =
-//        std::variant<bool, int, double, std::string, std::vector<bool>,
-//                std::vector<int>, std::vector<double>>;
-
-/*
-// More complex attribute / parameter implementation. However, this relies on
-//  undefined behavior as std::map is being defined with an incomplete type.
-//  This seems to work for GCC but isn't portable.
-template<typename T>
-class IncompleteTypeWrapper
-{
-public:
-    IncompleteTypeWrapper(const T &t)
-    {
-        value = std::make_unique<T>(t);
-    }
-    IncompleteTypeWrapper(const IncompleteTypeWrapper &other)
-    {
-        value = std::make_unique<T>(*(other.value.get()));
-    }
-    ~IncompleteTypeWrapper() = default;
-
-    auto operator== (const IncompleteTypeWrapper &other) const
-    {
-        return value == other.value;
-    }
-    auto operator!= (const IncompleteTypeWrapper &other) const
-    {
-        return value != other.value;
-    }
-    operator T() { return value.get(); }
-private:
-    std::unique_ptr<T> value;
-};
-
-template <typename Attribute>
-using AttributeBase =
-        std::variant<bool, int, double, std::string, std::vector<Attribute>,
-                IncompleteTypeWrapper<std::map<std::string, Attribute>>>;
-
-// The "using" keyword cannot be used recursively
-struct AttributePrototype
-{
-    using type = AttributeBase<AttributePrototype>;
-};
-using NeuronAttribute3 = AttributePrototype::type;
-*/
 
 } // namespace
 

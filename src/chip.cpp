@@ -129,7 +129,7 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
     // Map all neurons in order
     for (const Neuron *neuron : neurons_in_mapped_order)
     {
-        if (!neuron->core_id.has_value())
+        if (!neuron->core_address.has_value())
         {
             std::string error = "Neuron: " + neuron->parent_group_id + "." +
                     std::to_string(neuron->offset) + " not mapped.";
@@ -138,8 +138,8 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         }
         TRACE1(CHIP, "Mapping neuron %s.%zu to core:%zu\n",
                 neuron->parent_group_id.c_str(), neuron->offset,
-                neuron->core_id.value());
-        Core &mapped_core = list_of_cores[neuron->core_id.value()];
+                neuron->core_address.value().id);
+        Core &mapped_core = list_of_cores[neuron->core_address.value().id];
         mapped_core.map_neuron(*neuron, total_neurons_mapped);
         ++total_neurons_mapped;
     }

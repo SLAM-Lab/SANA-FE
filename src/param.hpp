@@ -95,6 +95,33 @@ struct ModelParam
     {
         return (value == rhs.value);
     }
+    std::string print() const
+    {
+        if (std::holds_alternative<bool>(value))
+        {
+            return std::get<bool>(value) ? "true" : "false";
+        }
+        else if (std::holds_alternative<int>(value))
+        {
+            return std::to_string(std::get<int>(value));
+        }
+        else if (std::holds_alternative<double>(value))
+        {
+            std::ostringstream ss;
+            ss << std::scientific << std::get<double>(value);
+            return ss.str();
+        }
+        else if (std::holds_alternative<std::string>(value))
+        {
+            return std::get<std::string>(value);
+        }
+        else if (std::holds_alternative<std::vector<ModelParam>>(value))
+        {
+            throw std::runtime_error("Printing vectors not yet supported");
+        }
+        // This should not be reached if all variant types are handled
+        throw std::runtime_error("Unknown variant type in ModelParam");
+    }
 
     // In C++17, we cannot use std::map (which would be the natural choice) with
     //  incomplete types i.e., cannot use std::map in such a recursive
