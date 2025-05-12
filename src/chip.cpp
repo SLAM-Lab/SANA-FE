@@ -230,7 +230,6 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
     MappedConnection &mapped_con = pre_neuron.connections_out.back();
     mapped_con.pre_neuron = &pre_neuron;
     mapped_con.post_neuron = &post_neuron;
-    mapped_con.dendrite_params = con.dendrite_params;
 
     // Map to synapse hardware unit
     Core &post_core = *(post_neuron.core);

@@ -228,7 +228,6 @@ struct Timestep
 class MappedConnection
 {
 public:
-    std::map<std::string, ModelParam> dendrite_params{};
     MappedNeuron *post_neuron{nullptr};
     MappedNeuron *pre_neuron{nullptr};
     PipelineUnit *synapse_hw{nullptr};
