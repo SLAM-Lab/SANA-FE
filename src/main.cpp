@@ -7,7 +7,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <ctime>
 #include <filesystem> // For std::filesystem::path
 #include <optional>
 #include <string>
@@ -49,12 +48,30 @@ int main(int argc, char *argv[])
     sanafe::TimingModel timing_model = sanafe::TIMING_MODEL_DETAILED;
     std::string timing_model_str = "detailed";
 
+    #ifdef HAVE_OPENMP
+        int nthreads = omp_get_num_procs();
+        INFO("OpenMP enabled, %d threads detected\n", nthreads);
+#else
+        INFO("No OpenMP multithreading enabled.\n");
+#endif
+
     while (argc > 2)
     {
         if (argv[0][0] == '-')
         {
             switch (argv[0][1])
             {
+            case 'c':
+                argc--;
+                argv++;
+#ifndef HAVE_OPENMP
+                INFO("Warning: multiple threads not supported; flag ignored");
+#else
+                nthreads = std::min(nthreads, std::stoi(argv[0]));
+                INFO("Setting threads to %d\n", nthreads);
+                omp_set_num_threads(nthreads);
+#endif
+                break;
             case 'o': {
                 argc--;
                 argv++;
@@ -129,12 +146,7 @@ int main(int argc, char *argv[])
         INFO("Running SANA-FE simulation (build:%s)\n", GIT_COMMIT);
         INFO("Loading booksim2 library for cycle-accurate support\n");
         booksim_init();
-#ifdef HAVE_OPENMP
-        const int nthreads = omp_get_num_procs();
-        INFO("OpenMP enabled, %d threads detected\n", nthreads);
-#else
-        INFO("No OpenMP multithreading enabled.\n");
-#endif
+
         sanafe::Architecture arch =
                 sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
         INFO("Architecture initialized.\n");

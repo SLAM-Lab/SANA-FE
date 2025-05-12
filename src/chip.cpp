@@ -5,6 +5,7 @@
 //  chip.cpp
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -18,6 +19,9 @@
 #include <vector>
 
 #include <booksim_lib.hpp>
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 
 #include "arch.hpp"
 #include "chip.hpp"
@@ -336,16 +340,16 @@ sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
 {
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
+    std::chrono::high_resolution_clock timer;
+
     ++total_timesteps;
     Timestep ts = Timestep(total_timesteps, core_count);
-    timespec ts_start;
-    timespec ts_end;
-    timespec ts_elapsed;
+    double ts_elapsed;
 
     // Run and measure the wall-clock time taken to run the simulation
-    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+    auto ts_start = timer.now();
     sim_timestep(ts, timing_model);
-    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    auto ts_end = timer.now();
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
     // Update global chip performance counters
@@ -384,12 +388,7 @@ sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
             }
         }
     }
-    constexpr double ns_in_second = 1.0e9;
-    wall_time +=
-            (double) ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / ns_in_second);
-    TRACE1(CHIP, "Time-step took: %fs.\n",
-            static_cast<double>(
-                    ts_elapsed.tv_sec + (ts_elapsed.tv_nsec / ns_in_second)));
+    wall_time += ts_elapsed;
 
     return ts;
 }
@@ -493,6 +492,7 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < core_list.size(); idx++)
     {
+        //INFO("omp thread:%d\n", omp_get_thread_num());
         Core &core = core_list[idx];
         TRACE1(CHIP, "Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
@@ -1571,6 +1571,9 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
     //  every time-step, regardless of whether it received inputs or not.
     // Note that energy is accounted for, but latency is not considered here.
     auto core_list = cores();
+#ifdef ENABLE_OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     for (size_t idx = 0; idx < core_list.size(); idx++)
     {
         Core &core = core_list[idx];
@@ -1615,15 +1618,20 @@ void sanafe::SpikingChip::sim_timestep(
         Timestep &ts, const TimingModel timing_model)
 {
     Scheduler scheduler;
+    std::chrono::high_resolution_clock timer;
 
     // Start the next time-step, clear all buffers
     assert(core_count > 0);
     ts = Timestep(ts.timestep, core_count);
     sim_reset_measurements();
 
+
+    auto start_tm = timer.now();
     process_neurons(ts);
+    auto neuron_processing_end_tm = timer.now();
     process_messages(ts);
     forced_updates(ts);
+    auto message_processing_end_tm = timer.now();
 
     scheduler.noc_width = noc_width;
     scheduler.noc_height = noc_height;
@@ -1664,9 +1672,9 @@ void sanafe::SpikingChip::sim_timestep(
         INFO("Error: Timing model:%d not recognized\n", timing_model);
         throw std::invalid_argument("Timing model not recognized");
     }
+    auto scheduler_end = timer.now();
 
     sim_calculate_energy(ts);
-
     for (auto &tile : tiles)
     {
         ts.total_hops += tile.hops;
@@ -1683,8 +1691,27 @@ void sanafe::SpikingChip::sim_timestep(
             }
         }
     }
-
     TRACE1(CHIP, "Spikes sent: %ld\n", ts.spike_count);
+    auto profile_end = timer.now();
+
+    // Calculate various simulator timings
+    neuron_processing_wall +=
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    neuron_processing_end_tm - start_tm)
+                    .count() * 1.0e-9;
+    message_processing_wall +=
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    message_processing_end_tm - neuron_processing_end_tm)
+                    .count() * 1.0e-9;
+    scheduler_wall += std::chrono::duration_cast<std::chrono::nanoseconds>(
+            scheduler_end - message_processing_end_tm)
+                               .count() * 1.0e-9;
+    other_stats_wall += std::chrono::duration_cast<std::chrono::nanoseconds>(
+            profile_end - scheduler_end)
+                               .count() * 1.0e-9;
+    TRACE1(CHIP, "neuron:%e message:%e scheduler:%e stats:%e\n",
+            neuron_processing_wall, message_processing_wall, scheduler_wall,
+            other_stats_wall);
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
@@ -2231,20 +2258,17 @@ void sanafe::SpikingChip::sim_trace_record_message(
     message_trace_file << std::endl;
 }
 
-timespec sanafe::calculate_elapsed_time(
-        const timespec &ts_start, const timespec &ts_end)
+double sanafe::calculate_elapsed_time(
+        const std::chrono::time_point<std::chrono::high_resolution_clock>
+                &ts_start,
+        const std::chrono::time_point<std::chrono::high_resolution_clock>
+                &ts_end)
 {
     // Calculate elapsed wall-clock time between ts_start and ts_end
-    timespec ts_elapsed;
-
-    ts_elapsed.tv_nsec = ts_end.tv_nsec - ts_start.tv_nsec;
-    ts_elapsed.tv_sec = ts_end.tv_sec - ts_start.tv_sec;
-    if (ts_end.tv_nsec < ts_start.tv_nsec)
-    {
-        --ts_elapsed.tv_sec;
-        constexpr double ns_in_second = 1000000000UL;
-        ts_elapsed.tv_nsec += ns_in_second;
-    }
+    double ts_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            ts_end - ts_start)
+                                .count();
+    ts_elapsed *= 1.0e-9;
 
     return ts_elapsed;
 }

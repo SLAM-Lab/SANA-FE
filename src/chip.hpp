@@ -14,6 +14,7 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -123,7 +124,12 @@ private:
     double soma_energy{0.0};
     double network_energy{0.0};
 
+    // Performance and other misc tracking
     static std::atomic<int> chip_count;
+    double neuron_processing_wall{0.0};
+    double message_processing_wall{0.0};
+    double scheduler_wall{0.0};
+    double other_stats_wall{0.0};
 
     // Flags and filestreams
     bool spike_trace_enabled{false};
@@ -575,7 +581,7 @@ struct AxonOutModel
     size_t src_neuron_id{};
 };
 
-timespec calculate_elapsed_time(const timespec &ts_start, const timespec &ts_end);
+double calculate_elapsed_time(const std::chrono::time_point<std::chrono::high_resolution_clock> &ts_start, const std::chrono::time_point<std::chrono::high_resolution_clock> &ts_end);
 size_t abs_diff(size_t a, size_t b);
 BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str, const bool buffer_inside_unit);
 }
