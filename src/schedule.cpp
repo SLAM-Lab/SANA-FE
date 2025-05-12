@@ -17,6 +17,8 @@
 #include <iterator>
 #include <vector>
 
+#include <booksim_lib.hpp>
+
 #include "network.hpp"
 #include "print.hpp"
 #include "schedule.hpp"
@@ -55,6 +57,46 @@ double sanafe::schedule_messages_simple(
             *std::max_element(neuron_processing_latencies.begin(),
                     neuron_processing_latencies.end());
     return std::max(max_message_processing, max_neuron_processing);
+}
+
+double sanafe::schedule_messages_cycle_accurate(
+        std::vector<std::list<Message>> &messages, const BookSimConfig &config)
+{
+    for (auto &core_messages : messages)
+    {
+        for (auto &message : core_messages)
+        {
+            if (message.mid == placeholder_mid)
+            {
+                booksim_create_processing_event(message.timestep,
+                        std::make_pair(
+                                message.src_neuron_group_id,
+                                message.src_neuron_id),
+                        std::make_pair(
+                                message.src_tile_id, message.src_core_offset),
+                        message.generation_delay);
+            }
+            else
+            {
+                booksim_create_spike_event(message.timestep,
+                        std::make_pair(
+                                message.src_neuron_group_id,
+                                message.src_neuron_id),
+                        std::make_pair(
+                                message.src_tile_id, message.src_core_offset),
+                        std::make_pair(
+                                message.dest_tile_id, message.dest_core_offset),
+                        message.generation_delay, message.receive_delay);
+            }
+        }
+    }
+
+    // Messages have been sent to the library, so now just execute the
+    //  simulation and return simulated time
+    TRACE1(SCHEDULER, "Running Booksim2 simulation\n");
+    double booksim_time = booksim_run(config);
+
+    return booksim_time;
 }
 
 double sanafe::schedule_messages(
@@ -105,20 +147,6 @@ double sanafe::schedule_messages(
         Message &m = priority.top();
         priority.pop();
         last_timestamp = fmax(last_timestamp, m.sent_timestamp);
-
-        // TODO: HACK remove
-        /*
-        if (!m.placeholder)
-        {
-            last_rx_core = m.dest_core_id;
-            last_rx = true;
-        }
-        else
-        {
-            last_tx_core = m.src_core_id;
-            last_rx = false;
-        }
-        */
 
         // Update the Network-on-Chip state
         schedule_update_noc(m.sent_timestamp, noc);

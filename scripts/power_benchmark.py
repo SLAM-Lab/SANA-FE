@@ -145,8 +145,7 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
     return net
 
 
-def run_spiking_experiment(mapping, max_size=30, timing_model="simple",
-                           cycle_accurate_validation=False):
+def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
     with open(os.path.join(PROJECT_DIR, "runs", "power", "sandia_data",
                            "weights_loihi.pkl"), "rb") as weights_file:
         weights = pickle.load(weights_file)
@@ -168,59 +167,24 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple",
 
         print("Testing network with {0} neurons".format(2*layer_neurons))
         results = chip.sim(timesteps, timing_model=timing_model)
-        if cycle_accurate_validation:
-            booksim_cycles = run_cycle_accurate(timesteps)
-        else:
-            booksim_cycles = None
 
         with open(os.path.join(PROJECT_DIR, "runs",
                                "power", f"sim_spiking_{timing_model}.csv"),
                   "a") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                             ("neuron_counts", "energy", "time",
-                                             "cycles", "mapping"))
+                                             "mapping"))
             neuron_counts = layer_neurons * 2
             if copy_network:
                 neuron_counts *= 2
             spiking_writer.writerow({"neuron_counts": neuron_counts,
                                       "time": results["sim_time"],
                                       "energy": results["energy"]["total"],
-                                      "cycles": booksim_cycles,
                                       "mapping": mapping
                                     })
             print(f"Run results:{results}")
 
     return
-
-
-def run_cycle_accurate(timesteps):
-    import subprocess
-    # TODO: parameterize to not be as environment specific..
-    # Note: this assumes that there is a messages trace file generated
-    # TODO: add a sanity check that the trace file exists
-    print("Running cycle-accurate Booksim2 model")
-    with open("messages.csv", "r") as messages_file:
-        df = pd.read_csv(messages_file, dtype={"src_hw": str, "dest_hw": str,
-                                               "src_neuron": str})
-
-    cycles_per_ts = []
-    for timestep in range(timesteps + 1):
-        filtered_df = df[df.iloc[:, 0] == timestep]
-        with open(f"messages_single_ts.csv", "w") as output_file:
-            filtered_df.to_csv(output_file, index=False)
-
-        result = subprocess.run(("/home/usr1/jboyle/neuro/booksim2/src/booksim",
-                                "/home/usr1/jboyle/neuro/sana-fe/scripts/booksim.config"),
-                                capture_output=True, text=True)
-
-        for line in result.stdout.split('\n'):
-            if "Time taken is" in line:
-                # Extract the number of cycles
-                cycles_per_ts.append(int(line.split("is")[1].split()[0]))
-
-    total_cycles = sum(cycles_per_ts)
-    print(f"Total booksim cycles:{total_cycles}")
-    return total_cycles
 
 
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
@@ -239,23 +203,27 @@ if __name__ == "__main__":
                                "sim_spiking_simple.csv"), "w") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                        ("neuron_counts", "energy", "time",
-                                        "cycles", "mapping"))
+                                        "mapping"))
             spiking_writer.writeheader()
         with open(os.path.join("runs", "power",
                                "sim_spiking_detailed.csv"), "w") as spiking_csv:
             spiking_writer = csv.DictWriter(spiking_csv,
                                        ("neuron_counts", "energy", "time",
-                                        "cycles", "mapping"))
+                                        "mapping"))
+            spiking_writer.writeheader()
+        with open(os.path.join("runs", "power",
+                               "sim_spiking_cycle.csv"), "w") as spiking_csv:
+            spiking_writer = csv.DictWriter(spiking_csv,
+                                       ("neuron_counts", "energy", "time",
+                                        "mapping"))
             spiking_writer.writeheader()
 
         # Run experiments using both the simple analytical timing model, and the
         #  detailed semi-analytical model
         for mapping in mappings:
-            run_spiking_experiment(mapping, max_size=30, timing_model="simple",
-                                   cycle_accurate_validation=False)
-            run_spiking_experiment(mapping, max_size=30,
-                                   timing_model="detailed",
-                                   cycle_accurate_validation=True)
+            run_spiking_experiment(mapping, max_size=30, timing_model="simple")
+            run_spiking_experiment(mapping, max_size=30, timing_model="detailed")
+            run_spiking_experiment(mapping, max_size=30, timing_model="cycle")
         with open(os.path.join("runs", "power", "sandia_data",
                                "weights_loihi.pkl"), "rb") as weights_file:
             weights = pickle.load(weights_file)
@@ -281,6 +249,10 @@ if __name__ == "__main__":
                                "sim_spiking_simple.csv"), "r") as spiking_csv:
              df_analytical = pd.read_csv(spiking_csv)
 
+        with open(os.path.join("runs", "power",
+                               "sim_spiking_cycle.csv"), "r") as spiking_csv:
+             df_cycle_accurate = pd.read_csv(spiking_csv)
+
         with open(os.path.join("runs", "power", "sandia_data",
                                "loihi_spiking.csv"), "r") as spiking_csv:
             spiking_reader = csv.DictReader(spiking_csv)
@@ -293,12 +265,11 @@ if __name__ == "__main__":
         # First plot results for the simple fixed mapping, where one layer is on
         #  one core and the second layer is on another
         spiking_frame = df.loc[(df["mapping"] == "luke")]
+        cycle_frame = df_cycle_accurate.loc[(df["mapping"] == "luke")]
         spiking_times = np.array(spiking_frame["time"])
+        cycle_times = np.array(cycle_frame["time"])
         spiking_energy = np.array(spiking_frame["energy"])
         neuron_counts = np.array(spiking_frame["neuron_counts"])
-        cycles = np.array(spiking_frame["cycles"])
-        cycle_period = 1e-9
-        cycle_times = cycles * cycle_period
 
         plt.figure(figsize=(1.5, 1.5))
         plt.plot(neuron_counts[6:-7],
@@ -353,12 +324,13 @@ if __name__ == "__main__":
         ## Plot the effect of cores blocking
         spiking_frame = df.loc[(df["mapping"] == "l2_split")]
         analytical_frame = df_analytical.loc[(df["mapping"] == "l2_split")]
+        cycle_frame = df_cycle_accurate.loc[(df["mapping"] == "l2_split")]
 
         plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts[6:], np.array(loihi_times_spikes["l2_split"][6:]) * 1.0e3, "-")
         plt.plot(neuron_counts[6:], np.array(spiking_frame["time"][6:]) * 1.0e3, "ko",
                  fillstyle="none")
-        plt.plot(neuron_counts[6:], np.array(spiking_frame["cycles"][6:]) * cycle_period * 1.0e3, "ks",
+        plt.plot(neuron_counts[6:], np.array(cycle_frame["time"][6:]) * 1.0e3, "ks",
                  fillstyle="none")
         plt.plot(neuron_counts[6:], np.array(analytical_frame["time"][6:]) * 1.0e3, "kx",
                  fillstyle="none")
@@ -382,14 +354,14 @@ if __name__ == "__main__":
         # Plot the effect of network tiles blocking
         spiking_frame = df.loc[(df["mapping"] == "split_4")]
         analytical_frame = df_analytical.loc[(df["mapping"] == "split_4")]
-        cycle_frame = df.loc[(df["mapping"] == "split_4")]
+        cycle_frame = df_cycle_accurate.loc[(df["mapping"] == "split_4")]
 
         plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["split_4"]) * 1.0e3, "-")
         plt.gca().set_box_aspect(1)
         plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
                  fillstyle="none")
-        plt.plot(neuron_counts[6:], np.array(spiking_frame["cycles"][6:]) * cycle_period * 1.0e3, "ks",
+        plt.plot(neuron_counts[6:], np.array(cycle_frame["time"][6:]) * 1.0e3, "ks",
                  fillstyle="none")
         plt.plot(neuron_counts, np.array(analytical_frame["time"]) * 1.0e3, "kx")
 
@@ -405,11 +377,12 @@ if __name__ == "__main__":
 
         spiking_frame = df.loc[(df["mapping"] == "luke")]
         analytical_frame = df_analytical.loc[(df["mapping"] == "luke")]
+        cycle_frame = df_cycle_accurate.loc[(df["mapping"] == "luke")]
         plt.figure(figsize=(1.6, 1.5))
         plt.plot(neuron_counts, np.array(loihi_times_spikes["luke"]) * 1.0e3, "-")
         plt.plot(neuron_counts, np.array(spiking_frame["time"]) * 1.0e3, "ko",
                  fillstyle="none")
-        plt.plot(neuron_counts[6:], np.array(spiking_frame["cycles"][6:]) * cycle_period * 1.0e3, "ks",
+        plt.plot(neuron_counts[6:], np.array(cycle_frame["time"][6:]) * 1.0e3, "ks",
                  fillstyle="none")
         plt.plot(neuron_counts, np.array(analytical_frame["time"]) * 1.0e3,
                   "kx")

@@ -127,6 +127,8 @@ int main(int argc, char *argv[])
 #define GIT_COMMIT "git-hash-unknown"
 #endif
         INFO("Running SANA-FE simulation (build:%s)\n", GIT_COMMIT);
+        INFO("Loading booksim2 library for cycle-accurate support\n");
+        booksim_init();
 #ifdef HAVE_OPENMP
         const int nthreads = omp_get_num_procs();
         INFO("OpenMP enabled, %d threads detected\n", nthreads);
@@ -197,7 +199,6 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: integrate Booksim2 as a 'cycle' accurate modeling option
 // TODO: support saving SNNs to yaml and netlist formats
 // TODO: extend the old netlist format to support embedded YAML, group mappings,
 //  and hyperedges

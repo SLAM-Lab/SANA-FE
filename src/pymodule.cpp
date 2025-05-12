@@ -467,6 +467,10 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     {
         timing_model = sanafe::TIMING_MODEL_DETAILED;
     }
+    else if (timing_model_str == "cycle")
+    {
+        timing_model = sanafe::TIMING_MODEL_CYCLE_ACCURATE;
+    }
     else
     {
         throw std::invalid_argument("Error: unsupoorted timing model");

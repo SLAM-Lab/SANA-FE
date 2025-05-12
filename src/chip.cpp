@@ -77,13 +77,9 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         }
     }
 
-    char arg1[] = "booksim";
-    char arg2[] = "/home/usr1/jboyle/neuro/sana-fe/scripts/booksim.config";
-    char *argv[] = {arg1, arg2};
-    // TODO: only initialize the library the first time we run. Maybe better
-    //  separate library initialization with loading the config and setting up
-    //  things
-    booksim_config = booksim_init(2, (char **) argv);
+    const std::vector<std::string> booksim_config_vec(
+            std::begin(booksim_config_str), std::end(booksim_config_str));
+    booksim_config = booksim_load_config(booksim_config_vec);
     chip_count++;
 }
 
@@ -1631,7 +1627,6 @@ void sanafe::SpikingChip::sim_timestep(
     scheduler.core_count = core_count;
     scheduler.max_cores_per_tile = max_cores_per_tile;
 
-    // TODO: remove
     if (timing_model == TIMING_MODEL_SIMPLE)
     {
         TRACE1(CHIP, "Running simple timing model\n");
@@ -1645,8 +1640,6 @@ void sanafe::SpikingChip::sim_timestep(
     else if (timing_model == TIMING_MODEL_CYCLE_ACCURATE)
     {
         TRACE1(CHIP, "Running cycle-accurate timing model\n");
-        // TODO: pass all the message information to booksim directly, rather
-        //  than passing it via a file
         if (chip_count > 1)
         {
             INFO("Error: Cannot run multiple simultaneous cycle-accurate "
@@ -1656,9 +1649,11 @@ void sanafe::SpikingChip::sim_timestep(
                  "need to simulate in parallel, launch separate SANA-FE "
                  "processes.");
             throw std::runtime_error(
-                    "Error: Cannot run multiple simultaneous cycle-accurate simulations.");
+                    "Error: Cannot run multiple simultaneous cycle-accurate "
+                    "simulations.");
         }
-        booksim_run(booksim_config);
+        ts.sim_time =
+                schedule_messages_cycle_accurate(ts.messages, booksim_config);
     }
     else
     {
