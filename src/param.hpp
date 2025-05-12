@@ -93,7 +93,17 @@ struct ModelParam
     }
     bool operator==(const ModelParam &rhs) const
     {
-        return (value == rhs.value);
+        return (value == rhs.value &&
+                (forward_to_synapse == rhs.forward_to_synapse) &&
+                (forward_to_dendrite == rhs.forward_to_dendrite) &&
+                (forward_to_soma == rhs.forward_to_soma));
+    }
+    bool operator!=(const ModelParam &rhs) const
+    {
+        return (value != rhs.value) ||
+                (forward_to_synapse != rhs.forward_to_synapse) ||
+                (forward_to_dendrite != rhs.forward_to_dendrite) ||
+                (forward_to_soma != rhs.forward_to_soma);
     }
     std::string print() const
     {

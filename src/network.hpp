@@ -139,11 +139,13 @@ public:
 
     NeuronGroup &create_neuron_group(const std::string name, size_t neuron_count, const NeuronConfiguration &default_config);
     [[nodiscard]] std::string info() const;
-    void save_netlist(const std::filesystem::path &path) const;
     void save(const std::filesystem::path &path, const bool use_netlist_format = false) const;
 
     size_t update_mapping_count();
 private:
+    void save_netlist(const std::filesystem::path &path) const;
+    void save_yaml(const std::filesystem::path &path) const;
+
     size_t mapping_count{0};
 };
 

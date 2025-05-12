@@ -199,11 +199,10 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: support saving SNNs/mappings to yaml and netlist formats
-//  * SNNs can save either netlists or YAML descriptions
-//  * SpikingChip can save its mapping, either to netlist or append to YAML
-// TODO: extend the old netlist format to support embedded YAML, group mappings,
-//  and hyperedges
+// TODO: command-line argument to set thread count
+// TODO: improve multithreaded support, especially for the scheduler
 // ** Misc **
 // TODO: update tutorials to use Jupyter notebook
 // TODO: Improve plug-in documentation
+// TODO: extend the old netlist format to support embedded YAML, group mappings,
+//  and hyperedges

@@ -1827,6 +1827,411 @@ std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
     return std::make_pair(first, last);
 }
 
+void sanafe::description_write_network_yaml(
+        const std::filesystem::path path, const sanafe::SpikingNetwork &network)
+{
+    std::ifstream previous_content(path);
+
+    // Create a new YAML tree
+    ryml::Tree tree;
+    ryml::NodeRef root = tree.rootref();
+
+    // Try to read existing content if file exists and is not empty
+    bool file_empty =
+            (previous_content.peek() == std::ifstream::traits_type::eof());
+
+    if (!previous_content.is_open() || file_empty)
+    {
+        // Read existing YAML content
+        std::string existing_content(
+                (std::istreambuf_iterator<char>(previous_content)),
+                std::istreambuf_iterator<char>());
+
+        // Parse existing content
+        tree = ryml::parse_in_arena(existing_content.c_str());
+        root = tree.rootref();
+        previous_content.close();
+
+        // Remove the existing network info if it exists
+        if (root.has_child("network"))
+        {
+            root.remove_child("network");
+        }
+    }
+    else
+    {
+        // Initialize with empty document
+        root = tree.rootref();
+        root |= ryml::MAP;
+    }
+
+    std::ofstream fp(path);
+    // Note we need to keep all the generated strings alive as long as we are
+    //  dealing with this YAML file. RapidYAML only uses views of strings for
+    //  speed, and doesn't copy the string contents
+    std::list<std::string> strings{};
+    // Add network section
+    description_serialize_network_to_yaml(root, network, strings);
+
+    // Convert to string and write to file
+    std::ostringstream ss;
+    ss << tree;
+    fp << ss.str();
+    fp.close();
+}
+
+ryml::NodeRef sanafe::description_serialize_network_to_yaml(ryml::NodeRef root,
+        const sanafe::SpikingNetwork &network, std::list<std::string> &strings)
+{
+    auto network_node = root["network"];
+    network_node |= ryml::MAP;
+    if (network.name.empty())
+    {
+        network_node["name"] << " ";
+    }
+    else
+    {
+        network_node["name"] << network.name;
+    }
+
+    // Add neuron groups
+    auto groups_node = network_node["groups"];
+    groups_node |= ryml::SEQ;
+
+    for (const auto &[name, group] : network.groups)
+    {
+        description_serialize_neuron_group_to_yaml(groups_node, group, strings);
+    }
+
+    // Add edges (connections)
+    auto edges_node = network_node["edges"];
+    edges_node |= ryml::SEQ;
+
+    // Iterate through all neurons and their connections
+    for (const auto &[group_name, group] : network.groups)
+    {
+        for (const auto &neuron : group.neurons)
+        {
+            for (const auto &connection : neuron.edges_out)
+            {
+                ryml::NodeRef edge_map = edges_node.append_child();
+                edge_map |= ryml::MAP;
+
+                // Create edge description (source -> destination)
+                std::string edge_description =
+                        connection.pre_neuron.group_name + "." +
+                        std::to_string(
+                                connection.pre_neuron.neuron_offset.value()) +
+                        " -> " + connection.post_neuron.group_name + "." +
+                        std::to_string(
+                                connection.post_neuron.neuron_offset.value());
+
+                const std::string &ref = strings.emplace_back(edge_description);
+                ryml::NodeRef edge_node = edge_map[ref.c_str()];
+                edge_node |= ryml::MAP;
+                // For conciseness use flow style outputs for edge attributes
+                edge_node |= ryml::FLOW_SL;
+                // For now assume there are no default connection parameters
+                std::map<std::string, ModelParam> default_params{};
+                description_serialize_model_params_to_yaml(
+                        edge_node, connection.synapse_params, default_params);
+
+                // TODO: support synapse-specific parameters
+                // if (!connection.synapse_params.empty())
+                // {
+                //     auto synapse_node = edge_node["synapse"];
+                //     synapse_node |= ryml::MAP;
+                //     description_serialize_model_params_to_yaml(
+                //             synapse_node, connection.synapse_params);
+                // }
+                // // Add dendrite-specific parameters
+                // if (!connection.dendrite_params.empty())
+                // {
+                //     auto dendrite_node = edge_node["dendrite"];
+                //     dendrite_node |= ryml::MAP;
+                //     description_serialize_model_params_to_yaml(
+                //             dendrite_node, connection.dendrite_params);
+                // }
+            }
+        }
+    }
+
+    return network_node;
+}
+
+ryml::NodeRef sanafe::description_serialize_neuron_group_to_yaml(
+        ryml::NodeRef parent, const sanafe::NeuronGroup &group,
+        std::list<std::string> &strings)
+{
+    auto group_node = parent.append_child();
+    group_node |= ryml::MAP;
+    group_node["name"] << group.name;
+
+    // Add attributes if they exist
+    auto attr_node = group_node["attributes"];
+    attr_node |= ryml::MAP;
+
+    // Add model parameters if they exist
+    std::map<std::string, ModelParam> no_default_params{};
+    if (!group.default_neuron_config.model_parameters.empty())
+    {
+        description_serialize_model_params_to_yaml(attr_node,
+                group.default_neuron_config.model_parameters,
+                no_default_params);
+    }
+
+    // Add neurons
+    auto neurons_node = group_node["neurons"];
+    neurons_node |= ryml::SEQ;
+
+    // Group neurons with identical configurations to reduce output size
+    std::vector<std::tuple<size_t, size_t>> neuron_runs;
+    size_t run_start{0UL};
+    auto prev_neuron = group.neurons.begin();
+    for (auto neuron_it = group.neurons.begin();
+            neuron_it != group.neurons.end(); ++neuron_it)
+    {
+        if (neuron_it->model_parameters != prev_neuron->model_parameters)
+        {
+            neuron_runs.push_back(
+                    std::make_tuple(run_start, prev_neuron->offset));
+            INFO("adding new run %zu..%zu\n", run_start, prev_neuron->offset);
+            // Set up the next run of unique neurons
+            run_start = neuron_it->offset;
+        }
+        prev_neuron = neuron_it;
+    }
+    neuron_runs.push_back(std::make_tuple(run_start, prev_neuron->offset));
+    INFO("adding new run %zu..%zu\n", run_start, prev_neuron->offset);
+
+    for (const auto &neuron_run : neuron_runs)
+    {
+        auto [start_offset, end_offset] = neuron_run;
+
+        auto neuron_map = neurons_node.append_child();
+        neuron_map |= ryml::MAP;
+
+        std::string neuron_id;
+        const Neuron &neuron = group.neurons[start_offset];
+        std::string neuron_description = std::to_string(start_offset);
+        if (end_offset != start_offset)
+        {
+            neuron_description += ".." + std::to_string(end_offset);
+        }
+        const std::string &ref = strings.emplace_back(neuron_description);
+        auto neuron_node = neuron_map[ref.c_str()];
+
+        // Add model parameters if they exist and differ from group defaults
+        neuron_node |= ryml::MAP;
+        neuron_node |= ryml::FLOW_SL;
+        if (!neuron.model_parameters.empty())
+        {
+            description_serialize_model_params_to_yaml(neuron_node,
+                    neuron.model_parameters,
+                    group.default_neuron_config.model_parameters);
+        }
+
+    }
+
+    return group_node;
+}
+
+ryml::NodeRef sanafe::description_serialize_model_params_to_yaml(
+        ryml::NodeRef parent,
+        const std::map<std::string, sanafe::ModelParam> &params,
+        const std::map<std::string, sanafe::ModelParam> &default_values)
+{
+    // Add all parameters to the parent node
+    for (const auto &[key, param] : params)
+    {
+        // TODO: support model-specific parameters
+        if (key == "synapse" || key == "dendrite" || key == "soma")
+        {
+            continue;
+        }
+
+        if ((default_values.find(key) == default_values.end()) ||
+                (default_values.at(key) != param))
+
+            // Its safe to reference into these strings; they will still valid
+            //  over the duration of the save
+            description_serialize_variant_value_to_yaml(
+                    parent[key.c_str()], param.value);
+    }
+
+    return parent;
+}
+
+ryml::NodeRef sanafe::description_serialize_variant_value_to_yaml(
+        ryml::NodeRef node,
+        const std::variant<bool, int, double, std::string,
+                std::vector<sanafe::ModelParam>> &value)
+{
+    std::visit(
+            [&node](auto &&arg) {
+                using T = std::decay_t<decltype(arg)>;
+
+                if constexpr (std::is_same_v<T, int>)
+                {
+                    node << arg;
+                }
+                else if constexpr (std::is_same_v<T, double>)
+                {
+                    node << arg;
+                }
+                else if constexpr (std::is_same_v<T, bool>)
+                {
+                    node << arg;
+                }
+                else if constexpr (std::is_same_v<T, std::string>)
+                {
+                    node << arg;
+                }
+                else if constexpr (std::is_same_v<T, std::vector<ModelParam>>)
+                {
+                    // Handle list of parameters
+                    node |= ryml::SEQ;
+
+                    for (const ModelParam &param : arg)
+                    {
+                        auto child = node.append_child();
+
+                        if (param.name.value().empty())
+                        {
+                            // Unnamed parameter - directly serialize its value
+                            description_serialize_variant_value_to_yaml(
+                                    child, param.value);
+                        }
+                        else
+                        {
+                            // Named parameter - create a map with the name as
+                            //  key
+                            child |= ryml::MAP;
+                            auto param_node = child[param.name.value().c_str()];
+                            description_serialize_variant_value_to_yaml(
+                                    param_node, param.value);
+                        }
+                    }
+                }
+            },
+            value);
+
+    return node;
+}
+
+void sanafe::description_write_mappings_yaml(
+        const std::filesystem::path path, const sanafe::SpikingNetwork &network)
+{
+    std::ifstream previous_content(path);
+
+    // Create a new YAML tree
+    ryml::Tree tree;
+    ryml::NodeRef root = tree.rootref();
+
+    // Try to read existing content if file exists and is not empty
+    bool file_empty =
+            (previous_content.peek() == std::ifstream::traits_type::eof());
+    if (!previous_content.is_open() || !file_empty)
+    {
+        // Read existing YAML content
+        std::string existing_content(
+                (std::istreambuf_iterator<char>(previous_content)),
+                std::istreambuf_iterator<char>());
+
+        // Parse existing content
+        tree = ryml::parse_in_arena(existing_content.c_str());
+        root = tree.rootref();
+        previous_content.close();
+
+        // Remove the existing network info if it exists
+        if (root.has_child("mappings"))
+        {
+            root.remove_child("mappings");
+        }
+    }
+    else
+    {
+        // Initialize with empty document
+        root = tree.rootref();
+        root |= ryml::MAP;
+    }
+
+    std::ofstream fp(path);
+    std::list<std::string> strings{};
+
+    // Add mappings section
+    auto mappings_node = root["mappings"];
+    mappings_node |= ryml::SEQ;
+
+    // Save all mappings
+    std::vector<std::reference_wrapper<const Neuron>> all_neurons;
+
+    // Collect all neurons from all groups
+    for (const auto &group : network.groups)
+    {
+        const auto &neurons = group.second.neurons;
+        all_neurons.insert(all_neurons.end(), neurons.begin(), neurons.end());
+    }
+
+    // Sort by mapping_order
+    std::sort(all_neurons.begin(), all_neurons.end(),
+            [](const Neuron &a, const Neuron &b) {
+                return a.mapping_order < b.mapping_order;
+            });
+
+    // Now write mappings
+    for (const Neuron &neuron : all_neurons)
+    {
+        if (!neuron.core_address.has_value())
+        {
+            INFO("Error: Neuron (nid:%s.%zu) not mapped, can't save.\n",
+                    neuron.parent_group_name.c_str(), neuron.offset);
+            throw std::runtime_error("Error: Neuron not mapped, can't save.");
+        }
+
+        auto mapping_entry = mappings_node.append_child();
+        mapping_entry |= ryml::MAP;
+
+        std::string neuron_addr;
+        neuron_addr =
+                neuron.parent_group_name + "." + std::to_string(neuron.offset);
+
+        const std::string &neuron_ref = strings.emplace_back(neuron_addr);
+        auto mapping_info = mapping_entry[neuron_ref.c_str()];
+        mapping_info |= ryml::MAP;
+
+        // Add core address
+        std::string core_address =
+                std::to_string(neuron.core_address->parent_tile_id) + "." +
+                std::to_string(neuron.core_address->id);
+        const std::string &core_ref = strings.emplace_back(core_address);
+        mapping_info["core"] << core_ref;
+
+        // Add hardware component names if consistently used by all neurons in
+        //  range
+        if (!neuron.soma_hw_name.empty())
+        {
+            mapping_info["soma"] << neuron.soma_hw_name;
+        }
+
+        if (!neuron.dendrite_hw_name.empty())
+        {
+            mapping_info["dendrite"] << neuron.dendrite_hw_name;
+        }
+
+        if (!neuron.default_synapse_hw_name.empty())
+        {
+            mapping_info["synapse"] << neuron.default_synapse_hw_name;
+        }
+    }
+
+    // Convert to string and write to file
+    std::stringstream ss;
+    ss << tree;
+    fp << ss.str();
+    fp.close();
+}
+
 // *****************************************************************************
 // Netlist (v1) SNN description format. Supported for back-compatability.
 //  This format is useful for extremely large network files, as parsing this

@@ -498,12 +498,22 @@ void sanafe::SpikingNetwork::save_netlist(
     return;
 }
 
+void sanafe::SpikingNetwork::save_yaml(const std::filesystem::path &path) const
+{
+    description_write_network_yaml(path, *this);
+    description_write_mappings_yaml(path, *this);
+}
+
 void sanafe::SpikingNetwork::save(
         const std::filesystem::path &path, const bool use_netlist_format) const
 {
     if (use_netlist_format)
     {
         save_netlist(path);
+    }
+    else
+    {
+        save_yaml(path);
     }
 
     return;
