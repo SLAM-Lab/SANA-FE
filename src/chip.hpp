@@ -389,10 +389,15 @@ public:
     virtual double get_potential(size_t neuron_address) { return 0.0; }
     virtual void map_connection(MappedConnection &con) {}
 
-    // Normal member functions
+    // Normal member functions and function pointers
     void set_time(const long int timestep) { simulation_time = timestep; }
     void configure(std::string unit_name, const ModelInfo &model);
-    PipelineResult process_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+
+    using InputInterfaceFunc = PipelineResult (PipelineUnit:: *)(Timestep &, MappedNeuron &, std::optional<MappedConnection*>, const PipelineResult &);
+    using OutputInterfaceFunc = PipelineResult (PipelineUnit:: *)(MappedNeuron &, std::optional<MappedConnection *>, const PipelineResult &);
+    InputInterfaceFunc process_input_fn{nullptr};
+    OutputInterfaceFunc process_output_fn{nullptr};
 
     // Model information
     std::map<std::string, ModelParam> model_parameters{};
@@ -418,9 +423,9 @@ public:
 
     // Implementation flags, set whichever operations your derived unit supports
     //  to 'true'. Note that a hardware unit must support one or more of these
-    bool implements_synapse{false};
-    bool implements_dendrite{false};
-    bool implements_soma{false};
+    const bool implements_synapse;
+    const bool implements_dendrite;
+    const bool implements_soma;
 
     // Performance monitoring flags
     bool log_energy{false};
@@ -428,14 +433,21 @@ public:
 
 protected:
     long int simulation_time{0L};
-    PipelineUnit() = default;
+    PipelineUnit(const bool implements_synapse, const bool implements_dendrite, const bool implements_soma);
+
+    PipelineResult process_synapse_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    PipelineResult process_dendrite_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    PipelineResult process_soma_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+
+    PipelineResult process_synapse_output(MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &output);
+    PipelineResult process_dendrite_output(MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &output);
+    PipelineResult process_soma_output(MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &output);
 
 private:
     PipelineResult calculate_synapse_default_energy_latency(MappedConnection &con, const PipelineResult &simulation_result);
     PipelineResult calculate_dendrite_default_energy_latency(MappedNeuron &n, const PipelineResult &simulation_result);
     PipelineResult calculate_soma_default_energy_latency(MappedNeuron &n, const PipelineResult &simulation_result);
     void update_soma_activity(MappedNeuron &n, const PipelineResult &simulation_result);
-
     void check_outputs(const MappedNeuron &n, const PipelineResult &result);
 };
 
@@ -445,6 +457,7 @@ private:
 class SynapseUnit : public PipelineUnit
 {
 public:
+    SynapseUnit() : PipelineUnit(true, false, false) {};
     virtual PipelineResult update(size_t synapse_address, bool read = false) = 0;
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override final { throw std::logic_error("Error: Synapse H/W called with dendrite inputs"); }
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) override final { throw std::logic_error("Error: Synapse H/W called with soma inputs"); }
@@ -454,6 +467,7 @@ public:
 class DendriteUnit : public PipelineUnit
 {
 public:
+    DendriteUnit() : PipelineUnit(false, true, false) {};
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override = 0;
     virtual PipelineResult update(size_t synapse_address, bool read = false) override final { throw std::logic_error("Error: Dendrite H/W called with synapse inputs"); }
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) override final { throw std::logic_error("Error: Dendrite H/W called with soma inputs"); }
@@ -462,6 +476,7 @@ public:
 class SomaUnit : public PipelineUnit
 {
 public:
+    SomaUnit() : PipelineUnit(false, false, true) {};
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) = 0;
     virtual PipelineResult update(size_t synapse_address, bool read = false) override final { throw std::logic_error("Error: Soma H/W called with synapse inputs"); }
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override final { throw std::logic_error("Error: Soma H/W called with dendrite inputs"); }

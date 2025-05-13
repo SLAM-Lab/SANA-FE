@@ -578,6 +578,41 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
     return;
 }
 
+sanafe::PipelineUnit::PipelineUnit(const bool implements_synapse,
+        const bool implements_dendrite, const bool implements_soma)
+        : implements_synapse(implements_synapse)
+        , implements_dendrite(implements_dendrite)
+        , implements_soma(implements_soma)
+{
+    // Set input interface
+    if (implements_synapse)
+    {
+        process_input_fn = &PipelineUnit::process_synapse_input;
+    }
+    else if (implements_dendrite)
+    {
+        process_input_fn = &PipelineUnit::process_dendrite_input;
+    }
+    else
+    {
+        process_input_fn = &PipelineUnit::process_soma_input;
+    }
+
+    // Set output interface
+    if (implements_soma)
+    {
+        process_output_fn = &PipelineUnit::process_soma_output;
+    }
+    else if (implements_dendrite)
+    {
+        process_output_fn = &PipelineUnit::process_dendrite_output;
+    }
+    else
+    {
+        process_output_fn = &PipelineUnit::process_synapse_output;
+    }
+}
+
 void sanafe::PipelineUnit::check_outputs(
         const MappedNeuron &n, const PipelineResult &result)
 {
@@ -638,7 +673,7 @@ sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
     PipelineResult output{input};
     for (auto unit : pipeline)
     {
-        output = unit->process_input(ts, n, con, output);
+        output = unit->process(ts, n, con, output);
         total_energy += output.energy.value();
         total_latency += output.latency.value();
         if (output.status != INVALID_NEURON_STATE)
@@ -652,59 +687,97 @@ sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
     return output;
 }
 
-sanafe::PipelineResult sanafe::PipelineUnit::process_input(Timestep &ts,
+sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
         MappedNeuron &n, std::optional<MappedConnection *> con,
         const PipelineResult &input)
 {
     TRACE2(CHIP, "Updating nid:%zu (ts:%ld)\n", n.id, ts.timestep);
     set_time(ts.timestep);
 
-    PipelineResult output{};
-    if (implements_synapse) // Synapse is input interface
-    {
-        if (!con.has_value())
-        {
-            throw std::logic_error(
-                    "Error: Pipeline error, didn't receive "
-                    "synaptic connection info. Check that no h/w unit is being "
-                    "invoked before this one in the pipeline.");
-        }
-        output = update(con.value()->synapse_address, true);
-        ++spikes_processed;
-    }
-    else if (implements_dendrite) // Dendrite is input interface
-    {
-        std::optional<size_t> synapse_address{std::nullopt};
-        if (con.has_value() && (con.value() != nullptr))
-        {
-            synapse_address = con.value()->synapse_address;
-        }
-        output = update(n.mapped_address, input.current, synapse_address);
-    }
-    else if (implements_soma) // Soma is input interface
-    {
-        output = update(n.mapped_address, input.current);
-    }
+    // Process inputs
+    PipelineResult output = (this->*process_input_fn)(ts, n, con, input);
 
-    if (implements_soma) // Soma is output interface
-    {
-        output = calculate_soma_default_energy_latency(n, output);
-        update_soma_activity(n, output);
-    }
-    else if (implements_dendrite) // Dendrite is output interface
-    {
-        output = calculate_dendrite_default_energy_latency(n, output);
-    }
-    else if (implements_synapse) // Synapse is output interface
-    {
-        output = calculate_synapse_default_energy_latency(
-                *(con.value()), output);
-    }
-    check_outputs(n, output);
+    // Post-processing on outputs
+    PipelineResult processed_output =
+            (this->*process_output_fn)(n, con, output);
 
-    energy += output.energy.value();
+#ifndef NDEBUG
+    check_outputs(n, processed_output);
+#endif
+    energy += processed_output.energy.value();
+
+    return processed_output;
+}
+
+sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(Timestep &ts,
+        MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &input)
+{
+
+
+    if (!con.has_value())
+    {
+        throw std::runtime_error(
+                "Error: Pipeline error, didn't receive "
+                "synaptic connection info. Check that no h/w unit is being "
+                "invoked before this one in the pipeline.");
+    }
+    PipelineResult output = update(con.value()->synapse_address, true);
+    ++spikes_processed;
 
     return output;
+}
+
+sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_input(
+        Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &input)
+{
+    PipelineResult output{};
+
+    std::optional<size_t> synapse_address{std::nullopt};
+    if (con.has_value() && (con.value() != nullptr))
+    {
+        synapse_address = con.value()->synapse_address;
+    }
+    output = update(n.mapped_address, input.current, synapse_address);
+
+    return output;
+}
+
+sanafe::PipelineResult sanafe::PipelineUnit::process_soma_input(Timestep &ts,
+        MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &input)
+{
+    PipelineResult output = update(n.mapped_address, input.current);
+    return output;
+}
+
+sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_output(
+        MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &output)
+{
+    PipelineResult output_with_power =
+            calculate_synapse_default_energy_latency(*(con.value()), output);
+    return output_with_power;
+}
+
+sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_output(
+        MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &output)
+{
+    PipelineResult output_with_power =
+            calculate_dendrite_default_energy_latency(n, output);
+    return output_with_power;
+}
+
+sanafe::PipelineResult sanafe::PipelineUnit::process_soma_output(
+        MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &output)
+{
+    PipelineResult processed_output =
+            calculate_soma_default_energy_latency(n, output);
+    update_soma_activity(n, processed_output);
+    return processed_output;
 }
 
 double sanafe::SpikingChip::pipeline_process_axon_in(
@@ -1308,9 +1381,6 @@ sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
     }
 
     auto &new_unit = pipeline_hw.back();
-    new_unit->implements_synapse = config.implements_synapse;
-    new_unit->implements_dendrite = config.implements_dendrite;
-    new_unit->implements_soma = config.implements_soma;
     TRACE1(CHIP, "implements synapse:%d dendrite:%d soma:%d\n",
             new_unit->implements_synapse, new_unit->implements_dendrite,
             new_unit->implements_soma);
