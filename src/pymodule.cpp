@@ -12,6 +12,10 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
+
 #include "arch.hpp"
 #include "network.hpp"
 #include "print.hpp"
@@ -456,7 +460,7 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
 }
 
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-        const long int heartbeat, std::string timing_model_str)
+        const long int heartbeat, std::string timing_model_str, int nthreads)
 {
     sanafe::TimingModel timing_model;
     if (timing_model_str == "simple")
@@ -475,6 +479,14 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     {
         throw std::invalid_argument("Error: unsupoorted timing model");
     }
+
+#ifdef HAVE_OPENMP
+    // If nthreads <= 0, just leave it at the system default
+    if (nthreads > 0)
+    {
+        omp_set_num_threads(nthreads);
+    }
+#endif
 
     return run_data_to_dict(self->sim(timesteps, heartbeat, timing_model));
 }
@@ -723,7 +735,8 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("sim", &pysim,
                     pybind11::arg("timesteps") = 1,
                     pybind11::arg("heartbeat") = 100,
-                    pybind11::arg("timing_model") = "detailed")
+                    pybind11::arg("timing_model") = "detailed",
+                    pybind11::arg("nthreads") = 0)
             .def("get_power", &sanafe::SpikingChip::get_power)
             .def("get_run_summary", [](sanafe::SpikingChip *self) {
                 return run_data_to_dict(self->get_run_summary());

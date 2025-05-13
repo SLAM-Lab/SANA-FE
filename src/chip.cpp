@@ -676,10 +676,7 @@ sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
         output = unit->process(ts, n, con, output);
         total_energy += output.energy.value();
         total_latency += output.latency.value();
-        if (output.status != INVALID_NEURON_STATE)
-        {
-            n.status = output.status;
-        }
+        n.status = output.status;
     }
 
     output.energy = total_energy;
