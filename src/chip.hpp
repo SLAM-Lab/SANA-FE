@@ -395,7 +395,7 @@ public:
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
     using InputInterfaceFunc = PipelineResult (PipelineUnit:: *)(Timestep &, MappedNeuron &, std::optional<MappedConnection*>, const PipelineResult &);
-    using OutputInterfaceFunc = PipelineResult (PipelineUnit:: *)(MappedNeuron &, std::optional<MappedConnection *>, const PipelineResult &);
+    using OutputInterfaceFunc = void (PipelineUnit:: *)(MappedNeuron &, std::optional<MappedConnection *>, PipelineResult &);
     InputInterfaceFunc process_input_fn{nullptr};
     OutputInterfaceFunc process_output_fn{nullptr};
 
@@ -439,14 +439,14 @@ protected:
     PipelineResult process_dendrite_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     PipelineResult process_soma_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
-    PipelineResult process_synapse_output(MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &output);
-    PipelineResult process_dendrite_output(MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &output);
-    PipelineResult process_soma_output(MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &output);
+    void process_synapse_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
+    void process_dendrite_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
+    void process_soma_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
 
 private:
-    PipelineResult calculate_synapse_default_energy_latency(MappedConnection &con, const PipelineResult &simulation_result);
-    PipelineResult calculate_dendrite_default_energy_latency(MappedNeuron &n, const PipelineResult &simulation_result);
-    PipelineResult calculate_soma_default_energy_latency(MappedNeuron &n, const PipelineResult &simulation_result);
+    void calculate_synapse_default_energy_latency(MappedConnection &con, PipelineResult &simulation_result);
+    void calculate_dendrite_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
+    void calculate_soma_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
     void update_soma_activity(MappedNeuron &n, const PipelineResult &simulation_result);
     void check_outputs(const MappedNeuron &n, const PipelineResult &result);
 };
