@@ -48,7 +48,7 @@ struct Message;
 class Neuron;
 struct Connection;
 struct MappedNeuron;
-struct MappedConnection;
+class MappedConnection;
 struct Synapse;
 struct NeuronConfiguration;
 struct ModelInfo;
@@ -233,9 +233,8 @@ public:
     PipelineUnit *synapse_hw{nullptr};
     std::vector<PipelineUnit *> message_processing_pipeline{};
     size_t synapse_address{0UL};
-    int id;
 
-    explicit MappedConnection(int connection_id);
+    explicit MappedConnection();
     void build_message_processing_pipeline();
 };
 

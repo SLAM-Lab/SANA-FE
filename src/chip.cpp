@@ -226,7 +226,7 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
     MappedNeuron &post_neuron =
             *(post_group[con.post_neuron.neuron_offset.value()]);
 
-    pre_neuron.connections_out.emplace_back(pre_neuron.connections_out.size());
+    pre_neuron.connections_out.emplace_back();
     MappedConnection &mapped_con = pre_neuron.connections_out.back();
     mapped_con.pre_neuron = &pre_neuron;
     mapped_con.post_neuron = &post_neuron;
@@ -443,16 +443,12 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < core_list.size(); idx++)
     {
-        Core &core = core_list[idx];
-        if (core.pipeline_config.buffer_position < BUFFER_BEFORE_DENDRITE_UNIT)
-        {
-            throw std::logic_error("Error: Buffer must be after synaptic h/w");
-        }
-        for (MappedNeuron &n : core.neurons)
+        for (MappedNeuron &n : core_list[idx].get().neurons)
         {
             process_neuron(ts, n);
         }
 
+        Core &core = core_list[idx];
         // Account for any remaining neuron processing
         bool placeholder_event = (core.next_message_generation_delay != 0.0);
         if (placeholder_event)
@@ -520,7 +516,11 @@ void sanafe::SpikingChip::receive_message(Message &m)
 
 void sanafe::MappedNeuron::build_neuron_processing_pipeline()
 {
-    if (core->pipeline_config.buffer_position <= BUFFER_INSIDE_DENDRITE_UNIT)
+    if (core->pipeline_config.buffer_position < BUFFER_BEFORE_DENDRITE_UNIT)
+    {
+        throw std::runtime_error("Error: Buffer must be after synaptic h/w");
+    }
+    if (core->pipeline_config.buffer_position == BUFFER_INSIDE_DENDRITE_UNIT)
     {
         neuron_processing_pipeline.push_back(dendrite_hw);
     }
@@ -1411,11 +1411,10 @@ sanafe::Core::Core(const CoreConfiguration &config)
     timestep_buffer.resize(pipeline_config.max_neurons_supported);
 }
 
-sanafe::MappedConnection::MappedConnection(const int connection_id)
+sanafe::MappedConnection::MappedConnection()
         : post_neuron(nullptr)
         , pre_neuron(nullptr)
         , synapse_hw(nullptr)
-        , id(connection_id)
 {
 }
 
@@ -1493,7 +1492,6 @@ void sanafe::SpikingChip::sim_format_run_summary(
     out << "timesteps_executed: " << run_data.timesteps_executed << "\n";
     out << "total_spikes: " << run_data.spikes << "\n";
     out << "total_messages_sent: " << run_data.packets_sent << "\n";
-    out << "wall_time: " << std::fixed << run_data.wall_time << "\n";
     out << "total_neurons_fired: " << run_data.neurons_fired << "\n";
     out << "sim_time: " << std::scientific << run_data.sim_time << "\n";
     // Give a more detailed energy breakdown, as this is often useful
@@ -1503,6 +1501,17 @@ void sanafe::SpikingChip::sim_format_run_summary(
     out << "  soma:" << std::scientific << run_data.soma_energy << "\n";
     out << "  network: " << std::scientific << run_data.network_energy << "\n";
     out << "  total: " << std::scientific << run_data.total_energy << "\n";
+    // Give a more detailed simulator walltime breakdown too
+    out << "wall_time:\n";
+    out << "  neuron_processing: " << std::fixed << neuron_processing_wall
+        << "\n";
+    out << "  message_processing: " << std::fixed << message_processing_wall
+        << "\n";
+    out << "  scheduler: " << std::fixed << scheduler_wall << "\n";
+    double misc_wall = run_data.wall_time -
+            (neuron_processing_wall + message_processing_wall + scheduler_wall);
+    out << "  misc: " << std::fixed << misc_wall << "\n";
+    out << "  total: " << std::fixed << run_data.wall_time << "\n";
 }
 
 std::ofstream sanafe::SpikingChip::sim_trace_open_spike_trace(
@@ -1694,20 +1703,21 @@ void sanafe::SpikingChip::sim_timestep(
     auto profile_end = timer.now();
 
     // Calculate various simulator timings
+    constexpr double ns_to_second = 1.0e-9;
     neuron_processing_wall +=
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                     neuron_processing_end_tm - start_tm)
-                    .count() * 1.0e-9;
+                    .count() * ns_to_second;
     message_processing_wall +=
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                     message_processing_end_tm - neuron_processing_end_tm)
-                    .count() * 1.0e-9;
+                    .count() * ns_to_second;
     scheduler_wall += std::chrono::duration_cast<std::chrono::nanoseconds>(
             scheduler_end - message_processing_end_tm)
-                               .count() * 1.0e-9;
+                               .count() * ns_to_second;
     other_stats_wall += std::chrono::duration_cast<std::chrono::nanoseconds>(
             profile_end - scheduler_end)
-                               .count() * 1.0e-9;
+                               .count() * ns_to_second;
     TRACE1(CHIP, "neuron:%e message:%e scheduler:%e stats:%e\n",
             neuron_processing_wall, message_processing_wall, scheduler_wall,
             other_stats_wall);
@@ -1860,7 +1870,6 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     std::set<Core *> cores_out;
     for (MappedConnection &curr_connection : pre_neuron.connections_out)
     {
-        TRACE1(CHIP, "Looking at connection id: %d\n", curr_connection.id);
         Core *dest_core = curr_connection.post_neuron->core;
         cores_out.insert(dest_core);
         TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
@@ -1882,7 +1891,7 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
         // Add every connection to the axon. Also link to the map in the
         //  post synaptic core / neuron
         Core &post_core = *(curr_connection.post_neuron->core);
-        TRACE1(CHIP, "Adding connection:%d\n", curr_connection.id);
+        //TRACE1(CHIP, "Adding connection:%d\n", curr_connection.id);
         sim_add_connection_to_axon(curr_connection, post_core);
     }
     TRACE1(CHIP, "Finished mapping connections to hardware for nid:%s.%zu.\n",

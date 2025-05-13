@@ -165,7 +165,7 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
         #snn.save_net_description(network_filename)
         chip.load(snn)
 
-        print("Testing network with {0} neurons".format(2*layer_neurons))
+        print(f"Testing network with {2*layer_neurons} neurons")
         results = chip.sim(timesteps, timing_model=timing_model)
 
         with open(os.path.join(PROJECT_DIR, "runs",
