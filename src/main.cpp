@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
                 INFO("Warning: multiple threads not supported; flag ignored");
 #else
                 processing_threads = std::min(total_threads_available, std::stoi(argv[0]));
-                INFO("Setting threads to %d\n", processing_threads);
+                INFO("Setting processing threads to %d\n", processing_threads);
                 omp_set_num_threads(processing_threads);
 #endif
                 break;
@@ -106,6 +106,7 @@ int main(int argc, char *argv[])
                 argv++;
                 scheduler_threads =
                         std::min(total_threads_available, std::stoi(argv[0]));
+                INFO("Setting scheduling threads to %d\n", scheduler_threads);
 
                 break;
 
@@ -222,8 +223,8 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: Support multithreaded scheduling with dynamic scaling
-// TODO: Add support for Fugu and Lava frameworks as extra (optional) dependencies
+// TODO: Add support for Fugu and Lava frameworks as extra (optional) Python
+//  dependencies
 // ** Misc **
 // TODO: Update and extend tutorials using Jupyter notebooks
 // TODO: Improve plug-in documentation
