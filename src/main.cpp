@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     bool use_netlist_format{false};
     int total_threads_available{1};
     int processing_threads{1};
-    int scheduler_threads{1};
+    int scheduler_threads{0};
     // Select the timing model on the command line. The default is the
     //  detailed build-in timing model (using a scheduler). Select only one of
     //  these two flags to enable either the simple analytical timing model or
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
             case 'v':
                 record_potentials = true;
                 break;
-            case 'x':
+            case 'N':
                 argc--;
                 argv++;
 #ifndef HAVE_OPENMP
@@ -100,7 +100,8 @@ int main(int argc, char *argv[])
                 INFO("Setting threads to %d\n", processing_threads);
                 omp_set_num_threads(processing_threads);
 #endif
-            case 'y':
+                break;
+            case 'S':
                 argc--;
                 argv++;
                 scheduler_threads =
@@ -185,15 +186,16 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        const long int heartbeat = 100L;
         INFO("Running simulation.\n");
-        hw.sim(timesteps, heartbeat, timing_model, scheduler_threads);
+        sanafe::RunData run_summary = hw.sim(timesteps,
+                sanafe::default_heartbeat_timesteps, timing_model,
+                scheduler_threads);
 
         INFO("Closing Booksim2 library\n");
         booksim_close();
 
         INFO("***** Run Summary *****\n");
-        hw.sim_output_run_summary(output_dir);
+        hw.sim_output_run_summary(output_dir, run_summary);
         double average_power = hw.get_power();
         INFO("Average power consumption: %f W.\n", average_power);
         INFO("Run finished.\n");

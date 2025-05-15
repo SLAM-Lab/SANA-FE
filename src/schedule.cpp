@@ -33,8 +33,7 @@ sanafe::NocInfo::NocInfo(const int width, const int height,
 {
 }
 
-double sanafe::schedule_messages_simple(
-        Timestep &ts, const Scheduler &scheduler)
+double sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
 {
     const size_t cores = ts.messages->size();
     std::vector<double> neuron_processing_latencies(cores, 0.0);
@@ -56,11 +55,14 @@ double sanafe::schedule_messages_simple(
     double max_neuron_processing =
             *std::max_element(neuron_processing_latencies.begin(),
                     neuron_processing_latencies.end());
-    return std::max(max_message_processing, max_neuron_processing);
+
+    ts.sim_time = std::max(max_message_processing, max_neuron_processing);
+    scheduler.timesteps_to_write.push(ts);
+    return ts.sim_time;
 }
 
 double sanafe::schedule_messages_cycle_accurate(
-        Timestep &ts, const BookSimConfig &config)
+        Timestep &ts, const BookSimConfig &config, Scheduler &scheduler)
 {
     for (auto &core_messages : *(ts.messages))
     {
@@ -96,6 +98,8 @@ double sanafe::schedule_messages_cycle_accurate(
     TRACE1(SCHEDULER, "Running Booksim2 simulation\n");
     double booksim_time = booksim_run(config);
 
+    ts.sim_time = booksim_time;
+    scheduler.timesteps_to_write.push(ts);
     return booksim_time;
 }
 
@@ -103,7 +107,7 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
 {
     if (scheduler.scheduler_threads.empty())
     {
-        ts.sim_time = schedule_messages_timestep(ts, scheduler);
+        schedule_messages_timestep(ts, scheduler);
     }
     else
     {
@@ -129,9 +133,7 @@ void sanafe::schedule_messages_thread(
         if (got_ts)
         {
             TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", tid,ts.timestep);
-            ts.sim_time = schedule_messages_timestep(ts, scheduler);
-            TRACE1(SCHEDULER, "tid:%d storing ts, time:%e\n", tid, ts.sim_time);
-            scheduler.timesteps_to_write.push(ts);
+            schedule_messages_timestep(ts, scheduler);
         }
     }
 
@@ -142,9 +144,8 @@ void sanafe::schedule_messages_thread(
 void sanafe::schedule_stop_all_threads(sanafe::Scheduler &scheduler,
         std::ofstream &message_trace, sanafe::RunData &rd)
 {
-    TRACE1(SCHEDULER, "Stopping all threads.\n");
+    TRACE1(SCHEDULER, "Stopping all scheduling threads.\n");
     scheduler.timesteps_to_schedule.wait_until_empty();
-    // TODO: wait until all messages written to file as well
     TRACE1(SCHEDULER, "All messages scheduled so terminate threads.\n");
     scheduler.should_stop = true;
     scheduler.timesteps_to_schedule.set_terminate();
@@ -160,12 +161,8 @@ void sanafe::schedule_stop_all_threads(sanafe::Scheduler &scheduler,
     return;
 }
 
-double sanafe::schedule_messages_timestep(
-        Timestep &ts, const Scheduler &scheduler)
+double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
 {
-    // TODO: if we have multiple worker threads, push work onto a thread-safe
-    //  queue. Otherwise, just process the time-step here
-
     // Schedule the global order of messages. Takes a vector containing
     //  a list of messages per core, and scheduler parameters (mostly
     //  NoC configuration parameters). Returns the timestamp of the last
@@ -300,6 +297,9 @@ double sanafe::schedule_messages_timestep(
     }
     TRACE1(SCHEDULER, "Scheduler finished.\n");
     //INFO("last rx:%d tx:%d t:%e rx:%d\n", last_rx_core, last_tx_core, last_timestamp, last_rx);
+
+    ts.sim_time = last_timestamp;
+    scheduler.timesteps_to_write.push(ts);
 
     return last_timestamp;
 }

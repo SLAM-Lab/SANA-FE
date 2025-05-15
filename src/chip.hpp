@@ -78,7 +78,7 @@ enum TimingModel : int
     TIMING_MODEL_CYCLE_ACCURATE, // Booksim2 simulator
 };
 
-constexpr long int default_heartbeat_timesteps = 100L;
+constexpr long int default_heartbeat_timesteps = 1000L;
 
 class SpikingChip
 {
@@ -97,8 +97,7 @@ public:
     RunData sim(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps, const TimingModel timing_model = TIMING_MODEL_DETAILED, const int scheduler_threads = 1);
     void load(const SpikingNetwork &net);
     double get_power() const;
-    RunData get_run_summary() const;
-    void sim_output_run_summary(const std::filesystem::path &output_dir) const;
+    void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
     void reset();
 
     std::vector<std::reference_wrapper<Core>> cores();
@@ -163,11 +162,11 @@ private:
     void process_messages(Timestep &ts);
     void forced_updates(const Timestep &ts);
 
-
     void process_neuron(Timestep &ts, MappedNeuron &n);
     void receive_message(Message &m);
     double process_message(Timestep &ts, Core &c, Message &m);
     PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    void retire_scheduled_messages(RunData &rd, Scheduler &scheduler);
 
     double pipeline_process_axon_in(Core &core, const Message &m);
     PipelineResult pipeline_process_axon_out(Timestep &ts, MappedNeuron &n);

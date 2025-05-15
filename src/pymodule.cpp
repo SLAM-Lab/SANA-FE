@@ -738,9 +738,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("timing_model") = "detailed",
                     pybind11::arg("nthreads") = 0)
             .def("get_power", &sanafe::SpikingChip::get_power)
-            .def("get_run_summary", [](sanafe::SpikingChip *self) {
-                return run_data_to_dict(self->get_run_summary());
-            })
             .def("reset", &sanafe::SpikingChip::reset);
     pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
             .def("set_model_attributes", &pyset_model_attributes,

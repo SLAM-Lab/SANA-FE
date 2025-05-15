@@ -284,6 +284,41 @@ sanafe::RunData::RunData(const long int start, const long int steps)
 {
 }
 
+void sanafe::SpikingChip::retire_scheduled_messages(
+        sanafe::RunData &rd, sanafe::Scheduler &scheduler)
+{
+    while (!scheduler.timesteps_to_write.empty())
+    {
+        Timestep ts;
+        scheduler.timesteps_to_write.pop(ts);
+        TRACE1(CHIP, "retiring ts:%ld\n", ts.timestep);
+        if (message_trace_enabled)
+        {
+            for (auto &q : *(ts.messages))
+            {
+                for (Message &m : q)
+                {
+                    sim_trace_record_message(message_trace, m);
+                }
+            }
+        }
+        rd.total_energy += ts.total_energy;
+        rd.synapse_energy += ts.synapse_energy;
+        rd.dendrite_energy += ts.dendrite_energy;
+        rd.soma_energy += ts.soma_energy;
+        rd.network_energy += ts.network_energy;
+        rd.sim_time += ts.sim_time;
+        rd.spikes += ts.spike_count;
+        rd.packets_sent += ts.packets_sent;
+        rd.neurons_fired += ts.neurons_fired;
+        rd.wall_time = wall_time;
+
+        total_sim_time += ts.sim_time;
+    }
+
+    return;
+}
+
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const long int heartbeat, const TimingModel timing_model,
         const int scheduler_threads)
@@ -336,90 +371,14 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
             // Print a heart-beat message to show that the simulation is running
             INFO("*** Time-step %ld ***\n", timestep);
         }
-        // TODO: this is a mess, we shouldn't get the timestep until its ready
-        //  to be written. We need a single flow for both cases - when doing
-        //  everything on one thread, and otherwise
         Timestep ts = step(scheduler);
-
-        // TODO: every step makes sure we write any pending timesteps to file
-        if (scheduler_threads > 0)
-        {
-            while (scheduler.timesteps_to_write.try_pop(ts))
-            {
-                if (message_trace_enabled)
-                {
-                    for (auto &q : *(ts.messages))
-                    {
-                        for (Message &m : q)
-                        {
-                            sim_trace_record_message(message_trace, m);
-                        }
-                    }
-                }
-                //INFO("Saving ts:%ld\n", ts.timestep);
-                total_sim_time += ts.sim_time;
-                rd.total_energy += ts.total_energy;
-                rd.synapse_energy += ts.synapse_energy;
-                rd.dendrite_energy += ts.dendrite_energy;
-                rd.soma_energy += ts.soma_energy;
-                rd.network_energy += ts.network_energy;
-                rd.sim_time += ts.sim_time;
-                rd.spikes += ts.spike_count;
-                rd.packets_sent += ts.packets_sent;
-                rd.neurons_fired += ts.neurons_fired;
-                rd.wall_time = wall_time;
-
-            }
-        }
-        else // All on one thread
-        {
-            TRACE1(CHIP, "Neurons fired in ts:%ld: %zu\n", timestep,
-            ts.neurons_fired);
-            rd.total_energy += ts.total_energy;
-            rd.synapse_energy += ts.synapse_energy;
-            rd.dendrite_energy += ts.dendrite_energy;
-            rd.soma_energy += ts.soma_energy;
-            rd.network_energy += ts.network_energy;
-            rd.sim_time += ts.sim_time;
-            rd.spikes += ts.spike_count;
-            rd.packets_sent += ts.packets_sent;
-            rd.neurons_fired += ts.neurons_fired;
-            rd.wall_time = wall_time;
-        }
+        // Retire and trace messages as we go along. Not strictly required, but
+        //  avoids the message write queue growing too large
+        retire_scheduled_messages(rd, scheduler);
     }
 
     schedule_stop_all_threads(scheduler, message_trace, rd);
-
-    while (!scheduler.timesteps_to_write.empty())
-    {
-        Timestep ts;
-        scheduler.timesteps_to_write.pop(ts);
-        if (message_trace_enabled)
-        {
-            for (auto &q : *(ts.messages))
-            {
-                for (const Message &m : q)
-                {
-                    sim_trace_record_message(message_trace, m);
-                }
-            }
-        }
-        TRACE1(SCHEDULER, "Saving ts:%ld sim_time:%e total:%e\n", ts.timestep,
-                ts.sim_time, rd.sim_time);
-        // TODO: its confusing how we have chip-wide arguments and then a
-        //  separately maintained RunData struct? Surely these should match
-        //  better / just be kept in one place. Maybe get rid of total_sim_time
-        total_sim_time += ts.sim_time;
-        rd.total_energy += ts.total_energy;
-        rd.synapse_energy += ts.synapse_energy;
-        rd.dendrite_energy += ts.dendrite_energy;
-        rd.soma_energy += ts.soma_energy;
-        rd.network_energy += ts.network_energy;
-        rd.sim_time += ts.sim_time;
-        rd.spikes += ts.spike_count;
-        rd.packets_sent += ts.packets_sent;
-        rd.neurons_fired += ts.neurons_fired;
-    }
+    retire_scheduled_messages(rd, scheduler);
 
     return rd;
 }
@@ -447,12 +406,6 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     soma_energy += ts.soma_energy;
     network_energy += ts.network_energy;
 
-    // TODO: this becomes a bit messier now that we schedule the ts timings
-    //  asynchronously. Need to figure this out as well. Maybe get rid of total sim time
-    if (scheduler.scheduler_threads.empty())
-    {
-        total_sim_time += ts.sim_time;
-    }
     total_spikes += ts.spike_count;
     total_neurons_fired += ts.neurons_fired;
     // The total_messages_sent is incremented during the simulation since it's
@@ -469,21 +422,6 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     {
         sim_trace_record_perf(perf_trace, ts);
     }
-    // if (message_trace_enabled)
-    // {
-    //     // TODO: we can't do this anymore, we need to wait until the timestep
-    //     //  has been scheduled
-    //     auto &message_queue = ts.messages;
-    //     for (const auto &q : message_queue)
-    //     {
-    //         for (const auto &m : q)
-    //         {
-    //             // Ignore dummy messages (without a destination). These account
-    //             //  for processing that doesn't result in a spike being sent
-    //             sim_trace_record_message(message_trace, m);
-    //         }
-    //     }
-    // }
     wall_time += ts_elapsed;
 
     return ts;
@@ -1199,27 +1137,6 @@ size_t sanafe::abs_diff(const size_t a, const size_t b)
     return (a > b) ? (a - b) : (b - a);
 }
 
-sanafe::RunData sanafe::SpikingChip::get_run_summary() const
-{
-    // Store the summary data in a string to string mapping
-    RunData run_data(0, total_timesteps);
-
-    run_data.spikes = total_spikes;
-    run_data.packets_sent = total_messages_sent;
-    run_data.wall_time = wall_time;
-    run_data.neurons_fired = total_neurons_fired;
-
-    run_data.total_energy = total_energy;
-    run_data.synapse_energy = synapse_energy;
-    run_data.dendrite_energy = dendrite_energy;
-    run_data.soma_energy = soma_energy;
-    run_data.network_energy = network_energy;
-
-    run_data.sim_time = total_sim_time;
-
-    return run_data;
-}
-
 std::vector<std::reference_wrapper<sanafe::Core>> sanafe::SpikingChip::cores()
 {
     std::vector<std::reference_wrapper<Core>> all_cores_in_hw;
@@ -1611,9 +1528,8 @@ void sanafe::MappedNeuron::set_model_attributes(
 }
 
 void sanafe::SpikingChip::sim_output_run_summary(
-        const std::filesystem::path &output_dir) const
+        const std::filesystem::path &output_dir, const RunData &run_data) const
 {
-    const RunData run_data = get_run_summary();
     // Summarize and output the run data using a YAML format to the console
     sim_format_run_summary(std::cout, run_data);
 
@@ -1815,7 +1731,7 @@ void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
     if (scheduler.timing_model == TIMING_MODEL_SIMPLE)
     {
         TRACE1(CHIP, "Running simple timing model\n");
-        ts.sim_time = schedule_messages_simple(ts, scheduler);
+        schedule_messages_simple(ts, scheduler);
     }
     else if (scheduler.timing_model == TIMING_MODEL_DETAILED)
     {
@@ -1825,7 +1741,7 @@ void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
     else if (scheduler.timing_model == TIMING_MODEL_CYCLE_ACCURATE)
     {
         TRACE1(CHIP, "Running cycle-accurate timing model\n");
-        if (chip_count > 1)
+        if ((scheduler.scheduler_threads.size() > 1) || (chip_count > 1))
         {
             INFO("Error: Cannot run multiple simultaneous cycle-accurate "
                  "simulations. The Booksim2 library does not support "
@@ -1837,7 +1753,7 @@ void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
                     "Error: Cannot run multiple simultaneous cycle-accurate "
                     "simulations.");
         }
-        ts.sim_time = schedule_messages_cycle_accurate(ts, *booksim_config);
+        schedule_messages_cycle_accurate(ts, *booksim_config, scheduler);
     }
     else
     {
