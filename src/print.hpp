@@ -76,7 +76,7 @@ std::string print_int(const long int val);
 #define DEBUG_LEVEL_PLUGINS 0
 #endif
 #ifndef DEBUG_LEVEL_SCHEDULER
-#define DEBUG_LEVEL_SCHEDULER_0
+#define DEBUG_LEVEL_SCHEDULER 0
 #endif
 #ifndef DEBUG_LEVEL_CHIP
 #define DEBUG_LEVEL_CHIP 0
