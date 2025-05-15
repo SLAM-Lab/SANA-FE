@@ -285,7 +285,8 @@ sanafe::RunData::RunData(const long int start, const long int steps)
 }
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
-        const long int heartbeat, const TimingModel timing_model)
+        const long int heartbeat, const TimingModel timing_model,
+        const int scheduler_threads)
 {
     RunData rd((total_timesteps + 1), timesteps);
     Scheduler scheduler;
@@ -299,12 +300,12 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     // TOOD: for now, hard code the number of threads. Then calculate the
     //  hard-coded thread count. The finally allow threads to dynamically change
     //  based on performance
-    INFO("Creating %d scheduler threads\n", schedule_thread_count);
-    for (int tid = 0; tid < schedule_thread_count; tid++)
+    INFO("Creating %d scheduler threads\n", scheduler_threads);
+    for (int tid = 0; tid < scheduler_threads; tid++)
     {
         TRACE1(CHIP, "Created scheduler thread:%d\n", tid);
         scheduler.scheduler_threads.emplace_back(
-                &schedule_messages_task, std::ref(scheduler), tid);
+                &schedule_messages_thread, std::ref(scheduler), tid);
     }
 
     if (total_timesteps <= 0)
@@ -341,7 +342,7 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         Timestep ts = step(scheduler);
 
         // TODO: every step makes sure we write any pending timesteps to file
-        if (schedule_thread_count > 0)
+        if (scheduler_threads > 0)
         {
             while (scheduler.timesteps_to_write.try_pop(ts))
             {
@@ -447,8 +448,8 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     network_energy += ts.network_energy;
 
     // TODO: this becomes a bit messier now that we schedule the ts timings
-    //  asynchronously. Need to figure this out as well
-    if (schedule_thread_count == 0)
+    //  asynchronously. Need to figure this out as well. Maybe get rid of total sim time
+    if (scheduler.scheduler_threads.empty())
     {
         total_sim_time += ts.sim_time;
     }

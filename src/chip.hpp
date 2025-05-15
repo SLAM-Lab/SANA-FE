@@ -79,7 +79,6 @@ enum TimingModel : int
 };
 
 constexpr long int default_heartbeat_timesteps = 100L;
-constexpr int schedule_thread_count = 2;
 
 class SpikingChip
 {
@@ -95,7 +94,7 @@ public:
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps, const TimingModel timing_model = TIMING_MODEL_DETAILED);
+    RunData sim(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps, const TimingModel timing_model = TIMING_MODEL_DETAILED, const int scheduler_threads = 1);
     void load(const SpikingNetwork &net);
     double get_power() const;
     RunData get_run_summary() const;

@@ -114,7 +114,8 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
     }
 }
 
-void sanafe::schedule_messages_task(sanafe::Scheduler &scheduler, const int tid)
+void sanafe::schedule_messages_thread(
+        sanafe::Scheduler &scheduler, const int tid)
 {
     while (!scheduler.should_stop)
     {

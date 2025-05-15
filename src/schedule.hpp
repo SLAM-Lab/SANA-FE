@@ -152,7 +152,6 @@ struct TimestepComparator
 struct Scheduler
 {
     std::vector<std::thread> scheduler_threads{};
-    // TODO: allow for threads to be individually stopped, not just globally
     std::atomic<bool> should_stop{false};
     ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, TimestepComparator> timesteps_to_schedule{};
     ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, TimestepComparator> timesteps_to_write{};
@@ -199,7 +198,7 @@ void schedule_messages_detailed(Timestep &ts, Scheduler &scheduler);
 double schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config);
 
 
-void schedule_messages_task(Scheduler &scheduler, const int tid);
+void schedule_messages_thread(Scheduler &scheduler, const int tid);
 void schedule_stop_all_threads(Scheduler &scheduler, std::ofstream &message_trace, RunData &rd);
 
 double schedule_messages_timestep(Timestep &ts, const Scheduler &scheduler);

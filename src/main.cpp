@@ -41,6 +41,9 @@ int main(int argc, char *argv[])
     bool record_perf{false};
     bool record_messages{false};
     bool use_netlist_format{false};
+    int total_threads_available{1};
+    int processing_threads{1};
+    int scheduler_threads{1};
     // Select the timing model on the command line. The default is the
     //  detailed build-in timing model (using a scheduler). Select only one of
     //  these two flags to enable either the simple analytical timing model or
@@ -49,8 +52,8 @@ int main(int argc, char *argv[])
     std::string timing_model_str = "detailed";
 
     #ifdef HAVE_OPENMP
-        int nthreads = omp_get_num_procs();
-        INFO("OpenMP enabled, %d threads detected\n", nthreads);
+        total_threads_available = omp_get_num_procs();
+        INFO("OpenMP enabled, %d threads detected\n", total_threads_available);
 #else
         INFO("No OpenMP multithreading enabled.\n");
 #endif
@@ -61,17 +64,6 @@ int main(int argc, char *argv[])
         {
             switch (argv[0][1])
             {
-            case 'c':
-                argc--;
-                argv++;
-#ifndef HAVE_OPENMP
-                INFO("Warning: multiple threads not supported; flag ignored");
-#else
-                nthreads = std::min(nthreads, std::stoi(argv[0]));
-                INFO("Setting threads to %d\n", nthreads);
-                omp_set_num_threads(nthreads);
-#endif
-                break;
             case 'o': {
                 argc--;
                 argv++;
@@ -97,6 +89,23 @@ int main(int argc, char *argv[])
                 break;
             case 'v':
                 record_potentials = true;
+                break;
+            case 'x':
+                argc--;
+                argv++;
+#ifndef HAVE_OPENMP
+                INFO("Warning: multiple threads not supported; flag ignored");
+#else
+                processing_threads = std::min(total_threads_available, std::stoi(argv[0]));
+                INFO("Setting threads to %d\n", processing_threads);
+                omp_set_num_threads(processing_threads);
+#endif
+            case 'y':
+                argc--;
+                argv++;
+                scheduler_threads =
+                        std::min(total_threads_available, std::stoi(argv[0]));
+
                 break;
 
             default:
@@ -178,7 +187,7 @@ int main(int argc, char *argv[])
 
         const long int heartbeat = 100L;
         INFO("Running simulation.\n");
-        hw.sim(timesteps, heartbeat, timing_model);
+        hw.sim(timesteps, heartbeat, timing_model, scheduler_threads);
 
         INFO("Closing Booksim2 library\n");
         booksim_close();
