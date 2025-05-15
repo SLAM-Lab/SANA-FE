@@ -42,11 +42,11 @@ double sanafe::schedule_messages_simple(
     for (size_t sending_core = 0; sending_core < ts.messages.size();
             ++sending_core)
     {
-        std::list<MessagePtr> &q = ts.messages.at(sending_core);
-        for (MessagePtr &m : q)
+        std::list<Message> &q = ts.messages.at(sending_core);
+        for (Message &m : q)
         {
-            neuron_processing_latencies[sending_core] += m->generation_delay;
-            message_processing_latencies[m->dest_core_id] += m->receive_delay;
+            neuron_processing_latencies[sending_core] += m.generation_delay;
+            message_processing_latencies[m.dest_core_id] += m.receive_delay;
         }
     }
 
@@ -66,27 +66,27 @@ double sanafe::schedule_messages_cycle_accurate(
     {
         for (auto &message : core_messages)
         {
-            if (message->mid == placeholder_mid)
+            if (message.mid == placeholder_mid)
             {
-                booksim_create_processing_event(message->timestep,
+                booksim_create_processing_event(message.timestep,
                         std::make_pair(
-                                message->src_neuron_group_id,
-                                message->src_neuron_id),
+                                message.src_neuron_group_id,
+                                message.src_neuron_id),
                         std::make_pair(
-                                message->src_tile_id, message->src_core_offset),
-                        message->generation_delay);
+                                message.src_tile_id, message.src_core_offset),
+                        message.generation_delay);
             }
             else
             {
-                booksim_create_spike_event(message->timestep,
+                booksim_create_spike_event(message.timestep,
                         std::make_pair(
-                                message->src_neuron_group_id,
-                                message->src_neuron_id),
+                                message.src_neuron_group_id,
+                                message.src_neuron_id),
                         std::make_pair(
-                                message->src_tile_id, message->src_core_offset),
+                                message.src_tile_id, message.src_core_offset),
                         std::make_pair(
-                                message->dest_tile_id, message->dest_core_offset),
-                        message->generation_delay, message->receive_delay);
+                                message.dest_tile_id, message.dest_core_offset),
+                        message.generation_delay, message.receive_delay);
             }
         }
     }
@@ -184,7 +184,7 @@ double sanafe::schedule_messages_timestep(
     for (size_t core = 0; core < ts.messages.size(); core++)
     {
         auto &q = ts.messages.at(core);
-        for (MessagePtr &m : q)
+        for (Message &m : q)
         {
             messages_sent_per_core[core].push_back(m);
         }
@@ -209,75 +209,75 @@ double sanafe::schedule_messages_timestep(
     while (!priority.empty())
     {
         // Get the core's queue with the earliest simulation time
-        MessagePtr m = priority.top();
+        Message m = priority.top();
         priority.pop();
-        last_timestamp = fmax(last_timestamp, m->sent_timestamp);
+        last_timestamp = fmax(last_timestamp, m.sent_timestamp);
 
         // Update the Network-on-Chip state
-        schedule_update_noc(m->sent_timestamp, noc);
+        schedule_update_noc(m.sent_timestamp, noc);
 
         // Messages without a destination (neuron) are dummy messages.
         //  Dummy messages account for processing time that does not
         //  result in any spike messages. Otherwise, messages are sent
         //  from a src neuron to a dest neuron
-        if (!m->placeholder)
+        if (!m.placeholder)
         {
             TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
-                    m->src_neuron_group_id.c_str(), m->src_neuron_id);
-            TRACE1(SCHEDULER, "Send delay:%e\n", m->generation_delay);
-            TRACE1(SCHEDULER, "Receive delay:%e\n", m->receive_delay);
-            const int dest_core = m->dest_core_id;
+                    m.src_neuron_group_id.c_str(), m.src_neuron_id);
+            TRACE1(SCHEDULER, "Send delay:%e\n", m.generation_delay);
+            TRACE1(SCHEDULER, "Receive delay:%e\n", m.receive_delay);
+            const int dest_core = m.dest_core_id;
             // Figure out if we are able to send a message into the
             //  network i.e., is the route to the dest core
             //  saturated and likely to block? Sum along the route
             //  and see the density of messages along all links.
             const double messages_along_route =
-                    schedule_calculate_messages_along_route(*m, noc);
+                    schedule_calculate_messages_along_route(m, noc);
 
-            const size_t path_capacity = (m->hops + 1) * scheduler.buffer_size;
+            const size_t path_capacity = (m.hops + 1) * scheduler.buffer_size;
             if (messages_along_route > path_capacity)
             {
-                m->sent_timestamp += (messages_along_route - path_capacity) *
+                m.sent_timestamp += (messages_along_route - path_capacity) *
                         noc.mean_in_flight_receive_delay;
             }
 
             // Now, push the message into the right receiving queue
             //  Calculate the network delay and when the message
             //  is received
-            m->in_noc = true;
+            m.in_noc = true;
             noc.messages_received[dest_core].push_back(m);
 
             // Update the rolling average for message
             //  receiving times in-flight in the network
-            schedule_update_noc_message_counts(*m, noc, true);
+            schedule_update_noc_message_counts(m, noc, true);
 
             double network_delay = messages_along_route *
-                    noc.mean_in_flight_receive_delay / (m->hops + 1.0);
+                    noc.mean_in_flight_receive_delay / (m.hops + 1.0);
             TRACE1(SCHEDULER, "Path capacity:%zu messages:%lf delay:%e\n",
                     path_capacity, messages_along_route, network_delay);
 
             const double earliest_received_time =
-                    m->sent_timestamp + fmax(m->network_delay, network_delay);
-            m->received_timestamp = fmax(noc.core_finished_receiving[dest_core],
+                    m.sent_timestamp + fmax(m.network_delay, network_delay);
+            m.received_timestamp = fmax(noc.core_finished_receiving[dest_core],
                     earliest_received_time);
             noc.core_finished_receiving[dest_core] = fmax(
-                    (noc.core_finished_receiving[dest_core] + m->receive_delay),
-                    (earliest_received_time + m->receive_delay));
-            m->processed_timestamp = noc.core_finished_receiving[dest_core];
-            last_timestamp = fmax(last_timestamp, m->processed_timestamp);
+                    (noc.core_finished_receiving[dest_core] + m.receive_delay),
+                    (earliest_received_time + m.receive_delay));
+            m.processed_timestamp = noc.core_finished_receiving[dest_core];
+            last_timestamp = fmax(last_timestamp, m.processed_timestamp);
         }
 
         // Get the next message for this core
-        const size_t src_core = m->src_core_id;
+        const size_t src_core = m.src_core_id;
         if (!messages_sent_per_core[src_core].empty())
         {
             auto &q = messages_sent_per_core[src_core];
-            std::shared_ptr<Message> next_message = q.front();
+            Message &next_message = q.front();
             // If applicable, schedule this next message immediately
             //  after the current message finishes sending
-            next_message->sent_timestamp =
-                    m->sent_timestamp + next_message->generation_delay;
-            last_timestamp = fmax(last_timestamp, next_message->sent_timestamp);
+            next_message.sent_timestamp =
+                    m.sent_timestamp + next_message.generation_delay;
+            last_timestamp = fmax(last_timestamp, next_message.sent_timestamp);
             priority.push(next_message);
             q.pop_front();
         }
@@ -519,15 +519,15 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
         auto it = q.begin();
         while (it != q.end())
         {
-            std::shared_ptr<Message> m = (*it);
+            Message &m = (*it);
             bool remove_message = false;
             auto curr = it;
-            if (m->in_noc && (t >= m->received_timestamp))
+            if (m.in_noc && (t >= m.received_timestamp))
             {
-                m->in_noc = false;
+                m.in_noc = false;
                 // Go along the message path and decrement tile
                 //  message counters for all links traversed
-                schedule_update_noc_message_counts(*m, noc, false);
+                schedule_update_noc_message_counts(m, noc, false);
                 remove_message = true;
             }
             std::advance(it, 1);
@@ -552,9 +552,9 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
         //  and add it to the corresponding priority queue
         if (!q.empty()) // messages
         {
-            std::shared_ptr<Message> m = q.front();
+            Message m = q.front();
             q.pop_front();
-            m->sent_timestamp = m->generation_delay;
+            m.sent_timestamp = m.generation_delay;
             priority.push(m);
         }
         else

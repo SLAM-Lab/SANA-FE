@@ -33,16 +33,15 @@ enum Direction
     ndirections,
 };
 
-using MessagePtr = std::shared_ptr<Message>;
-using MessageFifo = std::list<MessagePtr>;
+using MessageFifo = std::list<Message>;
 
 class CompareMessages
 {
 public:
-    bool operator()(const MessagePtr &first, const MessagePtr &second) const { return first->sent_timestamp > second->sent_timestamp; }
+    bool operator()(const Message &first, const Message &second) const { return first.sent_timestamp > second.sent_timestamp; }
 };
 
-using MessagePriorityQueue = std::priority_queue<MessagePtr, std::vector<MessagePtr>, CompareMessages>;
+using MessagePriorityQueue = std::priority_queue<Message, std::vector<Message>, CompareMessages>;
 
 
 template <typename T, typename Container = std::vector<T>,

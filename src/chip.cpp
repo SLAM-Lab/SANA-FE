@@ -479,9 +479,9 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
         if (placeholder_event)
         {
             const MappedNeuron &last_neuron = core.neurons.back();
-            MessagePtr placeholder = std::make_shared<Message>(
-                    placeholder_mid, *this, last_neuron, ts.timestep);
-            placeholder->generation_delay = core.next_message_generation_delay;
+            Message placeholder =
+                    Message(placeholder_mid, *this, last_neuron, ts.timestep);
+            placeholder.generation_delay = core.next_message_generation_delay;
             // Create a dummy placeholder message
             auto &message_queue = ts.messages;
             message_queue[core.id].push_back(placeholder);
@@ -498,7 +498,7 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
     {
         for (auto &m : q)
         {
-            if (!m->placeholder)
+            if (!m.placeholder)
             {
                 receive_message(m);
             }
@@ -520,24 +520,24 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
                 core.messages_in.size(), core.id);
         for (auto &m : core.messages_in)
         {
-            m->receive_delay += process_message(ts, core, *m);
+            m.receive_delay += process_message(ts, core, m);
         }
     }
 }
 
-void sanafe::SpikingChip::receive_message(MessagePtr &m)
+void sanafe::SpikingChip::receive_message(Message &m)
 {
-    assert(static_cast<size_t>(m->src_tile_id) < tiles.size());
-    assert(static_cast<size_t>(m->dest_tile_id) < tiles.size());
+    assert(static_cast<size_t>(m.src_tile_id) < tiles.size());
+    assert(static_cast<size_t>(m.dest_tile_id) < tiles.size());
 
-    const Tile &src_tile = tiles[m->src_tile_id];
-    Tile &dest_tile = tiles[m->dest_tile_id];
+    const Tile &src_tile = tiles[m.src_tile_id];
+    Tile &dest_tile = tiles[m.dest_tile_id];
 
-    m->network_delay = sim_estimate_network_costs(src_tile, dest_tile);
-    m->hops = abs_diff(src_tile.x, dest_tile.x) +
+    m.network_delay = sim_estimate_network_costs(src_tile, dest_tile);
+    m.hops = abs_diff(src_tile.x, dest_tile.x) +
             abs_diff(src_tile.y, dest_tile.y);
 
-    Core &core = dest_tile.cores[m->dest_core_offset];
+    Core &core = dest_tile.cores[m.dest_core_offset];
     core.messages_in.push_back(m);
 }
 
@@ -1055,13 +1055,12 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
             n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const int axon_address : n.axon_out_addresses)
     {
-        MessagePtr m = std::make_shared<Message>(
-                total_messages_sent, *this, n, ts.timestep, axon_address);
+        Message m(total_messages_sent, *this, n, ts.timestep, axon_address);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
         axon_out_hw.energy += axon_out_hw.energy_access;
 
-        m->generation_delay = n.core->next_message_generation_delay +
+        m.generation_delay = n.core->next_message_generation_delay +
                 axon_out_hw.latency_access;
         n.core->next_message_generation_delay = 0.0;
 
@@ -1797,7 +1796,7 @@ void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
-        : messages(std::vector<std::list<MessagePtr>>(
+        : messages(std::vector<std::list<Message>>(
                   core_count))
         , timestep(ts)
 {
@@ -2115,7 +2114,7 @@ void sanafe::SpikingChip::sim_reset_measurements()
             }
 
             // Reset the message buffer
-            c.messages_in = std::vector<MessagePtr>();
+            c.messages_in = std::vector<Message>();
         }
     }
 
@@ -2312,31 +2311,31 @@ void sanafe::SpikingChip::sim_trace_record_perf(
 }
 
 void sanafe::SpikingChip::sim_trace_record_message(
-        std::ofstream &message_trace_file, const MessagePtr &m)
+        std::ofstream &message_trace_file, const Message &m)
 {
     assert(message_trace_file.is_open());
-    message_trace_file << m->timestep << ",";
-    message_trace_file << m->mid << ",";
-    message_trace_file << m->src_neuron_group_id << ".";
-    message_trace_file << m->src_neuron_id << ",";
-    message_trace_file << m->src_tile_id << "." << m->src_core_offset << ",";
+    message_trace_file << m.timestep << ",";
+    message_trace_file << m.mid << ",";
+    message_trace_file << m.src_neuron_group_id << ".";
+    message_trace_file << m.src_neuron_id << ",";
+    message_trace_file << m.src_tile_id << "." << m.src_core_offset << ",";
 
-    if (m->placeholder)
+    if (m.placeholder)
     {
         message_trace_file << "x.x,";
     }
     else
     {
-        message_trace_file << m->dest_tile_id << ".";
-        message_trace_file << m->dest_core_offset << ",";
+        message_trace_file << m.dest_tile_id << ".";
+        message_trace_file << m.dest_core_offset << ",";
     }
 
-    message_trace_file << m->hops << ",";
-    message_trace_file << m->spikes << ",";
-    message_trace_file << m->generation_delay << ",";
-    message_trace_file << m->network_delay << ",";
-    message_trace_file << m->receive_delay << ",";
-    message_trace_file << m->blocked_delay;
+    message_trace_file << m.hops << ",";
+    message_trace_file << m.spikes << ",";
+    message_trace_file << m.generation_delay << ",";
+    message_trace_file << m.network_delay << ",";
+    message_trace_file << m.receive_delay << ",";
+    message_trace_file << m.blocked_delay;
     message_trace_file << std::endl;
 }
 

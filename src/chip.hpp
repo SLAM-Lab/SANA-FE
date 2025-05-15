@@ -45,7 +45,6 @@ struct AxonOutConfiguration;
 
 class SpikingNetwork;
 struct Message;
-using MessagePtr = std::shared_ptr<Message>;
 class Neuron;
 struct Connection;
 struct MappedNeuron;
@@ -165,7 +164,7 @@ private:
 
 
     void process_neuron(Timestep &ts, MappedNeuron &n);
-    void receive_message(MessagePtr &m);
+    void receive_message(Message &m);
     double process_message(Timestep &ts, Core &c, Message &m);
     PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
@@ -182,7 +181,7 @@ private:
     void sim_trace_write_message_header(std::ofstream &message_trace_file);
     void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps);
     void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep);
-    void sim_trace_record_message(std::ofstream &message_trace_file, const MessagePtr &m);
+    void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
     void sim_trace_record_perf(std::ofstream &out, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
 };
@@ -210,7 +209,7 @@ constexpr long int invalid_timestep = -1L;
 struct Timestep
 {
     // Is outer shared_ptr really needed?
-    std::vector<std::list<MessagePtr>> messages{};
+    std::vector<std::list<Message>> messages{};
     long int timestep{invalid_timestep};
     long int spike_count{0L};
     long int total_hops{0L};
@@ -511,7 +510,7 @@ public:
     std::vector<std::shared_ptr<PipelineUnit>> pipeline_hw;
     std::vector<AxonOutUnit> axon_out_hw;
 
-    std::vector<MessagePtr> messages_in;
+    std::vector<Message> messages_in;
     std::vector<AxonInModel> axons_in;
     std::vector<MappedNeuron> neurons;
     std::vector<MappedConnection *> connections_in;
