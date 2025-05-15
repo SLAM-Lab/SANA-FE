@@ -1,3 +1,5 @@
+![SANA-FE](https://github.com/SLAM-Lab/SANA-FE/blob/cpp/sanafe_logo.svg)
+
 Copyright (c) 2025 - The University of Texas at Austin
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
