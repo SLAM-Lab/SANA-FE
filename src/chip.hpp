@@ -45,6 +45,7 @@ struct AxonOutConfiguration;
 
 class SpikingNetwork;
 struct Message;
+using MessagePtr = std::shared_ptr<Message>;
 class Neuron;
 struct Connection;
 struct MappedNeuron;
@@ -141,13 +142,13 @@ private:
     std::ofstream message_trace{};
     std::ofstream perf_trace{};
 
-    Timestep step(TimingModel timing_model=TIMING_MODEL_DETAILED);
+    Timestep step(Scheduler &scheduler);
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
     MappedConnection &map_connection(const Connection &con);
     void map_axons();
     void sim_reset_measurements();
-    void sim_timestep(Timestep &ts, const TimingModel timing_model = TIMING_MODEL_DETAILED);
+    void sim_timestep(Timestep &ts, Scheduler &scheduler);
     double sim_estimate_network_costs(const Tile &src, Tile &dest);
     void sim_calculate_energy(Timestep &ts);
 
@@ -164,7 +165,7 @@ private:
 
 
     void process_neuron(Timestep &ts, MappedNeuron &n);
-    void receive_message(Message &m);
+    void receive_message(MessagePtr &m);
     double process_message(Timestep &ts, Core &c, Message &m);
     PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
@@ -181,7 +182,7 @@ private:
     void sim_trace_write_message_header(std::ofstream &message_trace_file);
     void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps);
     void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep);
-    void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
+    void sim_trace_record_message(std::ofstream &message_trace_file, const MessagePtr &m);
     void sim_trace_record_perf(std::ofstream &out, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
 };
@@ -205,11 +206,12 @@ struct RunData
     RunData(long int start,  long int steps);
 };
 
-
+constexpr long int invalid_timestep = -1L;
 struct Timestep
 {
-    std::vector<std::list<Message>> messages;
-    long int timestep;
+    // Is outer shared_ptr really needed?
+    std::vector<std::list<MessagePtr>> messages{};
+    long int timestep{invalid_timestep};
     long int spike_count{0L};
     long int total_hops{0L};
     long int packets_sent{0L};
@@ -222,6 +224,7 @@ struct Timestep
     double network_energy{0.0};
     double sim_time{0.0};
 
+    Timestep() = default;
     Timestep(long int ts, int core_count);
 };
 
@@ -289,7 +292,7 @@ struct Synapse
     MappedConnection *con;
 };
 
-constexpr long int placeholder_mid = -1UL; // An invalid message id for placeholders
+constexpr long int placeholder_mid = -1L; // An invalid message id for placeholders
 struct Message
 {
     double generation_delay{0.0};
@@ -300,7 +303,7 @@ struct Message
     double received_timestamp{-std::numeric_limits<double>::infinity()};
     double processed_timestamp{-std::numeric_limits<double>::infinity()};
     long int timestep;
-    const long int mid;
+    long int mid;
     int spikes{0};
     size_t hops{0UL};
     size_t src_neuron_id;
@@ -322,6 +325,7 @@ struct Message
 
     explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep);
     explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
+    Message(const Message &copy) = default;
 };
 
 struct PipelineResult
@@ -507,7 +511,7 @@ public:
     std::vector<std::shared_ptr<PipelineUnit>> pipeline_hw;
     std::vector<AxonOutUnit> axon_out_hw;
 
-    std::vector<Message *> messages_in;
+    std::vector<MessagePtr> messages_in;
     std::vector<AxonInModel> axons_in;
     std::vector<MappedNeuron> neurons;
     std::vector<MappedConnection *> connections_in;

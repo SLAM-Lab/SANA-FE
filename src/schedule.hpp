@@ -6,10 +6,15 @@
 #ifndef SCHEDULE_HEADER_INCLUDED_
 #define SCHEDULE_HEADER_INCLUDED_
 
+#include <condition_variable>
 #include <functional> // For std::reference_wrapper
+#include <mutex>
 #include <queue>
+#include <thread>
 #include <vector>
+
 #include <booksim_config.hpp>
+
 #include "chip.hpp"
 
 namespace sanafe
@@ -28,18 +33,132 @@ enum Direction
     ndirections,
 };
 
+using MessagePtr = std::shared_ptr<Message>;
+using MessageFifo = std::list<MessagePtr>;
+
 class CompareMessages
 {
 public:
-    bool operator()(const Message &first, const Message &second) const { return first.sent_timestamp > second.sent_timestamp; }
+    bool operator()(const MessagePtr &first, const MessagePtr &second) const { return first->sent_timestamp > second->sent_timestamp; }
 };
 
-using MessageRef = std::reference_wrapper<Message>;
-using MessagePriorityQueue = std::priority_queue<MessageRef, std::vector<MessageRef>, CompareMessages>;
-using MessageFifo = std::list<MessageRef>;
+using MessagePriorityQueue = std::priority_queue<MessagePtr, std::vector<MessagePtr>, CompareMessages>;
+
+
+template <typename T, typename Container = std::vector<T>,
+        typename Compare = std::less<T>>
+class ThreadSafePriorityQueue
+{
+public:
+    ThreadSafePriorityQueue()
+            : pq_()
+            , mutex_()
+            , cv_()
+    {
+    }
+
+    // Wait until the queue is empty or terminated
+    void wait_until_empty()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        empty_cv_.wait(lock, [this] { return pq_.empty() || terminated_; });
+    }
+
+    template <typename... Args> void push(Args &&...args)
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            pq_.push(std::forward<Args>(args)...);
+        }
+        cv_.notify_one();
+    }
+
+    bool pop(T &value)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this] { return !pq_.empty() || terminated_; });
+        if (pq_.empty())
+        {
+            return false;
+        }
+        else
+        {
+            value = pq_.top();
+            pq_.pop();
+            // If queue is now empty, notify any threads waiting for empty state
+            if (pq_.empty())
+            {
+                empty_cv_.notify_all();
+            }
+
+            return true;
+        }
+    }
+
+    bool try_pop(T &value)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (pq_.empty())
+        {
+            return false;
+        }
+        value = pq_.top();
+        pq_.pop();
+        if (pq_.empty())
+        {
+            empty_cv_.notify_all();
+        }
+
+        return true;
+    }
+
+    bool empty() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return pq_.empty();
+    }
+
+    size_t size() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return pq_.size();
+    }
+
+    void set_terminate()
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            terminated_ = true;
+        }
+        cv_.notify_all();
+    }
+
+private:
+    std::priority_queue<T, Container, Compare> pq_;
+    mutable std::mutex mutex_;
+    std::condition_variable cv_;
+    std::condition_variable empty_cv_;
+    bool terminated_ = false;
+};
+
+// For comparing timesteps when maintaining priority queue of timesteps
+struct TimestepComparator
+{
+    bool operator()(const Timestep &lhs, const Timestep &rhs) const
+    {
+        return lhs.timestep > rhs.timestep;
+    }
+};
 
 struct Scheduler
 {
+    std::vector<std::thread> scheduler_threads{};
+    // TODO: allow for threads to be individually stopped, not just globally
+    std::atomic<bool> should_stop{false};
+    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, TimestepComparator> timesteps_to_schedule{};
+    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, TimestepComparator> timesteps_to_write{};
+
+    TimingModel timing_model{TIMING_MODEL_DETAILED};
     int noc_width;
     int noc_height;
     int buffer_size;
@@ -76,9 +195,15 @@ struct NocInfo
 };
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
-double schedule_messages_simple(std::vector<std::list<Message>> &messages, const Scheduler &scheduler);
-double schedule_messages(std::vector<std::list<Message>> &messages_sent_per_core, const Scheduler &scheduler);
-double schedule_messages_cycle_accurate(std::vector<std::list<Message>> &messages_sent_per_core, const BookSimConfig &config);
+double schedule_messages_simple(Timestep &ts, const Scheduler &scheduler);
+void schedule_messages_detailed(Timestep &ts, Scheduler &scheduler);
+double schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config);
+
+
+void schedule_messages_task(Scheduler &scheduler, const int tid);
+void schedule_stop_all_threads(Scheduler &scheduler);
+
+double schedule_messages_timestep(Timestep &ts, const Scheduler &scheduler);
 void schedule_update_noc_message_counts(const Message &m, NocInfo &noc, bool message_in);
 double schedule_calculate_messages_along_route(const Message &m, NocInfo &noc);
 void schedule_update_noc(double t, NocInfo &noc);

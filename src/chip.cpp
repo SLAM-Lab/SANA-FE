@@ -288,10 +288,28 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const long int heartbeat, const TimingModel timing_model)
 {
     RunData rd((total_timesteps + 1), timesteps);
+    Scheduler scheduler;
+
+    scheduler.noc_width = noc_width;
+    scheduler.noc_height = noc_height;
+    scheduler.buffer_size = noc_buffer_size;
+    scheduler.core_count = core_count;
+    scheduler.max_cores_per_tile = max_cores_per_tile;
+    scheduler.timing_model = timing_model;
+    // TOOD: for now, hard code the number of threads. Then calculate the
+    //  hard-coded thread count. The finally allow threads to dynamically change
+    //  based on performance
+    constexpr int schedule_thread_count = 12;
+    for (int tid = 0; tid < schedule_thread_count; tid++)
+    {
+        INFO("Created scheduler thread:%d\n", tid);
+        scheduler.scheduler_threads.emplace_back(
+                &schedule_messages_task, std::ref(scheduler), tid);
+    }
+
     if (total_timesteps <= 0)
     {
         // If no timesteps have been simulated, open the trace files
-        //  and simulate.
         if (spike_trace_enabled)
         {
             spike_trace = sim_trace_open_spike_trace(out_dir);
@@ -317,7 +335,7 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
             // Print a heart-beat message to show that the simulation is running
             INFO("*** Time-step %ld ***\n", timestep);
         }
-        const Timestep ts = step(timing_model);
+        const Timestep ts = step(scheduler);
         TRACE1(CHIP, "Neurons fired in ts:%ld: %zu\n", timestep,
                 ts.neurons_fired);
         rd.total_energy += ts.total_energy;
@@ -330,12 +348,18 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         rd.packets_sent += ts.packets_sent;
         rd.neurons_fired += ts.neurons_fired;
         rd.wall_time = wall_time;
+
+        // TODO: every step makes sure we write any pending timesteps to file
     }
+
+    // TODO: here, make sure all threads have finished and also all timesteps
+    //   have been written before finishing the simulation run
+    schedule_stop_all_threads(scheduler);
 
     return rd;
 }
 
-sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
+sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
 {
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
@@ -347,7 +371,7 @@ sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
 
     // Run and measure the wall-clock time taken to run the simulation
     auto ts_start = timer.now();
-    sim_timestep(ts, timing_model);
+    sim_timestep(ts, scheduler);
     auto ts_end = timer.now();
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
@@ -377,7 +401,8 @@ sanafe::Timestep sanafe::SpikingChip::step(const TimingModel timing_model)
     }
     if (message_trace_enabled)
     {
-        for (const auto &q : ts.messages)
+        auto &message_queue = ts.messages;
+        for (const auto &q : message_queue)
         {
             for (const auto &m : q)
             {
@@ -454,11 +479,12 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
         if (placeholder_event)
         {
             const MappedNeuron &last_neuron = core.neurons.back();
-            Message placeholder(
+            MessagePtr placeholder = std::make_shared<Message>(
                     placeholder_mid, *this, last_neuron, ts.timestep);
-            placeholder.generation_delay = core.next_message_generation_delay;
+            placeholder->generation_delay = core.next_message_generation_delay;
             // Create a dummy placeholder message
-            ts.messages[core.id].push_back(placeholder);
+            auto &message_queue = ts.messages;
+            message_queue[core.id].push_back(placeholder);
         }
     }
 }
@@ -467,11 +493,12 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
 {
     // Assign outgoing spike messages to their respective destination
     //  cores, and calculate network costs
-    for (auto &q : ts.messages)
+    auto &message_queue = ts.messages;
+    for (auto &q : message_queue)
     {
         for (auto &m : q)
         {
-            if (!m.placeholder)
+            if (!m->placeholder)
             {
                 receive_message(m);
             }
@@ -491,27 +518,27 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
         Core &core = core_list[idx];
         TRACE1(CHIP, "Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
-        for (auto *m : core.messages_in)
+        for (auto &m : core.messages_in)
         {
             m->receive_delay += process_message(ts, core, *m);
         }
     }
 }
 
-void sanafe::SpikingChip::receive_message(Message &m)
+void sanafe::SpikingChip::receive_message(MessagePtr &m)
 {
-    assert(static_cast<size_t>(m.src_tile_id) < tiles.size());
-    assert(static_cast<size_t>(m.dest_tile_id) < tiles.size());
+    assert(static_cast<size_t>(m->src_tile_id) < tiles.size());
+    assert(static_cast<size_t>(m->dest_tile_id) < tiles.size());
 
-    const Tile &src_tile = tiles[m.src_tile_id];
-    Tile &dest_tile = tiles[m.dest_tile_id];
+    const Tile &src_tile = tiles[m->src_tile_id];
+    Tile &dest_tile = tiles[m->dest_tile_id];
 
-    m.network_delay = sim_estimate_network_costs(src_tile, dest_tile);
-    m.hops = abs_diff(src_tile.x, dest_tile.x) +
+    m->network_delay = sim_estimate_network_costs(src_tile, dest_tile);
+    m->hops = abs_diff(src_tile.x, dest_tile.x) +
             abs_diff(src_tile.y, dest_tile.y);
 
-    Core &core = dest_tile.cores[m.dest_core_offset];
-    core.messages_in.push_back(&m);
+    Core &core = dest_tile.cores[m->dest_core_offset];
+    core.messages_in.push_back(m);
 }
 
 void sanafe::MappedNeuron::build_neuron_processing_pipeline()
@@ -1028,16 +1055,18 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
             n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const int axon_address : n.axon_out_addresses)
     {
-        Message m(total_messages_sent, *this, n, ts.timestep, axon_address);
+        MessagePtr m = std::make_shared<Message>(
+                total_messages_sent, *this, n, ts.timestep, axon_address);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
         axon_out_hw.energy += axon_out_hw.energy_access;
 
-        m.generation_delay = n.core->next_message_generation_delay +
+        m->generation_delay = n.core->next_message_generation_delay +
                 axon_out_hw.latency_access;
         n.core->next_message_generation_delay = 0.0;
 
-        ts.messages[n.core->id].push_back(m);
+        auto &message_queue = ts.messages;
+        message_queue[n.core->id].push_back(m);
         ++axon_out_hw.packets_out;
         ++total_messages_sent;
 
@@ -1672,10 +1701,8 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
     return;
 }
 
-void sanafe::SpikingChip::sim_timestep(
-        Timestep &ts, const TimingModel timing_model)
+void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
 {
-    Scheduler scheduler;
     std::chrono::high_resolution_clock timer;
 
     // Start the next time-step, clear all buffers
@@ -1690,23 +1717,17 @@ void sanafe::SpikingChip::sim_timestep(
     forced_updates(ts);
     auto message_processing_end_tm = timer.now();
 
-    scheduler.noc_width = noc_width;
-    scheduler.noc_height = noc_height;
-    scheduler.buffer_size = noc_buffer_size;
-    scheduler.core_count = core_count;
-    scheduler.max_cores_per_tile = max_cores_per_tile;
-
-    if (timing_model == TIMING_MODEL_SIMPLE)
+    if (scheduler.timing_model == TIMING_MODEL_SIMPLE)
     {
         TRACE1(CHIP, "Running simple timing model\n");
-        ts.sim_time = schedule_messages_simple(ts.messages, scheduler);
+        ts.sim_time = schedule_messages_simple(ts, scheduler);
     }
-    else if (timing_model == TIMING_MODEL_DETAILED)
+    else if (scheduler.timing_model == TIMING_MODEL_DETAILED)
     {
         TRACE1(CHIP, "Running detailed timing model\n");
-        ts.sim_time = schedule_messages(ts.messages, scheduler);
+        schedule_messages_detailed(ts, scheduler);
     }
-    else if (timing_model == TIMING_MODEL_CYCLE_ACCURATE)
+    else if (scheduler.timing_model == TIMING_MODEL_CYCLE_ACCURATE)
     {
         TRACE1(CHIP, "Running cycle-accurate timing model\n");
         if (chip_count > 1)
@@ -1721,12 +1742,11 @@ void sanafe::SpikingChip::sim_timestep(
                     "Error: Cannot run multiple simultaneous cycle-accurate "
                     "simulations.");
         }
-        ts.sim_time =
-                schedule_messages_cycle_accurate(ts.messages, *booksim_config);
+        ts.sim_time = schedule_messages_cycle_accurate(ts, *booksim_config);
     }
     else
     {
-        INFO("Error: Timing model:%d not recognized\n", timing_model);
+        INFO("Error: Timing model:%d not recognized\n", scheduler.timing_model);
         throw std::invalid_argument("Timing model not recognized");
     }
     auto scheduler_end = timer.now();
@@ -1777,7 +1797,8 @@ void sanafe::SpikingChip::sim_timestep(
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
-        : messages(std::vector<std::list<Message>>(core_count))
+        : messages(std::vector<std::list<MessagePtr>>(
+                  core_count))
         , timestep(ts)
 {
 }
@@ -2094,7 +2115,7 @@ void sanafe::SpikingChip::sim_reset_measurements()
             }
 
             // Reset the message buffer
-            c.messages_in = std::vector<Message *>();
+            c.messages_in = std::vector<MessagePtr>();
         }
     }
 
@@ -2291,31 +2312,31 @@ void sanafe::SpikingChip::sim_trace_record_perf(
 }
 
 void sanafe::SpikingChip::sim_trace_record_message(
-        std::ofstream &message_trace_file, const Message &m)
+        std::ofstream &message_trace_file, const MessagePtr &m)
 {
     assert(message_trace_file.is_open());
-    message_trace_file << m.timestep << ",";
-    message_trace_file << m.mid << ",";
-    message_trace_file << m.src_neuron_group_id << ".";
-    message_trace_file << m.src_neuron_id << ",";
-    message_trace_file << m.src_tile_id << "." << m.src_core_offset << ",";
+    message_trace_file << m->timestep << ",";
+    message_trace_file << m->mid << ",";
+    message_trace_file << m->src_neuron_group_id << ".";
+    message_trace_file << m->src_neuron_id << ",";
+    message_trace_file << m->src_tile_id << "." << m->src_core_offset << ",";
 
-    if (m.placeholder)
+    if (m->placeholder)
     {
         message_trace_file << "x.x,";
     }
     else
     {
-        message_trace_file << m.dest_tile_id << ".";
-        message_trace_file << m.dest_core_offset << ",";
+        message_trace_file << m->dest_tile_id << ".";
+        message_trace_file << m->dest_core_offset << ",";
     }
 
-    message_trace_file << m.hops << ",";
-    message_trace_file << m.spikes << ",";
-    message_trace_file << m.generation_delay << ",";
-    message_trace_file << m.network_delay << ",";
-    message_trace_file << m.receive_delay << ",";
-    message_trace_file << m.blocked_delay;
+    message_trace_file << m->hops << ",";
+    message_trace_file << m->spikes << ",";
+    message_trace_file << m->generation_delay << ",";
+    message_trace_file << m->network_delay << ",";
+    message_trace_file << m->receive_delay << ",";
+    message_trace_file << m->blocked_delay;
     message_trace_file << std::endl;
 }
 
