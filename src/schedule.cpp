@@ -19,10 +19,10 @@
 
 #include <booksim_lib.hpp>
 
+#include "chip.hpp"
 #include "network.hpp"
 #include "print.hpp"
 #include "schedule.hpp"
-#include "chip.hpp"
 
 sanafe::NocInfo::NocInfo(const int width, const int height,
         const int core_count, const size_t max_cores_per_tile)
@@ -36,13 +36,13 @@ sanafe::NocInfo::NocInfo(const int width, const int height,
 double sanafe::schedule_messages_simple(
         Timestep &ts, const Scheduler &scheduler)
 {
-    const size_t cores = ts.messages.size();
+    const size_t cores = ts.messages->size();
     std::vector<double> neuron_processing_latencies(cores, 0.0);
     std::vector<double> message_processing_latencies(cores, 0.0);
-    for (size_t sending_core = 0; sending_core < ts.messages.size();
+    for (size_t sending_core = 0; sending_core < ts.messages->size();
             ++sending_core)
     {
-        std::list<Message> &q = ts.messages.at(sending_core);
+        std::list<Message> &q = ts.messages->at(sending_core);
         for (Message &m : q)
         {
             neuron_processing_latencies[sending_core] += m.generation_delay;
@@ -62,7 +62,7 @@ double sanafe::schedule_messages_simple(
 double sanafe::schedule_messages_cycle_accurate(
         Timestep &ts, const BookSimConfig &config)
 {
-    for (auto &core_messages : ts.messages)
+    for (auto &core_messages : *(ts.messages))
     {
         for (auto &message : core_messages)
         {
@@ -107,7 +107,8 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
     }
     else
     {
-        INFO("Pushing timestep:%ld to be scheduled\n", ts.timestep);
+        TRACE1(SCHEDULER, "Pushing timestep:%ld to be scheduled\n",
+                ts.timestep);
         scheduler.timesteps_to_schedule.push(ts);
         return;
     }
@@ -115,7 +116,6 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
 
 void sanafe::schedule_messages_task(sanafe::Scheduler &scheduler, const int tid)
 {
-    // TODO: support graceful termination
     while (!scheduler.should_stop)
     {
         if (scheduler.should_stop)
@@ -123,31 +123,28 @@ void sanafe::schedule_messages_task(sanafe::Scheduler &scheduler, const int tid)
             break;
         }
 
-        //INFO("tid:%d Waiting for input\n", tid);
         Timestep ts;
         bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
         if (got_ts)
         {
-            INFO("tid:%d Scheduling timestep:%ld\n", tid,ts.timestep);
-            schedule_messages_timestep(ts, scheduler);
-            INFO("tid:%d Writing timestep:%ld\n", tid, ts.timestep);
-            INFO("tid:%d storing ts with size:%zu and %zu elems\n", tid, sizeof(ts),
-                    ts.messages.size());
+            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", tid,ts.timestep);
+            ts.sim_time = schedule_messages_timestep(ts, scheduler);
+            TRACE1(SCHEDULER, "tid:%d storing ts, time:%e\n", tid, ts.sim_time);
             scheduler.timesteps_to_write.push(ts);
         }
     }
 
-    // Clean up if needed before terminating
-    INFO("Scheduler thread terminating gracefully\n");
+    TRACE1(SCHEDULER, "Scheduler thread tid:%d terminating gracefully\n", tid);
     return;
 }
 
-void sanafe::schedule_stop_all_threads(sanafe::Scheduler &scheduler)
+void sanafe::schedule_stop_all_threads(sanafe::Scheduler &scheduler,
+        std::ofstream &message_trace, sanafe::RunData &rd)
 {
-    INFO("Stopping all threads.\n");
-    // TODO: need to wait until all messages have been scheduled
+    TRACE1(SCHEDULER, "Stopping all threads.\n");
     scheduler.timesteps_to_schedule.wait_until_empty();
-    INFO("All messages scheduled so terminate threads.\n");
+    // TODO: wait until all messages written to file as well
+    TRACE1(SCHEDULER, "All messages scheduled so terminate threads.\n");
     scheduler.should_stop = true;
     scheduler.timesteps_to_schedule.set_terminate();
     scheduler.timesteps_to_write.set_terminate();
@@ -181,9 +178,9 @@ double sanafe::schedule_messages_timestep(
     noc.message_density = std::vector<double>(total_links, 0.0);
 
     std::vector<MessageFifo> messages_sent_per_core(noc.core_count);
-    for (size_t core = 0; core < ts.messages.size(); core++)
+    for (size_t core = 0; core < ts.messages->size(); core++)
     {
-        auto &q = ts.messages.at(core);
+        auto &q = ts.messages->at(core);
         for (Message &m : q)
         {
             messages_sent_per_core[core].push_back(m);

@@ -211,7 +211,8 @@ int main(int argc, char *argv[])
 // Project TODOs and wishlist roughly in priority order
 //
 // ** New simulator features **
-// TODO: improve multithreaded support, especially for the scheduler
+// TODO: Support multithreaded scheduling with dynamic scaling
+// TODO: Add support for Fugu and Lava frameworks as extra (optional) dependencies
 // ** Misc **
 // TODO: Update and extend tutorials using Jupyter notebooks
 // TODO: Improve plug-in documentation

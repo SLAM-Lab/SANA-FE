@@ -79,6 +79,8 @@ enum TimingModel : int
 };
 
 constexpr long int default_heartbeat_timesteps = 100L;
+constexpr int schedule_thread_count = 2;
+
 class SpikingChip
 {
 public:
@@ -128,8 +130,8 @@ private:
     static std::atomic<int> chip_count;
     double neuron_processing_wall{0.0};
     double message_processing_wall{0.0};
+    double energy_stats_wall{0.0};
     double scheduler_wall{0.0};
-    double other_stats_wall{0.0};
 
     // Flags and filestreams
     bool spike_trace_enabled{false};
@@ -181,10 +183,11 @@ private:
     void sim_trace_write_message_header(std::ofstream &message_trace_file);
     void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps);
     void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep);
-    void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
     void sim_trace_record_perf(std::ofstream &out, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
 };
+
+void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
 
 struct RunData
 {
@@ -208,8 +211,7 @@ struct RunData
 constexpr long int invalid_timestep = -1L;
 struct Timestep
 {
-    // Is outer shared_ptr really needed?
-    std::vector<std::list<Message>> messages{};
+    std::shared_ptr<std::vector<std::list<Message>>> messages{};
     long int timestep{invalid_timestep};
     long int spike_count{0L};
     long int total_hops{0L};

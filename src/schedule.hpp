@@ -200,7 +200,7 @@ double schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &confi
 
 
 void schedule_messages_task(Scheduler &scheduler, const int tid);
-void schedule_stop_all_threads(Scheduler &scheduler);
+void schedule_stop_all_threads(Scheduler &scheduler, std::ofstream &message_trace, RunData &rd);
 
 double schedule_messages_timestep(Timestep &ts, const Scheduler &scheduler);
 void schedule_update_noc_message_counts(const Message &m, NocInfo &noc, bool message_in);

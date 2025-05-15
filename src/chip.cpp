@@ -299,10 +299,10 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     // TOOD: for now, hard code the number of threads. Then calculate the
     //  hard-coded thread count. The finally allow threads to dynamically change
     //  based on performance
-    constexpr int schedule_thread_count = 12;
+    INFO("Creating %d scheduler threads\n", schedule_thread_count);
     for (int tid = 0; tid < schedule_thread_count; tid++)
     {
-        INFO("Created scheduler thread:%d\n", tid);
+        TRACE1(CHIP, "Created scheduler thread:%d\n", tid);
         scheduler.scheduler_threads.emplace_back(
                 &schedule_messages_task, std::ref(scheduler), tid);
     }
@@ -335,9 +335,80 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
             // Print a heart-beat message to show that the simulation is running
             INFO("*** Time-step %ld ***\n", timestep);
         }
-        const Timestep ts = step(scheduler);
-        TRACE1(CHIP, "Neurons fired in ts:%ld: %zu\n", timestep,
-                ts.neurons_fired);
+        // TODO: this is a mess, we shouldn't get the timestep until its ready
+        //  to be written. We need a single flow for both cases - when doing
+        //  everything on one thread, and otherwise
+        Timestep ts = step(scheduler);
+
+        // TODO: every step makes sure we write any pending timesteps to file
+        if (schedule_thread_count > 0)
+        {
+            while (scheduler.timesteps_to_write.try_pop(ts))
+            {
+                if (message_trace_enabled)
+                {
+                    for (auto &q : *(ts.messages))
+                    {
+                        for (Message &m : q)
+                        {
+                            sim_trace_record_message(message_trace, m);
+                        }
+                    }
+                }
+                //INFO("Saving ts:%ld\n", ts.timestep);
+                total_sim_time += ts.sim_time;
+                rd.total_energy += ts.total_energy;
+                rd.synapse_energy += ts.synapse_energy;
+                rd.dendrite_energy += ts.dendrite_energy;
+                rd.soma_energy += ts.soma_energy;
+                rd.network_energy += ts.network_energy;
+                rd.sim_time += ts.sim_time;
+                rd.spikes += ts.spike_count;
+                rd.packets_sent += ts.packets_sent;
+                rd.neurons_fired += ts.neurons_fired;
+                rd.wall_time = wall_time;
+
+            }
+        }
+        else // All on one thread
+        {
+            TRACE1(CHIP, "Neurons fired in ts:%ld: %zu\n", timestep,
+            ts.neurons_fired);
+            rd.total_energy += ts.total_energy;
+            rd.synapse_energy += ts.synapse_energy;
+            rd.dendrite_energy += ts.dendrite_energy;
+            rd.soma_energy += ts.soma_energy;
+            rd.network_energy += ts.network_energy;
+            rd.sim_time += ts.sim_time;
+            rd.spikes += ts.spike_count;
+            rd.packets_sent += ts.packets_sent;
+            rd.neurons_fired += ts.neurons_fired;
+            rd.wall_time = wall_time;
+        }
+    }
+
+    schedule_stop_all_threads(scheduler, message_trace, rd);
+
+    while (!scheduler.timesteps_to_write.empty())
+    {
+        Timestep ts;
+        scheduler.timesteps_to_write.pop(ts);
+        if (message_trace_enabled)
+        {
+            for (auto &q : *(ts.messages))
+            {
+                for (const Message &m : q)
+                {
+                    sim_trace_record_message(message_trace, m);
+                }
+            }
+        }
+        TRACE1(SCHEDULER, "Saving ts:%ld sim_time:%e total:%e\n", ts.timestep,
+                ts.sim_time, rd.sim_time);
+        // TODO: its confusing how we have chip-wide arguments and then a
+        //  separately maintained RunData struct? Surely these should match
+        //  better / just be kept in one place. Maybe get rid of total_sim_time
+        total_sim_time += ts.sim_time;
         rd.total_energy += ts.total_energy;
         rd.synapse_energy += ts.synapse_energy;
         rd.dendrite_energy += ts.dendrite_energy;
@@ -347,14 +418,7 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         rd.spikes += ts.spike_count;
         rd.packets_sent += ts.packets_sent;
         rd.neurons_fired += ts.neurons_fired;
-        rd.wall_time = wall_time;
-
-        // TODO: every step makes sure we write any pending timesteps to file
     }
-
-    // TODO: here, make sure all threads have finished and also all timesteps
-    //   have been written before finishing the simulation run
-    schedule_stop_all_threads(scheduler);
 
     return rd;
 }
@@ -382,7 +446,12 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     soma_energy += ts.soma_energy;
     network_energy += ts.network_energy;
 
-    total_sim_time += ts.sim_time;
+    // TODO: this becomes a bit messier now that we schedule the ts timings
+    //  asynchronously. Need to figure this out as well
+    if (schedule_thread_count == 0)
+    {
+        total_sim_time += ts.sim_time;
+    }
     total_spikes += ts.spike_count;
     total_neurons_fired += ts.neurons_fired;
     // The total_messages_sent is incremented during the simulation since it's
@@ -399,19 +468,21 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     {
         sim_trace_record_perf(perf_trace, ts);
     }
-    if (message_trace_enabled)
-    {
-        auto &message_queue = ts.messages;
-        for (const auto &q : message_queue)
-        {
-            for (const auto &m : q)
-            {
-                // Ignore dummy messages (without a destination). These account
-                //  for processing that doesn't result in a spike being sent
-                sim_trace_record_message(message_trace, m);
-            }
-        }
-    }
+    // if (message_trace_enabled)
+    // {
+    //     // TODO: we can't do this anymore, we need to wait until the timestep
+    //     //  has been scheduled
+    //     auto &message_queue = ts.messages;
+    //     for (const auto &q : message_queue)
+    //     {
+    //         for (const auto &m : q)
+    //         {
+    //             // Ignore dummy messages (without a destination). These account
+    //             //  for processing that doesn't result in a spike being sent
+    //             sim_trace_record_message(message_trace, m);
+    //         }
+    //     }
+    // }
     wall_time += ts_elapsed;
 
     return ts;
@@ -483,7 +554,7 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
                     Message(placeholder_mid, *this, last_neuron, ts.timestep);
             placeholder.generation_delay = core.next_message_generation_delay;
             // Create a dummy placeholder message
-            auto &message_queue = ts.messages;
+            auto &message_queue = *(ts.messages);
             message_queue[core.id].push_back(placeholder);
         }
     }
@@ -493,7 +564,7 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
 {
     // Assign outgoing spike messages to their respective destination
     //  cores, and calculate network costs
-    auto &message_queue = ts.messages;
+    auto &message_queue = *(ts.messages);
     for (auto &q : message_queue)
     {
         for (auto &m : q)
@@ -1064,7 +1135,7 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
                 axon_out_hw.latency_access;
         n.core->next_message_generation_delay = 0.0;
 
-        auto &message_queue = ts.messages;
+        auto &message_queue = *(ts.messages);
         message_queue[n.core->id].push_back(m);
         ++axon_out_hw.packets_out;
         ++total_messages_sent;
@@ -1586,8 +1657,10 @@ void sanafe::SpikingChip::sim_format_run_summary(
     out << "  message_processing: " << std::fixed << message_processing_wall
         << "\n";
     out << "  scheduler: " << std::fixed << scheduler_wall << "\n";
+    out << "  energy: " << std::fixed << energy_stats_wall << "\n";
     double misc_wall = run_data.wall_time -
-            (neuron_processing_wall + message_processing_wall + scheduler_wall);
+            (neuron_processing_wall + message_processing_wall + scheduler_wall +
+                    energy_stats_wall);
     out << "  misc: " << std::fixed << misc_wall << "\n";
     out << "  total: " << std::fixed << run_data.wall_time << "\n";
 }
@@ -1709,12 +1782,34 @@ void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
     ts = Timestep(ts.timestep, core_count);
     sim_reset_measurements();
 
-    auto start_tm = timer.now();
+    auto neuron_processing_start_tm = timer.now();
     process_neurons(ts);
     auto neuron_processing_end_tm = timer.now();
+    auto message_processing_start_tm = neuron_processing_end_tm;
     process_messages(ts);
     forced_updates(ts);
     auto message_processing_end_tm = timer.now();
+    auto energy_calculation_start_tm = message_processing_end_tm;
+    sim_calculate_energy(ts);
+    for (auto &tile : tiles)
+    {
+        ts.total_hops += tile.hops;
+        for (auto &c : tile.cores)
+        {
+            for (const auto &hw : c.pipeline_hw)
+            {
+                ts.spike_count += hw->spikes_processed;
+                ts.neurons_fired += hw->neurons_fired;
+            }
+            for (const auto &axon_out : c.axon_out_hw)
+            {
+                ts.packets_sent += axon_out.packets_out;
+            }
+        }
+    }
+    TRACE1(CHIP, "Spikes sent: %ld\n", ts.spike_count);
+    auto energy_calculation_end_tm = timer.now();
+    auto scheduler_start_tm = energy_calculation_end_tm;
 
     if (scheduler.timing_model == TIMING_MODEL_SIMPLE)
     {
@@ -1748,55 +1843,36 @@ void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
         INFO("Error: Timing model:%d not recognized\n", scheduler.timing_model);
         throw std::invalid_argument("Timing model not recognized");
     }
-    auto scheduler_end = timer.now();
-
-    sim_calculate_energy(ts);
-    for (auto &tile : tiles)
-    {
-        ts.total_hops += tile.hops;
-        for (auto &c : tile.cores)
-        {
-            for (const auto &hw : c.pipeline_hw)
-            {
-                ts.spike_count += hw->spikes_processed;
-                ts.neurons_fired += hw->neurons_fired;
-            }
-            for (const auto &axon_out : c.axon_out_hw)
-            {
-                ts.packets_sent += axon_out.packets_out;
-            }
-        }
-    }
-    TRACE1(CHIP, "Spikes sent: %ld\n", ts.spike_count);
-    auto profile_end = timer.now();
+    auto scheduler_end_tm = timer.now();
 
     // Calculate various simulator timings
     constexpr double ns_to_second = 1.0e-9;
     neuron_processing_wall +=
             std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    neuron_processing_end_tm - start_tm)
+                    neuron_processing_end_tm - neuron_processing_start_tm)
                     .count() *
             ns_to_second;
     message_processing_wall +=
             std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    message_processing_end_tm - neuron_processing_end_tm)
+                    message_processing_end_tm - message_processing_start_tm)
                     .count() *
             ns_to_second;
     scheduler_wall += std::chrono::duration_cast<std::chrono::nanoseconds>(
-                              scheduler_end - message_processing_end_tm)
+                              scheduler_end_tm - scheduler_start_tm)
                               .count() *
             ns_to_second;
-    other_stats_wall += std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                profile_end - scheduler_end)
-                                .count() *
+    energy_stats_wall +=
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    energy_calculation_end_tm - energy_calculation_start_tm)
+                    .count() *
             ns_to_second;
-    TRACE1(CHIP, "neuron:%e message:%e scheduler:%e stats:%e\n",
+    TRACE1(CHIP, "neuron:%e message:%e scheduler:%e energy:%e\n",
             neuron_processing_wall, message_processing_wall, scheduler_wall,
-            other_stats_wall);
+            energy_stats_wall);
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
-        : messages(std::vector<std::list<Message>>(
+        : messages(std::make_shared<std::vector<std::list<Message>>>(
                   core_count))
         , timestep(ts)
 {
@@ -2310,7 +2386,7 @@ void sanafe::SpikingChip::sim_trace_record_perf(
     perf_trace_file << "\n";
 }
 
-void sanafe::SpikingChip::sim_trace_record_message(
+void sanafe::sim_trace_record_message(
         std::ofstream &message_trace_file, const Message &m)
 {
     assert(message_trace_file.is_open());
