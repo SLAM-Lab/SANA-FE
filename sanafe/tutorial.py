@@ -157,7 +157,6 @@ def check_exercise_snns_4(snn):
 def check_api(snn):
     check_exercise_api_1(snn)
     check_exercise_api_2(snn)
-    check_exercise_api_3(snn)
 
 
 def check_exercise_api_1(snn):
@@ -172,19 +171,21 @@ def check_exercise_api_1(snn):
 
 
 def check_exercise_api_2(snn):
-    # Run and check we get the right number of spikes due to changing the bias
-    pass
-
-
-def check_exercise_api_3(snn):
     in_layer = snn["in"]
     neuron = in_layer[0]
     connections_out = in_layer[0].edges_out
+
     if (len(connections_out) != 2 or
         connections_out[0].post_neuron.group_name != "out" or
         connections_out[1].post_neuron.group_name != "out"):
         print(f"{red_text}Exercise 2: FAIL - Should be 2 edges out of in.0, "
-              f"to the output layer, found {connections_out}{default_text}")
+              f"to the output layer, found {len(connections_out)}{default_text}")
+        return
+
+    synapse_attributes = connections_out[1].synapse_attributes
+    if (synapse_attributes.get("w") not in (-2, -2.0) and
+        synapse_attributes.get("weight") not in (-2, -2.0)):
+        print(f"{red_text}Exercise 2: FAIL - in.0 weight should be -2{default_text}")
         return
 
     connections_out = in_layer[1].edges_out
@@ -195,8 +196,10 @@ def check_exercise_api_3(snn):
               f"out.1, found {len(connections_out)}{default_text}")
         return
 
-    # TODO: run the SNN and check the outputs match expected values, but how
-    #  can we check the weights are right without probing the value?
+    synapse_attributes = connections_out[0].synapse_attributes
+    if (synapse_attributes.get("w") not in (3, 3.0) and
+        synapse_attributes.get("weight") not in (3, 3.0)):
+        print(f"{red_text}Exercise 2: FAIL - in.0 weight should be 3{default_text}")
+        return
 
     print(f"{green_text}Exercise 2: PASS{default_text}")
-

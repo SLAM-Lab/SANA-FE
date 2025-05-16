@@ -163,6 +163,82 @@ sanafe::ModelAttribute pyobject_to_model_attribute(
 
     return attribute;
 }
+
+pybind11::object pymodel_attribute_to_pyobject(
+        const sanafe::ModelAttribute &attribute)
+{
+    if (std::holds_alternative<bool>(attribute.value))
+    {
+        auto bool_value = static_cast<bool>(attribute);
+        return pybind11::cast(bool_value);
+    }
+    else if (std::holds_alternative<int>(attribute.value))
+    {
+        auto int_value = static_cast<int>(attribute);
+        return pybind11::cast(int_value);
+    }
+    else if (std::holds_alternative<double>(attribute.value))
+    {
+        auto float_val = static_cast<double>(attribute);
+        return pybind11::cast(float_val);
+    }
+    else if (std::holds_alternative<std::string>(attribute.value))
+    {
+        auto str_value = static_cast<std::string>(attribute);
+        return pybind11::cast(str_value);
+    }
+    else if (std::holds_alternative<std::vector<sanafe::ModelAttribute>>(
+                     attribute.value))
+    {
+        auto attribute_vec =
+                static_cast<std::vector<sanafe::ModelAttribute>>(attribute);
+        // If the vector of sub-attributes is either empty, or seems to be
+        //  named attributes (i.e., a mapping)
+        if (!attribute_vec.empty() && attribute_vec[0].name.has_value())
+        {
+            pybind11::dict pydict{};
+            for (const auto &sub_attribute : attribute_vec)
+            {
+                if (!sub_attribute.name.has_value())
+                {
+                    INFO("Error: Sub-attribute is unnamed in mapping.\n");
+                    throw std::runtime_error(
+                            "Error: Sub-attribute is unnamed.\n");
+                }
+                pydict[pybind11::str(sub_attribute.name.value())] =
+                        pymodel_attribute_to_pyobject(sub_attribute);
+            }
+            return pydict;
+        }
+        else
+        {
+            pybind11::list pylist{};
+            for (const auto &sub_attribute : attribute_vec)
+            {
+                pylist.append(pymodel_attribute_to_pyobject(sub_attribute));
+            }
+            return pylist;
+        }
+    }
+
+    throw std::runtime_error("Unrecognized model attribute type\n");
+}
+
+pybind11::dict pymodel_attributes_to_pydict(
+        const std::map<std::string, sanafe::ModelAttribute> &model_attributes)
+{
+    pybind11::dict attribute_dict{};
+
+    for (const auto &[key, attribute] : model_attributes)
+    {
+        attribute_dict[pybind11::str(key)] =
+                pymodel_attribute_to_pyobject(attribute);
+    }
+
+    return attribute_dict;
+}
+
+
 void pyconnect_neurons_sparse(sanafe::NeuronGroup *self,
         sanafe::NeuronGroup &dest_group, const pybind11::dict attributes,
         const pybind11::list &src_dest_id_pairs)
@@ -771,6 +847,11 @@ PYBIND11_MODULE(sanafecpp, m)
             .def_readonly("post_neuron", &sanafe::Connection::post_neuron)
             .def_readonly(
                     "synapse_hw_name", &sanafe::Connection::synapse_hw_name)
+            .def_property_readonly("synapse_attributes",
+                    [](const sanafe::Connection &self) -> pybind11::object {
+                        return pymodel_attributes_to_pydict(
+                                self.synapse_attributes);
+                    })
             .def("__repr__", &sanafe::Connection::info);
 
     pybind11::class_<sanafe::NeuronAddress>(m, "NeuronAddress")
