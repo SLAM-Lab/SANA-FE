@@ -21,6 +21,38 @@
 #include "network.hpp"
 #include "print.hpp"
 
+std::string sanafe::NeuronAddress::info() const
+{
+    std::ostringstream ss;
+    ss << "sanafe::NeuronAddress(group_name=" << group_name;
+    if (neuron_offset.has_value())
+    {
+        ss << " neuron_offset=" << neuron_offset.value();
+    }
+    ss << ")";
+
+    return ss.str();
+}
+
+std::string sanafe::Connection::info() const
+{
+    std::ostringstream ss;
+    ss << "sanafe::Connection(pre_neuron=" << pre_neuron.group_name;
+    if (pre_neuron.neuron_offset.has_value())
+    {
+        ss << "." << pre_neuron.neuron_offset.value();
+    }
+
+    ss << " post_neuron=" << post_neuron.group_name;
+    if (post_neuron.neuron_offset.has_value())
+    {
+        ss << "." << post_neuron.neuron_offset.value();
+    }
+    ss << ")";
+
+    return ss.str();
+}
+
 sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
         SpikingNetwork &net, const size_t neuron_count,
         const NeuronConfiguration &default_config)

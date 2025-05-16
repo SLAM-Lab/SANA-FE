@@ -292,6 +292,10 @@ void sanafe::SpikingChip::retire_scheduled_messages(
         Timestep ts;
         scheduler.timesteps_to_write.pop(ts);
         TRACE1(CHIP, "retiring ts:%ld\n", ts.timestep);
+        if (perf_trace_enabled)
+        {
+            sim_trace_record_perf(perf_trace, ts);
+        }
         if (message_trace_enabled)
         {
             for (auto &q : *(ts.messages))
@@ -417,10 +421,6 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     if (potential_trace_enabled)
     {
         sim_trace_record_potentials(potential_trace, total_timesteps);
-    }
-    if (perf_trace_enabled)
-    {
-        sim_trace_record_perf(perf_trace, ts);
     }
     wall_time += ts_elapsed;
 
@@ -2139,7 +2139,8 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
             }
         }
     }
-    potential_trace_file << std::endl;
+    potential_trace_file << "\n";
+    potential_trace_file.flush();
 }
 
 std::map<std::string, double>
@@ -2210,6 +2211,7 @@ void sanafe::SpikingChip::sim_trace_write_perf_header(
         perf_trace_file << "," << name;
     }
     perf_trace_file << "\n";
+    perf_trace_file.flush();
 }
 
 void sanafe::SpikingChip::sim_trace_write_message_header(
@@ -2226,8 +2228,8 @@ void sanafe::SpikingChip::sim_trace_write_message_header(
     message_trace_file << "generation_latency,";
     message_trace_file << "network_latency,";
     message_trace_file << "processing_latency,";
-    message_trace_file << "blocking_latency";
-    message_trace_file << std::endl;
+    message_trace_file << "blocking_latency\n";
+    message_trace_file.flush();
 }
 
 void sanafe::SpikingChip::sim_trace_record_spikes(
@@ -2245,7 +2247,8 @@ void sanafe::SpikingChip::sim_trace_record_spikes(
                 spike_trace_file << neuron->parent_group_name << ".";
                 spike_trace_file << neuron->id << ",";
                 spike_trace_file << timestep;
-                spike_trace_file << std::endl;
+                spike_trace_file << "\n";
+                spike_trace_file.flush();
             }
         }
     }
@@ -2278,7 +2281,8 @@ void sanafe::SpikingChip::sim_trace_record_potentials(
     // Each timestep takes up a line in the respective csv file
     if (potential_probe_count > 0)
     {
-        potential_trace_file << std::endl;
+        potential_trace_file << "\n";
+        potential_trace_file.flush();
     }
 }
 
@@ -2301,6 +2305,7 @@ void sanafe::SpikingChip::sim_trace_record_perf(
         perf_trace_file << "," << std::scientific << trace;
     }
     perf_trace_file << "\n";
+    perf_trace_file.flush();
 }
 
 void sanafe::sim_trace_record_message(
@@ -2328,8 +2333,8 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.generation_delay << ",";
     message_trace_file << m.network_delay << ",";
     message_trace_file << m.receive_delay << ",";
-    message_trace_file << m.blocked_delay;
-    message_trace_file << std::endl;
+    message_trace_file << m.blocked_delay << "\n";
+    message_trace_file.flush();
 }
 
 double sanafe::calculate_elapsed_time(

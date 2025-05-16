@@ -58,6 +58,7 @@ struct NeuronAddress
 {
     std::string group_name{};
     std::optional<size_t> neuron_offset{std::nullopt};
+    [[nodiscard]] std::string info() const;
 };
 
 struct Conv2DParameters
@@ -159,6 +160,7 @@ struct Connection
     int id;
 
     Connection(size_t id) : id(id) {}
+    [[nodiscard]] std::string info() const;
 };
 
 SpikingNetwork load_net(const std::filesystem::path &path, Architecture &arch, bool use_netlist_format = false);

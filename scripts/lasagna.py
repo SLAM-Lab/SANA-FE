@@ -111,13 +111,13 @@ hidden_layer = network.create_neuron_group("hidden", hidden_neurons)
 out_layer = network.create_neuron_group("out", out_neurons)
 
 print("Creating input layer")
-for id, neuron in enumerate(in_layer.neurons):
+for id, neuron in enumerate(in_layer):
     neuron.configure(soma_hw_name=f"input[{id}]",
                             log_spikes=True)
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 print("Creating hidden layer")
-for id, neuron in enumerate(hidden_layer.neurons):
+for id, neuron in enumerate(hidden_layer):
     hidden_parameters = {
         "threshold": 1.0,
         "leak_decay": 0.85,
@@ -141,7 +141,7 @@ for id, neuron in enumerate(hidden_layer.neurons):
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 print("Creating output layer")
-for id, neuron in enumerate(out_layer.neurons):
+for id, neuron in enumerate(out_layer):
     if dataset == "shd":
         neuron.configure(soma_hw_name=f"loihi",
                          log_potential=True,
@@ -172,8 +172,8 @@ for src in range(in_neurons):
     for dst in range(hidden_neurons):
         weight = weights["fc1.weight"][dst, src]
         if abs(weight) > min_weight:
-            network.groups["in"].neurons[src].connect_to_neuron(
-                network.groups["hidden"].neurons[dst], {"weight": weight})
+            network["in"][src].connect_to_neuron(
+                network["hidden"][dst], {"weight": weight})
 
 if dataset == "shd":  # Add recurrent connections only for spiking digits
     print("Adding recurrent connections")
@@ -181,8 +181,8 @@ if dataset == "shd":  # Add recurrent connections only for spiking digits
         for dst in range(hidden_neurons):
             weight = weights["fcr.weight"][dst, src]
             if abs(weight) > min_weight:
-                network.groups["hidden"].neurons[src].connect_to_neuron(
-                    network.groups["hidden"].neurons[dst], {"weight": weight}
+                network["hidden"][src].connect_to_neuron(
+                    network["hidden"][dst], {"weight": weight}
                 )
 
 print("Adding second layer connections")
@@ -190,8 +190,8 @@ for src in range(hidden_neurons):
     for dst in range(out_neurons):
         weight = weights["fc2.weight"][dst, src]
         if abs(weight) > min_weight:
-            network.groups["hidden"].neurons[src].connect_to_neuron(
-                network.groups["out"].neurons[dst], {"weight": weight})
+            network["hidden"][src].connect_to_neuron(
+                network["out"][dst], {"weight": weight})
 
 # Run a simulation
 print("Building h/w")
