@@ -58,7 +58,7 @@ enum BufferPosition : int
 
 struct ModelInfo
 {
-    std::map<std::string, ModelParam> model_parameters{};
+    std::map<std::string, ModelAttribute> model_attributes{};
     std::optional<std::filesystem::path> plugin_library_path{};
     std::string name;
     bool log_energy{false};

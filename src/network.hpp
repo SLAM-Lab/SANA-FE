@@ -39,11 +39,11 @@ struct Connection;
 struct Synapse;
 struct NeuronAddress;
 // Models
-struct ModelParam;
+struct ModelAttribute;
 
 struct NeuronConfiguration
 {
-    std::map<std::string, ModelParam> model_parameters{};
+    std::map<std::string, ModelAttribute> model_attributes{};
     std::optional<std::string> soma_hw_name{};
     std::optional<std::string> default_synapse_hw_name{};
     std::optional<std::string> dendrite_hw_name{};
@@ -77,7 +77,7 @@ class Neuron
 {
 public:
     std::vector<Connection> edges_out;
-    std::map<std::string, ModelParam> model_parameters;
+    std::map<std::string, ModelAttribute> model_attributes;
     std::string soma_hw_name{};
     std::string default_synapse_hw_name{};
     std::string dendrite_hw_name{};
@@ -104,7 +104,7 @@ public:
 class NeuronGroup
 {
 public:
-    // A neuron group is a collection of neurons that share common parameters
+    // A neuron group is a collection of neurons that share common attributes
     std::vector<Neuron> neurons;
     NeuronConfiguration default_neuron_config;
     std::string name;
@@ -112,9 +112,9 @@ public:
     [[nodiscard]] std::string get_name() const { return name; }
     explicit NeuronGroup(const std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronConfiguration &default_config);
 
-    void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists);
-    void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
-    void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelParam>> &attribute_lists, const Conv2DParameters &convolution);
+    void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists);
+    void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
+    void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const Conv2DParameters &convolution);
     [[nodiscard]] std::string info() const;
 };
 
@@ -152,8 +152,8 @@ private:
 
 struct Connection
 {
-    std::map<std::string, ModelParam> synapse_params;
-    std::map<std::string, ModelParam> dendrite_params;
+    std::map<std::string, ModelAttribute> synapse_attributes;
+    std::map<std::string, ModelAttribute> dendrite_attributes;
     std::string synapse_hw_name{};
     NeuronAddress pre_neuron{};
     NeuronAddress post_neuron{};

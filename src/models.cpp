@@ -33,8 +33,8 @@ sanafe::PipelineResult sanafe::CurrentBasedSynapseModel::update(
 }
 
 void sanafe::CurrentBasedSynapseModel::set_attribute_edge(
-        const size_t synapse_address, const std::string &param_name,
-        const ModelParam &param)
+        const size_t synapse_address, const std::string &attribute_name,
+        const ModelAttribute &param)
 {
     if (weights.size() <= synapse_address)
     {
@@ -42,7 +42,7 @@ void sanafe::CurrentBasedSynapseModel::set_attribute_edge(
         weights.resize(std::max(weights.size() * 2, synapse_address + 1));
     }
 
-    if ((param_name == "w") || (param_name == "weight"))
+    if ((attribute_name == "w") || (attribute_name == "weight"))
     {
         TRACE1(MODELS, "Setting weight at address:%zu = %lf\n", synapse_address,
                 static_cast<double>(param));
@@ -58,7 +58,7 @@ void sanafe::CurrentBasedSynapseModel::reset()
 }
 
 sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
-    const size_t synapse_address, const bool read)
+        const size_t synapse_address, const bool read)
 {
     // TODO: add lookup table with different synapse read costs?
     // More detailed Loihi synaptic model
@@ -132,10 +132,10 @@ void sanafe::LoihiSynapseModel::reset()
     return;
 }
 
-void sanafe::LoihiSynapseModel::set_attribute_hw(const std::string &param_name,
-    const ModelParam &param)
+void sanafe::LoihiSynapseModel::set_attribute_hw(
+        const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (param_name == "latency_concurrent_access")
+    if (attribute_name == "latency_concurrent_access")
     {
         concurrent_access_latency = static_cast<double>(param);
     }
@@ -143,9 +143,8 @@ void sanafe::LoihiSynapseModel::set_attribute_hw(const std::string &param_name,
     return;
 }
 
-void sanafe::LoihiSynapseModel::set_attribute_edge(
-        const size_t synapse_address, const std::string &param_name,
-        const ModelParam &param)
+void sanafe::LoihiSynapseModel::set_attribute_edge(const size_t synapse_address,
+        const std::string &attribute_name, const ModelAttribute &param)
 {
     if (weights.size() <= synapse_address)
     {
@@ -161,21 +160,21 @@ void sanafe::LoihiSynapseModel::set_attribute_edge(
         groups.resize(synapse_address + 1, -1);
     }
 
-    if ((param_name == "w") || (param_name == "weight"))
+    if ((attribute_name == "w") || (attribute_name == "weight"))
     {
         TRACE1(MODELS, "Setting weight at address:%zu = %lf\n", synapse_address,
                 static_cast<double>(param));
         weights[synapse_address] = static_cast<double>(param);
     }
-    else if (param_name == "mixed")
+    else if (attribute_name == "mixed")
     {
         mixed_sign_mode = static_cast<bool>(param);
     }
-    else if (param_name == "latency")
+    else if (attribute_name == "latency")
     {
         costs[synapse_address] = static_cast<double>(param);
     }
-    else if (param_name == "g")
+    else if (attribute_name == "g")
     {
         groups[synapse_address] = static_cast<int>(param);
     }
@@ -193,9 +192,8 @@ void sanafe::LoihiSynapseModel::map_connection(MappedConnection &con)
 }
 
 // *** Dendrite models ***
-sanafe::PipelineResult sanafe::AccumulatorModel::update(
-        size_t neuron_address, std::optional<double> current,
-        std::optional<size_t> synapse_address)
+sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
+        std::optional<double> current, std::optional<size_t> synapse_address)
 {
     PipelineResult output;
 
@@ -216,17 +214,16 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(
 }
 
 void sanafe::AccumulatorModel::set_attribute_neuron(const size_t neuron_address,
-        const std::string &param_name, const ModelParam &param)
+        const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (param_name == "dendrite_leak_decay")
+    if (attribute_name == "dendrite_leak_decay")
     {
         leak_decay = static_cast<double>(param);
     }
 }
 
-sanafe::PipelineResult sanafe::MultiTapModel1D::update(
-        size_t neuron_address, std::optional<double> current,
-        std::optional<size_t> synapse_address)
+sanafe::PipelineResult sanafe::MultiTapModel1D::update(size_t neuron_address,
+        std::optional<double> current, std::optional<size_t> synapse_address)
 {
     while (timesteps_simulated < simulation_time)
     {
@@ -278,14 +275,14 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(
         {
             tap = synapse_to_tap[synapse_address.value()];
         }
-        if((tap < 0) || (static_cast<size_t>(tap) >= tap_voltages.size()))
+        if ((tap < 0) || (static_cast<size_t>(tap) >= tap_voltages.size()))
         {
-            std::string error("Error: tap should be >= 0 and less than taps.\n");
+            std::string error(
+                    "Error: tap should be >= 0 and less than taps.\n");
             throw std::logic_error(error);
         }
         tap_voltages[tap] += current.value();
-        TRACE2(MODELS, "Adding current:%lf to tap %d\n",
-                current.value(), tap);
+        TRACE2(MODELS, "Adding current:%lf to tap %d\n", current.value(), tap);
     }
 
     TRACE1(MODELS, "Tap voltages after update for address:%zu\n",
@@ -303,9 +300,9 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(
 }
 
 void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t address,
-        const std::string &param_name, const ModelParam &param)
+        const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (param_name == "taps")
+    if (attribute_name == "taps")
     {
         const size_t n_taps = static_cast<int>(param);
         if (n_taps == 0)
@@ -322,7 +319,7 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t address,
         time_constants.resize(n_taps);
         space_constants.resize(n_taps - 1);
     }
-    else if (param_name == "time_constants")
+    else if (attribute_name == "time_constants")
     {
         time_constants = static_cast<std::vector<double>>(param);
         const size_t n_taps = time_constants.size();
@@ -341,7 +338,7 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t address,
             space_constants.resize(n_taps - 1);
         }
     }
-    else if (param_name == "space_constants")
+    else if (attribute_name == "space_constants")
     {
         space_constants = static_cast<std::vector<double>>(param);
         const size_t n_taps = space_constants.size() + 1;
@@ -362,14 +359,15 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t address,
     }
     else
     {
-        INFO("Warning: attribute '%s' not recognized.\n", param_name.c_str());
+        INFO("Warning: attribute '%s' not recognized.\n",
+                attribute_name.c_str());
     }
 }
 
 void sanafe::MultiTapModel1D::set_attribute_edge(const size_t address,
-    const std::string &param_name, const ModelParam &param)
+        const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (param_name == "tap")
+    if (attribute_name == "tap")
     {
         // Each connection/synapse will specify a destination tap
         if (synapse_to_tap.size() <= address)
@@ -394,9 +392,9 @@ void sanafe::MultiTapModel1D::reset()
 
 // **** Soma hardware unit models ****
 void sanafe::LoihiLifModel::set_attribute_hw(
-        const std::string &param_name, const ModelParam &param)
+        const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (param_name == "noise")
+    if (attribute_name == "noise")
     {
         std::string noise_filename = static_cast<std::string>(param);
         noise_type = NOISE_FILE_STREAM;
@@ -414,57 +412,57 @@ void sanafe::LoihiLifModel::set_attribute_hw(
 }
 
 void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
-        const std::string &param_name, const ModelParam &param)
+        const std::string &attribute_name, const ModelAttribute &param)
 {
     LoihiCompartment &cx = compartments[neuron_address];
 
-    if (param_name == "threshold")
+    if (attribute_name == "threshold")
     {
         cx.threshold = static_cast<double>(param);
     }
-    else if (param_name == "reverse_threshold")
+    else if (attribute_name == "reverse_threshold")
     {
         cx.reverse_threshold = static_cast<double>(param);
     }
-    else if (param_name == "reset")
+    else if (attribute_name == "reset")
     {
         cx.reset = static_cast<double>(param);
     }
-    else if (param_name == "reverse_reset")
+    else if (attribute_name == "reverse_reset")
     {
         cx.reverse_reset = static_cast<double>(param);
     }
-    else if (param_name == "reset_mode")
+    else if (attribute_name == "reset_mode")
     {
         const std::string reset_mode_str = static_cast<std::string>(param);
         cx.reset_mode = model_parse_reset_mode(reset_mode_str);
     }
-    else if (param_name == "reverse_reset_mode")
+    else if (attribute_name == "reverse_reset_mode")
     {
         const std::string reverse_reset_mode_str =
                 static_cast<std::string>(param);
         cx.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
     }
-    else if (param_name == "leak_decay")
+    else if (attribute_name == "leak_decay")
     {
         cx.leak_decay = static_cast<double>(param);
     }
-    else if (param_name == "input_decay")
+    else if (attribute_name == "input_decay")
     {
         cx.input_decay = static_cast<double>(param);
     }
-    else if (param_name == "bias")
+    else if (attribute_name == "bias")
     {
         cx.bias = static_cast<double>(param);
         TRACE2(MODELS, "Setting bias of %zu=%lf\n", neuron_address, cx.bias);
     }
-    else if ((param_name == "force_update") ||
-            (param_name == "force_soma_update"))
+    else if ((attribute_name == "force_update") ||
+            (attribute_name == "force_soma_update"))
     {
         cx.force_update = static_cast<bool>(param);
     }
 
-    TRACE1(MODELS, "Set parameter: %s\n", param_name.c_str());
+    TRACE1(MODELS, "Set parameter: %s\n", attribute_name.c_str());
 }
 
 sanafe::PipelineResult sanafe::LoihiLifModel::update(
@@ -576,33 +574,33 @@ void sanafe::LoihiLifModel::reset()
 
 double sanafe::LoihiLifModel::loihi_generate_noise()
 {
-	int random_val = 0;
+    int random_val = 0;
 
-	if (noise_type == NOISE_FILE_STREAM)
-	{
-		// With a noise stream, we have a file containing a series of
-		//  random values. This is useful if we want to exactly
-		//  replicate h/w without knowing how the stream is generated.
-		//  We can record the random sequence and replicate it here
-		std::string noise_str;
-		// If we get to the end of the stream, by default reset it.
-		//  However, it is unlikely the stream will be correct at this
-		//  point
+    if (noise_type == NOISE_FILE_STREAM)
+    {
+        // With a noise stream, we have a file containing a series of
+        //  random values. This is useful if we want to exactly
+        //  replicate h/w without knowing how the stream is generated.
+        //  We can record the random sequence and replicate it here
+        std::string noise_str;
+        // If we get to the end of the stream, by default reset it.
+        //  However, it is unlikely the stream will be correct at this
+        //  point
         if (!noise_stream.is_open())
-		{
-			INFO("Error: Noise stream is not open.\n");
-			throw std::runtime_error("Noise stream is not open");
-		}
+        {
+            INFO("Error: Noise stream is not open.\n");
+            throw std::runtime_error("Noise stream is not open");
+        }
 
         // Peek ahead to see if we're at the end of the file without consuming
         if (noise_stream.eof() ||
                 (noise_stream.peek() == std::ifstream::traits_type::eof()))
         {
-			INFO("Warning: At the end of the noise stream. "
-			     "Random values are unlikely to be correct.\n");
-			noise_stream.clear();
+            INFO("Warning: At the end of the noise stream. "
+                 "Random values are unlikely to be correct.\n");
+            noise_stream.clear();
             noise_stream.seekg(0, std::ios::beg);
-		}
+        }
 
         if (std::getline(noise_stream, noise_str))
         {
@@ -624,65 +622,65 @@ double sanafe::LoihiLifModel::loihi_generate_noise()
             INFO("Error: Couldn't read noise entry from file\n");
             throw std::runtime_error("Couldn't read noise entry");
         }
-	}
+    }
     // else, don't generate any noise and return 0.0
 
-	// Get the number of noise bits required TODO: generalize
-	int sign_bit = random_val & 0x100;
-	random_val &= 0x7f; // TODO: hack, fixed for 8 bits
-	if (sign_bit)
-	{
-		// Sign extend
-		random_val |= ~(0x7f);
-	}
+    // Get the number of noise bits required TODO: generalize
+    int sign_bit = random_val & 0x100;
+    random_val &= 0x7f; // TODO: hack, fixed for 8 bits
+    if (sign_bit)
+    {
+        // Sign extend
+        random_val |= ~(0x7f);
+    }
 
-	return static_cast<double>(random_val);
+    return static_cast<double>(random_val);
 }
 
 void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,
-        const std::string &param_name, const ModelParam &param)
+        const std::string &attribute_name, const ModelAttribute &param)
 {
     TrueNorthNeuron &n = neurons[neuron_address];
-    if (param_name == "threshold")
+    if (attribute_name == "threshold")
     {
         n.threshold = static_cast<double>(param);
     }
-    else if (param_name == "reverse_threshold")
+    else if (attribute_name == "reverse_threshold")
     {
         n.reverse_threshold = static_cast<double>(param);
     }
-    else if (param_name == "reset")
+    else if (attribute_name == "reset")
     {
         n.reset = static_cast<double>(param);
     }
-    else if (param_name == "reverse_reset")
+    else if (attribute_name == "reverse_reset")
     {
         n.reverse_reset = static_cast<double>(param);
     }
-    else if (param_name == "reset_mode")
+    else if (attribute_name == "reset_mode")
     {
         const std::string reset_mode_str = static_cast<std::string>(param);
         n.reset_mode = model_parse_reset_mode(reset_mode_str);
     }
-    else if (param_name == "reverse_reset_mode")
+    else if (attribute_name == "reverse_reset_mode")
     {
         const std::string reverse_reset_mode_str =
                 static_cast<std::string>(param);
         n.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
     }
-    else if (param_name == "leak")
+    else if (attribute_name == "leak")
     {
         n.leak = static_cast<double>(param);
     }
-    else if (param_name == "bias")
+    else if (attribute_name == "bias")
     {
         n.bias = static_cast<double>(param);
     }
-    else if (param_name == "force_soma_update")
+    else if (attribute_name == "force_soma_update")
     {
         n.force_update = static_cast<bool>(param);
     }
-    else if (param_name == "leak_towards_zero")
+    else if (attribute_name == "leak_towards_zero")
     {
         n.leak_towards_zero = static_cast<bool>(param);
     }
@@ -781,22 +779,22 @@ sanafe::PipelineResult sanafe::TrueNorthModel::update(
 }
 
 void sanafe::InputModel::set_attribute_neuron(const size_t neuron_address,
-        const std::string &param_name, const ModelParam &param)
+        const std::string &attribute_name, const ModelAttribute &param)
 {
-    TRACE1(MODELS, "Setting attribute:%s\n", param_name.c_str());
-    if (param_name == "spikes")
+    TRACE1(MODELS, "Setting attribute:%s\n", attribute_name.c_str());
+    if (attribute_name == "spikes")
     {
         spikes = static_cast<std::vector<bool>>(param);
         TRACE1(MODELS, "Setting input spike train (len:%zu)\n", spikes.size());
         curr_spike = spikes.begin();
     }
-    else if (param_name == "poisson")
+    else if (attribute_name == "poisson")
     {
         poisson_probability = static_cast<double>(param);
         TRACE2(MODELS, "Setting poisson probability:%lf\n",
                 poisson_probability);
     }
-    else if (param_name == "rate")
+    else if (attribute_name == "rate")
     {
         rate = static_cast<double>(param);
         TRACE2(MODELS, "Setting rate probability:%lf\n", rate);

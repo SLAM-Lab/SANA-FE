@@ -24,20 +24,21 @@
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
 // Forward declarations
-std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
+std::map<std::string, sanafe::ModelAttribute> pydict_to_model_attributes(
         const pybind11::dict &dictionary, const bool forward_to_synapse = true,
         const bool forward_to_dendrite = true,
         const bool forward_to_soma = true);
-sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value);
+sanafe::ModelAttribute pyobject_to_model_attribute(
+        const pybind11::object &value);
 pybind11::dict run_data_to_dict(const sanafe::RunData &run);
 
-std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
+std::map<std::string, sanafe::ModelAttribute> pydict_to_model_attributes(
         const pybind11::dict &dictionary, const bool forward_to_synapse,
         const bool forward_to_dendrite, const bool forward_to_soma)
 {
     // Convert a Python dict to a set of C++ attribute strings,
     //  ready to be used by the kernel
-    std::map<std::string, sanafe::ModelParam> map;
+    std::map<std::string, sanafe::ModelAttribute> map;
     for (const auto &key_value_pair : dictionary)
     {
         const std::string key =
@@ -46,23 +47,23 @@ std::map<std::string, sanafe::ModelParam> pydict_to_model_parameters(
 
         pybind11::object value =
                 pybind11::cast<pybind11::object>(key_value_pair.second);
-        sanafe::ModelParam parameter = pyobject_to_model_parameter(value);
+        sanafe::ModelAttribute attribute = pyobject_to_model_attribute(value);
 
-        parameter.forward_to_synapse = forward_to_synapse;
-        parameter.forward_to_dendrite = forward_to_dendrite;
-        parameter.forward_to_soma = forward_to_soma;
-        parameter.name = key;
-        map[key] = parameter;
+        attribute.forward_to_synapse = forward_to_synapse;
+        attribute.forward_to_dendrite = forward_to_dendrite;
+        attribute.forward_to_soma = forward_to_soma;
+        attribute.name = key;
+        map[key] = attribute;
     }
     TRACE1(PYMODULE, "Converted map.size()=%zu\n", map.size());
 
     return map;
 }
 
-std::map<std::string, std::vector<sanafe::ModelParam>>
+std::map<std::string, std::vector<sanafe::ModelAttribute>>
 pydict_to_attribute_lists(pybind11::dict attributes)
 {
-    std::map<std::string, std::vector<sanafe::ModelParam>> map{};
+    std::map<std::string, std::vector<sanafe::ModelAttribute>> map{};
 
     for (const auto &key_value_pair : attributes)
     {
@@ -78,25 +79,26 @@ pydict_to_attribute_lists(pybind11::dict attributes)
             throw std::invalid_argument(error);
         }
 
-        map[attribute_name] = std::vector<sanafe::ModelParam>();
+        map[attribute_name] = std::vector<sanafe::ModelAttribute>();
         for (auto iter = pybind11::iter(key_value_pair.second);
                 iter != pybind11::iterator::sentinel(); ++iter)
         {
-            map[attribute_name].push_back(pyobject_to_model_parameter(
+            map[attribute_name].push_back(pyobject_to_model_attribute(
                     pybind11::cast<pybind11::object>(*iter)));
         }
     }
     return map;
 }
 
-sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
+sanafe::ModelAttribute pyobject_to_model_attribute(
+        const pybind11::object &value)
 {
     // Convert a Python object (string, int or float) to a C++ string.
     //  This is required by the kernel. Although this isn't the
     //  most efficient way to share data between Python and the kernel, it
     //  does enforce a representation that will always be possible to save
     //  and load (and be reproducible)
-    sanafe::ModelParam parameter;
+    sanafe::ModelAttribute attribute;
     bool is_int{false};
     bool is_float{false};
     bool is_string = pybind11::isinstance<pybind11::str>(value);
@@ -119,53 +121,53 @@ sanafe::ModelParam pyobject_to_model_parameter(const pybind11::object &value)
     // Now check against each type and make the appropriate cast
     if (is_string)
     {
-        parameter.value = pybind11::cast<std::string>(value);
-        TRACE1(PYMODULE, "Converted str to parameter\n");
+        attribute.value = pybind11::cast<std::string>(value);
+        TRACE1(PYMODULE, "Converted str to attribute\n");
     }
     else if (is_int)
     {
-        parameter.value = pybind11::cast<int>(value);
-        TRACE1(PYMODULE, "Converted int to parameter\n");
+        attribute.value = pybind11::cast<int>(value);
+        TRACE1(PYMODULE, "Converted int to attribute\n");
     }
     else if (is_float)
     {
-        parameter.value = pybind11::cast<float>(value);
-        TRACE1(PYMODULE, "Converted float to parameter\n");
+        attribute.value = pybind11::cast<float>(value);
+        TRACE1(PYMODULE, "Converted float to attribute\n");
     }
     else if (pybind11::isinstance<pybind11::dict>(value))
     {
-        std::vector<sanafe::ModelParam> model_parameters;
+        std::vector<sanafe::ModelAttribute> model_attributes;
         for (auto item : pybind11::cast<pybind11::dict>(value))
         {
-            sanafe::ModelParam param = pyobject_to_model_parameter(
+            sanafe::ModelAttribute attribute = pyobject_to_model_attribute(
                     pybind11::cast<pybind11::object>(item.second));
-            param.name = pybind11::cast<std::string>(item.first);
+            attribute.name = pybind11::cast<std::string>(item.first);
         }
-        parameter.value = model_parameters;
+        attribute.value = model_attributes;
     }
     else if (pybind11::isinstance<pybind11::iterable>(value))
     {
-        std::vector<sanafe::ModelParam> list;
+        std::vector<sanafe::ModelAttribute> list;
         for (auto iter = pybind11::iter(value);
                 iter != pybind11::iterator::sentinel(); ++iter)
         {
-            list.push_back(pyobject_to_model_parameter(
+            list.push_back(pyobject_to_model_attribute(
                     pybind11::cast<pybind11::object>(*iter)));
         }
-        parameter.value = list;
+        attribute.value = list;
     }
     else
     {
         throw std::invalid_argument("Error: dict has unsupported type");
     }
 
-    return parameter;
+    return attribute;
 }
 void pyconnect_neurons_sparse(sanafe::NeuronGroup *self,
         sanafe::NeuronGroup &dest_group, const pybind11::dict attributes,
         const pybind11::list &src_dest_id_pairs)
 {
-    const std::map<std::string, std::vector<sanafe::ModelParam>>
+    const std::map<std::string, std::vector<sanafe::ModelAttribute>>
             attribute_lists = pydict_to_attribute_lists(attributes);
 
     // Convert python list of tuples to SANA-FE format
@@ -213,7 +215,7 @@ void pyconnect_neurons_conv2d(sanafe::NeuronGroup *self,
         int kernel_height, int kernel_count, int stride_width,
         int stride_height)
 {
-    const std::map<std::string, std::vector<sanafe::ModelParam>>
+    const std::map<std::string, std::vector<sanafe::ModelAttribute>>
             attribute_lists = pydict_to_attribute_lists(attributes);
     sanafe::Conv2DParameters config{};
     config.input_width = input_width;
@@ -234,7 +236,7 @@ void pyconnect_neurons_conv2d(sanafe::NeuronGroup *self,
 void pyconnect_neurons_dense(sanafe::NeuronGroup *self,
         sanafe::NeuronGroup &dest_group, const pybind11::dict attributes)
 {
-    const std::map<std::string, std::vector<sanafe::ModelParam>>
+    const std::map<std::string, std::vector<sanafe::ModelAttribute>>
             attribute_lists = pydict_to_attribute_lists(attributes);
 
     self->connect_neurons_dense(dest_group, attribute_lists);
@@ -279,9 +281,9 @@ sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
     default_neuron_config.log_spikes = log_spikes;
     default_neuron_config.soma_hw_name = soma_hw_name;
 
-    std::map<std::string, sanafe::ModelParam> model_parameters =
-            pydict_to_model_parameters(model_dict);
-    default_neuron_config.model_parameters = model_parameters;
+    std::map<std::string, sanafe::ModelAttribute> model_attributes =
+            pydict_to_model_attributes(model_dict);
+    default_neuron_config.model_attributes = model_attributes;
 
     return self->create_neuron_group(
             group_name, neuron_count, default_neuron_config);
@@ -397,9 +399,9 @@ void pyconfigure(sanafe::Neuron *self, std::optional<std::string> soma_hw_name,
         std::optional<bool> log_spikes, std::optional<bool> log_potential,
         std::optional<bool> force_synapse_update,
         std::optional<bool> force_dendrite_update,
-        std::optional<bool> force_soma_update, pybind11::dict model_parameters,
-        pybind11::dict dendrite_specific_parameters,
-        pybind11::dict soma_specific_parameters)
+        std::optional<bool> force_soma_update, pybind11::dict model_attributes,
+        pybind11::dict dendrite_specific_attributes,
+        pybind11::dict soma_specific_attributes)
 {
     sanafe::NeuronConfiguration neuron_template{};
 
@@ -412,19 +414,19 @@ void pyconfigure(sanafe::Neuron *self, std::optional<std::string> soma_hw_name,
     neuron_template.force_dendrite_update = force_dendrite_update;
     neuron_template.force_soma_update = force_soma_update;
 
-    auto parsed = pydict_to_model_parameters(model_parameters);
-    neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
-    parsed = pydict_to_model_parameters(
-            dendrite_specific_parameters, false, true, false);
-    neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
-    parsed = pydict_to_model_parameters(
-            soma_specific_parameters, false, false, true);
-    neuron_template.model_parameters.insert(parsed.begin(), parsed.end());
+    auto parsed = pydict_to_model_attributes(model_attributes);
+    neuron_template.model_attributes.insert(parsed.begin(), parsed.end());
+    parsed = pydict_to_model_attributes(
+            dendrite_specific_attributes, false, true, false);
+    neuron_template.model_attributes.insert(parsed.begin(), parsed.end());
+    parsed = pydict_to_model_attributes(
+            soma_specific_attributes, false, false, true);
+    neuron_template.model_attributes.insert(parsed.begin(), parsed.end());
 
     TRACE1(PYMODULE, "Setting neuron attributes\n");
     if (DEBUG_LEVEL_PYMODULE > 0)
     {
-        for (auto &[key, value] : neuron_template.model_parameters)
+        for (auto &[key, value] : neuron_template.model_attributes)
         {
             TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
         }
@@ -435,30 +437,30 @@ void pyconfigure(sanafe::Neuron *self, std::optional<std::string> soma_hw_name,
 }
 
 void pyset_model_attributes(sanafe::MappedNeuron *self,
-        pybind11::dict model_parameters,
-        pybind11::dict dendrite_specific_parameters,
-        pybind11::dict soma_specific_parameters)
+        pybind11::dict model_attributes,
+        pybind11::dict dendrite_specific_attributes,
+        pybind11::dict soma_specific_attributes)
 {
-    std::map<std::string, sanafe::ModelParam> converted_parameters;
+    std::map<std::string, sanafe::ModelAttribute> converted_attributes;
 
-    auto parsed = pydict_to_model_parameters(model_parameters);
-    converted_parameters.insert(parsed.begin(), parsed.end());
-    parsed = pydict_to_model_parameters(
-            dendrite_specific_parameters, false, true, false);
-    converted_parameters.insert(parsed.begin(), parsed.end());
-    parsed = pydict_to_model_parameters(
-            soma_specific_parameters, false, false, true);
-    converted_parameters.insert(parsed.begin(), parsed.end());
+    auto parsed = pydict_to_model_attributes(model_attributes);
+    converted_attributes.insert(parsed.begin(), parsed.end());
+    parsed = pydict_to_model_attributes(
+            dendrite_specific_attributes, false, true, false);
+    converted_attributes.insert(parsed.begin(), parsed.end());
+    parsed = pydict_to_model_attributes(
+            soma_specific_attributes, false, false, true);
+    converted_attributes.insert(parsed.begin(), parsed.end());
 
     TRACE1(PYMODULE, "Setting neuron attributes\n");
     if (DEBUG_LEVEL_PYMODULE > 0)
     {
-        for (auto &[key, value] : converted_parameters)
+        for (auto &[key, value] : converted_attributes)
         {
             TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
         }
     }
-    self->set_model_attributes(converted_parameters);
+    self->set_model_attributes(converted_attributes);
 
     return;
 }
@@ -558,7 +560,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("create_neuron_group", &pycreate_neuron_group,
                     pybind11::return_value_policy::reference_internal,
                     pybind11::arg("group_name"), pybind11::arg("neuron_count"),
-                    pybind11::arg("model_parameters") = pybind11::dict(),
+                    pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("default_synapse_hw_name") = "",
                     pybind11::arg("default_dendrite_hw_name") = "",
                     pybind11::arg("force_dendrite_update") = false,
@@ -698,15 +700,15 @@ PYBIND11_MODULE(sanafecpp, m)
                             std::optional<bool> force_synapse_update,
                             std::optional<bool> force_dendrite_update,
                             std::optional<bool> force_soma_update,
-                            pybind11::dict model_parameters,
-                            pybind11::dict dendrite_specific_parameters,
-                            pybind11::dict soma_specific_parameters) {
+                            pybind11::dict model_attributes,
+                            pybind11::dict dendrite_specific_attributes,
+                            pybind11::dict soma_specific_attributes) {
                         pyconfigure(ref.get(), soma_hw_name,
                                 default_synapse_hw_name, dendrite_hw_name,
                                 log_spikes, log_potential, force_synapse_update,
                                 force_dendrite_update, force_soma_update,
-                                model_parameters, dendrite_specific_parameters,
-                                soma_specific_parameters);
+                                model_attributes, dendrite_specific_attributes,
+                                soma_specific_attributes);
                     },
                     pybind11::arg("soma_hw_name") = pybind11::none(),
                     pybind11::arg("default_synapse_hw_name") = pybind11::none(),
@@ -716,36 +718,36 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("force_synapse_update") = pybind11::none(),
                     pybind11::arg("force_dendrite_update") = pybind11::none(),
                     pybind11::arg("force_soma_update") = pybind11::none(),
-                    pybind11::arg("model_parameters") = pybind11::dict(),
-                    pybind11::arg("soma_parameters") = pybind11::dict(),
-                    pybind11::arg("dendrite_parameters") = pybind11::dict())
-        //     .def("connect_to_neuron",
-        //             [](const PyNeuronRef &ref, sanafe::Neuron &dest,
-        //                     std::optional<pybind11::dict> attr =
-        //                             pybind11::none()) {
-        //                 // Forward to the original Neuron's connect_to_neuron method
-        //                 if (!attr.has_value())
-        //                 {
-        //                     attr = pybind11::dict();
-        //                 }
-        //                 const size_t con_idx =
-        //                         ref.get()->connect_to_neuron(dest);
-        //                 sanafe::Connection &con = ref.get()->edges_out[con_idx];
-        //                 const auto parameters =
-        //                         pydict_to_model_parameters(attr.value());
-        //                 for (auto &[key, parameter] : parameters)
-        //                 {
-        //                     if (parameter.forward_to_synapse)
-        //                     {
-        //                         con.synapse_params[key] = parameter;
-        //                     }
-        //                     if (parameter.forward_to_dendrite)
-        //                     {
-        //                         con.dendrite_params[key] = parameter;
-        //                     }
-        //                 }
-        //                 return con_idx;
-        //             })
+                    pybind11::arg("model_attributes") = pybind11::dict(),
+                    pybind11::arg("soma_attributes") = pybind11::dict(),
+                    pybind11::arg("dendrite_attributes") = pybind11::dict())
+            //     .def("connect_to_neuron",
+            //             [](const PyNeuronRef &ref, sanafe::Neuron &dest,
+            //                     std::optional<pybind11::dict> attr =
+            //                             pybind11::none()) {
+            //                 // Forward to the original Neuron's connect_to_neuron method
+            //                 if (!attr.has_value())
+            //                 {
+            //                     attr = pybind11::dict();
+            //                 }
+            //                 const size_t con_idx =
+            //                         ref.get()->connect_to_neuron(dest);
+            //                 sanafe::Connection &con = ref.get()->edges_out[con_idx];
+            //                 const auto attributes =
+            //                         pydict_to_model_attributes(attr.value());
+            //                 for (auto &[key, attribute] : attributes)
+            //                 {
+            //                     if (attribute.forward_to_synapse)
+            //                     {
+            //                         con.synapse_attributes[key] = attribute;
+            //                     }
+            //                     if (attribute.forward_to_dendrite)
+            //                     {
+            //                         con.dendrite_attributes[key] = attribute;
+            //                     }
+            //                 }
+            //                 return con_idx;
+            //             })
             // Add special handling for connecting to another NeuronRef
             .def("connect_to_neuron",
                     [](const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
@@ -761,17 +763,17 @@ PYBIND11_MODULE(sanafecpp, m)
                         const size_t con_idx =
                                 ref.get()->connect_to_neuron(dest);
                         sanafe::Connection &con = ref.get()->edges_out[con_idx];
-                        const auto parameters =
-                                pydict_to_model_parameters(attr.value());
-                        for (auto &[key, parameter] : parameters)
+                        const auto attributes =
+                                pydict_to_model_attributes(attr.value());
+                        for (auto &[key, attribute] : attributes)
                         {
-                            if (parameter.forward_to_synapse)
+                            if (attribute.forward_to_synapse)
                             {
-                                con.synapse_params[key] = parameter;
+                                con.synapse_attributes[key] = attribute;
                             }
-                            if (parameter.forward_to_dendrite)
+                            if (attribute.forward_to_dendrite)
                             {
-                                con.dendrite_params[key] = parameter;
+                                con.dendrite_attributes[key] = attribute;
                             }
                         }
                         return con_idx;
@@ -874,7 +876,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("reset", &sanafe::SpikingChip::reset);
     pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
             .def("set_model_attributes", &pyset_model_attributes,
-                    pybind11::arg("model_parameters") = pybind11::dict(),
-                    pybind11::arg("soma_parameters") = pybind11::dict(),
-                    pybind11::arg("dendrite_parameters") = pybind11::dict());
+                    pybind11::arg("model_attributes") = pybind11::dict(),
+                    pybind11::arg("soma_attributes") = pybind11::dict(),
+                    pybind11::arg("dendrite_attributes") = pybind11::dict());
 }

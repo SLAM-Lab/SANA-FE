@@ -49,8 +49,8 @@ if dataset == "mnist":
             os.path.join(PROJECT_DIR, "etc", "mnist.pt"),
             pickle_module=dill,
             map_location=torch.device("cpu"))
-    for param_name, param in mnist_model.named_parameters():
-        weights[param_name] = param.detach().numpy()
+    for attribute_name, param in mnist_model.named_parameters():
+        weights[attribute_name] = param.detach().numpy()
 
     # Load the MNIST test inputs which were stored during training in a CSV file
     inputs = np.loadtxt(os.path.join(PROJECT_DIR, "etc", "mnist.csv"),
@@ -68,8 +68,8 @@ elif dataset == "shd":
             pickle_module=dill,
             map_location=torch.device("cpu"))
     weights = {}
-    for param_name, param in spiking_digits_model.named_parameters():
-        weights[param_name] = param.detach().numpy()
+    for attribute_name, param in spiking_digits_model.named_parameters():
+        weights[attribute_name] = param.detach().numpy()
 
     # Load the spiking digits test inputs from the raw dataset, applying the
     #  same transformations as the training scripts
@@ -129,7 +129,7 @@ for id, neuron in enumerate(hidden_layer):
     if analog_neurons:
         neuron.configure(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
                          log_spikes=True, log_potential=True,
-                         model_parameters=hidden_parameters)
+                         model_attributes=hidden_parameters)
     else:
         if dataset == "shd":
             # Clip anything below 0
@@ -137,7 +137,7 @@ for id, neuron in enumerate(hidden_layer):
             hidden_parameters["reverse_reset_mode"] = "saturate"
         neuron.configure(soma_hw_name=f"loihi",
                          log_spikes=True,
-                         model_parameters=hidden_parameters)
+                         model_attributes=hidden_parameters)
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 print("Creating output layer")
@@ -145,7 +145,7 @@ for id, neuron in enumerate(out_layer):
     if dataset == "shd":
         neuron.configure(soma_hw_name=f"loihi",
                          log_potential=True,
-                         model_parameters={
+                         model_attributes={
                             "leak_decay": 0.85,
                             "reset_mode": "none",
                             "input_decay": weights["lif2.alpha"][id]
@@ -155,7 +155,7 @@ for id, neuron in enumerate(out_layer):
             neuron.configure(soma_hw_name=f"analog_lif[{id}]", log_spikes=True)
         else:
             neuron.configure(soma_hw_name=f"loihi", log_spikes=True,
-                             model_parameters={
+                             model_attributes={
                                  "threshold": 1.0,
                                  "leak_decay": 0.85,
                                  "reset_mode": "hard"
@@ -211,13 +211,13 @@ for input in range(num_inputs):
         mnist_input = inputs[input, :]
         for id, mapped_neuron in enumerate(mapped_inputs):
             mapped_neuron.set_model_attributes(
-                model_parameters={"poisson": mnist_input[id]})
+                model_attributes={"poisson": mnist_input[id]})
     elif dataset == "shd":
         spiking_digit_input = inputs[input].squeeze()
         for id, mapped_neuron in enumerate(mapped_inputs):
             spiketrain = list(spiking_digit_input[:, id])
             mapped_neuron.set_model_attributes(
-                model_parameters={"spikes": spiketrain})
+                model_attributes={"spikes": spiketrain})
         timesteps = len(spiketrain)
     else:
         raise Exception(f"Dataset: {dataset} not recognized!")

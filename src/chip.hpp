@@ -279,7 +279,7 @@ public:
     MappedNeuron& operator=(const MappedNeuron& other) = default;
     MappedNeuron(MappedNeuron&& other) = default;
     MappedNeuron& operator=(MappedNeuron&& other) = default;
-    void set_model_attributes(const std::map<std::string, ModelParam> &model_parameters);
+    void set_model_attributes(const std::map<std::string, ModelAttribute> &model_attributes);
 
 private:
     void build_neuron_processing_pipeline();
@@ -374,9 +374,9 @@ public:
     PipelineUnit &operator=(PipelineUnit &&other) = default;
 
     // Virtual member functions
-    virtual void set_attribute_hw(const std::string &param_name, const ModelParam &param) = 0;
-    virtual void set_attribute_neuron(size_t neuron_address, const std::string &param_name, const ModelParam &param) = 0;
-    virtual void set_attribute_edge(size_t synapse_address, const std::string &param_name, const ModelParam &param) = 0;
+    virtual void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) = 0;
+    virtual void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) = 0;
+    virtual void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) = 0;
     virtual void reset() = 0;
 
     // Optional virtual functions
@@ -403,7 +403,7 @@ public:
     OutputInterfaceFunc process_output_fn{nullptr};
 
     // Model information
-    std::map<std::string, ModelParam> model_parameters{};
+    std::map<std::string, ModelAttribute> model_attributes{};
     std::optional<std::filesystem::path> plugin_lib{std::nullopt};
     std::string name;
     std::string model;
@@ -464,7 +464,7 @@ public:
     virtual PipelineResult update(size_t synapse_address, bool read = false) = 0;
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override final { throw std::logic_error("Error: Synapse H/W called with dendrite inputs"); }
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) override final { throw std::logic_error("Error: Synapse H/W called with soma inputs"); }
-    virtual void set_attribute_neuron(size_t neuron_address,  const std::string &param_name, const ModelParam &param) override final {};
+    virtual void set_attribute_neuron(size_t neuron_address,  const std::string &attribute_name, const ModelAttribute &param) override final {};
 };
 
 class DendriteUnit : public PipelineUnit
@@ -483,7 +483,7 @@ public:
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) = 0;
     virtual PipelineResult update(size_t synapse_address, bool read = false) override final { throw std::logic_error("Error: Soma H/W called with synapse inputs"); }
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override final { throw std::logic_error("Error: Soma H/W called with dendrite inputs"); }
-    virtual void set_attribute_edge(size_t synapse_address, const std::string &param_name, const ModelParam &param) override final {};
+    virtual void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override final {};
     virtual void map_connection(MappedConnection &con) override final {};
 };
 

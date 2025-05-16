@@ -96,29 +96,29 @@ public:
         return;
     }
 
-    void set_attribute_hw(const std::string &param_name,
-            const sanafe::ModelParam &param)
+    void set_attribute_hw(const std::string &attribute_name,
+            const sanafe::ModelAttribute &param)
     {
         return;
     };
 
     void set_attribute_neuron(const size_t neuron_address,
-            const std::string &param_name,
-            const sanafe::ModelParam &param) override
+            const std::string &attribute_name,
+            const sanafe::ModelAttribute &param) override
     {
-        if (param_name == "m")
+        if (attribute_name == "m")
         {
             m = static_cast<double>(param);
         }
-        else if (param_name == "n")
+        else if (attribute_name == "n")
         {
             n = static_cast<double>(param);
         }
-        else if (param_name == "h")
+        else if (attribute_name == "h")
         {
             h = static_cast<double>(param);
         }
-        else if (param_name == "current")
+        else if (attribute_name == "current")
         {
             I = static_cast<double>(param);
         }

@@ -15,7 +15,7 @@ namespace sanafe
 // An attribute can contain a scalar value, or either a list or named set of
 //  attributes i.e., attributes can be recursively defined. However,
 //  in C++, variants cannot be defined recursively, so create this new class.
-struct ModelParam
+struct ModelAttribute
 {
     operator bool() const
     {
@@ -72,7 +72,7 @@ struct ModelParam
     template <typename T> operator std::vector<T>() const
     {
         std::vector<T> cast_vector;
-        const auto &value_vector = std::get<std::vector<ModelParam>>(value);
+        const auto &value_vector = std::get<std::vector<ModelAttribute>>(value);
         cast_vector.reserve(value_vector.size());
 
         for (const auto &element : value_vector)
@@ -81,24 +81,24 @@ struct ModelParam
         }
         return cast_vector;
     }
-    template <typename T> operator std::map<std::string, ModelParam>() const
+    template <typename T> operator std::map<std::string, ModelAttribute>() const
     {
-        std::map<std::string, ModelParam> cast_map;
-        const auto &value_vector = std::get<std::vector<ModelParam>>(value);
+        std::map<std::string, ModelAttribute> cast_map;
+        const auto &value_vector = std::get<std::vector<ModelAttribute>>(value);
         for (const auto &element : value_vector)
         {
             cast_map[element.name.value()] = static_cast<T>(element);
         }
         return cast_map;
     }
-    bool operator==(const ModelParam &rhs) const
+    bool operator==(const ModelAttribute &rhs) const
     {
         return (value == rhs.value &&
                 (forward_to_synapse == rhs.forward_to_synapse) &&
                 (forward_to_dendrite == rhs.forward_to_dendrite) &&
                 (forward_to_soma == rhs.forward_to_soma));
     }
-    bool operator!=(const ModelParam &rhs) const
+    bool operator!=(const ModelAttribute &rhs) const
     {
         return (value != rhs.value) ||
                 (forward_to_synapse != rhs.forward_to_synapse) ||
@@ -125,12 +125,12 @@ struct ModelParam
         {
             return std::get<std::string>(value);
         }
-        else if (std::holds_alternative<std::vector<ModelParam>>(value))
+        else if (std::holds_alternative<std::vector<ModelAttribute>>(value))
         {
             throw std::runtime_error("Printing vectors not yet supported");
         }
         // This should not be reached if all variant types are handled
-        throw std::runtime_error("Unknown variant type in ModelParam");
+        throw std::runtime_error("Unknown variant type in ModelAttribute");
     }
 
     // In C++17, we cannot use std::map (which would be the natural choice) with
@@ -143,7 +143,8 @@ struct ModelParam
     //  JSON and YAML parsers, but they end up either requiring Boost or other
     //  dependencies, and / or rely on undefined C++ behavior and generally
     //  require complex solutions.
-    std::variant<bool, int, double, std::string, std::vector<ModelParam>> value;
+    std::variant<bool, int, double, std::string, std::vector<ModelAttribute>>
+            value;
     std::optional<std::string> name;
 
     // Filters control which hardware units can receive this parameter

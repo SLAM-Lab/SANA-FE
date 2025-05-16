@@ -122,8 +122,8 @@ void sanafe::Neuron::configure(const NeuronConfiguration &config)
         force_synapse_update = config.force_synapse_update.value();
     }
 
-    model_parameters.insert(
-            config.model_parameters.begin(), config.model_parameters.end());
+    model_attributes.insert(
+            config.model_attributes.begin(), config.model_attributes.end());
 }
 
 std::string sanafe::Neuron::info() const
@@ -219,7 +219,8 @@ std::string sanafe::SpikingNetwork::info() const
 }
 
 void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
-        const std::map<std::string, std::vector<ModelParam>> &attribute_lists,
+        const std::map<std::string, std::vector<ModelAttribute>>
+                &attribute_lists,
         const std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
 {
     for (auto [source_id, dest_id] : source_dest_id_pairs)
@@ -244,7 +245,7 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
         Connection &con = source.edges_out[connection_idx];
 
         // Create attributes map for this neuron
-        std::map<std::string, ModelParam> attributes;
+        std::map<std::string, ModelAttribute> attributes;
         for (auto &[key, value_list] : attribute_lists)
         {
             if (value_list.size() != source_dest_id_pairs.size())
@@ -259,13 +260,14 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
             attributes[key] = value_list[source_id];
         }
 
-        con.synapse_params = attributes;
-        con.dendrite_params = attributes;
+        con.synapse_attributes = attributes;
+        con.dendrite_attributes = attributes;
     }
 }
 
 void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
-        const std::map<std::string, std::vector<ModelParam>> &attribute_lists,
+        const std::map<std::string, std::vector<ModelAttribute>>
+                &attribute_lists,
         const Conv2DParameters &convolution)
 {
     // Only support channels-last storage for now
@@ -398,22 +400,22 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
                                             "Not enough entries defined "
                                             "for attribute");
                                 }
-                                const ModelParam &attribute =
+                                const ModelAttribute &attribute =
                                         attribute_list[filter_idx];
                                 if (attribute.forward_to_dendrite)
                                 {
-                                    con.dendrite_params[key] = attribute;
+                                    con.dendrite_attributes[key] = attribute;
                                 }
                                 if (attribute.forward_to_synapse)
                                 {
-                                    con.synapse_params[key] = attribute;
+                                    con.synapse_attributes[key] = attribute;
                                 }
                             }
                             TRACE1(NET, "%s.%zu->%s.%zu w=%d\n",
                                     source.parent_group_name.c_str(),
                                     source.offset,
                                     dest.parent_group_name.c_str(), dest.offset,
-                                    (int) con.synapse_params["weight"]);
+                                    (int) con.synapse_attributes["weight"]);
                         }
                     }
                 }
@@ -423,7 +425,8 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
 }
 
 void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
-        const std::map<std::string, std::vector<ModelParam>> &attribute_lists)
+        const std::map<std::string, std::vector<ModelAttribute>>
+                &attribute_lists)
 {
     for (size_t source_index = 0; source_index < neurons.size(); ++source_index)
     {
@@ -447,14 +450,14 @@ void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
                     throw std::invalid_argument("Not enough entries defined "
                                                 "for attribute");
                 }
-                const ModelParam &attribute = attribute_list[list_index];
+                const ModelAttribute &attribute = attribute_list[list_index];
                 if (attribute.forward_to_synapse)
                 {
-                    con.synapse_params[key] = attribute;
+                    con.synapse_attributes[key] = attribute;
                 }
                 if (attribute.forward_to_dendrite)
                 {
-                    con.dendrite_params[key] = attribute;
+                    con.dendrite_attributes[key] = attribute;
                 }
             }
         }

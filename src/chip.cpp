@@ -190,7 +190,7 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                 MappedConnection &mapped_con =
                         mapped_neuron.connections_out[idx];
 
-                for (auto &name_value_pair : con.synapse_params)
+                for (auto &name_value_pair : con.synapse_attributes)
                 {
                     if (name_value_pair.second.forward_to_synapse)
                     {
@@ -1160,36 +1160,36 @@ sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
 void sanafe::PipelineUnit::configure(
         std::string unit_name, const ModelInfo &model)
 {
-    model_parameters = model.model_parameters;
+    model_attributes = model.model_attributes;
     plugin_lib = model.plugin_library_path;
     name = unit_name;
     log_energy = model.log_energy;
     log_latency = model.log_latency;
 
-    if (model_parameters.find("energy_process_spike") != model_parameters.end())
+    if (model_attributes.find("energy_process_spike") != model_attributes.end())
     {
         default_energy_process_spike =
-                static_cast<double>(model_parameters["energy_process_spike"]);
+                static_cast<double>(model_attributes["energy_process_spike"]);
     }
-    if (model_parameters.find("latency_process_spike") !=
-            model_parameters.end())
+    if (model_attributes.find("latency_process_spike") !=
+            model_attributes.end())
     {
         default_latency_process_spike =
-                static_cast<double>(model_parameters["latency_process_spike"]);
+                static_cast<double>(model_attributes["latency_process_spike"]);
     }
-    if (model_parameters.find("energy_update") != model_parameters.end())
+    if (model_attributes.find("energy_update") != model_attributes.end())
     {
         default_energy_update =
-                static_cast<double>(model_parameters["energy_update"]);
+                static_cast<double>(model_attributes["energy_update"]);
     }
-    if (model_parameters.find("latency_update") != model_parameters.end())
+    if (model_attributes.find("latency_update") != model_attributes.end())
     {
         default_latency_update =
-                static_cast<double>(model_parameters["latency_update"]);
+                static_cast<double>(model_attributes["latency_update"]);
     }
 
     auto key_exists = [this](const std::string &key) {
-        return model_parameters.find(key) != model_parameters.end();
+        return model_attributes.find(key) != model_attributes.end();
     };
 
     const std::set<std::string> energy_metric_names{
@@ -1210,11 +1210,11 @@ void sanafe::PipelineUnit::configure(
         }
         SomaEnergyMetrics energy_metrics;
         energy_metrics.energy_access_neuron =
-                static_cast<double>(model_parameters["energy_access_neuron"]);
+                static_cast<double>(model_attributes["energy_access_neuron"]);
         energy_metrics.energy_update_neuron =
-                static_cast<double>(model_parameters["energy_update_neuron"]);
+                static_cast<double>(model_attributes["energy_update_neuron"]);
         energy_metrics.energy_spike_out =
-                static_cast<double>(model_parameters["energy_spike_out"]);
+                static_cast<double>(model_attributes["energy_spike_out"]);
         default_soma_energy_metrics = energy_metrics;
     }
 
@@ -1236,20 +1236,20 @@ void sanafe::PipelineUnit::configure(
         }
         SomaLatencyMetrics latency_metrics;
         latency_metrics.latency_access_neuron =
-                static_cast<double>(model_parameters["latency_access_neuron"]);
+                static_cast<double>(model_attributes["latency_access_neuron"]);
         latency_metrics.latency_update_neuron =
-                static_cast<double>(model_parameters["latency_update_neuron"]);
+                static_cast<double>(model_attributes["latency_update_neuron"]);
         latency_metrics.latency_spike_out =
-                static_cast<double>(model_parameters["latency_spike_out"]);
+                static_cast<double>(model_attributes["latency_spike_out"]);
         default_soma_latency_metrics = latency_metrics;
     }
 
-    // Finally, forward all parameters from the architecture description to the
+    // Finally, forward all attributes from the architecture description to the
     //  model. This might be useful if you want to define any additional
     //  model-specific attributes here, e.g., fault-rate or maximum memory size.
-    for (auto &[key, param] : model_parameters)
+    for (auto &[key, attribute] : model_attributes)
     {
-        set_attribute_hw(key, param);
+        set_attribute_hw(key, attribute);
     }
 }
 
@@ -1505,24 +1505,25 @@ sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
         , log_potential(neuron_to_map.log_potential)
 
 {
-    set_model_attributes(neuron_to_map.model_parameters);
+    set_model_attributes(neuron_to_map.model_attributes);
     build_neuron_processing_pipeline();
 }
 
 void sanafe::MappedNeuron::set_model_attributes(
-        const std::map<std::string, sanafe::ModelParam> &model_parameters)
+        const std::map<std::string, sanafe::ModelAttribute> &model_attributes)
 {
-    for (auto &[key, param] : model_parameters)
+    for (auto &[key, attribute] : model_attributes)
     {
-        TRACE2(CHIP, "Forwarding param: %s (dendrite:%d soma:%d)\n",
-                key.c_str(), param.forward_to_dendrite, param.forward_to_soma);
-        if (param.forward_to_dendrite && (dendrite_hw != nullptr))
+        TRACE2(CHIP, "Forwarding attribute: %s (dendrite:%d soma:%d)\n",
+                key.c_str(), attribute.forward_to_dendrite,
+                attribute.forward_to_soma);
+        if (attribute.forward_to_dendrite && (dendrite_hw != nullptr))
         {
-            dendrite_hw->set_attribute_neuron(mapped_address, key, param);
+            dendrite_hw->set_attribute_neuron(mapped_address, key, attribute);
         }
-        if (param.forward_to_soma && (soma_hw != nullptr))
+        if (attribute.forward_to_soma && (soma_hw != nullptr))
         {
-            soma_hw->set_attribute_neuron(mapped_address, key, param);
+            soma_hw->set_attribute_neuron(mapped_address, key, attribute);
         }
     }
 }
@@ -1789,8 +1790,8 @@ void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
 }
 
 sanafe::Timestep::Timestep(const long int ts, const int core_count)
-        : messages(std::make_shared<std::vector<std::list<Message>>>(
-                  core_count))
+        : messages(
+                  std::make_shared<std::vector<std::list<Message>>>(core_count))
         , timestep(ts)
 {
 }

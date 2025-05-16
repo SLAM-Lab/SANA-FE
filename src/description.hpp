@@ -80,17 +80,17 @@ c4::yml::NodeRef description_serialize_network_to_yaml(c4::yml::NodeRef root, co
 c4::yml::NodeRef description_serialize_neuron_group_to_yaml(c4::yml::NodeRef parent, const NeuronGroup &group, std::list<std::string> &strings);
 c4::yml::NodeRef description_serialize_neuron_to_yaml(c4::yml::NodeRef parent, const Neuron &neuron, std::list<std::string> &strings);
 c4::yml::NodeRef description_serialize_connection_to_yaml(c4::yml::NodeRef parent, const Connection &connection, std::list<std::string> &strings);
-c4::yml::NodeRef description_serialize_model_params_to_yaml(c4::yml::NodeRef parent, const std::map<std::string, ModelParam> &params, const std::map<std::string, ModelParam> &default_values);
-c4::yml::NodeRef description_serialize_model_param_to_yaml(c4::yml::NodeRef parent, const ModelParam &param);
+c4::yml::NodeRef description_serialize_model_attributes_to_yaml(c4::yml::NodeRef parent, const std::map<std::string, ModelAttribute> &attributes, const std::map<std::string, ModelAttribute> &default_values);
+c4::yml::NodeRef description_serialize_model_attribute_to_yaml(c4::yml::NodeRef parent, const ModelAttribute &attribute);
 
 // Helper for YAML serialization of variant types
 
 
 // Helper functions
-std::map<std::string, ModelParam> description_parse_model_parameters_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef parameters_node);
-ModelParam description_parse_parameter_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node);
+std::map<std::string, ModelAttribute> description_parse_model_attributes_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node);
+ModelAttribute description_parse_attribute_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node);
 void check_key(const ryml::Parser &parser, const ryml::ConstNodeRef node, const std::string &key);
-ryml::NodeRef description_serialize_variant_value_to_yaml(ryml::NodeRef node, const std::variant<bool, int, double, std::string, std::vector<sanafe::ModelParam>> &value);
+ryml::NodeRef description_serialize_variant_value_to_yaml(ryml::NodeRef node, const std::variant<bool, int, double, std::string, std::vector<sanafe::ModelAttribute>> &value);
 
 // Netlist (SANA-FE v1) network description format
 SpikingNetwork description_parse_network_file_netlist(std::ifstream &fp, Architecture &arch);
