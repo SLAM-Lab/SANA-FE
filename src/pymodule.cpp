@@ -431,7 +431,7 @@ void pyconfigure(sanafe::Neuron *self, std::optional<std::string> soma_hw_name,
             TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
         }
     }
-    self->configure(neuron_template);
+    self->set_attributes(neuron_template);
 
     return;
 }

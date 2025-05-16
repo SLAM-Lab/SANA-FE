@@ -1157,7 +1157,7 @@ sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
 {
 }
 
-void sanafe::PipelineUnit::configure(
+void sanafe::PipelineUnit::set_attributes(
         std::string unit_name, const ModelInfo &model)
 {
     model_attributes = model.model_attributes;
@@ -1381,7 +1381,7 @@ sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
     TRACE1(CHIP, "implements synapse:%d dendrite:%d soma:%d\n",
             new_unit->implements_synapse, new_unit->implements_dendrite,
             new_unit->implements_soma);
-    new_unit->configure(config.name, config.model_info);
+    new_unit->set_attributes(config.name, config.model_info);
     TRACE1(CHIP, "New h/w unit created (%s) in core:%zu\n", config.name.c_str(),
             id);
 

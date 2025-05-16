@@ -74,7 +74,7 @@ sanafe::Neuron::Neuron(const size_t neuron_offset, SpikingNetwork &net,
         , parent_net(net)
         , offset(neuron_offset)
 {
-    configure(config);
+    set_attributes(config);
 }
 
 void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
@@ -87,7 +87,7 @@ void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
     return;
 }
 
-void sanafe::Neuron::configure(const NeuronConfiguration &config)
+void sanafe::Neuron::set_attributes(const NeuronConfiguration &config)
 {
     if (config.default_synapse_hw_name.has_value())
     {

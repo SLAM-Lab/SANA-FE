@@ -394,7 +394,7 @@ public:
 
     // Normal member functions and function pointers
     void set_time(const long int timestep) { simulation_time = timestep; }
-    void configure(std::string unit_name, const ModelInfo &model);
+    void set_attributes(std::string unit_name, const ModelInfo &model);
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
     using InputInterfaceFunc = PipelineResult (PipelineUnit:: *)(Timestep &, MappedNeuron &, std::optional<MappedConnection*>, const PipelineResult &);

@@ -112,7 +112,7 @@ out_layer = network.create_neuron_group("out", out_neurons)
 
 print("Creating input layer")
 for id, neuron in enumerate(in_layer):
-    neuron.configure(soma_hw_name=f"input[{id}]",
+    neuron.set_attributes(soma_hw_name=f"input[{id}]",
                             log_spikes=True)
     neuron.map_to_core(arch.tiles[0].cores[0])
 
@@ -127,7 +127,7 @@ for id, neuron in enumerate(hidden_layer):
         hidden_parameters["input_decay"] = weights["lif1.alpha"][id]
 
     if analog_neurons:
-        neuron.configure(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
+        neuron.set_attributes(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
                          log_spikes=True, log_potential=True,
                          model_attributes=hidden_parameters)
     else:
@@ -135,7 +135,7 @@ for id, neuron in enumerate(hidden_layer):
             # Clip anything below 0
             hidden_parameters["reverse_threshold"] = 0.0
             hidden_parameters["reverse_reset_mode"] = "saturate"
-        neuron.configure(soma_hw_name=f"loihi",
+        neuron.set_attributes(soma_hw_name=f"loihi",
                          log_spikes=True,
                          model_attributes=hidden_parameters)
     neuron.map_to_core(arch.tiles[0].cores[0])
@@ -143,7 +143,7 @@ for id, neuron in enumerate(hidden_layer):
 print("Creating output layer")
 for id, neuron in enumerate(out_layer):
     if dataset == "shd":
-        neuron.configure(soma_hw_name=f"loihi",
+        neuron.set_attributes(soma_hw_name=f"loihi",
                          log_potential=True,
                          model_attributes={
                             "leak_decay": 0.85,
@@ -152,9 +152,9 @@ for id, neuron in enumerate(out_layer):
                         })
     elif dataset == "mnist":
         if analog_neurons:
-            neuron.configure(soma_hw_name=f"analog_lif[{id}]", log_spikes=True)
+            neuron.set_attributes(soma_hw_name=f"analog_lif[{id}]", log_spikes=True)
         else:
-            neuron.configure(soma_hw_name=f"loihi", log_spikes=True,
+            neuron.set_attributes(soma_hw_name=f"loihi", log_spikes=True,
                              model_attributes={
                                  "threshold": 1.0,
                                  "leak_decay": 0.85,

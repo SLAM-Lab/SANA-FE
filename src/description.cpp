@@ -1013,14 +1013,14 @@ void sanafe::description_parse_neuron(const std::string &id,
                 ++instance)
         {
             Neuron &n = neuron_group.neurons.at(instance);
-            n.configure(config);
+            n.set_attributes(config);
         }
     }
     else
     {
         const size_t nid = std::stoull(id);
         Neuron &n = neuron_group.neurons.at(nid);
-        n.configure(config);
+        n.set_attributes(config);
     }
 }
 
@@ -2646,7 +2646,7 @@ void sanafe::description_read_network_entry(
         net.create_neuron_group(neuron_group_id, neuron_count, neuron_config);
         break;
     case 'n': // Add neuron
-        neuron_ptr->configure(neuron_config);
+        neuron_ptr->set_attributes(neuron_config);
         break;
     case 'e': {
         assert(neuron_ptr != nullptr);

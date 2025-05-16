@@ -97,7 +97,7 @@ public:
     [[nodiscard]] size_t get_id() const { return offset; }
     size_t connect_to_neuron(Neuron &dest);
     void map_to_core(const CoreConfiguration &core);
-    void configure(const NeuronConfiguration &attributes);
+    void set_attributes(const NeuronConfiguration &attributes);
     [[nodiscard]] std::string info() const;
 };
 
