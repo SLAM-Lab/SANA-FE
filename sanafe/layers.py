@@ -17,6 +17,7 @@ class Layer:
             i += 1
         return
 
+
 class Input2D(Layer):
     _count = 0
     def __init__(self, snn, width, height, channels=1, **kwargs):
@@ -25,7 +26,8 @@ class Input2D(Layer):
         self.height = height
         self.channels = channels
         self.group = snn.create_neuron_group(f"input_{Input2D._count}",
-                                             neuron_count)
+                                             neuron_count,
+                                             model_attributes=kwargs)
 
 
 class Conv2D(Layer):
@@ -72,7 +74,8 @@ class Dense(Layer):
     _count = 0
     def __init__(self, snn, prev_layer, neuron_count, weights, **kwargs):
         self.group = snn.create_neuron_group(f"dense_{Dense._count}",
-                                             neuron_count, kwargs)
+                                             neuron_count,
+                                             model_attributes=kwargs)
         attributes = {"w": weights.flatten()}
         prev_layer.group.connect_neurons_dense(self.group, attributes)
 

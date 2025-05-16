@@ -13,6 +13,7 @@ green_text = "\033[92m"
 red_text = "\033[31m"
 default_text = "\033[0m"
 
+
 def check_arch(arch_filename):
     with open("arch.yaml", "r") as arch_file:
         arch_details = yaml.safe_load(arch_file)

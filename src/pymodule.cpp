@@ -806,7 +806,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("log_energy") = false,
                     pybind11::arg("log_latency") = false,
                     pybind11::return_value_policy::reference_internal)
-            .def_readwrite("tiles", &sanafe::Architecture::tiles);
+            .def_readwrite("tiles", &sanafe::Architecture::tiles)
+            .def("cores", &sanafe::Architecture::cores);
 
     pybind11::class_<sanafe::TileConfiguration>(m, "Tile")
             .def(pybind11::init(&pyconstruct_tile), pybind11::arg("name"),
