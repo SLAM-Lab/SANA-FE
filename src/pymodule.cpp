@@ -393,7 +393,8 @@ sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
     return self->create_core(name, parent_tile_id, pipeline_config);
 }
 
-void pyconfigure(sanafe::Neuron *self, std::optional<std::string> soma_hw_name,
+void pyset_attributes(sanafe::Neuron *self,
+        std::optional<std::string> soma_hw_name,
         std::optional<std::string> default_synapse_hw_name,
         std::optional<std::string> dendrite_hw_name,
         std::optional<bool> log_spikes, std::optional<bool> log_potential,
@@ -525,6 +526,34 @@ public:
     }
 };
 
+// Custom iterator class for iterating over NeuronRef objects efficiently
+class NeuronGroupIterator
+{
+private:
+    pybind11::object group_ref_;
+    sanafe::NeuronGroup *group_;
+    size_t current_;
+    size_t size_;
+
+public:
+    NeuronGroupIterator(pybind11::object group_ref, sanafe::NeuronGroup *group)
+            : group_ref_(std::move(group_ref))
+            , group_(group)
+            , current_(0)
+            , size_(group->neurons.size())
+    {
+    }
+
+    PyNeuronRef next()
+    {
+        if (current_ >= size_)
+        {
+            throw pybind11::stop_iteration();
+        }
+        return PyNeuronRef(group_ref_, &group_->neurons[current_++]);
+    }
+};
+
 PYBIND11_MODULE(sanafecpp, m)
 {
     m.doc() = R"pbdoc(
@@ -542,9 +571,6 @@ PYBIND11_MODULE(sanafecpp, m)
     m.def("load_arch", &sanafe::load_arch);
     m.def("load_net", &sanafe::load_net, pybind11::arg("path"),
             pybind11::arg("arch"), pybind11::arg("use_netlist_format") = false);
-    pybind11::register_exception<std::runtime_error>(m, "KernelRuntimeError");
-    pybind11::register_exception<std::invalid_argument>(
-            m, "KernelInvalidArgument");
 
     pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
             .value("BUFFER_BEFORE_DENDRITE_UNIT",
@@ -600,21 +626,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("kernel_count") = 1,
                     pybind11::arg("stride_width") = 1,
                     pybind11::arg("stride_height") = 1)
-            //.def(
-            //     "__getitem__",
-            //     [](sanafe::NeuronGroup &self,
-            //             pybind11::object index) -> sanafe::Neuron * {
-            //             // Integer indexing
-            //             size_t i = pybind11::cast<size_t>(index);
-            //             if (i >= self.neurons.size())
-            //             {
-            //                 throw pybind11::index_error();
-            //             }
-            //             return &self.neurons[i];
-            //     },
-            //     pybind11::keep_alive<0, 1>(),
-            //     pybind11::return_value_policy::reference_internal)
-            // And modify the NeuronGroup.__getitem__ to use this reference
             .def("__getitem__",
                     [](pybind11::object self_obj,
                             pybind11::object index) -> pybind11::object {
@@ -662,15 +673,11 @@ PYBIND11_MODULE(sanafecpp, m)
                     [](const sanafe::NeuronGroup &self) {
                         return self.neurons.size();
                     })
-            .def(
-                    "__iter__",
-                    [](sanafe::NeuronGroup &self) {
-                        return pybind11::make_iterator(self.neurons.begin(),
-                                self.neurons.end(),
-                                pybind11::return_value_policy::
-                                        reference_internal);
-                    },
-                    pybind11::keep_alive<0, 1>());
+            .def("__iter__", [](pybind11::object self_obj) {
+                sanafe::NeuronGroup &self =
+                        pybind11::cast<sanafe::NeuronGroup &>(self_obj);
+                return NeuronGroupIterator(self_obj, &self);
+            });
     // Neuron bindings are a little more complicated, because we use a wrapper
     //  reference class to help with managing object lifetimes. This is partly
     //  due to the fact PyBind11 struggles to keep the parent alive when
@@ -681,7 +688,7 @@ PYBIND11_MODULE(sanafecpp, m)
                         return ref.get()
                                 ->info(); // Delegate to neuron's info method
                     })
-            // Forward all methods from Neuron to NeuronRef
+            // Forward all methods from Neuron to PyNeuronRef
             .def("get_id",
                     [](const PyNeuronRef &ref) { return ref.get()->get_id(); })
             .def("map_to_core",
@@ -690,7 +697,7 @@ PYBIND11_MODULE(sanafecpp, m)
                         return ref.get()->map_to_core(core_configuration);
                     })
             .def(
-                    "configure",
+                    "set_attributes",
                     [](const PyNeuronRef &ref,
                             std::optional<std::string> soma_hw_name,
                             std::optional<std::string> default_synapse_hw_name,
@@ -703,7 +710,7 @@ PYBIND11_MODULE(sanafecpp, m)
                             pybind11::dict model_attributes,
                             pybind11::dict dendrite_specific_attributes,
                             pybind11::dict soma_specific_attributes) {
-                        pyconfigure(ref.get(), soma_hw_name,
+                        pyset_attributes(ref.get(), soma_hw_name,
                                 default_synapse_hw_name, dendrite_hw_name,
                                 log_spikes, log_potential, force_synapse_update,
                                 force_dendrite_update, force_soma_update,
@@ -721,34 +728,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict())
-            //     .def("connect_to_neuron",
-            //             [](const PyNeuronRef &ref, sanafe::Neuron &dest,
-            //                     std::optional<pybind11::dict> attr =
-            //                             pybind11::none()) {
-            //                 // Forward to the original Neuron's connect_to_neuron method
-            //                 if (!attr.has_value())
-            //                 {
-            //                     attr = pybind11::dict();
-            //                 }
-            //                 const size_t con_idx =
-            //                         ref.get()->connect_to_neuron(dest);
-            //                 sanafe::Connection &con = ref.get()->edges_out[con_idx];
-            //                 const auto attributes =
-            //                         pydict_to_model_attributes(attr.value());
-            //                 for (auto &[key, attribute] : attributes)
-            //                 {
-            //                     if (attribute.forward_to_synapse)
-            //                     {
-            //                         con.synapse_attributes[key] = attribute;
-            //                     }
-            //                     if (attribute.forward_to_dendrite)
-            //                     {
-            //                         con.dendrite_attributes[key] = attribute;
-            //                     }
-            //                 }
-            //                 return con_idx;
-            //             })
-            // Add special handling for connecting to another NeuronRef
             .def("connect_to_neuron",
                     [](const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
                             std::optional<pybind11::dict> attr =
@@ -781,6 +760,12 @@ PYBIND11_MODULE(sanafecpp, m)
             // Expose edges_out as a property
             .def_property_readonly("edges_out",
                     [](const PyNeuronRef &ref) { return ref.edges_out(); });
+    pybind11::class_<NeuronGroupIterator>(m, "NeuronGroupIterator")
+            .def("__iter__",
+                    [](NeuronGroupIterator &it) -> NeuronGroupIterator & {
+                        return it;
+                    })
+            .def("__next__", &NeuronGroupIterator::next);
     pybind11::class_<sanafe::Connection>(m, "Connection")
             .def_readonly("pre_neuron", &sanafe::Connection::pre_neuron)
             .def_readonly("post_neuron", &sanafe::Connection::post_neuron)
