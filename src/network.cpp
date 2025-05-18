@@ -57,14 +57,14 @@ sanafe::NeuronGroup::NeuronGroup(const std::string group_name,
         SpikingNetwork &net, const size_t neuron_count,
         const NeuronConfiguration &default_config)
         : default_neuron_config(default_config)
-        , name(std::move(group_name))
+        , name(group_name)
 {
     neurons.reserve(neuron_count);
     for (size_t neuron_offset = 0; neuron_offset < neuron_count;
             ++neuron_offset)
     {
-        neurons.emplace_back(
-                Neuron(neuron_offset, net, group_name, default_config));
+        neurons.emplace_back(Neuron(
+                neuron_offset, net, group_name, default_config));
     }
 }
 

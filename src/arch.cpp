@@ -62,7 +62,7 @@ std::string sanafe::Architecture::info() const
 sanafe::TileConfiguration::TileConfiguration(
         std::string name, const size_t id, const TilePowerMetrics &metrics)
         : power_metrics(metrics)
-        , name(name)
+        , name(std::move(name))
         , id(id)
 {
 }
@@ -71,7 +71,7 @@ sanafe::CoreConfiguration::CoreConfiguration(std::string name,
         const CoreAddress &address,
         const CorePipelineConfiguration &pipeline)
         : pipeline(pipeline)
-        , name(name)
+        , name(std::move(name))
         , address(address)
 {
 }

@@ -172,7 +172,7 @@ struct AxonInConfiguration
 {
     AxonInPowerMetrics metrics;
     std::string name;
-    AxonInConfiguration(const AxonInPowerMetrics &metrics, std::string name) : metrics(metrics), name(name) {}
+    AxonInConfiguration(const AxonInPowerMetrics &metrics, std::string name) : metrics(metrics), name(std::move(name)) {}
 };
 
 struct PipelineUnitConfiguration
@@ -186,7 +186,7 @@ struct PipelineUnitConfiguration
     bool implements_dendrite{false};
     bool implements_soma{false};
 
-    PipelineUnitConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(name) {}
+    PipelineUnitConfiguration(const ModelInfo &model_info, std::string name) : model_info(model_info), name(std::move(name)) {}
 };
 
 struct AxonOutPowerMetrics
@@ -199,7 +199,7 @@ struct AxonOutConfiguration
 {
     AxonOutPowerMetrics metrics;
     std::string name;
-    AxonOutConfiguration(const AxonOutPowerMetrics &metrics, std::string name) : metrics(metrics), name(name) {}
+    AxonOutConfiguration(const AxonOutPowerMetrics &metrics, std::string name) : metrics(metrics), name(std::move(name)) {}
 };
 }
 

@@ -12,6 +12,10 @@ namespace sanafe
 {
 class PipelineUnit;
 
+struct DlHandleDeleter
+{
+    void operator()(void *handle) const;
+};
 void plugin_init_hw(const std::string &model_name, const std::filesystem::path &plugin_path);
 std::shared_ptr<PipelineUnit> plugin_get_hw(const std::string &model_name, const std::filesystem::path &plugin_path);
 }

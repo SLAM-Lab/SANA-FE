@@ -17,6 +17,17 @@
 using _create_hw = sanafe::PipelineUnit *();
 
 std::map<std::string, _create_hw *> plugin_create_hw;
+// Use a unique_ptr with the custom deleter to automatically manage the library handle
+using DlHandlePtr = std::unique_ptr<void, sanafe::DlHandleDeleter>;
+std::unordered_map<std::string, DlHandlePtr> plugin_handles;
+
+void sanafe::DlHandleDeleter::operator()(void *handle) const
+{
+    if (handle)
+    {
+        dlclose(handle);
+    }
+}
 
 void sanafe::plugin_init_hw(
         const std::string &model_name, const std::filesystem::path &plugin_path)
@@ -26,6 +37,7 @@ void sanafe::plugin_init_hw(
     // Load the soma library
     INFO("Loading plugin:%s\n", plugin_path.c_str());
     void *hw = dlopen(plugin_path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+    plugin_handles[model_name] = DlHandlePtr(hw);
     if (hw == nullptr)
     {
         INFO("Error: Couldn't load library %s\n", plugin_path.c_str());
@@ -45,6 +57,8 @@ void sanafe::plugin_init_hw(
     {
         INFO("Error: Couldn't load symbol %s: %s\n", create.c_str(),
                 dlsym_error);
+        // This will also automatically close the library through its unique_ptr
+        plugin_handles.erase(model_name);
         throw std::runtime_error("Error: Could not load symbol.\n");
     }
     INFO("Loaded plugin symbols for %s.\n", model_name.c_str());

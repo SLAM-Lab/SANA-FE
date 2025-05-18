@@ -512,28 +512,17 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
         // Go through all messages in the NoC and check to see if that
         //  message has been fully received by time t. If so, remove it
         //  from the NoC.
-        // TODO: replace all of this with std::remove_if() algorithm?
-        //  When we remove, we need to also update the noc counts before erasing
-        auto it = q.begin();
-        while (it != q.end())
-        {
-            Message &m = (*it);
-            bool remove_message = false;
-            auto curr = it;
+        // Use remove_if to identify messages that should be removed
+        q.remove_if([&](Message &m) -> bool {
             if (m.in_noc && (t >= m.received_timestamp))
             {
                 m.in_noc = false;
-                // Go along the message path and decrement tile
-                //  message counters for all links traversed
+                // Update message counts before removing
                 schedule_update_noc_message_counts(m, noc, false);
-                remove_message = true;
+                return true;  // Remove this message
             }
-            std::advance(it, 1);
-            if (remove_message)
-            {
-                q.erase(curr);
-            }
-        }
+            return false;  // Keep this message
+        });
     }
 }
 

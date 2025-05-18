@@ -53,7 +53,7 @@ std::map<std::string, sanafe::ModelAttribute> pydict_to_model_attributes(
         attribute.forward_to_dendrite = forward_to_dendrite;
         attribute.forward_to_soma = forward_to_soma;
         attribute.name = key;
-        map[key] = attribute;
+        map[key] = std::move(attribute);
     }
     TRACE1(PYMODULE, "Converted map.size()=%zu\n", map.size());
 
@@ -355,11 +355,11 @@ sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
     default_neuron_config.force_soma_update = force_soma_update;
     default_neuron_config.log_potential = log_potential;
     default_neuron_config.log_spikes = log_spikes;
-    default_neuron_config.soma_hw_name = soma_hw_name;
+    default_neuron_config.soma_hw_name = std::move(soma_hw_name);
 
     std::map<std::string, sanafe::ModelAttribute> model_attributes =
             pydict_to_model_attributes(model_dict);
-    default_neuron_config.model_attributes = model_attributes;
+    default_neuron_config.model_attributes = std::move(model_attributes);
 
     return self->create_neuron_group(
             group_name, neuron_count, default_neuron_config);
@@ -384,7 +384,7 @@ sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
     tile_power_metrics.log_energy = log_energy;
     tile_power_metrics.log_latency = log_latency;
 
-    return self->create_tile(name, tile_power_metrics);
+    return self->create_tile(std::move(name), tile_power_metrics);
 }
 
 std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
@@ -445,7 +445,7 @@ sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
     pipeline_config.log_energy = log_energy;
     pipeline_config.log_latency = log_latency;
 
-    return self->create_core(name, parent_tile_id, pipeline_config);
+    return self->create_core(std::move(name), parent_tile_id, pipeline_config);
 }
 
 void pyset_attributes(sanafe::Neuron *self,
@@ -765,9 +765,10 @@ PYBIND11_MODULE(sanafecpp, m)
                             pybind11::dict model_attributes,
                             pybind11::dict dendrite_specific_attributes,
                             pybind11::dict soma_specific_attributes) {
-                        pyset_attributes(ref.get(), soma_hw_name,
-                                default_synapse_hw_name, dendrite_hw_name,
-                                log_spikes, log_potential, force_synapse_update,
+                        pyset_attributes(ref.get(), std::move(soma_hw_name),
+                                std::move(default_synapse_hw_name),
+                                std::move(dendrite_hw_name), log_spikes,
+                                log_potential, force_synapse_update,
                                 force_dendrite_update, force_soma_update,
                                 model_attributes, dendrite_specific_attributes,
                                 soma_specific_attributes);
@@ -814,7 +815,10 @@ PYBIND11_MODULE(sanafecpp, m)
                     })
             // Expose edges_out as a property
             .def_property_readonly("edges_out",
-                    [](const PyNeuronRef &ref) { return ref.edges_out(); });
+                    [](const PyNeuronRef &ref)
+                            -> const std::vector<sanafe::Connection> & {
+                        return ref.edges_out();
+                    });
     pybind11::class_<NeuronGroupIterator>(m, "NeuronGroupIterator")
             .def("__iter__",
                     [](NeuronGroupIterator &it) -> NeuronGroupIterator & {

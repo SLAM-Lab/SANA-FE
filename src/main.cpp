@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
                 break;
             case 'n':
                 use_netlist_format = true;
+                break;
             case 'p':
                 record_perf = true;
                 break;
