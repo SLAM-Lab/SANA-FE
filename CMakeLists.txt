@@ -145,9 +145,10 @@ set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 
 ############## booksim2
 project(booksim2-quickstart LANGUAGES CXX)
+set(BOOKSIM_VERSION "afa3b54")
 FetchContent_Declare(booksim
     GIT_REPOSITORY https://github.com/SLAM-Lab/booksim2-sanafe.git
-    GIT_TAG "main"
+    GIT_TAG ${BOOKSIM_VERSION}
     GIT_SHALLOW FALSE
 )
 FetchContent_MakeAvailable(booksim)
