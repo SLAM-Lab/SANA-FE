@@ -110,7 +110,6 @@ if(PYTHON_BUILD_ENABLED)
         find_package(Python COMPONENTS Interpreter Development REQUIRED)
     endif()
 endif()
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
 option(ENABLE_OPENMP "Enable OpenMP support for parallel processing" ON)
 find_package(OpenMP)
