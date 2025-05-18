@@ -2171,7 +2171,7 @@ sanafe::SpikingChip::sim_trace_get_optional_traces()
                 optional_perf_traces[t.name + "." + c.name + ".latency"] = 0.0;
             }
 
-            for (const auto hw : c.pipeline_hw)
+            for (const auto &hw : c.pipeline_hw)
             {
                 if (hw->log_energy)
                 {
