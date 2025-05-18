@@ -1714,12 +1714,13 @@ sanafe::ModelAttribute sanafe::description_parse_attribute_yaml(
         std::vector<ModelAttribute> attribute_list;
         for (const auto &node : attribute_node)
         {
-            INFO("Parsing sub-attribute in list.\n");
+            TRACE2(DESCRIPTION, "Parsing sub-attribute in list.\n");
             ModelAttribute curr =
                     description_parse_attribute_yaml(parser, node);
             attribute_list.push_back(curr);
         }
-        INFO("Setting attribute to an list of %zu unnamed attributes\n",
+        TRACE2(DESCRIPTION,
+                "Setting attribute to an list of %zu unnamed attributes\n",
                 attribute_list.size());
         attribute.value = attribute_list;
     }
@@ -1729,16 +1730,17 @@ sanafe::ModelAttribute sanafe::description_parse_attribute_yaml(
         std::vector<ModelAttribute> attribute_list;
         for (const auto &node : attribute_node)
         {
-            INFO("Parsing mapping of attributes.\n");
+            TRACE2(DESCRIPTION, "Parsing mapping of attributes.\n");
             ModelAttribute curr =
                     description_parse_attribute_yaml(parser, node);
             std::string key;
             node >> ryml::key(key);
             curr.name = key;
-            INFO("Saving to key: %s\n", key.c_str());
+            TRACE2(DESCRIPTION, "Saving to key: %s\n", key.c_str());
             attribute_list.push_back(curr);
         }
-        INFO("Setting attribute to a list of %zu named attributes\n",
+        TRACE1(DESCRIPTION,
+                "Setting attribute to a list of %zu named attributes\n",
                 attribute_list.size());
         attribute.value = attribute_list;
     }
@@ -2049,6 +2051,7 @@ ryml::NodeRef sanafe::description_serialize_model_attributes_to_yaml(
     // Add all attributes to the parent node
     for (const auto &[key, attribute] : attributes)
     {
+        TRACE1(DESCRIPTION, "Adding attribute %s\n", key.c_str());
         // TODO: support model-specific attributes
         if (key == "synapse" || key == "dendrite" || key == "soma")
         {
@@ -2102,7 +2105,8 @@ ryml::NodeRef sanafe::description_serialize_variant_value_to_yaml(
                     {
                         auto child = node.append_child();
 
-                        if (attribute.name.value().empty())
+                        if (!attribute.name.has_value() ||
+                                attribute.name.value().empty())
                         {
                             // Unnamed attribute - directly serialize its value
                             description_serialize_variant_value_to_yaml(
@@ -2537,8 +2541,6 @@ sanafe::netlist_parse_embedded_json(
         return model_attributes;
     }
 
-    INFO("all fields:%s\n", all_fields.c_str());
-
     char opening_char = all_fields[0];
     char closing_char;
     if (opening_char == '[')
@@ -2590,7 +2592,6 @@ sanafe::netlist_parse_embedded_json(
 
     all_fields.resize(end_pos + 1);
 
-    INFO("all fields after:%s\n", all_fields.c_str());
     // Create YAML parser
     ryml::EventHandlerTree event_handler = {};
     ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
@@ -2645,7 +2646,10 @@ void sanafe::netlist_read_group(const std::vector<std::string_view> &fields,
         neuron_config.log_potential = static_cast<bool>(attributes["log_v"]);
     }
 
+    TRACE1(DESCRIPTION, "Creating neuron group:%s with count:%d\n",
+            neuron_group_id.c_str(), neuron_count);
     net.create_neuron_group(neuron_group_id, neuron_count, neuron_config);
+
     return;
 }
 
@@ -2865,21 +2869,22 @@ std::string sanafe::netlist_group_to_netlist(const NeuronGroup &group)
     }
 
     TRACE2(NET, "saving attributes\n");
-    for (auto attribute : group.default_neuron_config.model_attributes)
-    {
-        TRACE2(NET, "saving attribute %s\n", attribute.first.c_str());
-        entry += " " + attribute.first + "=" + attribute.second.print();
-    }
+    std::map<std::string, ModelAttribute> no_default_attributes{};
+    entry += netlist_attributes_to_netlist(
+            group.default_neuron_config.model_attributes,
+            no_default_attributes);
 
     return entry;
 }
 
 std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
-        const std::map<std::string, size_t> group_name_to_id)
+        const SpikingNetwork &net,
+        const std::map<std::string, size_t> &group_name_to_id)
 {
     // TODO: support attributes specific to certain h/w units
-    const NeuronGroup &parent_group =
-            neuron.parent_net.groups.at(neuron.parent_group_name);
+    TRACE1(DESCRIPTION, "Saving neuron nid:%s.%zu to netlist\n",
+            neuron.parent_group_name.c_str(), neuron.get_id());
+    const NeuronGroup &parent_group = net.groups.at(neuron.parent_group_name);
 
     size_t group_id = group_name_to_id.at(parent_group.name);
     std::string entry = "n " + std::to_string(group_id) + "." +
@@ -2950,16 +2955,14 @@ std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
         entry += "log_potential=" + std::to_string(neuron.log_potential) + " ";
     }
 
-    for (auto attribute : neuron.model_attributes)
-    {
-        entry += " " + attribute.first + "=" + attribute.second.print();
-    }
+    entry += netlist_attributes_to_netlist(neuron.model_attributes,
+            parent_group.default_neuron_config.model_attributes);
 
     return entry;
 }
 
 std::string sanafe::netlist_mapping_to_netlist(const Neuron &neuron,
-        const std::map<std::string, size_t> group_name_to_id)
+        const std::map<std::string, size_t> &group_name_to_id)
 {
     std::string entry{};
 
@@ -2980,7 +2983,7 @@ std::string sanafe::netlist_mapping_to_netlist(const Neuron &neuron,
 }
 
 std::string sanafe::netlist_connection_to_netlist(const Connection &con,
-        const std::map<std::string, size_t> group_name_to_id)
+        const std::map<std::string, size_t> &group_name_to_id)
 {
     // TODO: support hyperedges
     // TODO: support attributes specific to only synapse or dendrite h/w
@@ -2991,12 +2994,60 @@ std::string sanafe::netlist_connection_to_netlist(const Connection &con,
             std::to_string(dest_group_id) + "." +
             std::to_string(con.post_neuron.neuron_offset.value());
 
-    for (auto attribute : con.synapse_attributes)
-    {
-        entry += " " + attribute.first + "=" + attribute.second.print();
-    }
+    std::map<std::string, ModelAttribute> no_default_attributes{};
+    entry += netlist_attributes_to_netlist(
+            con.synapse_attributes, no_default_attributes);
 
     return entry;
+}
+
+std::string sanafe::netlist_attributes_to_netlist(
+        const std::map<std::string, sanafe::ModelAttribute> &model_attributes,
+        const std::map<std::string, sanafe::ModelAttribute> &default_attributes)
+{
+    std::string attribute_str{};
+
+    TRACE1(DESCRIPTION, "Parsing attributes\n");
+    bool nested_attributes = false;
+    for (auto &[key, attribute] : model_attributes)
+    {
+        if (std::holds_alternative<std::vector<ModelAttribute>>(
+                    attribute.value))
+        {
+            // One or more attributes is nested
+            nested_attributes = true;
+            break;
+        }
+    }
+
+    if (nested_attributes)
+    {
+        TRACE2(DESCRIPTION, "Parsing nested attributes\n");
+        ryml::Tree tree;
+        ryml::NodeRef root = tree.rootref();
+        root |= ryml::MAP;
+        root |= ryml::FLOW_SL;
+
+        description_serialize_model_attributes_to_yaml(
+                root, model_attributes, default_attributes);
+        std::ostringstream ss;
+        ss << tree;
+        attribute_str = " " + ss.str();
+        INFO("attribute str:%s\n", attribute_str.c_str());
+    }
+    else
+    {
+        TRACE2(DESCRIPTION, "Parsing attributes using normal format\n");
+        for (auto attribute : model_attributes)
+        {
+            attribute_str += " ";
+            attribute_str += attribute.first;
+            attribute_str += "=";
+            attribute_str += attribute.second.print();
+        }
+    }
+
+    return attribute_str;
 }
 
 size_t sanafe::field_to_int(const std::string_view &field)

@@ -484,21 +484,22 @@ void sanafe::SpikingNetwork::save_netlist(
     }
 
     // Save all groups first
-    INFO("saving groups\n");
+    TRACE1(NET, "Saving groups\n");
     for (const auto &[group_name, group] : groups)
     {
-        INFO("saving group:%s\n", group_name.c_str());
+        TRACE1(NET, "Saving group:%s\n", group_name.c_str());
         out << netlist_group_to_netlist(group) << "\n";
     }
 
     // Now save all neurons and connections
-    INFO("saving neurons\n");
+    TRACE1(NET, "Saving neurons\n");
     for (const auto &[group_name, group] : groups)
     {
         for (const Neuron &n : group.neurons)
         {
             // Save neuron description
-            out << netlist_neuron_to_netlist(n, group_name_to_id) << "\n";
+            out << netlist_neuron_to_netlist(n, *this, group_name_to_id)
+                << "\n";
             // Save all edges for this neuron
             for (const Connection &con : n.edges_out)
             {
@@ -508,7 +509,7 @@ void sanafe::SpikingNetwork::save_netlist(
         }
     }
 
-    INFO("saving mappings\n");
+    TRACE1(NET, "Saving mappings\n");
     // Save all mappings
     std::vector<std::reference_wrapper<const Neuron>> all_neurons;
 

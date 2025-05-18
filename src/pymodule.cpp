@@ -365,27 +365,6 @@ sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
             group_name, neuron_count, default_neuron_config);
 }
 
-std::unique_ptr<sanafe::Neuron> pycreate_neuron(size_t neuron_id,
-        sanafe::SpikingNetwork &parent_net, std::string parent_group_id,
-        std::string soma_hw_name, std::string default_synapse_hw_name,
-        std::string dendrite_hw_name, bool log_spikes, bool log_potential,
-        bool force_synapse_update, bool force_dendrite_update,
-        bool force_soma_update)
-{
-    sanafe::NeuronConfiguration neuron_config;
-    neuron_config.soma_hw_name = soma_hw_name;
-    neuron_config.default_synapse_hw_name = default_synapse_hw_name;
-    neuron_config.dendrite_hw_name = dendrite_hw_name;
-    neuron_config.log_spikes = log_spikes;
-    neuron_config.log_potential = log_potential;
-    neuron_config.force_synapse_update = force_synapse_update;
-    neuron_config.force_dendrite_update = force_dendrite_update;
-    neuron_config.force_soma_update = force_soma_update;
-
-    return std::make_unique<sanafe::Neuron>(
-            neuron_id, parent_net, parent_group_id, neuron_config);
-}
-
 sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
         std::string name, double energy_north_hop, double latency_north_hop,
         double energy_east_hop, double latency_east_hop,

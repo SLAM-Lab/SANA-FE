@@ -148,7 +148,7 @@ private:
     MappedConnection &map_connection(const Connection &con);
     void map_axons();
     void sim_reset_measurements();
-    void sim_timestep(Timestep &ts, Scheduler &scheduler);
+    void sim_hw_timestep(Timestep &ts, Scheduler &scheduler);
     double sim_estimate_network_costs(const Tile &src, Tile &dest);
     void sim_calculate_energy(Timestep &ts);
 

@@ -102,9 +102,10 @@ std::tuple<std::string, size_t, size_t, size_t> netlist_parse_mapping_field(cons
 void netlist_read_network_entry(const std::vector<std::string_view> &fields, Architecture &arch, SpikingNetwork &net, const int line_number);
 
 std::string netlist_group_to_netlist(const NeuronGroup &group);
-std::string netlist_neuron_to_netlist(const Neuron &neuron, const std::map<std::string, size_t> group_name_to_id);
-std::string netlist_mapping_to_netlist(const Neuron &neuron, const std::map<std::string, size_t> group_name_to_id);
-std::string netlist_connection_to_netlist(const Connection &con, const std::map<std::string, size_t> group_name_to_id);
+std::string netlist_neuron_to_netlist(const Neuron &neuron, const SpikingNetwork &net, const std::map<std::string, size_t> &group_name_to_id);
+std::string netlist_mapping_to_netlist(const Neuron &neuron, const std::map<std::string, size_t> &group_name_to_id);
+std::string netlist_connection_to_netlist(const Connection &con, const std::map<std::string, size_t> &group_name_to_id);
+std::string netlist_attributes_to_netlist(const std::map<std::string, ModelAttribute> &model_attributes, const std::map<std::string, ModelAttribute> &default_attributes);
 
 void netlist_read_group(const std::vector<std::string_view> &fields, SpikingNetwork &net, const int line_number);
 void netlist_read_neuron(const std::vector<std::string_view> &fields, SpikingNetwork &net, const int line_number);

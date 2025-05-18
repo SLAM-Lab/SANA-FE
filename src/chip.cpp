@@ -399,7 +399,7 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
 
     // Run and measure the wall-clock time taken to run the simulation
     auto ts_start = timer.now();
-    sim_timestep(ts, scheduler);
+    sim_hw_timestep(ts, scheduler);
     auto ts_end = timer.now();
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
 
@@ -1719,7 +1719,7 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
     return;
 }
 
-void sanafe::SpikingChip::sim_timestep(Timestep &ts, Scheduler &scheduler)
+void sanafe::SpikingChip::sim_hw_timestep(Timestep &ts, Scheduler &scheduler)
 {
     std::chrono::high_resolution_clock timer;
 
