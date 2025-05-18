@@ -29,7 +29,7 @@ namespace sanafe
 {
 
 class Neuron;
-struct MappedConnection;
+class MappedConnection;
 struct Message;
 
 struct TileConfiguration;

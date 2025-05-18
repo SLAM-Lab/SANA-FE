@@ -33,8 +33,8 @@ public:
     CurrentBasedSynapseModel(const CurrentBasedSynapseModel &copy) = default;
     CurrentBasedSynapseModel(CurrentBasedSynapseModel &&other) = default;
     ~CurrentBasedSynapseModel() override = default;
-    CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = default;
-    CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = default;
+    CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = delete;
+    CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = delete;
 
     PipelineResult update(size_t synapse_address, bool read) override;
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
@@ -55,8 +55,8 @@ public:
     LoihiSynapseModel(const LoihiSynapseModel &copy) = default;
     LoihiSynapseModel(LoihiSynapseModel &&other) = default;
     ~LoihiSynapseModel() override = default;
-    LoihiSynapseModel &operator=(const LoihiSynapseModel &other) = default;
-    LoihiSynapseModel &operator=(LoihiSynapseModel &&other) = default;
+    LoihiSynapseModel &operator=(const LoihiSynapseModel &other) = delete;
+    LoihiSynapseModel &operator=(LoihiSynapseModel &&other) = delete;
 
     PipelineResult update(size_t synapse_address, bool read) override;
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override;
@@ -83,8 +83,8 @@ public:
     AccumulatorModel(const AccumulatorModel &copy) = default;
     AccumulatorModel(AccumulatorModel &&other) = default;
     ~AccumulatorModel() override = default;
-    AccumulatorModel &operator=(const AccumulatorModel &other) = default;
-    AccumulatorModel &operator=(AccumulatorModel &&other) = default;
+    AccumulatorModel &operator=(const AccumulatorModel &other) = delete;
+    AccumulatorModel &operator=(AccumulatorModel &&other) = delete;
 
     PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
     void reset() override { return; }
@@ -105,8 +105,8 @@ public:
     MultiTapModel1D(const MultiTapModel1D &copy) = default;
     MultiTapModel1D(MultiTapModel1D &&other) = default;
     ~MultiTapModel1D() override = default;
-    MultiTapModel1D &operator=(const MultiTapModel1D &other) = default;
-    MultiTapModel1D &operator=(MultiTapModel1D &&other) = default;
+    MultiTapModel1D &operator=(const MultiTapModel1D &other) = delete;
+    MultiTapModel1D &operator=(MultiTapModel1D &&other) = delete;
 
     PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
@@ -128,8 +128,8 @@ class LoihiLifModel : public SomaUnit
 {
 public:
     LoihiLifModel() = default;
-    LoihiLifModel(const LoihiLifModel &copy) = default;
-    LoihiLifModel(LoihiLifModel &&other) = default;
+    LoihiLifModel(const LoihiLifModel &copy) = delete;
+    LoihiLifModel(LoihiLifModel &&other) = delete;
     ~LoihiLifModel() override = default;
     LoihiLifModel &operator=(const LoihiLifModel &other) = delete;
     LoihiLifModel &operator=(LoihiLifModel &&other) = delete;

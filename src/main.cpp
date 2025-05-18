@@ -42,7 +42,9 @@ int main(int argc, char *argv[])
     bool record_messages{false};
     bool use_netlist_format{false};
     int total_threads_available{1};
+#ifdef HAVE_OPENMP
     int processing_threads{1};
+#endif
     int scheduler_threads{0};
     // Select the timing model on the command line. The default is the
     //  detailed build-in timing model (using a scheduler). Select only one of

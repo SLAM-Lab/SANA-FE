@@ -675,8 +675,6 @@ double sanafe::SpikingChip::process_message(
 {
     double message_processing_latency = pipeline_process_axon_in(core, m);
 
-    PipelineResult pipeline_output;
-
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
     const AxonInModel &axon_in = core.axons_in[m.dest_axon_id];
     PipelineResult empty_input{}; // Empty/default struct used as dummy input

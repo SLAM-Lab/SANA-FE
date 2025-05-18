@@ -36,7 +36,7 @@ endif()
 project(sana-fe)
 
 add_compile_options(
-    -Wall -pedantic -Werror -g -fopenmp -fPIC
+    -Wall -pedantic -Werror -g -fopenmp -fPIC -pthread
 )
 
 # Set default debug levels for tracing
