@@ -1696,7 +1696,7 @@ sanafe::description_parse_model_attributes_yaml(
     else
     {
         throw std::invalid_argument(
-                "Error: Model attributes must be an ordered map or mapping of"
+                "Error: Model attributes must be an ordered map or mapping of "
                 "named attributes.\n");
     }
 
@@ -2442,11 +2442,20 @@ std::map<std::string, sanafe::ModelAttribute> sanafe::netlist_parse_attributes(
         const std::vector<std::string_view> &attribute_fields,
         const int line_number)
 {
-    // Parse attributes from remaining fields
-    // TODO:
-    // if the first character is [ or { read using a YAML parser, otherwise
-    //  parse as list of space separated fields using <key>=<value> as below
     std::map<std::string, ModelAttribute> attributes{};
+    // Parse attributes from remaining fields
+    if (attribute_fields.empty() || attribute_fields.at(0).empty())
+    {
+        return attributes;
+    }
+
+    std::string_view first_field = attribute_fields.at(0);
+    char first_char = first_field.at(0);
+    if (first_char == '[' || first_char == '{')
+    {
+        return netlist_parse_embedded_json(attribute_fields, line_number);
+    }
+
     for (const auto &field : attribute_fields)
     {
         TRACE1(DESCRIPTION, "Parsing field:%s\n", std::string(field).c_str());
@@ -2506,6 +2515,92 @@ std::map<std::string, sanafe::ModelAttribute> sanafe::netlist_parse_attributes(
     }
 
     return attributes;
+}
+
+std::map<std::string, sanafe::ModelAttribute>
+sanafe::netlist_parse_embedded_json(
+        const std::vector<std::string_view> &attribute_fields,
+        const int line_number)
+{
+    std::map<std::string, ModelAttribute> model_attributes{};
+
+    // Concatenate fields again, and search for the terminating character
+    std::string all_fields;
+    for (auto field : attribute_fields)
+    {
+        all_fields += field;
+        all_fields += ' ';
+    }
+
+    if (all_fields.empty())
+    {
+        return model_attributes;
+    }
+
+    INFO("all fields:%s\n", all_fields.c_str());
+
+    char opening_char = all_fields[0];
+    char closing_char;
+    if (opening_char == '[')
+    {
+        closing_char = ']';
+    }
+    else if (opening_char == '{')
+    {
+        closing_char = '}';
+    }
+    else
+    {
+        INFO("Error: Invalid opening character (%c)\n", opening_char);
+        throw std::runtime_error("Invalid opening character\n");
+    }
+
+    int nested_level = 0;
+    size_t end_pos = 0;
+    while (end_pos < all_fields.length())
+    {
+        char ch = all_fields[end_pos];
+        if (ch == opening_char)
+        {
+            ++nested_level;
+        }
+        else if (ch == closing_char)
+        {
+            --nested_level;
+        }
+
+        if (nested_level < 1)
+        {
+            break;
+        }
+        ++end_pos;
+    }
+
+    if (nested_level > 0)
+    {
+        INFO("Error: JSON attributes weren't terminated (%s) on line:%d.\n",
+                all_fields.c_str(), line_number);
+        throw std::invalid_argument("JSON attributes weren't terminated.");
+    }
+    if (all_fields.length() > (end_pos + 2))
+    {
+        INFO("Warning: Text found after delimiter, end of line:%d ignored\n",
+                line_number);
+    }
+
+    all_fields.resize(end_pos + 1);
+
+    INFO("all fields after:%s\n", all_fields.c_str());
+    // Create YAML parser
+    ryml::EventHandlerTree event_handler = {};
+    ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    ryml::Tree tree = ryml::parse_in_place(all_fields.data());
+    ryml::ConstNodeRef yaml_node = tree.rootref();
+
+    model_attributes =
+            description_parse_model_attributes_yaml(parser, yaml_node);
+
+    return model_attributes;
 }
 
 void sanafe::netlist_read_group(const std::vector<std::string_view> &fields,
@@ -2713,8 +2808,7 @@ void sanafe::netlist_read_mapping(const std::vector<std::string_view> &fields,
 
 std::string sanafe::netlist_group_to_netlist(const NeuronGroup &group)
 {
-    // TODO: support embedded YAML when model attributes isn't a simple scalar
-    // TODO: support attributeaters specific to certain h/w units
+    // TODO: support attribute specific to certain h/w units
     std::string entry = "g " + std::to_string(group.neurons.size());
 
     if (group.default_neuron_config.default_synapse_hw_name.has_value() &&
@@ -2783,7 +2877,6 @@ std::string sanafe::netlist_group_to_netlist(const NeuronGroup &group)
 std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
         const std::map<std::string, size_t> group_name_to_id)
 {
-    // TODO: support embedded YAML when model attributes isn't a simple scalar
     // TODO: support attributes specific to certain h/w units
     const NeuronGroup &parent_group =
             neuron.parent_net.groups.at(neuron.parent_group_name);
@@ -2890,7 +2983,6 @@ std::string sanafe::netlist_connection_to_netlist(const Connection &con,
         const std::map<std::string, size_t> group_name_to_id)
 {
     // TODO: support hyperedges
-    // TODO: support embedded YAML when modelattributes isn't a simple scalar
     // TODO: support attributes specific to only synapse or dendrite h/w
     size_t src_group_id = group_name_to_id.at(con.pre_neuron.group_name);
     size_t dest_group_id = group_name_to_id.at(con.post_neuron.group_name);

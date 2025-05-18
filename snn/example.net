@@ -8,8 +8,8 @@ g   3       threshold=2.0 soma_hw_name=demo_soma_alt
 n   0.0    bias=1.0  connections_out=1
 n   0.1    bias=0.0  connections_out=1
 n   0.2    bias=1.0  connections_out=1
-n   1.0    bias=0.0
-n   1.1    bias=1.0
+n   1.0    { bias: 1.0 }
+n   1.1    [bias: 1.0]
 n   1.2    bias=0.0
 
 ## Edges

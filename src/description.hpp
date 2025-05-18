@@ -112,6 +112,7 @@ void netlist_read_edge(const std::vector<std::string_view> &fields, SpikingNetwo
 void netlist_read_mapping(const std::vector<std::string_view> &fields, Architecture &arch, SpikingNetwork &net, const int line_number);
 
 std::map<std::string, ModelAttribute> netlist_parse_attributes(const std::vector<std::string_view> &attribute_fields, const int line_number);
+std::map<std::string, ModelAttribute> netlist_parse_embedded_json(const std::vector<std::string_view> &attribute_fields, const int line_number);
 }
 
 #endif
