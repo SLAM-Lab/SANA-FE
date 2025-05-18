@@ -1367,11 +1367,11 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
                 {
                     ModelAttribute value = description_parse_attribute_yaml(
                             parser, model_attribute_node);
-                    attribute_list.push_back(value);
+                    attribute_list.push_back(std::move(value));
                 }
                 std::string attribute_name;
                 attribute >> ryml::key(attribute_name);
-                attribute_lists[attribute_name] = attribute_list;
+                attribute_lists[attribute_name] = std::move(attribute_list);
             }
         }
 
@@ -1738,7 +1738,7 @@ sanafe::ModelAttribute sanafe::description_parse_attribute_yaml(
             node >> ryml::key(key);
             curr.name = key;
             TRACE2(DESCRIPTION, "Saving to key: %s\n", key.c_str());
-            attribute_list.push_back(curr);
+            attribute_list.push_back(std::move(curr));
         }
         TRACE1(DESCRIPTION,
                 "Setting attribute to a list of %zu named attributes\n",
@@ -2473,8 +2473,14 @@ std::map<std::string, sanafe::ModelAttribute> sanafe::netlist_parse_attributes(
         }
 
         const auto pos = field.find_first_of('=');
+        if (pos == std::string::npos)
+        {
+            INFO("Error: Line %d: Missing '=' in field: %s\n", line_number,
+                    std::string(field).c_str());
+            continue;
+        }
         std::string key(field.substr(0, pos));
-        std::string value_str(field.substr(pos + 1UL));
+        std::string value_str(field.substr(pos + 1));
 
         ModelAttribute attribute;
         int decoded_int;
