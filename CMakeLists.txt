@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -149,10 +149,25 @@ FetchContent_Declare(booksim
     GIT_REPOSITORY https://github.com/SLAM-Lab/booksim2-sanafe.git
     GIT_TAG "main"
     GIT_SHALLOW FALSE
-    SOURCE_SUBDIR src
 )
 FetchContent_MakeAvailable(booksim)
+if(NOT booksim_POPULATED)
+    FetchContent_Populate(booksim)
+endif()
 
+get_target_property(BOOKSIM_INCLUDE_DIRS booksim INTERFACE_INCLUDE_DIRECTORIES)
+if(NOT BOOKSIM_INCLUDE_DIRS)
+    # Fallback for older CMake versions
+    set(BOOKSIM_INCLUDE_DIRS
+        ${booksim_SOURCE_DIR}
+        ${booksim_SOURCE_DIR}/src/arbiters
+        ${booksim_SOURCE_DIR}/src/allocators
+        ${booksim_SOURCE_DIR}/src/routers
+        ${booksim_SOURCE_DIR}/src/networks
+        ${booksim_SOURCE_DIR}/src/power
+    )
+    include_directories(${BOOKSIM_INCLUDE_DIRS})
+endif()
 #### END of booksim2
 
 include_directories(${PYTHON_INCLUDE_DIRS})
@@ -182,6 +197,7 @@ if(PYTHON_BUILD_ENABLED)
         sanafecpp
         ${SOURCE_FILES}
     )
+
     target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
     target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
     target_link_libraries(sanafecpp PUBLIC ryml::ryml)
