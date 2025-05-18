@@ -464,6 +464,9 @@ protected:
             "latency_update",
             "energy_message_out",
             "latency_message_out",
+            // Legacy attributes (v1)
+            "log_v",
+            "connections_out",
     };
     long int simulation_time{0L};
     PipelineUnit(const bool implements_synapse, const bool implements_dendrite, const bool implements_soma);

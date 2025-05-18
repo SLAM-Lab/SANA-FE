@@ -201,7 +201,7 @@ sanafe::SpikingNetwork sanafe::load_net(const std::filesystem::path &path,
         INFO("Loading network from netlist file (legacy): %s\n", path.c_str());
         // Fall back to the original netlist based format used by SANA-FE v1.
         //  This is supported mainly for back-compatibility
-        net = description_parse_network_file_netlist(network_fp, arch);
+        net = netlist_parse_file(network_fp, arch);
     }
     else
     {
@@ -488,7 +488,7 @@ void sanafe::SpikingNetwork::save_netlist(
     for (const auto &[group_name, group] : groups)
     {
         INFO("saving group:%s\n", group_name.c_str());
-        out << description_group_to_netlist(group) << "\n";
+        out << netlist_group_to_netlist(group) << "\n";
     }
 
     // Now save all neurons and connections
@@ -498,11 +498,11 @@ void sanafe::SpikingNetwork::save_netlist(
         for (const Neuron &n : group.neurons)
         {
             // Save neuron description
-            out << description_neuron_to_netlist(n, group_name_to_id) << "\n";
+            out << netlist_neuron_to_netlist(n, group_name_to_id) << "\n";
             // Save all edges for this neuron
             for (const Connection &con : n.edges_out)
             {
-                out << description_connection_to_netlist(con, group_name_to_id)
+                out << netlist_connection_to_netlist(con, group_name_to_id)
                     << "\n";
             }
         }
@@ -527,7 +527,7 @@ void sanafe::SpikingNetwork::save_netlist(
 
     for (const Neuron &n : all_neurons)
     {
-        out << description_mapping_to_netlist(n, group_name_to_id) << "\n";
+        out << netlist_mapping_to_netlist(n, group_name_to_id) << "\n";
     }
 
     return;
