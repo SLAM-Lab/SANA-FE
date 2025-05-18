@@ -190,20 +190,20 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                 MappedConnection &mapped_con =
                         mapped_neuron.connections_out[idx];
 
-                for (auto &name_value_pair : con.synapse_attributes)
+                for (auto &[key, value] : con.synapse_attributes)
                 {
-                    if (name_value_pair.second.forward_to_synapse)
+                    if (value.forward_to_synapse)
                     {
+                        mapped_con.synapse_hw->check_attribute(key);
                         mapped_con.synapse_hw->set_attribute_edge(
-                                mapped_con.synapse_address,
-                                name_value_pair.first, name_value_pair.second);
+                                mapped_con.synapse_address, key, value);
                     }
-                    if (name_value_pair.second.forward_to_dendrite)
+                    if (value.forward_to_dendrite)
                     {
                         MappedNeuron &n = *(mapped_con.post_neuron);
+                        n.dendrite_hw->check_attribute(key);
                         n.dendrite_hw->set_attribute_edge(
-                                mapped_con.synapse_address,
-                                name_value_pair.first, name_value_pair.second);
+                                mapped_con.synapse_address, key, value);
                     }
                 }
             }
@@ -669,6 +669,33 @@ void sanafe::PipelineUnit::check_outputs(
 
     return;
 }
+
+void sanafe::PipelineUnit::register_attributes(
+        const std::set<std::string> &attribute_names)
+{
+    for (const auto &attr : attribute_names)
+    {
+        supported_attribute_names.insert(attr);
+    }
+    return;
+}
+
+void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
+{
+    if (supported_attribute_names.find(attribute_name) ==
+            supported_attribute_names.end())
+    {
+        INFO("Warning: Attribute (%s) not supported by model: %s, will be "
+             "ignored.\nEither remove this attribute from the SNN/Architecture "
+             "description file, be more specific which hardware requires it "
+             "(using synapse/dendrite/soma sections) or register the attribute "
+             "in the constructor to suppress this warning.\n",
+                attribute_name.c_str(), name.c_str());
+    }
+
+    return;
+}
+
 
 double sanafe::SpikingChip::process_message(
         Timestep &ts, Core &core, Message &m)
@@ -1247,6 +1274,7 @@ void sanafe::PipelineUnit::set_attributes(
     //  model-specific attributes here, e.g., fault-rate or maximum memory size.
     for (auto &[key, attribute] : model_attributes)
     {
+        check_attribute(key);
         set_attribute_hw(key, attribute);
     }
 }
@@ -1517,10 +1545,12 @@ void sanafe::MappedNeuron::set_model_attributes(
                 attribute.forward_to_soma);
         if (attribute.forward_to_dendrite && (dendrite_hw != nullptr))
         {
+            dendrite_hw->check_attribute(key);
             dendrite_hw->set_attribute_neuron(mapped_address, key, attribute);
         }
         if (attribute.forward_to_soma && (soma_hw != nullptr))
         {
+            soma_hw->check_attribute(key);
             soma_hw->set_attribute_neuron(mapped_address, key, attribute);
         }
     }

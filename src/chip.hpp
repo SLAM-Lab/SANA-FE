@@ -21,6 +21,7 @@
 #include <list>
 #include <memory>
 #include <queue>
+#include <set>
 #include <variant>
 
 class BookSimConfig;
@@ -389,13 +390,15 @@ public:
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) { throw std::logic_error("Error: Dendrite input not implemented"); }
     // If using somatic inputs (address and current in)
     virtual PipelineResult update(size_t neuron_address, std::optional<double> current_in) { throw std::logic_error("Error: Soma input not implemented"); }
-    virtual double get_potential(size_t neuron_address) { return 0.0; }
     virtual void map_connection(MappedConnection &con) {}
+    virtual double get_potential(size_t neuron_address) { return 0.0; }
 
     // Normal member functions and function pointers
     void set_time(const long int timestep) { simulation_time = timestep; }
     void set_attributes(std::string unit_name, const ModelInfo &model);
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    void register_attributes(const std::set<std::string> &attribute_names);
+    void check_attribute(const std::string attribute_name);
 
     using InputInterfaceFunc = PipelineResult (PipelineUnit:: *)(Timestep &, MappedNeuron &, std::optional<MappedConnection*>, const PipelineResult &);
     using OutputInterfaceFunc = void (PipelineUnit:: *)(MappedNeuron &, std::optional<MappedConnection *>, PipelineResult &);
@@ -435,6 +438,33 @@ public:
     bool log_latency{false};
 
 protected:
+    std::set<std::string> supported_attribute_names{
+            "log_spikes",
+            "log_potential",
+            "force_update",
+            "force_synapse_update",
+            "force_dendrite_update",
+            "force_soma_update",
+            "synapse_hw_name",
+            "dendrite_hw_name",
+            "soma_hw_name",
+            "model",
+            "plugin",
+            "energy_message_in",
+            "latency_message_in",
+            "energy_access_neuron",
+            "latency_access_neuron",
+            "energy_update_neuron",
+            "latency_update_neuron",
+            "energy_spike_out",
+            "latency_spike_out",
+            "energy_process_spike",
+            "latency_process_spike",
+            "energy_update",
+            "latency_update",
+            "energy_message_out",
+            "latency_message_out",
+    };
     long int simulation_time{0L};
     PipelineUnit(const bool implements_synapse, const bool implements_dendrite, const bool implements_soma);
 

@@ -29,7 +29,7 @@ constexpr int loihi_max_compartments{1024};
 class CurrentBasedSynapseModel : public SynapseUnit
 {
 public:
-    CurrentBasedSynapseModel() = default;
+    CurrentBasedSynapseModel() { register_attributes(current_based_synapse_attributes); }
     CurrentBasedSynapseModel(const CurrentBasedSynapseModel &copy) = default;
     CurrentBasedSynapseModel(CurrentBasedSynapseModel &&other) = default;
     ~CurrentBasedSynapseModel() override = default;
@@ -42,6 +42,7 @@ public:
     void reset() override;
 
 private:
+    const std::set<std::string> current_based_synapse_attributes{"weight", "w"};
     std::vector<double> weights{};
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};
@@ -51,7 +52,7 @@ private:
 class LoihiSynapseModel : public SynapseUnit
 {
 public:
-    LoihiSynapseModel() = default;
+    LoihiSynapseModel() { register_attributes(loihi_synapse_attributes); }
     LoihiSynapseModel(const LoihiSynapseModel &copy) = default;
     LoihiSynapseModel(LoihiSynapseModel &&other) = default;
     ~LoihiSynapseModel() override = default;
@@ -65,6 +66,8 @@ public:
     void map_connection(MappedConnection &con) override;
 
 private:
+    const std::set<std::string> loihi_synapse_attributes{
+            "weight", "w", "latency", "latency_concurrent_access"};
     std::vector<double> weights{};
     std::vector<double> groups{};
     std::vector<double> costs{};
@@ -79,7 +82,7 @@ private:
 class AccumulatorModel : public DendriteUnit
 {
 public:
-    AccumulatorModel() = default;
+    AccumulatorModel() { register_attributes(accumulator_attributes); }
     AccumulatorModel(const AccumulatorModel &copy) = default;
     AccumulatorModel(AccumulatorModel &&other) = default;
     ~AccumulatorModel() override = default;
@@ -93,6 +96,10 @@ public:
     void set_attribute_edge(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
 
 private:
+    // Technically soma attributes, but due to common usage, suppres warnings
+    //  for these in the dendrite H/W too
+    const std::set<std::string> accumulator_attributes{"reset_mode", "reset",
+            "bias", "threshold", "leak_decay", "noise", "weight", "w"};
     std::vector<double> accumulated_charges{std::vector<double>(loihi_max_compartments, 0.0)};
     std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
     double leak_decay{0.0};
@@ -115,6 +122,8 @@ public:
     void reset() override;
 
 private:
+    const std::set<std::string> multitap_attributes{
+            "taps", "time_constants", "space_constants"};
     // Modeling a 1D dendrite with taps
     std::vector<double> tap_voltages{std::vector<double>(1, 0.0)};
     std::vector<double> next_voltages{std::vector<double>(1, 0.0)};
@@ -127,7 +136,7 @@ private:
 class LoihiLifModel : public SomaUnit
 {
 public:
-    LoihiLifModel() = default;
+    LoihiLifModel() { register_attributes(loihi_lif_attributes); }
     LoihiLifModel(const LoihiLifModel &copy) = delete;
     LoihiLifModel(LoihiLifModel &&other) = delete;
     ~LoihiLifModel() override = default;
@@ -168,6 +177,8 @@ public:
     };
 
 private:
+    const std::set<std::string> loihi_lif_attributes{"reset_mode", "reset",
+            "bias", "threshold", "leak_decay", "noise"};
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{NOISE_NONE};
     std::ifstream noise_stream;
@@ -179,7 +190,7 @@ constexpr int truenorth_max_neurons{4096};
 class TrueNorthModel : public SomaUnit
 {
 public:
-    TrueNorthModel() = default;
+    TrueNorthModel() { register_attributes(truenorth_attributes); }
     TrueNorthModel(const TrueNorthModel &copy) = default;
     TrueNorthModel(TrueNorthModel &&other) = default;
     ~TrueNorthModel() override = default;
@@ -213,13 +224,23 @@ public:
     };
 
 private:
+    const std::set<std::string> truenorth_attributes{
+            "reset_mode",
+            "reverse_reset_mode",
+            "reset",
+            "reverse_reset",
+            "bias",
+            "threshold",
+            "reverse_threshold",
+            "leak",
+    };
     std::vector<TrueNorthNeuron> neurons{truenorth_max_neurons};
 };
 
 class InputModel : public SomaUnit
 {
 public:
-    InputModel() = default;
+    InputModel() { register_attributes(input_attributes); }
     InputModel(const InputModel &copy) = delete; // Because of random_device
     InputModel(InputModel &&other) = delete; // Because of random_device
     ~InputModel() override = default;
@@ -232,6 +253,7 @@ public:
     void reset() override { send_spike = false; return; }
 
 private:
+    const std::set<std::string> input_attributes{"rate", "poisson", "spikes"};
     std::vector<bool> spikes{};
     std::vector<bool>::const_iterator curr_spike{spikes.begin()};
     std::uniform_real_distribution<double> uniform_distribution{0.0, 1.0};

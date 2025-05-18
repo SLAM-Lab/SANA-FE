@@ -23,18 +23,18 @@ class HH : public sanafe::SomaUnit
     // HH specific
 public:
     // system variables
-    double C_m;
-    double g_Na;
-    double g_K;
-    double g_L;
-    double V_Na;
-    double V_K;
-    double V_L;
-    double dt;
+    double C_m{10.0}; // Effective capacitance per area of membrane; default is 1
+    double g_Na{1200.0}; // Conductance of sodium
+    double g_K{360.0}; // Conductance of potassium
+    double g_L{3.0}; // Conductance of leak channel
+    double V_Na{50.0}; // Reverse potential of sodium
+    double V_K{-77.0}; // Reverse potential of potassium
+    double V_L{54.387}; // Reverse potential of leak channel
+    double dt{0.1};
 
     // main parameters
-    double V;
-    double prev_V; // Membrane potential
+    double V{0.0};
+    double prev_V{0.0}; // Membrane potential
     double I; // Stimulation current per area
     double m; // m, n, h are coeff
     double n;
@@ -60,15 +60,7 @@ public:
 
     HH()
     {
-        V = 0.0;
-        C_m = 10.0; // Effective capacitance per area of membrane; default is 1
-        g_Na = 1200.0; // Conductance of sodium
-        g_K = 360.0; // Conductance of potassium
-        g_L = 3.0; // Conductance of leak channel
-        V_Na = 50.0; // Reverse potential of sodium
-        V_K = -77.0; // Reverse potential of potassium
-        V_L = -54.387; // Reverse potential of leak channel
-        dt = 0.1;
+        register_attributes({"m", "n", "h", "current"});
     }
 
     double get_potential(const size_t neuron_address) override
