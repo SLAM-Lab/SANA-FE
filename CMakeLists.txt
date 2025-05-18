@@ -113,6 +113,7 @@ endif()
 
 option(ENABLE_OPENMP "Enable OpenMP support for parallel processing" ON)
 find_package(OpenMP)
+find_package(Threads REQUIRED)
 
 # OpenMP i.e. multithreaded builds are optional, but on by default
 if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
@@ -206,6 +207,8 @@ if(PYTHON_BUILD_ENABLED)
         target_link_libraries(sanafecpp PRIVATE OpenMP::OpenMP_CXX)
         target_compile_definitions(sanafecpp PRIVATE HAVE_OPENMP)
     endif()
+    target_link_libraries(sanafecpp PRIVATE Threads::Threads)
+
 endif()
 
 if(STANDALONE_BUILD_ENABLED)
@@ -220,4 +223,5 @@ if(STANDALONE_BUILD_ENABLED)
         target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
         target_compile_definitions(sim PRIVATE HAVE_OPENMP)
     endif()
+    target_link_libraries(sim PRIVATE Threads::Threads)
 endif()
