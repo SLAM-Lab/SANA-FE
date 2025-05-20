@@ -18,9 +18,9 @@
 #include "plugins.hpp"
 #include "print.hpp"
 
-class HH : public sanafe::SomaUnit
+class HodgkinHuxley : public sanafe::SomaUnit
 {
-    // HH specific
+    // HodgkinHuxley specific
 public:
     // system variables
     double C_m{10.0}; // Effective capacitance per area of membrane; default is 1
@@ -58,7 +58,7 @@ public:
     double tau_V{0.0};
     double Vinf{0.0};
 
-    HH()
+    HodgkinHuxley()
     {
         register_attributes({"m", "n", "h", "current"});
     }
@@ -173,8 +173,8 @@ public:
 };
 
 // the Class factories
-extern "C" sanafe::SomaUnit *create_HH()
+extern "C" sanafe::PipelineUnit *create_HodgkinHuxley()
 {
     TRACE1(MODELS, "Creating HH soma instance\n");
-    return (sanafe::SomaUnit *) new HH();
+    return (sanafe::PipelineUnit *) new HodgkinHuxley();
 }

@@ -99,8 +99,7 @@ sanafe::TileConfiguration &sanafe::Architecture::create_tile(
         std::string name, const TilePowerMetrics &power_metrics)
 {
     // Tiles are assigned sequential IDs based on creation order to ensure
-    //  deterministic addressing in the network-on-chip topology. The tile id is
-    //  a unique global value that be used to index
+    //  deterministic addressing in the network-on-chip topology
     const size_t new_tile_id = tiles.size();
 
     // Tile IDs serve as both array indices and as network addresses in the NoC

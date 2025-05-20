@@ -11,14 +11,21 @@ Simulating Advanced Neuromorphic Architectures for Fast Exploration (SANA-FE)
 
 A framework to model energy and performance of neuromorphic hardware.
 
-# Reference
+# Citation
 
 We hope that you find this project useful. If you use SANA-FE in your work,
-please cite:
+please cite our paper:
 J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
 "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
 in IEEE Transactions on Computer-Aided Design of Integrated Circuits and
 Systems, doi: 10.1109/TCAD.2025.3537971.
+
+    @article{boyle2025sanafe,
+      title={SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration},
+      author={Boyle, James A and Plagge, Mark and Cardwell, Suma George and Chance, Frances S and Gerstlauer, Andreas},
+      journal={IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems},
+      year={2025},
+    }
 
 # To Build
 
@@ -29,27 +36,30 @@ compilation, run the following command in the project directory:
 Then compile SANA-FE by using the command:
 `make`
 
-Optionally, enable multithreaded builds using the optional flag `-j`
+Optionally, enable multithreaded builds using the optional flag `-j <nthreads>`
 
 ## Dependencies
 
 Building this project requires `cmake`, `make`, and a compiler that supports the
 C++17 standard (e.g., GCC >= 8, Clang >= 5). This project makes use of the
-opensource project RapidYAML for all YAML file parsing. To build with Python
-interfaces (currently mandatory), you must also have Python 3.x installed with
-PyBind11. Assuming Python3 is available, you can install PyBind11 using:
+open source projects RapidYAML for all YAML file parsing, and Booksim 2 for
+optional cycle-accurate NoC modeling. To build with Python interfaces, you must
+also have Python 3.x installed with PyBind11. Assuming Python3 is available, you
+can install PyBind11 using:
 
 `pip install pybind11`
 
+Booksim 2 requires the `bison` and `flex` dependencies for config parsing.
+
 # To Run an Example
 
-`./sim arch/example.yaml snn/example.yaml 10`
+`./sim arch/example.yaml snn/example.yaml 200`
 
-This simulates 10 time-steps of a tiny connected spiking neural network (SNN).
+This simulates 200 time-steps of a tiny connected spiking neural network (SNN).
 
 General usage:
 
-`./sim <architecture description> <SNN description> <N timesteps>`
+`./sim [optional flags] <architecture description> <SNN description> <N timesteps>`
 
 In addition to the standlone simulator, SANA-FE can also be scripted using a
 Python API. For an example of how this can be done, see the Jupyter
@@ -69,13 +79,15 @@ after enabling traces globally, you will still have to create probes at the
 neuron level to get trace output.
 
 Flags:
+* `-o`: Output directory
 * `-m`: Enable message traces to `messages.csv`
 * `-n`: Use the (legacy) netlist format for SNNs, instead of YAML.
 * `-p`: Record the simulated performance of each timestep to `perf.csv`
 * `-s`: Enable spike traces to `spikes.csv`
-* `-t`: Use a faster but less accurate analytical timing model instead of the
-default scheduler
+* `-t [simple/detailed/cycle]`: Specify the timing model  (default=`detailed`)
 * `-v`: Enable potential (voltage) traces to `potential.csv`
+* `-N`: Number of neuron/message processing threads (default=1)
+* `-S`: Number of scheduling threads (default=0, use main thread)
 
 ## SNN Description
 
@@ -99,10 +111,10 @@ useful for sharing common attributes or connections. Under the `groups`
 subsection, you must create a list of named neuron groups. Within each group is
 an `attributes` section and a `neurons` section.
 
-In each `neurons` subsection, list all sets of neurons belonging to the group as
-an ID:attributes pair. For conciseness it is possible define ranges of neurons
-at once using the range (..) notation. Following each neuron, give an ordered or
-unordered list of attributes e.g.,
+In each `neurons` subsection, list all sets of neurons belonging to the group.
+For conciseness we support specifying multiple neurons using the range (..)
+notation. Following each neuron, give an ordered or unordered list of
+attributes e.g.,
 
 - 0..2: [attribute1: value1]
 - 3: {attribute1: value1}
@@ -229,50 +241,71 @@ hardware units.
 
 As part of SANA-FE, the user can implement different hardware models using
 custom plugins. Models for synapses, dendrites and somas are all supported.
-The plugin mechanism defines common interfaces for you to create .so files.
-There are some example plugins provided in the `/plugins` folder, including an
-implementation of a Hodgkin-Huxley neuron.
+SANA-FE supports a base hardware model base class, with which it implements
+all of its synaptic, dendritic and somatic hardware models. Using SANA-FE's
+`PipelineUnit` base class, you can implement your own models as hardware
+plugins.
 
-To include your plugin, several steps need to be taken:
-1. The path to the plugin needs to be specified in the architecture yaml file,
-inside a corresponding `synapse`, `dendrite` or `soma` hardware unit.
-You must provide the plugin path using the attribute `plugin: <name>`. You must
-also specify the name of the model inside the plugin using the attribute
-`model: <name>`.
-2. The hardware unit is mapped to in the net file with the keyword
-`soma_hw_name`.
-3. The `/plugins`folder contains the plugin compiled into a file with the
-format `[plugin name].so`.
+## Using Plugins
 
-Each plugin must implement a class derived from the base classes `SynapseUnit`,
-`DendriteUnit` or `SomaUnit` classes. On every creation of a neuron or
-connection, a new instance of the specific plugin class will be created.
+There is one example already provided in the `/plugins` folder implementing a
+Hodgkin-Huxley neuron model (`hodgkin_huxley.cpp`). There are a few steps
+required to use plugins in SANA-FE:
+
+1. Specify the plugin path in the architecture yaml file, in the corresponding
+`synapse`, `dendrite` or `soma` hardware section. Specify the plugin path using
+the attribute `plugin: <pathname>`.
+2. Specify the model name using the attribute `model: <name>`.
+3. Map neurons to the hardware unit as usual with the attribute: `soma_hw_name`.
+
+For example, for the Hodgkin-Huxley example provided with SANA-FE, you could use
+it as follows:
+
+    # Rest of arch description
+    ...
+    soma:
+    - name: plugin_example_soma
+      attributes:
+        plugin: plugins/hodgkin_huxley.cpp
+        model: HodgkinHuxley
+    ...
 
 ## Creating a New Plugin
 
-SANA-FE's plugin model makes it easy to create new models and
-integrate them directly into your SNN execution. There are, however,
-two main interfacing requirements to allow plugins to smoothly execute.
+SANA-FE can run any models provided as user plugins. The plugin must be compiled
+as a shared library containing one or more hardware models.
+Models can execute arbitrary code, but interfaces must be derived either from
+the  general `PipelineUnit` class, or one of the specialized `SynapseUnit`,
+`DendriteUnit` or `SomaUnit` base classes.
 
-1. The plugin class must extend the `BaseSoma` located in `plugins.hpp`.
-This includes implementing the base constructor, `update()`, `reset()` and
-`set_attribute()` functions.
-2. One class factory functions needs to be created. This has to be in the
-format `create_<plugin_name>`. This function is used to get an instance of your
-new class. The objects are automatically destructed.
+SANA-FE's plugin mechanism makes it easy to integrate plugins with your
+architectural simulations. However, a few steps are needed to get plugins
+running:
 
-It is recommended new users read through the hodgkin_huxley.cpp file to see what
-an example soma class looks like. The `update_soma` function will be passed
-the input current spike as a double and returns `NeuronStatus`, an enum
-representing whether the neuron is idle, updated, or fired. The `parameters`
-function takes in a struct of `attributes` with a specified int length.
-These parameters are arbitrary keyword=value pairs that can pass in any
-information to the class. This is where parameters specified in the network
-file will be passed to.
+1. You must make sure your plugin has been built as a shared library (`.so`),
+either by updating the plugin CMake file or providing your own build scripts.
+2. Your new plugin must implement a hardware model class with the hardware
+functionality you want. The model class you implement must be derived from
+`PipelineUnit` in `chip.hpp`, which defines the required interfaces. These are
+enforced by pure virtual methods, including attribute parsing methods update
+methods. For examples of different hardware models, see either `models.cpp` or
+the `plugins` folder.
+3. Finally, provide a class factory function that returns a new instance of
+your model class. This has to be in the format `create_<modelname>`. For
+example, for a `HodgkinHuxley` model, we would specify the following code in
+the plugin C++ file:
 
-The .so should be kept, the .o file is unnecessary and can be deleted.
+```
+extern "C" sanafe::PipelineUnit *create_HodgkinHuxley()
+{
+    return (sanafe::PipelineUnit *) new HodgkinHuxley();
+}
+```
 
-## Legacy SNN Description Format (netlist)
+It is recommended new users look through the rest of the `hodgkin_huxley.cpp`
+file to see what an example plugin looks like.
+
+## Legacy SNN Description (Netlist) Format
 
 Version 1 of SANA-FE (written in C) defined a simpler, less capable SNN
 description format (compared to the current YAML-based format). For
@@ -327,6 +360,26 @@ directory. See header files for more detail on supported classes and functions.
 `schedule.cpp`
 
 C++ code has been written using the C++17 standard.
+
+# References
+
+J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
+"SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
+in IEEE Transactions on Computer-Aided Design of Integrated Circuits and
+Systems, 2025,
+[doi:10.1109/TCAD.2025.3537971](https://doi.org/10.1109/TCAD.2025.3537971).
+
+J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
+"Tutorial: Large-Scale Spiking Neuromorphic Architecture Exploration using
+SANA-FE," in 2024 International Conference on Hardware/Software Codesign and
+System Synthesis (CODES+ISSS), Raleigh, NC, USA,
+[doi:10.1109/CODES-ISSS60120.2024.00007](https://doi.org/10.1109/CODES-ISSS60120.2024.00007).
+
+J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
+"Performance and Energy Simulation of Spiking Neuromorphic Architectures for
+Fast Exploration," in 2023 International Conference on Neuromorphic Systems
+(ICONS), Santa Fe, NM, USA,
+[doi:10.1145/3589737.3605970](https://doi.org/10.1145/3589737.3605970).
 
 # Contact
 James Boyle: james.boyle@utexas.edu
