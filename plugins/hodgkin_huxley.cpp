@@ -56,7 +56,7 @@ public:
     double ph;
     double denominator;
     double tau_V;
-    double Vinf;
+    double Vinf{0.0};
 
     HH()
     {
