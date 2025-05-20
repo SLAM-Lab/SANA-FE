@@ -181,7 +181,7 @@ void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
     }
     if (!hw_exists)
     {
-        PipelineUnitConfiguration &synapse = parent_core.create_hw(name, model);
+        PipelineUnitConfiguration &synapse = parent_core.create_hardware_unit(name, model);
         synapse.implements_synapse = true;
     }
 }
@@ -297,7 +297,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
         if (!hw_exists)
         {
             PipelineUnitConfiguration &dendrite =
-                    parent_core.create_hw(name, model_details);
+                    parent_core.create_hardware_unit(name, model_details);
             dendrite.implements_dendrite = true;
         }
     }
@@ -393,7 +393,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         if (!hw_exists)
         {
             PipelineUnitConfiguration &soma =
-                    parent_core.create_hw(name, model_details);
+                    parent_core.create_hardware_unit(name, model_details);
             soma.implements_soma = true;
         }
     }

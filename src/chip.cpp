@@ -45,8 +45,8 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         const bool record_potentials, const bool record_perf,
         const bool record_messages)
         : core_count(arch.core_count)
-        , noc_width(arch.noc_width)
-        , noc_height(arch.noc_height)
+        , noc_width(arch.noc_width_in_tiles)
+        , noc_height(arch.noc_height_in_tiles)
         , noc_buffer_size(arch.noc_buffer_size)
         , max_cores_per_tile(arch.max_cores_per_tile)
         , out_dir(output_dir)
@@ -1423,6 +1423,13 @@ sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
             id);
 
     return axon_out_hw.back();
+}
+
+std::string sanafe::Core::info() const noexcept
+{
+    std::ostringstream ss;
+    ss << "sanafe::Core(name= " << name << " tile=" << parent_tile_id << ")";
+    return ss.str();
 }
 
 sanafe::Message::Message(const long int id, const SpikingChip &hw,

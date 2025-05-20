@@ -570,7 +570,7 @@ public:
     AxonOutUnit &create_axon_out(const AxonOutConfiguration &config);
     [[nodiscard]] int get_id() const { return id; }
     [[nodiscard]] int get_offset() const { return offset; }
-    [[nodiscard]] std::string info() const;
+    [[nodiscard]] std::string info() const noexcept;
 };
 
 class Tile
