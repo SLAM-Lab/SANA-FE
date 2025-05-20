@@ -652,6 +652,13 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("soma_hw_name") = "")
             .def("save", &sanafe::SpikingNetwork::save, pybind11::arg("path"),
                     pybind11::arg("use_netlist_format") = false)
+            .def_property_readonly(
+                    "groups",
+                    [](sanafe::SpikingNetwork &self)
+                            -> std::map<std::string, sanafe::NeuronGroup> & {
+                        return self.groups;
+                    },
+                    pybind11::return_value_policy::reference_internal)
             .def(
                     "__getitem__",
                     [](sanafe::SpikingNetwork &self,
@@ -681,6 +688,13 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("kernel_count") = 1,
                     pybind11::arg("stride_width") = 1,
                     pybind11::arg("stride_height") = 1)
+            .def_property_readonly(
+                    "neurons",
+                    [](sanafe::NeuronGroup &self)
+                            -> std::vector<sanafe::Neuron> & {
+                        return self.neurons;
+                    },
+                    pybind11::return_value_policy::reference_internal)
             .def("__getitem__",
                     [](pybind11::object self_obj,
                             pybind11::object index) -> pybind11::object {

@@ -14,4 +14,9 @@ layer2 = net.create_neuron_group("out", 2, {})
 print(layer1)
 print(layer2)
 
-layer1.connect_neurons_sparse(layer2, {}, [(0, 0), (0, 100)])
+layer1.connect_neurons_sparse(layer2, {}, [(0, 0), (0, 1)])
+
+groups = net.groups
+names = list(net.groups.keys())
+print(groups)
+print(names)
