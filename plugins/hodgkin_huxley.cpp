@@ -89,7 +89,7 @@ public:
     }
 
     void set_attribute_hw(const std::string &attribute_name,
-            const sanafe::ModelAttribute &param)
+            const sanafe::ModelAttribute &param) override
     {
         return;
     };
