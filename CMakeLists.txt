@@ -82,6 +82,7 @@ foreach(category ARCH CHIP DESCRIPTION MODELS NET PLUGINS PYMODULE SCHEDULER)
 endforeach()
 
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/plugins")
 include(CMakePrintHelpers)
 cmake_print_variables(SRC_DIR)
 file (GLOB SOURCE_FILES "${SRC_DIR}/*.cpp")
