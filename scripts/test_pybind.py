@@ -20,3 +20,5 @@ groups = net.groups
 names = list(net.groups.keys())
 print(groups)
 print(names)
+print(groups["in"].neurons)
+print(groups["in"].neurons[0])

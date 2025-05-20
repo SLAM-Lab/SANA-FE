@@ -690,9 +690,16 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("stride_height") = 1)
             .def_property_readonly(
                     "neurons",
-                    [](sanafe::NeuronGroup &self)
-                            -> std::vector<sanafe::Neuron> & {
-                        return self.neurons;
+                    [](pybind11::object &self_obj) -> pybind11::object {
+                        sanafe::NeuronGroup &self =
+                                pybind11::cast<sanafe::NeuronGroup &>(self_obj);
+                        std::vector<pybind11::object> neuron_refs;
+                        for (sanafe::Neuron &neuron : self.neurons)
+                        {
+                            neuron_refs.emplace_back(pybind11::cast(
+                                    PyNeuronRef(self_obj, &neuron)));
+                        }
+                        return pybind11::cast(neuron_refs);
                     },
                     pybind11::return_value_policy::reference_internal)
             .def("__getitem__",
