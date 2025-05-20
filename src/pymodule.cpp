@@ -612,7 +612,7 @@ public:
 PYBIND11_MODULE(sanafecpp, m)
 {
     m.doc() = R"pbdoc(
-    SANA-FE Kernel Module
+    SANA-FE CPP Kernel Module
     --------------------------------
 
     .. currentmodule:: sanafecpp

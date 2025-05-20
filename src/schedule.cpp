@@ -26,8 +26,8 @@
 
 sanafe::NocInfo::NocInfo(const int width, const int height,
         const int core_count, const size_t max_cores_per_tile)
-        : noc_width(width)
-        , noc_height(height)
+        : noc_width_in_tiles(width)
+        , noc_height_in_tiles(height)
         , core_count(core_count)
         , max_cores_per_tile(max_cores_per_tile)
 {
@@ -35,6 +35,13 @@ sanafe::NocInfo::NocInfo(const int width, const int height,
 
 double sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
 {
+    // Simple analytical model, that takes the maximum of either neuron or
+    //  message processing for each core, and takes the maximum latency of
+    //  any core in the design.
+    //
+    // This scheduler is extremely simple and therefore
+    //  fast (also easily done in parallel), however, it won't capture any
+    //  network interactions or resource contention.
     const size_t cores = ts.messages->size();
     std::vector<double> neuron_processing_latencies(cores, 0.0);
     std::vector<double> message_processing_latencies(cores, 0.0);
@@ -64,6 +71,17 @@ double sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
 double sanafe::schedule_messages_cycle_accurate(
         Timestep &ts, const BookSimConfig &config, Scheduler &scheduler)
 {
+    // Cycle-accurate (NoC)-based timing model for highly accurate network
+    //  simulation, using external simulator Booksim 2. This is the most
+    //  accurate model, but is probably too slow for meaningful design-space
+    //  exploration (about 1000x/100x slower than the simple/detailed models).
+    //  The timings within each core's pipeline is predictible, but network
+    //  effects are more complex. Booksim 2 has been developed in Stanford and
+    //  accurately models the transactions happening within an NoC [Jiang 2013]
+    //
+    // The version of Booksim 2 used here has had substantial modifications,
+    //  including a new static library interface (instead of being standalone)
+    // TODO: support running across multiple threads like the detailed model
     for (auto &core_messages : *(ts.messages))
     {
         for (auto &message : core_messages)
@@ -71,8 +89,7 @@ double sanafe::schedule_messages_cycle_accurate(
             if (message.mid == placeholder_mid)
             {
                 booksim_create_processing_event(message.timestep,
-                        std::make_pair(
-                                message.src_neuron_group_id,
+                        std::make_pair(message.src_neuron_group_id,
                                 message.src_neuron_id),
                         std::make_pair(
                                 message.src_tile_id, message.src_core_offset),
@@ -81,8 +98,7 @@ double sanafe::schedule_messages_cycle_accurate(
             else
             {
                 booksim_create_spike_event(message.timestep,
-                        std::make_pair(
-                                message.src_neuron_group_id,
+                        std::make_pair(message.src_neuron_group_id,
                                 message.src_neuron_id),
                         std::make_pair(
                                 message.src_tile_id, message.src_core_offset),
@@ -132,7 +148,7 @@ void sanafe::schedule_messages_thread(
         bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
         if (got_ts)
         {
-            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", tid,ts.timestep);
+            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", tid, ts.timestep);
             schedule_messages_timestep(ts, scheduler);
         }
     }
@@ -150,6 +166,8 @@ void sanafe::schedule_stop_all_threads(sanafe::Scheduler &scheduler,
     scheduler.should_stop = true;
     scheduler.timesteps_to_schedule.set_terminate();
     scheduler.timesteps_to_write.set_terminate();
+
+    // This function is blocking i.e., waits for all workers to finish
     for (auto &thread : scheduler.scheduler_threads)
     {
         if (thread.joinable())
@@ -158,20 +176,24 @@ void sanafe::schedule_stop_all_threads(sanafe::Scheduler &scheduler,
         }
     }
 
+    TRACE1(SCHEDULER, "All threads stopped successfully.\n");
     return;
 }
 
 double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
 {
-    // Schedule the global order of messages. Takes a vector containing
-    //  a list of messages per core, and scheduler parameters (mostly
-    //  NoC configuration parameters). Returns the timestamp of the last
-    //  scheduled event, i.e., the total time-step delay
+    // Schedule the global order of messages using a semi-analytical timing
+    //  model. This sits in between the complexity of the simple and
+    //  cycle-accurate model, capturing some but not all network effects. This
+    //  takes a vector containing a list of messages per core, and scheduler
+    //  parameters (mostly NoC configuration parameters). Returns the timestamp
+    //  of the last scheduled event, i.e., the total time-step delay
     MessagePriorityQueue priority;
     NocInfo noc(scheduler.noc_width, scheduler.noc_height, scheduler.core_count,
             scheduler.max_cores_per_tile);
     double last_timestamp;
-    const size_t total_links = noc.noc_height * noc.noc_width *
+    const size_t total_links = noc.noc_height_in_tiles *
+            noc.noc_width_in_tiles *
             (sanafe::ndirections + noc.max_cores_per_tile);
     noc.message_density = std::vector<double>(total_links, 0.0);
 
@@ -198,9 +220,6 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
     //  the point of sending, and the average processing delay of
     //  all of those messages. When a message is added or removed from the
     //  NoC we update the average counts.
-    //int last_rx_core = -1;
-    //int last_tx_core = -1;
-    //bool last_rx = true;
     while (!priority.empty())
     {
         // Get the core's queue with the earliest simulation time
@@ -296,7 +315,6 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
         TRACE1(SCHEDULER, "Priority size:%zu\n", priority.size());
     }
     TRACE1(SCHEDULER, "Scheduler finished.\n");
-    //INFO("last rx:%d tx:%d t:%e rx:%d\n", last_rx_core, last_tx_core, last_timestamp, last_rx);
 
     ts.sim_time = last_timestamp;
     scheduler.timesteps_to_write.push(ts);
@@ -430,13 +448,13 @@ void sanafe::schedule_update_noc_message_counts(
 double sanafe::schedule_calculate_messages_along_route(
         const Message &m, NocInfo &noc)
 {
-    // Calculate the total flow density along a spike message route.
-    //  Sum the densities for all links the message will travel
-    double flow_density;
+    // Calculate the total flow density along a spike message route to act as a
+    //  link congestion metric. This is given by the sum of the densities, for
+    //  all links the message will travel i.e., the message path
     int x_increment;
     int y_increment;
 
-    flow_density = 0.0;
+    double flow_density = 0.0;
     if (m.src_x < m.dest_x)
     {
         x_increment = 1;
@@ -519,9 +537,9 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
                 m.in_noc = false;
                 // Update message counts before removing
                 schedule_update_noc_message_counts(m, noc, false);
-                return true;  // Remove this message
+                return true; // Remove this message
             }
-            return false;  // Keep this message
+            return false; // Keep this message
         });
     }
 }
@@ -529,20 +547,20 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
 sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
         std::vector<MessageFifo> &message_queues_per_core)
 {
-    // Create the priority queue of messages
     MessagePriorityQueue priority;
 
     TRACE1(SCHEDULER, "Initializing priority queue.\n");
-    for (auto &q : message_queues_per_core)
+    for (auto &message_queue : message_queues_per_core)
     {
-        // For each per-core queue, get the first message for that core
-        //  and add it to the corresponding priority queue
-        if (!q.empty()) // messages
+        // Initialize each per-core queue with the first message for that core
+        //  We use priority queues so that we can sort by simulation time and
+        //  always pop the next timing event
+        if (!message_queue.empty()) // messages
         {
-            Message m = q.front();
-            q.pop_front();
-            m.sent_timestamp = m.generation_delay;
-            priority.push(m);
+            Message message = message_queue.front();
+            message_queue.pop_front();
+            message.sent_timestamp = message.generation_delay;
+            priority.push(message);
         }
         else
         {

@@ -18,7 +18,7 @@
 #include <sstream>
 #include <vector>
 
-#include <booksim_lib.hpp>
+#include <booksim_lib.hpp> // For cycle-accurate NoC simulation
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif

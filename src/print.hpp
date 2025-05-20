@@ -14,8 +14,6 @@
 namespace sanafe
 {
 std::string print_format_attributes(const std::map<std::string, std::any> &attr);
-std::string print_float(const double val);
-std::string print_int(const long int val);
 }
 
 
@@ -56,7 +54,7 @@ std::string print_int(const long int val);
 #define DEBUG_CATEGORY_SCHEDULER 6
 #define DEBUG_CATEGORY_PLUGINS 7
 
-// Default debug levels; CMake can override these later
+// Default debug levels; CMake can override these defaults later
 #ifndef DEBUG_LEVEL_ARCH
 #define DEBUG_LEVEL_ARCH 0
 #endif

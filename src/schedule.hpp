@@ -169,8 +169,8 @@ struct Scheduler
 struct NocInfo
 {
     std::vector<MessageFifo> messages_received;
-    const size_t noc_width;
-    const size_t noc_height;
+    const size_t noc_width_in_tiles;
+    const size_t noc_height_in_tiles;
     const size_t core_count;
     const size_t max_cores_per_tile;
     // Message density is the distribution of messages buffered in different
@@ -187,7 +187,7 @@ struct NocInfo
     [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
     {
         const size_t links_per_router = max_cores_per_tile + ndirections;
-        return (x * noc_height * links_per_router) + (y * links_per_router) +
+        return (x * noc_height_in_tiles * links_per_router) + (y * links_per_router) +
                 link;
     }
 };
