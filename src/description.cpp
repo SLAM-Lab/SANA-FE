@@ -1396,7 +1396,7 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
                                 parser, model_attribute_node);
                         value.forward_to_dendrite = false;
                         value.forward_to_soma = false;
-                        attribute_list.push_back(value);
+                        attribute_list.push_back(std::move(value));
                     }
                     std::string attribute_name;
                     synapse_attribute_node >> ryml::key(attribute_name);
@@ -1420,7 +1420,7 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
                     }
                     std::string attribute_name;
                     dendrite_attribute_node >> ryml::key(attribute_name);
-                    attribute_lists[attribute_name] = attribute_list;
+                    attribute_lists[attribute_name] = std::move(attribute_list);
                 }
             }
             else if (attribute.key() != "type")

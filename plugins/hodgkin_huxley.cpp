@@ -35,27 +35,27 @@ public:
     // main parameters
     double V{0.0};
     double prev_V{0.0}; // Membrane potential
-    double I; // Stimulation current per area
-    double m; // m, n, h are coeff
-    double n;
-    double h;
+    double I{}; // Stimulation current per area
+    double m{}; // m, n, h are coeff
+    double n{};
+    double h{};
 
     // internal results of various differential equations
-    double alpha_m;
-    double alpha_n;
-    double alpha_h;
-    double beta_m;
-    double beta_n;
-    double beta_h;
+    double alpha_m{};
+    double alpha_n{};
+    double alpha_h{};
+    double beta_m{};
+    double beta_n{};
+    double beta_h{};
 
-    double tau_m;
-    double tau_n;
-    double tau_h;
-    double pm;
-    double pn;
-    double ph;
-    double denominator;
-    double tau_V;
+    double tau_m{0.0};
+    double tau_n{0.0};
+    double tau_h{0.0};
+    double pm{};
+    double pn{};
+    double ph{};
+    double denominator{0.0};
+    double tau_V{0.0};
     double Vinf{0.0};
 
     HH()
