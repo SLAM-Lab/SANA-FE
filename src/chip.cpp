@@ -987,25 +987,17 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
     }
 
     bool soma_latency_metrics_set =
-            n.soma_hw->default_soma_energy_metrics.has_value();
+            n.soma_hw->default_soma_latency_metrics.has_value();
     if (latency_simulated && soma_latency_metrics_set)
     {
         std::string error(
                 "Error: Soma unit simulates latency and also has "
-                "default energy costs set. Remove the default latency metrics "
+                "default latency costs set. Remove the default latency metrics "
                 "from the architecture description");
         throw std::logic_error(error);
     }
     if (soma_latency_metrics_set)
     {
-        if (simulation_result.latency.has_value())
-        {
-            std::string error(
-                    "Error: Soma unit simulates energy and also has "
-                    "default energy costs set. Remove default energy costs from the "
-                    "architecture description.");
-            throw std::logic_error(error);
-        }
         simulation_result.latency =
                 n.soma_hw->default_soma_latency_metrics->latency_access_neuron;
     }
@@ -1013,12 +1005,12 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
     if ((simulation_result.status == sanafe::UPDATED) ||
             (simulation_result.status == sanafe::FIRED))
     {
-        if (n.soma_hw->default_soma_energy_metrics.has_value())
+        if (soma_energy_metrics_set)
         {
             simulation_result.energy.value() +=
                     n.soma_hw->default_soma_energy_metrics->energy_update_neuron;
         }
-        if (n.soma_hw->default_soma_latency_metrics.has_value())
+        if (soma_latency_metrics_set)
         {
             simulation_result.latency.value() +=
                     n.soma_hw->default_soma_latency_metrics
@@ -1027,12 +1019,12 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
     }
     if (simulation_result.status == sanafe::FIRED)
     {
-        if (n.soma_hw->default_soma_energy_metrics.has_value())
+        if (soma_energy_metrics_set)
         {
             simulation_result.energy.value() +=
                     n.soma_hw->default_soma_energy_metrics->energy_spike_out;
         }
-        if (n.soma_hw->default_soma_latency_metrics.has_value())
+        if (soma_latency_metrics_set)
         {
             simulation_result.latency.value() +=
                     n.soma_hw->default_soma_latency_metrics->latency_spike_out;

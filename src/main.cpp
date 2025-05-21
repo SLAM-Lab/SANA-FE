@@ -228,8 +228,3 @@ int main(int argc, char *argv[])
 // ** New simulator features **
 // TODO: Add support for Fugu and Lava frameworks as extra (optional) Python
 //  dependencies
-// ** Misc **
-// TODO: Update and extend tutorials using Jupyter notebooks
-// TODO: Improve plug-in documentation
-// TODO: extend the old netlist format to support embedded YAML, group mappings,
-//  and hyperedges
