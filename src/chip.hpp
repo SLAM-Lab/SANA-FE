@@ -32,14 +32,14 @@
 namespace sanafe
 {
 
+constexpr long int default_heartbeat_timesteps = 1000L;
+
 enum TimingModel : int
 {
     TIMING_MODEL_SIMPLE, // analytical model
     TIMING_MODEL_DETAILED, // semi-analytical model
     TIMING_MODEL_CYCLE_ACCURATE, // Booksim2 simulator
 };
-
-constexpr long int default_heartbeat_timesteps = 1000L;
 
 class SpikingChip
 {
@@ -57,16 +57,16 @@ public:
     SpikingChip &operator=(SpikingChip &&other) = delete;
     RunData sim(long int timesteps = 1, long int heartbeat = default_heartbeat_timesteps, const TimingModel timing_model = TIMING_MODEL_DETAILED, const int scheduler_threads = 1);
     void load(const SpikingNetwork &net);
-    double get_power() const;
+    double get_power() const noexcept;
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
     void reset();
 
     std::vector<std::reference_wrapper<Core>> cores();
 
     size_t core_count{0UL};
-    int noc_width;
-    int noc_height;
-    int noc_buffer_size;
+    int noc_width_in_tiles{1};
+    int noc_height_in_tiles{1};
+    int noc_buffer_size{1};
     int max_cores_per_tile{0};
 
 private:
@@ -114,7 +114,7 @@ private:
 
     void sim_format_run_summary(std::ostream &out, const RunData &run_data) const;
 
-    void sim_print_axon_summary();
+    void sim_print_axon_summary() const noexcept;
     void sim_create_neuron_axons(MappedNeuron &pre_neuron);
     void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
     void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);

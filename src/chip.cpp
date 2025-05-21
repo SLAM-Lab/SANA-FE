@@ -63,8 +63,8 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         const bool record_potentials, const bool record_perf,
         const bool record_messages)
         : core_count(arch.core_count)
-        , noc_width(arch.noc_width_in_tiles)
-        , noc_height(arch.noc_height_in_tiles)
+        , noc_width_in_tiles(arch.noc_width_in_tiles)
+        , noc_height_in_tiles(arch.noc_height_in_tiles)
         , noc_buffer_size(arch.noc_buffer_size)
         , max_cores_per_tile(arch.max_cores_per_tile)
         , out_dir(output_dir)
@@ -355,8 +355,8 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     RunData rd((total_timesteps + 1), timesteps);
     Scheduler scheduler;
 
-    scheduler.noc_width = noc_width;
-    scheduler.noc_height = noc_height;
+    scheduler.noc_width = noc_width_in_tiles;
+    scheduler.noc_height = noc_height_in_tiles;
     scheduler.buffer_size = noc_buffer_size;
     scheduler.core_count = core_count;
     scheduler.max_cores_per_tile = max_cores_per_tile;
@@ -475,7 +475,7 @@ void sanafe::SpikingChip::reset()
     }
 }
 
-double sanafe::SpikingChip::get_power() const
+double sanafe::SpikingChip::get_power() const noexcept
 {
     double power; // Watts
     if (total_sim_time > 0.0)
@@ -1189,23 +1189,23 @@ void sanafe::SpikingChip::sim_add_connection_to_axon(
     last_added_target_axon.synapse_addresses.push_back(con.synapse_address);
 }
 
-void sanafe::SpikingChip::sim_print_axon_summary()
+void sanafe::SpikingChip::sim_print_axon_summary() const noexcept
 {
     int in_count = 0;
     int out_count = 0;
 
     INFO("** Mapping summary **\n");
-    for (Tile &tile : tiles)
+    for (const Tile &tile : tiles)
     {
         // For debug only, print the axon maps
-        for (Core &core : tile.cores)
+        for (const Core &core : tile.cores)
         {
             bool core_used = false;
             for (size_t k = 0; k < core.neurons.size(); k++)
             {
                 if (DEBUG_LEVEL_CHIP >= 2)
                 {
-                    MappedNeuron &n = core.neurons[k];
+                    const MappedNeuron &n = core.neurons[k];
                     TRACE2(CHIP, "\tnid:%s.%zu ", n.parent_group_name.c_str(),
                             n.id);
                     TRACE2(CHIP, "i:%d o:%d\n", n.maps_in_count,
