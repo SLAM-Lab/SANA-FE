@@ -8,10 +8,10 @@
 #include <filesystem>
 #include <string>
 
+#include "fwd.hpp"
+
 namespace sanafe
 {
-class PipelineUnit;
-
 struct DlHandleDeleter
 {
     void operator()(void *handle) const;

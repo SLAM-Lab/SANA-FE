@@ -32,27 +32,10 @@
 #include <vector>
 
 #include "attribute.hpp"
+#include "fwd.hpp"
 
 namespace sanafe
 {
-
-class Neuron;
-class MappedConnection;
-struct Message;
-
-struct TileConfiguration;
-struct CoreConfiguration;
-struct AxonInConfiguration;
-struct PipelineUnitConfiguration;
-struct AxonOutConfiguration;
-struct TilePowerMetrics;
-struct AxonInPowerMetrics;
-struct AxonOutPowerMetrics;
-struct CorePipelineConfiguration;
-struct NetworkOnChipConfiguration;
-
-struct AxonInModel;
-struct AxonOutModel;
 
 enum BufferPosition : int
 {

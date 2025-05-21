@@ -12,31 +12,13 @@
 #include <vector>
 
 #include "arch.hpp"
+#include "fwd.hpp"
 #include "mapped.hpp"
 #include "message.hpp"
 #include "pipeline.hpp"
 
 namespace sanafe
 {
-
-// Forward declarations
-enum BufferPosition : int;
-struct AxonInUnit;
-struct AxonInModel;
-struct AxonOutModel;
-struct AxonInConfiguration;
-struct AxonOutConfiguration;
-struct CoreConfiguration;
-struct CorePipelineConfiguration;
-struct PipelineUnit;
-struct AxonOutUnit;
-struct MappedNeuron;
-struct MappedConnection;
-struct Message;
-struct Neuron;
-struct PipelineResult;
-struct PipelineUnitConfiguration;
-
 struct AxonInModel
 {
     // List of all neuron connections to send spikes to

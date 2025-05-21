@@ -8,11 +8,10 @@
 #include <limits>
 #include <string>
 
+#include "fwd.hpp"
+
 namespace sanafe
 {
-
-struct MappedNeuron;
-class SpikingChip;
 
 constexpr long int placeholder_mid = -1L; // An invalid message id for placeholders
 struct Message

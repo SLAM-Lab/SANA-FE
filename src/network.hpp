@@ -22,24 +22,12 @@
 #include <variant>
 
 #include "attribute.hpp"
+#include "fwd.hpp"
 #include "print.hpp"
 #include "chip.hpp"
 
 namespace sanafe
 {
-// Forward declarations
-// Architecture
-class Architecture;
-struct CoreConfiguration;
-// Network
-class SpikingNetwork;
-class NeuronGroup;
-class Neuron;
-struct Connection;
-struct Synapse;
-struct NeuronAddress;
-// Models
-struct ModelAttribute;
 
 struct NeuronConfiguration
 {

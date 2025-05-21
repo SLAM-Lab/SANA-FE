@@ -10,11 +10,10 @@
 #include <vector>
 
 #include "core.hpp"
+#include "fwd.hpp"
 
 namespace sanafe
 {
-struct TileConfiguration;
-
 class Tile
 {
 public:

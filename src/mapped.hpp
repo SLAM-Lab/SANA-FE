@@ -8,17 +8,11 @@
 #include <string>
 #include <vector>
 
-//#include "network.hpp"
 #include "attribute.hpp"
+#include "fwd.hpp"
 
 namespace sanafe
 {
-
-struct AxonOutUnit;
-struct Core;
-struct MappedNeuron;
-struct Neuron;
-struct PipelineUnit;
 
 enum NeuronStatus : int
 {

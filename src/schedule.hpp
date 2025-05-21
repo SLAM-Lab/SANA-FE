@@ -16,12 +16,10 @@
 #include <booksim_config.hpp>
 
 #include "chip.hpp"
+#include "fwd.hpp"
 
 namespace sanafe
 {
-
-struct Message;
-struct RouterMessageStats;
 
 enum Direction
 {

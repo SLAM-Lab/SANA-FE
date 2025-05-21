@@ -27,6 +27,7 @@
 class BookSimConfig;
 
 #include "arch.hpp"
+#include "fwd.hpp"
 #include "core.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
@@ -34,39 +35,6 @@ class BookSimConfig;
 
 namespace sanafe
 {
-struct Timestep;
-struct RunData;
-struct Scheduler;
-struct NocInfo;
-
-class Architecture;
-struct TileConfiguration;
-struct CoreConfiguration;
-struct CorePipelineConfiguration;
-struct AxonInConfiguration;
-struct PipelineUnitConfiguration;
-struct AxonOutConfiguration;
-
-class SpikingNetwork;
-struct Message;
-class Neuron;
-struct Connection;
-class MappedNeuron;
-class MappedConnection;
-struct Synapse;
-struct NeuronConfiguration;
-struct ModelInfo;
-struct PipelineResult;
-
-class Tile;
-class Core;
-class AxonInUnit;
-class AxonOutUnit;
-class PipelineUnit;
-
-struct AxonInModel;
-struct AxonOutModel;
-enum BufferPosition : int;
 
 enum TimingModel : int
 {

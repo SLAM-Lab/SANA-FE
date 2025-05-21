@@ -14,15 +14,11 @@
 #include <vector>
 
 #include "chip.hpp"
+#include "fwd.hpp"
 #include "print.hpp"
 
 namespace sanafe
 {
-
-// Forward declarations
-struct Synapse;
-enum NeuronStatus : int;
-
 constexpr int default_weight_bits = 8; // Based on real-world H/W e.g., Loihi
 constexpr int loihi_max_compartments{1024};
 

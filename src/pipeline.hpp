@@ -9,17 +9,12 @@
 #include <set>
 #include <string>
 
-#include "mapped.hpp"
 #include "attribute.hpp"
+#include "fwd.hpp"
+#include "mapped.hpp"
 
 namespace sanafe
 {
-
-struct MappedNeuron;
-struct MappedConnection;
-struct ModelInfo;
-struct Timestep;
-
 struct SomaEnergyMetrics
 {
     double energy_update_neuron{0.0};
