@@ -11,8 +11,6 @@
 #ifndef CHIP_HEADER_INCLUDED_
 #define CHIP_HEADER_INCLUDED_
 
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -23,8 +21,6 @@
 #include <queue>
 #include <set>
 #include <variant>
-
-class BookSimConfig;
 
 #include "arch.hpp"
 #include "fwd.hpp"

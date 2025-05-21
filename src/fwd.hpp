@@ -49,6 +49,10 @@ struct Message;
 
 enum BufferPosition : int;
 enum NeuronStatus : int;
+
 }
+
+// External library forward declarations i.e., not in SANA-FE's namespace
+class BookSimConfig;
 
 #endif

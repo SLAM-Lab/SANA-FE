@@ -113,10 +113,22 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
 sanafe::SpikingChip::~SpikingChip()
 {
     // Close any open trace files
-    spike_trace.close();
-    potential_trace.close();
-    perf_trace.close();
-    message_trace.close();
+    if (spike_trace.is_open())
+    {
+        spike_trace.close();
+    }
+    if (potential_trace.is_open())
+    {
+        potential_trace.close();
+    }
+    if (perf_trace.is_open())
+    {
+        perf_trace.close();
+    }
+    if (message_trace.is_open())
+    {
+        message_trace.close();
+    }
 
     chip_count--;
 }
@@ -530,14 +542,16 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
 
     // Now process all messages at receiving cores
     auto core_list = cores();
-    // Older versions of OpenMP don't support range-based for loops yet...
+    // Older versions of OpenMP don't support range-based for loops yet
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     // codechecker_suppress [modernize-loop-convert]
     for (size_t idx = 0; idx < core_list.size(); idx++)
     {
-        //INFO("omp thread:%d\n", omp_get_thread_num());
+#ifdef HAVE_OPENMP
+        TRACE3(CHIP, "omp thread:%d\n", omp_get_thread_num());
+#endif
         Core &core = core_list[idx];
         TRACE1(CHIP, "Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
