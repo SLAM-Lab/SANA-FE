@@ -348,17 +348,6 @@ An example of how to use the netlist format is given in `snn/example.net`
 This project has been written in C++ and Python. All code is in the `/src`
 directory. See header files for more detail on supported classes and functions.
 
-`arch.cpp`
-`chip.cpp`
-`description.cpp`
-`main.cpp`
-`network.cpp`
-`param.hpp`
-`plugins.cpp`
-`print.cpp`
-`pymodule.cpp`
-`schedule.cpp`
-
 C++ code has been written using the C++17 standard.
 
 # References

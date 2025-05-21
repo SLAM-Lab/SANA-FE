@@ -20,6 +20,7 @@
 #include <booksim_lib.hpp>
 
 #include "chip.hpp"
+#include "message.hpp"
 #include "network.hpp"
 #include "print.hpp"
 #include "schedule.hpp"

@@ -31,7 +31,7 @@
 #include <optional>
 #include <vector>
 
-#include "param.hpp"
+#include "attribute.hpp"
 
 namespace sanafe
 {

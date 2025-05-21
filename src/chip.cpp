@@ -25,11 +25,16 @@
 
 #include "arch.hpp"
 #include "chip.hpp"
+#include "core.hpp"
+#include "message.hpp"
 #include "models.hpp"
 #include "network.hpp"
+#include "pipeline.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
+#include "utils.hpp" // For abs_diff
 #include "schedule.hpp"
+#include "tile.hpp"
 
 // Track the number of SpikingChips current instantiated, only as a safety
 //  mechanism for cycle-accurate runs (Booksim2): We throw an error
@@ -552,48 +557,6 @@ void sanafe::SpikingChip::receive_message(Message &m)
     core.messages_in.push_back(m);
 }
 
-void sanafe::MappedNeuron::build_neuron_processing_pipeline()
-{
-    if (core->pipeline_config.buffer_position < BUFFER_BEFORE_DENDRITE_UNIT)
-    {
-        throw std::runtime_error("Error: Buffer must be after synaptic h/w");
-    }
-    if (core->pipeline_config.buffer_position == BUFFER_INSIDE_DENDRITE_UNIT)
-    {
-        neuron_processing_pipeline.push_back(dendrite_hw);
-    }
-    if ((core->pipeline_config.buffer_position <= BUFFER_INSIDE_SOMA_UNIT) &&
-            (soma_hw != dendrite_hw))
-    {
-        neuron_processing_pipeline.push_back(soma_hw);
-    }
-}
-
-void sanafe::MappedConnection::build_message_processing_pipeline()
-{
-    MappedNeuron &n = *post_neuron;
-    Core &mapped_core = *(n.core);
-
-    // We don't support putting the buffer inside or before the synapse unit, so
-    //  unconditionally push the synapse h/w. This is because putting the buffer
-    //  here could cause a spike sent that shouldn't be
-    message_processing_pipeline.push_back(synapse_hw);
-    if ((mapped_core.pipeline_config.buffer_position >
-                BUFFER_BEFORE_DENDRITE_UNIT) &&
-            (n.dendrite_hw != synapse_hw))
-    {
-        message_processing_pipeline.push_back(n.dendrite_hw);
-    }
-    if ((mapped_core.pipeline_config.buffer_position >
-                BUFFER_BEFORE_SOMA_UNIT) &&
-            (n.soma_hw != n.dendrite_hw))
-    {
-        message_processing_pipeline.push_back(n.soma_hw);
-    }
-
-    return;
-}
-
 void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 {
     Core &c = *(n.core);
@@ -615,88 +578,6 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 
     return;
 }
-
-sanafe::PipelineUnit::PipelineUnit(const bool implements_synapse,
-        const bool implements_dendrite, const bool implements_soma)
-        : implements_synapse(implements_synapse)
-        , implements_dendrite(implements_dendrite)
-        , implements_soma(implements_soma)
-{
-    // Set input interface
-    if (implements_synapse)
-    {
-        process_input_fn = &PipelineUnit::process_synapse_input;
-    }
-    else if (implements_dendrite)
-    {
-        process_input_fn = &PipelineUnit::process_dendrite_input;
-    }
-    else
-    {
-        process_input_fn = &PipelineUnit::process_soma_input;
-    }
-
-    // Set output interface
-    if (implements_soma)
-    {
-        process_output_fn = &PipelineUnit::process_soma_output;
-    }
-    else if (implements_dendrite)
-    {
-        process_output_fn = &PipelineUnit::process_dendrite_output;
-    }
-    else
-    {
-        process_output_fn = &PipelineUnit::process_synapse_output;
-    }
-}
-
-void sanafe::PipelineUnit::check_outputs(
-        const MappedNeuron &n, const PipelineResult &result)
-{
-    // Check the hw returns a valid value for the next unit or network to
-    //  process
-    if (implements_soma && result.status == INVALID_NEURON_STATE)
-    {
-        throw std::runtime_error("Soma output; should return valid "
-                                 "neuron state.\n");
-    }
-    else if (!implements_soma && (implements_synapse || implements_dendrite) &&
-            !result.current.has_value())
-    {
-        throw std::runtime_error("Synaptic or dendritic output; should return "
-                                 "synaptic/dendritic current\n");
-    }
-
-    return;
-}
-
-void sanafe::PipelineUnit::register_attributes(
-        const std::set<std::string> &attribute_names)
-{
-    for (const auto &attr : attribute_names)
-    {
-        supported_attribute_names.insert(attr);
-    }
-    return;
-}
-
-void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
-{
-    if (supported_attribute_names.find(attribute_name) ==
-            supported_attribute_names.end())
-    {
-        INFO("Warning: Attribute (%s) not supported by model: %s, will be "
-             "ignored.\nEither remove this attribute from the SNN/Architecture "
-             "description file, be more specific which hardware requires it "
-             "(using synapse/dendrite/soma sections) or register the attribute "
-             "in the constructor to suppress this warning.\n",
-                attribute_name.c_str(), name.c_str());
-    }
-
-    return;
-}
-
 
 double sanafe::SpikingChip::process_message(
         Timestep &ts, Core &core, Message &m)
@@ -768,69 +649,6 @@ sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
     return output;
 }
 
-sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(Timestep &ts,
-        MappedNeuron &n, std::optional<MappedConnection *> con,
-        const PipelineResult &input)
-{
-    if (!con.has_value())
-    {
-        throw std::runtime_error(
-                "Error: Pipeline error, didn't receive "
-                "synaptic connection info. Check that no h/w unit is being "
-                "invoked before this one in the pipeline.");
-    }
-    PipelineResult output = update(con.value()->synapse_address, true);
-    ++spikes_processed;
-
-    return output;
-}
-
-sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_input(
-        Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con,
-        const PipelineResult &input)
-{
-    PipelineResult output{};
-
-    std::optional<size_t> synapse_address{std::nullopt};
-    if (con.has_value() && (con.value() != nullptr))
-    {
-        synapse_address = con.value()->synapse_address;
-    }
-    output = update(n.mapped_address, input.current, synapse_address);
-
-    return output;
-}
-
-sanafe::PipelineResult sanafe::PipelineUnit::process_soma_input(Timestep &ts,
-        MappedNeuron &n, std::optional<MappedConnection *> con,
-        const PipelineResult &input)
-{
-    PipelineResult output = update(n.mapped_address, input.current);
-    return output;
-}
-
-void sanafe::PipelineUnit::process_synapse_output(MappedNeuron &n,
-        std::optional<MappedConnection *> con, PipelineResult &output)
-{
-    calculate_synapse_default_energy_latency(*(con.value()), output);
-    return;
-}
-
-void sanafe::PipelineUnit::process_dendrite_output(MappedNeuron &n,
-        std::optional<MappedConnection *> con, PipelineResult &output)
-{
-    calculate_dendrite_default_energy_latency(n, output);
-    return;
-}
-
-void sanafe::PipelineUnit::process_soma_output(MappedNeuron &n,
-        std::optional<MappedConnection *> con, PipelineResult &output)
-{
-    calculate_soma_default_energy_latency(n, output);
-    update_soma_activity(n, output);
-    return;
-}
-
 double sanafe::SpikingChip::pipeline_process_axon_in(
         Core &core, const Message &m)
 {
@@ -840,231 +658,6 @@ double sanafe::SpikingChip::pipeline_process_axon_in(
     axon_unit.spike_messages_in++;
 
     return axon_unit.latency_spike_message;
-}
-
-void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
-        MappedConnection &con, PipelineResult &simulation_result)
-{
-    bool energy_simulated = simulation_result.energy.has_value();
-    bool latency_simulated = simulation_result.latency.has_value();
-
-    bool default_synapse_energy_metrics_set =
-            con.synapse_hw->default_energy_process_spike.has_value();
-    if (energy_simulated && default_synapse_energy_metrics_set)
-    {
-        std::string error("Error: Synapse unit simulates energy and also has "
-                          "default energy metrics set.");
-        throw std::logic_error(error);
-    }
-    if (default_synapse_energy_metrics_set)
-    {
-        simulation_result.energy =
-                con.synapse_hw->default_energy_process_spike.value();
-    }
-
-    bool default_synapse_latency_metrics_set =
-            con.synapse_hw->default_latency_process_spike.has_value();
-    if (latency_simulated && default_synapse_latency_metrics_set)
-    {
-        std::string error("Error: Synapse unit simulates latency and also has "
-                          "default latency metrics set. Remove the default "
-                          "metric from the architecture description.");
-        throw std::logic_error(error);
-    }
-
-    if (default_synapse_latency_metrics_set)
-    {
-        if (simulation_result.latency.has_value())
-        {
-            std::string error(
-                    "Error: Synapse unit simulates latency and also has "
-                    "default latency metrics set. Remove the default "
-                    "metric from the architecture description.");
-            throw std::logic_error(error);
-        }
-        simulation_result.latency =
-                con.synapse_hw->default_latency_process_spike.value();
-    }
-
-    if (!simulation_result.energy.has_value())
-    {
-        std::string error(
-                "Error: Synapse unit does not simulate energy or provide "
-                "a default energy cost in the architecture "
-                "description.");
-        throw std::logic_error(error);
-    }
-    if (!simulation_result.latency.has_value())
-    {
-        std::string error("Error: Synapse unit does not simulate latency or "
-                          "provide a default latency cost in the architecture "
-                          "description.");
-        throw std::logic_error(error);
-    }
-
-    return;
-}
-
-void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
-        MappedNeuron &n, PipelineResult &simulation_result)
-{
-    bool energy_simulated = simulation_result.energy.has_value();
-    bool latency_simulated = simulation_result.latency.has_value();
-
-    bool default_dendrite_energy_metrics_set =
-            n.dendrite_hw->default_energy_update.has_value();
-    if (energy_simulated && default_dendrite_energy_metrics_set)
-    {
-        std::string error("Error: Dendrite unit simulates energy and also has "
-                          "default energy metrics set.");
-        throw std::logic_error(error);
-    }
-    if (default_dendrite_energy_metrics_set)
-    {
-        simulation_result.energy = n.dendrite_hw->default_energy_update.value();
-    }
-
-    bool default_dendrite_latency_metrics_set =
-            n.dendrite_hw->default_latency_update.has_value();
-    if (latency_simulated && default_dendrite_latency_metrics_set)
-    {
-        std::string error("Error: Dendrite unit simulates latency and also has "
-                          "default energy metrics set.");
-        throw std::logic_error(error);
-    }
-
-    if (default_dendrite_latency_metrics_set)
-    {
-        if (simulation_result.latency.has_value())
-        {
-            std::string error(
-                    "Error: Dendrite unit simulates energy and also has default energy metrics set.");
-            throw std::logic_error(error);
-        }
-        simulation_result.latency =
-                n.dendrite_hw->default_latency_update.value();
-    }
-
-    if (!simulation_result.energy.has_value())
-    {
-        std::string error(
-                "Error: Dendrite unit does not simulate energy or provide "
-                "a default energy cost in the architecture "
-                "description.");
-        throw std::logic_error(error);
-    }
-    if (!simulation_result.latency.has_value())
-    {
-        std::string error("Error: Dendrite unit does not simulate latency or "
-                          "provide a default latency cost in the architecture "
-                          "description.");
-        throw std::logic_error(error);
-    }
-
-    return;
-}
-
-void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
-        MappedNeuron &n, PipelineResult &simulation_result)
-{
-    bool energy_simulated = simulation_result.energy.has_value();
-    bool latency_simulated = simulation_result.latency.has_value();
-
-    bool soma_energy_metrics_set =
-            n.soma_hw->default_soma_energy_metrics.has_value();
-    if (energy_simulated && soma_energy_metrics_set)
-    {
-        std::string error(
-                "Error: Soma unit simulates energy and also has "
-                "default energy metrics set. Remove the default energy metrics "
-                "from the architecture description.");
-        throw std::logic_error(error);
-    }
-    if (soma_energy_metrics_set)
-    {
-        simulation_result.energy =
-                n.soma_hw->default_soma_energy_metrics->energy_access_neuron;
-    }
-
-    bool soma_latency_metrics_set =
-            n.soma_hw->default_soma_latency_metrics.has_value();
-    if (latency_simulated && soma_latency_metrics_set)
-    {
-        std::string error(
-                "Error: Soma unit simulates latency and also has "
-                "default latency costs set. Remove the default latency metrics "
-                "from the architecture description");
-        throw std::logic_error(error);
-    }
-    if (soma_latency_metrics_set)
-    {
-        simulation_result.latency =
-                n.soma_hw->default_soma_latency_metrics->latency_access_neuron;
-    }
-
-    if ((simulation_result.status == sanafe::UPDATED) ||
-            (simulation_result.status == sanafe::FIRED))
-    {
-        if (soma_energy_metrics_set)
-        {
-            simulation_result.energy.value() +=
-                    n.soma_hw->default_soma_energy_metrics->energy_update_neuron;
-        }
-        if (soma_latency_metrics_set)
-        {
-            simulation_result.latency.value() +=
-                    n.soma_hw->default_soma_latency_metrics
-                            ->latency_update_neuron;
-        }
-    }
-    if (simulation_result.status == sanafe::FIRED)
-    {
-        if (soma_energy_metrics_set)
-        {
-            simulation_result.energy.value() +=
-                    n.soma_hw->default_soma_energy_metrics->energy_spike_out;
-        }
-        if (soma_latency_metrics_set)
-        {
-            simulation_result.latency.value() +=
-                    n.soma_hw->default_soma_latency_metrics->latency_spike_out;
-        }
-    }
-
-    if (!simulation_result.energy.has_value())
-    {
-        std::string error("Error: Soma unit does not simulate energy or "
-                          "provide default energy costs in the architecture "
-                          "description.");
-        throw std::logic_error(error);
-    }
-    if (!simulation_result.latency.has_value())
-    {
-        std::string error("Error: Soma unit does not simulate latency or "
-                          "provide default latency costs in the architecture "
-                          "description.");
-        throw std::logic_error(error);
-    }
-
-    return;
-}
-
-void sanafe::PipelineUnit::update_soma_activity(
-        MappedNeuron &n, const PipelineResult &simulation_result)
-{
-    if ((simulation_result.status == sanafe::UPDATED) ||
-            (simulation_result.status == sanafe::FIRED))
-    {
-        n.soma_hw->neuron_updates++;
-
-        if (simulation_result.status == sanafe::FIRED)
-        {
-            n.soma_hw->neurons_fired++;
-            n.axon_out_input_spike = true;
-            TRACE1(CHIP, "Neuron %s.%zu fired\n", n.parent_group_name.c_str(),
-                    n.id);
-        }
-    }
 }
 
 sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
@@ -1105,56 +698,6 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
     return axon_result;
 }
 
-sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
-        const std::string &buffer_pos_str, const bool buffer_inside_unit)
-{
-    BufferPosition buffer_pos;
-    // H/w either has SANA-FE insert and manage a time-step buffer on the h/w
-    //  unit's inputs (before the unit), or can assume that the unit manages its
-    //  own state that is internally buffered over consecutive time-steps e.g.,
-    //  using a double buffer
-
-    if (buffer_pos_str == "dendrite")
-    {
-        if (buffer_inside_unit)
-        {
-            buffer_pos = BUFFER_INSIDE_DENDRITE_UNIT;
-        }
-        else
-        {
-            buffer_pos = BUFFER_BEFORE_DENDRITE_UNIT;
-        }
-    }
-    else if (buffer_pos_str == "soma")
-    {
-        if (buffer_inside_unit)
-        {
-            buffer_pos = BUFFER_INSIDE_SOMA_UNIT;
-        }
-        else
-        {
-            buffer_pos = BUFFER_BEFORE_SOMA_UNIT;
-        }
-    }
-    else if (buffer_pos_str == "axon_out")
-    {
-        buffer_pos = BUFFER_BEFORE_AXON_OUT_UNIT;
-    }
-    else
-    {
-        INFO("Error: Buffer position %s not supported", buffer_pos_str.c_str());
-        throw std::invalid_argument("Error: Buffer position not supported");
-    }
-
-    return buffer_pos;
-}
-
-size_t sanafe::abs_diff(const size_t a, const size_t b)
-{
-    // Returns the absolute difference between two unsigned (size_t) values
-    return (a > b) ? (a - b) : (b - a);
-}
-
 std::vector<std::reference_wrapper<sanafe::Core>> sanafe::SpikingChip::cores()
 {
     std::vector<std::reference_wrapper<Core>> all_cores_in_hw;
@@ -1175,320 +718,11 @@ sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
 {
 }
 
-void sanafe::PipelineUnit::set_attributes(
-        std::string unit_name, const ModelInfo &model)
-{
-    model_attributes = model.model_attributes;
-    plugin_lib = model.plugin_library_path;
-    name = std::move(unit_name);
-    log_energy = model.log_energy;
-    log_latency = model.log_latency;
-
-    if (model_attributes.find("energy_process_spike") != model_attributes.end())
-    {
-        default_energy_process_spike =
-                static_cast<double>(model_attributes["energy_process_spike"]);
-    }
-    if (model_attributes.find("latency_process_spike") !=
-            model_attributes.end())
-    {
-        default_latency_process_spike =
-                static_cast<double>(model_attributes["latency_process_spike"]);
-    }
-    if (model_attributes.find("energy_update") != model_attributes.end())
-    {
-        default_energy_update =
-                static_cast<double>(model_attributes["energy_update"]);
-    }
-    if (model_attributes.find("latency_update") != model_attributes.end())
-    {
-        default_latency_update =
-                static_cast<double>(model_attributes["latency_update"]);
-    }
-
-    auto key_exists = [this](const std::string &key) {
-        return model_attributes.find(key) != model_attributes.end();
-    };
-
-    const std::set<std::string> energy_metric_names{
-            "energy_access_neuron", "energy_update_neuron", "energy_spike_out"};
-    bool parse_energy_metrics = std::any_of(
-            energy_metric_names.begin(), energy_metric_names.end(), key_exists);
-    if (parse_energy_metrics)
-    {
-        for (const auto &metric : energy_metric_names)
-        {
-            if (!key_exists(metric))
-            {
-                const std::string error =
-                        "Error: Metric not defined: " + metric + "\n";
-                INFO("%s", error.c_str());
-                throw std::invalid_argument(error);
-            }
-        }
-        SomaEnergyMetrics energy_metrics;
-        energy_metrics.energy_access_neuron =
-                static_cast<double>(model_attributes["energy_access_neuron"]);
-        energy_metrics.energy_update_neuron =
-                static_cast<double>(model_attributes["energy_update_neuron"]);
-        energy_metrics.energy_spike_out =
-                static_cast<double>(model_attributes["energy_spike_out"]);
-        default_soma_energy_metrics = energy_metrics;
-    }
-
-    const std::set<std::string> latency_metric_names{"latency_access_neuron",
-            "latency_update_neuron", "latency_spike_out"};
-    bool parse_latency_metrics = std::any_of(latency_metric_names.begin(),
-            latency_metric_names.end(), key_exists);
-    if (parse_latency_metrics)
-    {
-        for (const auto &metric : latency_metric_names)
-        {
-            if (!key_exists(metric))
-            {
-                const std::string error =
-                        "Error: Missing metric: " + metric + "\n";
-                INFO("%s", error.c_str());
-                throw std::invalid_argument(error);
-            }
-        }
-        SomaLatencyMetrics latency_metrics;
-        latency_metrics.latency_access_neuron =
-                static_cast<double>(model_attributes["latency_access_neuron"]);
-        latency_metrics.latency_update_neuron =
-                static_cast<double>(model_attributes["latency_update_neuron"]);
-        latency_metrics.latency_spike_out =
-                static_cast<double>(model_attributes["latency_spike_out"]);
-        default_soma_latency_metrics = latency_metrics;
-    }
-
-    // Finally, forward all attributes from the architecture description to the
-    //  model. This might be useful if you want to define any additional
-    //  model-specific attributes here, e.g., fault-rate or maximum memory size.
-    for (auto &[key, attribute] : model_attributes)
-    {
-        check_attribute(key);
-        set_attribute_hw(key, attribute);
-    }
-}
-
 sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
         : name(std::move(config.name))
         , energy_access(config.metrics.energy_message_out)
         , latency_access(config.metrics.latency_message_out)
 {
-}
-
-void sanafe::Core::map_neuron(
-        const Neuron &neuron_to_map, const size_t neuron_id)
-{
-    TRACE1(CHIP, "Mapping nid:%s.%zu to core: %zu\n",
-            neuron_to_map.parent_group_name.c_str(), neuron_to_map.offset, id);
-
-    if (neurons.size() >= pipeline_config.max_neurons_supported)
-    {
-        INFO("Error: Exceeded maximum neurons per core (%zu)",
-                pipeline_config.max_neurons_supported);
-        throw std::runtime_error("Error: Exceeded maximum neurons per core.");
-    }
-
-    // Map neuron model to dendrite and soma hardware units in this core.
-    //  Search through all models implemented by this core and return the
-    //  one that matches. If no dendrite / soma hardware is specified,
-    //  default to the first one defined
-    if (pipeline_hw.empty())
-    {
-        INFO("Error: No pipeline units defined for cid:%zu\n", id);
-        throw std::runtime_error("Error: No units defined");
-    }
-    PipelineUnit *mapped_dendrite;
-
-    bool choose_first_dendrite_by_default =
-            (neuron_to_map.dendrite_hw_name.length() == 0);
-    bool dendrite_found = false;
-    for (auto &hw : pipeline_hw)
-    {
-        if (hw->implements_dendrite &&
-                (choose_first_dendrite_by_default ||
-                        neuron_to_map.dendrite_hw_name == hw->name))
-        {
-            mapped_dendrite = hw.get();
-            dendrite_found = true;
-            break;
-        }
-    }
-    if (!dendrite_found)
-    {
-        INFO("Error: Could not map neuron nid:%zu (hw:%s) "
-             "to any dendrite h/w.\n",
-                neuron_to_map.offset, neuron_to_map.dendrite_hw_name.c_str());
-        throw std::runtime_error("Error: Could not map neuron to dendrite h/w");
-    }
-
-    PipelineUnit *mapped_soma;
-    bool choose_first_soma_by_default =
-            (neuron_to_map.soma_hw_name.length() == 0);
-    bool soma_found = false;
-    for (auto &hw : pipeline_hw)
-    {
-        if (hw->implements_soma &&
-                (choose_first_soma_by_default ||
-                        neuron_to_map.soma_hw_name == hw->name))
-        {
-            mapped_soma = hw.get();
-            soma_found = true;
-            break;
-        }
-    }
-    if (!soma_found)
-    {
-        INFO("Error: Could not map neuron nid:%zu (hw:%s) "
-             "to any soma h/w.\n",
-                neuron_to_map.offset, neuron_to_map.soma_hw_name.c_str());
-        throw std::runtime_error("Error: Could not map neuron to soma h/w");
-    }
-    mapped_soma->neuron_count++;
-
-    if (axon_out_hw.empty())
-    {
-        INFO("Error: No axon out units defined for cid:%zu\n", id);
-        throw std::runtime_error("Error: No axon out units defined");
-    }
-    AxonOutUnit *mapped_axon_out = &(axon_out_hw[0]);
-
-    // Map the neuron to the core and its hardware units
-    const size_t address = neurons.size();
-    neurons.emplace_back(neuron_to_map, this, neuron_id, address,
-            mapped_dendrite, mapped_soma, mapped_axon_out);
-
-    return;
-}
-
-sanafe::AxonInUnit &sanafe::Core::create_axon_in(
-        const AxonInConfiguration &config)
-{
-    axon_in_hw.emplace_back(config);
-    TRACE1(CHIP, "New axon in h/w unit created (%zu.%zu)\n", parent_tile_id,
-            id);
-
-    return axon_in_hw.back();
-}
-
-sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
-        const PipelineUnitConfiguration &config)
-{
-    // Create the synapse model
-    if (config.model_info.plugin_library_path.has_value())
-    {
-        const std::filesystem::path plugin_lib_path =
-                config.model_info.plugin_library_path.value();
-        TRACE1(CHIP, "Creating unit from plugin: %s.\n",
-                plugin_lib_path.c_str());
-        pipeline_hw.emplace_back(
-                plugin_get_hw(config.model_info.name, plugin_lib_path));
-    }
-    else
-    {
-        // Use built in models
-        TRACE1(CHIP, "Creating built-in model %s.\n",
-                config.model_info.name.c_str());
-        pipeline_hw.emplace_back(
-                model_get_pipeline_unit(config.model_info.name));
-    }
-
-    auto &new_unit = pipeline_hw.back();
-    TRACE1(CHIP, "implements synapse:%d dendrite:%d soma:%d\n",
-            new_unit->implements_synapse, new_unit->implements_dendrite,
-            new_unit->implements_soma);
-    new_unit->set_attributes(config.name, config.model_info);
-    TRACE1(CHIP, "New h/w unit created (%s) in core:%zu\n", config.name.c_str(),
-            id);
-
-    return *new_unit;
-}
-
-sanafe::AxonOutUnit &sanafe::Core::create_axon_out(
-        const AxonOutConfiguration &config)
-{
-    axon_out_hw.emplace_back(config);
-    TRACE1(CHIP, "New axon out h/w unit created: (%zu.%zu)\n", parent_tile_id,
-            id);
-
-    return axon_out_hw.back();
-}
-
-std::string sanafe::Core::info() const noexcept
-{
-    std::ostringstream ss;
-    ss << "sanafe::Core(name= " << name << " tile=" << parent_tile_id << ")";
-    return ss.str();
-}
-
-sanafe::Message::Message(const long int id, const SpikingChip &hw,
-        const MappedNeuron &n, const long int timestep)
-        : timestep(timestep)
-        , mid(id)
-        , src_neuron_id(n.id)
-        , src_neuron_group_id(n.parent_group_name)
-{
-    // If no axon was given create a message with no destination. By
-    //  default, messages without destinations act as a placeholder for neuron
-    //  processing
-    const Core &src_core = *(n.core);
-    const Tile &src_tile = hw.tiles[src_core.parent_tile_id];
-    src_x = src_tile.x;
-    src_y = src_tile.y;
-    src_tile_id = src_tile.id;
-    src_core_id = src_core.id;
-    src_core_offset = src_core.offset;
-}
-
-sanafe::Message::Message(const long int id, const SpikingChip &hw,
-        const MappedNeuron &n, const long int timestep, const int axon_address)
-        : Message(id, hw, n, timestep)
-{
-    const Core &src_core = *(n.core);
-    const AxonOutModel &src_axon = src_core.axons_out[axon_address];
-    const Tile &dest_tile = hw.tiles[src_axon.dest_tile_id];
-    const Core &dest_core = dest_tile.cores[src_axon.dest_core_offset];
-    const AxonInModel &dest_axon = dest_core.axons_in[src_axon.dest_axon_id];
-
-    placeholder = false;
-    spikes = dest_axon.synapse_addresses.size();
-    dest_x = dest_tile.x;
-    dest_y = dest_tile.y;
-    dest_tile_id = dest_tile.id;
-    dest_core_id = dest_core.id;
-    dest_core_offset = dest_core.offset;
-    dest_axon_id = src_axon.dest_axon_id;
-    dest_axon_hw = 0;
-}
-
-sanafe::Tile::Tile(const TileConfiguration &config)
-        : name(config.name)
-        , energy_north_hop(config.power_metrics.energy_north_hop)
-        , latency_north_hop(config.power_metrics.latency_north_hop)
-        , energy_east_hop(config.power_metrics.energy_east_hop)
-        , latency_east_hop(config.power_metrics.latency_east_hop)
-        , energy_south_hop(config.power_metrics.energy_south_hop)
-        , latency_south_hop(config.power_metrics.latency_south_hop)
-        , energy_west_hop(config.power_metrics.energy_west_hop)
-        , latency_west_hop(config.power_metrics.latency_west_hop)
-        , id(config.id)
-        , x(config.x)
-        , y(config.y)
-        , log_energy(config.power_metrics.log_energy)
-        , log_latency(config.power_metrics.log_latency)
-{
-}
-
-std::string sanafe::Tile::info() const
-{
-    std::ostringstream ss;
-    ss << "sanafe::Tile(tile=" << id << " cores=";
-    ss << cores.size() << ")";
-
-    return ss.str();
 }
 
 sanafe::Core::Core(const CoreConfiguration &config)
@@ -1502,58 +736,6 @@ sanafe::Core::Core(const CoreConfiguration &config)
 
 {
     timestep_buffer.resize(pipeline_config.max_neurons_supported);
-}
-
-sanafe::MappedConnection::MappedConnection()
-        : post_neuron(nullptr)
-        , pre_neuron(nullptr)
-        , synapse_hw(nullptr)
-{
-}
-
-sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
-        Core *mapped_core, const size_t nid, const size_t mapped_address,
-        PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma,
-        AxonOutUnit *mapped_axon_out)
-        : parent_group_name(neuron_to_map.parent_group_name)
-        , offset(neuron_to_map.offset)
-        , id(nid)
-        , core(mapped_core)
-        , dendrite_hw(mapped_dendrite)
-        , soma_hw(mapped_soma)
-        , axon_out_hw(mapped_axon_out)
-        , mapped_address(mapped_address)
-        , mapping_order(neuron_to_map.mapping_order)
-        , force_synapse_update(neuron_to_map.force_synapse_update)
-        , force_dendrite_update(neuron_to_map.force_dendrite_update)
-        , force_soma_update(neuron_to_map.force_soma_update)
-        , log_spikes(neuron_to_map.log_spikes)
-        , log_potential(neuron_to_map.log_potential)
-
-{
-    set_model_attributes(neuron_to_map.model_attributes);
-    build_neuron_processing_pipeline();
-}
-
-void sanafe::MappedNeuron::set_model_attributes(
-        const std::map<std::string, sanafe::ModelAttribute> &model_attributes)
-{
-    for (auto &[key, attribute] : model_attributes)
-    {
-        TRACE2(CHIP, "Forwarding attribute: %s (dendrite:%d soma:%d)\n",
-                key.c_str(), attribute.forward_to_dendrite,
-                attribute.forward_to_soma);
-        if (attribute.forward_to_dendrite && (dendrite_hw != nullptr))
-        {
-            dendrite_hw->check_attribute(key);
-            dendrite_hw->set_attribute_neuron(mapped_address, key, attribute);
-        }
-        if (attribute.forward_to_soma && (soma_hw != nullptr))
-        {
-            soma_hw->check_attribute(key);
-            soma_hw->set_attribute_neuron(mapped_address, key, attribute);
-        }
-    }
 }
 
 void sanafe::SpikingChip::sim_output_run_summary(
@@ -2366,17 +1548,47 @@ void sanafe::sim_trace_record_message(
     message_trace_file.flush();
 }
 
-double sanafe::calculate_elapsed_time(
-        const std::chrono::time_point<std::chrono::high_resolution_clock>
-                &ts_start,
-        const std::chrono::time_point<std::chrono::high_resolution_clock>
-                &ts_end)
-{
-    // Calculate elapsed wall-clock time between ts_start and ts_end
-    double ts_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            ts_end - ts_start)
-                                .count();
-    ts_elapsed *= 1.0e-9;
 
-    return ts_elapsed;
+sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
+        const std::string &buffer_pos_str, const bool buffer_inside_unit)
+{
+    BufferPosition buffer_pos;
+    // H/w either has SANA-FE insert and manage a time-step buffer on the h/w
+    //  unit's inputs (before the unit), or can assume that the unit manages its
+    //  own state that is internally buffered over consecutive time-steps e.g.,
+    //  using a double buffer
+
+    if (buffer_pos_str == "dendrite")
+    {
+        if (buffer_inside_unit)
+        {
+            buffer_pos = BUFFER_INSIDE_DENDRITE_UNIT;
+        }
+        else
+        {
+            buffer_pos = BUFFER_BEFORE_DENDRITE_UNIT;
+        }
+    }
+    else if (buffer_pos_str == "soma")
+    {
+        if (buffer_inside_unit)
+        {
+            buffer_pos = BUFFER_INSIDE_SOMA_UNIT;
+        }
+        else
+        {
+            buffer_pos = BUFFER_BEFORE_SOMA_UNIT;
+        }
+    }
+    else if (buffer_pos_str == "axon_out")
+    {
+        buffer_pos = BUFFER_BEFORE_AXON_OUT_UNIT;
+    }
+    else
+    {
+        INFO("Error: Buffer position %s not supported", buffer_pos_str.c_str());
+        throw std::invalid_argument("Error: Buffer position not supported");
+    }
+
+    return buffer_pos;
 }

@@ -23,6 +23,14 @@
 #include "print.hpp"
 #include "chip.hpp"
 
+enum ProgramArgs
+{
+    ARCH_FILENAME = 0,
+    NETWORK_FILENAME = 1,
+    TIMESTEPS = 2,
+    PROGRAM_NARGS = 3,
+};
+
 int main(int argc, char *argv[])
 {
     if (argc < 1)
@@ -126,7 +134,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (argc < sanafe::PROGRAM_NARGS)
+    if (argc < PROGRAM_NARGS)
     {
         INFO("Usage: ./sim [-psvmo] <arch description> <network description> <timesteps>\n");
         return 0;
@@ -162,10 +170,10 @@ int main(int argc, char *argv[])
         booksim_init();
 
         sanafe::Architecture arch =
-                sanafe::load_arch(argv[sanafe::ARCH_FILENAME]);
+                sanafe::load_arch(argv[ARCH_FILENAME]);
         INFO("Architecture initialized.\n");
         sanafe::SpikingNetwork net = sanafe::load_net(
-                argv[sanafe::NETWORK_FILENAME], arch, use_netlist_format);
+                argv[NETWORK_FILENAME], arch, use_netlist_format);
         INFO("Network initialized.\n");
 
         sanafe::SpikingChip hw(arch, output_dir, record_spikes,
@@ -175,12 +183,12 @@ int main(int argc, char *argv[])
         long int timesteps;
         try
         {
-            timesteps = std::stol(argv[sanafe::TIMESTEPS]);
+            timesteps = std::stol(argv[TIMESTEPS]);
         }
         catch(const std::exception& e)
         {
             INFO("Error: Invalid time-step format: %s\n",
-                    argv[sanafe::TIMESTEPS]);
+                    argv[TIMESTEPS]);
             return 1;
         }
 
