@@ -36,6 +36,19 @@
 #include "schedule.hpp"
 #include "tile.hpp"
 
+sanafe::Timestep::Timestep(const long int ts, const int core_count)
+        : messages(
+                  std::make_shared<std::vector<std::list<Message>>>(core_count))
+        , timestep(ts)
+{
+}
+
+sanafe::RunData::RunData(const long int start, const long int steps)
+        : timestep_start(start)
+        , timesteps_executed(steps)
+{
+}
+
 // Track the number of SpikingChips current instantiated, only as a safety
 //  mechanism for cycle-accurate runs (Booksim2): We throw an error
 //  at launch for cycle-accurate runs when multiple SANA-FE simulations are
@@ -282,12 +295,6 @@ void sanafe::SpikingChip::map_axons()
 
     TRACE1(CHIP, "Finished creating connection maps.\n");
     sim_print_axon_summary();
-}
-
-sanafe::RunData::RunData(const long int start, const long int steps)
-        : timestep_start(start)
-        , timesteps_executed(steps)
-{
 }
 
 void sanafe::SpikingChip::retire_scheduled_messages(
@@ -711,33 +718,6 @@ std::vector<std::reference_wrapper<sanafe::Core>> sanafe::SpikingChip::cores()
     return all_cores_in_hw;
 }
 
-sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
-        : name(config.name)
-        , energy_spike_message(config.metrics.energy_message_in)
-        , latency_spike_message(config.metrics.latency_message_in)
-{
-}
-
-sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
-        : name(std::move(config.name))
-        , energy_access(config.metrics.energy_message_out)
-        , latency_access(config.metrics.latency_message_out)
-{
-}
-
-sanafe::Core::Core(const CoreConfiguration &config)
-        : pipeline_config(config.pipeline)
-        , name(std::move(config.name))
-        , id(config.address.id)
-        , offset(config.address.offset_within_tile)
-        , parent_tile_id(config.address.parent_tile_id)
-        , log_energy(config.pipeline.log_energy)
-        , log_latency(config.pipeline.log_latency)
-
-{
-    timestep_buffer.resize(pipeline_config.max_neurons_supported);
-}
-
 void sanafe::SpikingChip::sim_output_run_summary(
         const std::filesystem::path &output_dir, const RunData &run_data) const
 {
@@ -997,13 +977,6 @@ void sanafe::SpikingChip::sim_hw_timestep(Timestep &ts, Scheduler &scheduler)
     TRACE1(CHIP, "neuron:%e message:%e scheduler:%e energy:%e\n",
             neuron_processing_wall, message_processing_wall, scheduler_wall,
             energy_stats_wall);
-}
-
-sanafe::Timestep::Timestep(const long int ts, const int core_count)
-        : messages(
-                  std::make_shared<std::vector<std::list<Message>>>(core_count))
-        , timestep(ts)
-{
 }
 
 double sanafe::SpikingChip::sim_estimate_network_costs(
@@ -1547,7 +1520,6 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.blocked_delay << "\n";
     message_trace_file.flush();
 }
-
 
 sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
         const std::string &buffer_pos_str, const bool buffer_inside_unit)

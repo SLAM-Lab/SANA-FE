@@ -7,6 +7,33 @@
 #include "network.hpp"
 #include "plugins.hpp"
 
+sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
+        : name(config.name)
+        , energy_spike_message(config.metrics.energy_message_in)
+        , latency_spike_message(config.metrics.latency_message_in)
+{
+}
+
+sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
+        : name(std::move(config.name))
+        , energy_access(config.metrics.energy_message_out)
+        , latency_access(config.metrics.latency_message_out)
+{
+}
+
+sanafe::Core::Core(const CoreConfiguration &config)
+        : pipeline_config(config.pipeline)
+        , name(std::move(config.name))
+        , id(config.address.id)
+        , offset(config.address.offset_within_tile)
+        , parent_tile_id(config.address.parent_tile_id)
+        , log_energy(config.pipeline.log_energy)
+        , log_latency(config.pipeline.log_latency)
+
+{
+    timestep_buffer.resize(pipeline_config.max_neurons_supported);
+}
+
 void sanafe::Core::map_neuron(
         const Neuron &neuron_to_map, const size_t neuron_id)
 {
