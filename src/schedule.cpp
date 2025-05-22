@@ -34,7 +34,35 @@ sanafe::NocInfo::NocInfo(const int width, const int height,
 {
 }
 
-double sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
+void sanafe::schedule_messages(
+        Timestep &ts, Scheduler &scheduler, const BookSimConfig &booksim_config)
+{
+    if (scheduler.timing_model == TIMING_MODEL_SIMPLE)
+    {
+        TRACE1(CHIP, "Running simple timing model\n");
+        schedule_messages_simple(ts, scheduler);
+    }
+    else if (scheduler.timing_model == TIMING_MODEL_DETAILED)
+    {
+        TRACE1(CHIP, "Running detailed timing model\n");
+        schedule_messages_detailed(ts, scheduler);
+    }
+    else if (scheduler.timing_model == TIMING_MODEL_CYCLE_ACCURATE)
+    {
+        TRACE1(CHIP, "Running cycle-accurate timing model\n");
+        schedule_messages_cycle_accurate(ts, booksim_config, scheduler);
+    }
+    else
+    {
+        INFO("Error: Timing model:%d not recognized\n", scheduler.timing_model);
+        throw std::invalid_argument("Timing model not recognized");
+    }
+
+    return;
+}
+
+void sanafe::schedule_messages_simple(
+        Timestep &ts, Scheduler &scheduler)
 {
     // Simple analytical model, that takes the maximum of either neuron or
     //  message processing for each core, and takes the maximum latency of
@@ -66,10 +94,10 @@ double sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
 
     ts.sim_time = std::max(max_message_processing, max_neuron_processing);
     scheduler.timesteps_to_write.push(ts);
-    return ts.sim_time;
+    return;
 }
 
-double sanafe::schedule_messages_cycle_accurate(
+void sanafe::schedule_messages_cycle_accurate(
         Timestep &ts, const BookSimConfig &config, Scheduler &scheduler)
 {
     // Cycle-accurate (NoC)-based timing model for highly accurate network
@@ -117,7 +145,7 @@ double sanafe::schedule_messages_cycle_accurate(
 
     ts.sim_time = booksim_time;
     scheduler.timesteps_to_write.push(ts);
-    return booksim_time;
+    return;
 }
 
 void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)

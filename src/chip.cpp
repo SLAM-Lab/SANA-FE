@@ -410,6 +410,20 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     return rd;
 }
 
+void sanafe::SpikingChip::sim_update_total_energy_and_counts(const Timestep &ts)
+{
+    // Update global chip performance counters
+    total_energy += ts.total_energy;
+    synapse_energy += ts.synapse_energy;
+    dendrite_energy += ts.dendrite_energy;
+    soma_energy += ts.soma_energy;
+    network_energy += ts.network_energy;
+
+    total_spikes += ts.spike_count;
+    total_neurons_fired += ts.neurons_fired;
+    return;
+}
+
 sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
 {
     // Run neuromorphic hardware simulation for one timestep
@@ -425,16 +439,7 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     sim_hw_timestep(ts, scheduler);
     auto ts_end = timer.now();
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
-
-    // Update global chip performance counters
-    total_energy += ts.total_energy;
-    synapse_energy += ts.synapse_energy;
-    dendrite_energy += ts.dendrite_energy;
-    soma_energy += ts.soma_energy;
-    network_energy += ts.network_energy;
-
-    total_spikes += ts.spike_count;
-    total_neurons_fired += ts.neurons_fired;
+    sim_update_total_energy_and_counts(ts);
     // The total_messages_sent is incremented during the simulation since it's
     //  used to calculate the mid, so nothing needs to be done here
     if (spike_trace_enabled)
@@ -893,6 +898,27 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
     return;
 }
 
+void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
+{
+    for (auto &tile : tiles)
+    {
+        ts.total_hops += tile.hops;
+        for (auto &c : tile.cores)
+        {
+            for (const auto &hw : c.pipeline_hw)
+            {
+                ts.spike_count += hw->spikes_processed;
+                ts.neurons_fired += hw->neurons_fired;
+            }
+            for (const auto &axon_out : c.axon_out_hw)
+            {
+                ts.packets_sent += axon_out.packets_out;
+            }
+        }
+    }
+    TRACE1(CHIP, "Spikes sent: %ld\n", ts.spike_count);
+}
+
 void sanafe::SpikingChip::sim_hw_timestep(Timestep &ts, Scheduler &scheduler)
 {
     std::chrono::high_resolution_clock timer;
@@ -911,58 +937,15 @@ void sanafe::SpikingChip::sim_hw_timestep(Timestep &ts, Scheduler &scheduler)
     auto message_processing_end_tm = timer.now();
     auto energy_calculation_start_tm = message_processing_end_tm;
     sim_calculate_energy(ts);
-    for (auto &tile : tiles)
-    {
-        ts.total_hops += tile.hops;
-        for (auto &c : tile.cores)
-        {
-            for (const auto &hw : c.pipeline_hw)
-            {
-                ts.spike_count += hw->spikes_processed;
-                ts.neurons_fired += hw->neurons_fired;
-            }
-            for (const auto &axon_out : c.axon_out_hw)
-            {
-                ts.packets_sent += axon_out.packets_out;
-            }
-        }
-    }
-    TRACE1(CHIP, "Spikes sent: %ld\n", ts.spike_count);
+    sim_update_ts_counters(ts);
+
     auto energy_calculation_end_tm = timer.now();
     auto scheduler_start_tm = energy_calculation_end_tm;
-
-    if (scheduler.timing_model == TIMING_MODEL_SIMPLE)
+    if (scheduler.timing_model == TIMING_MODEL_CYCLE_ACCURATE)
     {
-        TRACE1(CHIP, "Running simple timing model\n");
-        schedule_messages_simple(ts, scheduler);
+        check_booksim_compatibility(scheduler, chip_count);
     }
-    else if (scheduler.timing_model == TIMING_MODEL_DETAILED)
-    {
-        TRACE1(CHIP, "Running detailed timing model\n");
-        schedule_messages_detailed(ts, scheduler);
-    }
-    else if (scheduler.timing_model == TIMING_MODEL_CYCLE_ACCURATE)
-    {
-        TRACE1(CHIP, "Running cycle-accurate timing model\n");
-        if ((scheduler.scheduler_threads.size() > 1) || (chip_count > 1))
-        {
-            INFO("Error: Cannot run multiple simultaneous cycle-accurate "
-                 "simulations. The Booksim2 library does not support "
-                 "concurrent runs as it has a lot of global state. For now "
-                 "it's simplest to just not allow for concurrent runs. If you "
-                 "need to simulate in parallel, launch separate SANA-FE "
-                 "processes.");
-            throw std::runtime_error(
-                    "Error: Cannot run multiple simultaneous cycle-accurate "
-                    "simulations.");
-        }
-        schedule_messages_cycle_accurate(ts, *booksim_config, scheduler);
-    }
-    else
-    {
-        INFO("Error: Timing model:%d not recognized\n", scheduler.timing_model);
-        throw std::invalid_argument("Timing model not recognized");
-    }
+    schedule_messages(ts, scheduler, *booksim_config);
     auto scheduler_end_tm = timer.now();
 
     // Calculate various simulator timings
@@ -1575,4 +1558,21 @@ sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
     }
 
     return buffer_pos;
+}
+
+void sanafe::SpikingChip::check_booksim_compatibility(
+        const Scheduler &scheduler, const int sim_count)
+{
+    if ((scheduler.scheduler_threads.size() > 1) || (chip_count > 1))
+        {
+            INFO("Error: Cannot run multiple simultaneous cycle-accurate "
+                 "simulations. The Booksim2 library does not support "
+                 "concurrent runs as it has a lot of global state. For now "
+                 "it's simplest to just not allow for concurrent runs. If you "
+                 "need to simulate in parallel, launch separate SANA-FE "
+                 "processes.");
+            throw std::runtime_error(
+                    "Error: Cannot run multiple simultaneous cycle-accurate "
+                    "simulations.");
+        }
 }

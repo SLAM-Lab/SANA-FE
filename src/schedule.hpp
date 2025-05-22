@@ -191,9 +191,10 @@ struct NocInfo
 };
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
-double schedule_messages_simple(Timestep &ts, Scheduler &scheduler);
+void schedule_messages(Timestep &ts, Scheduler &scheduler, const BookSimConfig &booksim_config);
+void schedule_messages_simple(Timestep &ts, Scheduler &scheduler);
 void schedule_messages_detailed(Timestep &ts, Scheduler &scheduler);
-double schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config, Scheduler &scheduler);
+void schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config, Scheduler &scheduler);
 
 
 void schedule_messages_thread(Scheduler &scheduler, const int tid);

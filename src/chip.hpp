@@ -109,8 +109,10 @@ private:
     void map_axons();
     void sim_reset_measurements();
     void sim_hw_timestep(Timestep &ts, Scheduler &scheduler);
+    void sim_update_ts_counters(Timestep &ts);
     double sim_estimate_network_costs(const Tile &src, Tile &dest);
     void sim_calculate_energy(Timestep &ts);
+    void sim_update_total_energy_and_counts(const Timestep &ts);
 
     void sim_format_run_summary(std::ostream &out, const RunData &run_data) const;
 
@@ -144,6 +146,8 @@ private:
     void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep);
     void sim_trace_record_perf(std::ofstream &out, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
+
+    void check_booksim_compatibility(const Scheduler &scheduler, const int sim_count);
 };
 
 void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
