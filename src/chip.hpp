@@ -46,7 +46,7 @@ class SpikingChip
 public:
     std::vector<Tile> tiles{};
     // Keep a reference to the different neuron groups mapped to the H/W
-    std::map<std::string, std::vector<MappedNeuron *>> mapped_neuron_groups{};
+    std::map<std::string, std::vector<std::reference_wrapper<MappedNeuron>>> mapped_neuron_groups{};
 
     SpikingChip(const Architecture &arch, const std::filesystem::path &output_dir = ".", bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false);
     ~SpikingChip();

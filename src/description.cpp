@@ -1870,11 +1870,15 @@ void sanafe::description_write_network_yaml(
     else
     {
         // Initialize with empty document
-        root = tree.rootref();
         root |= ryml::MAP;
     }
 
     std::ofstream fp(path);
+    if (!fp.is_open())
+    {
+        throw std::system_error(std::make_error_code(std::errc::io_error),
+                "Failed to open YAML file for writing: " + path.string());
+    }
     // Note we need to keep all the generated strings alive as long as we are
     //  dealing with this YAML file. RapidYAML only uses views of strings for
     //  speed, and doesn't copy the string contents
@@ -2169,6 +2173,11 @@ void sanafe::description_write_mappings_yaml(
     }
 
     std::ofstream fp(path);
+    if (!fp.is_open())
+    {
+        throw std::system_error(std::make_error_code(std::errc::io_error),
+                "Failed to open YAML file for writing: " + path.string());
+    }
     std::list<std::string> strings{};
 
     // Add mappings section

@@ -3,16 +3,17 @@
 #include "network.hpp"
 #include "mapped.hpp"
 
-sanafe::MappedConnection::MappedConnection()
-        : post_neuron(nullptr)
-        , pre_neuron(nullptr)
+sanafe::MappedConnection::MappedConnection(
+        MappedNeuron &pre_neuron, MappedNeuron &post_neuron)
+        : pre_neuron(pre_neuron)
+        , post_neuron(post_neuron)
         , synapse_hw(nullptr)
 {
 }
 
 void sanafe::MappedConnection::build_message_processing_pipeline()
 {
-    MappedNeuron &n = *post_neuron;
+    MappedNeuron &n = post_neuron;
     Core &mapped_core = *(n.core);
 
     // We don't support putting the buffer inside or before the synapse unit, so

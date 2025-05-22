@@ -3,6 +3,7 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 //  chip.cpp
+
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -141,41 +142,40 @@ void sanafe::SpikingChip::load(const SpikingNetwork &net)
 
 void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
 {
-    std::vector<const Neuron *> neurons_in_mapped_order;
+    std::vector<std::reference_wrapper<const Neuron>> neurons_in_mapped_order;
 
     // Figure out which order to map the neurons in to hardware
     for (const auto &[name, group] : net.groups)
     {
-        mapped_neuron_groups[name] =
-                std::vector<MappedNeuron *>(group.neurons.size(), nullptr);
+        mapped_neuron_groups[name].reserve(group.neurons.size());
         for (const Neuron &neuron : group.neurons)
         {
-            neurons_in_mapped_order.push_back(&neuron);
+            neurons_in_mapped_order.emplace_back(neuron);
         }
     }
     INFO("Total neurons to map: %zu\n", neurons_in_mapped_order.size());
 
     std::sort(neurons_in_mapped_order.begin(), neurons_in_mapped_order.end(),
-            [](const Neuron *const a, const Neuron *const b) {
-                return a->mapping_order < b->mapping_order;
+            [](const Neuron &a, const Neuron &b) {
+                return a.mapping_order < b.mapping_order;
             });
 
     auto list_of_cores = cores();
     // Map all neurons in order
-    for (const Neuron *neuron : neurons_in_mapped_order)
+    for (const Neuron &neuron : neurons_in_mapped_order)
     {
-        if (!neuron->core_address.has_value())
+        if (!neuron.core_address.has_value())
         {
-            std::string error = "Neuron: " + neuron->parent_group_name + "." +
-                    std::to_string(neuron->offset) + " not mapped.";
+            std::string error = "Neuron: " + neuron.parent_group_name + "." +
+                    std::to_string(neuron.offset) + " not mapped.";
             INFO("%s", error.c_str());
             throw std::runtime_error(error);
         }
         TRACE1(CHIP, "Mapping neuron %s.%zu to core:%zu\n",
-                neuron->parent_group_name.c_str(), neuron->offset,
-                neuron->core_address.value().id);
-        Core &mapped_core = list_of_cores[neuron->core_address.value().id];
-        mapped_core.map_neuron(*neuron, total_neurons_mapped);
+                neuron.parent_group_name.c_str(), neuron.offset,
+                neuron.core_address.value().id);
+        Core &mapped_core = list_of_cores[neuron.core_address.value().id];
+        mapped_core.map_neuron(neuron, total_neurons_mapped);
         ++total_neurons_mapped;
     }
 
@@ -188,7 +188,7 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         for (MappedNeuron &mapped_neuron : core.neurons)
         {
             mapped_neuron_groups[mapped_neuron.parent_group_name]
-                                [mapped_neuron.offset] = &mapped_neuron;
+                                [mapped_neuron.offset] = mapped_neuron;
         }
     }
 }
@@ -214,7 +214,7 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
         for (size_t nid = 0; nid < group.neurons.size(); ++nid)
         {
             const Neuron &pre_neuron = group.neurons[nid];
-            MappedNeuron &mapped_neuron = *(mapped_neuron_groups[name][nid]);
+            MappedNeuron &mapped_neuron = mapped_neuron_groups[name][nid];
             for (size_t idx = 0; idx < pre_neuron.edges_out.size(); ++idx)
             {
                 const Connection &con = pre_neuron.edges_out[idx];
@@ -231,7 +231,7 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                     }
                     if (value.forward_to_dendrite)
                     {
-                        MappedNeuron &n = *(mapped_con.post_neuron);
+                        MappedNeuron &n = mapped_con.post_neuron;
                         n.dendrite_hw->check_attribute(key);
                         n.dendrite_hw->set_attribute_edge(
                                 mapped_con.synapse_address, key, value);
@@ -251,16 +251,14 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
 
     auto &pre_group = mapped_neuron_groups.at(con.pre_neuron.group_name);
     MappedNeuron &pre_neuron =
-            *(pre_group[con.pre_neuron.neuron_offset.value()]);
+            pre_group[con.pre_neuron.neuron_offset.value()];
 
     auto &post_group = mapped_neuron_groups.at(con.post_neuron.group_name);
     MappedNeuron &post_neuron =
-            *(post_group[con.post_neuron.neuron_offset.value()]);
+            post_group[con.post_neuron.neuron_offset.value()];
 
-    pre_neuron.connections_out.emplace_back();
+    pre_neuron.connections_out.emplace_back(pre_neuron, post_neuron);
     MappedConnection &mapped_con = pre_neuron.connections_out.back();
-    mapped_con.pre_neuron = &pre_neuron;
-    mapped_con.post_neuron = &post_neuron;
 
     // Map to synapse hardware unit
     Core &post_core = *(post_neuron.core);
@@ -468,9 +466,9 @@ void sanafe::SpikingChip::reset()
 
     for (auto &[group_name, neurons] : mapped_neuron_groups)
     {
-        for (MappedNeuron *neuron : neurons)
+        for (MappedNeuron &neuron : neurons)
         {
-            neuron->status = INVALID_NEURON_STATE;
+            neuron.status = INVALID_NEURON_STATE;
         }
     }
 }
@@ -617,7 +615,7 @@ double sanafe::SpikingChip::process_message(
         //  updates to the dendrite and/or soma units as well. Keep propagating
         //  outputs/inputs until we hit the time-step buffer, where outputs
         //  are stored as inputs ready for the next time-step
-        MappedNeuron &n = *(con.post_neuron);
+        MappedNeuron &n = con.post_neuron;
         PipelineResult pipeline_output = execute_pipeline(
                 con.message_processing_pipeline, ts, n, &con, empty_input);
         core.timestep_buffer[n.mapped_address] = pipeline_output;
@@ -1134,7 +1132,7 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     std::set<Core *> cores_out;
     for (MappedConnection &curr_connection : pre_neuron.connections_out)
     {
-        Core *dest_core = curr_connection.post_neuron->core;
+        Core *dest_core = curr_connection.post_neuron.core;
         cores_out.insert(dest_core);
         TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
     }
@@ -1154,7 +1152,7 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     {
         // Add every connection to the axon. Also link to the map in the
         //  post synaptic core / neuron
-        Core &post_core = *(curr_connection.post_neuron->core);
+        Core &post_core = *(curr_connection.post_neuron.core);
         //TRACE1(CHIP, "Adding connection:%d\n", curr_connection.id);
         sim_add_connection_to_axon(curr_connection, post_core);
     }
@@ -1328,12 +1326,12 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
     potential_trace_file << "timestep,";
     for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
-        for (const MappedNeuron *neuron : group_neurons)
+        for (const MappedNeuron &neuron : group_neurons)
         {
-            if (neuron->log_potential)
+            if (neuron.log_potential)
             {
                 potential_trace_file << "neuron " << group_name;
-                potential_trace_file << "." << neuron->id << ",";
+                potential_trace_file << "." << neuron.id << ",";
             }
         }
     }
@@ -1438,12 +1436,12 @@ void sanafe::SpikingChip::sim_trace_record_spikes(
 
     for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
-        for (const MappedNeuron *neuron : group_neurons)
+        for (const MappedNeuron &neuron : group_neurons)
         {
-            if (neuron->log_spikes && (neuron->status == sanafe::FIRED))
+            if (neuron.log_spikes && (neuron.status == sanafe::FIRED))
             {
-                spike_trace_file << neuron->parent_group_name << ".";
-                spike_trace_file << neuron->id << ",";
+                spike_trace_file << neuron.parent_group_name << ".";
+                spike_trace_file << neuron.id << ",";
                 spike_trace_file << timestep;
                 spike_trace_file << "\n";
                 spike_trace_file.flush();
@@ -1464,12 +1462,12 @@ void sanafe::SpikingChip::sim_trace_record_potentials(
     long int potential_probe_count = 0;
     for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
-        for (const MappedNeuron *neuron : group_neurons)
+        for (const MappedNeuron &neuron : group_neurons)
         {
-            if (neuron->log_potential)
+            if (neuron.log_potential)
             {
-                potential_trace_file << neuron->soma_hw->get_potential(
-                        neuron->mapped_address);
+                potential_trace_file << neuron.soma_hw->get_potential(
+                        neuron.mapped_address);
                 potential_trace_file << ",";
                 potential_probe_count++;
             }

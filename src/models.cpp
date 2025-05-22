@@ -187,8 +187,8 @@ void sanafe::LoihiSynapseModel::map_connection(MappedConnection &con)
 {
     size_t synapse_address = con.synapse_address;
     // Get unique identifier for spiking neuron
-    const MappedNeuron *pre_neuron = con.pre_neuron;
-    synapse_to_pre_neuron[synapse_address] = pre_neuron->id;
+    const MappedNeuron &pre_neuron = con.pre_neuron;
+    synapse_to_pre_neuron[synapse_address] = pre_neuron.id;
 }
 
 // *** Dendrite models ***

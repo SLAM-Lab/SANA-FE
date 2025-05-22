@@ -26,13 +26,13 @@ enum NeuronStatus : int
 class MappedConnection
 {
 public:
-    MappedNeuron *post_neuron{nullptr};
-    MappedNeuron *pre_neuron{nullptr};
+    MappedNeuron &pre_neuron;
+    MappedNeuron &post_neuron;
     PipelineUnit *synapse_hw{nullptr};
     std::vector<PipelineUnit *> message_processing_pipeline{};
     size_t synapse_address{0UL};
 
-    explicit MappedConnection();
+    explicit MappedConnection(MappedNeuron &pre_neuron, MappedNeuron &post_neuron);
     void build_message_processing_pipeline();
 };
 

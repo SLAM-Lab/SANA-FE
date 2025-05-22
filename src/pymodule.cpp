@@ -927,7 +927,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     "mapped_neuron_groups",
                     [](sanafe::SpikingChip &self)
                             -> std::map<std::string,
-                                    std::vector<sanafe::MappedNeuron *>> & {
+                                    std::vector<std::reference_wrapper<sanafe::MappedNeuron>>> & {
                         return self.mapped_neuron_groups;
                     },
                     nullptr, pybind11::return_value_policy::reference_internal)
