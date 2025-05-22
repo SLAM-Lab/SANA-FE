@@ -45,6 +45,7 @@ std::string print_format_attributes(const std::map<std::string, std::any> &attr)
 //      foreach(category <append to this list>)
 
 // Define categories
+// NOLINTBEGIN
 #define DEBUG_CATEGORY_CHIP 0
 #define DEBUG_CATEGORY_ARCH 1
 #define DEBUG_CATEGORY_NET 2
@@ -79,8 +80,10 @@ std::string print_format_attributes(const std::map<std::string, std::any> &attr)
 #ifndef DEBUG_LEVEL_CHIP
 #define DEBUG_LEVEL_CHIP 0
 #endif
+// NOLINTEND
 
 // INFO prints are always enabled
+//NOLINTBEGIN
 #define INFO(...) do { \
     fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
     fprintf(stdout, __VA_ARGS__); \
@@ -109,5 +112,6 @@ std::string print_format_attributes(const std::map<std::string, std::any> &attr)
         fprintf(stdout, __VA_ARGS__); \
     } \
 } while (0)
+// NOLINTEND
 
 #endif

@@ -4,7 +4,8 @@
 #include "mapped.hpp"
 
 sanafe::MappedConnection::MappedConnection(
-        MappedNeuron &pre_neuron, MappedNeuron &post_neuron)
+        std::reference_wrapper<MappedNeuron> pre_neuron,
+        std::reference_wrapper<MappedNeuron> post_neuron)
         : pre_neuron(pre_neuron)
         , post_neuron(post_neuron)
         , synapse_hw(nullptr)

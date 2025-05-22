@@ -14,14 +14,13 @@
 namespace sanafe
 {
 
-enum NeuronStatus : int
+enum NeuronStatus : uint8_t
 {
-    INVALID_NEURON_STATE,
-    IDLE,
-    UPDATED,
-    FIRED
+    INVALID_NEURON_STATE = 0,
+    IDLE = 1,
+    UPDATED = 2,
+    FIRED = 3
 };
-
 
 class MappedConnection
 {
@@ -32,7 +31,7 @@ public:
     std::vector<PipelineUnit *> message_processing_pipeline{};
     size_t synapse_address{0UL};
 
-    explicit MappedConnection(MappedNeuron &pre_neuron, MappedNeuron &post_neuron);
+    explicit MappedConnection(std::reference_wrapper<MappedNeuron> pre_neuron, std::reference_wrapper<MappedNeuron> post_neuron);
     void build_message_processing_pipeline();
 };
 

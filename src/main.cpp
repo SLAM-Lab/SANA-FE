@@ -4,11 +4,13 @@
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // main.cpp - Command line interface
 // Performance simulation of neuromorphic architectures
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <filesystem> // For std::filesystem::path
-#include <optional>
+#include <stdexcept>
 #include <string>
 #ifdef HAVE_OPENMP
 #include <omp.h>
@@ -18,12 +20,11 @@
 
 #include "arch.hpp"
 #include "description.hpp"
-#include "models.hpp"
 #include "network.hpp"
 #include "print.hpp"
 #include "chip.hpp"
 
-enum ProgramArgs
+enum ProgramArgs : uint8_t
 {
     ARCH_FILENAME = 0,
     NETWORK_FILENAME = 1,
@@ -49,7 +50,7 @@ int main(int argc, char *argv[])
     bool record_perf{false};
     bool record_messages{false};
     bool use_netlist_format{false};
-    int total_threads_available{1};
+    int total_threads_available{1}; // NOLINT(misc-const-correctness)
 #ifdef HAVE_OPENMP
     int processing_threads{1};
 #endif
@@ -172,7 +173,7 @@ int main(int argc, char *argv[])
         sanafe::Architecture arch =
                 sanafe::load_arch(argv[ARCH_FILENAME]);
         INFO("Architecture initialized.\n");
-        sanafe::SpikingNetwork net = sanafe::load_net(
+        const sanafe::SpikingNetwork net = sanafe::load_net(
                 argv[NETWORK_FILENAME], arch, use_netlist_format);
         INFO("Network initialized.\n");
 
@@ -180,7 +181,7 @@ int main(int argc, char *argv[])
                 record_potentials, record_perf, record_messages);
         hw.load(net);
 
-        long int timesteps;
+        long int timesteps{0L};
         try
         {
             timesteps = std::stol(argv[TIMESTEPS]);
@@ -199,7 +200,7 @@ int main(int argc, char *argv[])
         }
 
         INFO("Running simulation.\n");
-        sanafe::RunData run_summary = hw.sim(timesteps,
+        const sanafe::RunData run_summary = hw.sim(timesteps,
                 sanafe::default_heartbeat_timesteps, timing_model,
                 scheduler_threads);
 
@@ -208,7 +209,7 @@ int main(int argc, char *argv[])
 
         INFO("***** Run Summary *****\n");
         hw.sim_output_run_summary(output_dir, run_summary);
-        double average_power = hw.get_power();
+        const double average_power = hw.get_power();
         INFO("Average power consumption: %f W.\n", average_power);
         INFO("Run finished.\n");
 

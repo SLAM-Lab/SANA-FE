@@ -134,7 +134,7 @@ void sanafe::description_parse_axon_in_section_yaml(const ryml::Parser &parser,
     }
     const AxonInPowerMetrics in_metrics =
             description_parse_axon_in_attributes_yaml(parser, attributes);
-    parent_core.create_axon_in(name, in_metrics);
+    parent_core.create_axon_in(std::move(name), in_metrics);
 }
 
 sanafe::AxonInPowerMetrics sanafe::description_parse_axon_in_attributes_yaml(
@@ -181,7 +181,8 @@ void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
     }
     if (!hw_exists)
     {
-        PipelineUnitConfiguration &synapse = parent_core.create_hardware_unit(name, model);
+        PipelineUnitConfiguration &synapse =
+                parent_core.create_hardware_unit(std::move(name), model);
         synapse.implements_synapse = true;
     }
 }
@@ -2785,10 +2786,10 @@ void sanafe::netlist_read_mapping(const std::vector<std::string_view> &fields,
         sanafe::Architecture &arch, sanafe::SpikingNetwork &net,
         const int line_number)
 {
-    std::string neuron_group_id;
-    size_t neuron_id;
-    size_t tile_id;
-    size_t core_offset;
+    std::string neuron_group_id{};
+    size_t neuron_id{0};
+    size_t tile_id{0};
+    size_t core_offset{0};
 
     std::tie(neuron_group_id, neuron_id, tile_id, core_offset) =
             netlist_parse_mapping_field(fields[1]);
@@ -3026,7 +3027,7 @@ std::string sanafe::netlist_attributes_to_netlist(
 
     TRACE1(DESCRIPTION, "Parsing attributes\n");
     bool nested_attributes = false;
-    for (auto &[key, attribute] : model_attributes)
+    for (const auto &[key, attribute] : model_attributes)
     {
         if (std::holds_alternative<std::vector<ModelAttribute>>(
                     attribute.value))

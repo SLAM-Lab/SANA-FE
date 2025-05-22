@@ -1,0 +1,53 @@
+# .clang-tidy configuration file
+Checks: >
+  modernize-*,
+  readability-*,
+  cppcoreguidelines-*,
+  bugprone-*,
+  performance-*,
+  clang-analyzer-*,
+  misc-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -misc-non-private-member-variables-in-classes,
+  -readability-identifier-length
+  -cppcoreguidelines-non-private-member-variables-in-classes
+# Inherit parent configs (useful for large projects)
+InheritParentConfig: true
+
+# Header filter - only check headers in your project, not system headers
+HeaderFilterRegex: '(src/|include/|test/).*\.(h|hpp|hxx)$'
+
+# Configure specific checkers
+CheckOptions:
+  # Readability options
+  readability-identifier-naming.VariableCase: 'lower_case'
+  readability-identifier-naming.FunctionCase: 'lower_case'
+  readability-identifier-naming.ClassCase: 'CamelCase'
+  readability-identifier-naming.StructCase: 'CamelCase'
+  readability-identifier-naming.NamespaceCase: 'lower_case'
+  readability-identifier-naming.EnumCase: 'CamelCase'
+  readability-identifier-naming.ConstantCase: 'UPPER_CASE'
+  readability-identifier-naming.MacroCase: 'UPPER_CASE'
+
+  # Function length limits
+  readability-function-size.LineThreshold: 100
+  readability-function-size.StatementThreshold: 50
+  readability-function-size.BranchThreshold: 20
+  readability-function-size.ParameterThreshold: 8
+
+  # Performance options
+  performance-for-range-copy.WarnOnAllAutoCopies: true
+  performance-inefficient-vector-operation.VectorLikeClasses: 'std::vector,std::deque'
+
+  # Modernize options
+  modernize-use-auto.MinTypeNameLength: 5
+  modernize-loop-convert.MinConfidence: reasonable
+
+  # Core Guidelines options
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions: true
+
+# Format style for fix suggestions (optional)
+FormatStyle: file

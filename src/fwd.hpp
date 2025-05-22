@@ -48,7 +48,7 @@ struct AxonOutModel;
 struct Message;
 
 enum BufferPosition : int;
-enum NeuronStatus : int;
+enum NeuronStatus : uint8_t;
 
 }
 
