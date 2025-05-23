@@ -19,7 +19,7 @@ Checks: >
 InheritParentConfig: true
 
 # Header filter - only check headers in src/, exclude _deps/ and external dependencies
-HeaderFilterRegex: '^src/.*\.hpp'
+HeaderFilterRegex: '^sana-fe/src/.*\.hpp'
 
 # Configure specific checkers
 CheckOptions:

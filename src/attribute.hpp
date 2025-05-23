@@ -57,10 +57,10 @@ struct ModelAttribute
             return static_cast<double>(std::get<int>(value));
         }
 
-        std::string error = "Error: Attribute ";
+        std::string error = "Error: Attribute";
         if (name.has_value())
         {
-            error += name.value();
+            error += " " + name.value();
         }
         error += " cannot be cast to a double";
         throw std::runtime_error(error);

@@ -2,30 +2,17 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
-#include <algorithm>
 #include <cassert>
-#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
-#include <fstream>
-#include <functional>
-#include <iosfwd>
-#include <iostream>
-#include <iterator>
 #include <limits>
-#include <list>
 #include <map>
 #include <optional>
 #include <set>
-#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <string_view>
-#include <system_error>
-#include <tuple>
-#include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <variant>
@@ -35,12 +22,10 @@
 #include <ryml_std.hpp> // NOLINT(misc-include-cleaner)
 
 #include "attribute.hpp"
-#include "arch.hpp"
-#include "chip.hpp"
 #include "description.hpp"
-#include "network.hpp"
 #include "print.hpp"
 
+// NOLINTBEGIN(misc-include-cleaner)
 sanafe::DescriptionParsingError::DescriptionParsingError(
         const std::string &error, const ryml::Parser &parser,
         const ryml::ConstNodeRef &node)
@@ -50,6 +35,7 @@ sanafe::DescriptionParsingError::DescriptionParsingError(
     message = "Error: " + error + " (Line " + std::to_string(pos.line + 1) +
             ':' + std::to_string(pos.col + 1) + ").\n";
 }
+// NOLINTEND(misc-include-cleaner)
 
 const char *sanafe::DescriptionParsingError::what() const noexcept
 {
@@ -152,7 +138,6 @@ std::string sanafe::description_get_type_string(const std::type_info &type)
     return type.name();
 }
 
-
 std::map<std::string, sanafe::ModelAttribute>
 sanafe::description_parse_model_attributes_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node)
@@ -175,7 +160,7 @@ sanafe::description_parse_model_attributes_yaml(
         for (const auto &node : attributes_node)
         {
             std::string key_str;
-            node >> ryml::key(key_str);
+            node >> ryml::key(key_str); // NOLINT(misc-include-cleaner)
             std::set<std::string> unit_specific_keys = {
                     "synapse", "dendrite", "soma"};
             if (unit_specific_keys.find(key_str) == unit_specific_keys.end())
@@ -196,7 +181,6 @@ sanafe::description_parse_model_attributes_yaml(
     return model_attributes;
 }
 
-
 sanafe::ModelAttribute sanafe::description_parse_attribute_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node)
 {
@@ -204,75 +188,102 @@ sanafe::ModelAttribute sanafe::description_parse_attribute_yaml(
 
     if (attribute_node.is_seq())
     {
-        // Create an list of unnamed attributes
-        std::vector<ModelAttribute> attribute_list;
-        for (const auto &node : attribute_node)
-        {
-            TRACE2(DESCRIPTION, "Parsing sub-attribute in list.\n");
-            ModelAttribute curr =
-                    description_parse_attribute_yaml(parser, node);
-            attribute_list.push_back(std::move(curr));
-        }
-        TRACE2(DESCRIPTION,
-                "Setting attribute to an list of %zu unnamed attributes\n",
-                attribute_list.size());
-        attribute.value = attribute_list;
+        attribute.value =
+                description_parse_attribute_list(parser, attribute_node);
     }
     else if (attribute_node.is_map())
     {
-        // Create a list of named attributes
-        std::vector<ModelAttribute> attribute_list;
-        for (const auto &node : attribute_node)
-        {
-            TRACE2(DESCRIPTION, "Parsing mapping of attributes.\n");
-            ModelAttribute curr =
-                    description_parse_attribute_yaml(parser, node);
-            std::string key;
-            node >> ryml::key(key);
-            curr.name = key;
-            TRACE2(DESCRIPTION, "Saving to key: %s\n", key.c_str());
-            attribute_list.push_back(std::move(curr));
-        }
-        TRACE1(DESCRIPTION,
-                "Setting attribute to a list of %zu named attributes\n",
-                attribute_list.size());
-        attribute.value = attribute_list;
+        attribute.value =
+                description_parse_attribute_map(parser, attribute_node);
     }
     else
     {
-        if (attribute_node.invalid())
-        {
-            throw std::invalid_argument("Invalid node.\n");
-        }
-        int decoded_int = 0;
-        double decoded_double = std::numeric_limits<double>::quiet_NaN();
-        bool decoded_bool = false;
-        std::string decoded_str;
-        // BEGINNOLINT(misc-include-cleaner)
-        if (c4::yml::read(attribute_node, &decoded_int))
-        {
-            TRACE1(DESCRIPTION, "Parsed int: %d.\n", decoded_int);
-            attribute.value = decoded_int;
-        }
-        else if (c4::yml::read(attribute_node, &decoded_double))
-        {
-            TRACE1(DESCRIPTION, "Parsed float: %lf.\n", decoded_double);
-            attribute.value = decoded_double;
-        }
-        else if (c4::yml::read(attribute_node, &decoded_bool))
-        {
-            TRACE2(DESCRIPTION, "Parsed bool: %d.\n", decoded_bool);
-            attribute.value = decoded_bool;
-        }
-        else if (c4::yml::read(attribute_node, &decoded_str))
-        {
-            TRACE2(DESCRIPTION, "Parsed string: %s.\n", decoded_str.c_str());
-            attribute.value = std::move(decoded_str);
-        }
-        // ENDNOLINT(misc-include-cleaner)
+        attribute.value =
+                description_parse_attribute_scalar(attribute_node);
     }
 
     return attribute;
+}
+
+std::vector<sanafe::ModelAttribute> sanafe::description_parse_attribute_list(
+        const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node)
+{
+    // Create an list of unnamed attributes
+    std::vector<ModelAttribute> attribute_list;
+    for (const auto &node : attribute_node)
+    {
+        TRACE2(DESCRIPTION, "Parsing sub-attribute in list.\n");
+        ModelAttribute curr = description_parse_attribute_yaml(parser, node);
+        attribute_list.push_back(std::move(curr));
+    }
+    TRACE2(DESCRIPTION,
+            "Setting attribute to an list of %zu unnamed attributes\n",
+            attribute_list.size());
+
+    return attribute_list;
+}
+
+std::vector<sanafe::ModelAttribute> sanafe::description_parse_attribute_map(
+        const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node)
+{
+    std::vector<ModelAttribute> attribute_map;
+    for (const auto &node : attribute_node)
+    {
+        TRACE2(DESCRIPTION, "Parsing mapping of attributes.\n");
+        // Recursively parse YAML attribute
+        ModelAttribute curr = description_parse_attribute_yaml(parser, node);
+        std::string key;
+        node >> ryml::key(key);
+        curr.name = key;
+        TRACE2(DESCRIPTION, "Saving to key: %s\n", key.c_str());
+        attribute_map.push_back(std::move(curr));
+    }
+    TRACE1(DESCRIPTION, "Setting attribute to a list of %zu named attributes\n",
+            attribute_map.size());
+
+    return attribute_map;
+}
+
+std::variant<bool, int, double, std::string, std::vector<sanafe::ModelAttribute>>
+sanafe::description_parse_attribute_scalar(
+        const ryml::ConstNodeRef attribute_node)
+{
+    if (attribute_node.invalid())
+    {
+        throw std::invalid_argument("Invalid node.\n");
+    }
+    int decoded_int = 0;
+    double decoded_double = std::numeric_limits<double>::quiet_NaN();
+    bool decoded_bool = false;
+    std::string decoded_str;
+
+    std::variant<bool, int, double, std::string,
+            std::vector<sanafe::ModelAttribute>>
+            value;
+    // NOLINTBEGIN(misc-include-cleaner)
+    if (c4::yml::read(attribute_node, &decoded_int))
+    {
+        TRACE1(DESCRIPTION, "Parsed int: %d.\n", decoded_int);
+        value = decoded_int;
+    }
+    else if (c4::yml::read(attribute_node, &decoded_double))
+    {
+        TRACE1(DESCRIPTION, "Parsed float: %lf.\n", decoded_double);
+        value = decoded_double;
+    }
+    else if (c4::yml::read(attribute_node, &decoded_bool))
+    {
+        TRACE2(DESCRIPTION, "Parsed bool: %d.\n", decoded_bool);
+        value = decoded_bool;
+    }
+    else if (c4::yml::read(attribute_node, &decoded_str))
+    {
+        TRACE2(DESCRIPTION, "Parsed string: %s.\n", decoded_str.c_str());
+        value = std::move(decoded_str);
+    }
+    // NOLINTEND(misc-include-cleaner)
+
+    return value;
 }
 
 std::pair<size_t, size_t> sanafe::description_parse_range_yaml(
