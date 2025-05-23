@@ -204,9 +204,6 @@ struct RunData
 
     RunData(long int start);
 };
-
-BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str, const bool buffer_inside_unit);
-
 }
 
 #endif

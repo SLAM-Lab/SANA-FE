@@ -5,6 +5,7 @@
 #ifndef PIPELINE_HEADER_INCLUDED_
 #define PIPELINE_HEADER_INCLUDED_
 
+#include <filesystem>
 #include <optional>
 #include <set>
 #include <string>
@@ -193,6 +194,8 @@ public:
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) final {};
     void map_connection(MappedConnection &con) final {};
 };
+
+BufferPosition pipeline_parse_buffer_pos_str(const std::string &buffer_pos_str, const bool buffer_inside_unit);
 
 }
 #endif

@@ -522,7 +522,7 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
 }
 
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-        const long int heartbeat, std::string timing_model_str, int nthreads)
+        std::string timing_model_str, int nthreads)
 {
     sanafe::TimingModel timing_model;
     if (timing_model_str == "simple")
@@ -550,7 +550,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     }
 #endif
 
-    return run_data_to_dict(self->sim(timesteps, heartbeat, timing_model));
+    return run_data_to_dict(self->sim(timesteps, timing_model));
 }
 
 // Custom Python wrapper class for the Neuron class
@@ -940,7 +940,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("record_messages") = false)
             .def("load", &sanafe::SpikingChip::load)
             .def("sim", &pysim, pybind11::arg("timesteps") = 1,
-                    pybind11::arg("heartbeat") = 100,
                     pybind11::arg("timing_model") = "detailed",
                     pybind11::arg("nthreads") = 0)
             .def("get_power", &sanafe::SpikingChip::get_power)

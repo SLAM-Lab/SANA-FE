@@ -18,8 +18,10 @@
 
 #include "arch.hpp"
 #include "description.hpp"
+#include "netlist.hpp"
 #include "network.hpp"
 #include "print.hpp"
+#include "yaml_snn.hpp"
 
 std::string sanafe::NeuronAddress::info() const
 {

@@ -1520,50 +1520,6 @@ void sanafe::sim_trace_record_message(
     message_trace_file.flush();
 }
 
-sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
-        const std::string &buffer_pos_str, const bool buffer_inside_unit)
-{
-    BufferPosition buffer_pos{BUFFER_BEFORE_DENDRITE_UNIT};
-    // H/w either has SANA-FE insert and manage a time-step buffer on the h/w
-    //  unit's inputs (before the unit), or can assume that the unit manages its
-    //  own state that is internally buffered over consecutive time-steps e.g.,
-    //  using a double buffer
-
-    if (buffer_pos_str == "dendrite")
-    {
-        if (buffer_inside_unit)
-        {
-            buffer_pos = BUFFER_INSIDE_DENDRITE_UNIT;
-        }
-        else
-        {
-            buffer_pos = BUFFER_BEFORE_DENDRITE_UNIT;
-        }
-    }
-    else if (buffer_pos_str == "soma")
-    {
-        if (buffer_inside_unit)
-        {
-            buffer_pos = BUFFER_INSIDE_SOMA_UNIT;
-        }
-        else
-        {
-            buffer_pos = BUFFER_BEFORE_SOMA_UNIT;
-        }
-    }
-    else if (buffer_pos_str == "axon_out")
-    {
-        buffer_pos = BUFFER_BEFORE_AXON_OUT_UNIT;
-    }
-    else
-    {
-        INFO("Error: Buffer position %s not supported", buffer_pos_str.c_str());
-        throw std::invalid_argument("Error: Buffer position not supported");
-    }
-
-    return buffer_pos;
-}
-
 void sanafe::SpikingChip::check_booksim_compatibility(
         const Scheduler &scheduler, const int /*sim_count*/)
 {

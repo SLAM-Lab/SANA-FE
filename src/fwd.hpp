@@ -29,6 +29,7 @@ struct AxonInPowerMetrics;
 
 class SpikingNetwork;
 class Neuron;
+class NeuronGroup;
 struct Connection;
 class MappedNeuron;
 class MappedConnection;
