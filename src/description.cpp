@@ -298,7 +298,8 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
         if (!hw_exists)
         {
             PipelineUnitConfiguration &dendrite =
-                    parent_core.create_hardware_unit(name, model_details);
+                    parent_core.create_hardware_unit(
+                            std::move(name), model_details);
             dendrite.implements_dendrite = true;
         }
     }
@@ -393,8 +394,8 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         }
         if (!hw_exists)
         {
-            PipelineUnitConfiguration &soma =
-                    parent_core.create_hardware_unit(name, model_details);
+            PipelineUnitConfiguration &soma = parent_core.create_hardware_unit(
+                    std::move(name), model_details);
             soma.implements_soma = true;
         }
     }
@@ -418,7 +419,7 @@ void sanafe::description_parse_axon_out_section(const ryml::Parser &parser,
     power_metrics.latency_message_out = description_required_field<double>(
             parser, attributes, "latency_message_out");
 
-    parent_core.create_axon_out(axon_out_name, power_metrics);
+    parent_core.create_axon_out(std::move(axon_out_name), power_metrics);
 }
 
 void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,

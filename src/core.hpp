@@ -62,7 +62,6 @@ public:
     double latency_access;
 
     explicit AxonOutUnit(const AxonOutConfiguration &config);
-    //std::string description() const;
 };
 
 class Core

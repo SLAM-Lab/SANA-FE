@@ -110,9 +110,10 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         }
     }
 
-    const std::vector<std::string> booksim_config_vec(
+    std::vector<std::string> booksim_config_vec(
             std::begin(booksim_config_str), std::end(booksim_config_str));
-    const BookSimConfig new_config = booksim_load_config(booksim_config_vec);
+    const BookSimConfig new_config =
+            booksim_load_config(std::move(booksim_config_vec));
     // Use a unique_ptr for the config so that we don't need to include Booksim
     //  library in the header (meaning that plugins using chip.hpp don't need to
     //  also include this library)
@@ -446,7 +447,7 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
     sim_update_total_energy_and_counts(ts);
     // The total_messages_sent is incremented during the simulation since it's
-    //  used to calculate the mid, so nothing needs to be done here
+    //  used to calculate the message id, so nothing needs to be done here
     if (spike_trace_enabled)
     {
         sim_trace_record_spikes(spike_trace, total_timesteps);

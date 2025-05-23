@@ -2,10 +2,18 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
+#include <cstddef>
+#include <filesystem>
+#include <sstream>
+#include <stdexcept>
+
+#include "arch.hpp"
 #include "core.hpp"
 #include "models.hpp"
 #include "network.hpp"
+#include "pipeline.hpp"
 #include "plugins.hpp"
+#include "print.hpp"
 
 sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
         : name(config.name)
@@ -15,7 +23,7 @@ sanafe::AxonInUnit::AxonInUnit(const AxonInConfiguration &config)
 }
 
 sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
-        : name(std::move(config.name))
+        : name(config.name)
         , energy_access(config.metrics.energy_message_out)
         , latency_access(config.metrics.latency_message_out)
 {
@@ -23,7 +31,7 @@ sanafe::AxonOutUnit::AxonOutUnit(const AxonOutConfiguration &config)
 
 sanafe::Core::Core(const CoreConfiguration &config)
         : pipeline_config(config.pipeline)
-        , name(std::move(config.name))
+        , name(config.name)
         , id(config.address.id)
         , offset(config.address.offset_within_tile)
         , parent_tile_id(config.address.parent_tile_id)
@@ -56,10 +64,10 @@ void sanafe::Core::map_neuron(
         INFO("Error: No pipeline units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No units defined");
     }
-    PipelineUnit *mapped_dendrite;
+    PipelineUnit *mapped_dendrite{nullptr};
 
-    bool choose_first_dendrite_by_default =
-            (neuron_to_map.dendrite_hw_name.length() == 0);
+    const bool choose_first_dendrite_by_default =
+            (neuron_to_map.dendrite_hw_name.empty());
     bool dendrite_found = false;
     for (auto &hw : pipeline_hw)
     {
@@ -80,9 +88,9 @@ void sanafe::Core::map_neuron(
         throw std::runtime_error("Error: Could not map neuron to dendrite h/w");
     }
 
-    PipelineUnit *mapped_soma;
-    bool choose_first_soma_by_default =
-            (neuron_to_map.soma_hw_name.length() == 0);
+    PipelineUnit *mapped_soma{nullptr};
+    const bool choose_first_soma_by_default =
+            (neuron_to_map.soma_hw_name.empty());
     bool soma_found = false;
     for (auto &hw : pipeline_hw)
     {
@@ -109,14 +117,12 @@ void sanafe::Core::map_neuron(
         INFO("Error: No axon out units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No axon out units defined");
     }
-    AxonOutUnit *mapped_axon_out = &(axon_out_hw[0]);
+    AxonOutUnit *mapped_axon_out = axon_out_hw.data();
 
     // Map the neuron to the core and its hardware units
     const size_t address = neurons.size();
     neurons.emplace_back(neuron_to_map, this, neuron_id, address,
             mapped_dendrite, mapped_soma, mapped_axon_out);
-
-    return;
 }
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(
