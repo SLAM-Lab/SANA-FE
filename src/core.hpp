@@ -22,7 +22,7 @@ namespace sanafe
 struct AxonInModel
 {
     // List of all neuron connections to send spikes to
-    std::vector<int> synapse_addresses{};
+    std::vector<size_t> synapse_addresses{};
     Message *message{nullptr};
     int spikes_received{0};
     int active_synapses{0};
@@ -30,9 +30,9 @@ struct AxonInModel
 
 struct AxonOutModel
 {
-    int dest_axon_id{-1};
-    int dest_tile_id{-1};
-    int dest_core_offset{-1};
+    size_t dest_axon_id{};
+    size_t dest_tile_id{};
+    size_t dest_core_offset{};
     size_t src_neuron_id{};
 };
 

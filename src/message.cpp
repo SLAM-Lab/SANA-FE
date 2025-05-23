@@ -23,7 +23,8 @@ sanafe::Message::Message(const long int id, const SpikingChip &hw,
 }
 
 sanafe::Message::Message(const long int id, const SpikingChip &hw,
-        const MappedNeuron &n, const long int timestep, const int axon_address)
+        const MappedNeuron &n, const long int timestep,
+        const size_t axon_address)
         : Message(id, hw, n, timestep)
 {
     const Core &src_core = *(n.core);

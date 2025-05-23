@@ -45,7 +45,7 @@ struct Message
     bool in_noc{false};
 
     explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep);
-    explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep, int axon_address);
+    explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep, size_t axon_address);
     Message(const Message &copy) = default;
 };
 

@@ -4,7 +4,6 @@
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // arch.cpp
 #include <algorithm>
-#include <any>
 #include <cassert>
 #include <cctype>
 #include <cmath>
@@ -13,18 +12,17 @@
 #include <fstream>
 #include <functional> // For std::reference_wrapper
 #include <iostream>
-#include <limits>
-#include <list>
-#include <map>
-#include <set>
+#include <iterator>
 #include <sstream>
+#include <stdexcept>
+#include <string>
+#include <system_error>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include "arch.hpp"
-#include "chip.hpp"
 #include "description.hpp"
-#include "models.hpp"
-#include "network.hpp"
-#include "plugins.hpp"
 #include "print.hpp"
 
 sanafe::Architecture::Architecture(
@@ -84,14 +82,14 @@ sanafe::CoreConfiguration::CoreConfiguration(std::string name,
 }
 
 std::pair<int, int> sanafe::Architecture::calculate_tile_coordinates(
-        const size_t tile_id)
+        const size_t tile_id) const
 {
     // Map linear tile IDs to 2D coordinates for physical layout representation.
     //  This conversion assumes a row-major NoC grid arrangement where
     //  consecutive IDs are placed vertically before moving to the next column.
-    size_t x = tile_id / noc_height_in_tiles;  // floor(id/height)
-    size_t y = tile_id % noc_height_in_tiles;
-    assert (x < noc_width_in_tiles);
+    const size_t x = tile_id / noc_height_in_tiles; // floor(id/height)
+    const size_t y = tile_id % noc_height_in_tiles;
+    assert(x < noc_width_in_tiles);
     return std::make_pair(x, y);
 }
 
@@ -111,7 +109,7 @@ sanafe::TileConfiguration &sanafe::Architecture::create_tile(
     return new_tile;
 }
 
-sanafe::Architecture sanafe::load_arch(std::filesystem::path path)
+sanafe::Architecture sanafe::load_arch(const std::filesystem::path &path)
 {
     std::ifstream arch_fp_stream(path);
 
@@ -138,7 +136,7 @@ sanafe::CoreConfiguration &sanafe::Architecture::create_core(std::string name,
     TileConfiguration &parent_tile = tiles.at(parent_tile_id);
     const size_t offset_within_tile = parent_tile.cores.size();
     const size_t new_core_id = core_count++;
-    CoreAddress new_core_address = {
+    const CoreAddress new_core_address = {
             parent_tile_id, offset_within_tile, new_core_id};
     // Cores have dual referencing: within their parent tile's local space and
     //  globally within the architecture to support both local and cross-tile

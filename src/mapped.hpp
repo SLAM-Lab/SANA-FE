@@ -39,7 +39,7 @@ class MappedNeuron
 {
 public:
     std::vector<MappedConnection> connections_out;
-    std::vector<int> axon_out_addresses;
+    std::vector<size_t> axon_out_addresses;
     std::string parent_group_name;
     size_t offset;
     size_t id;

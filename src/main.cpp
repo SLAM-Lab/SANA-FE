@@ -6,6 +6,7 @@
 // Performance simulation of neuromorphic architectures
 #include <algorithm>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -200,9 +201,8 @@ int main(int argc, char *argv[])
         }
 
         INFO("Running simulation.\n");
-        const sanafe::RunData run_summary = hw.sim(timesteps,
-                sanafe::default_heartbeat_timesteps, timing_model,
-                scheduler_threads);
+        const sanafe::RunData run_summary =
+                hw.sim(timesteps, timing_model, scheduler_threads);
 
         INFO("Closing Booksim2 library\n");
         booksim_close();

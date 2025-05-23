@@ -158,8 +158,8 @@ struct Scheduler
     int noc_width;
     int noc_height;
     int buffer_size;
-    int core_count;
-    int max_cores_per_tile;
+    size_t core_count;
+    size_t max_cores_per_tile;
 };
 
 // NocInfo is used by the scheduler to track the high-level state of the NoC
@@ -196,7 +196,7 @@ void schedule_messages_simple(Timestep &ts, Scheduler &scheduler);
 void schedule_messages_detailed(Timestep &ts, Scheduler &scheduler);
 void schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config, Scheduler &scheduler);
 
-
+void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
 void schedule_messages_thread(Scheduler &scheduler, const int tid);
 void schedule_stop_all_threads(Scheduler &scheduler, std::ofstream &message_trace, RunData &rd);
 

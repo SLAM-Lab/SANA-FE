@@ -61,8 +61,7 @@ void sanafe::schedule_messages(
     return;
 }
 
-void sanafe::schedule_messages_simple(
-        Timestep &ts, Scheduler &scheduler)
+void sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
 {
     // Simple analytical model, that takes the maximum of either neuron or
     //  message processing for each core, and takes the maximum latency of
@@ -163,8 +162,20 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
     }
 }
 
-void sanafe::schedule_messages_thread(
-        sanafe::Scheduler &scheduler, const int tid)
+void sanafe::schedule_create_threads(
+        Scheduler &scheduler, const int scheduler_thread_count)
+{
+    INFO("Creating %d scheduler threads\n", scheduler_thread_count);
+    for (int thread_id = 0; thread_id < scheduler_thread_count;
+            thread_id++)
+    {
+        TRACE1(CHIP, "Created scheduler thread:%d\n", thread_id);
+        scheduler.scheduler_threads.emplace_back(
+                &schedule_messages_thread, std::ref(scheduler), thread_id);
+    }
+}
+
+void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
 {
     while (!scheduler.should_stop)
     {
@@ -177,17 +188,19 @@ void sanafe::schedule_messages_thread(
         bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
         if (got_ts)
         {
-            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", tid, ts.timestep);
+            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", thread_id,
+                    ts.timestep);
             schedule_messages_timestep(ts, scheduler);
         }
     }
 
-    TRACE1(SCHEDULER, "Scheduler thread tid:%d terminating gracefully\n", tid);
+    TRACE1(SCHEDULER, "Scheduler thread tid:%d terminating gracefully\n",
+            thread_id);
     return;
 }
 
-void sanafe::schedule_stop_all_threads(sanafe::Scheduler &scheduler,
-        std::ofstream &message_trace, sanafe::RunData &rd)
+void sanafe::schedule_stop_all_threads(
+        Scheduler &scheduler, std::ofstream &message_trace, sanafe::RunData &rd)
 {
     TRACE1(SCHEDULER, "Stopping all scheduling threads.\n");
     scheduler.timesteps_to_schedule.wait_until_empty();

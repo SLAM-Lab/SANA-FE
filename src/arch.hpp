@@ -71,10 +71,10 @@ public:
     std::vector<TileConfiguration> tiles{};
     std::string name{};
     size_t core_count{0UL};
+    size_t max_cores_per_tile{0UL};
     int noc_width_in_tiles{1};
     int noc_height_in_tiles{1};
     int noc_buffer_size{0};
-    int max_cores_per_tile{0};
 
     Architecture(std::string name, const NetworkOnChipConfiguration &noc);
     [[nodiscard]] std::vector<std::reference_wrapper<CoreConfiguration>> cores();
@@ -83,10 +83,10 @@ public:
     [[nodiscard]] std::string info() const noexcept;
 
 private:
-    std::pair<int, int> calculate_tile_coordinates(const size_t tile_id);
+    std::pair<int, int> calculate_tile_coordinates(const size_t tile_id) const;
 };
 
-Architecture load_arch(const std::filesystem::path path);
+Architecture load_arch(const std::filesystem::path &path);
 
 struct NetworkOnChipConfiguration
 {

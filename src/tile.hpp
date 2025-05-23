@@ -28,13 +28,13 @@ public:
     double latency_south_hop;
     double energy_west_hop;
     double latency_west_hop;
-    long int hops{0L};
+    size_t hops{0UL};
     long int messages_received{0L};
     long int total_neurons_fired{0L};
-    long int north_hops{0L};
-    long int east_hops{0L};
-    long int south_hops{0L};
-    long int west_hops{0L};
+    size_t north_hops{0UL};
+    size_t east_hops{0UL};
+    size_t south_hops{0UL};
+    size_t west_hops{0UL};
     size_t id;
     size_t x{0};
     size_t y{0};
