@@ -83,7 +83,7 @@ T sanafe::description_required_field(const ryml::Parser &parser,
         throw DescriptionParsingError(message, parser, field_node);
     }
 
-    T field;
+    T field{};
     // Efficiently convert to type T by trying the RapidYAML reader.
     //  If read() fails, it returns false and execution falls through
     if (c4::yml::read(field_node, &field))
@@ -139,7 +139,7 @@ std::string sanafe::description_get_type_string(const std::type_info &type)
 }
 
 std::map<std::string, sanafe::ModelAttribute>
-sanafe::description_parse_model_attributes_yaml(
+sanafe::description_parse_model_attributes_yaml( // NOLINT(misc-no-recursion)
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node)
 {
     std::map<std::string, ModelAttribute> model_attributes;
@@ -181,6 +181,7 @@ sanafe::description_parse_model_attributes_yaml(
     return model_attributes;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 sanafe::ModelAttribute sanafe::description_parse_attribute_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node)
 {
@@ -205,6 +206,7 @@ sanafe::ModelAttribute sanafe::description_parse_attribute_yaml(
     return attribute;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 std::vector<sanafe::ModelAttribute> sanafe::description_parse_attribute_list(
         const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node)
 {
@@ -213,6 +215,7 @@ std::vector<sanafe::ModelAttribute> sanafe::description_parse_attribute_list(
     for (const auto &node : attribute_node)
     {
         TRACE2(DESCRIPTION, "Parsing sub-attribute in list.\n");
+        // NOLINTNEXTLINE(misc-no-recursion)
         ModelAttribute curr = description_parse_attribute_yaml(parser, node);
         attribute_list.push_back(std::move(curr));
     }
@@ -223,6 +226,7 @@ std::vector<sanafe::ModelAttribute> sanafe::description_parse_attribute_list(
     return attribute_list;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 std::vector<sanafe::ModelAttribute> sanafe::description_parse_attribute_map(
         const ryml::Parser &parser, const ryml::ConstNodeRef attribute_node)
 {
@@ -230,7 +234,7 @@ std::vector<sanafe::ModelAttribute> sanafe::description_parse_attribute_map(
     for (const auto &node : attribute_node)
     {
         TRACE2(DESCRIPTION, "Parsing mapping of attributes.\n");
-        // Recursively parse YAML attribute
+        // Recursively parse YAML attribute NOLINTNEXTLINE(misc-no-recursion)
         ModelAttribute curr = description_parse_attribute_yaml(parser, node);
         std::string key;
         node >> ryml::key(key);
@@ -260,7 +264,8 @@ sanafe::description_parse_attribute_scalar(
     std::variant<bool, int, double, std::string,
             std::vector<sanafe::ModelAttribute>>
             value;
-    // NOLINTBEGIN(misc-include-cleaner)
+    // For some reason clang is unable to see the RapidYAML headers, so suppress
+    //  warnings NOLINTBEGIN(misc-include-cleaner)
     if (c4::yml::read(attribute_node, &decoded_int))
     {
         TRACE1(DESCRIPTION, "Parsed int: %d.\n", decoded_int);

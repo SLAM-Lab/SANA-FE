@@ -15,11 +15,12 @@ Checks: >
   -readability-identifier-length,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -performance-unnecessary-value-param,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
 # Inherit parent configs (useful for large projects)
 InheritParentConfig: true
 
 # Header filter - only check headers in src/, exclude _deps/ and external dependencies
-HeaderFilterRegex: '^sana-fe/src/.*\.hpp'
+HeaderFilterRegex: '^sana-fe/src/.*\.(h|hpp)$'
 
 # Configure specific checkers
 CheckOptions:
