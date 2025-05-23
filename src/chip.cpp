@@ -1192,7 +1192,7 @@ void sanafe::SpikingChip::sim_print_axon_summary() const noexcept
         // For debug only, print the axon maps
         for (const Core &core : tile.cores)
         {
-#if DEBUG_LEVEL_CHIP == 2
+#if (DEBUG_LEVEL_CHIP == 2)
             for (const auto &n : core.neurons)
             {
                 TRACE2(CHIP, "\tnid:%s.%zu ", n.parent_group_name.c_str(),
