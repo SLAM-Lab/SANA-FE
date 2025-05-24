@@ -136,7 +136,7 @@ void sanafe::description_parse_edges_section_yaml(const ryml::Parser &parser,
 void sanafe::description_parse_group(const ryml::Parser &parser,
         const ryml::ConstNodeRef neuron_group_node, SpikingNetwork &net)
 {
-    const auto group_name = description_required_field<std::string>(
+    auto group_name = description_required_field<std::string>(
             parser, neuron_group_node, "name");
     INFO("Parsing neuron group: %s\n", group_name.c_str());
 
@@ -156,7 +156,7 @@ void sanafe::description_parse_group(const ryml::Parser &parser,
                 parser, neuron_group_node["attributes"]);
     }
     NeuronGroup &group = net.create_neuron_group(
-            group_name, neuron_count, default_neuron_config);
+            std::move(group_name), neuron_count, default_neuron_config);
     TRACE1(DESCRIPTION, "Parsing neuron section\n");
     description_parse_neuron_section_yaml(parser, neurons_node, group);
 }
@@ -1235,7 +1235,6 @@ void sanafe::description_write_mappings_yaml(
     else
     {
         // Initialize with empty document
-        root = tree.rootref();
         root |= ryml::MAP; // NOLINT(misc-include-cleaner)
     }
 

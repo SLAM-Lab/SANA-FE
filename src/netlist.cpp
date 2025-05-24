@@ -2,17 +2,32 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
+// netlist.cpp
+#include <charconv>
+#include <cstddef>
+#include <fstream>
 #include <limits>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <tuple>
+#include <utility>
+#include <variant>
 #include <vector>
 
 #include <ryml.hpp>
 
+#include "arch.hpp"
+#include "attribute.hpp"
 #include "description.hpp"
 #include "netlist.hpp"
 #include "network.hpp"
+#include "print.hpp"
 #include "yaml_snn.hpp"
 
-// *****************************************************************************
 // Netlist (v1) SNN description format. Supported for back-compatability.
 //  This format is useful for extremely large network files, as parsing this
 //  simpler format requires less memory than YAML parsing.

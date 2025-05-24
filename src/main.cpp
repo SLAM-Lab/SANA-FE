@@ -5,52 +5,40 @@
 // main.cpp - Command line interface
 // Performance simulation of neuromorphic architectures
 #include <algorithm>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <filesystem> // For std::filesystem::path
 #include <stdexcept>
 #include <string>
-#ifdef HAVE_OPENMP
+#include <string_view>
+#include <vector>
+
+#if HAVE_OPENMP
 #include <omp.h>
 #endif
-
 #include <booksim_lib.hpp>
 
 #include "arch.hpp"
+#include "chip.hpp"
 #include "description.hpp"
 #include "network.hpp"
 #include "print.hpp"
-#include "chip.hpp"
 
-enum ProgramArgs : uint8_t
+namespace // anonymous to keep members private
 {
-    ARCH_FILENAME = 0,
-    NETWORK_FILENAME = 1,
-    TIMESTEPS = 2,
-    PROGRAM_NARGS = 3,
-};
 
-int main(int argc, char *argv[])
+struct OptionalProgramFlags
 {
-    if (argc < 1)
-    {
-        INFO("Error: No program arguments.");
-        return 1;
-    }
-    // First arg is always program name, skip
-    argc--;
-    argv++;
-
-    // Parse optional args
-    std::filesystem::path output_dir = std::filesystem::current_path();
+    std::filesystem::path output_dir{std::filesystem::current_path()};
     bool record_spikes{false};
     bool record_potentials{false};
     bool record_perf{false};
     bool record_messages{false};
     bool use_netlist_format{false};
+    int total_args_parsed{0};
     int total_threads_available{1}; // NOLINT(misc-const-correctness)
 #ifdef HAVE_OPENMP
     int processing_threads{1};
@@ -61,86 +49,27 @@ int main(int argc, char *argv[])
     //  these two flags to enable either the simple analytical timing model or
     //  an external cycle-accurate timing model (Booksim2).
     sanafe::TimingModel timing_model = sanafe::TIMING_MODEL_DETAILED;
-    std::string timing_model_str = "detailed";
+};
 
-    #ifdef HAVE_OPENMP
-        total_threads_available = omp_get_num_procs();
-        INFO("OpenMP enabled, %d threads detected\n", total_threads_available);
-#else
-        INFO("No OpenMP multithreading enabled.\n");
-#endif
-
-    while (argc > 2)
+struct RequiredProgramArgs
+{
+    enum ArgIdx : uint8_t
     {
-        if (argv[0][0] == '-')
-        {
-            switch (argv[0][1])
-            {
-            case 'o': {
-                argc--;
-                argv++;
-                output_dir = std::filesystem::path(argv[0]);
-                INFO("Writing output to %s\n", output_dir.c_str());
-                break;
-            }
-            case 'm':
-                record_messages = true;
-                break;
-            case 'n':
-                use_netlist_format = true;
-                break;
-            case 'p':
-                record_perf = true;
-                break;
-            case 's':
-                record_spikes = true;
-                break;
-            case 't':
-                argc--;
-                argv++;
-                timing_model_str = std::string(argv[0]);
-                break;
-            case 'v':
-                record_potentials = true;
-                break;
-            case 'N':
-                argc--;
-                argv++;
-#ifndef HAVE_OPENMP
-                INFO("Warning: multiple threads not supported; flag ignored");
-#else
-                processing_threads = std::min(total_threads_available, std::stoi(argv[0]));
-                INFO("Setting processing threads to %d\n", processing_threads);
-                omp_set_num_threads(processing_threads);
-#endif
-                break;
-            case 'S':
-                argc--;
-                argv++;
-                scheduler_threads =
-                        std::min(total_threads_available, std::stoi(argv[0]));
-                INFO("Setting scheduling threads to %d\n", scheduler_threads);
+        // Ignoring optional flags
+        arch_filename_idx = 0,
+        network_filename_idx = 1,
+        timesteps_to_execute_idx = 2,
+        program_nargs = 3,
+    };
+    std::string arch_filename;
+    std::string network_filename;
+    long int timesteps_to_execute{0L};
+};
 
-                break;
-
-            default:
-                INFO("Error: Flag %c not recognized.\n", argv[0][1]);
-                break;
-            }
-            argc--;
-            argv++;
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    if (argc < PROGRAM_NARGS)
-    {
-        INFO("Usage: ./sim [-psvmo] <arch description> <network description> <timesteps>\n");
-        return 0;
-    }
+sanafe::TimingModel parse_timing_model(const std::string_view &timing_model_str)
+{
+    sanafe::TimingModel timing_model{
+            sanafe::TimingModel::TIMING_MODEL_DETAILED};
 
     if (timing_model_str == "simple")
     {
@@ -149,7 +78,6 @@ int main(int argc, char *argv[])
     else if (timing_model_str == "detailed")
     {
         timing_model = sanafe::TIMING_MODEL_DETAILED;
-
     }
     else if (timing_model_str == "cycle")
     {
@@ -157,8 +85,205 @@ int main(int argc, char *argv[])
     }
     else
     {
-        INFO("Error: Timing model %s not recognized.\n",
-                timing_model_str.c_str());
+        INFO("Error: Timing model %s not recognized, default is 'detailed'.\n",
+                std::string(timing_model_str).c_str());
+    }
+
+    return timing_model;
+}
+
+std::string_view get_next_arg(
+        const std::vector<std::string_view> &args, const size_t current_idx)
+{
+    // Helper function to get next argument safely
+    if (current_idx + 1 >= args.size())
+    {
+        throw std::runtime_error("Flag requires an argument but none provided");
+    }
+    return args[current_idx + 1];
+}
+
+// NOLINTNEXTLINE(readability-function-size)
+int parse_flag(const std::vector<std::string_view> args,
+        const size_t current_idx, OptionalProgramFlags &flags)
+{
+    const std::string_view arg = args[current_idx];
+    if (arg.empty() || arg[0] != '-')
+    {
+        INFO("Invalid flag, should start with '-'");
+        return 0;
+    }
+    if (arg.length() < 2)
+    {
+        INFO("Invalid flag, too short");
+        return 0;
+    }
+
+    int args_consumed = 1;
+    // Ignore the first character (arg[0]), which we know is a dash. Parse the
+    //  character and fields immediately after
+    switch (arg[1])
+    {
+    case 'o': {
+        args_consumed = 2;
+        flags.output_dir =
+                std::filesystem::path(get_next_arg(args, current_idx));
+        INFO("Writing output to %s\n", flags.output_dir.c_str());
+        break;
+    }
+    case 'm':
+        flags.record_messages = true;
+        break;
+    case 'n':
+        flags.use_netlist_format = true;
+        break;
+    case 'p':
+        flags.record_perf = true;
+        break;
+    case 's':
+        flags.record_spikes = true;
+        break;
+    case 't':
+        args_consumed = 2;
+        flags.timing_model =
+                parse_timing_model(get_next_arg(args, current_idx));
+        break;
+    case 'v':
+        flags.record_potentials = true;
+        break;
+    case 'N':
+        args_consumed = 2;
+#ifndef HAVE_OPENMP
+        INFO("Warning: multiple threads not supported; flag ignored");
+        get_next_arg(
+                args, current_idx); // consume the argument even if we ignore it
+#else
+        processing_threads =
+                std::min(total_threads_available, std::stoi(get_next_arg()));
+        INFO("Setting processing threads to %d\n", processing_threads);
+        omp_set_num_threads(processing_threads);
+#endif
+        break;
+    case 'S':
+        args_consumed = 2;
+        flags.scheduler_threads = std::min(flags.total_threads_available,
+                std::stoi(std::string(get_next_arg(args, current_idx))));
+        INFO("Setting scheduling threads to %d\n", flags.scheduler_threads);
+
+        break;
+
+    default:
+        INFO("Error: Flag %c not recognized.\n", arg[1]);
+        break;
+    }
+
+    return args_consumed;
+}
+
+OptionalProgramFlags parse_command_line_flags(
+        const std::vector<std::string_view> &args)
+{
+    OptionalProgramFlags flags;
+
+    // Record the number of available threads to OpenMP, later we need this
+    //  when configuring how many processing threads to use
+#if HAVE_OPENMP
+    flags.total_threads_available = omp_get_num_procs();
+    INFO("OpenMP enabled, %d threads detected\n",
+            flags.total_threads_available);
+#else
+    INFO("No OpenMP multithreading enabled.\n");
+#endif
+
+    // Should always be three arguments from the end
+    size_t current_idx = 0;
+    while (current_idx < args.size() &&
+            (args.size() - current_idx) > (RequiredProgramArgs::program_nargs))
+    {
+        if (args[current_idx].empty() || args[current_idx][0] != '-')
+        {
+            break;
+        }
+        try
+        {
+            const int args_consumed = parse_flag(args, current_idx, flags);
+            if (args_consumed == 0)
+            {
+                break; // Error while parsing flag
+            }
+            current_idx += args_consumed;
+            flags.total_args_parsed += args_consumed;
+        }
+        catch (const std::exception &exc)
+        {
+            INFO("Error parsing flag: %s\n", exc.what());
+            break;
+        }
+    }
+
+    return flags;
+}
+
+RequiredProgramArgs parse_required_args(
+        const std::vector<std::string_view> &args, const int optional_flags)
+{
+    RequiredProgramArgs required_args;
+
+    required_args.arch_filename =
+            args[optional_flags + RequiredProgramArgs::arch_filename_idx];
+    required_args.network_filename =
+            args[optional_flags + RequiredProgramArgs::network_filename_idx];
+
+    try // Catch exceptions when converting from string to long
+    {
+        const auto timestep_arg = std::string(args[optional_flags +
+                RequiredProgramArgs::timesteps_to_execute_idx]);
+        required_args.timesteps_to_execute = std::stol(timestep_arg);
+    }
+    catch (const std::exception &e)
+    {
+        throw std::invalid_argument("Error: Invalid time-step arg:");
+    }
+    if (required_args.timesteps_to_execute <= 0)
+    {
+        throw std::invalid_argument("Error: Time-steps must be > 0");
+    }
+
+    return required_args;
+}
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
+std::vector<std::string_view> program_args_to_vector(
+        const int argc, const char *argv[])
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
+{
+    std::vector<std::string_view> args;
+
+    // Ignore the first argument, which should just be the program name 'sim'
+    for (int i = 1; i < argc; i++)
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        args.emplace_back(argv[i]);
+    }
+
+    return args;
+}
+
+}
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,readability-function-size)
+int main(int argc, const char *argv[])
+{
+    const std::vector<std::string_view> arg_vec =
+            program_args_to_vector(argc, argv);
+    const OptionalProgramFlags optional_flags =
+            parse_command_line_flags(arg_vec);
+    argc -= optional_flags.total_args_parsed;
+    if (argc < RequiredProgramArgs::program_nargs)
+    {
+        INFO("Usage: ./sim [-psvmo] <arch description> <network description> "
+             "<timesteps>\n");
+        return 0;
     }
 
     // Read in program args, sanity check and parse inputs
@@ -168,47 +293,33 @@ int main(int argc, char *argv[])
 #define GIT_COMMIT "git-hash-unknown"
 #endif
         INFO("Running SANA-FE simulation (build:%s)\n", GIT_COMMIT);
-        INFO("Loading booksim2 library for cycle-accurate support\n");
         booksim_init();
 
+        const RequiredProgramArgs required_args =
+                parse_required_args(arg_vec, optional_flags.total_args_parsed);
         sanafe::Architecture arch =
-                sanafe::load_arch(argv[ARCH_FILENAME]);
+                sanafe::load_arch(required_args.arch_filename);
         INFO("Architecture initialized.\n");
-        const sanafe::SpikingNetwork net = sanafe::load_net(
-                argv[NETWORK_FILENAME], arch, use_netlist_format);
+        const sanafe::SpikingNetwork net =
+                sanafe::load_net(required_args.network_filename, arch,
+                        optional_flags.use_netlist_format);
         INFO("Network initialized.\n");
 
-        sanafe::SpikingChip hw(arch, output_dir, record_spikes,
-                record_potentials, record_perf, record_messages);
+        sanafe::SpikingChip hw(arch, optional_flags.output_dir,
+                optional_flags.record_spikes, optional_flags.record_potentials,
+                optional_flags.record_perf, optional_flags.record_messages);
         hw.load(net);
 
-        long int timesteps{0L};
-        try
-        {
-            timesteps = std::stol(argv[TIMESTEPS]);
-        }
-        catch(const std::exception& e)
-        {
-            INFO("Error: Invalid time-step format: %s\n",
-                    argv[TIMESTEPS]);
-            return 1;
-        }
-
-        if (timesteps <= 0)
-        {
-            INFO("Error: Time-steps must be > 0 (%ld)\n", timesteps);
-            return 1;
-        }
-
         INFO("Running simulation.\n");
-        const sanafe::RunData run_summary =
-                hw.sim(timesteps, timing_model, scheduler_threads);
+        const sanafe::RunData run_summary = hw.sim(
+                required_args.timesteps_to_execute, optional_flags.timing_model,
+                optional_flags.scheduler_threads);
 
         INFO("Closing Booksim2 library\n");
         booksim_close();
 
         INFO("***** Run Summary *****\n");
-        hw.sim_output_run_summary(output_dir, run_summary);
+        hw.sim_output_run_summary(optional_flags.output_dir, run_summary);
         const double average_power = hw.get_power();
         INFO("Average power consumption: %f W.\n", average_power);
         INFO("Run finished.\n");

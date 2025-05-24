@@ -337,8 +337,8 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
         const CorePipelineConfiguration pipeline_config =
                 description_parse_core_pipeline_yaml(
                         parser, core_node["attributes"]);
-        CoreConfiguration &core =
-                arch.create_core(name, parent_tile_id, pipeline_config);
+        CoreConfiguration &core = arch.create_core(
+                std::move(name), parent_tile_id, pipeline_config);
 
         if (!core_node.find_child("axon_in").invalid())
         {
@@ -544,7 +544,7 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
                         parser, tile_node["attributes"]);
 
         const TileConfiguration &new_tile =
-                arch.create_tile(name, power_metrics);
+                arch.create_tile(std::move(name), power_metrics);
 
         if (tile_node.find_child("core").invalid())
         {
