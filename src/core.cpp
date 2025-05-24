@@ -121,8 +121,8 @@ void sanafe::Core::map_neuron(
 
     // Map the neuron to the core and its hardware units
     const size_t address = neurons.size();
-    neurons.emplace_back(neuron_to_map, this, neuron_id, address,
-            mapped_dendrite, mapped_soma, mapped_axon_out);
+    neurons.emplace_back(neuron_to_map, neuron_id, this, mapped_soma, address,
+            mapped_axon_out, mapped_dendrite);
 }
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(

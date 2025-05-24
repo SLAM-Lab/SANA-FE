@@ -69,12 +69,13 @@ public:
     // Track spikes
     bool axon_out_input_spike{false};
 
-    MappedNeuron(const Neuron &neuron_to_map, Core *mapped_core, const size_t nid, const size_t mapped_address, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
+    MappedNeuron(const Neuron &neuron_to_map, const size_t nid, Core *mapped_core, PipelineUnit *mapped_soma, const size_t mapped_address, AxonOutUnit *mapped_axon_out, PipelineUnit *mapped_dendrite);
     MappedNeuron(const MappedNeuron &copy) = default;
     MappedNeuron& operator=(const MappedNeuron& other) = default;
     MappedNeuron(MappedNeuron&& other) = default;
     MappedNeuron& operator=(MappedNeuron&& other) = default;
-    void set_model_attributes(const std::map<std::string, ModelAttribute> &model_attributes);
+    void set_model_attributes(
+            const std::map<std::string, ModelAttribute> &model_attributes) const;
 
 private:
     void build_neuron_processing_pipeline();

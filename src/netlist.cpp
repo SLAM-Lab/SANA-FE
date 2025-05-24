@@ -8,6 +8,7 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -18,7 +19,7 @@
 #include <variant>
 #include <vector>
 
-#include <ryml.hpp>
+#include <ryml.hpp> // NOLINT(misc-include-cleaner)
 
 #include "arch.hpp"
 #include "attribute.hpp"
@@ -241,108 +242,103 @@ std::map<std::string, sanafe::ModelAttribute> sanafe::netlist_parse_attributes(
 
     for (const auto &field : attribute_fields)
     {
-        TRACE1(DESCRIPTION, "Parsing field:%s\n", std::string(field).c_str());
-
-        if ((field.length() < 3))
-        {
-            INFO("Error: Line %d: Invalid field: %s\n", line_number,
-                    std::string(field).c_str());
-            continue;
-        }
-
-        const auto pos = field.find_first_of('=');
-        if (pos == std::string::npos)
-        {
-            INFO("Error: Line %d: Missing '=' in field: %s\n", line_number,
-                    std::string(field).c_str());
-            continue;
-        }
-        const std::string key(field.substr(0, pos));
-        const std::string value_str(field.substr(pos + 1));
-
-        ModelAttribute attribute;
-        int decoded_int = 0;
-        double decoded_double = std::numeric_limits<double>::quiet_NaN();
-        bool decoded_bool = false;
-        attribute.name = key;
-
-        std::stringstream int_ss(value_str);
-        std::stringstream float_ss(value_str);
-        std::stringstream bool_ss(value_str);
-        if ((int_ss >> decoded_int) && int_ss.eof())
-        {
-            TRACE1(DESCRIPTION, "Parsed integer: %d (%s).\n", decoded_int,
-                    key.c_str());
-            attribute.value = decoded_int;
-        }
-        else if ((float_ss >> decoded_double) && float_ss.eof())
-        {
-            TRACE1(DESCRIPTION, "Parsed float: %e (%s).\n", decoded_double,
-                    key.c_str());
-            attribute.value = decoded_double;
-        }
-        else if ((bool_ss >> decoded_bool) && bool_ss.eof())
-        {
-            TRACE1(DESCRIPTION, "Parsed bool: %d.\n", decoded_bool);
-            attribute.value = decoded_bool;
-        }
-        else
-        {
-            // Parsed string
-            TRACE1(DESCRIPTION, "Parsed string: %s\n", value_str.c_str());
-            attribute.value = std::string(value_str);
-        }
-
-        if ((key.empty()) || (value_str.empty()))
-        {
-            INFO("Error: Line %d: Invalid attribute: %s\n", line_number,
-                    std::string(field).c_str());
-            continue;
-        }
-
-        attributes.insert({key, attribute});
+        netlist_parse_attribute_field(field, attributes, line_number);
     }
 
     return attributes;
 }
 
-std::map<std::string, sanafe::ModelAttribute>
-sanafe::netlist_parse_embedded_json(
-        const std::vector<std::string_view> &attribute_fields,
+void sanafe::netlist_parse_attribute_field(const std::string_view &field,
+        std::map<std::string, ModelAttribute> &attributes,
         const int line_number)
 {
-    std::map<std::string, ModelAttribute> model_attributes{};
+    TRACE1(DESCRIPTION, "Parsing field:%s\n", std::string(field).c_str());
+    if ((field.length() < 3))
+    {
+        INFO("Error: Line %d: Invalid field: %s\n", line_number,
+                std::string(field).c_str());
+        return;
+    }
+    const auto pos = field.find_first_of('=');
+    if (pos == std::string::npos)
+    {
+        INFO("Error: Line %d: Missing '=' in field: %s\n", line_number,
+                std::string(field).c_str());
+        return;
+    }
+    ModelAttribute attribute;
+    const std::string key(field.substr(0, pos));
+    const std::string value_str(field.substr(pos + 1));
 
-    // Concatenate fields again, and search for the terminating character
-    std::string all_fields;
-    for (auto field : attribute_fields)
+    attribute.name = key;
+    attribute.value = netlist_parse_attribute_value(value_str);
+
+    if ((key.empty()) || (value_str.empty()))
     {
-        all_fields += field;
-        all_fields += ' ';
+        INFO("Error: Line %d: Invalid attribute: %s\n", line_number,
+                std::string(field).c_str());
+        return;
     }
 
-    if (all_fields.empty())
+    attributes.insert({key, attribute});
+}
+
+std::variant<bool, int, double, std::string, std::vector<sanafe::ModelAttribute>>
+sanafe::netlist_parse_attribute_value(std::string value_str)
+{
+    std::stringstream int_ss(value_str);
+    std::stringstream float_ss(value_str);
+    std::stringstream bool_ss(value_str);
+
+    int decoded_int = 0;
+    // Use the extractor operator to attempt to parse each type in turn,
+    //  returning at the first successful parsed value. Note that we check
+    //  for end of file (eof) to make sure we didn't only partially parse the
+    //  value string
+    if ((int_ss >> decoded_int) && int_ss.eof())
     {
-        return model_attributes;
+        TRACE1(DESCRIPTION, "Parsed integer: %d.\n", decoded_int);
+        return decoded_int;
     }
 
-    const char opening_char = all_fields[0];
-    char closing_char = 0;
-    if (opening_char == '[')
+    double decoded_double = std::numeric_limits<double>::quiet_NaN();
+    if ((float_ss >> decoded_double) && float_ss.eof())
     {
-        closing_char = ']';
+        TRACE1(DESCRIPTION, "Parsed float: %e.\n", decoded_double);
+        return decoded_double;
     }
-    else if (opening_char == '{')
+
+    bool decoded_bool = false;
+    if ((bool_ss >> decoded_bool) && bool_ss.eof())
     {
-        closing_char = '}';
+        TRACE1(DESCRIPTION, "Parsed bool: %d.\n", decoded_bool);
+        return decoded_bool;
     }
-    else
+
+    TRACE1(DESCRIPTION, "Parsed string: %s\n", value_str.c_str());
+    return std::string(value_str);
+}
+
+char sanafe::netlist_get_closing_char(const char opening_char)
+{
+    switch(opening_char)
     {
+    case '[':
+        return ']';
+    case '{':
+        return '}';
+    default:
         INFO("Error: Invalid opening character (%c)\n", opening_char);
         throw std::runtime_error("Invalid opening character\n");
     }
+}
 
+size_t sanafe::netlist_embedded_json_end_pos(const char opening_char,
+        const std::string &all_fields, const int line_number)
+{
+    const char closing_char = netlist_get_closing_char(opening_char);
     int nested_level = 0;
+
     size_t end_pos = 0;
     while (end_pos < all_fields.length())
     {
@@ -375,14 +371,41 @@ sanafe::netlist_parse_embedded_json(
                 line_number);
     }
 
+    return end_pos;
+}
+
+std::map<std::string, sanafe::ModelAttribute>
+sanafe::netlist_parse_embedded_json(
+        const std::vector<std::string_view> &attribute_fields,
+        const int line_number)
+{
+    std::map<std::string, ModelAttribute> model_attributes{};
+
+    // Concatenate fields again, and search for the terminating character
+    std::string all_fields;
+    for (auto field : attribute_fields)
+    {
+        all_fields += field;
+        all_fields += ' ';
+    }
+    if (all_fields.empty())
+    {
+        return model_attributes;
+    }
+
+    const char opening_char = all_fields[0];
+    const size_t end_pos = netlist_embedded_json_end_pos(
+            opening_char, all_fields, line_number);
     all_fields.resize(end_pos + 1);
 
-    // Create YAML parser
+    // Create YAML parser, ignore linter include warnings on RapidYAML classes
+    // NOLINTBEGIN(misc-include-cleaner)
     ryml::EventHandlerTree event_handler = {};
     const ryml::Parser parser(
             &event_handler, ryml::ParserOptions().locations(true));
     ryml::Tree tree = ryml::parse_in_place(all_fields.data());
     const ryml::ConstNodeRef yaml_node = tree.rootref();
+    // NOLINTEND(misc-include-cleaner)
 
     model_attributes =
             description_parse_model_attributes_yaml(parser, yaml_node);
@@ -663,6 +686,28 @@ std::string sanafe::netlist_group_to_netlist(const NeuronGroup &group)
     return entry;
 }
 
+void sanafe::add_string_attribute_if_unique(std::string &entry,
+        const std::string &attr_name, const std::string &neuron_value,
+        const std::optional<std::string> &group_default)
+{
+    if (!neuron_value.empty() &&
+            is_unique_attribute(group_default, neuron_value))
+    {
+        entry += " " + attr_name + "=" + neuron_value;
+    }
+}
+
+void sanafe::add_bool_attribute_if_unique(std::string &entry,
+        const std::string &attr_name, bool neuron_value,
+        const std::optional<bool> &group_default)
+{
+    if (neuron_value && is_unique_attribute(group_default, neuron_value))
+    {
+        entry += " " + attr_name + "=" +
+                std::to_string(static_cast<int>(neuron_value));
+    }
+}
+
 std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
         const SpikingNetwork &net,
         const std::map<std::string, size_t> &group_name_to_id)
@@ -673,75 +718,32 @@ std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
     const NeuronGroup &parent_group = net.groups.at(neuron.parent_group_name);
 
     const size_t group_id = group_name_to_id.at(parent_group.name);
+    const auto &default_config = parent_group.default_neuron_config;
     std::string entry = "n " + std::to_string(group_id) + "." +
             std::to_string(neuron.offset);
 
-    // Output if the neuron variable is defined and unique for the group i.e.,
-    //  hasn't already been defined as a group-level attribute
-    if (!neuron.soma_hw_name.empty() &&
-            (!parent_group.default_neuron_config.soma_hw_name.has_value() ||
-                    (parent_group.default_neuron_config.soma_hw_name.value() !=
-                            neuron.soma_hw_name)))
-    {
-        entry += " soma_hw_name=" + neuron.soma_hw_name;
-    }
-    if (!neuron.default_synapse_hw_name.empty() &&
-            (!parent_group.default_neuron_config.default_synapse_hw_name
-                            .has_value() ||
-                    (parent_group.default_neuron_config.default_synapse_hw_name
-                                    .value() != neuron.default_synapse_hw_name)))
-    {
-        entry += " synapse_hw_name=" + neuron.default_synapse_hw_name;
-    }
-    if (!neuron.dendrite_hw_name.empty() &&
-            (!parent_group.default_neuron_config.dendrite_hw_name.has_value() ||
-                    (parent_group.default_neuron_config.dendrite_hw_name
-                                    .value() != neuron.dendrite_hw_name)))
-    {
-        entry += " dendrite_hw_name=" + neuron.dendrite_hw_name;
-    }
-    if (neuron.force_synapse_update &&
-            (!parent_group.default_neuron_config.force_synapse_update
-                            .has_value() ||
-                    (parent_group.default_neuron_config.force_synapse_update
-                                    .value() != neuron.force_synapse_update)))
-    {
-        entry += " force_synapse_update=" +
-                std::to_string(static_cast<int>(neuron.force_synapse_update));
-    }
-    if (neuron.force_dendrite_update &&
-            (!parent_group.default_neuron_config.force_dendrite_update
-                            .has_value() ||
-                    (parent_group.default_neuron_config.force_dendrite_update
-                                    .value() != neuron.force_dendrite_update)))
-    {
-        entry += " force_dendrite_update=" +
-                std::to_string(static_cast<int>(neuron.force_dendrite_update));
-    }
-    if (neuron.force_soma_update &&
-            (!parent_group.default_neuron_config.force_soma_update.has_value() ||
-                    (parent_group.default_neuron_config.force_soma_update
-                                    .value() != neuron.force_soma_update)))
-    {
-        entry += " force_soma_update=" +
-                std::to_string(static_cast<int>(neuron.force_soma_update));
-    }
-    if (neuron.log_spikes &&
-            (!parent_group.default_neuron_config.log_spikes.has_value() ||
-                    (parent_group.default_neuron_config.log_spikes.value() !=
-                            neuron.log_spikes)))
-    {
-        entry += " log_spikes=" +
-                std::to_string(static_cast<int>(neuron.log_spikes));
-    }
-    if (neuron.log_potential &&
-            (!parent_group.default_neuron_config.log_potential.has_value() ||
-                    (parent_group.default_neuron_config.log_potential.value() !=
-                            neuron.log_potential)))
-    {
-        entry += "log_potential=" +
-                std::to_string(static_cast<int>(neuron.log_potential)) + " ";
-    }
+    // Add hardware name attributes if they differ from group defaults
+    add_string_attribute_if_unique(entry, "soma_hw_name", neuron.soma_hw_name,
+            default_config.soma_hw_name);
+    add_string_attribute_if_unique(entry, "synapse_hw_name",
+            neuron.default_synapse_hw_name,
+            default_config.default_synapse_hw_name);
+    add_string_attribute_if_unique(entry, "dendrite_hw_name",
+            neuron.dendrite_hw_name, default_config.dendrite_hw_name);
+
+    // Add force update flags if they differ from group defaults
+    add_bool_attribute_if_unique(entry, "force_synapse_update",
+            neuron.force_synapse_update, default_config.force_synapse_update);
+    add_bool_attribute_if_unique(entry, "force_dendrite_update",
+            neuron.force_dendrite_update, default_config.force_dendrite_update);
+    add_bool_attribute_if_unique(entry, "force_soma_update",
+            neuron.force_soma_update, default_config.force_soma_update);
+
+    // Add logging flags if they differ from group defaults
+    add_bool_attribute_if_unique(
+            entry, "log_spikes", neuron.log_spikes, default_config.log_spikes);
+    add_bool_attribute_if_unique(entry, "log_potential", neuron.log_potential,
+            default_config.log_potential);
 
     entry += netlist_attributes_to_netlist(neuron.model_attributes,
             parent_group.default_neuron_config.model_attributes);
@@ -825,8 +827,8 @@ std::string sanafe::netlist_attributes_to_netlist(
     if (nested_attributes)
     {
         TRACE2(DESCRIPTION, "Parsing nested attributes\n");
-        ryml::Tree tree;
-        ryml::NodeRef root = tree.rootref();
+        ryml::Tree tree; // NOLINT(misc-include-cleaner)
+        ryml::NodeRef root = tree.rootref();  // NOLINT(misc-include-cleaner)
         root |= ryml::MAP; // NOLINT(misc-include-cleaner)
         root |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
 

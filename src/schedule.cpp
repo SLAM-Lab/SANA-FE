@@ -403,7 +403,7 @@ void sanafe::schedule_update_noc_message_counts(
         y_increment = -1;
     }
     int prev_direction = sanafe::ndirections + (m.src_core_offset);
-    for (int x = m.src_x; x != m.dest_x; x += x_increment)
+    for (size_t x = m.src_x; x != m.dest_x; x += x_increment)
     {
         int direction;
         if (x_increment > 0)
@@ -425,7 +425,7 @@ void sanafe::schedule_update_noc_message_counts(
         }
         prev_direction = direction;
     }
-    for (int y = m.src_y; y != m.dest_y; y += y_increment)
+    for (size_t y = m.src_y; y != m.dest_y; y += y_increment)
     {
         int direction;
         if (y_increment > 0)
@@ -515,7 +515,7 @@ double sanafe::schedule_calculate_messages_along_route(
     }
 
     int prev_direction = sanafe::ndirections + (m.src_core_offset);
-    for (int x = m.src_x; x != m.dest_x; x += x_increment)
+    for (size_t x = m.src_x; x != m.dest_x; x += x_increment)
     {
         const int direction = (x_increment > 0) ? sanafe::east : sanafe::west;
         if (x == m.src_x)
@@ -530,7 +530,7 @@ double sanafe::schedule_calculate_messages_along_route(
         prev_direction = direction;
     }
 
-    for (int y = m.src_y; y != m.dest_y; y += y_increment)
+    for (size_t y = m.src_y; y != m.dest_y; y += y_increment)
     {
         const int direction = (y_increment > 0) ? sanafe::north : sanafe::south;
         if (m.src_x == m.dest_x && y == m.src_y)

@@ -73,6 +73,8 @@ private:
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};
     bool mixed_sign_mode{true};
+
+    PipelineResult read_synapse(const size_t synapse_address);
 };
 
 class AccumulatorModel : public DendriteUnit
@@ -127,6 +129,10 @@ private:
     std::vector<double> time_constants{std::vector<double>(1, 0.0)};
     std::vector<int> synapse_to_tap{};
     long int timesteps_simulated{0L};
+
+    void calculate_next_state();
+    void input_current(double current, std::optional<size_t> synapse_address);
+    void print_taps();
 };
 
 class LoihiLifModel : public SomaUnit
@@ -179,7 +185,12 @@ private:
     NoiseType noise_type{NOISE_NONE};
     std::ifstream noise_stream;
 
+    static void loihi_leak_and_quantize(LoihiCompartment &cx);
+    static bool loihi_threshold_and_reset(LoihiCompartment &cx);
+
     double loihi_generate_noise();
+    int loihi_read_noise_stream();
+    void loihi_reset_noise_stream();
 };
 
 constexpr int truenorth_max_neurons{4096};
@@ -231,6 +242,9 @@ private:
             "leak",
     };
     std::vector<TrueNorthNeuron> neurons{truenorth_max_neurons};
+
+    static void truenorth_leak(TrueNorthNeuron &n);
+    static bool truenorth_threshold_and_reset(TrueNorthNeuron &n);
 };
 
 class InputModel : public SomaUnit

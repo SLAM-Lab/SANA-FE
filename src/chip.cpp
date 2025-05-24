@@ -707,7 +707,7 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
             n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const size_t axon_address : n.axon_out_addresses)
     {
-        Message m(total_messages_sent, *this, n, ts.timestep, axon_address);
+        Message m(total_messages_sent, *this, axon_address, n, ts.timestep);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
         axon_out_hw.energy += axon_out_hw.energy_access;

@@ -1,5 +1,8 @@
+#include <cstddef>
+
 #include "chip.hpp"
 #include "core.hpp"
+#include "mapped.hpp"
 #include "message.hpp"
 #include "tile.hpp"
 
@@ -23,8 +26,8 @@ sanafe::Message::Message(const long int id, const SpikingChip &hw,
 }
 
 sanafe::Message::Message(const long int id, const SpikingChip &hw,
-        const MappedNeuron &n, const long int timestep,
-        const size_t axon_address)
+        const size_t axon_address, const MappedNeuron &n,
+        const long int timestep)
         : Message(id, hw, n, timestep)
 {
     const Core &src_core = *(n.core);

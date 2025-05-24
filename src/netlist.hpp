@@ -35,8 +35,26 @@ void netlist_read_neuron(const std::vector<std::string_view> &fields, SpikingNet
 void netlist_read_edge(const std::vector<std::string_view> &fields, SpikingNetwork &net, const int line_number);
 void netlist_read_mapping(const std::vector<std::string_view> &fields, Architecture &arch, SpikingNetwork &net, const int line_number);
 
+std::variant<bool, int, double, std::string, std::vector<ModelAttribute>> netlist_parse_attribute_value(std::string value_str);
+void netlist_parse_attribute_field(const std::string_view &field, std::map<std::string, ModelAttribute> &attributes, const int line_number);
 std::map<std::string, ModelAttribute> netlist_parse_attributes(const std::vector<std::string_view> &attribute_fields, const int line_number);
 std::map<std::string, ModelAttribute> netlist_parse_embedded_json(const std::vector<std::string_view> &attribute_fields, const int line_number);
+char netlist_get_closing_char(const char opening_char);
+size_t netlist_embedded_json_end_pos(const char opening_char, const std::string &all_fields, const int line_number);
+
+void add_string_attribute_if_unique(std::string &entry, const std::string &attr_name, const std::string &neuron_value, const std::optional<std::string> &group_default);
+void add_bool_attribute_if_unique(std::string &entry, const std::string &attr_name, bool neuron_value, const std::optional<bool> &group_default);
+
+template <typename T>
+bool is_unique_attribute(const std::optional<T> &group_default, const T &neuron_value, bool is_empty = false)
+{
+    if (is_empty)
+    {
+        return false;
+    }
+    return !group_default.has_value() ||
+            (group_default.value() != neuron_value);
+}
 
 }
 
