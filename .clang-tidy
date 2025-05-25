@@ -12,6 +12,7 @@ Checks: >
   -readability-magic-numbers,
   -cppcoreguidelines-avoid-magic-numbers,
   -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
   -readability-identifier-length,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -performance-unnecessary-value-param,

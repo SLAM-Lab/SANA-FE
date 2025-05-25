@@ -155,11 +155,16 @@ protected:
     void process_soma_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
 
 private:
-    void calculate_synapse_default_energy_latency(MappedConnection &con, PipelineResult &simulation_result);
-    void calculate_dendrite_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
-    void calculate_soma_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
-    void update_soma_activity(MappedNeuron &n, const PipelineResult &simulation_result);
-    void check_outputs(const MappedNeuron &n, const PipelineResult &result);
+    static void calculate_synapse_default_energy_latency(
+            MappedConnection &con, PipelineResult &simulation_result);
+    static void calculate_dendrite_default_energy_latency(
+            MappedNeuron &n, PipelineResult &simulation_result);
+    static void calculate_soma_default_energy_latency(
+            MappedNeuron &n, PipelineResult &simulation_result);
+    static void update_soma_activity(
+            MappedNeuron &n, const PipelineResult &simulation_result);
+    void check_outputs(
+            const MappedNeuron &n, const PipelineResult &result) const;
 };
 
 // Specific unit base classes, for the normal use case where the model

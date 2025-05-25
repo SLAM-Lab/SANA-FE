@@ -144,8 +144,7 @@ struct ModelAttribute
     //  JSON and YAML parsers, but they end up either requiring Boost or other
     //  dependencies, and / or rely on undefined C++ behavior and generally
     //  require complex solutions.
-    std::variant<bool, int, double, std::string, std::vector<ModelAttribute>>
-            value;
+    std::variant<bool, int, double, std::string, std::vector<ModelAttribute>> value;
     std::optional<std::string> name;
 
     // Filters control which hardware units can receive this parameter
@@ -153,5 +152,9 @@ struct ModelAttribute
     bool forward_to_dendrite{true};
     bool forward_to_soma{true};
 };
+
+// We define an alias for abbreviating the unwieldy value variant
+using AttributeVariant = std::variant<bool, int, double, std::string,
+        std::vector<sanafe::ModelAttribute>>;
 }
 #endif

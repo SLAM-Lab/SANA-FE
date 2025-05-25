@@ -23,9 +23,9 @@
 
 #include "arch.hpp"
 #include "chip.hpp"
-#include "description.hpp"
 #include "network.hpp"
 #include "print.hpp"
+#include "yaml_common.hpp"
 
 namespace // anonymous to keep members private
 {
@@ -326,7 +326,7 @@ int main(int argc, const char *argv[])
 
         return 0;
     }
-    catch (const sanafe::DescriptionParsingError &exc)
+    catch (const sanafe::YamlDescriptionParsingError &exc)
     {
         INFO("%s", exc.what());
         return 1;

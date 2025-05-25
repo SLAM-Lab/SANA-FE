@@ -1,20 +1,20 @@
 #include <ryml.hpp> // NOLINT(misc-include-cleaner)
 #include <ryml_std.hpp> // NOLINT(misc-include-cleaner)
 
-#include "description.hpp"
 #include "pipeline.hpp"
 #include "yaml_arch.hpp"
+#include "yaml_common.hpp"
 
 void sanafe::description_parse_axon_in_section_yaml(const ryml::Parser &parser,
         const ryml::ConstNodeRef axon_in_node, CoreConfiguration &parent_core)
 {
-    auto name = description_required_field<std::string>(
+    auto name = yaml_required_field<std::string>(
             parser, axon_in_node, "name");
     const ryml::ConstNodeRef &attributes =
             axon_in_node.find_child("attributes");
     if (attributes.invalid())
     {
-        throw DescriptionParsingError(
+        throw YamlDescriptionParsingError(
                 "No attributes section defined", parser, axon_in_node);
     }
     const AxonInPowerMetrics in_metrics =
@@ -26,9 +26,9 @@ sanafe::AxonInPowerMetrics sanafe::description_parse_axon_in_attributes_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
     AxonInPowerMetrics axon_in_metrics;
-    axon_in_metrics.energy_message_in = description_required_field<double>(
+    axon_in_metrics.energy_message_in = yaml_required_field<double>(
             parser, attributes, "energy_message_in");
-    axon_in_metrics.latency_message_in = description_required_field<double>(
+    axon_in_metrics.latency_message_in = yaml_required_field<double>(
             parser, attributes, "latency_message_in");
 
     return axon_in_metrics;
@@ -37,7 +37,7 @@ sanafe::AxonInPowerMetrics sanafe::description_parse_axon_in_attributes_yaml(
 void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
         const ryml::ConstNodeRef synapse_node, CoreConfiguration &parent_core)
 {
-    auto name = description_required_field<std::string>(
+    auto name = yaml_required_field<std::string>(
             parser, synapse_node, "name");
     auto model = description_parse_synapse_attributes_yaml(
             parser, synapse_node.find_child("attributes"));
@@ -78,7 +78,7 @@ sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
     ModelInfo model_details;
-    model_details.name = description_required_field<std::string>(
+    model_details.name = yaml_required_field<std::string>(
             parser, attributes, "model");
     model_details.model_attributes =
             description_parse_model_attributes_yaml(parser, attributes);
@@ -101,12 +101,12 @@ sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
 void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
         const ryml::ConstNodeRef dendrite_node, CoreConfiguration &parent_core)
 {
-    auto dendrite_name = description_required_field<std::string>(
+    auto dendrite_name = yaml_required_field<std::string>(
             parser, dendrite_node, "name");
     std::pair<int, int> dendrite_range = {0, 0};
     if (dendrite_name.find("..") != std::string::npos)
     {
-        dendrite_range = description_parse_range_yaml(dendrite_name);
+        dendrite_range = yaml_parse_range(dendrite_name);
     }
 
     for (int d = dendrite_range.first; d <= dendrite_range.second; ++d)
@@ -121,7 +121,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
                 dendrite_node.find_child("attributes");
         if (attributes.invalid())
         {
-            throw DescriptionParsingError(
+            throw YamlDescriptionParsingError(
                     "No attributes section defined", parser, dendrite_node);
         }
 
@@ -138,7 +138,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
         {
             latency_node >> model_details.log_latency;
         }
-        model_details.name = description_required_field<std::string>(
+        model_details.name = yaml_required_field<std::string>(
                 parser, attributes, "model");
         const ryml::ConstNodeRef plugin_path_node =
                 attributes.find_child("plugin");
@@ -153,7 +153,7 @@ void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
             }
             else
             {
-                throw DescriptionParsingError(
+                throw YamlDescriptionParsingError(
                         "Expected plugin path to be string", parser,
                         plugin_path_node);
             }
@@ -201,11 +201,11 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
         const ryml::ConstNodeRef soma_node, CoreConfiguration &parent_core)
 {
     auto soma_name =
-            description_required_field<std::string>(parser, soma_node, "name");
+            yaml_required_field<std::string>(parser, soma_node, "name");
     std::pair<int, int> soma_range = {0, 0};
     if (soma_name.find("..") != std::string::npos)
     {
-        soma_range = description_parse_range_yaml(soma_name);
+        soma_range = yaml_parse_range(soma_name);
     }
 
     for (int s = soma_range.first; s <= soma_range.second; ++s)
@@ -220,13 +220,13 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
                 soma_node.find_child("attributes");
         if (attributes.invalid())
         {
-            throw DescriptionParsingError(
+            throw YamlDescriptionParsingError(
                     "No attributes section defined", parser, soma_node);
         }
         const std::string model_str;
 
         ModelInfo model_details;
-        model_details.name = description_required_field<std::string>(
+        model_details.name = yaml_required_field<std::string>(
                 parser, attributes, "model");
         const ryml::ConstNodeRef energy_node =
                 attributes.find_child("log_energy");
@@ -255,7 +255,7 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
             }
             else
             {
-                throw DescriptionParsingError(
+                throw YamlDescriptionParsingError(
                         "Expected plugin path to be string", parser,
                         plugin_path_node);
             }
@@ -300,19 +300,19 @@ void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
 void sanafe::description_parse_axon_out_section(const ryml::Parser &parser,
         const ryml::ConstNodeRef axon_out_node, CoreConfiguration &parent_core)
 {
-    auto axon_out_name = description_required_field<std::string>(
+    auto axon_out_name = yaml_required_field<std::string>(
             parser, axon_out_node, "name");
 
     const auto &attributes = axon_out_node.find_child("attributes");
     if (attributes.invalid())
     {
-        throw DescriptionParsingError(
+        throw YamlDescriptionParsingError(
                 "No attributes section defined", parser, axon_out_node);
     }
     AxonOutPowerMetrics power_metrics;
-    power_metrics.energy_message_out = description_required_field<double>(
+    power_metrics.energy_message_out = yaml_required_field<double>(
             parser, attributes, "energy_message_out");
-    power_metrics.latency_message_out = description_required_field<double>(
+    power_metrics.latency_message_out = yaml_required_field<double>(
             parser, attributes, "latency_message_out");
 
     parent_core.create_axon_out(std::move(axon_out_name), power_metrics);
@@ -323,11 +323,11 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
         Architecture &arch)
 {
     auto core_name =
-            description_required_field<std::string>(parser, core_node, "name");
+            yaml_required_field<std::string>(parser, core_node, "name");
     std::pair<int, int> core_range = {0, 0};
     if (core_name.find("..") != std::string::npos)
     {
-        core_range = description_parse_range_yaml(core_name);
+        core_range = yaml_parse_range(core_name);
     }
 
     for (int c = core_range.first; c <= core_range.second; c++)
@@ -359,7 +359,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
         else
         {
             const std::string error = "No axon in section defined";
-            throw DescriptionParsingError(error, parser, core_node);
+            throw YamlDescriptionParsingError(error, parser, core_node);
         }
 
         if (!core_node.find_child("synapse").invalid())
@@ -380,7 +380,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
         else
         {
             const std::string error = "No synapse section defined";
-            throw DescriptionParsingError(error, parser, core_node);
+            throw YamlDescriptionParsingError(error, parser, core_node);
         }
         if (!core_node.find_child("dendrite").invalid())
         {
@@ -402,7 +402,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
         else
         {
             const std::string error = "No dendrite section defined";
-            throw DescriptionParsingError(error, parser, core_node);
+            throw YamlDescriptionParsingError(error, parser, core_node);
         }
 
         if (!core_node.find_child("soma").invalid())
@@ -423,7 +423,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
         else
         {
             const std::string error = "No soma section defined";
-            throw DescriptionParsingError(error, parser, core_node);
+            throw YamlDescriptionParsingError(error, parser, core_node);
         }
 
         if (!core_node.find_child("axon_out").invalid())
@@ -444,7 +444,7 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
         else
         {
             const std::string error = "No axon out seciont defined";
-            throw DescriptionParsingError(error, parser, core_node);
+            throw YamlDescriptionParsingError(error, parser, core_node);
         }
     }
 }
@@ -475,10 +475,10 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
     }
 
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
-            description_required_field<std::string>(
+            yaml_required_field<std::string>(
                     parser, attributes, "buffer_position"),
             buffer_inside_unit);
-    pipeline_config.max_neurons_supported = description_required_field<int>(
+    pipeline_config.max_neurons_supported = yaml_required_field<int>(
             parser, attributes, "max_neurons_supported");
 
     return pipeline_config;
@@ -489,24 +489,24 @@ sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
 {
     TilePowerMetrics tile_metrics;
 
-    tile_metrics.energy_north_hop = description_required_field<double>(
+    tile_metrics.energy_north_hop = yaml_required_field<double>(
             parser, attributes, "energy_north_hop");
-    tile_metrics.latency_north_hop = description_required_field<double>(
+    tile_metrics.latency_north_hop = yaml_required_field<double>(
             parser, attributes, "latency_north_hop");
 
-    tile_metrics.energy_east_hop = description_required_field<double>(
+    tile_metrics.energy_east_hop = yaml_required_field<double>(
             parser, attributes, "energy_east_hop");
-    tile_metrics.latency_east_hop = description_required_field<double>(
+    tile_metrics.latency_east_hop = yaml_required_field<double>(
             parser, attributes, "latency_east_hop");
 
-    tile_metrics.energy_south_hop = description_required_field<double>(
+    tile_metrics.energy_south_hop = yaml_required_field<double>(
             parser, attributes, "energy_south_hop");
-    tile_metrics.latency_south_hop = description_required_field<double>(
+    tile_metrics.latency_south_hop = yaml_required_field<double>(
             parser, attributes, "latency_south_hop");
 
-    tile_metrics.energy_west_hop = description_required_field<double>(
+    tile_metrics.energy_west_hop = yaml_required_field<double>(
             parser, attributes, "energy_west_hop");
-    tile_metrics.latency_west_hop = description_required_field<double>(
+    tile_metrics.latency_west_hop = yaml_required_field<double>(
             parser, attributes, "latency_west_hop");
 
     if (!attributes.find_child("log_energy").invalid())
@@ -532,7 +532,7 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
 
     if (tile_name.find("..") != std::string::npos)
     {
-        range = description_parse_range_yaml(tile_name);
+        range = yaml_parse_range(tile_name);
     }
 
     for (int t = range.first; t <= range.second; t++)
@@ -549,7 +549,7 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
         if (tile_node.find_child("core").invalid())
         {
             const std::string error = "No core section defined";
-            throw DescriptionParsingError(error, parser, tile_node);
+            throw YamlDescriptionParsingError(error, parser, tile_node);
         }
         const ryml::ConstNodeRef core_section = tile_node["core"];
         if (core_section.is_seq())
@@ -574,10 +574,10 @@ sanafe::description_parse_noc_configuration_yaml(
 {
     NetworkOnChipConfiguration noc;
     noc.width_in_tiles =
-            description_required_field<int>(parser, noc_attributes, "width");
+            yaml_required_field<int>(parser, noc_attributes, "width");
     noc.height_in_tiles =
-            description_required_field<int>(parser, noc_attributes, "height");
-    noc.link_buffer_size = description_required_field<int>(
+            yaml_required_field<int>(parser, noc_attributes, "height");
+    noc.link_buffer_size = yaml_required_field<int>(
             parser, noc_attributes, "link_buffer_size");
 
     return noc;
@@ -588,7 +588,7 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
 {
     if (arch_node.invalid())
     {
-        throw DescriptionParsingError(
+        throw YamlDescriptionParsingError(
                 "No top-level architecture section defined.\n", parser,
                 arch_node);
     }
@@ -596,7 +596,7 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
     arch_node["name"] >> arch_name;
     if (arch_name.find('[') != std::string::npos)
     {
-        throw DescriptionParsingError(
+        throw YamlDescriptionParsingError(
                 "Multiple architectures not supported", parser, arch_node);
     }
     const NetworkOnChipConfiguration noc =
@@ -621,7 +621,7 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
     }
     else
     {
-        throw DescriptionParsingError(
+        throw YamlDescriptionParsingError(
                 "No tile section defined", parser, arch_node);
     }
 
@@ -658,7 +658,7 @@ sanafe::Architecture sanafe::description_parse_arch_file_yaml(std::ifstream &fp)
 
     if (top_level_yaml["architecture"].invalid())
     {
-        throw DescriptionParsingError(
+        throw YamlDescriptionParsingError(
                 "No architecture section defined", parser, top_level_yaml);
     }
     return description_parse_arch_section_yaml(
