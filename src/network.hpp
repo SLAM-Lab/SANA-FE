@@ -61,6 +61,39 @@ struct Conv2DParameters
     int stride_height{1};
 };
 
+struct Conv2DCoordinate
+{
+    int channel;
+    int y;
+    int x;
+
+    Conv2DCoordinate(const int channel, const int y_pos, const int x_pos) : channel(channel), y(y_pos), x(x_pos) {}
+};
+
+struct Conv2DOutputDimensions
+{
+    int output_width;
+    int output_height;
+    int output_channels;
+    size_t expected_input_size;
+    size_t expected_output_size;
+};
+
+struct Conv2DPosition
+{
+    Conv2DCoordinate output_coordinate;
+    int c_in;
+    int y_filter;
+    int x_filter;
+};
+
+struct Conv2DIndices
+{
+    int dest_idx;
+    int source_idx;
+    int filter_idx;
+};
+
 class Neuron
 {
 public:
@@ -81,11 +114,11 @@ public:
     bool log_spikes{false};
     bool log_potential{false};
 
-    explicit Neuron(size_t neuron_offset, SpikingNetwork &net, const std::string parent_group_id, const NeuronConfiguration &config);
+    explicit Neuron(size_t neuron_offset, SpikingNetwork &net, const std::string parent_group_name, const NeuronConfiguration &config);
     [[nodiscard]] size_t get_id() const { return offset; }
     size_t connect_to_neuron(Neuron &dest);
     void map_to_core(const CoreConfiguration &core);
-    void set_attributes(const NeuronConfiguration &attributes);
+    void set_attributes(const NeuronConfiguration &config);
     [[nodiscard]] std::string info() const;
 };
 
@@ -104,6 +137,15 @@ public:
     void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
     void connect_neurons_conv2d(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const Conv2DParameters &convolution);
     [[nodiscard]] std::string info() const;
+
+private:
+    static Conv2DOutputDimensions conv2d_calculate_dimensions(const Conv2DParameters &convolution);
+    void conv2d_validate_neuron_counts(const NeuronGroup &dest_group, const Conv2DOutputDimensions &dims) const;
+    static Conv2DIndices conv2d_calculate_indices(const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims, const Conv2DPosition &position);
+    static bool conv2d_is_position_valid(int position, int max_size) noexcept;
+    void conv2d_create_output_neuron_connections(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims, const Conv2DCoordinate &out);
+    void conv2d_create_kernel_connections(Neuron &dest, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims, const Conv2DCoordinate &out, int c_in);
+    static void conv2d_create_and_configure_connection(Neuron &source, Neuron &dest, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, int filter_idx);
 };
 
 class SpikingNetwork
@@ -133,6 +175,11 @@ public:
     size_t update_mapping_count();
 private:
     void save_netlist(const std::filesystem::path &path) const;
+    void save_groups_to_netlist(std::ofstream &out) const;
+    void save_neurons_to_netlist(std::ofstream &out, const std::map<std::string, size_t> &group_name_to_id) const;
+    void save_mappings_to_netlist(std::ofstream &out, const std::map<std::string, size_t> &group_name_to_id) const;
+    std::map<std::string, size_t> create_group_name_to_id_mapping() const;
+
     void save_yaml(const std::filesystem::path &path) const;
 
     size_t mapping_count{0};
