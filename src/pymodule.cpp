@@ -3,31 +3,48 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // pymodule.cpp
-#include <any>
+#include <cstddef>
+#include <functional>
 #include <map>
-#include <sstream>
-#include <unordered_map>
+#include <memory>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
+#include <pybind11/attr.h>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/stl/filesystem.h>
+#include <pybind11/pytypes.h>
 
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
 
 #include "arch.hpp"
+#include "attribute.hpp"
 #include "chip.hpp"
+#include "mapped.hpp"
 #include "network.hpp"
+#include "pipeline.hpp"
 #include "print.hpp"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
+// Normally we don't suppress these warnings, but in this file, Python allows for
+//  named arguments - removing the risk of accidentally swapping args and
+//  making it easier to specify a large number of args
+// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-size)
+
 // Forward declarations
+namespace // anonymous
+{
 std::map<std::string, sanafe::ModelAttribute> pydict_to_model_attributes(
-        const pybind11::dict &dictionary, const bool forward_to_synapse = true,
-        const bool forward_to_dendrite = true,
-        const bool forward_to_soma = true);
+        const pybind11::dict &dictionary, bool forward_to_synapse = true,
+        bool forward_to_dendrite = true, bool forward_to_soma = true);
 sanafe::ModelAttribute pyobject_to_model_attribute(
         const pybind11::object &value);
 pybind11::dict run_data_to_dict(const sanafe::RunData &run);
@@ -41,11 +58,10 @@ std::map<std::string, sanafe::ModelAttribute> pydict_to_model_attributes(
     std::map<std::string, sanafe::ModelAttribute> map;
     for (const auto &key_value_pair : dictionary)
     {
-        const std::string key =
-                pybind11::cast<std::string>(key_value_pair.first);
+        const auto key = pybind11::cast<std::string>(key_value_pair.first);
         TRACE1(PYMODULE, "Adding dict val: dict['%s']\n", key.c_str());
 
-        pybind11::object value =
+        const auto value =
                 pybind11::cast<pybind11::object>(key_value_pair.second);
         sanafe::ModelAttribute attribute = pyobject_to_model_attribute(value);
 
@@ -67,11 +83,11 @@ pydict_to_attribute_lists(pybind11::dict attributes)
 
     for (const auto &key_value_pair : attributes)
     {
-        const std::string attribute_name =
+        const auto attribute_name =
                 pybind11::cast<std::string>(key_value_pair.first);
         if (!pybind11::isinstance<pybind11::iterable>(key_value_pair.second))
         {
-            std::string error(
+            const std::string error(
                     "Error: Each attribute must be provided as a "
                     "1D list/array of values. Multi-dimensional arrays must be "
                     "flattened in C-order and storing channels as the last dim");
@@ -90,6 +106,7 @@ pydict_to_attribute_lists(pybind11::dict attributes)
     return map;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity,readability-function-size)
 sanafe::ModelAttribute pyobject_to_model_attribute(
         const pybind11::object &value)
 {
@@ -101,13 +118,13 @@ sanafe::ModelAttribute pyobject_to_model_attribute(
     sanafe::ModelAttribute attribute;
     bool is_int{false};
     bool is_float{false};
-    bool is_string = pybind11::isinstance<pybind11::str>(value);
+    const bool is_string = pybind11::isinstance<pybind11::str>(value);
 
-    bool is_numpy = pybind11::hasattr(value, "dtype");
+    const bool is_numpy = pybind11::hasattr(value, "dtype");
     if (is_numpy)
     {
         auto dtype = value.attr("dtype");
-        std::string code = dtype.attr("kind").cast<std::string>();
+        const auto code = dtype.attr("kind").cast<std::string>();
         is_int = (code == "i" || code == "u");
         is_float = (code == "f");
     }
@@ -115,7 +132,6 @@ sanafe::ModelAttribute pyobject_to_model_attribute(
     {
         is_int = pybind11::isinstance<pybind11::int_>(value);
         is_float = pybind11::isinstance<pybind11::float_>(value);
-        //is_float = pybind11::detail::make_caster<float>().load(value, true)
     }
 
     // Now check against each type and make the appropriate cast
@@ -172,22 +188,22 @@ pybind11::object pymodel_attribute_to_pyobject(
         auto bool_value = static_cast<bool>(attribute);
         return pybind11::cast(bool_value);
     }
-    else if (std::holds_alternative<int>(attribute.value))
+    if (std::holds_alternative<int>(attribute.value))
     {
         auto int_value = static_cast<int>(attribute);
         return pybind11::cast(int_value);
     }
-    else if (std::holds_alternative<double>(attribute.value))
+    if (std::holds_alternative<double>(attribute.value))
     {
         auto float_val = static_cast<double>(attribute);
         return pybind11::cast(float_val);
     }
-    else if (std::holds_alternative<std::string>(attribute.value))
+    if (std::holds_alternative<std::string>(attribute.value))
     {
         auto str_value = static_cast<std::string>(attribute);
         return pybind11::cast(str_value);
     }
-    else if (std::holds_alternative<std::vector<sanafe::ModelAttribute>>(
+    if (std::holds_alternative<std::vector<sanafe::ModelAttribute>>(
                      attribute.value))
     {
         auto attribute_vec =
@@ -210,15 +226,13 @@ pybind11::object pymodel_attribute_to_pyobject(
             }
             return pydict;
         }
-        else
+
+        pybind11::list pylist{};
+        for (const auto &sub_attribute : attribute_vec)
         {
-            pybind11::list pylist{};
-            for (const auto &sub_attribute : attribute_vec)
-            {
-                pylist.append(pymodel_attribute_to_pyobject(sub_attribute));
-            }
-            return pylist;
+            pylist.append(pymodel_attribute_to_pyobject(sub_attribute));
         }
+        return pylist;
     }
 
     throw std::runtime_error("Unrecognized model attribute type\n");
@@ -238,6 +252,26 @@ pybind11::dict pymodel_attributes_to_pydict(
     return attribute_dict;
 }
 
+pybind11::dict run_data_to_dict(const sanafe::RunData &run)
+{
+    pybind11::dict energy_dict;
+    energy_dict["total"] = run.total_energy;
+    energy_dict["synapse"] = run.synapse_energy;
+    energy_dict["dendrite"] = run.dendrite_energy;
+    energy_dict["soma"] = run.soma_energy;
+    energy_dict["network"] = run.network_energy;
+
+    pybind11::dict run_data_dict;
+    run_data_dict["timestep_start"] = run.timestep_start;
+    run_data_dict["timesteps_executed"] = run.timesteps_executed;
+    run_data_dict["energy"] = energy_dict;
+    run_data_dict["sim_time"] = run.sim_time;
+    run_data_dict["spikes"] = run.spikes;
+    run_data_dict["packets_sent"] = run.packets_sent;
+    run_data_dict["neurons_fired"] = run.neurons_fired;
+
+    return run_data_dict;
+}
 
 void pyconnect_neurons_sparse(sanafe::NeuronGroup *self,
         sanafe::NeuronGroup &dest_group, const pybind11::dict attributes,
@@ -249,7 +283,7 @@ void pyconnect_neurons_sparse(sanafe::NeuronGroup *self,
     // Convert python list of tuples to SANA-FE format
     if (!pybind11::isinstance<pybind11::iterable>(src_dest_id_pairs))
     {
-        std::string error(
+        const std::string error(
                 "Error: must provide connectivity as a list of "
                 "source/destination pairs, providing the offsets within the "
                 "groups.");
@@ -263,26 +297,25 @@ void pyconnect_neurons_sparse(sanafe::NeuronGroup *self,
     {
         if (!pybind11::isinstance<pybind11::iterable>(*iter))
         {
-            std::string error(
+            const std::string error(
                     "Error: each entry in the src/dest id list must be a 2-tuple, "
                     "representing the neuron's offsets within the src and dest neuron groups");
             INFO("%s\n", error.c_str());
             throw pybind11::value_error(error);
         }
 
-        pybind11::sequence seq = pybind11::cast<pybind11::sequence>(*iter);
+        const auto seq = pybind11::cast<pybind11::sequence>(*iter);
         if (seq.size() != 2)
         {
             throw pybind11::value_error("Expected a 2-tuple");
         }
         const size_t src = pybind11::cast<size_t>(seq[0]);
         const size_t dest = pybind11::cast<size_t>(seq[1]);
-        src_dest_id_pairs_vec.push_back(std::make_pair(src, dest));
+        src_dest_id_pairs_vec.emplace_back(src, dest);
     }
 
     self->connect_neurons_sparse(
             dest_group, attribute_lists, src_dest_id_pairs_vec);
-    return;
 }
 
 void pyconnect_neurons_conv2d(sanafe::NeuronGroup *self,
@@ -306,7 +339,6 @@ void pyconnect_neurons_conv2d(sanafe::NeuronGroup *self,
     config.stride_height = stride_height;
 
     self->connect_neurons_conv2d(dest_group, attribute_lists, config);
-    return;
 }
 
 void pyconnect_neurons_dense(sanafe::NeuronGroup *self,
@@ -316,28 +348,6 @@ void pyconnect_neurons_dense(sanafe::NeuronGroup *self,
             attribute_lists = pydict_to_attribute_lists(attributes);
 
     self->connect_neurons_dense(dest_group, attribute_lists);
-    return;
-}
-
-pybind11::dict run_data_to_dict(const sanafe::RunData &run)
-{
-    pybind11::dict energy_dict;
-    energy_dict["total"] = run.total_energy;
-    energy_dict["synapse"] = run.synapse_energy;
-    energy_dict["dendrite"] = run.dendrite_energy;
-    energy_dict["soma"] = run.soma_energy;
-    energy_dict["network"] = run.network_energy;
-
-    pybind11::dict run_data_dict;
-    run_data_dict["timestep_start"] = run.timestep_start;
-    run_data_dict["timesteps_executed"] = run.timesteps_executed;
-    run_data_dict["energy"] = energy_dict;
-    run_data_dict["sim_time"] = run.sim_time;
-    run_data_dict["spikes"] = run.spikes;
-    run_data_dict["packets_sent"] = run.packets_sent;
-    run_data_dict["neurons_fired"] = run.neurons_fired;
-
-    return run_data_dict;
 }
 
 sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
@@ -387,12 +397,12 @@ sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
     return self->create_tile(std::move(name), tile_power_metrics);
 }
 
-std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
-        size_t tile_id, double energy_north_hop, double latency_north_hop,
-        double energy_east_hop, double latency_east_hop,
-        double energy_south_hop, double latency_south_hop,
-        double energy_west_hop, double latency_west_hop, bool log_energy,
-        bool log_latency)
+std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(
+        std::string name, size_t tile_id, double energy_north_hop,
+        double latency_north_hop, double energy_east_hop,
+        double latency_east_hop, double energy_south_hop,
+        double latency_south_hop, double energy_west_hop,
+        double latency_west_hop, bool log_energy, bool log_latency)
 {
     sanafe::TilePowerMetrics tile_power_metrics{};
     tile_power_metrics.energy_north_hop = energy_north_hop;
@@ -410,9 +420,9 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
             name, tile_id, tile_power_metrics);
 }
 
-std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
-        size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
-        std::string buffer_position, bool buffer_inside_unit,
+std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(
+        std::string name, size_t parent_tile_id, size_t offset_within_tile,
+        size_t core_id, std::string buffer_position, bool buffer_inside_unit,
         size_t max_neurons_supported, bool log_energy, bool log_latency)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
@@ -480,16 +490,13 @@ void pyset_attributes(sanafe::Neuron *self,
     neuron_template.model_attributes.insert(parsed.begin(), parsed.end());
 
     TRACE1(PYMODULE, "Setting neuron attributes\n");
-    if (DEBUG_LEVEL_PYMODULE > 0)
+#if (DEBUG_LEVEL_PYMODULE > 0)
+    for (auto &[key, value] : neuron_template.model_attributes)
     {
-        for (auto &[key, value] : neuron_template.model_attributes)
-        {
             TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
-        }
     }
+#endif
     self->set_attributes(neuron_template);
-
-    return;
 }
 
 void pyset_model_attributes(sanafe::MappedNeuron *self,
@@ -509,22 +516,19 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
     converted_attributes.insert(parsed.begin(), parsed.end());
 
     TRACE1(PYMODULE, "Setting neuron attributes\n");
-    if (DEBUG_LEVEL_PYMODULE > 0)
+#if (DEBUG_LEVEL_PYMODULE > 0)
+    for (auto &[key, value] : converted_attributes)
     {
-        for (auto &[key, value] : converted_attributes)
-        {
-            TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
-        }
+        TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
     }
+#endif
     self->set_model_attributes(converted_attributes);
-
-    return;
 }
 
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-        std::string timing_model_str, int nthreads)
+        std::string timing_model_str, int /*nthreads*/)
 {
-    sanafe::TimingModel timing_model;
+    sanafe::TimingModel timing_model{sanafe::TIMING_MODEL_DETAILED};
     if (timing_model_str == "simple")
     {
         timing_model = sanafe::TIMING_MODEL_SIMPLE;
@@ -553,6 +557,9 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     return run_data_to_dict(self->sim(timesteps, timing_model));
 }
 
+} // end of anonymous namespace
+
+
 // Custom Python wrapper class for the Neuron class
 //  While most objects are managed fine, pybind struggles to manage object
 //  lifetime for Neurons, which can be accessed as slices and returned inside
@@ -570,12 +577,12 @@ public:
     {
     }
 
-    sanafe::Neuron *get() const
+    [[nodiscard]] sanafe::Neuron *get() const
     {
         return neuron_;
     }
 
-    const std::vector<sanafe::Connection> &edges_out() const
+    [[nodiscard]] const std::vector<sanafe::Connection> &edges_out() const
     {
         return neuron_->edges_out;
     }
@@ -587,14 +594,13 @@ class NeuronGroupIterator
 private:
     pybind11::object group_ref_;
     sanafe::NeuronGroup *group_;
-    size_t current_;
+    size_t current_{0};
     size_t size_;
 
 public:
     NeuronGroupIterator(pybind11::object group_ref, sanafe::NeuronGroup *group)
             : group_ref_(std::move(group_ref))
             , group_(group)
-            , current_(0)
             , size_(group->neurons.size())
     {
     }
@@ -605,10 +611,11 @@ public:
         {
             throw pybind11::stop_iteration();
         }
-        return PyNeuronRef(group_ref_, &group_->neurons[current_++]);
+        return {group_ref_, &group_->neurons[current_++]};
     }
 };
 
+// NOLINTBEGIN(readability-function-cognitive-complexity)
 PYBIND11_MODULE(sanafecpp, m)
 {
     m.doc() = R"pbdoc(
@@ -691,7 +698,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .def_property_readonly(
                     "neurons",
                     [](pybind11::object &self_obj) -> pybind11::object {
-                        sanafe::NeuronGroup &self =
+                        auto &self =
                                 pybind11::cast<sanafe::NeuronGroup &>(self_obj);
                         std::vector<pybind11::object> neuron_refs;
                         for (sanafe::Neuron &neuron : self.neurons)
@@ -705,13 +712,13 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("__getitem__",
                     [](pybind11::object self_obj,
                             pybind11::object index) -> pybind11::object {
-                        sanafe::NeuronGroup &self =
+                        auto &self =
                                 pybind11::cast<sanafe::NeuronGroup &>(self_obj);
 
                         if (pybind11::isinstance<pybind11::int_>(index))
                         {
                             // Integer indexing
-                            size_t i = pybind11::cast<size_t>(index);
+                            const auto i = pybind11::cast<size_t>(index);
                             if (i >= self.neurons.size())
                             {
                                 throw pybind11::index_error();
@@ -720,12 +727,15 @@ PYBIND11_MODULE(sanafecpp, m)
                             return pybind11::cast(
                                     PyNeuronRef(self_obj, &self.neurons[i]));
                         }
-                        else if (pybind11::isinstance<pybind11::slice>(index))
+                        if (pybind11::isinstance<pybind11::slice>(index))
                         {
                             // Handle slice indexing
-                            pybind11::slice slice =
+                            const auto slice =
                                     pybind11::cast<pybind11::slice>(index);
-                            size_t start, stop, step, slice_length;
+                            size_t start = 0;
+                            size_t stop = 0;
+                            size_t step = 0;
+                            size_t slice_length = 0;
                             if (!slice.compute(self.neurons.size(), &start,
                                         &stop, &step, &slice_length))
                             {
@@ -736,7 +746,7 @@ PYBIND11_MODULE(sanafecpp, m)
                             pybind11::list result;
                             for (size_t i = 0; i < slice_length; ++i)
                             {
-                                size_t idx = start + i * step;
+                                const size_t idx = start + (i * step);
                                 result.append(pybind11::cast(PyNeuronRef(
                                         self_obj, &self.neurons[idx])));
                             }
@@ -750,8 +760,7 @@ PYBIND11_MODULE(sanafecpp, m)
                         return self.neurons.size();
                     })
             .def("__iter__", [](pybind11::object self_obj) {
-                sanafe::NeuronGroup &self =
-                        pybind11::cast<sanafe::NeuronGroup &>(self_obj);
+                auto &self = pybind11::cast<sanafe::NeuronGroup &>(self_obj);
                 return NeuronGroupIterator(self_obj, &self);
             });
     // Neuron bindings are a little more complicated, because we use a wrapper
@@ -770,7 +779,8 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("map_to_core",
                     [](const PyNeuronRef &ref,
                             const sanafe::CoreConfiguration &core_configuration) {
-                        return ref.get()->map_to_core(core_configuration);
+                        ref.get()->map_to_core(core_configuration);
+                        return;
                     })
             .def(
                     "set_attributes",
@@ -821,7 +831,7 @@ PYBIND11_MODULE(sanafecpp, m)
                         sanafe::Connection &con = ref.get()->edges_out[con_idx];
                         const auto attributes =
                                 pydict_to_model_attributes(attr.value());
-                        for (auto &[key, attribute] : attributes)
+                        for (const auto &[key, attribute] : attributes)
                         {
                             if (attribute.forward_to_synapse)
                             {
@@ -950,3 +960,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict());
 }
+// NOLINTEND(readability-function-cognitive-complexity)
+// NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size)
+

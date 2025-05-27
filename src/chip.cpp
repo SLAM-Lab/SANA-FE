@@ -667,10 +667,10 @@ sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
     set_time(ts.timestep);
 
     // Process inputs
-    PipelineResult output = (this->*process_input_fn)(ts, n, con, input);
+    PipelineResult output = process_input_fn(ts, n, con, input);
 
     // Post-processing on outputs
-    (this->*process_output_fn)(n, con, output);
+    process_output_fn(n, con, output);
 
 #ifndef NDEBUG
     check_outputs(n, output);

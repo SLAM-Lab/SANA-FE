@@ -4,26 +4,37 @@
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 //  plugins.cpp
 #include <filesystem>
-#include <iostream>
 #include <map>
+#include <memory>
+#include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 #include <dlfcn.h>
 
-#include "models.hpp"
+#include "pipeline.hpp"
 #include "plugins.hpp"
 #include "print.hpp"
 
-using _create_hw = sanafe::PipelineUnit *();
+using create_hw = sanafe::PipelineUnit *();
 
-std::map<std::string, _create_hw *> plugin_create_hw;
-// Use a unique_ptr with the custom deleter to automatically manage the library handle
+namespace // anonymous
+{
+// Manage the different plugins and their corresponding factory routines. For
+//  now, use a couple of global maps (ignoring any clang lint warnings).
+//  Probably not the cleanest or most modern, but it works and should be self-
+//  contained in this file.
+std::map<std::string, create_hw *> plugin_create_hw; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+// Use a unique_ptr with the custom deleter to automatically manage the library
+//  handle
 using DlHandlePtr = std::unique_ptr<void, sanafe::DlHandleDeleter>;
-std::unordered_map<std::string, DlHandlePtr> plugin_handles;
+std::unordered_map<std::string, DlHandlePtr> plugin_handles; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+}
 
 void sanafe::DlHandleDeleter::operator()(void *handle) const
 {
-    if (handle)
+    if (handle != nullptr)
     {
         dlclose(handle);
     }
@@ -49,7 +60,8 @@ void sanafe::plugin_init_hw(
 
     // Function to create an instance of the Soma class
     INFO("Loading function: %s\n", create.c_str());
-    auto *create_func = (_create_hw *) dlsym(hw, create.c_str());
+    auto *create_func =
+            reinterpret_cast<create_hw *>(dlsym(hw, create.c_str()));
     plugin_create_hw[model_name] = create_func;
 
     const char *dlsym_error = dlerror();

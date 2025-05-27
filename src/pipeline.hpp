@@ -6,6 +6,7 @@
 #define PIPELINE_HEADER_INCLUDED_
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <set>
 #include <string>
@@ -74,11 +75,13 @@ public:
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     void register_attributes(const std::set<std::string> &attribute_names);
     void check_attribute(std::string attribute_name);
+    void check_implemented(bool check_implements_synapse, bool check_implements_dendrite, bool check_implements_soma) const;
 
-    using InputInterfaceFunc = PipelineResult (PipelineUnit:: *)(Timestep &, MappedNeuron &, std::optional<MappedConnection*>, const PipelineResult &);
-    using OutputInterfaceFunc = void (PipelineUnit:: *)(MappedNeuron &, std::optional<MappedConnection *>, PipelineResult &);
-    InputInterfaceFunc process_input_fn{nullptr};
-    OutputInterfaceFunc process_output_fn{nullptr};
+    // using InputInterfaceFunc = PipelineResult (PipelineUnit:: *)(Timestep &, MappedNeuron &, std::optional<MappedConnection*>, const PipelineResult &);
+    // using OutputInterfaceFunc = void (*)(MappedNeuron &, std::optional<MappedConnection *>, PipelineResult &);
+
+    using InputInterfaceFunc = std::function<PipelineResult(Timestep&, MappedNeuron&, std::optional<MappedConnection*>, const PipelineResult&)>;
+    using OutputInterfaceFunc = std::function<void(MappedNeuron&, std::optional<MappedConnection*>, PipelineResult&)>;
 
     // Model information
     std::map<std::string, ModelAttribute> model_attributes{};
@@ -143,6 +146,8 @@ protected:
             "log_v",
             "connections_out",
     };
+    InputInterfaceFunc process_input_fn;
+    OutputInterfaceFunc process_output_fn;
     long int simulation_time{0L};
     PipelineUnit(bool implements_synapse, bool implements_dendrite, bool implements_soma);
 
@@ -150,21 +155,20 @@ protected:
     PipelineResult process_dendrite_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     PipelineResult process_soma_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
-    void process_synapse_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
-    void process_dendrite_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
-    void process_soma_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
+    static void process_synapse_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
+    static void process_dendrite_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
+    static void process_soma_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
 
 private:
-    static void calculate_synapse_default_energy_latency(
-            MappedConnection &con, PipelineResult &simulation_result);
-    static void calculate_dendrite_default_energy_latency(
-            MappedNeuron &n, PipelineResult &simulation_result);
-    static void calculate_soma_default_energy_latency(
-            MappedNeuron &n, PipelineResult &simulation_result);
-    static void update_soma_activity(
-            MappedNeuron &n, const PipelineResult &simulation_result);
-    void check_outputs(
-            const MappedNeuron &n, const PipelineResult &result) const;
+    static void calculate_synapse_default_energy_latency(MappedConnection &con, PipelineResult &simulation_result);
+    static void calculate_dendrite_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
+    static void calculate_soma_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
+    static void update_soma_activity(MappedNeuron &n, const PipelineResult &simulation_result);
+    void check_outputs(const MappedNeuron &n, const PipelineResult &result) const;
+
+    void synapse_set_default_attributes();
+    void dendrite_set_default_attributes();
+    void soma_set_default_attributes();
 };
 
 // Specific unit base classes, for the normal use case where the model
@@ -173,7 +177,7 @@ private:
 class SynapseUnit : public PipelineUnit
 {
 public:
-    SynapseUnit() : PipelineUnit(true, false, false) {};
+    SynapseUnit() : PipelineUnit(true, false, false) {}
     PipelineResult update(size_t synapse_address, bool read = false) override = 0;
     PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) final { throw std::logic_error("Error: Synapse H/W called with dendrite inputs"); }
     PipelineResult update(size_t neuron_address, std::optional<double> current_in) final { throw std::logic_error("Error: Synapse H/W called with soma inputs"); }
@@ -183,7 +187,7 @@ public:
 class DendriteUnit : public PipelineUnit
 {
 public:
-    DendriteUnit() : PipelineUnit(false, true, false) {};
+    DendriteUnit() : PipelineUnit(false, true, false) {}
     PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override = 0;
     PipelineResult update(size_t synapse_address, bool read = false) final { throw std::logic_error("Error: Dendrite H/W called with synapse inputs"); }
     PipelineResult update(size_t neuron_address, std::optional<double> current_in) final { throw std::logic_error("Error: Dendrite H/W called with soma inputs"); }
@@ -192,7 +196,7 @@ public:
 class SomaUnit : public PipelineUnit
 {
 public:
-    SomaUnit() : PipelineUnit(false, false, true) {};
+    SomaUnit() : PipelineUnit(false, false, true) {}
     PipelineResult update(size_t neuron_address, std::optional<double> current_in) override = 0;
     PipelineResult update(size_t synapse_address, bool read = false) final { throw std::logic_error("Error: Soma H/W called with synapse inputs"); }
     PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) final { throw std::logic_error("Error: Soma H/W called with dendrite inputs"); }

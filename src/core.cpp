@@ -158,10 +158,12 @@ sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
     }
 
     auto &new_unit = pipeline_hw.back();
-    TRACE1(CHIP, "implements synapse:%d dendrite:%d soma:%d\n",
-            new_unit->implements_synapse, new_unit->implements_dendrite,
-            new_unit->implements_soma);
+    // Forward all attributes onto the new h/w unit
     new_unit->set_attributes(config.name, config.model_info);
+    // Set the input/output interface of the pipeline unit and in doing so we
+    //  configure which functionality the h/w unit supports
+    new_unit->check_implemented(config.implements_synapse,
+            config.implements_dendrite, config.implements_soma);
     TRACE1(CHIP, "New h/w unit created (%s) in core:%zu\n", config.name.c_str(),
             id);
 

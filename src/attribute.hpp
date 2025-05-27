@@ -8,6 +8,7 @@
 #include <optional>
 #include <sstream>
 #include <variant>
+#include <vector>
 
 #include "print.hpp"
 

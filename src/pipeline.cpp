@@ -4,6 +4,7 @@
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 #include <algorithm>
 #include <cstddef>
+#include <map>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -22,50 +23,145 @@ sanafe::PipelineUnit::PipelineUnit(const bool implements_synapse,
         , implements_dendrite(implements_dendrite)
         , implements_soma(implements_soma)
 {
+    // When constructing the pipeline h/w unit, setup input/output interfaces.
+    //  A hardware unit may implement synaptic, dendritic
+    //  or somatic functionality, or a combination of the three. The
+    //  functionality that a derived class implements will determine the correct
+    //  input and output interfaces. The input interface is then selected based
+    //  on the first supported functional unit (synapse/dendrite/soma), whereas
+    //  the output interface is selected for the last supported functionality.
+    //  The input and output interfaces are dynamically assigned using
+    //  std::function references (similar conceptually to function pointers)
+    //
+    // This approach using std::function was chosen over other approaches e.g.,
+    //  using a templated class or a class containing templated interfaces. The
+    //  main reason for this is we require pipelines of multiple h/w units
+    //  stored in a single container. This implies each pipeline unit should be
+    //  the same type, which is not possible / very complex with a templated
+    //  approach. Additionally, using templates would require us creating a
+    //  different type for every possible combination. The std::function
+    //  approach is simpler and probably more flexible for the future e.g., if
+    //  we expand the pipeline.
+    //
+    // Note that supporting synaptic and somatic, but not dendritic operations
+    //  is an invalid combination and will raise an exception
+    TRACE1(CHIP, "Setting interfaces %d %d %d\n", implements_synapse,
+            implements_dendrite, implements_soma);
+    if (implements_synapse && implements_soma && !implements_dendrite)
+    {
+        throw std::logic_error(
+                "Invalid pipeline configuration: h/w supports synapse and soma "
+                "but not dendrite functionality. To fix this, either add this "
+                "to the core's dendrite section, or remove from either the "
+                "synapse or soma sections.");
+    }
+
     // Set input interface
     if (implements_synapse)
     {
-        process_input_fn = &PipelineUnit::process_synapse_input;
+        process_input_fn = [this](auto &&ts, auto &&n, auto &&con,
+                                   auto &&input) {
+            return this->process_synapse_input(ts, n, con, input);
+        };
     }
     else if (implements_dendrite)
     {
-        process_input_fn = &PipelineUnit::process_dendrite_input;
+        process_input_fn = [this](auto &&ts, auto &&n, auto &&con,
+                                   auto &&input) {
+            return this->process_dendrite_input(ts, n, con, input);
+        };
+    }
+    else if (implements_soma)
+    {
+        process_input_fn = [this](auto &&ts, auto &&n, auto &&con,
+                                   auto &&input) {
+            return this->process_soma_input(ts, n, con, input);
+        };
     }
     else
     {
-        process_input_fn = &PipelineUnit::process_soma_input;
+        throw std::logic_error(
+                "H/w must implement at least one functional unit out of "
+                "synapse/dendrite/soma");
     }
 
     // Set output interface
     if (implements_soma)
     {
-        process_output_fn = &PipelineUnit::process_soma_output;
+        process_output_fn = [](auto &&n, auto &&con, auto &&output) {
+            process_soma_output(n, con, output);
+        };
     }
     else if (implements_dendrite)
     {
-        process_output_fn = &PipelineUnit::process_dendrite_output;
+        process_output_fn = [](auto &&n, auto &&con, auto &&output) {
+            process_dendrite_output(n, con, output);
+        };
     }
-    else
+    else if (implements_synapse)
     {
-        process_output_fn = &PipelineUnit::process_synapse_output;
+        process_output_fn = [](auto &&n, auto &&con, auto &&output) {
+            process_synapse_output(n, con, output);
+        };
     }
+    // else the fallthrough case where nothing is implemented should have
+    //  already been handled above
+}
+
+void sanafe::PipelineUnit::check_implemented(
+        const bool check_implements_synapse,
+        const bool check_implements_dendrite,
+        const bool check_implements_soma) const
+{
+    if (check_implements_synapse != implements_synapse)
+    {
+        const std::string error = check_implements_synapse ?
+                "Unit does not support synapse functionality, remove from arch "
+                "description's 'synapse' section" :
+                "Unit supports synapse functionality but was not added to "
+                "'synapse' hardware section. Add it or pick a different model.";
+        INFO("Error: %s\n", error.c_str());
+        throw std::runtime_error(error);
+    }
+
+    if (check_implements_dendrite != implements_dendrite)
+    {
+        const std::string error = check_implements_dendrite ?
+                "Unit does not support dendrite functionality, remove from arch "
+                "description's 'dendrite' section" :
+                "Unit supports dendrite functionality but was not added to "
+                "'dendrite' hardware section. Add it or pick a different model.";
+        INFO("Error: %s\n", error.c_str());
+        throw std::runtime_error(error);
+    }
+
+    if (check_implements_soma != implements_soma)
+    {
+        const std::string error = check_implements_soma ?
+                "Unit does not support soma functionality, remove from arch "
+                "description's 'soma' section" :
+                "Unit supports soma functionality but was not added to "
+                "'soma' hardware section. Add it or pick a different model.";
+        INFO("Error: %s\n", error.c_str());
+        throw std::runtime_error(error);
+    }
+
 }
 
 void sanafe::PipelineUnit::check_outputs(
         const MappedNeuron & /*n*/, const PipelineResult &result) const
 {
-    // Check the hw returns a valid value for the next unit or network to
-    //  process
+    // Check the hw returns a valid value for the next unit to process
     if (implements_soma && result.status == INVALID_NEURON_STATE)
     {
         throw std::runtime_error("Soma output; should return valid "
-                                 "neuron state.\n");
+                                 "neuron state.");
     }
     if (!implements_soma && (implements_synapse || implements_dendrite) &&
             !result.current.has_value())
     {
         throw std::runtime_error("Synaptic or dendritic output; should return "
-                                 "synaptic/dendritic current\n");
+                                 "synaptic/dendritic current");
     }
 }
 
@@ -119,7 +215,7 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_soma_input(
 void sanafe::PipelineUnit::process_synapse_output(MappedNeuron & /*n*/,
         std::optional<MappedConnection *> con, PipelineResult &output)
 {
-    calculate_synapse_default_energy_latency(*(con.value()), output);
+    calculate_synapse_default_energy_latency(*(con.value_or(nullptr)), output);
 }
 
 void sanafe::PipelineUnit::process_dendrite_output(MappedNeuron &n,
@@ -142,7 +238,7 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
     if (!con.has_value())
     {
         throw std::runtime_error(
-                "Error: Pipeline error, didn't receive "
+                "Pipeline error, didn't receive "
                 "synaptic connection info. Check that no h/w unit is being "
                 "invoked before this one in the pipeline.");
     }
@@ -151,7 +247,6 @@ sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
 
     return output;
 }
-
 
 void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
         MappedConnection &con, PipelineResult &simulation_result)
@@ -164,14 +259,13 @@ void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
     if (energy_simulated && default_synapse_energy_metrics_set)
     {
         const std::string error(
-                "Error: Synapse unit simulates energy and also has "
+                "Synapse unit simulates energy and also has "
                 "default energy metrics set.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
     if (default_synapse_energy_metrics_set)
     {
-        simulation_result.energy =
-                con.synapse_hw->default_energy_process_spike.value();
+        simulation_result.energy = con.synapse_hw->default_energy_process_spike;
     }
 
     const bool default_synapse_latency_metrics_set =
@@ -179,10 +273,10 @@ void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
     if (latency_simulated && default_synapse_latency_metrics_set)
     {
         const std::string error(
-                "Error: Synapse unit simulates latency and also has "
+                "Synapse unit simulates latency and also has "
                 "default latency metrics set. Remove the default "
                 "metric from the architecture description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
 
     if (default_synapse_latency_metrics_set)
@@ -190,30 +284,30 @@ void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
         if (simulation_result.latency.has_value())
         {
             const std::string error(
-                    "Error: Synapse unit simulates latency and also has "
+                    "Synapse unit simulates latency and also has "
                     "default latency metrics set. Remove the default "
                     "metric from the architecture description.");
-            throw std::logic_error(error);
+            throw std::runtime_error(error);
         }
         simulation_result.latency =
-                con.synapse_hw->default_latency_process_spike.value();
+                con.synapse_hw->default_latency_process_spike;
     }
 
     if (!simulation_result.energy.has_value())
     {
         const std::string error(
-                "Error: Synapse unit does not simulate energy or provide "
+                "Synapse unit does not simulate energy or provide "
                 "a default energy cost in the architecture "
                 "description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
     if (!simulation_result.latency.has_value())
     {
         const std::string error(
-                "Error: Synapse unit does not simulate latency or "
+                "Synapse unit does not simulate latency or "
                 "provide a default latency cost in the architecture "
                 "description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
 }
 
@@ -228,13 +322,13 @@ void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
     if (energy_simulated && default_dendrite_energy_metrics_set)
     {
         const std::string error(
-                "Error: Dendrite unit simulates energy and also has "
+                "Dendrite unit simulates energy and also has "
                 "default energy metrics set.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
     if (default_dendrite_energy_metrics_set)
     {
-        simulation_result.energy = n.dendrite_hw->default_energy_update.value();
+        simulation_result.energy = n.dendrite_hw->default_energy_update;
     }
 
     const bool default_dendrite_latency_metrics_set =
@@ -242,9 +336,9 @@ void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
     if (latency_simulated && default_dendrite_latency_metrics_set)
     {
         const std::string error(
-                "Error: Dendrite unit simulates latency and also has "
-                "default energy metrics set.");
-        throw std::logic_error(error);
+                "Dendrite unit simulates latency and also has "
+                "default latency metrics set.");
+        throw std::runtime_error(error);
     }
 
     if (default_dendrite_latency_metrics_set)
@@ -252,11 +346,11 @@ void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
         if (simulation_result.latency.has_value())
         {
             const std::string error(
-                    "Error: Dendrite unit simulates energy and also has default energy metrics set.");
-            throw std::logic_error(error);
+                    "Error: Dendrite unit simulates latency and also has "
+                    "default latency metrics set.");
+            throw std::runtime_error(error);
         }
-        simulation_result.latency =
-                n.dendrite_hw->default_latency_update.value();
+        simulation_result.latency = n.dendrite_hw->default_latency_update;
     }
 
     if (!simulation_result.energy.has_value())
@@ -265,7 +359,7 @@ void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
                 "Error: Dendrite unit does not simulate energy or provide "
                 "a default energy cost in the architecture "
                 "description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
     if (!simulation_result.latency.has_value())
     {
@@ -273,7 +367,7 @@ void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
                 "Error: Dendrite unit does not simulate latency or "
                 "provide a default latency cost in the architecture "
                 "description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
 }
 
@@ -291,7 +385,7 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
                 "Error: Soma unit simulates energy and also has "
                 "default energy metrics set. Remove the default energy metrics "
                 "from the architecture description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
     if (soma_energy_metrics_set)
     {
@@ -307,7 +401,7 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
                 "Error: Soma unit simulates latency and also has "
                 "default latency costs set. Remove the default latency metrics "
                 "from the architecture description");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
     if (soma_latency_metrics_set)
     {
@@ -347,18 +441,18 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
     if (!simulation_result.energy.has_value())
     {
         const std::string error(
-                "Error: Soma unit does not simulate energy or "
+                "Soma unit does not simulate energy or "
                 "provide default energy costs in the architecture "
                 "description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
     if (!simulation_result.latency.has_value())
     {
         const std::string error(
-                "Error: Soma unit does not simulate latency or "
+                "Soma unit does not simulate latency or "
                 "provide default latency costs in the architecture "
                 "description.");
-        throw std::logic_error(error);
+        throw std::runtime_error(error);
     }
 }
 
@@ -380,7 +474,6 @@ void sanafe::PipelineUnit::update_soma_activity(
     }
 }
 
-
 void sanafe::PipelineUnit::set_attributes(
         std::string unit_name, const ModelInfo &model)
 {
@@ -390,6 +483,22 @@ void sanafe::PipelineUnit::set_attributes(
     log_energy = model.log_energy;
     log_latency = model.log_latency;
 
+    synapse_set_default_attributes();
+    dendrite_set_default_attributes();
+    soma_set_default_attributes();
+
+    // Finally, forward all attributes from the architecture description to the
+    //  model. This might be useful if you want to define any additional
+    //  model-specific attributes here, e.g., fault-rate or maximum memory size.
+    for (auto &[key, attribute] : model_attributes)
+    {
+        check_attribute(key);
+        set_attribute_hw(key, attribute);
+    }
+}
+
+void sanafe::PipelineUnit::synapse_set_default_attributes()
+{
     if (model_attributes.find("energy_process_spike") != model_attributes.end())
     {
         default_energy_process_spike =
@@ -401,6 +510,10 @@ void sanafe::PipelineUnit::set_attributes(
         default_latency_process_spike =
                 static_cast<double>(model_attributes["latency_process_spike"]);
     }
+}
+
+void sanafe::PipelineUnit::dendrite_set_default_attributes()
+{
     if (model_attributes.find("energy_update") != model_attributes.end())
     {
         default_energy_update =
@@ -411,11 +524,16 @@ void sanafe::PipelineUnit::set_attributes(
         default_latency_update =
                 static_cast<double>(model_attributes["latency_update"]);
     }
+}
 
+void sanafe::PipelineUnit::soma_set_default_attributes()
+{
+    // Lambda for finding keys later
     auto key_exists = [this](const std::string &key) {
         return model_attributes.find(key) != model_attributes.end();
     };
 
+    // Soma energy attributes
     const std::set<std::string> energy_metric_names{
             "energy_access_neuron", "energy_update_neuron", "energy_spike_out"};
     const bool parse_energy_metrics = std::any_of(
@@ -427,8 +545,8 @@ void sanafe::PipelineUnit::set_attributes(
             if (!key_exists(metric))
             {
                 const std::string error =
-                        "Error: Metric not defined: " + metric + "\n";
-                INFO("%s", error.c_str());
+                        "Metric not defined: " + metric;
+                INFO("Error: %s\n", error.c_str());
                 throw std::invalid_argument(error);
             }
         }
@@ -442,6 +560,7 @@ void sanafe::PipelineUnit::set_attributes(
         default_soma_energy_metrics = energy_metrics;
     }
 
+    // Soma latency attributes
     const std::set<std::string> latency_metric_names{"latency_access_neuron",
             "latency_update_neuron", "latency_spike_out"};
     const bool parse_latency_metrics = std::any_of(latency_metric_names.begin(),
@@ -453,8 +572,8 @@ void sanafe::PipelineUnit::set_attributes(
             if (!key_exists(metric))
             {
                 const std::string error =
-                        "Error: Missing metric: " + metric + "\n";
-                INFO("%s", error.c_str());
+                        "Missing metric: " + metric;
+                INFO("Error: %s\n", error.c_str());
                 throw std::invalid_argument(error);
             }
         }
@@ -467,17 +586,7 @@ void sanafe::PipelineUnit::set_attributes(
                 static_cast<double>(model_attributes["latency_spike_out"]);
         default_soma_latency_metrics = latency_metrics;
     }
-
-    // Finally, forward all attributes from the architecture description to the
-    //  model. This might be useful if you want to define any additional
-    //  model-specific attributes here, e.g., fault-rate or maximum memory size.
-    for (auto &[key, attribute] : model_attributes)
-    {
-        check_attribute(key);
-        set_attribute_hw(key, attribute);
-    }
 }
-
 
 sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
         const std::string &buffer_pos_str, const bool buffer_inside_unit)
