@@ -157,15 +157,16 @@ struct Scheduler
     TimingModel timing_model{TIMING_MODEL_DETAILED};
     int noc_width;
     int noc_height;
-    int buffer_size;
+    size_t buffer_size;
     size_t core_count;
     size_t max_cores_per_tile;
 };
 
 // NocInfo is used by the scheduler to track the high-level state of the NoC
 //  at a given time
-struct NocInfo
+class NocInfo
 {
+public:
     std::vector<MessageFifo> messages_received;
     const size_t noc_width_in_tiles;
     const size_t noc_height_in_tiles;
@@ -181,13 +182,20 @@ struct NocInfo
     double mean_in_flight_receive_delay{0.0};
     long int messages_in_noc{0L};
 
-    NocInfo(int width, int height, int core_count, size_t max_cores_per_tile);
+    NocInfo(const Scheduler &scheduler);
     [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
     {
         const size_t links_per_router = max_cores_per_tile + ndirections;
         return (x * noc_height_in_tiles * links_per_router) + (y * links_per_router) +
                 link;
     }
+
+    void update_message_density(const Message &message, bool entering_noc);
+    void update_rolling_averages(const Message& message, bool entering_noc);
+    double calculate_route_congestion(const Message& message) const;
+
+private:
+    static std::pair<int, int> get_route_xy_increments(const Message &m) noexcept;
 };
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
@@ -197,11 +205,14 @@ void schedule_messages_detailed(Timestep &ts, Scheduler &scheduler);
 void schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config, Scheduler &scheduler);
 
 void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
-void schedule_messages_thread(Scheduler &scheduler, const int tid);
+void schedule_messages_thread(Scheduler &scheduler, const int thread_id);
 void schedule_stop_all_threads(Scheduler &scheduler, std::ofstream &message_trace, RunData &rd);
 
+std::vector<MessageFifo> schedule_init_message_queues(Timestep &ts, NocInfo &noc);
 double schedule_messages_timestep(Timestep &ts, Scheduler &scheduler);
-void schedule_update_noc_message_counts(const Message &m, NocInfo &noc, bool message_in);
+void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
+double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
+void schedule_update_noc(const Message &m, NocInfo &noc, bool entering_noc);
 double schedule_calculate_messages_along_route(const Message &m, NocInfo &noc);
 void schedule_update_noc(double t, NocInfo &noc);
 

@@ -69,7 +69,7 @@ public:
     size_t max_cores_per_tile{0UL};
     int noc_width_in_tiles{1};
     int noc_height_in_tiles{1};
-    int noc_buffer_size{1};
+    size_t noc_buffer_size{1UL};
 
 private:
     std::unique_ptr<BookSimConfig> booksim_config{};

@@ -33,14 +33,6 @@ sanafe::Architecture::Architecture(
         , noc_height_in_tiles(noc.height_in_tiles)
         , noc_buffer_size(noc.link_buffer_size)
 {
-    if (noc_width_in_tiles <= 0)
-    {
-        throw std::invalid_argument("NoC width must be > 0 tiles");
-    }
-    if (noc_height_in_tiles <= 0)
-    {
-        throw std::invalid_argument("NoC height must be > 0 tiles");
-    }
 }
 
 std::vector<std::reference_wrapper<sanafe::CoreConfiguration>>

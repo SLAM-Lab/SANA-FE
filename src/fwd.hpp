@@ -11,7 +11,7 @@ namespace sanafe
 class SpikingChip;
 struct Timestep;
 struct RunData;
-struct NocInfo;
+class NocInfo;
 
 struct Scheduler;
 

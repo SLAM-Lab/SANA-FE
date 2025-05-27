@@ -72,9 +72,9 @@ public:
     std::string name{};
     size_t core_count{0UL};
     size_t max_cores_per_tile{0UL};
-    int noc_width_in_tiles{1};
-    int noc_height_in_tiles{1};
-    int noc_buffer_size{0};
+    size_t noc_width_in_tiles{1UL};
+    size_t noc_height_in_tiles{1UL};
+    size_t noc_buffer_size{0UL};
 
     Architecture(std::string name, const NetworkOnChipConfiguration &noc);
     [[nodiscard]] std::vector<std::reference_wrapper<CoreConfiguration>> cores();
@@ -90,9 +90,9 @@ Architecture load_arch(const std::filesystem::path &path);
 
 struct NetworkOnChipConfiguration
 {
-    int width_in_tiles{1};
-    int height_in_tiles{1};
-    int link_buffer_size{0};
+    size_t width_in_tiles{1UL};
+    size_t height_in_tiles{1UL};
+    size_t link_buffer_size{0UL};
 };
 
 struct TilePowerMetrics

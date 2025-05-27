@@ -960,6 +960,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict());
 }
+
 // NOLINTEND(readability-function-cognitive-complexity)
 // NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size)
-
