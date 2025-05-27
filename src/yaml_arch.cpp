@@ -1,16 +1,33 @@
+
+#include <cstddef>
+#include <fstream>
+#include <ios>
+#include <iosfwd>
+#include <iterator>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include <ryml.hpp> // NOLINT(misc-include-cleaner)
 #include <ryml_std.hpp> // NOLINT(misc-include-cleaner)
 
+#include "arch.hpp"
 #include "pipeline.hpp"
+#include "print.hpp"
 #include "yaml_arch.hpp"
 #include "yaml_common.hpp"
 
-void sanafe::description_parse_axon_in_section_yaml(const ryml::Parser &parser,
-        const ryml::ConstNodeRef axon_in_node, CoreConfiguration &parent_core)
+constexpr std::string_view range_delimiter = "..";
+
+void sanafe::yaml_parse_axon_in(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef axon_in_node, // NOLINT(misc-include-cleaner)
+        CoreConfiguration &parent_core, const std::string_view & /*type*/,
+        const std::string &name)
 {
-    auto name = yaml_required_field<std::string>(
-            parser, axon_in_node, "name");
-    const ryml::ConstNodeRef &attributes =
+    const ryml::ConstNodeRef &attributes = // NOLINT(misc-include-cleaner)
             axon_in_node.find_child("attributes");
     if (attributes.invalid())
     {
@@ -18,12 +35,45 @@ void sanafe::description_parse_axon_in_section_yaml(const ryml::Parser &parser,
                 "No attributes section defined", parser, axon_in_node);
     }
     const AxonInPowerMetrics in_metrics =
-            description_parse_axon_in_attributes_yaml(parser, attributes);
-    parent_core.create_axon_in(std::move(name), in_metrics);
+            yaml_parse_axon_in_attributes(parser, attributes);
+    parent_core.create_axon_in(name, in_metrics);
 }
 
-sanafe::AxonInPowerMetrics sanafe::description_parse_axon_in_attributes_yaml(
-        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
+void sanafe::yaml_parse_axon_out(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef axon_out_node, // NOLINT(misc-include-cleaner)
+        CoreConfiguration &parent_core, const std::string_view & /*type*/,
+        const std::string &name)
+{
+    const auto &attributes = axon_out_node.find_child("attributes");
+    if (attributes.invalid())
+    {
+        throw YamlDescriptionParsingError(
+                "No attributes section defined", parser, axon_out_node);
+    }
+    const AxonOutPowerMetrics out_metrics =
+            yaml_parse_axon_out_attributes(parser, attributes);
+
+    parent_core.create_axon_out(name, out_metrics);
+}
+
+// Generic helper for parsing model info attributes
+void sanafe::yaml_parse_processing_unit(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef node, // NOLINT(misc-include-cleaner)
+        CoreConfiguration &parent_core, const std::string_view &type,
+        const std::string &unit_name)
+{
+    auto model = yaml_parse_processing_unit_attributes(
+            parser, node.find_child("attributes"));
+
+    yaml_merge_or_create_hardware_unit(parent_core, unit_name, model, type);
+}
+
+// NOLINTNEXTLINE(misc-include-cleaner)
+sanafe::AxonInPowerMetrics sanafe::yaml_parse_axon_in_attributes(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
 {
     AxonInPowerMetrics axon_in_metrics;
     axon_in_metrics.energy_message_in = yaml_required_field<double>(
@@ -34,60 +84,34 @@ sanafe::AxonInPowerMetrics sanafe::description_parse_axon_in_attributes_yaml(
     return axon_in_metrics;
 }
 
-void sanafe::description_parse_synapse_section_yaml(const ryml::Parser &parser,
-        const ryml::ConstNodeRef synapse_node, CoreConfiguration &parent_core)
+sanafe::AxonOutPowerMetrics sanafe::yaml_parse_axon_out_attributes(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
 {
-    auto name = yaml_required_field<std::string>(
-            parser, synapse_node, "name");
-    auto model = description_parse_synapse_attributes_yaml(
-            parser, synapse_node.find_child("attributes"));
+    AxonOutPowerMetrics axon_out_metrics;
+    axon_out_metrics.energy_message_out = yaml_required_field<double>(
+            parser, attributes, "energy_message_out");
+    axon_out_metrics.latency_message_out = yaml_required_field<double>(
+            parser, attributes, "latency_message_out");
 
-    bool hw_exists = false;
-    for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
-    {
-        if (hw.name == name)
-        {
-            hw_exists = true;
-            hw.implements_synapse = true;
-            // Merge the attributes from all sections with the same name
-            //  and warn if the library is overwritten
-            hw.model_info.model_attributes.merge(model.model_attributes);
-            if (model.plugin_library_path.has_value())
-            {
-                if (hw.model_info.plugin_library_path.has_value() &&
-                        hw.model_info.plugin_library_path !=
-                                model.plugin_library_path)
-                {
-                    INFO("Warning: overwriting plugin path:%s\n",
-                            model.plugin_library_path.value().c_str());
-                }
-                hw.model_info.plugin_library_path = model.plugin_library_path;
-            }
-            break;
-        }
-    }
-    if (!hw_exists)
-    {
-        PipelineUnitConfiguration &synapse =
-                parent_core.create_hardware_unit(std::move(name), model);
-        synapse.implements_synapse = true;
-    }
+    return axon_out_metrics;
 }
 
-sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
-        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
+sanafe::ModelInfo sanafe::yaml_parse_processing_unit_attributes(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef &attributes) // NOLINT(misc-include-cleaner)
 {
     ModelInfo model_details;
-    model_details.name = yaml_required_field<std::string>(
-            parser, attributes, "model");
-    model_details.model_attributes =
-            description_parse_model_attributes_yaml(parser, attributes);
+    model_details.name =
+            yaml_required_field<std::string>(parser, attributes, "model");
 
+    // NOLINTNEXTLINE(misc-include-cleaner)
     const ryml::ConstNodeRef energy_node = attributes.find_child("log_energy");
     if (!energy_node.invalid())
     {
         energy_node >> model_details.log_energy;
     }
+
     const ryml::ConstNodeRef latency_node =
             attributes.find_child("log_latency");
     if (!latency_node.invalid())
@@ -95,237 +119,181 @@ sanafe::ModelInfo sanafe::description_parse_synapse_attributes_yaml(
         latency_node >> model_details.log_latency;
     }
 
+    // Handle plugin path NOLINTNEXTLINE(misc-include-cleaner)
+    const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
+    if (!plugin_path_node.invalid())
+    {
+        if (plugin_path_node.has_val())
+        {
+            std::string plugin_path;
+            plugin_path_node >> plugin_path;
+            model_details.plugin_library_path = plugin_path;
+        }
+        else
+        {
+            throw YamlDescriptionParsingError(
+                    "Expected plugin path to be string", parser,
+                    plugin_path_node);
+        }
+    }
+
+    model_details.model_attributes =
+            description_parse_model_attributes_yaml(parser, attributes);
     return model_details;
 }
 
-void sanafe::description_parse_dendrite_section_yaml(const ryml::Parser &parser,
-        const ryml::ConstNodeRef dendrite_node, CoreConfiguration &parent_core)
+void sanafe::yaml_merge_or_create_hardware_unit(CoreConfiguration &parent_core,
+        const std::string &name, ModelInfo &model_details,
+        const std::string_view &section)
 {
-    auto dendrite_name = yaml_required_field<std::string>(
-            parser, dendrite_node, "name");
-    std::pair<int, int> dendrite_range = {0, 0};
-    if (dendrite_name.find("..") != std::string::npos)
+    bool hw_exists = false;
+    for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
     {
-        dendrite_range = yaml_parse_range(dendrite_name);
-    }
+        if (hw.name == name)
+        {
+            hw_exists = true;
+            yaml_set_implements_flag(hw, section);
 
-    for (int d = dendrite_range.first; d <= dendrite_range.second; ++d)
-    {
-        std::string name(dendrite_name);
-        if (dendrite_name.find("..") != std::string::npos)
-        {
-            name = dendrite_name.substr(0, dendrite_name.find('[')) + '[' +
-                    std::to_string(d) + ']';
-        }
-        const ryml::ConstNodeRef attributes =
-                dendrite_node.find_child("attributes");
-        if (attributes.invalid())
-        {
-            throw YamlDescriptionParsingError(
-                    "No attributes section defined", parser, dendrite_node);
-        }
-
-        ModelInfo model_details;
-        const ryml::ConstNodeRef energy_node =
-                attributes.find_child("log_energy");
-        if (!energy_node.invalid())
-        {
-            energy_node >> model_details.log_energy;
-        }
-        const ryml::ConstNodeRef latency_node =
-                attributes.find_child("log_latency");
-        if (!latency_node.invalid())
-        {
-            latency_node >> model_details.log_latency;
-        }
-        model_details.name = yaml_required_field<std::string>(
-                parser, attributes, "model");
-        const ryml::ConstNodeRef plugin_path_node =
-                attributes.find_child("plugin");
-        if (!plugin_path_node.invalid())
-        {
-            if (plugin_path_node.has_val())
+            // Merge attributes and handle plugin path conflicts
+            hw.model_info.model_attributes.merge(
+                    model_details.model_attributes);
+            if (model_details.plugin_library_path.has_value())
             {
-                std::string plugin_path;
-                plugin_path_node >> plugin_path;
-                INFO("Dendrite plugin path found: %s\n", plugin_path.c_str());
-                model_details.plugin_library_path = plugin_path;
-            }
-            else
-            {
-                throw YamlDescriptionParsingError(
-                        "Expected plugin path to be string", parser,
-                        plugin_path_node);
-            }
-        }
-        model_details.model_attributes =
-                description_parse_model_attributes_yaml(parser, attributes);
-
-        bool hw_exists = false;
-        for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
-        {
-            if (hw.name == name)
-            {
-                hw_exists = true;
-                hw.implements_dendrite = true;
-                // Merge the attributes from all sections with the same name
-                //  and warn if the library is overwritten
-                hw.model_info.model_attributes.merge(
-                        model_details.model_attributes);
-                if (model_details.plugin_library_path.has_value())
+                if (hw.model_info.plugin_library_path.has_value() &&
+                        hw.model_info.plugin_library_path !=
+                                model_details.plugin_library_path)
                 {
-                    if (hw.model_info.plugin_library_path.has_value() &&
-                            hw.model_info.plugin_library_path !=
-                                    model_details.plugin_library_path)
-                    {
-                        INFO("Warning: overwriting plugin path:%s\n",
-                                model_details.plugin_library_path.value()
-                                        .c_str());
-                    }
-                    hw.model_info.plugin_library_path =
-                            model_details.plugin_library_path;
+                    INFO("Warning: overwriting plugin path:%s\n",
+                            model_details.plugin_library_path.value().c_str());
                 }
+                hw.model_info.plugin_library_path =
+                        model_details.plugin_library_path;
             }
+            break;
         }
-        if (!hw_exists)
-        {
-            PipelineUnitConfiguration &dendrite =
-                    parent_core.create_hardware_unit(
-                            std::move(name), model_details);
-            dendrite.implements_dendrite = true;
-        }
+    }
+
+    if (!hw_exists)
+    {
+        PipelineUnitConfiguration &new_unit =
+                parent_core.create_hardware_unit(name, model_details);
+        yaml_set_implements_flag(new_unit, section);
     }
 }
 
-void sanafe::description_parse_soma_section_yaml(const ryml::Parser &parser,
-        const ryml::ConstNodeRef soma_node, CoreConfiguration &parent_core)
+template <typename ParseFunc>
+void sanafe::yaml_parse_pipeline_entry(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef &unit_node, // NOLINT(misc-include-cleaner)
+        CoreConfiguration &parent_core, const std::string_view &type,
+        ParseFunc parsing_function)
 {
-    auto soma_name =
-            yaml_required_field<std::string>(parser, soma_node, "name");
-    std::pair<int, int> soma_range = {0, 0};
-    if (soma_name.find("..") != std::string::npos)
+    auto name = yaml_required_field<std::string>(parser, unit_node, "name");
+    std::pair<int, int> range = {0, 0};
+
+    if (name.find(range_delimiter) != std::string::npos)
     {
-        soma_range = yaml_parse_range(soma_name);
+        range = yaml_parse_range(name);
     }
 
-    for (int s = soma_range.first; s <= soma_range.second; ++s)
+    // Parse the same entry every time we want to create a new object.
+    //  This isn't optimum, but the number of iterations should be small and the
+    //  objects duplicated aren't expensive - so prefer simpler code
+    for (int i = range.first; i <= range.second; ++i)
     {
-        std::string name(soma_name);
-        if (soma_name.find("..") != std::string::npos)
+        // Name the hardware unit based on the given name, and append bracketed
+        //  notation based on the iteration count e.g., foo -> foo[1]
+        std::string unit_name(name);
+        if (name.find(range_delimiter) != std::string::npos)
         {
-            name = soma_name.substr(0, soma_name.find('[')) + '[' +
-                    std::to_string(s) + ']';
-        }
-        const ryml::ConstNodeRef attributes =
-                soma_node.find_child("attributes");
-        if (attributes.invalid())
-        {
-            throw YamlDescriptionParsingError(
-                    "No attributes section defined", parser, soma_node);
-        }
-        const std::string model_str;
-
-        ModelInfo model_details;
-        model_details.name = yaml_required_field<std::string>(
-                parser, attributes, "model");
-        const ryml::ConstNodeRef energy_node =
-                attributes.find_child("log_energy");
-        if (!energy_node.invalid())
-        {
-            energy_node >> model_details.log_energy;
-        }
-        const ryml::ConstNodeRef latency_node =
-                attributes.find_child("log_latency");
-        if (!latency_node.invalid())
-        {
-            latency_node >> model_details.log_latency;
-        }
-        model_details.model_attributes =
-                description_parse_model_attributes_yaml(parser, attributes);
-        const ryml::ConstNodeRef plugin_path_node =
-                attributes.find_child("plugin");
-        if (!plugin_path_node.invalid())
-        {
-            if (plugin_path_node.has_val())
-            {
-                std::string plugin_path;
-                plugin_path_node >> plugin_path;
-                INFO("Soma plugin path found: %s\n", plugin_path.c_str());
-                model_details.plugin_library_path = plugin_path;
-            }
-            else
-            {
-                throw YamlDescriptionParsingError(
-                        "Expected plugin path to be string", parser,
-                        plugin_path_node);
-            }
+            unit_name = name.substr(0, name.find('[')) + '[' +
+                    std::to_string(i) + ']';
         }
 
-        bool hw_exists = false;
-        for (PipelineUnitConfiguration &hw : parent_core.pipeline_hw)
-        {
-            if (hw.name == name)
-            {
-                hw_exists = true;
-                hw.implements_soma = true;
-                // Merge the attributes from all sections with the same name
-                //  and warn if the library is overwritten
-                hw.model_info.model_attributes.merge(
-                        model_details.model_attributes);
-                if (model_details.plugin_library_path.has_value())
-                {
-                    if (hw.model_info.plugin_library_path.has_value() &&
-                            hw.model_info.plugin_library_path !=
-                                    model_details.plugin_library_path)
-                    {
-                        INFO("Warning: overwriting plugin path:%s\n",
-                                model_details.plugin_library_path.value()
-                                        .c_str());
-                    }
-                    hw.model_info.plugin_library_path =
-                            model_details.plugin_library_path;
-                }
-                break;
-            }
-        }
-        if (!hw_exists)
-        {
-            PipelineUnitConfiguration &soma = parent_core.create_hardware_unit(
-                    std::move(name), model_details);
-            soma.implements_soma = true;
-        }
+        // Call a provided parsing function for either axons or processing units
+        parsing_function(parser, unit_node, parent_core, type, unit_name);
     }
 }
 
-void sanafe::description_parse_axon_out_section(const ryml::Parser &parser,
-        const ryml::ConstNodeRef axon_out_node, CoreConfiguration &parent_core)
+void sanafe::yaml_set_implements_flag(
+        PipelineUnitConfiguration &hw, const std::string_view &section)
 {
-    auto axon_out_name = yaml_required_field<std::string>(
-            parser, axon_out_node, "name");
-
-    const auto &attributes = axon_out_node.find_child("attributes");
-    if (attributes.invalid())
+    if (section == "synapse")
     {
-        throw YamlDescriptionParsingError(
-                "No attributes section defined", parser, axon_out_node);
+        hw.implements_synapse = true;
     }
-    AxonOutPowerMetrics power_metrics;
-    power_metrics.energy_message_out = yaml_required_field<double>(
-            parser, attributes, "energy_message_out");
-    power_metrics.latency_message_out = yaml_required_field<double>(
-            parser, attributes, "latency_message_out");
-
-    parent_core.create_axon_out(std::move(axon_out_name), power_metrics);
+    else if (section == "dendrite")
+    {
+        hw.implements_dendrite = true;
+    }
+    else if (section == "soma")
+    {
+        hw.implements_soma = true;
+    }
+    else
+    {
+        throw std::runtime_error("Section not recognized");
+    }
 }
 
-void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
-        const ryml::ConstNodeRef core_node, const size_t parent_tile_id,
-        Architecture &arch)
+void sanafe::description_parse_core_yaml(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef core_node, // NOLINT(misc-include-cleaner)
+        const size_t parent_tile_id, Architecture &arch,
+        const std::string_view &name)
+{
+    const CorePipelineConfiguration pipeline_config =
+            description_parse_core_pipeline_yaml(
+                    parser, core_node["attributes"]);
+    CoreConfiguration &core = arch.create_core(
+            std::string(name), parent_tile_id, pipeline_config);
+
+    // Define required hardware sections with their parsing functions
+    const std::vector<PipelineUnitSectionInfo> required_sections = {
+            {"axon_in", yaml_parse_axon_in},
+            // Synapse, dendrite and soma units share a common parsing routine
+            {"synapse", yaml_parse_processing_unit},
+            {"dendrite", yaml_parse_processing_unit},
+            {"soma", yaml_parse_processing_unit},
+            {"axon_out", yaml_parse_axon_out}};
+
+    for (const auto &section : required_sections)
+    {
+        const ryml::ConstNodeRef section_node =
+                core_node.find_child(std::string(section.name).c_str());
+        if (section_node.invalid())
+        {
+            const std::string error = std::string("No ") +
+                    std::string(section.name) + " section defined";
+            throw YamlDescriptionParsingError(error, parser, core_node);
+        }
+
+        if (section_node.is_seq())
+        {
+            for (const auto &item_node : section_node)
+            {
+                yaml_parse_pipeline_entry(parser, item_node, core, section.name,
+                        section.parsing_function);
+            }
+        }
+        else
+        {
+            yaml_parse_pipeline_entry(parser, section_node, core, section.name,
+                    section.parsing_function);
+        }
+    }
+}
+
+void sanafe::description_parse_core_section_yaml(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef core_node, // NOLINT(misc-include-cleaner)
+        const size_t parent_tile_id, Architecture &arch)
 {
     auto core_name =
             yaml_required_field<std::string>(parser, core_node, "name");
     std::pair<int, int> core_range = {0, 0};
-    if (core_name.find("..") != std::string::npos)
+
+    if (core_name.find(range_delimiter) != std::string::npos)
     {
         core_range = yaml_parse_range(core_name);
     }
@@ -334,123 +302,14 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
     {
         const std::string name = core_name.substr(0, core_name.find('[')) +
                 '[' + std::to_string(c) + ']';
-        const CorePipelineConfiguration pipeline_config =
-                description_parse_core_pipeline_yaml(
-                        parser, core_node["attributes"]);
-        CoreConfiguration &core = arch.create_core(
-                std::move(name), parent_tile_id, pipeline_config);
-
-        if (!core_node.find_child("axon_in").invalid())
-        {
-            const ryml::ConstNodeRef axon_in_node = core_node["axon_in"];
-            if (axon_in_node.is_seq())
-            {
-                for (const auto &axon : axon_in_node)
-                {
-                    description_parse_axon_in_section_yaml(parser, axon, core);
-                }
-            }
-            else
-            {
-                description_parse_axon_in_section_yaml(
-                        parser, axon_in_node, core);
-            }
-        }
-        else
-        {
-            const std::string error = "No axon in section defined";
-            throw YamlDescriptionParsingError(error, parser, core_node);
-        }
-
-        if (!core_node.find_child("synapse").invalid())
-        {
-            const ryml::ConstNodeRef synapses = core_node["synapse"];
-            if (synapses.is_seq())
-            {
-                for (const auto &syn : synapses)
-                {
-                    description_parse_synapse_section_yaml(parser, syn, core);
-                }
-            }
-            else
-            {
-                description_parse_synapse_section_yaml(parser, synapses, core);
-            }
-        }
-        else
-        {
-            const std::string error = "No synapse section defined";
-            throw YamlDescriptionParsingError(error, parser, core_node);
-        }
-        if (!core_node.find_child("dendrite").invalid())
-        {
-            const ryml::ConstNodeRef dendrite_node = core_node["dendrite"];
-            if (dendrite_node.is_seq())
-            {
-                for (const auto &dendrite : dendrite_node)
-                {
-                    description_parse_dendrite_section_yaml(
-                            parser, dendrite, core);
-                }
-            }
-            else
-            {
-                description_parse_dendrite_section_yaml(
-                        parser, dendrite_node, core);
-            }
-        }
-        else
-        {
-            const std::string error = "No dendrite section defined";
-            throw YamlDescriptionParsingError(error, parser, core_node);
-        }
-
-        if (!core_node.find_child("soma").invalid())
-        {
-            const ryml::ConstNodeRef soma_node = core_node["soma"];
-            if (soma_node.is_seq())
-            {
-                for (const auto &soma : soma_node)
-                {
-                    description_parse_soma_section_yaml(parser, soma, core);
-                }
-            }
-            else
-            {
-                description_parse_soma_section_yaml(parser, soma_node, core);
-            }
-        }
-        else
-        {
-            const std::string error = "No soma section defined";
-            throw YamlDescriptionParsingError(error, parser, core_node);
-        }
-
-        if (!core_node.find_child("axon_out").invalid())
-        {
-            const ryml::ConstNodeRef axon_out_node = core_node["axon_out"];
-            if (axon_out_node.is_seq())
-            {
-                for (const auto &axon : axon_out_node)
-                {
-                    description_parse_axon_out_section(parser, axon, core);
-                }
-            }
-            else
-            {
-                description_parse_axon_out_section(parser, axon_out_node, core);
-            }
-        }
-        else
-        {
-            const std::string error = "No axon out seciont defined";
-            throw YamlDescriptionParsingError(error, parser, core_node);
-        }
+        description_parse_core_yaml(
+                parser, core_node, parent_tile_id, arch, name);
     }
 }
 
 sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
-        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
 {
     CorePipelineConfiguration pipeline_config{};
 
@@ -485,29 +344,30 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
 }
 
 sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
-        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
 {
     TilePowerMetrics tile_metrics;
 
-    tile_metrics.energy_north_hop = yaml_required_field<double>(
-            parser, attributes, "energy_north_hop");
+    tile_metrics.energy_north_hop =
+            yaml_required_field<double>(parser, attributes, "energy_north_hop");
     tile_metrics.latency_north_hop = yaml_required_field<double>(
             parser, attributes, "latency_north_hop");
 
-    tile_metrics.energy_east_hop = yaml_required_field<double>(
-            parser, attributes, "energy_east_hop");
-    tile_metrics.latency_east_hop = yaml_required_field<double>(
-            parser, attributes, "latency_east_hop");
+    tile_metrics.energy_east_hop =
+            yaml_required_field<double>(parser, attributes, "energy_east_hop");
+    tile_metrics.latency_east_hop =
+            yaml_required_field<double>(parser, attributes, "latency_east_hop");
 
-    tile_metrics.energy_south_hop = yaml_required_field<double>(
-            parser, attributes, "energy_south_hop");
+    tile_metrics.energy_south_hop =
+            yaml_required_field<double>(parser, attributes, "energy_south_hop");
     tile_metrics.latency_south_hop = yaml_required_field<double>(
             parser, attributes, "latency_south_hop");
 
-    tile_metrics.energy_west_hop = yaml_required_field<double>(
-            parser, attributes, "energy_west_hop");
-    tile_metrics.latency_west_hop = yaml_required_field<double>(
-            parser, attributes, "latency_west_hop");
+    tile_metrics.energy_west_hop =
+            yaml_required_field<double>(parser, attributes, "energy_west_hop");
+    tile_metrics.latency_west_hop =
+            yaml_required_field<double>(parser, attributes, "latency_west_hop");
 
     if (!attributes.find_child("log_energy").invalid())
     {
@@ -523,14 +383,16 @@ sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
     return tile_metrics;
 }
 
-void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
-        const ryml::ConstNodeRef tile_node, Architecture &arch)
+void sanafe::description_parse_tile_section_yaml(
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef tile_node, // NOLINT(misc-include-cleaner)
+        Architecture &arch)
 {
     std::string tile_name;
     tile_node["name"] >> tile_name;
     std::pair<int, int> range = {0, 0};
 
-    if (tile_name.find("..") != std::string::npos)
+    if (tile_name.find(range_delimiter) != std::string::npos)
     {
         range = yaml_parse_range(tile_name);
     }
@@ -544,7 +406,7 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
                         parser, tile_node["attributes"]);
 
         const TileConfiguration &new_tile =
-                arch.create_tile(std::move(name), power_metrics);
+                arch.create_tile(name, power_metrics);
 
         if (tile_node.find_child("core").invalid())
         {
@@ -570,7 +432,8 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
 
 sanafe::NetworkOnChipConfiguration
 sanafe::description_parse_noc_configuration_yaml(
-        const ryml::Parser &parser, const ryml::ConstNodeRef noc_attributes)
+        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
+        const ryml::ConstNodeRef noc_attributes) // NOLINT(misc-include-cleaner)
 {
     NetworkOnChipConfiguration noc;
     noc.width_in_tiles =
@@ -648,12 +511,14 @@ sanafe::Architecture sanafe::description_parse_arch_file_yaml(std::ifstream &fp)
             std::istreambuf_iterator<char>());
     fp.close();
 
+    // NOLINTBEGIN(misc-include-cleaner)
     ryml::EventHandlerTree event_handler = {};
     // Enable location tracking for helpful error prints
     ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
     INFO("Loading YAML information from file.\n");
     ryml::Tree top_level_yaml =
             ryml::parse_in_place(&parser, file_content.data());
+    // NOLINTEND(misc-include-cleaner)
     INFO("YAML information loaded from file.\n");
 
     if (top_level_yaml["architecture"].invalid())
