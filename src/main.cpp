@@ -40,9 +40,7 @@ struct OptionalProgramFlags
     bool use_netlist_format{false};
     int total_args_parsed{0};
     int total_threads_available{1}; // NOLINT(misc-const-correctness)
-#ifdef HAVE_OPENMP
     int processing_threads{1};
-#endif
     int scheduler_threads{0};
     // Select the timing model on the command line. The default is the
     //  detailed build-in timing model (using a scheduler). Select only one of
@@ -155,13 +153,14 @@ int parse_flag(const std::vector<std::string_view> args,
         args_consumed = 2;
 #ifndef HAVE_OPENMP
         INFO("Warning: multiple threads not supported; flag ignored");
+        INFO("Processing threads:%d (default)\n", flags.processing_threads);
         get_next_arg(
                 args, current_idx); // consume the argument even if we ignore it
 #else
-        processing_threads =
-                std::min(total_threads_available, std::stoi(get_next_arg()));
-        INFO("Setting processing threads to %d\n", processing_threads);
-        omp_set_num_threads(processing_threads);
+        flags.processing_threads = std::min(flags.total_threads_available,
+                std::stoi(std::string(get_next_arg(args, current_idx))));
+        INFO("Setting processing threads to %d\n", flags.processing_threads);
+        omp_set_num_threads(flags.processing_threads);
 #endif
         break;
     case 'S':

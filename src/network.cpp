@@ -207,7 +207,7 @@ sanafe::SpikingNetwork sanafe::load_net(const std::filesystem::path &path,
     else
     {
         INFO("Loading network from YAML file: %s\n", path.c_str());
-        net = description_parse_network_file_yaml(network_fp, arch);
+        net = yaml_parse_network_file(network_fp, arch);
     }
     network_fp.close();
 
@@ -648,7 +648,7 @@ void sanafe::SpikingNetwork::save_mappings_to_netlist(std::ofstream &out,
 void sanafe::SpikingNetwork::save_yaml(const std::filesystem::path &path) const
 {
     description_write_network_yaml(path, *this);
-    description_write_mappings_yaml(path, *this);
+    yaml_write_mappings_file(path, *this);
 }
 
 void sanafe::SpikingNetwork::save(

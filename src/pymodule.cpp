@@ -526,7 +526,7 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
 }
 
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-        std::string timing_model_str, int /*nthreads*/)
+        std::string timing_model_str, const int nthreads)
 {
     sanafe::TimingModel timing_model{sanafe::TIMING_MODEL_DETAILED};
     if (timing_model_str == "simple")
@@ -551,6 +551,11 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     if (nthreads > 0)
     {
         omp_set_num_threads(nthreads);
+    }
+#else
+    if (nthreads > 1)
+    {
+        INFO("Warning: OpenMP disabled, no multithreaded support\n");
     }
 #endif
 
