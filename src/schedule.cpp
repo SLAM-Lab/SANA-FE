@@ -29,8 +29,8 @@
 #include "schedule.hpp"
 
 sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
-        : noc_width_in_tiles(scheduler.noc_width)
-        , noc_height_in_tiles(scheduler.noc_height)
+        : noc_width_in_tiles(scheduler.noc_width_in_tiles)
+        , noc_height_in_tiles(scheduler.noc_height_in_tiles)
         , core_count(scheduler.core_count)
         , max_cores_per_tile(scheduler.max_cores_per_tile)
 {
@@ -275,31 +275,33 @@ void sanafe::schedule_messages_cycle_accurate(
         {
             if (message.mid == placeholder_mid)
             {
-                const std::pair<std::string, int> src_neuron =
+                std::pair<std::string, int> src_neuron =
                         std::make_pair(message.src_neuron_group_id,
                                 static_cast<int>(message.src_neuron_id));
-                const std::pair<int, int> src_hw =
+                std::pair<int, int> src_hw =
                         std::make_pair(static_cast<int>(message.src_tile_id),
                                 static_cast<int>(message.src_core_offset));
 
                 booksim_create_processing_event(
-                        static_cast<int>(message.timestep), src_neuron, src_hw,
+                        static_cast<int>(message.timestep),
+                        std::move(src_neuron), std::move(src_hw),
                         message.generation_delay);
             }
             else
             {
-                const std::pair<std::string, int> src_neuron =
+                std::pair<std::string, int> src_neuron =
                         std::make_pair(message.src_neuron_group_id,
                                 static_cast<int>(message.src_neuron_id));
-                const std::pair<int, int> src_hw =
+                std::pair<int, int> src_hw =
                         std::make_pair(static_cast<int>(message.src_tile_id),
                                 static_cast<int>(message.src_core_offset));
-                const std::pair<int, int> dest_hw =
+                std::pair<int, int> dest_hw =
                         std::make_pair(static_cast<int>(message.dest_tile_id),
                                 static_cast<int>(message.dest_core_offset));
 
                 booksim_create_spike_event(static_cast<int>(message.timestep),
-                        src_neuron, src_hw, dest_hw, message.generation_delay,
+                        std::move(src_neuron), std::move(src_hw),
+                        std::move(dest_hw), message.generation_delay,
                         message.receive_delay);
             }
         }
@@ -468,9 +470,12 @@ double sanafe::schedule_push_next_message(
     next_message.sent_timestamp =
             current_message.sent_timestamp + next_message.generation_delay;
     priority.push(next_message);
+
+    // Record the latest timestamp before deleting the copy of the message
+    const double last_timestamp = next_message.sent_timestamp;
     q.pop_front();
 
-    return next_message.sent_timestamp;
+    return last_timestamp;
 }
 
 double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)

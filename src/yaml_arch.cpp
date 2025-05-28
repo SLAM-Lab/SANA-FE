@@ -13,7 +13,6 @@
 #include <c4/yml/event_handler_tree.hpp>
 #include <c4/yml/fwd.hpp>
 #include <c4/yml/node.hpp>
-#include <c4/yml/node_type.hpp>
 #include <c4/yml/parse.hpp>
 #include <c4/yml/tree.hpp>
 #include <ryml.hpp> // NOLINT(misc-include-cleaner)
@@ -395,14 +394,14 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
 
     for (int t = range.first; t <= range.second; t++)
     {
-        const std::string name = tile_name.substr(0, tile_name.find('[')) +
+        std::string name = tile_name.substr(0, tile_name.find('[')) +
                 "[" + std::to_string(t) + "]";
         const TilePowerMetrics power_metrics =
                 description_parse_tile_metrics_yaml(
                         parser, tile_node["attributes"]);
 
         const TileConfiguration &new_tile =
-                arch.create_tile(name, power_metrics);
+                arch.create_tile(std::move(name), power_metrics);
 
         if (tile_node.find_child("core").invalid())
         {

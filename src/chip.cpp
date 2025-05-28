@@ -370,8 +370,8 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     rd.timesteps_executed += timesteps;
 
     Scheduler scheduler;
-    scheduler.noc_width = noc_width_in_tiles;
-    scheduler.noc_height = noc_height_in_tiles;
+    scheduler.noc_width_in_tiles = noc_width_in_tiles;
+    scheduler.noc_height_in_tiles = noc_height_in_tiles;
     scheduler.buffer_size = noc_buffer_size;
     scheduler.core_count = core_count;
     scheduler.max_cores_per_tile = max_cores_per_tile;
@@ -1074,8 +1074,8 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
     {
         axon_in_energy = static_cast<double>(axon.spike_messages_in) *
                 axon.energy_spike_message;
-        TRACE1(CHIP, "spikes in: %ld, energy:%e\n",
-                axon.spike_messages_in, axon.energy_spike_message);
+        TRACE1(CHIP, "spikes in: %ld, energy:%e\n", axon.spike_messages_in,
+                axon.energy_spike_message);
     }
     ts.network_energy += axon_in_energy;
     ts.network_energy += axon_out_energy;
@@ -1105,8 +1105,8 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
     for (const auto &axon : core.axon_out_hw)
     {
         axon_out_energy = axon.energy;
-        TRACE1(CHIP, "packets: %ld, energy per packet:%e\n",
-                axon.packets_out, axon.energy_access);
+        TRACE1(CHIP, "packets: %ld, energy per packet:%e\n", axon.packets_out,
+                axon.energy_access);
     }
 
     core.energy = axon_in_energy;
@@ -1197,8 +1197,7 @@ void sanafe::SpikingChip::sim_print_axon_summary() const noexcept
             {
                 TRACE2(CHIP, "\tnid:%s.%zu ", n.parent_group_name.c_str(),
                         n.id);
-                TRACE2(CHIP, "i:%d o:%d\n", n.maps_in_count,
-                        n.maps_out_count);
+                TRACE2(CHIP, "i:%d o:%d\n", n.maps_in_count, n.maps_out_count);
             }
 #endif
             if (!core.neurons.empty())

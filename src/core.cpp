@@ -42,28 +42,9 @@ sanafe::Core::Core(const CoreConfiguration &config)
     timestep_buffer.resize(pipeline_config.max_neurons_supported);
 }
 
-void sanafe::Core::map_neuron(
-        const Neuron &neuron_to_map, const size_t neuron_id)
+sanafe::PipelineUnit *sanafe::Core::map_neuron_to_dendrite(
+        const Neuron &neuron_to_map)
 {
-    TRACE1(CHIP, "Mapping nid:%s.%zu to core: %zu\n",
-            neuron_to_map.parent_group_name.c_str(), neuron_to_map.offset, id);
-
-    if (neurons.size() >= pipeline_config.max_neurons_supported)
-    {
-        INFO("Error: Exceeded maximum neurons per core (%zu)",
-                pipeline_config.max_neurons_supported);
-        throw std::runtime_error("Error: Exceeded maximum neurons per core.");
-    }
-
-    // Map neuron model to dendrite and soma hardware units in this core.
-    //  Search through all models implemented by this core and return the
-    //  one that matches. If no dendrite / soma hardware is specified,
-    //  default to the first one defined
-    if (pipeline_hw.empty())
-    {
-        INFO("Error: No pipeline units defined for cid:%zu\n", id);
-        throw std::runtime_error("Error: No units defined");
-    }
     PipelineUnit *mapped_dendrite{nullptr};
 
     const bool choose_first_dendrite_by_default =
@@ -88,6 +69,12 @@ void sanafe::Core::map_neuron(
         throw std::runtime_error("Error: Could not map neuron to dendrite h/w");
     }
 
+    return mapped_dendrite;
+}
+
+sanafe::PipelineUnit *sanafe::Core::map_neuron_to_soma(
+        const Neuron &neuron_to_map)
+{
     PipelineUnit *mapped_soma{nullptr};
     const bool choose_first_soma_by_default =
             (neuron_to_map.soma_hw_name.empty());
@@ -111,6 +98,34 @@ void sanafe::Core::map_neuron(
         throw std::runtime_error("Error: Could not map neuron to soma h/w");
     }
     mapped_soma->neuron_count++;
+
+    return mapped_soma;
+}
+
+void sanafe::Core::map_neuron(
+        const Neuron &neuron_to_map, const size_t neuron_id)
+{
+    TRACE1(CHIP, "Mapping nid:%s.%zu to core: %zu\n",
+            neuron_to_map.parent_group_name.c_str(), neuron_to_map.offset, id);
+
+    if (neurons.size() >= pipeline_config.max_neurons_supported)
+    {
+        INFO("Error: Exceeded maximum neurons per core (%zu)",
+                pipeline_config.max_neurons_supported);
+        throw std::runtime_error("Error: Exceeded maximum neurons per core.");
+    }
+
+    // Map neuron model to dendrite and soma hardware units in this core.
+    //  Search through all models implemented by this core and return the
+    //  one that matches. If no dendrite / soma hardware is specified,
+    //  default to the first one defined
+    if (pipeline_hw.empty())
+    {
+        INFO("Error: No pipeline units defined for cid:%zu\n", id);
+        throw std::runtime_error("Error: No units defined");
+    }
+    PipelineUnit *mapped_dendrite = map_neuron_to_dendrite(neuron_to_map);
+    PipelineUnit *mapped_soma = map_neuron_to_soma(neuron_to_map);
 
     if (axon_out_hw.empty())
     {

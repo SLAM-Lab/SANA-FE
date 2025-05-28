@@ -67,8 +67,8 @@ public:
 
     size_t core_count{0UL};
     size_t max_cores_per_tile{0UL};
-    int noc_width_in_tiles{1};
-    int noc_height_in_tiles{1};
+    size_t noc_width_in_tiles{1UL};
+    size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{1UL};
 
 private:

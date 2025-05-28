@@ -316,7 +316,7 @@ sanafe::netlist_parse_attribute_value(std::string value_str)
     }
 
     TRACE1(DESCRIPTION, "Parsed string: %s\n", value_str.c_str());
-    return std::string(value_str);
+    return std::move(value_str);
 }
 
 char sanafe::netlist_get_closing_char(const char opening_char)

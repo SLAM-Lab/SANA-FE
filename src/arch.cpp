@@ -24,7 +24,6 @@
 #include "arch.hpp"
 #include "print.hpp"
 #include "yaml_arch.hpp"
-#include "yaml_common.hpp"
 
 sanafe::Architecture::Architecture(
         std::string name, const NetworkOnChipConfiguration &noc)

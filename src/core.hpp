@@ -99,6 +99,10 @@ public:
     [[nodiscard]] int get_id() const { return id; }
     [[nodiscard]] int get_offset() const { return offset; }
     [[nodiscard]] std::string info() const noexcept;
+
+private:
+    PipelineUnit *map_neuron_to_dendrite(const Neuron &neuron_to_map);
+    PipelineUnit *map_neuron_to_soma(const Neuron &neuron_to_map);
 };
 
 }

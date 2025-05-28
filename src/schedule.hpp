@@ -155,8 +155,8 @@ struct Scheduler
     ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, TimestepComparator> timesteps_to_write{};
 
     TimingModel timing_model{TIMING_MODEL_DETAILED};
-    int noc_width;
-    int noc_height;
+    size_t noc_width_in_tiles;
+    size_t noc_height_in_tiles;
     size_t buffer_size;
     size_t core_count;
     size_t max_cores_per_tile;
