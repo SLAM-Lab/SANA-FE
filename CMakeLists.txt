@@ -128,10 +128,8 @@ else()
 endif()
 
 ############## rapid-yaml
-cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 project(ryml-quickstart LANGUAGES CXX)
-
-set(RYML_VERSION "v0.8.0")
+set(RYML_VERSION "v0.9.0")
 message(STATUS "FetchContent for tag: ${RYML_VERSION}")
 
 include(FetchContent)

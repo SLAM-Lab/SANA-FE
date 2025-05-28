@@ -9,7 +9,8 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 
 Simulating Advanced Neuromorphic Architectures for Fast Exploration (SANA-FE)
 
-A framework to model energy and performance of neuromorphic hardware.
+A framework for modeling the energy usage and performance of different
+neuromorphic hardware.
 
 # Citation
 
