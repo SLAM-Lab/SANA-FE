@@ -63,56 +63,6 @@ void sanafe::check_key(const ryml::Parser &parser,
     }
 }
 
-template <typename T>
-T sanafe::yaml_required_field(const ryml::Parser &parser,
-        const ryml::ConstNodeRef node, const std::string &key)
-{
-    // Wrapper around YAML library for field=map[key], adding more error prints
-    if (node.invalid())
-    {
-        const std::string message = "Invalid node when looking up key: " + key;
-        throw std::runtime_error(message);
-    }
-    const ryml::ConstNodeRef field_node = node.find_child(key.c_str());
-    if (field_node.invalid())
-    {
-        const std::string message = "Key '" + key + "' does not exist";
-        throw YamlDescriptionParsingError(message, parser, node);
-    }
-    if (!field_node.has_val())
-    {
-        const std::string message = "'" + key + "' value should be a scalar";
-        throw YamlDescriptionParsingError(message, parser, field_node);
-    }
-
-    T field{};
-    // Efficiently convert to type T by trying the RapidYAML reader.
-    //  If read() fails, it returns false and execution falls through
-    if (c4::yml::read(field_node, &field))
-    {
-        return field; // type T
-    }
-
-    const std::string message = "Could not cast field '" + key +
-            "' to type: " + yaml_get_type_string(typeid(field));
-    throw YamlDescriptionParsingError(message, parser, field_node);
-}
-
-// Template instantiations. The alternative is to have the implemented function
-//  in the header file, but I prefer it this way, as the instantiations should
-//  be limited to a few basic types
-template bool sanafe::yaml_required_field<bool>(
-        const ryml::Parser &parser, ryml::ConstNodeRef node,
-        const std::string &key);
-template int sanafe::yaml_required_field<int>(const ryml::Parser &parser,
-        ryml::ConstNodeRef node, const std::string &key);
-template double sanafe::yaml_required_field<double>(
-        const ryml::Parser &parser, ryml::ConstNodeRef node,
-        const std::string &key);
-template std::string sanafe::yaml_required_field<std::string>(
-        const ryml::Parser &parser, ryml::ConstNodeRef node,
-        const std::string &key);
-
 std::string sanafe::yaml_get_type_string(const std::type_info &type)
 {
     if (type == typeid(bool))

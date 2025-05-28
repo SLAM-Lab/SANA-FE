@@ -10,6 +10,12 @@
 #include <utility>
 #include <vector>
 
+#include <c4/yml/event_handler_tree.hpp>
+#include <c4/yml/fwd.hpp>
+#include <c4/yml/node.hpp>
+#include <c4/yml/node_type.hpp>
+#include <c4/yml/parse.hpp>
+#include <c4/yml/tree.hpp>
 #include <ryml.hpp> // NOLINT(misc-include-cleaner)
 #include <ryml_std.hpp> // NOLINT(misc-include-cleaner)
 
@@ -21,13 +27,11 @@
 
 constexpr std::string_view range_delimiter = "..";
 
-void sanafe::yaml_parse_axon_in(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef axon_in_node, // NOLINT(misc-include-cleaner)
-        CoreConfiguration &parent_core, const std::string_view & /*type*/,
-        const std::string &name)
+void sanafe::yaml_parse_axon_in(const ryml::Parser &parser,
+        const ryml::ConstNodeRef axon_in_node, CoreConfiguration &parent_core,
+        const std::string_view & /*type*/, const std::string &name)
 {
-    const ryml::ConstNodeRef &attributes = // NOLINT(misc-include-cleaner)
+    const ryml::ConstNodeRef &attributes =
             axon_in_node.find_child("attributes");
     if (attributes.invalid())
     {
@@ -39,11 +43,9 @@ void sanafe::yaml_parse_axon_in(
     parent_core.create_axon_in(name, in_metrics);
 }
 
-void sanafe::yaml_parse_axon_out(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef axon_out_node, // NOLINT(misc-include-cleaner)
-        CoreConfiguration &parent_core, const std::string_view & /*type*/,
-        const std::string &name)
+void sanafe::yaml_parse_axon_out(const ryml::Parser &parser,
+        const ryml::ConstNodeRef axon_out_node, CoreConfiguration &parent_core,
+        const std::string_view & /*type*/, const std::string &name)
 {
     const auto &attributes = axon_out_node.find_child("attributes");
     if (attributes.invalid())
@@ -58,11 +60,9 @@ void sanafe::yaml_parse_axon_out(
 }
 
 // Generic helper for parsing model info attributes
-void sanafe::yaml_parse_processing_unit(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef node, // NOLINT(misc-include-cleaner)
-        CoreConfiguration &parent_core, const std::string_view &type,
-        const std::string &unit_name)
+void sanafe::yaml_parse_processing_unit(const ryml::Parser &parser,
+        const ryml::ConstNodeRef node, CoreConfiguration &parent_core,
+        const std::string_view &type, const std::string &unit_name)
 {
     auto model = yaml_parse_processing_unit_attributes(
             parser, node.find_child("attributes"));
@@ -72,8 +72,7 @@ void sanafe::yaml_parse_processing_unit(
 
 // NOLINTNEXTLINE(misc-include-cleaner)
 sanafe::AxonInPowerMetrics sanafe::yaml_parse_axon_in_attributes(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
+        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
     AxonInPowerMetrics axon_in_metrics;
     axon_in_metrics.energy_message_in = yaml_required_field<double>(
@@ -85,8 +84,7 @@ sanafe::AxonInPowerMetrics sanafe::yaml_parse_axon_in_attributes(
 }
 
 sanafe::AxonOutPowerMetrics sanafe::yaml_parse_axon_out_attributes(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
+        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
     AxonOutPowerMetrics axon_out_metrics;
     axon_out_metrics.energy_message_out = yaml_required_field<double>(
@@ -98,8 +96,7 @@ sanafe::AxonOutPowerMetrics sanafe::yaml_parse_axon_out_attributes(
 }
 
 sanafe::ModelInfo sanafe::yaml_parse_processing_unit_attributes(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef &attributes) // NOLINT(misc-include-cleaner)
+        const ryml::Parser &parser, const ryml::ConstNodeRef &attributes)
 {
     ModelInfo model_details;
     model_details.name =
@@ -182,27 +179,25 @@ void sanafe::yaml_merge_or_create_hardware_unit(CoreConfiguration &parent_core,
 }
 
 template <typename ParseFunc>
-void sanafe::yaml_parse_pipeline_entry(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef &unit_node, // NOLINT(misc-include-cleaner)
-        CoreConfiguration &parent_core, const std::string_view &type,
-        ParseFunc parsing_function)
+void sanafe::yaml_parse_pipeline_entry(const ryml::Parser &parser,
+        const ryml::ConstNodeRef &unit_node, CoreConfiguration &parent_core,
+        const std::string_view &type, ParseFunc parsing_function)
 {
     auto name = yaml_required_field<std::string>(parser, unit_node, "name");
     std::pair<int, int> range = {0, 0};
 
+    // Check if name contains range notation (e.g., "foo[0..3]")
     if (name.find(range_delimiter) != std::string::npos)
     {
         range = yaml_parse_range(name);
     }
 
-    // Parse the same entry every time we want to create a new object.
-    //  This isn't optimum, but the number of iterations should be small and the
-    //  objects duplicated aren't expensive - so prefer simpler code
+    // Parse the same entry for each unit in the range
+    // Note: We re-parse the YAML node for each iteration rather than
+    // copying objects for simplicity, as the iteration count is typically small
     for (int i = range.first; i <= range.second; ++i)
     {
-        // Name the hardware unit based on the given name, and append bracketed
-        //  notation based on the iteration count e.g., foo -> foo[1]
+        // Generate unique name for each unit in the range
         std::string unit_name(name);
         if (name.find(range_delimiter) != std::string::npos)
         {
@@ -210,7 +205,7 @@ void sanafe::yaml_parse_pipeline_entry(
                     std::to_string(i) + ']';
         }
 
-        // Call a provided parsing function for either axons or processing units
+        // Delegate to the appropriate parsing function
         parsing_function(parser, unit_node, parent_core, type, unit_name);
     }
 }
@@ -218,6 +213,11 @@ void sanafe::yaml_parse_pipeline_entry(
 void sanafe::yaml_set_implements_flag(
         PipelineUnitConfiguration &hw, const std::string_view &section)
 {
+    // Sets the appropriate implementation flag based on the section type
+    //  This determines which type of processing unit (synapse/dendrite/soma) is
+    //  being configured. Note that a hardware unit can configured to implement
+    //  multiple units' functionality, in which case we would see the same unit
+    //  defined in multiple YAML sections
     if (section == "synapse")
     {
         hw.implements_synapse = true;
@@ -236,12 +236,13 @@ void sanafe::yaml_set_implements_flag(
     }
 }
 
-void sanafe::description_parse_core_yaml(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef core_node, // NOLINT(misc-include-cleaner)
-        const size_t parent_tile_id, Architecture &arch,
-        const std::string_view &name)
+void sanafe::description_parse_core_yaml(const ryml::Parser &parser,
+        const ryml::ConstNodeRef core_node, const size_t parent_tile_id,
+        Architecture &arch, const std::string_view &name)
 {
+    // Parses a complete core configuration from YAML
+    //  A core contains multiple types of pipeline units (axon_in, synapse,
+    //  dendrite, soma, axon_out)
     const CorePipelineConfiguration pipeline_config =
             description_parse_core_pipeline_yaml(
                     parser, core_node["attributes"]);
@@ -284,10 +285,9 @@ void sanafe::description_parse_core_yaml(
     }
 }
 
-void sanafe::description_parse_core_section_yaml(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef core_node, // NOLINT(misc-include-cleaner)
-        const size_t parent_tile_id, Architecture &arch)
+void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
+        const ryml::ConstNodeRef core_node, const size_t parent_tile_id,
+        Architecture &arch)
 {
     auto core_name =
             yaml_required_field<std::string>(parser, core_node, "name");
@@ -308,8 +308,7 @@ void sanafe::description_parse_core_section_yaml(
 }
 
 sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
+        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
     CorePipelineConfiguration pipeline_config{};
 
@@ -344,8 +343,7 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
 }
 
 sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef attributes) // NOLINT(misc-include-cleaner)
+        const ryml::Parser &parser, const ryml::ConstNodeRef attributes)
 {
     TilePowerMetrics tile_metrics;
 
@@ -383,10 +381,8 @@ sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
     return tile_metrics;
 }
 
-void sanafe::description_parse_tile_section_yaml(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef tile_node, // NOLINT(misc-include-cleaner)
-        Architecture &arch)
+void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
+        const ryml::ConstNodeRef tile_node, Architecture &arch)
 {
     std::string tile_name;
     tile_node["name"] >> tile_name;
@@ -432,8 +428,7 @@ void sanafe::description_parse_tile_section_yaml(
 
 sanafe::NetworkOnChipConfiguration
 sanafe::description_parse_noc_configuration_yaml(
-        const ryml::Parser &parser, // NOLINT(misc-include-cleaner)
-        const ryml::ConstNodeRef noc_attributes) // NOLINT(misc-include-cleaner)
+        const ryml::Parser &parser, const ryml::ConstNodeRef noc_attributes)
 {
     NetworkOnChipConfiguration noc;
     noc.width_in_tiles =

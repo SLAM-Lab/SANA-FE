@@ -489,8 +489,8 @@ void sanafe::NeuronGroup::conv2d_create_and_configure_connection(Neuron &source,
     {
         if (attribute_list.size() <= static_cast<size_t>(filter_idx))
         {
-            INFO("Error: Not enough entries defined for attribute: %s\n",
-                    key.c_str());
+            INFO("Error: Not enough entries defined for attribute (%zu): %s\n",
+                    attribute_list.size(), key.c_str());
             throw std::invalid_argument(
                     "Not enough entries defined for attribute");
         }
@@ -647,7 +647,7 @@ void sanafe::SpikingNetwork::save_mappings_to_netlist(std::ofstream &out,
 
 void sanafe::SpikingNetwork::save_yaml(const std::filesystem::path &path) const
 {
-    description_write_network_yaml(path, *this);
+    yaml_write_network(path, *this);
     yaml_write_mappings_file(path, *this);
 }
 

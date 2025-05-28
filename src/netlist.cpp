@@ -53,10 +53,10 @@ sanafe::SpikingNetwork sanafe::netlist_parse_file(
         TRACE1(DESCRIPTION, "%ld fields.\n", fields.size());
 
 #if (DEBUG_LEVEL_DESCRIPTION > 0)
-    for (auto &f : fields)
-    {
-        std::cout << "\tField:" << std::string(f) << "\n";
-    }
+        for (auto &f : fields)
+        {
+            std::cout << "\tField:" << std::string(f) << "\n";
+        }
 #endif
         if (!fields.empty())
         {
@@ -321,7 +321,7 @@ sanafe::netlist_parse_attribute_value(std::string value_str)
 
 char sanafe::netlist_get_closing_char(const char opening_char)
 {
-    switch(opening_char)
+    switch (opening_char)
     {
     case '[':
         return ']';
@@ -828,12 +828,12 @@ std::string sanafe::netlist_attributes_to_netlist(
     {
         TRACE2(DESCRIPTION, "Parsing nested attributes\n");
         ryml::Tree tree; // NOLINT(misc-include-cleaner)
-        ryml::NodeRef root = tree.rootref();  // NOLINT(misc-include-cleaner)
+        ryml::NodeRef root = tree.rootref(); // NOLINT(misc-include-cleaner)
         root |= ryml::MAP; // NOLINT(misc-include-cleaner)
         root |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
 
-        description_serialize_model_attributes_to_yaml(
-                root, model_attributes, default_attributes);
+        yaml_serialize_model_attributes(
+                default_attributes, root, model_attributes);
         std::ostringstream ss;
         ss << tree;
         attribute_str = " " + ss.str();
