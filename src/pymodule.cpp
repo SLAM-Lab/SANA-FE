@@ -19,6 +19,9 @@
 #include <pybind11/detail/common.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
+// clang-tidy tries to remove these... not sure why, but it'll break if it does
+#include <pybind11/stl.h> // NOLINT(misc-include-cleaner)
+#include <pybind11/stl/filesystem.h> // NOLINT(misc-include-cleaner)
 
 #ifdef HAVE_OPENMP
 #include <omp.h>
