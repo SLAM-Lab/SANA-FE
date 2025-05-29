@@ -4,4 +4,4 @@ include src/*.hpp
 include plugins/CMakeLists.txt
 include plugins/*.cpp
 include plugins/*.hpp
-__init__.py
+include __init__.py

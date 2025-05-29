@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
+include(CMakePrintHelpers)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -172,11 +173,18 @@ endif()
 
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-include(CMakePrintHelpers)
 cmake_print_variables(PyBind11_DIR)
 
 # PyBind specific
 if(PYTHON_BUILD_ENABLED)
+    if(PYTHON_FROM_SETUP)
+        # Force pybind11 to use the Python from setup.py
+        set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
+        set(Python_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
+        set(PYBIND11_PYTHON_VERSION "") # Don't let pybind11 override
+        message(STATUS "Forcing pybind11 to use Python: ${PYTHON_EXECUTABLE}")
+    endif()
+
     find_package(pybind11 CONFIG)
     if (NOT PYTHON_EXECUTABLE)
         message("PYTHON_EXECUTABLE not set, default command: 'python3'")
