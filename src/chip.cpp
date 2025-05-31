@@ -164,14 +164,14 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         }
     }
     INFO("Total neurons to map: %zu\n", neurons_in_mapped_order.size());
-
     std::sort(neurons_in_mapped_order.begin(), neurons_in_mapped_order.end(),
             [](const Neuron &a, const Neuron &b) {
                 return a.mapping_order < b.mapping_order;
             });
 
     auto list_of_cores = cores();
-    // Map all neurons in order
+    // Map all neurons in a given order, which may be non-obvious (e.g., if the
+    //  user gives a specific nontrivial mapping ordering)
     for (const Neuron &neuron : neurons_in_mapped_order)
     {
         if (!neuron.core_address.has_value())
@@ -189,16 +189,52 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         ++total_neurons_mapped;
     }
 
-    // Now that we mapped all neurons, index them using their group and neuron
-    //  IDs so that we can easily connect neurons to each other later.
-    //  Note we don't do this in the loop above because the vector will be
-    //   changing sizes dynamically as we map.
+    // Link mapped neurons to their neuron addresses (group.offset), making it
+    //  possible to connect mapped neurons easily later
+    track_mapped_neurons();
+}
+
+void sanafe::SpikingChip::track_mapped_neurons()
+{
+    // Create a structure tracking each neuron address against the corresponding
+    //  mapped neuron, object
+    auto list_of_cores = cores();
+
+    //  Push neurons first in their mapped order, causing this vector to
+    //  initially be out of order i.e., with vector idx != correct offset.
+    //  As a second pass we sort the vectors by offset order. Note we can't
+    //  populate this vector earlier when we map neurons, because the core's
+    //  neuron vector is dynamically populated. As the vector grows, previous
+    //  references would be invalidated. Also, as we use reference_wrappers
+    //  instead of pointers, we can't simply resize() the vector at the
+    //  beginning and fill them as we go
     for (Core &core : list_of_cores)
     {
         for (MappedNeuron &mapped_neuron : core.neurons)
         {
             mapped_neuron_groups[mapped_neuron.parent_group_name]
-                                [mapped_neuron.offset] = mapped_neuron;
+                                .emplace_back(std::ref(mapped_neuron));
+        }
+    }
+
+    // Now for every neuron group, sort by offset so that we should get the
+    //  vector in offset order
+    for (auto &[group_name, neuron_refs] : mapped_neuron_groups)
+    {
+        std::sort(neuron_refs.begin(), neuron_refs.end(),
+                [](const auto &a, const auto &b) {
+                    return a.get().offset < b.get().offset;
+                });
+
+        // Validate that offset == index
+        for (size_t i = 0; i < neuron_refs.size(); ++i)
+        {
+            if (neuron_refs[i].get().offset != i)
+            {
+                throw std::logic_error("Offset incorrect in group '" +
+                        group_name + "' at index " + std::to_string(i) + "(" +
+                        std::to_string(neuron_refs[i].get().offset) + ")");
+            }
         }
     }
 }

@@ -482,7 +482,7 @@ void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         cx.force_update = static_cast<bool>(param);
     }
 
-    TRACE1(MODELS, "Set parameter: %s\n", attribute_name.c_str());
+    TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
 }
 
 void sanafe::LoihiLifModel::loihi_leak_and_quantize(LoihiCompartment &cx)

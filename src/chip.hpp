@@ -111,6 +111,8 @@ private:
     void forward_connection_attributes(const SpikingNetwork &net);
     MappedConnection &map_connection(const Connection &con);
     void map_axons();
+    void track_mapped_neurons();
+
     void sim_reset_measurements();
     void sim_hw_timestep(Timestep &ts, Scheduler &scheduler);
     void sim_update_ts_counters(Timestep &ts);
@@ -121,8 +123,8 @@ private:
     void sim_update_total_energy_and_counts(const Timestep &ts);
 
     void sim_format_run_summary(std::ostream &out, const RunData &run_data) const;
-
     void sim_print_axon_summary() const noexcept;
+
     static void sim_create_neuron_axons(MappedNeuron &pre_neuron);
     static void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
     static void sim_add_connection_to_axon(
