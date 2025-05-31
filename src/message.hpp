@@ -48,6 +48,9 @@ struct Message
     explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep);
     explicit Message(const long int id, const SpikingChip &hw, size_t axon_address, const MappedNeuron &n, long int timestep);
     Message(const Message &copy) = default;
+    Message(Message &&move) = default;
+    Message& operator=(const Message &copy) = default;
+    Message& operator=(Message &&move) = default;
 };
 
 }

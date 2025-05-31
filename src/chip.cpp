@@ -565,8 +565,9 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
         Core &core = idx;
         TRACE1(CHIP, "Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
-        for (auto &m : core.messages_in)
+        for (auto &m_ref : core.messages_in)
         {
+            Message &m = m_ref;
             m.receive_delay += process_message(ts, core, m);
         }
     }
@@ -612,7 +613,7 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 double sanafe::SpikingChip::process_message(
         Timestep &ts, Core &core, Message &m)
 {
-    const double message_processing_latency = pipeline_process_axon_in(core, m);
+    double message_processing_latency = pipeline_process_axon_in(core, m);
 
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
     const AxonInModel &axon_in = core.axons_in[m.dest_axon_id];
@@ -631,7 +632,7 @@ double sanafe::SpikingChip::process_message(
         const PipelineResult pipeline_output = execute_pipeline(
                 con.message_processing_pipeline, ts, n, &con, empty_input);
         core.timestep_buffer[n.mapped_address] = pipeline_output;
-        m.receive_delay += pipeline_output.latency.value_or(0.0);
+        message_processing_latency += pipeline_output.latency.value_or(0.0);
     }
 
     return message_processing_latency;
@@ -1291,7 +1292,7 @@ void sanafe::SpikingChip::sim_reset_measurements()
             }
 
             // Reset the message buffer
-            c.messages_in = std::vector<Message>();
+            c.messages_in = std::vector<std::reference_wrapper<Message>>();
         }
     }
 }

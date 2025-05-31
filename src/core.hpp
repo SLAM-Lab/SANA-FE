@@ -71,7 +71,7 @@ public:
     std::vector<std::shared_ptr<PipelineUnit>> pipeline_hw;
     std::vector<AxonOutUnit> axon_out_hw;
 
-    std::vector<Message> messages_in;
+    std::vector<std::reference_wrapper<Message>> messages_in;
     std::vector<AxonInModel> axons_in;
     std::vector<MappedNeuron> neurons;
     std::vector<MappedConnection *> connections_in;

@@ -96,8 +96,10 @@ public:
 private:
     // Technically soma attributes, but due to common usage, suppres warnings
     //  for these in the dendrite H/W too
-    const std::set<std::string> accumulator_attributes{"reset_mode", "reset",
-            "bias", "threshold", "leak_decay", "noise", "weight", "w"};
+    const std::set<std::string> accumulator_attributes{"reset_mode",
+            "reverse_reset_mode", "reset", "reverse_reset", "bias", "threshold",
+            "reverse_threshold", "leak_decay", "noise", "weight", "w",
+            "latency"};
     std::vector<double> accumulated_charges{std::vector<double>(loihi_max_compartments, 0.0)};
     std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
     double leak_decay{0.0};
@@ -179,8 +181,9 @@ public:
     };
 
 private:
-    const std::set<std::string> loihi_lif_attributes{"reset_mode", "reset",
-            "bias", "threshold", "leak_decay", "noise"};
+    const std::set<std::string> loihi_lif_attributes{"reset_mode",
+            "reverse_reset_mode", "reset", "reverse_reset", "bias", "threshold",
+            "reverse_threshold", "leak_decay", "noise"};
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{NOISE_NONE};
     std::ifstream noise_stream;
