@@ -106,6 +106,12 @@ private:
     std::ofstream message_trace{};
     std::ofstream perf_trace{};
 
+    // Fixed delay cost that accounts for any constant delays per timestep
+    //  E.g. a fixed chip-wide clock period
+    //  E.g. additional delays caused by global barriers and/or a housekeeping
+    //   CPU
+    double fixed_timestep_delay{0.0};
+
     Timestep step(Scheduler &scheduler);
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);

@@ -488,15 +488,11 @@ void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
 void sanafe::LoihiLifModel::loihi_leak_and_quantize(LoihiCompartment &cx)
 {
     cx.input_current *= cx.input_decay;
-    // TODO: put leak decay into snn description for DVS gesture only
-    //  It still makes a very tiny difference overall, <1% difference in spiking
-    //  and energy/latency predictions! But is needed if we want spike exact
-    //  behaviour with dvs
-    //cx.leak_decay = 4095.0 / 4096.0;
     cx.potential *= cx.leak_decay;
     // TODO: formalize quantization for Loihi and remove hack
     //  Make sure we multiple all biases and thresholds by 64 in the snn
     //  description for loihi benchmarks, it shouldn't be managed here
+    //  Then we can simply apply quantization without multiplication first..
     //  Again, this has a pretty tiny effect on simulator predictions
     cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
 }

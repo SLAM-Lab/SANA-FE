@@ -31,6 +31,7 @@ sanafe::Architecture::Architecture(
         , noc_width_in_tiles(noc.width_in_tiles)
         , noc_height_in_tiles(noc.height_in_tiles)
         , noc_buffer_size(noc.link_buffer_size)
+        , timestep_delay(noc.timestep_delay)
 {
 }
 

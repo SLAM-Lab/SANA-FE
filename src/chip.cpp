@@ -83,6 +83,7 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         , potential_trace_enabled(record_potentials)
         , perf_trace_enabled(record_perf)
         , message_trace_enabled(record_messages)
+        , fixed_timestep_delay(arch.timestep_delay)
 {
     INFO("Initializing simulation.\n");
     for (const TileConfiguration &tile_config : arch.tiles)
@@ -413,6 +414,7 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     scheduler.core_count = core_count;
     scheduler.max_cores_per_tile = max_cores_per_tile;
     scheduler.timing_model = timing_model;
+    scheduler.fixed_timestep_delay = fixed_timestep_delay;
     schedule_create_threads(scheduler, scheduler_thread_count);
 
     if (total_timesteps <= 0)

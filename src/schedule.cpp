@@ -252,6 +252,8 @@ void sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
                     neuron_processing_latencies.end());
 
     ts.sim_time = std::max(max_message_processing, max_neuron_processing);
+    // Account for fixed costs per timestep e.g., house-keeping or global sync
+    ts.sim_time += scheduler.fixed_timestep_delay;
     scheduler.timesteps_to_write.push(ts);
 }
 
@@ -313,6 +315,8 @@ void sanafe::schedule_messages_cycle_accurate(
     const double booksim_time = booksim_run(config);
 
     ts.sim_time = booksim_time;
+    // Account for fixed costs per timestep e.g., house-keeping or global sync
+    ts.sim_time += scheduler.fixed_timestep_delay;
     scheduler.timesteps_to_write.push(ts);
 }
 
@@ -334,7 +338,7 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
 void sanafe::schedule_create_threads(
         Scheduler &scheduler, const int scheduler_thread_count)
 {
-    INFO("Creating %d scheduler threads\n", scheduler_thread_count);
+    TRACE1(CHIP, "Creating %d scheduler threads\n", scheduler_thread_count);
     for (int thread_id = 0; thread_id < scheduler_thread_count; thread_id++)
     {
         TRACE1(CHIP, "Created scheduler thread:%d\n", thread_id);
@@ -549,6 +553,8 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
     TRACE1(SCHEDULER, "Scheduler finished.\n");
 
     ts.sim_time = last_timestamp;
+    // Account for fixed costs per timestep e.g., house-keeping or global sync
+    ts.sim_time += scheduler.fixed_timestep_delay;
     scheduler.timesteps_to_write.push(ts);
 
     return last_timestamp;

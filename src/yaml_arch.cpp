@@ -436,6 +436,8 @@ sanafe::description_parse_noc_configuration_yaml(
             yaml_required_field<int>(parser, noc_attributes, "height");
     noc.link_buffer_size = yaml_required_field<int>(
             parser, noc_attributes, "link_buffer_size");
+    noc.timestep_delay = yaml_optional_field<double>(
+            noc_attributes, "timestep_delay").value_or(0.0);
 
     return noc;
 }

@@ -75,6 +75,7 @@ public:
     size_t noc_width_in_tiles{1UL};
     size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{0UL};
+    double timestep_delay{0.0};
 
     Architecture(std::string name, const NetworkOnChipConfiguration &noc);
     [[nodiscard]] std::vector<std::reference_wrapper<CoreConfiguration>> cores();
@@ -93,6 +94,7 @@ struct NetworkOnChipConfiguration
     size_t width_in_tiles{1UL};
     size_t height_in_tiles{1UL};
     size_t link_buffer_size{0UL};
+    double timestep_delay{0.0};
 };
 
 struct TilePowerMetrics
