@@ -66,9 +66,6 @@ public:
     bool log_spikes{false};
     bool log_potential{false};
 
-    // Track spikes
-    bool axon_out_input_spike{false};
-
     MappedNeuron(const Neuron &neuron_to_map, const size_t nid, Core *mapped_core, PipelineUnit *mapped_soma, const size_t mapped_address, AxonOutUnit *mapped_axon_out, PipelineUnit *mapped_dendrite);
     MappedNeuron(const MappedNeuron &copy) = default;
     MappedNeuron& operator=(const MappedNeuron& other) = default;

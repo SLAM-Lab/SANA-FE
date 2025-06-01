@@ -392,6 +392,7 @@ void sanafe::SpikingChip::retire_scheduled_messages(
         rd.sim_time += ts.sim_time;
         rd.spikes += ts.spike_count;
         rd.packets_sent += ts.packets_sent;
+        rd.neurons_updated += ts.neurons_updated;
         rd.neurons_fired += ts.neurons_fired;
         rd.wall_time = wall_time;
 
@@ -464,6 +465,7 @@ void sanafe::SpikingChip::sim_update_total_energy_and_counts(const Timestep &ts)
     network_energy += ts.network_energy;
 
     total_spikes += ts.spike_count;
+    total_neurons_updated += ts.neurons_updated;
     total_neurons_fired += ts.neurons_fired;
 }
 
@@ -642,8 +644,14 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
     const PipelineResult pipeline_output = execute_pipeline(
             n.neuron_processing_pipeline, ts, n, std::nullopt, input);
     n.core->next_message_generation_delay +=
-            pipeline_output.latency.value_or(0.0);
-    pipeline_process_axon_out(ts, n);
+             pipeline_output.latency.value_or(0.0);
+    // INFO("nid:%s.%d +%e:%e\n", n.parent_group_name.c_str(), n.id,
+    //         pipeline_output.latency.value_or(0.0),
+    //         n.core->next_message_generation_delay);
+    if (n.status == FIRED)
+    {
+        pipeline_process_axon_out(ts, n);
+    }
 }
 
 double sanafe::SpikingChip::process_message(
@@ -688,7 +696,10 @@ sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
         output = unit->process(ts, n, con, output);
         total_energy += output.energy.value_or(0.0);
         total_latency += output.latency.value_or(0.0);
-        n.status = output.status;
+        if (output.status != INVALID_NEURON_STATE)
+        {
+            n.status = output.status;
+        }
     }
 
     output.energy = total_energy;
@@ -735,11 +746,6 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
     axon_result.latency = 0.0;
     axon_result.energy = 0.0;
 
-    if (!n.axon_out_input_spike)
-    {
-        return axon_result;
-    }
-
     TRACE1(CHIP, "nid:%s.%zu sending spike message to %zu axons out\n",
             n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const size_t axon_address : n.axon_out_addresses)
@@ -761,7 +767,12 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         axon_result.energy.value() += axon_out_hw.energy_access;
         axon_result.latency.value() += axon_out_hw.latency_access;
     }
-    n.axon_out_input_spike = false;
+
+
+    // This was a bug lost in the noise, 0.2% error difference
+    // TODO: this existed in my old code.. can I justify it or was it a bug
+    //AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
+    //n.core->next_message_generation_delay += axon_out_hw.latency_access;
 
     return axon_result;
 }
@@ -810,6 +821,7 @@ void sanafe::SpikingChip::sim_format_run_summary(
     out << "timesteps_executed: " << run_data.timesteps_executed << "\n";
     out << "total_spikes: " << run_data.spikes << "\n";
     out << "total_messages_sent: " << run_data.packets_sent << "\n";
+    out << "total_neurons_updated: " << run_data.neurons_updated << "\n";
     out << "total_neurons_fired: " << run_data.neurons_fired << "\n";
     out << "sim_time: " << std::scientific << run_data.sim_time << "\n";
     // Give a more detailed energy breakdown, as this is often useful
@@ -950,6 +962,7 @@ void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
             for (const auto &hw : c.pipeline_hw)
             {
                 ts.spike_count += hw->spikes_processed;
+                ts.neurons_updated += hw->neurons_updated;
                 ts.neurons_fired += hw->neurons_fired;
             }
             for (const auto &axon_out : c.axon_out_hw)
@@ -1272,7 +1285,7 @@ void sanafe::SpikingChip::sim_allocate_axon(
     out.dest_axon_id = new_axon_in_address;
     out.dest_core_offset = post_core.offset;
     out.dest_tile_id = post_core.parent_tile_id;
-    out.src_neuron_id = pre_neuron.id;
+    out.src_neuron_offset = pre_neuron.offset;
     pre_core.axons_out.push_back(out);
     const size_t new_axon_out_address = pre_core.axons_out.size() - 1;
 
@@ -1316,7 +1329,7 @@ void sanafe::SpikingChip::sim_reset_measurements()
                 hw->energy = 0.0;
                 hw->time = 0.0;
                 hw->spikes_processed = 0;
-                hw->neuron_updates = 0L;
+                hw->neurons_updated = 0L;
                 hw->neurons_fired = 0L;
             }
 
@@ -1416,6 +1429,7 @@ void sanafe::SpikingChip::sim_trace_write_perf_header(
 
     // Mandatory performance metrics
     perf_trace_file << "fired,";
+    perf_trace_file << "updated,";
     perf_trace_file << "packets,";
     perf_trace_file << "hops,";
     perf_trace_file << "spikes,";
@@ -1511,6 +1525,7 @@ void sanafe::SpikingChip::sim_trace_record_perf(
     perf_trace_file << ts.timestep << ",";
     // Start with the mandatory counters and traces
     perf_trace_file << ts.neurons_fired << ",";
+    perf_trace_file << ts.neurons_updated << ",";
     perf_trace_file << ts.packets_sent << ",";
     perf_trace_file << ts.total_hops << ",";
     perf_trace_file << ts.spike_count << ",";
@@ -1534,7 +1549,7 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.timestep << ",";
     message_trace_file << m.mid << ",";
     message_trace_file << m.src_neuron_group_id << ".";
-    message_trace_file << m.src_neuron_id << ",";
+    message_trace_file << m.src_neuron_offset << ",";
     message_trace_file << m.src_tile_id << "." << m.src_core_offset << ",";
 
     if (m.placeholder)

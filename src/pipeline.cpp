@@ -462,12 +462,11 @@ void sanafe::PipelineUnit::update_soma_activity(
     if ((simulation_result.status == sanafe::UPDATED) ||
             (simulation_result.status == sanafe::FIRED))
     {
-        n.soma_hw->neuron_updates++;
+        n.soma_hw->neurons_updated++;
 
         if (simulation_result.status == sanafe::FIRED)
         {
             n.soma_hw->neurons_fired++;
-            n.axon_out_input_spike = true;
             TRACE1(CHIP, "Neuron %s.%zu fired\n", n.parent_group_name.c_str(),
                     n.id);
         }

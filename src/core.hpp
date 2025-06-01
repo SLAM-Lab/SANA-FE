@@ -33,7 +33,7 @@ struct AxonOutModel
     size_t dest_axon_id{};
     size_t dest_tile_id{};
     size_t dest_core_offset{};
-    size_t src_neuron_id{};
+    size_t src_neuron_offset{};
 };
 
 class AxonInUnit

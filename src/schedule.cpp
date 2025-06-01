@@ -277,7 +277,7 @@ void sanafe::schedule_messages_cycle_accurate(
             {
                 std::pair<std::string, int> src_neuron =
                         std::make_pair(message.src_neuron_group_id,
-                                static_cast<int>(message.src_neuron_id));
+                                static_cast<int>(message.src_neuron_offset));
                 std::pair<int, int> src_hw =
                         std::make_pair(static_cast<int>(message.src_tile_id),
                                 static_cast<int>(message.src_core_offset));
@@ -291,7 +291,7 @@ void sanafe::schedule_messages_cycle_accurate(
             {
                 std::pair<std::string, int> src_neuron =
                         std::make_pair(message.src_neuron_group_id,
-                                static_cast<int>(message.src_neuron_id));
+                                static_cast<int>(message.src_neuron_offset));
                 std::pair<int, int> src_hw =
                         std::make_pair(static_cast<int>(message.src_tile_id),
                                 static_cast<int>(message.src_core_offset));
@@ -413,7 +413,7 @@ void sanafe::schedule_handle_message(
         Message &m, Scheduler &scheduler, NocInfo &noc)
 {
     TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
-            m.src_neuron_group_id.c_str(), m.src_neuron_id);
+            m.src_neuron_group_id.c_str(), m.src_neuron_offset);
     TRACE1(SCHEDULER, "Send delay:%e\n", m.generation_delay);
     TRACE1(SCHEDULER, "Receive delay:%e\n", m.receive_delay);
     const size_t dest_core = m.dest_core_id;

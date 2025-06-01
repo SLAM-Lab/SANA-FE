@@ -207,7 +207,7 @@ pybind11::object pymodel_attribute_to_pyobject(
         return pybind11::cast(str_value);
     }
     if (std::holds_alternative<std::vector<sanafe::ModelAttribute>>(
-                     attribute.value))
+                attribute.value))
     {
         auto attribute_vec =
                 static_cast<std::vector<sanafe::ModelAttribute>>(attribute);
@@ -271,6 +271,7 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run)
     run_data_dict["sim_time"] = run.sim_time;
     run_data_dict["spikes"] = run.spikes;
     run_data_dict["packets_sent"] = run.packets_sent;
+    run_data_dict["neurons_updated"] = run.neurons_updated;
     run_data_dict["neurons_fired"] = run.neurons_fired;
 
     return run_data_dict;
@@ -400,12 +401,12 @@ sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
     return self->create_tile(std::move(name), tile_power_metrics);
 }
 
-std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(
-        std::string name, size_t tile_id, double energy_north_hop,
-        double latency_north_hop, double energy_east_hop,
-        double latency_east_hop, double energy_south_hop,
-        double latency_south_hop, double energy_west_hop,
-        double latency_west_hop, bool log_energy, bool log_latency)
+std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
+        size_t tile_id, double energy_north_hop, double latency_north_hop,
+        double energy_east_hop, double latency_east_hop,
+        double energy_south_hop, double latency_south_hop,
+        double energy_west_hop, double latency_west_hop, bool log_energy,
+        bool log_latency)
 {
     sanafe::TilePowerMetrics tile_power_metrics{};
     tile_power_metrics.energy_north_hop = energy_north_hop;
@@ -423,9 +424,9 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(
             name, tile_id, tile_power_metrics);
 }
 
-std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(
-        std::string name, size_t parent_tile_id, size_t offset_within_tile,
-        size_t core_id, std::string buffer_position, bool buffer_inside_unit,
+std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
+        size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
+        std::string buffer_position, bool buffer_inside_unit,
         size_t max_neurons_supported, bool log_energy, bool log_latency)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
@@ -496,7 +497,7 @@ void pyset_attributes(sanafe::Neuron *self,
 #if (DEBUG_LEVEL_PYMODULE > 0)
     for (auto &[key, value] : neuron_template.model_attributes)
     {
-            TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
+        TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
     }
 #endif
     self->set_attributes(neuron_template);
@@ -523,13 +524,15 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
     for (auto &[key, value] : converted_attributes)
     {
         TRACE1(PYMODULE, "\tkey: %s\n", key.c_str());
+        INFO("\tkey: %s\n", key.c_str());
     }
 #endif
     self->set_model_attributes(converted_attributes);
 }
 
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-        std::string timing_model_str, const int nthreads)
+        std::string timing_model_str, const int processing_threads,
+        const int scheduler_threads)
 {
     sanafe::TimingModel timing_model{sanafe::TIMING_MODEL_DETAILED};
     if (timing_model_str == "simple")
@@ -550,23 +553,24 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     }
 
 #ifdef HAVE_OPENMP
-    // If nthreads <= 0, just leave it at the system default
-    if (nthreads > 0)
+    // If processing_threads <= 0, just leave it at the system default
+    if (processing_threads > 0)
     {
-        omp_set_num_threads(nthreads);
+        INFO("Setting processing threads to %d\n", processing_threads);
+        omp_set_num_threads(processing_threads);
     }
 #else
-    if (nthreads > 1)
+    if (processing_threads > 1)
     {
         INFO("Warning: OpenMP disabled, no multithreaded support\n");
     }
 #endif
 
-    return run_data_to_dict(self->sim(timesteps, timing_model));
+    return run_data_to_dict(
+            self->sim(timesteps, timing_model, scheduler_threads));
 }
 
 } // end of anonymous namespace
-
 
 // Custom Python wrapper class for the Neuron class
 //  While most objects are managed fine, pybind struggles to manage object
@@ -940,12 +944,18 @@ PYBIND11_MODULE(sanafecpp, m)
                             sanafe::default_max_neurons,
                     pybind11::arg("log_energy") = false,
                     pybind11::arg("log_latency") = false);
+    pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
+            .def("set_model_attributes", &pyset_model_attributes,
+                    pybind11::arg("model_attributes") = pybind11::dict(),
+                    pybind11::arg("soma_attributes") = pybind11::dict(),
+                    pybind11::arg("dendrite_attributes") = pybind11::dict());
     pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
             .def_property(
                     "mapped_neuron_groups",
                     [](sanafe::SpikingChip &self)
                             -> std::map<std::string,
-                                    std::vector<std::reference_wrapper<sanafe::MappedNeuron>>> & {
+                                    std::vector<std::reference_wrapper<
+                                            sanafe::MappedNeuron>>> & {
                         return self.mapped_neuron_groups;
                     },
                     nullptr, pybind11::return_value_policy::reference_internal)
@@ -959,14 +969,10 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("load", &sanafe::SpikingChip::load)
             .def("sim", &pysim, pybind11::arg("timesteps") = 1,
                     pybind11::arg("timing_model") = "detailed",
-                    pybind11::arg("nthreads") = 0)
+                    pybind11::arg("processing_threads") = 0,
+                    pybind11::arg("scheduler_threads") = 0)
             .def("get_power", &sanafe::SpikingChip::get_power)
             .def("reset", &sanafe::SpikingChip::reset);
-    pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
-            .def("set_model_attributes", &pyset_model_attributes,
-                    pybind11::arg("model_attributes") = pybind11::dict(),
-                    pybind11::arg("soma_attributes") = pybind11::dict(),
-                    pybind11::arg("dendrite_attributes") = pybind11::dict());
 }
 
 // NOLINTEND(readability-function-cognitive-complexity)

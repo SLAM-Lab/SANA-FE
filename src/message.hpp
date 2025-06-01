@@ -28,7 +28,7 @@ struct Message
     long int mid;
     size_t spikes{0UL};
     size_t hops{0UL};
-    size_t src_neuron_id;
+    size_t src_neuron_offset;
     std::string src_neuron_group_id;
     size_t src_x;
     size_t dest_x{0UL};

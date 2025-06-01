@@ -10,7 +10,7 @@ sanafe::Message::Message(const long int id, const SpikingChip &hw,
         const MappedNeuron &n, const long int timestep)
         : timestep(timestep)
         , mid(id)
-        , src_neuron_id(n.id)
+        , src_neuron_offset(n.offset)
         , src_neuron_group_id(n.parent_group_name)
 {
     // If no axon was given create a message with no destination. By

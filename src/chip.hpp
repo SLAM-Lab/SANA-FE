@@ -75,6 +75,7 @@ private:
     std::unique_ptr<BookSimConfig> booksim_config{};
     std::string out_dir;
     size_t total_neurons_mapped{0UL};
+    long int total_neurons_updated{0L};
     long int total_neurons_fired{0L};
     long int total_timesteps{0L};
     long int total_spikes{0L};
@@ -174,6 +175,7 @@ struct Timestep
     long int spike_count{0L};
     size_t total_hops{0UL};
     long int packets_sent{0L};
+    long int neurons_updated{0L};
     long int neurons_fired{0L};
 
     double total_energy{0.0};
@@ -193,6 +195,7 @@ struct RunData
     double wall_time{0.0};
     long int spikes{0L};
     long int packets_sent{0L};
+    long int neurons_updated{0L};
     long int neurons_fired{0L};
     long int timestep_start;
     long int timesteps_executed{0L};

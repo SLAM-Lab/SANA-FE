@@ -101,7 +101,7 @@ public:
 
     // Performance counters
     long int spikes_processed{0L};
-    long int neuron_updates{0L};
+    long int neurons_updated{0L};
     long int neurons_fired{0L};
     long int neuron_count{0L};
 
