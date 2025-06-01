@@ -9,6 +9,7 @@ architecture:
     width: 8
     height: 4
     link_buffer_size: 16
+    timestep_delay: 1.4e-6
   tile:
     - name: loihi_tile[0..31]
       attributes:
@@ -43,20 +44,20 @@ architecture:
                 latency_update_neuron: 3.7e-9
                 energy_spike_out: 69.3e-12
                 latency_spike_out: 30.0e-9
-            - name: loihi_stochastic_lif
-              attributes:
-                model: leaky_integrate_fire
-                # Noise stream is based on Intel's proprietary data
-                #  TODO: also support a LFSR based random number generator that
-                #   can replace this for the public model
-                #noise: /home/usr1/jboyle/neuro/sana-fe/etc/loihi_random_seq.csv
-                energy_access_neuron: 51.2e-12
-                latency_access_neuron: 6.0e-9
-                # Here account for the 6 pJ cost of generating a random number
-                energy_update_neuron: 27.6e-12
-                latency_update_neuron: 3.7e-9
-                energy_spike_out: 69.3e-12
-                latency_spike_out: 30.0e-9
+            # - name: loihi_stochastic_lif
+            #   attributes:
+            #     model: leaky_integrate_fire
+            #     # Noise stream is based on Intel's proprietary data
+            #     #  TODO: also support a LFSR based random number generator that
+            #     #   can replace this for the public model
+            #     noise: /home/usr1/jboyle/neuro/sana-fe/etc/loihi_random_seq.csv
+            #     energy_access_neuron: 51.2e-12
+            #     latency_access_neuron: 6.0e-9
+            #     # Here account for the 6 pJ cost of generating a random number
+            #     energy_update_neuron: 27.6e-12
+            #     latency_update_neuron: 3.7e-9
+            #     energy_spike_out: 69.3e-12
+            #     latency_spike_out: 30.0e-9
             - name: loihi_inputs
               attributes:
                 model: input
@@ -82,16 +83,8 @@ architecture:
                 latency_concurrent_access: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
-                #model: loihi
-                model: current_based
+                model: loihi
                 energy_process_spike: 24.0e-12
-                # Originally calibrated value
-                latency_process_spike: 3.1e-9
-                # Experimentally chosen value, which seems more accurate with
-                #  current network model. These aren't taken from calibration
-                #  so don't really mean anything
-                ##latency_process_spike: 4.0e-9  # Most accurate, almost 0 average error (MAPE:~6%)
-                ##latency_process_spike: 4.3e-9  # For 10 idx bits
           dendrite:
           - name: loihi_dendrites
             attributes:

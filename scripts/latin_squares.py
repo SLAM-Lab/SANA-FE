@@ -207,7 +207,7 @@ if __name__ == "__main__":
                     energy = results["energy"]["total"] / TIMESTEPS
                     # Run the same experiment again using the cycle accurate
                     #  timing model
-                    row = (line["N"], line["network"], energy, time)
+                    row = [line["N"], line["network"], energy, time]
                     results = run_experiment(line["network"], timing_model="cycle")
 
                     cycle_accurate = results["sim_time"]

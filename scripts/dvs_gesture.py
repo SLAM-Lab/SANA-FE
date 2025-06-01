@@ -46,8 +46,6 @@ SIM_ENERGY_DATA_PATH = os.path.join(DVS_RUN_DIR, SIM_ENERGY_DATA_FILENAME)
 
 def parse_stats(stats):
     print("Parsing statistics")
-    total = stats.sum()
-    pd.set_option('display.max_rows', None)
     analysis = {}
     analysis["hops"] = stats.loc[:, "hops"]
     analysis["fired"] = stats.loc[:, "fired"]
@@ -283,7 +281,6 @@ if __name__ == "__main__":
             for i in range(0, frames):
                 total_times[i] = np.sum(times[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
                 total_hops[i] = np.sum(hops[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
-                #loihi_total_times[i] = np.sum(loihi_times[i*(timesteps-1):(i+1)*(timesteps-1)])
                 loihi_total_times[i] = np.sum(loihi_times[0:timesteps-2, i])
 
             plt.figure(figsize=(7.0, 1.6))
@@ -297,7 +294,7 @@ if __name__ == "__main__":
             plt.plot(np.arange(1, timesteps-1), times[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "--")
 
             #plt.plot(np.arange(1, timesteps-1), event_based_times[1:(timesteps-1)] * 1.0e6, ":k")
-            plt.plot(np.arange(1, timesteps-1), cycle_based_times[0:(timesteps-2)] * 1.0e6, ":r") # TODO: see
+            plt.plot(np.arange(1, timesteps-1), cycle_based_times[0:(timesteps-2)] * 1.0e6, ":r")
             plt.legend(("Measured on Loihi", "SANA-FE predictions", "Event-based predictions"),
                        fontsize=6)
             plt.ylabel("Time-step Latency ($\mu$s)")
