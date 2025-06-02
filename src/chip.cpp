@@ -375,7 +375,7 @@ void sanafe::SpikingChip::retire_scheduled_messages(
         {
             sim_trace_record_perf(perf_trace, ts);
         }
-        if (message_trace_enabled)
+        if (message_trace_enabled && (ts.messages != nullptr))
         {
             for (auto &q : *(ts.messages))
             {
@@ -569,7 +569,7 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
             placeholder.generation_delay = core.next_message_generation_delay;
             // Create a dummy placeholder message
             auto &message_queue = *(ts.messages);
-            message_queue[core.id].push_back(placeholder);
+            message_queue[core.id].push_back(std::move(placeholder));
         }
     }
 }
@@ -762,7 +762,7 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         n.core->next_message_generation_delay = 0.0;
 
         auto &message_queue = *(ts.messages);
-        message_queue[n.core->id].push_back(m);
+        message_queue[n.core->id].push_back(std::move(m));
         ++axon_out_hw.packets_out;
         ++total_messages_sent;
 
@@ -1178,7 +1178,7 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     std::set<Core *> cores_out;
     for (const MappedConnection &curr_connection : pre_neuron.connections_out)
     {
-        MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
+        const MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
         Core *dest_core = post_neuron.core;
         cores_out.insert(dest_core);
         TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
@@ -1199,7 +1199,7 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     {
         // Add every connection to the axon. Also link to the map in the
         //  post synaptic core / neuron
-        MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
+        const MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
         Core &post_core = *(post_neuron.core);
         //TRACE1(CHIP, "Adding connection:%d\n", curr_connection.id);
         sim_add_connection_to_axon(curr_connection, post_core);

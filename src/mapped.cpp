@@ -12,11 +12,13 @@
 #include "pipeline.hpp"
 #include "print.hpp"
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 sanafe::MappedConnection::MappedConnection(
         std::reference_wrapper<MappedNeuron> pre_neuron,
         std::reference_wrapper<MappedNeuron> post_neuron)
         : pre_neuron_ref(pre_neuron)
         , post_neuron_ref(post_neuron)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
 }
 

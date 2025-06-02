@@ -91,7 +91,7 @@ sanafe::TimingModel parse_timing_model(const std::string_view &timing_model_str)
 }
 
 std::string_view get_next_arg(
-        const std::vector<std::string_view> &args, const size_t current_idx)
+        const std::vector<std::string> &args, const size_t current_idx)
 {
     // Helper function to get next argument safely
     if (current_idx + 1 >= args.size())
@@ -102,8 +102,8 @@ std::string_view get_next_arg(
 }
 
 // NOLINTNEXTLINE(readability-function-size)
-int parse_flag(const std::vector<std::string_view> args,
-        const size_t current_idx, OptionalProgramFlags &flags)
+int parse_flag(const std::vector<std::string> args, const size_t current_idx,
+        OptionalProgramFlags &flags)
 {
     const std::string_view arg = args[current_idx];
     if (arg.empty() || arg[0] != '-')
@@ -180,7 +180,7 @@ int parse_flag(const std::vector<std::string_view> args,
 }
 
 OptionalProgramFlags parse_command_line_flags(
-        const std::vector<std::string_view> &args)
+        const std::vector<std::string> &args)
 {
     OptionalProgramFlags flags;
 
@@ -224,9 +224,15 @@ OptionalProgramFlags parse_command_line_flags(
 }
 
 RequiredProgramArgs parse_required_args(
-        const std::vector<std::string_view> &args, const int optional_flags)
+        const std::vector<std::string> &args, const int optional_flags)
 {
     RequiredProgramArgs required_args;
+
+    const auto base_idx = static_cast<size_t>(optional_flags);
+    if (base_idx + RequiredProgramArgs::program_nargs > args.size())
+    {
+        throw std::invalid_argument("Insufficient arguments provided");
+    }
 
     required_args.arch_filename =
             args[optional_flags + RequiredProgramArgs::arch_filename_idx];
@@ -252,11 +258,11 @@ RequiredProgramArgs parse_required_args(
 }
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
-std::vector<std::string_view> program_args_to_vector(
+std::vector<std::string> program_args_to_vector(
         const int argc, const char *argv[])
 // NOLINTEND(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
 {
-    std::vector<std::string_view> args;
+    std::vector<std::string> args;
 
     // Ignore the first argument, which should just be the program name 'sim'
     for (int i = 1; i < argc; i++)
@@ -273,7 +279,7 @@ std::vector<std::string_view> program_args_to_vector(
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,readability-function-size)
 int main(int argc, const char *argv[])
 {
-    const std::vector<std::string_view> arg_vec =
+    const std::vector<std::string> arg_vec =
             program_args_to_vector(argc, argv);
     const OptionalProgramFlags optional_flags =
             parse_command_line_flags(arg_vec);

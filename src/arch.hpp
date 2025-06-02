@@ -181,7 +181,8 @@ struct PipelineUnitConfiguration
     bool implements_dendrite{false};
     bool implements_soma{false};
 
-    PipelineUnitConfiguration(ModelInfo model_info, std::string name) : model_info(std::move(model_info)), name(std::move(name)) {}
+    PipelineUnitConfiguration(ModelInfo &&model_info, std::string &&name) : model_info(std::move(model_info)), name(std::move(name)) {}
+    PipelineUnitConfiguration(const ModelInfo &model_info, const std::string &name) : model_info(model_info), name(name) {}
 };
 
 struct AxonOutPowerMetrics
