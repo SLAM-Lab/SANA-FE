@@ -15,14 +15,14 @@
 sanafe::MappedConnection::MappedConnection(
         std::reference_wrapper<MappedNeuron> pre_neuron,
         std::reference_wrapper<MappedNeuron> post_neuron)
-        : pre_neuron(pre_neuron)
-        , post_neuron(post_neuron)
+        : pre_neuron_ref(pre_neuron)
+        , post_neuron_ref(post_neuron)
 {
 }
 
 void sanafe::MappedConnection::build_message_processing_pipeline()
 {
-    const MappedNeuron &n = post_neuron;
+    const MappedNeuron &n = post_neuron_ref;
     const Core &mapped_core = *(n.core);
 
     // We don't support putting the buffer inside or before the synapse unit, so
@@ -30,13 +30,13 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
     //  here could cause a spike sent that shouldn't be
     message_processing_pipeline.push_back(synapse_hw);
     if ((mapped_core.pipeline_config.buffer_position >
-                BUFFER_BEFORE_DENDRITE_UNIT) &&
+                buffer_before_dendrite_unit) &&
             (n.dendrite_hw != synapse_hw))
     {
         message_processing_pipeline.push_back(n.dendrite_hw);
     }
     if ((mapped_core.pipeline_config.buffer_position >
-                BUFFER_BEFORE_SOMA_UNIT) &&
+                buffer_before_soma_unit) &&
             (n.soma_hw != n.dendrite_hw))
     {
         message_processing_pipeline.push_back(n.soma_hw);
@@ -91,15 +91,15 @@ void sanafe::MappedNeuron::set_model_attributes(
 
 void sanafe::MappedNeuron::build_neuron_processing_pipeline()
 {
-    if (core->pipeline_config.buffer_position < BUFFER_BEFORE_DENDRITE_UNIT)
+    if (core->pipeline_config.buffer_position < buffer_before_dendrite_unit)
     {
         throw std::runtime_error("Error: Buffer must be after synaptic h/w");
     }
-    if (core->pipeline_config.buffer_position == BUFFER_INSIDE_DENDRITE_UNIT)
+    if (core->pipeline_config.buffer_position == buffer_inside_dendrite_unit)
     {
         neuron_processing_pipeline.push_back(dendrite_hw);
     }
-    if ((core->pipeline_config.buffer_position <= BUFFER_INSIDE_SOMA_UNIT) &&
+    if ((core->pipeline_config.buffer_position <= buffer_inside_soma_unit) &&
             (soma_hw != dendrite_hw))
     {
         neuron_processing_pipeline.push_back(soma_hw);

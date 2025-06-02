@@ -6,6 +6,7 @@
 #ifndef MESSAGE_HEADER_INCLUDED_
 #define MESSAGE_HEADER_INCLUDED_
 
+#include <cstddef>
 #include <limits>
 #include <string>
 
@@ -45,10 +46,13 @@ struct Message
     bool placeholder{true};
     bool in_noc{false};
 
-    explicit Message(const long int id, const SpikingChip &hw, const MappedNeuron &n, long int timestep);
-    explicit Message(const long int id, const SpikingChip &hw, size_t axon_address, const MappedNeuron &n, long int timestep);
+    explicit Message(long int id, const SpikingChip &hw, const MappedNeuron &n,
+            long int timestep);
+    explicit Message(long int id, const SpikingChip &hw, size_t axon_address,
+            const MappedNeuron &n, long int timestep);
     Message(const Message &copy) = default;
     Message(Message &&move) = default;
+    ~Message() = default;
     Message& operator=(const Message &copy) = default;
     Message& operator=(Message &&move) = default;
 };

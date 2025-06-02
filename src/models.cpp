@@ -69,7 +69,7 @@ void sanafe::CurrentBasedSynapseModel::reset()
 sanafe::PipelineResult sanafe::LoihiSynapseModel::read_synapse(
         const size_t synapse_address)
 {
-    constexpr size_t max_parallel_accesses = 4;
+    constexpr size_t max_parallel_accesses = 3;
     // Model the concurrent synaptic weights being access
     double latency = std::numeric_limits<double>::quiet_NaN();
     if (concurrent_access_latency.has_value())
@@ -192,7 +192,7 @@ void sanafe::LoihiSynapseModel::map_connection(MappedConnection &con)
 {
     const size_t synapse_address = con.synapse_address;
     // Get unique identifier for spiking neuron
-    const MappedNeuron &pre_neuron = con.pre_neuron;
+    const MappedNeuron &pre_neuron = con.pre_neuron_ref;
     synapse_to_pre_neuron[synapse_address] = pre_neuron.id;
 }
 
@@ -419,7 +419,7 @@ void sanafe::LoihiLifModel::set_attribute_hw(
     if (attribute_name == "noise")
     {
         const std::string noise_filename = static_cast<std::string>(param);
-        noise_type = NOISE_FILE_STREAM;
+        noise_type = noise_file_stream;
         noise_stream.open(noise_filename);
         TRACE1(MODELS, "Opening noise str: %s\n", noise_filename.c_str());
         if (!noise_stream.is_open())
@@ -503,11 +503,11 @@ bool sanafe::LoihiLifModel::loihi_threshold_and_reset(LoihiCompartment &cx)
 
     if (cx.potential > cx.threshold)
     {
-        if (cx.reset_mode == sanafe::NEURON_RESET_HARD)
+        if (cx.reset_mode == sanafe::neuron_reset_hard)
         {
             cx.potential = cx.reset;
         }
-        else if (cx.reset_mode == sanafe::NEURON_RESET_SOFT)
+        else if (cx.reset_mode == sanafe::neuron_reset_soft)
         {
             cx.potential -= cx.threshold;
         }
@@ -517,15 +517,15 @@ bool sanafe::LoihiLifModel::loihi_threshold_and_reset(LoihiCompartment &cx)
     // Check against reverse threshold
     if (cx.potential < cx.reverse_threshold)
     {
-        if (cx.reverse_reset_mode == sanafe::NEURON_RESET_SOFT)
+        if (cx.reverse_reset_mode == sanafe::neuron_reset_soft)
         {
             cx.potential -= cx.reverse_threshold;
         }
-        else if (cx.reverse_reset_mode == sanafe::NEURON_RESET_HARD)
+        else if (cx.reverse_reset_mode == sanafe::neuron_reset_hard)
         {
             cx.potential = cx.reverse_reset;
         }
-        else if (cx.reverse_reset_mode == sanafe::NEURON_RESET_SATURATE)
+        else if (cx.reverse_reset_mode == sanafe::neuron_reset_saturate)
         {
             cx.potential = cx.reverse_threshold;
         }
@@ -554,19 +554,19 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     //  integate inputs and apply any potential leak
     TRACE1(MODELS, "Updating potential (cx:%zu), before:%lf\n", neuron_address,
             cx.potential);
-    sanafe::NeuronStatus state = sanafe::IDLE;
+    sanafe::NeuronStatus state = sanafe::idle;
     // Update soma, if there are any received spikes, there is a non-zero
     //  bias or we force the neuron to update every time-step
     if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
             (std::fabs(cx.bias) > 0.0) || cx.force_update)
     {
         // Neuron is turned on and potential write
-        state = sanafe::UPDATED;
+        state = sanafe::updated;
     }
 
     loihi_leak_and_quantize(cx);
     // Add randomized noise to potential if enabled
-    if (noise_type == NOISE_FILE_STREAM)
+    if (noise_type == noise_file_stream)
     {
         cx.potential += loihi_generate_noise();
     }
@@ -585,7 +585,7 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     // Check against threshold potential (for spiking)
     if (loihi_threshold_and_reset(cx))
     {
-        state = sanafe::FIRED;
+        state = sanafe::fired;
     }
 
     ++(cx.timesteps_simulated);
@@ -658,7 +658,7 @@ double sanafe::LoihiLifModel::loihi_generate_noise()
 {
     int random_val = 0;
 
-    if (noise_type == NOISE_FILE_STREAM)
+    if (noise_type == noise_file_stream)
     {
         random_val = loihi_read_noise_stream();
     }
@@ -766,15 +766,15 @@ bool sanafe::TrueNorthModel::truenorth_threshold_and_reset(TrueNorthNeuron &n)
     bool fired = false;
     if (v >= n.threshold)
     {
-        if (n.reset_mode == NEURON_RESET_HARD)
+        if (n.reset_mode == neuron_reset_hard)
         {
             n.potential = n.reset;
         }
-        else if (n.reset_mode == NEURON_RESET_SOFT)
+        else if (n.reset_mode == neuron_reset_soft)
         {
             n.potential -= n.threshold;
         }
-        else if (n.reset_mode == NEURON_RESET_SATURATE)
+        else if (n.reset_mode == neuron_reset_saturate)
         {
             n.potential = n.threshold;
         }
@@ -782,15 +782,15 @@ bool sanafe::TrueNorthModel::truenorth_threshold_and_reset(TrueNorthNeuron &n)
     }
     else if (v <= n.reverse_threshold)
     {
-        if (n.reverse_reset_mode == NEURON_RESET_HARD)
+        if (n.reverse_reset_mode == neuron_reset_hard)
         {
             n.potential = n.reverse_reset;
         }
-        else if (n.reverse_reset_mode == NEURON_RESET_SOFT)
+        else if (n.reverse_reset_mode == neuron_reset_soft)
         {
             n.potential += n.reverse_threshold;
         }
-        else if (n.reverse_reset_mode == NEURON_RESET_SATURATE)
+        else if (n.reverse_reset_mode == neuron_reset_saturate)
         {
             n.potential = n.reverse_threshold;
         }
@@ -803,14 +803,14 @@ bool sanafe::TrueNorthModel::truenorth_threshold_and_reset(TrueNorthNeuron &n)
 sanafe::PipelineResult sanafe::TrueNorthModel::update(
         const size_t neuron_address, const std::optional<double> current_in)
 {
-    sanafe::NeuronStatus state = sanafe::IDLE;
+    sanafe::NeuronStatus state = sanafe::idle;
     TrueNorthNeuron &n = neurons[neuron_address];
 
     if ((std::fabs(n.potential) > 0.0) || current_in.has_value() ||
             (std::fabs(n.bias) > 0.0) || n.force_update)
     {
         // Neuron is turned on and potential write
-        state = sanafe::UPDATED;
+        state = sanafe::updated;
     }
 
     // Apply leak
@@ -824,7 +824,7 @@ sanafe::PipelineResult sanafe::TrueNorthModel::update(
     }
     if (truenorth_threshold_and_reset(n))
     {
-        state = sanafe::FIRED;
+        state = sanafe::fired;
     }
     TRACE2(MODELS, "potential:%lf threshold %lf\n", n.potential, n.threshold);
     PipelineResult output{};
@@ -898,7 +898,7 @@ sanafe::PipelineResult sanafe::InputModel::update(
         TRACE2(MODELS, "Randomly generating spikes (rate).\n");
     }
 
-    const NeuronStatus status = send_spike ? FIRED : IDLE;
+    const NeuronStatus status = send_spike ? fired : idle;
     PipelineResult output{};
     output.status = status;
     return output;
@@ -906,23 +906,23 @@ sanafe::PipelineResult sanafe::InputModel::update(
 
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 {
-    sanafe::NeuronResetModes reset_mode{sanafe::NEURON_NO_RESET};
+    sanafe::NeuronResetModes reset_mode{sanafe::neuron_no_reset};
 
     if (str == "none")
     {
-        reset_mode = sanafe::NEURON_NO_RESET;
+        reset_mode = sanafe::neuron_no_reset;
     }
     else if (str == "soft")
     {
-        reset_mode = sanafe::NEURON_RESET_SOFT;
+        reset_mode = sanafe::neuron_reset_soft;
     }
     else if (str == "hard")
     {
-        reset_mode = sanafe::NEURON_RESET_HARD;
+        reset_mode = sanafe::neuron_reset_hard;
     }
     else if (str == "saturate")
     {
-        reset_mode = sanafe::NEURON_RESET_SATURATE;
+        reset_mode = sanafe::neuron_reset_saturate;
     }
     else
     {

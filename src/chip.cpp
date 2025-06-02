@@ -283,7 +283,7 @@ void sanafe::SpikingChip::forward_connection_attributes(
                     }
                     if (value.forward_to_dendrite)
                     {
-                        MappedNeuron &n = mapped_con.post_neuron;
+                        MappedNeuron &n = mapped_con.post_neuron_ref;
                         n.dendrite_hw->check_attribute(key);
                         n.dendrite_hw->set_attribute_edge(
                                 mapped_con.synapse_address, key, value);
@@ -519,7 +519,7 @@ void sanafe::SpikingChip::reset()
     {
         for (MappedNeuron &neuron : neurons)
         {
-            neuron.status = INVALID_NEURON_STATE;
+            neuron.status = invalid_neuron_state;
         }
     }
 }
@@ -626,15 +626,15 @@ void sanafe::SpikingChip::receive_message(Message &m)
             abs_diff(src_tile.y, dest_tile.y);
 
     Core &core = dest_tile.cores[m.dest_core_offset];
-    core.messages_in.push_back(m);
+    core.messages_in.emplace_back(m);
 }
 
 void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 {
     Core &c = *(n.core);
     const bool simulate_buffer = (c.pipeline_config.buffer_position ==
-                                         BUFFER_BEFORE_DENDRITE_UNIT) ||
-            (c.pipeline_config.buffer_position == BUFFER_BEFORE_SOMA_UNIT);
+                                         buffer_before_dendrite_unit) ||
+            (c.pipeline_config.buffer_position == buffer_before_soma_unit);
 
     PipelineResult input{};
     if (simulate_buffer)
@@ -650,7 +650,7 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
     // INFO("nid:%s.%d +%e:%e\n", n.parent_group_name.c_str(), n.id,
     //         pipeline_output.latency.value_or(0.0),
     //         n.core->next_message_generation_delay);
-    if (n.status == FIRED)
+    if (n.status == fired)
     {
         pipeline_process_axon_out(ts, n);
     }
@@ -674,7 +674,7 @@ double sanafe::SpikingChip::process_message(
         //  updates to the dendrite and/or soma units as well. Keep propagating
         //  outputs/inputs until we hit the time-step buffer, where outputs
         //  are stored as inputs ready for the next time-step
-        MappedNeuron &n = con.post_neuron;
+        MappedNeuron &n = con.post_neuron_ref;
         const PipelineResult pipeline_output = execute_pipeline(
                 con.message_processing_pipeline, ts, n, &con, empty_input);
         core.timestep_buffer[n.mapped_address] = pipeline_output;
@@ -698,7 +698,7 @@ sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
         output = unit->process(ts, n, con, output);
         total_energy += output.energy.value_or(0.0);
         total_latency += output.latency.value_or(0.0);
-        if (output.status != INVALID_NEURON_STATE)
+        if (output.status != invalid_neuron_state)
         {
             n.status = output.status;
         }
@@ -996,7 +996,7 @@ void sanafe::SpikingChip::sim_hw_timestep(Timestep &ts, Scheduler &scheduler)
 
     auto energy_calculation_end_tm = std::chrono::high_resolution_clock::now();
     auto scheduler_start_tm = energy_calculation_end_tm;
-    if (scheduler.timing_model == TIMING_MODEL_CYCLE_ACCURATE)
+    if (scheduler.timing_model == timing_model_cycle_accurate)
     {
         check_booksim_compatibility(scheduler, chip_count);
     }
@@ -1178,7 +1178,8 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     std::set<Core *> cores_out;
     for (const MappedConnection &curr_connection : pre_neuron.connections_out)
     {
-        Core *dest_core = curr_connection.post_neuron.core;
+        MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
+        Core *dest_core = post_neuron.core;
         cores_out.insert(dest_core);
         TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
     }
@@ -1198,7 +1199,8 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     {
         // Add every connection to the axon. Also link to the map in the
         //  post synaptic core / neuron
-        Core &post_core = *(curr_connection.post_neuron.core);
+        MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
+        Core &post_core = *(post_neuron.core);
         //TRACE1(CHIP, "Adding connection:%d\n", curr_connection.id);
         sim_add_connection_to_axon(curr_connection, post_core);
     }
@@ -1477,7 +1479,7 @@ void sanafe::SpikingChip::sim_trace_record_spikes(
     {
         for (const MappedNeuron &neuron : group_neurons)
         {
-            if (neuron.log_spikes && (neuron.status == sanafe::FIRED))
+            if (neuron.log_spikes && (neuron.status == sanafe::fired))
             {
                 spike_trace_file << neuron.parent_group_name << ".";
                 spike_trace_file << neuron.id << ",";

@@ -5,8 +5,12 @@
 #ifndef ATTRIBUTE_HEADER_INCLUDED_
 #define ATTRIBUTE_HEADER_INCLUDED_
 
+#include <ios>
+#include <map>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -107,27 +111,27 @@ struct ModelAttribute
                 (forward_to_dendrite != rhs.forward_to_dendrite) ||
                 (forward_to_soma != rhs.forward_to_soma);
     }
-    std::string print() const
+    [[nodiscard]] std::string print() const
     {
         if (std::holds_alternative<bool>(value))
         {
             return std::get<bool>(value) ? "true" : "false";
         }
-        else if (std::holds_alternative<int>(value))
+        if (std::holds_alternative<int>(value))
         {
             return std::to_string(std::get<int>(value));
         }
-        else if (std::holds_alternative<double>(value))
+        if (std::holds_alternative<double>(value))
         {
             std::ostringstream ss;
             ss << std::scientific << std::get<double>(value);
             return ss.str();
         }
-        else if (std::holds_alternative<std::string>(value))
+        if (std::holds_alternative<std::string>(value))
         {
             return std::get<std::string>(value);
         }
-        else if (std::holds_alternative<std::vector<ModelAttribute>>(value))
+        if (std::holds_alternative<std::vector<ModelAttribute>>(value))
         {
             throw std::runtime_error("Printing vectors not yet supported");
         }

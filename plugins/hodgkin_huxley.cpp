@@ -119,7 +119,7 @@ public:
     sanafe::PipelineResult update(const size_t neuron_address,
             const std::optional<double> current_in) override
     {
-        sanafe::NeuronStatus status = sanafe::IDLE;
+        sanafe::NeuronStatus status = sanafe::idle;
 
         // Calculate the change in potential since the last update e.g.
         //  integate inputs and apply any potential leak
@@ -159,11 +159,11 @@ public:
         {
             // If voltage just crossed the 25 mV boundary, then
             //  spike
-            status = sanafe::FIRED;
+            status = sanafe::fired;
         }
         else
         {
-            status = sanafe::UPDATED;
+            status = sanafe::updated;
         }
 
         INFO("Updating potential, after:%f\n", V);

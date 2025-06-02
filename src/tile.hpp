@@ -6,6 +6,7 @@
 #ifndef TILE_HEADER_INCLUDED_
 #define TILE_HEADER_INCLUDED_
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,7 @@ namespace sanafe
 class Tile
 {
 public:
-    std::vector<Core> cores{};
+    std::vector<Core> cores;
     std::string name;
     double energy{0.0};
     double energy_north_hop;
@@ -42,7 +43,7 @@ public:
     bool log_latency{false};
 
     explicit Tile(const TileConfiguration &config);
-    [[nodiscard]] int get_id() const { return id; }
+    [[nodiscard]] size_t get_id() const { return id; }
     [[nodiscard]] std::string info() const;
 };
 }

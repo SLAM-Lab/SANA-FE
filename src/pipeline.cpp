@@ -152,7 +152,7 @@ void sanafe::PipelineUnit::check_outputs(
         const MappedNeuron & /*n*/, const PipelineResult &result) const
 {
     // Check the hw returns a valid value for the next unit to process
-    if (implements_soma && result.status == INVALID_NEURON_STATE)
+    if (implements_soma && result.status == invalid_neuron_state)
     {
         throw std::runtime_error("Soma output; should return valid "
                                  "neuron state.");
@@ -409,8 +409,8 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
                 n.soma_hw->default_soma_latency_metrics->latency_access_neuron;
     }
 
-    if ((simulation_result.status == sanafe::UPDATED) ||
-            (simulation_result.status == sanafe::FIRED))
+    if ((simulation_result.status == sanafe::updated) ||
+            (simulation_result.status == sanafe::fired))
     {
         if (soma_energy_metrics_set)
         {
@@ -424,7 +424,7 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
                             ->latency_update_neuron;
         }
     }
-    if (simulation_result.status == sanafe::FIRED)
+    if (simulation_result.status == sanafe::fired)
     {
         if (soma_energy_metrics_set)
         {
@@ -459,12 +459,12 @@ void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
 void sanafe::PipelineUnit::update_soma_activity(
         MappedNeuron &n, const PipelineResult &simulation_result)
 {
-    if ((simulation_result.status == sanafe::UPDATED) ||
-            (simulation_result.status == sanafe::FIRED))
+    if ((simulation_result.status == sanafe::updated) ||
+            (simulation_result.status == sanafe::fired))
     {
         n.soma_hw->neurons_updated++;
 
-        if (simulation_result.status == sanafe::FIRED)
+        if (simulation_result.status == sanafe::fired)
         {
             n.soma_hw->neurons_fired++;
             TRACE1(CHIP, "Neuron %s.%zu fired\n", n.parent_group_name.c_str(),
@@ -590,7 +590,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
 sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
         const std::string &buffer_pos_str, const bool buffer_inside_unit)
 {
-    BufferPosition buffer_pos{BUFFER_BEFORE_DENDRITE_UNIT};
+    BufferPosition buffer_pos{buffer_before_dendrite_unit};
     // H/w either has SANA-FE insert and manage a time-step buffer on the h/w
     //  unit's inputs (before the unit), or can assume that the unit manages its
     //  own state that is internally buffered over consecutive time-steps e.g.,
@@ -600,27 +600,27 @@ sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
     {
         if (buffer_inside_unit)
         {
-            buffer_pos = BUFFER_INSIDE_DENDRITE_UNIT;
+            buffer_pos = buffer_inside_dendrite_unit;
         }
         else
         {
-            buffer_pos = BUFFER_BEFORE_DENDRITE_UNIT;
+            buffer_pos = buffer_before_dendrite_unit;
         }
     }
     else if (buffer_pos_str == "soma")
     {
         if (buffer_inside_unit)
         {
-            buffer_pos = BUFFER_INSIDE_SOMA_UNIT;
+            buffer_pos = buffer_inside_soma_unit;
         }
         else
         {
-            buffer_pos = BUFFER_BEFORE_SOMA_UNIT;
+            buffer_pos = buffer_before_soma_unit;
         }
     }
     else if (buffer_pos_str == "axon_out")
     {
-        buffer_pos = BUFFER_BEFORE_AXON_OUT_UNIT;
+        buffer_pos = buffer_before_axon_out_unit;
     }
     else
     {

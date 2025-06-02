@@ -199,17 +199,17 @@ double sanafe::NocInfo::calculate_route_congestion(const Message &m) const
 void sanafe::schedule_messages(
         Timestep &ts, Scheduler &scheduler, const BookSimConfig &booksim_config)
 {
-    if (scheduler.timing_model == TIMING_MODEL_SIMPLE)
+    if (scheduler.timing_model == timing_model_simple)
     {
         TRACE1(CHIP, "Running simple timing model\n");
         schedule_messages_simple(ts, scheduler);
     }
-    else if (scheduler.timing_model == TIMING_MODEL_DETAILED)
+    else if (scheduler.timing_model == timing_model_detailed)
     {
         TRACE1(CHIP, "Running detailed timing model\n");
         schedule_messages_detailed(ts, scheduler);
     }
-    else if (scheduler.timing_model == TIMING_MODEL_CYCLE_ACCURATE)
+    else if (scheduler.timing_model == timing_model_cycle_accurate)
     {
         TRACE1(CHIP, "Running cycle-accurate timing model\n");
         schedule_messages_cycle_accurate(ts, booksim_config, scheduler);

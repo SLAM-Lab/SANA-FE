@@ -5,16 +5,17 @@
 #ifndef YAML_ARCH_HEADER_INCLUDED_
 #define YAML_ARCH_HEADER_INCLUDED_
 
+
 #include <cstdio>
 #include <fstream>
-#include <iostream>
-#include <optional>
+#include <functional>
+#include <string>
 #include <string_view>
-#include <variant>
-#include <vector>
 
 #include <ryml.hpp> // NOLINT(misc-include-cleaner)
 #include <ryml_std.hpp> // NOLINT(misc-include-cleaner)
+#include <c4/yml/fwd.hpp>
+#include <c4/yml/node.hpp>
 
 #include "arch.hpp"
 #include "fwd.hpp"
@@ -34,11 +35,11 @@ Architecture description_parse_arch_section_yaml(const ryml::Parser &parser, rym
 
 void description_parse_tile_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef tile_node, Architecture &arch);
 void description_parse_core_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef core_node, size_t parent_tile_id, Architecture &arch);
-void description_parse_core_yaml(const ryml::Parser &parser, const ryml::ConstNodeRef core_node, const size_t parent_tile_id, Architecture &arch, const std::string_view &name);
+void description_parse_core_yaml(const ryml::Parser &parser, ryml::ConstNodeRef core_node, size_t parent_tile_id, Architecture &arch, const std::string_view &name);
 
 void yaml_parse_axon_in(const ryml::Parser &parser, ryml::ConstNodeRef axon_in_node, CoreConfiguration &parent_core,  const std::string_view & /*type*/, const std::string &name);
 void yaml_parse_axon_out(const ryml::Parser &parser, ryml::ConstNodeRef axon_out_node, CoreConfiguration &parent_core, const std::string_view & /*type*/, const std::string &name);
-void yaml_parse_processing_unit(const ryml::Parser &parser, const ryml::ConstNodeRef synapse_node, CoreConfiguration &parent_core, const std::string_view &type, const std::string &name);
+void yaml_parse_processing_unit(const ryml::Parser &parser, ryml::ConstNodeRef synapse_node, CoreConfiguration &parent_core, const std::string_view &type, const std::string &name);
 
 AxonInPowerMetrics yaml_parse_axon_in_attributes(const ryml::Parser &parser, ryml::ConstNodeRef attributes);
 AxonOutPowerMetrics yaml_parse_axon_out_attributes(const ryml::Parser &parser, ryml::ConstNodeRef attributes);

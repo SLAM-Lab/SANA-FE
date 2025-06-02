@@ -12,41 +12,43 @@
 #define CHIP_HEADER_INCLUDED_
 
 #include <atomic>
-#include <chrono>
-#include <cstdio>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <list>
+#include <map>
 #include <memory>
-#include <queue>
-#include <set>
-#include <variant>
+#include <optional>
+#include <ostream>
+#include <string>
 
 #include "arch.hpp"
-#include "fwd.hpp"
 #include "core.hpp"
+#include "fwd.hpp"
 #include "pipeline.hpp"
-#include "print.hpp"
 #include "tile.hpp"
+#include <vector>
 
 namespace sanafe
 {
 
 constexpr long int default_heartbeat_timesteps = 1000L;
 
-enum TimingModel : int
+enum TimingModel : uint8_t
 {
-    TIMING_MODEL_SIMPLE, // analytical model
-    TIMING_MODEL_DETAILED, // semi-analytical model
-    TIMING_MODEL_CYCLE_ACCURATE, // Booksim2 simulator
+    timing_model_simple, // analytical model
+    timing_model_detailed, // semi-analytical model
+    timing_model_cycle_accurate, // Booksim2 simulator
 };
 
 class SpikingChip
 {
 public:
-    std::vector<Tile> tiles{};
+    std::vector<Tile> tiles;
     // Keep a reference to the different neuron groups mapped to the H/W
-    std::map<std::string, std::vector<std::reference_wrapper<MappedNeuron>>> mapped_neuron_groups{};
+    std::map<std::string, std::vector<std::reference_wrapper<MappedNeuron>>> mapped_neuron_groups;
 
     SpikingChip(const Architecture &arch, const std::filesystem::path &output_dir = ".", bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false);
     ~SpikingChip();
@@ -55,7 +57,7 @@ public:
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, const TimingModel timing_model = TIMING_MODEL_DETAILED, const int scheduler_thread_count = 1);
+    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1);
     void load(const SpikingNetwork &net);
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
     void reset();
@@ -72,7 +74,7 @@ public:
     size_t noc_buffer_size{1UL};
 
 private:
-    std::unique_ptr<BookSimConfig> booksim_config{};
+    std::unique_ptr<BookSimConfig> booksim_config;
     std::string out_dir;
     size_t total_neurons_mapped{0UL};
     long int total_neurons_updated{0L};
@@ -101,10 +103,10 @@ private:
     bool potential_trace_enabled{false};
     bool perf_trace_enabled{false};
     bool message_trace_enabled{false};
-    std::ofstream spike_trace{};
-    std::ofstream potential_trace{};
-    std::ofstream message_trace{};
-    std::ofstream perf_trace{};
+    std::ofstream spike_trace;
+    std::ofstream potential_trace;
+    std::ofstream message_trace;
+    std::ofstream perf_trace;
 
     // Fixed delay cost that accounts for any constant delays per timestep
     //  E.g. a fixed chip-wide clock period
@@ -134,8 +136,7 @@ private:
 
     static void sim_create_neuron_axons(MappedNeuron &pre_neuron);
     static void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
-    static void sim_add_connection_to_axon(
-            MappedConnection &con, Core &post_core);
+    static void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);
 
     void process_neurons(Timestep &ts);
     void process_messages(Timestep &ts);
@@ -144,10 +145,7 @@ private:
     void process_neuron(Timestep &ts, MappedNeuron &n);
     void receive_message(Message &m);
     static double process_message(Timestep &ts, Core &c, Message &m);
-    static PipelineResult execute_pipeline(
-            const std::vector<PipelineUnit *> &pipeline, Timestep &ts,
-            MappedNeuron &n, std::optional<MappedConnection *> con,
-            const PipelineResult &input);
+    static PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     void retire_scheduled_messages(RunData &rd, Scheduler &scheduler);
 
     static double pipeline_process_axon_in(Core &core, const Message &m);
@@ -160,15 +158,13 @@ private:
     static void sim_trace_write_spike_header(std::ofstream &spike_trace_file);
     void sim_trace_write_potential_header(std::ofstream &potential_trace_file);
     void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
-    static void sim_trace_write_message_header(
-            std::ofstream &message_trace_file);
+    static void sim_trace_write_message_header(std::ofstream &message_trace_file);
     void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps);
     void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep);
     void sim_trace_record_perf(std::ofstream &perf_trace_file, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
 
-    static void check_booksim_compatibility(
-            const Scheduler &scheduler, const int sim_count);
+    static void check_booksim_compatibility(const Scheduler &scheduler, int sim_count);
 };
 
 void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
@@ -176,7 +172,7 @@ void sim_trace_record_message(std::ofstream &message_trace_file, const Message &
 constexpr long int invalid_timestep = -1L;
 struct Timestep
 {
-    std::shared_ptr<std::vector<std::list<Message>>> messages{};
+    std::shared_ptr<std::vector<std::list<Message>>> messages;
     long int timestep{invalid_timestep};
     long int spike_count{0L};
     size_t total_hops{0UL};

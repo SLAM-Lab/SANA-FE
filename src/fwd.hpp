@@ -6,6 +6,8 @@
 #ifndef FWD_HEADER_INCLUDED_
 #define FWD_HEADER_INCLUDED_
 
+#include <cstdint>
+
 namespace sanafe
 {
 class SpikingChip;
@@ -42,14 +44,20 @@ class Core;
 class AxonInUnit;
 class AxonOutUnit;
 class PipelineUnit;
+class SynapseUnit;
+class DendriteUnit;
+class SomaUnit;
+
 
 struct AxonInModel;
 struct AxonOutModel;
 
 struct Message;
 
-enum BufferPosition : int;
+enum BufferPosition : uint8_t;
 enum NeuronStatus : uint8_t;
+
+struct ModelAttribute;
 
 }
 

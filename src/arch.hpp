@@ -22,13 +22,13 @@
 #define ARCH_HEADER_INCLUDED_
 
 #include <cstdint>
-#include <cstdio>
 #include <cstring>
 #include <filesystem> // For std::filesystem::path
 #include <functional> // For std::reference_wrapper
-#include <list>
 #include <map>
 #include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "attribute.hpp"
@@ -37,39 +37,39 @@
 namespace sanafe
 {
 
-enum BufferPosition : int
+enum BufferPosition : uint8_t
 {
-    BUFFER_BEFORE_DENDRITE_UNIT = 0,
-    BUFFER_INSIDE_DENDRITE_UNIT = 1,
-    BUFFER_BEFORE_SOMA_UNIT = 2,
-    BUFFER_INSIDE_SOMA_UNIT = 3,
-    BUFFER_BEFORE_AXON_OUT_UNIT = 4,
-    BUFFER_POSITIONS = 5,
+    buffer_before_dendrite_unit = 0U,
+    buffer_inside_dendrite_unit = 1U,
+    buffer_before_soma_unit = 2U,
+    buffer_inside_soma_unit = 3U,
+    buffer_before_axon_out_unit = 4U,
+    buffer_positions = 5U,
 };
 
 struct ModelInfo
 {
-    std::map<std::string, ModelAttribute> model_attributes{};
-    std::optional<std::filesystem::path> plugin_library_path{};
-    std::string name{};
+    std::map<std::string, ModelAttribute> model_attributes;
+    std::optional<std::filesystem::path> plugin_library_path;
+    std::string name;
     bool log_energy{false};
     bool log_latency{false};
 };
 
-enum NeuronResetModes
+enum NeuronResetModes : uint8_t
 {
-    NEURON_NO_RESET = 0,
-    NEURON_RESET_SOFT = 1,
-    NEURON_RESET_HARD = 2,
-    NEURON_RESET_SATURATE = 3,
-    NEURON_RESET_MODE_COUNT = 4,
+    neuron_no_reset = 0U,
+    neuron_reset_soft = 1U,
+    neuron_reset_hard = 2U,
+    neuron_reset_saturate = 3U,
+    neuron_reset_mode_count = 4U,
 };
 
 class Architecture
 {
 public:
-    std::vector<TileConfiguration> tiles{};
-    std::string name{};
+    std::vector<TileConfiguration> tiles;
+    std::string name;
     size_t core_count{0UL};
     size_t max_cores_per_tile{0UL};
     size_t noc_width_in_tiles{1UL};
@@ -84,7 +84,7 @@ public:
     [[nodiscard]] std::string info() const noexcept;
 
 private:
-    std::pair<int, int> calculate_tile_coordinates(const size_t tile_id) const;
+    [[nodiscard]] std::pair<int, int> calculate_tile_coordinates(size_t tile_id) const;
 };
 
 Architecture load_arch(const std::filesystem::path &path);
@@ -113,21 +113,21 @@ struct TilePowerMetrics
 
 struct TileConfiguration
 {
-    std::vector<CoreConfiguration> cores{};
+    std::vector<CoreConfiguration> cores;
     TilePowerMetrics power_metrics{};
-    std::string name{};
+    std::string name;
     size_t id{};
     size_t x{};
     size_t y{};
 
-    TileConfiguration(std::string name, const size_t id,
+    TileConfiguration(std::string name, size_t id,
             const TilePowerMetrics &metrics);
 };
 
 constexpr size_t default_max_neurons = 1024; // The same as Loihi 1
 struct CorePipelineConfiguration
 {
-    BufferPosition buffer_position{BUFFER_BEFORE_SOMA_UNIT};
+    BufferPosition buffer_position{buffer_before_soma_unit};
     size_t max_neurons_supported{default_max_neurons};
     bool log_energy{false};
     bool log_latency{false};
@@ -143,12 +143,12 @@ struct CoreAddress
 struct CoreConfiguration
 {
     CorePipelineConfiguration pipeline{};
-    std::string name{};
+    std::string name;
     CoreAddress address{};
 
-    std::vector<AxonInConfiguration> axon_in{};
-    std::vector<PipelineUnitConfiguration> pipeline_hw{};
-    std::vector<AxonOutConfiguration> axon_out{};
+    std::vector<AxonInConfiguration> axon_in;
+    std::vector<PipelineUnitConfiguration> pipeline_hw;
+    std::vector<AxonOutConfiguration> axon_out;
 
     AxonInConfiguration &create_axon_in(std::string name, const AxonInPowerMetrics &power_metrics);
     PipelineUnitConfiguration &create_hardware_unit(std::string name, const ModelInfo &model_details);
@@ -166,14 +166,14 @@ struct AxonInPowerMetrics
 struct AxonInConfiguration
 {
     AxonInPowerMetrics metrics{};
-    std::string name{};
+    std::string name;
     AxonInConfiguration(const AxonInPowerMetrics &metrics, std::string name) : metrics(metrics), name(std::move(name)) {}
 };
 
 struct PipelineUnitConfiguration
 {
     ModelInfo model_info{};
-    std::string name{};
+    std::string name;
     size_t tile_id{};
     size_t core_offset{};
     size_t core_id{};
@@ -181,7 +181,7 @@ struct PipelineUnitConfiguration
     bool implements_dendrite{false};
     bool implements_soma{false};
 
-    PipelineUnitConfiguration(const ModelInfo &model_info, const std::string name) : model_info(model_info), name(std::move(name)) {}
+    PipelineUnitConfiguration(ModelInfo model_info, std::string name) : model_info(std::move(model_info)), name(std::move(name)) {}
 };
 
 struct AxonOutPowerMetrics
@@ -193,8 +193,8 @@ struct AxonOutPowerMetrics
 struct AxonOutConfiguration
 {
     AxonOutPowerMetrics metrics{};
-    std::string name{};
-    AxonOutConfiguration(const AxonOutPowerMetrics &metrics, const std::string name) : metrics(metrics), name(std::move(name)) {}
+    std::string name;
+    AxonOutConfiguration(AxonOutPowerMetrics metrics, std::string name) : metrics(metrics), name(std::move(name)) {}
 };
 }
 

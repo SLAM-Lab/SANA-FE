@@ -11,40 +11,38 @@
 #ifndef NETWORK_HEADER_INCLUDED_
 #define NETWORK_HEADER_INCLUDED_
 
-#include <any>
-#include <cstdint>
+#include <cstddef>
 #include <filesystem>
-#include <functional> // For std::reference_wrapper
-#include <list>
+#include <fstream>
+#include <functional>
 #include <map>
-#include <memory>
 #include <optional>
-#include <variant>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "attribute.hpp"
+#include "arch.hpp"
 #include "fwd.hpp"
-#include "print.hpp"
-#include "chip.hpp"
 
 namespace sanafe
 {
 
 struct NeuronConfiguration
 {
-    std::map<std::string, ModelAttribute> model_attributes{};
-    std::optional<std::string> soma_hw_name{};
-    std::optional<std::string> default_synapse_hw_name{};
-    std::optional<std::string> dendrite_hw_name{};
-    std::optional<bool> log_spikes{};
-    std::optional<bool> log_potential{};
-    std::optional<bool> force_synapse_update{};
-    std::optional<bool> force_dendrite_update{};
-    std::optional<bool> force_soma_update{};
+    std::map<std::string, ModelAttribute> model_attributes;
+    std::optional<std::string> soma_hw_name;
+    std::optional<std::string> default_synapse_hw_name;
+    std::optional<std::string> dendrite_hw_name;
+    std::optional<bool> log_spikes;
+    std::optional<bool> log_potential;
+    std::optional<bool> force_synapse_update;
+    std::optional<bool> force_dendrite_update;
+    std::optional<bool> force_soma_update;
 };
 
 struct NeuronAddress
 {
-    std::string group_name{};
+    std::string group_name;
     std::optional<size_t> neuron_offset{std::nullopt};
     [[nodiscard]] std::string info() const;
 };
@@ -66,8 +64,6 @@ struct Conv2DCoordinate
     int channel;
     int y;
     int x;
-
-    Conv2DCoordinate(const int channel, const int y_pos, const int x_pos) : channel(channel), y(y_pos), x(x_pos) {}
 };
 
 struct Conv2DOutputDimensions
@@ -99,11 +95,11 @@ class Neuron
 public:
     std::vector<Connection> edges_out;
     std::map<std::string, ModelAttribute> model_attributes;
-    std::string soma_hw_name{};
-    std::string default_synapse_hw_name{};
-    std::string dendrite_hw_name{};
+    std::string soma_hw_name;
+    std::string default_synapse_hw_name;
+    std::string dendrite_hw_name;
     std::string parent_group_name;
-    SpikingNetwork &parent_net;
+    std::reference_wrapper<SpikingNetwork> parent_net;
     size_t offset{};
     std::optional<CoreAddress> core_address{std::nullopt};
     size_t mapping_order{};
@@ -114,7 +110,7 @@ public:
     bool log_spikes{false};
     bool log_potential{false};
 
-    explicit Neuron(size_t neuron_offset, SpikingNetwork &net, const std::string parent_group_name, const NeuronConfiguration &config);
+    explicit Neuron(size_t neuron_offset, SpikingNetwork &net, std::string parent_group_name, const NeuronConfiguration &config);
     [[nodiscard]] size_t get_id() const { return offset; }
     size_t connect_to_neuron(Neuron &dest);
     void map_to_core(const CoreConfiguration &core);
@@ -131,7 +127,7 @@ public:
     std::string name;
 
     [[nodiscard]] std::string get_name() const { return name; }
-    explicit NeuronGroup(const std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronConfiguration &default_config);
+    explicit NeuronGroup(std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronConfiguration &default_config);
 
     void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists);
     void connect_neurons_sparse(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const std::vector<std::pair<size_t, size_t> > &source_dest_id_pairs);
@@ -168,9 +164,11 @@ public:
     SpikingNetwork(const SpikingNetwork &) = delete;
     SpikingNetwork &operator=(const SpikingNetwork &) = delete;
 
-    NeuronGroup &create_neuron_group(const std::string name, size_t neuron_count, const NeuronConfiguration &default_config);
+    NeuronGroup &create_neuron_group(std::string name, size_t neuron_count,
+            const NeuronConfiguration &default_config);
     [[nodiscard]] std::string info() const;
-    void save(const std::filesystem::path &path, const bool use_netlist_format = false) const;
+    void save(const std::filesystem::path &path,
+            bool use_netlist_format = false) const;
 
     size_t update_mapping_count();
 private:
@@ -178,7 +176,8 @@ private:
     void save_groups_to_netlist(std::ofstream &out) const;
     void save_neurons_to_netlist(std::ofstream &out, const std::map<std::string, size_t> &group_name_to_id) const;
     void save_mappings_to_netlist(std::ofstream &out, const std::map<std::string, size_t> &group_name_to_id) const;
-    std::map<std::string, size_t> create_group_name_to_id_mapping() const;
+    [[nodiscard]] std::map<std::string, size_t>
+    create_group_name_to_id_mapping() const;
 
     void save_yaml(const std::filesystem::path &path) const;
 
@@ -189,10 +188,10 @@ struct Connection
 {
     std::map<std::string, ModelAttribute> synapse_attributes;
     std::map<std::string, ModelAttribute> dendrite_attributes;
-    std::string synapse_hw_name{};
+    std::string synapse_hw_name;
     NeuronAddress pre_neuron{};
     NeuronAddress post_neuron{};
-    int id;
+    size_t id;
 
     Connection(size_t id) : id(id) {}
     [[nodiscard]] std::string info() const;

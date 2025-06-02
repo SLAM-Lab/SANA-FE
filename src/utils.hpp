@@ -7,6 +7,7 @@
 #define UTILS_HEADER_INCLUDED_
 
 #include <chrono>
+#include <cstddef>
 
 namespace sanafe
 {

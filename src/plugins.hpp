@@ -6,6 +6,7 @@
 #ifndef PLUGINS_HEADER_INCLUDED_
 #define PLUGINS_HEADER_INCLUDED_
 #include <filesystem>
+#include <memory>
 #include <string>
 
 #include "fwd.hpp"

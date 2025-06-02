@@ -46,7 +46,7 @@ struct OptionalProgramFlags
     //  detailed build-in timing model (using a scheduler). Select only one of
     //  these two flags to enable either the simple analytical timing model or
     //  an external cycle-accurate timing model (Booksim2).
-    sanafe::TimingModel timing_model = sanafe::TIMING_MODEL_DETAILED;
+    sanafe::TimingModel timing_model = sanafe::timing_model_detailed;
 };
 
 struct RequiredProgramArgs
@@ -67,19 +67,19 @@ struct RequiredProgramArgs
 sanafe::TimingModel parse_timing_model(const std::string_view &timing_model_str)
 {
     sanafe::TimingModel timing_model{
-            sanafe::TimingModel::TIMING_MODEL_DETAILED};
+            sanafe::TimingModel::timing_model_detailed};
 
     if (timing_model_str == "simple")
     {
-        timing_model = sanafe::TIMING_MODEL_SIMPLE;
+        timing_model = sanafe::timing_model_simple;
     }
     else if (timing_model_str == "detailed")
     {
-        timing_model = sanafe::TIMING_MODEL_DETAILED;
+        timing_model = sanafe::timing_model_detailed;
     }
     else if (timing_model_str == "cycle")
     {
-        timing_model = sanafe::TIMING_MODEL_CYCLE_ACCURATE;
+        timing_model = sanafe::timing_model_cycle_accurate;
     }
     else
     {

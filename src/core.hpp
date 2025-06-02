@@ -6,6 +6,8 @@
 #ifndef CORE_HEADER_INCLUDED_
 #define CORE_HEADER_INCLUDED_
 
+#include <cstddef>
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -22,7 +24,7 @@ namespace sanafe
 struct AxonInModel
 {
     // List of all neuron connections to send spikes to
-    std::vector<size_t> synapse_addresses{};
+    std::vector<size_t> synapse_addresses;
     Message *message{nullptr};
     int spikes_received{0};
     int active_synapses{0};
@@ -76,10 +78,10 @@ public:
     std::vector<MappedNeuron> neurons;
     std::vector<MappedConnection *> connections_in;
     std::vector<AxonOutModel> axons_out;
-    std::vector<PipelineResult> timestep_buffer{};
+    std::vector<PipelineResult> timestep_buffer;
 
-    std::list<BufferPosition> neuron_processing_units{};
-    std::list<BufferPosition> message_processing_units{};
+    std::list<BufferPosition> neuron_processing_units;
+    std::list<BufferPosition> message_processing_units;
     CorePipelineConfiguration pipeline_config{};
     std::string name;
     double energy{0.0};
@@ -92,12 +94,12 @@ public:
     bool log_latency{false};
 
     explicit Core(const CoreConfiguration &config);
-    void map_neuron(const Neuron &n, const size_t neuron_id);
+    void map_neuron(const Neuron &n, size_t neuron_id);
     AxonInUnit &create_axon_in(const AxonInConfiguration &config);
     PipelineUnit &create_pipeline_unit(const PipelineUnitConfiguration &config);
     AxonOutUnit &create_axon_out(const AxonOutConfiguration &config);
-    [[nodiscard]] int get_id() const { return id; }
-    [[nodiscard]] int get_offset() const { return offset; }
+    [[nodiscard]] size_t get_id() const { return id; }
+    [[nodiscard]] size_t get_offset() const { return offset; }
     [[nodiscard]] std::string info() const noexcept;
 
 private:

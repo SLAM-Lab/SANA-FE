@@ -534,18 +534,18 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         std::string timing_model_str, const int processing_threads,
         const int scheduler_threads)
 {
-    sanafe::TimingModel timing_model{sanafe::TIMING_MODEL_DETAILED};
+    sanafe::TimingModel timing_model{sanafe::timing_model_detailed};
     if (timing_model_str == "simple")
     {
-        timing_model = sanafe::TIMING_MODEL_SIMPLE;
+        timing_model = sanafe::timing_model_simple;
     }
     else if (timing_model_str == "detailed")
     {
-        timing_model = sanafe::TIMING_MODEL_DETAILED;
+        timing_model = sanafe::timing_model_detailed;
     }
     else if (timing_model_str == "cycle")
     {
-        timing_model = sanafe::TIMING_MODEL_CYCLE_ACCURATE;
+        timing_model = sanafe::timing_model_cycle_accurate;
     }
     else
     {
@@ -647,12 +647,12 @@ PYBIND11_MODULE(sanafecpp, m)
             pybind11::arg("arch"), pybind11::arg("use_netlist_format") = false);
 
     pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
-            .value("BUFFER_BEFORE_DENDRITE_UNIT",
-                    sanafe::BUFFER_BEFORE_DENDRITE_UNIT)
-            .value("BUFFER_BEFORE_SOMA_UNIT", sanafe::BUFFER_BEFORE_SOMA_UNIT)
-            .value("BUFFER_BEFORE_AXON_OUT_UNIT",
-                    sanafe::BUFFER_BEFORE_AXON_OUT_UNIT)
-            .value("BUFFER_POSITIONS", sanafe::BUFFER_POSITIONS);
+            .value("buffer_before_dendrite_unit",
+                    sanafe::buffer_before_dendrite_unit)
+            .value("buffer_before_soma_unit", sanafe::buffer_before_soma_unit)
+            .value("buffer_before_axon_out_unit",
+                    sanafe::buffer_before_axon_out_unit)
+            .value("buffer_positions", sanafe::buffer_positions);
 
     pybind11::class_<sanafe::SpikingNetwork>(m, "Network")
             .def(pybind11::init<>())
@@ -906,7 +906,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("create_core", &pycreate_core, pybind11::arg("name"),
                     pybind11::arg("parent_tile_id"),
                     pybind11::arg("buffer_position") =
-                            sanafe::BUFFER_BEFORE_SOMA_UNIT,
+                            sanafe::buffer_before_soma_unit,
                     pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
@@ -938,7 +938,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("offset_within_tile"),
                     pybind11::arg("core_id"),
                     pybind11::arg("buffer_position") =
-                            sanafe::BUFFER_BEFORE_SOMA_UNIT,
+                            sanafe::buffer_before_soma_unit,
                     pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,

@@ -83,7 +83,8 @@ sanafe::Neuron::Neuron(const size_t neuron_offset, SpikingNetwork &net,
 void sanafe::Neuron::map_to_core(const CoreConfiguration &core)
 {
     this->core_address = core.address;
-    mapping_order = parent_net.update_mapping_count();
+    SpikingNetwork &net = parent_net;
+    mapping_order = net.update_mapping_count();
     TRACE1(NET, "Mapping order for nid:%s.%zu = %zu\n",
             parent_group_name.c_str(), offset, mapping_order);
 }
@@ -306,7 +307,7 @@ void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
         {
             for (int x_out = 0; x_out < dims.output_width; ++x_out)
             {
-                const Conv2DCoordinate out(c_out, y_out, x_out);
+                const Conv2DCoordinate out{c_out, y_out, x_out};
                 conv2d_create_output_neuron_connections(
                         dest_group, attribute_lists, convolution, dims, out);
             }
