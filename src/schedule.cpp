@@ -221,7 +221,7 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
         last_timestamp = std::max(last_timestamp, m.sent_timestamp);
 
         // Update the Network-on-Chip state
-        schedule_update_noc(m.sent_timestamp, noc);
+        noc_update_all_tracked_messages(m.sent_timestamp, noc);
 
         if (!m.placeholder)
         {
@@ -335,7 +335,7 @@ void sanafe::schedule_handle_message(
     //  network delay and when the message is received
     m.in_noc = true;
     noc.messages_received[dest_core].push_back(m);
-    schedule_update_noc(m, noc, true);
+    noc_update_message_tracking(m, noc, true);
 }
 
 double sanafe::schedule_push_next_message(
@@ -358,27 +358,7 @@ double sanafe::schedule_push_next_message(
     return last_timestamp;
 }
 
-void sanafe::schedule_update_noc(
-        const Message &m, NocInfo &noc, const bool entering_noc)
-{
-    // Update the tracked state of the NoC, accounting for a single message
-    //  either entering or leaving the NoC (message_in)
-    noc.update_message_density(m, entering_noc);
-    noc.update_rolling_averages(m, entering_noc);
-#if 0
-    INFO("Density:");
-    for (auto &val : noc.message_density)
-    {
-        printf("%.2lf,", val);
-    }
-    printf("\n");
-#endif
-    TRACE1(SCHEDULER, "Mean receive delay:%e\n",
-            noc.mean_in_flight_receive_delay);
-    TRACE1(SCHEDULER, "Messages:%ld\n", noc.messages_in_noc);
-}
-
-void sanafe::schedule_update_noc(const double t, NocInfo &noc)
+void sanafe::noc_update_all_tracked_messages(const double t, NocInfo &noc)
 {
     // Update the tracked state of the NoC at a given time, t
     for (auto &q : noc.messages_received)
@@ -391,13 +371,33 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
             if (m.in_noc && (t >= m.received_timestamp))
             {
                 m.in_noc = false;
-                schedule_update_noc(m, noc, false);
+                noc_update_message_tracking(m, noc, false);
                 TRACE1(SCHEDULER, "Removing message mid:%zu\n", m.mid);
                 return true; // Remove this message
             }
             return false; // Keep this message
         });
     }
+}
+
+void sanafe::noc_update_message_tracking(
+        const Message &m, NocInfo &noc, const bool entering_noc)
+{
+    // Update the tracked state of the NoC, accounting for a single message
+    //  either entering or leaving the NoC (message_in)
+    noc.update_message_density(m, entering_noc);
+    noc.update_rolling_averages(m, entering_noc);
+#if (DEBUG_LEVEL_SCHEDULER > 0)
+    INFO("Message density:");
+    for (auto &val : noc.message_density)
+    {
+        printf("%.2lf,", val);
+    }
+    printf("\n");
+#endif
+    TRACE1(SCHEDULER, "Mean receive delay:%e\n",
+            noc.mean_in_flight_receive_delay);
+    TRACE1(SCHEDULER, "Messages:%ld\n", noc.messages_in_noc);
 }
 
 sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(

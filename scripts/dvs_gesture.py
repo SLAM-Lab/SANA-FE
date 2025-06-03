@@ -170,7 +170,7 @@ if __name__ == "__main__":
             for id, mapped_neuron in enumerate(mapped_inputs):
                 mapped_neuron.set_model_attributes(
                     model_attributes={"bias": dvs_inputs[id]})
-            chip.sim(timesteps)
+            chip.sim(timesteps, timing_model="detailed")
             chip.reset()
 
         # Parse the detailed perf statistics

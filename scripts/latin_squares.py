@@ -23,7 +23,7 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 import sanafe
 
-ARCH_FILENAME = "arch/loihi.yaml"
+ARCH_FILENAME = "arch/loihi_with_noise.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
@@ -209,8 +209,7 @@ if __name__ == "__main__":
                     #  timing model
                     row = [line["N"], line["network"], energy, time]
                     results = run_experiment(line["network"], timing_model="cycle")
-
-                    cycle_accurate = results["sim_time"]
+                    cycle_accurate = results["sim_time"] / TIMESTEPS
                     row.append(cycle_accurate)
 
                     with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
@@ -230,6 +229,8 @@ if __name__ == "__main__":
         sim_latency = df["sim_latency"].values * 1.0e6
         loihi_latency = df["loihi_latency"].values * 1.0e6
         booksim_latency = df["sim_cycle"].values * 1.0e6
+        print(booksim_latency)
+        print(loihi_latency)
 
         # Plot the simulated vs measured energy
         plt.rcParams.update({"font.size": 6, "lines.markersize": 5})
@@ -256,8 +257,8 @@ if __name__ == "__main__":
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
 
-        plt.plot(sim_latency, loihi_latency, "x", mew=1.5)
         plt.plot(booksim_latency, loihi_latency, "s", mew=1.5, markerfacecolor="none")
+        plt.plot(sim_latency, loihi_latency, "x", mew=1.5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")
         plt.xlabel("Simulated Latency ($\mu$s)")
