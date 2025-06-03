@@ -38,164 +38,6 @@ sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
     core_finished_receiving = std::vector<double>(core_count);
 }
 
-void sanafe::NocInfo::update_rolling_averages(
-        const Message &message, const bool entering_noc)
-{
-    if (entering_noc)
-    {
-        // Message entering NoC
-        mean_in_flight_receive_delay +=
-                (message.receive_delay - mean_in_flight_receive_delay) /
-                (static_cast<double>(messages_in_noc) + 1.0);
-        messages_in_noc++;
-    }
-    else
-    {
-        // Message leaving the NoC
-        if (messages_in_noc > 1)
-        {
-            mean_in_flight_receive_delay +=
-                    (mean_in_flight_receive_delay - message.receive_delay) /
-                    (static_cast<double>(messages_in_noc) - 1.0);
-        }
-        else
-        {
-            mean_in_flight_receive_delay = 0.0;
-        }
-
-        messages_in_noc--;
-    }
-}
-
-void sanafe::NocInfo::update_message_density(
-        const Message &message, const bool entering_noc)
-{
-    // Adjust by dividing by the total number of links along the path, also
-    //  including the output link at the sending core and input link at the
-    //  receiving core, i.e. the hops plus 2. The total sum of the added
-    //  densities along the path should equal one for one new message.
-    constexpr double input_plus_output_link = 2.0;
-    double adjust = (1.0 /
-            (input_plus_output_link + static_cast<double>(message.hops)));
-
-    if (!entering_noc)
-    {
-        // Remove message from NoC
-        adjust *= -1.0;
-    }
-
-    auto [x_increment, y_increment] = get_route_xy_increments(message);
-    size_t prev_direction = sanafe::ndirections + (message.src_core_offset);
-    for (size_t x = message.src_x; x != message.dest_x; x += x_increment)
-    {
-        const int direction = (x_increment > 0) ? sanafe::east : sanafe::west;
-        if (x == message.src_x)
-        {
-            const size_t link = sanafe::ndirections + (message.src_core_offset);
-            message_density[idx(x, message.src_y, link)] += adjust;
-        }
-        else
-        {
-            message_density[idx(x, message.src_y, direction)] += adjust;
-        }
-        prev_direction = direction;
-    }
-    for (size_t y = message.src_y; y != message.dest_y; y += y_increment)
-    {
-        const int direction = (y_increment > 0) ? sanafe::north : sanafe::south;
-        if ((message.src_x == message.dest_x) && (y == message.src_y))
-        {
-            const size_t link = sanafe::ndirections + message.src_core_offset;
-            message_density[idx(message.dest_x, y, link)] += adjust;
-        }
-        else
-        {
-            message_density[idx(message.dest_x, y, prev_direction)] += adjust;
-        }
-
-        prev_direction = direction;
-    }
-
-    if ((message.src_x == message.dest_x) && (message.src_y == message.dest_y))
-    {
-        const size_t link = sanafe::ndirections + (message.src_core_offset);
-        message_density[idx(message.dest_x, message.dest_y, link)] += adjust;
-    }
-    else
-    {
-        message_density[idx(message.dest_x, message.dest_y, prev_direction)] +=
-                adjust;
-    }
-}
-
-std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
-        const Message &m) noexcept
-{
-    const int x_increment = (m.src_x < m.dest_x) ? 1 : -1;
-    const int y_increment = (m.src_y < m.dest_y) ? 1 : -1;
-
-    return std::make_pair(x_increment, y_increment);
-}
-
-double sanafe::NocInfo::calculate_route_congestion(const Message &m) const
-{
-    // Calculate the total flow density as a metric for route congestion along a
-    //  spike message's route. This is given by the sum of the densities, for
-    //  all links the message will travel i.e., the message path. Note that we
-    //  calculat ethe path assuming a dimension-order routing scheme.
-    // TODO: extend this to generalize to different routing schemes.
-    auto [x_increment, y_increment] = get_route_xy_increments(m);
-    double flow_density = 0.0;
-
-    size_t prev_direction = sanafe::ndirections + (m.src_core_offset);
-    for (size_t x = m.src_x; x != m.dest_x; x += x_increment)
-    {
-        const int direction = (x_increment > 0) ? sanafe::east : sanafe::west;
-        if (x == m.src_x)
-        {
-            const size_t link = sanafe::ndirections + m.src_core_offset;
-            flow_density += message_density[idx(x, m.src_y, link)];
-        }
-        else
-        {
-            flow_density += message_density[idx(x, m.src_y, direction)];
-        }
-        prev_direction = direction;
-    }
-
-    for (size_t y = m.src_y; y != m.dest_y; y += y_increment)
-    {
-        const int direction = (y_increment > 0) ? sanafe::north : sanafe::south;
-        if (m.src_x == m.dest_x && y == m.src_y)
-        {
-            const size_t link = sanafe::ndirections + m.src_core_offset;
-            flow_density += message_density[idx(m.dest_x, y, link)];
-        }
-        else
-        {
-            flow_density += message_density[idx(m.dest_x, y, prev_direction)];
-        }
-        prev_direction = direction;
-    }
-    // Handle the last (destination) tile
-    if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
-    {
-        const size_t link = sanafe::ndirections + m.src_core_offset;
-        flow_density += message_density[idx(m.dest_x, m.dest_y, link)];
-    }
-    else
-    {
-        flow_density +=
-                message_density[idx(m.dest_x, m.dest_y, prev_direction)];
-    }
-
-#ifndef NDEBUG
-    constexpr double epsilon = 0.1; // In case density is very slightly below 0
-#endif
-    assert(flow_density >= (-epsilon));
-    return flow_density;
-}
-
 void sanafe::schedule_messages(
         Timestep &ts, Scheduler &scheduler, const BookSimConfig &booksim_config)
 {
@@ -320,6 +162,20 @@ void sanafe::schedule_messages_cycle_accurate(
     scheduler.timesteps_to_write.push(ts);
 }
 
+void sanafe::schedule_create_threads(
+        Scheduler &scheduler, const int scheduler_thread_count)
+{
+    TRACE1(CHIP, "Creating %d scheduler threads\n", scheduler_thread_count);
+    for (int thread_id = 0; thread_id < scheduler_thread_count; thread_id++)
+    {
+        TRACE1(CHIP, "Created scheduler thread:%d\n", thread_id);
+        scheduler.scheduler_threads.emplace_back(
+                &schedule_messages_thread, std::ref(scheduler), thread_id);
+    }
+}
+
+// **** Detailed scheduler implementation ****
+
 void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
 {
     if (scheduler.scheduler_threads.empty())
@@ -333,153 +189,6 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
         scheduler.timesteps_to_schedule.push(ts);
         return;
     }
-}
-
-void sanafe::schedule_create_threads(
-        Scheduler &scheduler, const int scheduler_thread_count)
-{
-    TRACE1(CHIP, "Creating %d scheduler threads\n", scheduler_thread_count);
-    for (int thread_id = 0; thread_id < scheduler_thread_count; thread_id++)
-    {
-        TRACE1(CHIP, "Created scheduler thread:%d\n", thread_id);
-        scheduler.scheduler_threads.emplace_back(
-                &schedule_messages_thread, std::ref(scheduler), thread_id);
-    }
-}
-
-void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
-{
-    while (!scheduler.should_stop)
-    {
-        if (scheduler.should_stop)
-        {
-            break;
-        }
-
-        Timestep ts;
-        const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
-        if (got_ts)
-        {
-            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", thread_id,
-                    ts.timestep);
-            schedule_messages_timestep(ts, scheduler);
-        }
-    }
-
-    TRACE1(SCHEDULER, "Scheduler thread tid:%d terminating gracefully\n",
-            thread_id);
-}
-
-void sanafe::schedule_stop_all_threads(Scheduler &scheduler,
-        std::ofstream & /*message_trace*/, sanafe::RunData & /*rd*/)
-{
-    TRACE1(SCHEDULER, "Stopping all scheduling threads.\n");
-    scheduler.timesteps_to_schedule.wait_until_empty();
-    TRACE1(SCHEDULER, "All messages scheduled so terminate threads.\n");
-    scheduler.should_stop = true;
-    scheduler.timesteps_to_schedule.set_terminate();
-    scheduler.timesteps_to_write.set_terminate();
-
-    // This function is blocking i.e., waits for all workers to finish
-    for (auto &thread : scheduler.scheduler_threads)
-    {
-        if (thread.joinable())
-        {
-            thread.join();
-        }
-    }
-
-    TRACE1(SCHEDULER, "All threads stopped successfully.\n");
-}
-
-std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
-        Timestep &ts, NocInfo &noc)
-{
-    const size_t total_links = noc.noc_height_in_tiles *
-            noc.noc_width_in_tiles *
-            (sanafe::ndirections + noc.max_cores_per_tile);
-    noc.message_density = std::vector<double>(total_links, 0.0);
-
-    std::vector<MessageFifo> messages_sent_per_core(noc.core_count);
-    for (size_t core = 0; core < ts.messages->size(); core++)
-    {
-        auto &q = ts.messages->at(core);
-        for (const Message &m : q)
-        {
-            messages_sent_per_core[core].push_back(m);
-        }
-    }
-
-    return messages_sent_per_core;
-}
-
-void sanafe::schedule_handle_message(
-        Message &m, Scheduler &scheduler, NocInfo &noc)
-{
-    TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
-            m.src_neuron_group_id.c_str(), m.src_neuron_offset);
-    TRACE1(SCHEDULER, "Send delay:%e\n", m.generation_delay);
-    TRACE1(SCHEDULER, "Receive delay:%e\n", m.receive_delay);
-    const size_t dest_core = m.dest_core_id;
-    // Figure out if we are able to send a message into the
-    //  network i.e., is the route to the dest core
-    //  saturated and likely to block? Sum along the route
-    //  and see the density of messages along all links.
-    const double messages_along_route = noc.calculate_route_congestion(m);
-    const auto path_capacity =
-            static_cast<double>((m.hops + 1UL) * scheduler.buffer_size);
-    if (messages_along_route > path_capacity)
-    {
-        // Use heuristic for estimating delay based on route congestion,
-        //  path capacity in messages and the mean delay per message
-        m.sent_timestamp += (messages_along_route - path_capacity) *
-                noc.mean_in_flight_receive_delay;
-    }
-
-    // Now, push the message into the right receiving queue
-    //  Calculate the network delay and when the message
-    //  is received
-    m.in_noc = true;
-    noc.messages_received[dest_core].push_back(m);
-    schedule_update_noc(m, noc, true);
-
-    const double network_delay = messages_along_route *
-            noc.mean_in_flight_receive_delay /
-            (static_cast<double>(m.hops) + 1.0);
-    TRACE1(SCHEDULER, "Path capacity:%lf messages:%lf delay:%e\n",
-            path_capacity, messages_along_route, network_delay);
-
-    // Update the messages timestamps, both when the message is received and
-    //  when the receiving core has finished processing it
-    const double earliest_received_time =
-            m.sent_timestamp + std::max(m.network_delay, network_delay);
-    m.received_timestamp = std::max(
-            noc.core_finished_receiving[dest_core], earliest_received_time);
-
-    noc.core_finished_receiving[dest_core] =
-            std::max((noc.core_finished_receiving[dest_core] + m.receive_delay),
-                    (earliest_received_time + m.receive_delay));
-    m.processed_timestamp = noc.core_finished_receiving[dest_core];
-}
-
-double sanafe::schedule_push_next_message(
-        std::vector<MessageFifo> &messages_sent_per_core,
-        MessagePriorityQueue &priority, const Message &current_message)
-{
-    auto &q = messages_sent_per_core[current_message.src_core_id];
-    Message &next_message = q.front();
-
-    // If applicable, schedule this next message immediately
-    //  after the current message finishes sending
-    next_message.sent_timestamp =
-            current_message.sent_timestamp + next_message.generation_delay;
-    priority.push(next_message);
-
-    // Record the latest timestamp before deleting the copy of the message
-    const double last_timestamp = next_message.sent_timestamp;
-    q.pop_front();
-
-    return last_timestamp;
 }
 
 double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
@@ -557,6 +266,95 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
     ts.sim_time += scheduler.fixed_timestep_delay;
     scheduler.timesteps_to_write.push(ts);
 
+    return ts.sim_time;
+}
+
+std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
+        Timestep &ts, NocInfo &noc)
+{
+    const size_t total_links = noc.noc_height_in_tiles *
+            noc.noc_width_in_tiles *
+            (sanafe::ndirections + noc.max_cores_per_tile);
+    noc.message_density = std::vector<double>(total_links, 0.0);
+
+    std::vector<MessageFifo> messages_sent_per_core(noc.core_count);
+    for (size_t core = 0; core < ts.messages->size(); core++)
+    {
+        auto &q = ts.messages->at(core);
+        for (const Message &m : q)
+        {
+            messages_sent_per_core[core].push_back(m);
+        }
+    }
+
+    return messages_sent_per_core;
+}
+
+void sanafe::schedule_handle_message(
+        Message &m, Scheduler &scheduler, NocInfo &noc)
+{
+    TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
+            m.src_neuron_group_id.c_str(), m.src_neuron_offset);
+    TRACE1(SCHEDULER, "Send delay:%e\n", m.generation_delay);
+    TRACE1(SCHEDULER, "Receive delay:%e\n", m.receive_delay);
+    const size_t dest_core = m.dest_core_id;
+    // Figure out if we are able to send a message into the
+    //  network i.e., is the route to the dest core
+    //  saturated and likely to block? Sum along the route
+    //  and see the density of messages along all links.
+    const double messages_along_route = noc.calculate_route_congestion(m);
+    const auto path_capacity =
+            static_cast<double>((m.hops + 1UL) * scheduler.buffer_size);
+    if (messages_along_route > path_capacity)
+    {
+        // Use heuristic for estimating delay based on route congestion,
+        //  path capacity in messages and the mean delay per message
+        m.sent_timestamp += (messages_along_route - path_capacity) *
+                noc.mean_in_flight_receive_delay;
+    }
+
+    const double network_delay = messages_along_route *
+            noc.mean_in_flight_receive_delay /
+            (static_cast<double>(m.hops) + 1.0);
+    TRACE1(SCHEDULER, "Path capacity:%lf messages:%lf delay:%e\n",
+            path_capacity, messages_along_route, network_delay);
+
+    // Update the messages timestamps, both when the message is received and
+    //  when the receiving core has finished processing it
+    const double earliest_received_time =
+            m.sent_timestamp + std::max(m.network_delay, network_delay);
+    m.received_timestamp = std::max(
+            noc.core_finished_receiving[dest_core], earliest_received_time);
+
+    noc.core_finished_receiving[dest_core] =
+            std::max((noc.core_finished_receiving[dest_core] + m.receive_delay),
+                    (earliest_received_time + m.receive_delay));
+    m.processed_timestamp = noc.core_finished_receiving[dest_core];
+
+    // Now, push the message into the right receiving queue. Calculate the
+    //  network delay and when the message is received
+    m.in_noc = true;
+    noc.messages_received[dest_core].push_back(m);
+    schedule_update_noc(m, noc, true);
+}
+
+double sanafe::schedule_push_next_message(
+        std::vector<MessageFifo> &messages_sent_per_core,
+        MessagePriorityQueue &priority, const Message &current_message)
+{
+    auto &q = messages_sent_per_core[current_message.src_core_id];
+    Message &next_message = q.front();
+
+    // If applicable, schedule this next message immediately
+    //  after the current message finishes sending
+    next_message.sent_timestamp =
+            current_message.sent_timestamp + next_message.generation_delay;
+    priority.push(next_message);
+
+    // Record the latest timestamp before deleting the copy of the message
+    const double last_timestamp = next_message.sent_timestamp;
+    q.pop_front();
+
     return last_timestamp;
 }
 
@@ -567,6 +365,17 @@ void sanafe::schedule_update_noc(
     //  either entering or leaving the NoC (message_in)
     noc.update_message_density(m, entering_noc);
     noc.update_rolling_averages(m, entering_noc);
+#if 0
+    INFO("Density:");
+    for (auto &val : noc.message_density)
+    {
+        printf("%.2lf,", val);
+    }
+    printf("\n");
+#endif
+    TRACE1(SCHEDULER, "Mean receive delay:%e\n",
+            noc.mean_in_flight_receive_delay);
+    TRACE1(SCHEDULER, "Messages:%ld\n", noc.messages_in_noc);
 }
 
 void sanafe::schedule_update_noc(const double t, NocInfo &noc)
@@ -583,6 +392,7 @@ void sanafe::schedule_update_noc(const double t, NocInfo &noc)
             {
                 m.in_noc = false;
                 schedule_update_noc(m, noc, false);
+                TRACE1(SCHEDULER, "Removing message mid:%zu\n", m.mid);
                 return true; // Remove this message
             }
             return false; // Keep this message
@@ -615,4 +425,213 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
     }
 
     return priority;
+}
+
+void sanafe::NocInfo::update_rolling_averages(
+        const Message &message, const bool entering_noc)
+{
+    if (entering_noc)
+    {
+        // Message entering NoC
+        mean_in_flight_receive_delay +=
+                (message.receive_delay - mean_in_flight_receive_delay) /
+                (static_cast<double>(messages_in_noc) + 1.0);
+        messages_in_noc++;
+    }
+    else
+    {
+        // Message leaving the NoC
+        if (messages_in_noc > 1)
+        {
+            mean_in_flight_receive_delay +=
+                    (mean_in_flight_receive_delay - message.receive_delay) /
+                    (static_cast<double>(messages_in_noc) - 1.0);
+        }
+        else
+        {
+            mean_in_flight_receive_delay = 0.0;
+        }
+
+        messages_in_noc--;
+    }
+}
+
+void sanafe::NocInfo::update_message_density(
+        const Message &message, const bool entering_noc)
+{
+    // Adjust by dividing by the total number of links along the path, also
+    //  including the output link at the sending core and input link at the
+    //  receiving core, i.e. the hops plus 2. The total sum of the added
+    //  densities along the path should equal one for one new message.
+    constexpr double input_plus_output_link = 2.0;
+    double adjust = (1.0 /
+            (input_plus_output_link + static_cast<double>(message.hops)));
+
+    if (!entering_noc)
+    {
+        // Remove message from NoC
+        adjust *= -1.0;
+    }
+
+    auto [x_increment, y_increment] = get_route_xy_increments(message);
+    size_t prev_direction = sanafe::ndirections + (message.src_core_offset);
+    for (size_t x = message.src_x; x != message.dest_x; x += x_increment)
+    {
+        const int direction = (x_increment > 0) ? sanafe::east : sanafe::west;
+        if (x == message.src_x)
+        {
+            const size_t link = sanafe::ndirections + (message.src_core_offset);
+            message_density[idx(x, message.src_y, link)] += adjust;
+        }
+        else
+        {
+            message_density[idx(x, message.src_y, direction)] += adjust;
+        }
+        prev_direction = direction;
+    }
+    for (size_t y = message.src_y; y != message.dest_y; y += y_increment)
+    {
+        const int direction = (y_increment > 0) ? sanafe::north : sanafe::south;
+        if ((message.src_x == message.dest_x) && (y == message.src_y))
+        {
+            const size_t link = sanafe::ndirections + message.src_core_offset;
+            message_density[idx(message.dest_x, y, link)] += adjust;
+        }
+        else
+        {
+            message_density[idx(message.dest_x, y, prev_direction)] += adjust;
+        }
+
+        prev_direction = direction;
+    }
+
+    if ((message.src_x == message.dest_x) && (message.src_y == message.dest_y))
+    {
+        const size_t link = sanafe::ndirections + (message.src_core_offset);
+        message_density[idx(message.dest_x, message.dest_y, link)] += adjust;
+    }
+    else
+    {
+        message_density[idx(message.dest_x, message.dest_y, prev_direction)] +=
+                adjust;
+    }
+}
+
+double sanafe::NocInfo::calculate_route_congestion(const Message &m) const
+{
+    // Calculate the total flow density as a metric for route congestion along a
+    //  spike message's route. This is given by the sum of the densities, for
+    //  all links the message will travel i.e., the message path. Note that we
+    //  calculat ethe path assuming a dimension-order routing scheme.
+    // TODO: extend this to generalize to different routing schemes.
+    auto [x_increment, y_increment] = get_route_xy_increments(m);
+    double flow_density = 0.0;
+
+    size_t prev_direction = sanafe::ndirections + (m.src_core_offset);
+    for (size_t x = m.src_x; x != m.dest_x; x += x_increment)
+    {
+        const int direction = (x_increment > 0) ? sanafe::east : sanafe::west;
+        if (x == m.src_x)
+        {
+            const size_t link = sanafe::ndirections + m.src_core_offset;
+            flow_density += message_density[idx(x, m.src_y, link)];
+        }
+        else
+        {
+            flow_density += message_density[idx(x, m.src_y, direction)];
+        }
+        prev_direction = direction;
+    }
+
+    for (size_t y = m.src_y; y != m.dest_y; y += y_increment)
+    {
+        const int direction = (y_increment > 0) ? sanafe::north : sanafe::south;
+        if (m.src_x == m.dest_x && y == m.src_y)
+        {
+            const size_t link = sanafe::ndirections + m.src_core_offset;
+            flow_density += message_density[idx(m.dest_x, y, link)];
+        }
+        else
+        {
+            flow_density += message_density[idx(m.dest_x, y, prev_direction)];
+        }
+        prev_direction = direction;
+    }
+    // Handle the last (destination) tile
+    if ((m.src_x == m.dest_x) && (m.src_y == m.dest_y))
+    {
+        const size_t link = sanafe::ndirections + m.src_core_offset;
+        flow_density += message_density[idx(m.dest_x, m.dest_y, link)];
+    }
+    else
+    {
+        flow_density +=
+                message_density[idx(m.dest_x, m.dest_y, prev_direction)];
+    }
+
+#ifndef NDEBUG
+    constexpr double epsilon = 0.1; // In case density is very slightly below 0
+#endif
+    assert(flow_density >= (-epsilon));
+    return flow_density;
+}
+
+
+std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
+        const Message &m) noexcept
+{
+    const int x_increment = (m.src_x < m.dest_x) ? 1 : -1;
+    const int y_increment = (m.src_y < m.dest_y) ? 1 : -1;
+
+    return std::make_pair(x_increment, y_increment);
+}
+
+
+// **** Thread management ****
+// TODO: make this agnostic to scheduling algorithm, so it can be applied to
+//  the simple and cycle accurate models in future
+
+void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
+{
+    while (!scheduler.should_stop)
+    {
+        if (scheduler.should_stop)
+        {
+            break;
+        }
+
+        Timestep ts;
+        const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
+        if (got_ts)
+        {
+            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", thread_id,
+                    ts.timestep);
+            schedule_messages_timestep(ts, scheduler);
+        }
+    }
+
+    TRACE1(SCHEDULER, "Scheduler thread tid:%d terminating gracefully\n",
+            thread_id);
+}
+
+void sanafe::schedule_stop_all_threads(Scheduler &scheduler,
+        std::ofstream & /*message_trace*/, sanafe::RunData & /*rd*/)
+{
+    TRACE1(SCHEDULER, "Stopping all scheduling threads.\n");
+    scheduler.timesteps_to_schedule.wait_until_empty();
+    TRACE1(SCHEDULER, "All messages scheduled so terminate threads.\n");
+    scheduler.should_stop = true;
+    scheduler.timesteps_to_schedule.set_terminate();
+    scheduler.timesteps_to_write.set_terminate();
+
+    // This function is blocking i.e., waits for all workers to finish
+    for (auto &thread : scheduler.scheduler_threads)
+    {
+        if (thread.joinable())
+        {
+            thread.join();
+        }
+    }
+
+    TRACE1(SCHEDULER, "All threads stopped successfully.\n");
 }

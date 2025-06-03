@@ -659,6 +659,43 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 double sanafe::SpikingChip::process_message(
         Timestep &ts, Core &core, Message &m)
 {
+
+    // const double latencies[] = {
+    //     0.0,
+    //     0.00000002892606798,
+    //     0.00000002894865371,
+    //     0.00000004564573201,
+    //     0.00000004246846006,
+    //     0.00000004247438192,
+    //     0.00000004247237432,
+    //     0.00000005659757896,
+    //     0.00000005659945379,
+    //     0.00000005657260226,
+    //     0.00000007392710257,
+    //     0.00000007074468967,
+    //     0.0000000707229477,
+    //     0.00000008447058221,
+    //     0.00000008481010547,
+    //     0.00000008480691797,
+    //     0.00000009858068535,
+    //     0.0000001158763025,
+    //     0.00000009886579449,
+    //     0.0000001126828899,
+    //     0.000000112718968,
+    //     0.0000001129748819,
+    //     0.0000001267611725,
+    //     0.0000001266836962,
+    //     0.000000126653829,
+    //     0.0000001407869555,
+    //     0.0000001406869712,
+    //     0.0000001407240414,
+    //     0.0000001547693632,
+    //     0.0000001548646992,
+    //     0.0000001549567224,
+    //     0.0000001687381948,
+    //     0.0000001691043891,
+    // };
+
     double message_processing_latency = pipeline_process_axon_in(core, m);
 
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
@@ -666,6 +703,7 @@ double sanafe::SpikingChip::process_message(
     const PipelineResult
             empty_input{}; // Empty/default struct used as dummy input
 
+    //INFO("synapses in this axon:%zu\n", axon_in.synapse_addresses.size());
     for (const size_t synapse_address : axon_in.synapse_addresses)
     {
         MappedConnection &con = *(core.connections_in[synapse_address]);
@@ -680,6 +718,16 @@ double sanafe::SpikingChip::process_message(
         core.timestep_buffer[n.mapped_address] = pipeline_output;
         message_processing_latency += pipeline_output.latency.value_or(0.0);
     }
+
+    // if (axon_in.synapse_addresses.size() > 0 && axon_in.synapse_addresses.size() <= 32)
+    // {
+    //     message_processing_latency += latencies[axon_in.synapse_addresses.size() - 1];
+    // }
+    // if (axon_in.synapse_addresses.size() > 32)
+    // {
+    //     INFO("error!\n");
+    //     exit(0);
+    // }
 
     return message_processing_latency;
 }
@@ -769,7 +817,6 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         axon_result.energy.value() += axon_out_hw.energy_access;
         axon_result.latency.value() += axon_out_hw.latency_access;
     }
-
 
     // This was a bug lost in the noise, 0.2% error difference
     // TODO: this existed in my old code.. can I justify it or was it a bug
