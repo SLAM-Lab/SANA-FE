@@ -11,12 +11,14 @@
 //  and this textbook: https://mrgreene09.github.io/computational-neuroscience-textbook
 #include <cmath>
 #include <cstring>
-#include <iostream>
+#include <optional>
+#include <string>
 
-#include "arch.hpp"
-#include "models.hpp"
-#include "plugins.hpp"
+#include "attribute.hpp"
+#include "mapped.hpp"
+#include "pipeline.hpp"
 #include "print.hpp"
+
 
 class HodgkinHuxley : public sanafe::SomaUnit
 {
@@ -63,7 +65,7 @@ public:
         register_attributes({"m", "n", "h", "current"});
     }
 
-    double get_potential(const size_t neuron_address) override
+    double get_potential(const size_t /*neuron_address*/) override
     {
         return V;
     }
@@ -84,17 +86,12 @@ public:
         denominator = 0.0;
         tau_V = 0.0;
         Vinf = 0.0;
-
-        return;
     }
 
-    void set_attribute_hw(const std::string &attribute_name,
-            const sanafe::ModelAttribute &param) override
-    {
-        return;
-    };
+    void set_attribute_hw(const std::string & /*attribute_name*/,
+            const sanafe::ModelAttribute & /*param*/) override {};
 
-    void set_attribute_neuron(const size_t neuron_address,
+    void set_attribute_neuron(const size_t /*neuron_address*/,
             const std::string &attribute_name,
             const sanafe::ModelAttribute &param) override
     {
@@ -116,8 +113,8 @@ public:
         }
     }
 
-    sanafe::PipelineResult update(const size_t neuron_address,
-            const std::optional<double> current_in) override
+    sanafe::PipelineResult update(const size_t /*neuron_address*/,
+            const std::optional<double> /*current_in*/) override
     {
         sanafe::NeuronStatus status = sanafe::idle;
 
@@ -173,7 +170,7 @@ public:
 };
 
 // the Class factories
-extern "C" sanafe::PipelineUnit *create_HodgkinHuxley()
+extern "C" sanafe::PipelineUnit *create_hodgkin_huxley()
 {
     TRACE1(MODELS, "Creating HH soma instance\n");
     return (sanafe::PipelineUnit *) new HodgkinHuxley();
