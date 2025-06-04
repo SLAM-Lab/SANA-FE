@@ -73,7 +73,8 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         const std::filesystem::path &output_dir, const bool record_spikes,
         const bool record_potentials, const bool record_perf,
         const bool record_messages)
-        : core_count(arch.core_count)
+        : ts_sync_delay_table(arch.ts_sync_delay_table)
+        , core_count(arch.core_count)
         , max_cores_per_tile(arch.max_cores_per_tile)
         , noc_width_in_tiles(arch.noc_width_in_tiles)
         , noc_height_in_tiles(arch.noc_height_in_tiles)
@@ -83,7 +84,6 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch,
         , potential_trace_enabled(record_potentials)
         , perf_trace_enabled(record_perf)
         , message_trace_enabled(record_messages)
-        , fixed_timestep_delay(arch.timestep_delay)
 {
     INFO("Initializing simulation.\n");
     for (const TileConfiguration &tile_config : arch.tiles)
@@ -193,6 +193,8 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
     // Link mapped neurons to their neuron addresses (group.offset), making it
     //  possible to connect mapped neurons easily later
     track_mapped_neurons();
+    // Record how many tiles and cores have been mapped in total
+    track_mapped_tiles_and_cores();
 }
 
 void sanafe::SpikingChip::track_mapped_neurons()
@@ -236,6 +238,31 @@ void sanafe::SpikingChip::track_mapped_neurons()
                         group_name + "' at index " + std::to_string(i) + "(" +
                         std::to_string(neuron_refs[i].get().offset) + ")");
             }
+        }
+    }
+}
+
+void sanafe::SpikingChip::track_mapped_tiles_and_cores() noexcept
+{
+    // Reset in case this gets called multiple times
+    mapped_tiles = 0UL;
+    mapped_cores = 0UL;
+
+    for (const Tile &tile : tiles)
+    {
+        bool tile_used = false;
+        for (const Core &core : tile.cores)
+        {
+            if (!core.neurons.empty())
+            {
+                tile_used = true;
+                ++mapped_cores;
+            }
+        }
+
+        if (tile_used)
+        {
+            ++mapped_tiles;
         }
     }
 }
@@ -414,7 +441,6 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     scheduler.core_count = core_count;
     scheduler.max_cores_per_tile = max_cores_per_tile;
     scheduler.timing_model = timing_model;
-    scheduler.fixed_timestep_delay = fixed_timestep_delay;
     schedule_create_threads(scheduler, scheduler_thread_count);
 
     if (total_timesteps <= 0)
@@ -484,6 +510,7 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     auto ts_start = std::chrono::high_resolution_clock::now();
     sim_hw_timestep(ts, scheduler);
     auto ts_end = std::chrono::high_resolution_clock::now();
+
     ts_elapsed = calculate_elapsed_time(ts_start, ts_end);
     sim_update_total_energy_and_counts(ts);
     // The total_messages_sent is incremented during the simulation since it's
@@ -499,6 +526,20 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     wall_time += ts_elapsed;
 
     return ts;
+}
+
+void sanafe::SpikingChip::sim_timestep_sync(Scheduler &scheduler) const
+{
+    // Simulate the end of timestep where all tiles synchronize. This
+    //  could be using a fixed clock frequency or dynamically waiting until all
+    //  cores finish processing. This can also account for other fixed costs
+    //  on the chip e.g., initialization/monitoring by a housekeeping CPU
+    //
+    // TODO: in future we may want to have the option of simulating this
+    //  dynamically e.g., by modeling synchronization messages in the NoC
+
+    // Use a simple table based model for sync costs
+    scheduler.timestep_sync_delay = ts_sync_delay_table.get(mapped_tiles);
 }
 
 void sanafe::SpikingChip::reset()
@@ -549,7 +590,6 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    // codechecker_suppress [modernize-loop-convert]
     for (auto idx : core_list)
     {
         for (MappedNeuron &n : idx.get().neurons)
@@ -596,7 +636,6 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    // codechecker_suppress [modernize-loop-convert]
     for (auto idx : core_list)
     {
 #ifdef HAVE_OPENMP
@@ -659,43 +698,6 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 double sanafe::SpikingChip::process_message(
         Timestep &ts, Core &core, Message &m)
 {
-
-    // const double latencies[] = {
-    //     0.0,
-    //     0.00000002892606798,
-    //     0.00000002894865371,
-    //     0.00000004564573201,
-    //     0.00000004246846006,
-    //     0.00000004247438192,
-    //     0.00000004247237432,
-    //     0.00000005659757896,
-    //     0.00000005659945379,
-    //     0.00000005657260226,
-    //     0.00000007392710257,
-    //     0.00000007074468967,
-    //     0.0000000707229477,
-    //     0.00000008447058221,
-    //     0.00000008481010547,
-    //     0.00000008480691797,
-    //     0.00000009858068535,
-    //     0.0000001158763025,
-    //     0.00000009886579449,
-    //     0.0000001126828899,
-    //     0.000000112718968,
-    //     0.0000001129748819,
-    //     0.0000001267611725,
-    //     0.0000001266836962,
-    //     0.000000126653829,
-    //     0.0000001407869555,
-    //     0.0000001406869712,
-    //     0.0000001407240414,
-    //     0.0000001547693632,
-    //     0.0000001548646992,
-    //     0.0000001549567224,
-    //     0.0000001687381948,
-    //     0.0000001691043891,
-    // };
-
     double message_processing_latency = pipeline_process_axon_in(core, m);
 
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
@@ -703,7 +705,6 @@ double sanafe::SpikingChip::process_message(
     const PipelineResult
             empty_input{}; // Empty/default struct used as dummy input
 
-    //INFO("synapses in this axon:%zu\n", axon_in.synapse_addresses.size());
     for (const size_t synapse_address : axon_in.synapse_addresses)
     {
         MappedConnection &con = *(core.connections_in[synapse_address]);
@@ -718,16 +719,6 @@ double sanafe::SpikingChip::process_message(
         core.timestep_buffer[n.mapped_address] = pipeline_output;
         message_processing_latency += pipeline_output.latency.value_or(0.0);
     }
-
-    // if (axon_in.synapse_addresses.size() > 0 && axon_in.synapse_addresses.size() <= 32)
-    // {
-    //     message_processing_latency += latencies[axon_in.synapse_addresses.size() - 1];
-    // }
-    // if (axon_in.synapse_addresses.size() > 32)
-    // {
-    //     INFO("error!\n");
-    //     exit(0);
-    // }
 
     return message_processing_latency;
 }
@@ -817,11 +808,6 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         axon_result.energy.value() += axon_out_hw.energy_access;
         axon_result.latency.value() += axon_out_hw.latency_access;
     }
-
-    // This was a bug lost in the noise, 0.2% error difference
-    // TODO: this existed in my old code.. can I justify it or was it a bug
-    //AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
-    //n.core->next_message_generation_delay += axon_out_hw.latency_access;
 
     return axon_result;
 }
@@ -1036,6 +1022,8 @@ void sanafe::SpikingChip::sim_hw_timestep(Timestep &ts, Scheduler &scheduler)
     auto message_processing_start_tm = neuron_processing_end_tm;
     process_messages(ts);
     forced_updates(ts);
+    // The timestep ends once cores are synchronized
+    sim_timestep_sync(scheduler);
     auto message_processing_end_tm = std::chrono::high_resolution_clock::now();
     auto energy_calculation_start_tm = message_processing_end_tm;
     sim_calculate_ts_energy(ts);

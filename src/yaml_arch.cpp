@@ -21,6 +21,7 @@
 #include "arch.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
+#include "utils.hpp"
 #include "yaml_arch.hpp"
 #include "yaml_common.hpp"
 
@@ -436,10 +437,80 @@ sanafe::description_parse_noc_configuration_yaml(
             yaml_required_field<int>(parser, noc_attributes, "height");
     noc.link_buffer_size = yaml_required_field<int>(
             parser, noc_attributes, "link_buffer_size");
-    noc.timestep_delay = yaml_optional_field<double>(
-            noc_attributes, "timestep_delay").value_or(0.0);
+
+    const std::string model_type =
+            yaml_optional_field<std::string>(noc_attributes, "sync_model")
+                    .value_or("fixed");
+    noc.ts_sync_delay_table =
+            yaml_parse_sync_delay_table(parser, noc_attributes, model_type);
 
     return noc;
+}
+
+sanafe::LookupTable<double> sanafe::yaml_parse_sync_delay_table(
+        const ryml::Parser &parser, const ryml::ConstNodeRef &noc_attributes,
+        const std::string &model_type)
+{
+    LookupTable<double> table;
+
+    if (model_type == "fixed")
+    {
+        // Single value, defaults to 0.0 if not provided
+        const double delay =
+                yaml_optional_field<double>(noc_attributes, "latency_sync")
+                        .value_or(0.0);
+        table.values[0] = delay;
+    }
+    else if (model_type == "table")
+    {
+        const ryml::ConstNodeRef delay_node =
+                noc_attributes.find_child("latency_sync");
+        if (delay_node.invalid())
+        {
+            throw YamlDescriptionParsingError(
+                    "Attribute 'latency_sync' required when "
+                    "'table' synchronization model is chosen.",
+                    parser, noc_attributes);
+        }
+
+        if (delay_node.is_seq()) // YAML list
+        {
+            // Array of values - tile index is implicit (0, 1, 2, ...)
+            size_t tile_index = 0;
+            for (const auto &value_node : delay_node)
+            {
+                double delay_value = 0.0;
+                value_node >> delay_value;
+                table.values[tile_index++] = delay_value;
+            }
+        }
+        else if (delay_node.is_map()) // YAML mapping
+        {
+            // Mapping of tile_id -> delay_value
+            for (const auto &pair : delay_node)
+            {
+                size_t tile_id = 0UL;
+                double delay_value = 0.0;
+                pair >> ryml::key(tile_id);
+                pair >> delay_value;
+                table.values[tile_id] = delay_value;
+            }
+        }
+        else // if single YAML scalar value given
+        {
+            double delay_value = 0.0;
+            delay_node >> delay_value;
+            table.values[0] = delay_value;
+        }
+        INFO("Setting (%zu) sync latency values \n", table.values.size());
+    }
+    else
+    {
+        throw YamlDescriptionParsingError(
+                "Unknown sync_model: " + model_type, parser, noc_attributes);
+    }
+
+    return table;
 }
 
 sanafe::Architecture sanafe::description_parse_arch_section_yaml(

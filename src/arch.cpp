@@ -27,7 +27,8 @@
 
 sanafe::Architecture::Architecture(
         std::string name, const NetworkOnChipConfiguration &noc)
-        : name(std::move(name))
+        : ts_sync_delay_table(noc.ts_sync_delay_table)
+        , name(std::move(name))
         , noc_width_in_tiles(noc.width_in_tiles)
         , noc_height_in_tiles(noc.height_in_tiles)
         , noc_buffer_size(noc.link_buffer_size)

@@ -166,7 +166,7 @@ struct Scheduler
     size_t buffer_size;
     size_t core_count;
     size_t max_cores_per_tile;
-    double fixed_timestep_delay;
+    double timestep_sync_delay;
 };
 
 // NocInfo is used by the scheduler to track the high-level state of the NoC

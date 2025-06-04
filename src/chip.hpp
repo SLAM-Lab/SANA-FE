@@ -66,8 +66,11 @@ public:
     double get_power() const noexcept;
 
     std::vector<std::reference_wrapper<Core>> cores();
+    LookupTable<double> ts_sync_delay_table{};
 
     size_t core_count{0UL};
+    size_t mapped_cores{0UL};
+    size_t mapped_tiles{0UL};
     size_t max_cores_per_tile{0UL};
     size_t noc_width_in_tiles{1UL};
     size_t noc_height_in_tiles{1UL};
@@ -108,12 +111,6 @@ private:
     std::ofstream message_trace;
     std::ofstream perf_trace;
 
-    // Fixed delay cost that accounts for any constant delays per timestep
-    //  E.g. a fixed chip-wide clock period
-    //  E.g. additional delays caused by global barriers and/or a housekeeping
-    //   CPU
-    double fixed_timestep_delay{0.0};
-
     Timestep step(Scheduler &scheduler);
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
@@ -121,9 +118,11 @@ private:
     MappedConnection &map_connection(const Connection &con);
     void map_axons();
     void track_mapped_neurons();
+    void track_mapped_tiles_and_cores() noexcept;
 
     void sim_reset_measurements();
     void sim_hw_timestep(Timestep &ts, Scheduler &scheduler);
+    void sim_timestep_sync(Scheduler &scheduler) const;
     void sim_update_ts_counters(Timestep &ts);
     static double sim_estimate_network_costs(const Tile &src, Tile &dest);
     void sim_calculate_ts_energy(Timestep &ts);

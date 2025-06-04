@@ -59,6 +59,8 @@ enum NeuronStatus : uint8_t;
 
 struct ModelAttribute;
 
+template <typename T>
+struct LookupTable;
 }
 
 // External library forward declarations i.e., not in SANA-FE's namespace

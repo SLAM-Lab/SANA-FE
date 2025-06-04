@@ -9,12 +9,8 @@ architecture:
     width: 8
     height: 4
     link_buffer_size: 16
-    #timestep_sync_model: clock/barrier
-    #latency_timestep_sync: 0.5e-6  # TODO: how can we make this flexible to the number of mapped cores? As we map more cores, the sync time increases. Can we specify a sync delay that varies?
-    #latency_timestep_sync: 1.4e-6
-    # this value is between 0.5-1.7us, which is a big range
-    timestep_delay: 1.4e-6
-    #timestep_delay: 0.5e-6
+    sync_model: table
+    latency_sync: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
   tile:
     - name: loihi_tile[0..31]
       attributes:
@@ -64,16 +60,18 @@ architecture:
                 latency_process_spike: 3.8e-9
             - name: loihi_sparse_synapse
               attributes:
-                model: loihi
-                #model: current_based
+                model: current_based
                 energy_process_spike: 33.6e-12
-                #latency_process_spike: 4.7e-9
-                latency_concurrent_access: 4.7e-9
-                #latency_concurrent_access: 4.0e-9
+                latency_process_spike: 4.7e-9
+                # model: loihi
+                # latency_concurrent_access: 4.7e-9
+                #
             - name: loihi_conv_synapse
               attributes:
-                model: loihi
+                model: current_based
                 energy_process_spike: 24.0e-12
+                latency_process_spike: 3.1e-9
+                # model: loihi
           dendrite:
           - name: loihi_dendrites
             attributes:

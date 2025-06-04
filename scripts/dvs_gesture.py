@@ -327,7 +327,7 @@ if __name__ == "__main__":
             #print(total_hops)
             #exit()
             #plt.scatter(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, marker="x", s=0.1, cmap=cm, c=np.array(total_hops))
-            scatter = plt.plot(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "x")[0]
+            scatter = plt.plot(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "x", alpha=0.5)[0]
             plt.plot(np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6),
                      np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6), "k--")
             #plt.colorbar(label="Total Hops", shrink=0.5)
