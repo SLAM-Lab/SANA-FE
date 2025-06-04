@@ -1272,8 +1272,8 @@ void sanafe::SpikingChip::sim_add_connection_to_axon(
 
 void sanafe::SpikingChip::sim_print_axon_summary() const noexcept
 {
-    size_t in_count = 0UL;
-    size_t out_count = 0UL;
+    [[maybe_unused]] size_t in_count = 0UL;
+    [[maybe_unused]] size_t out_count = 0UL;
 
     INFO("** Mapping summary **\n");
     for (const Tile &tile : tiles)

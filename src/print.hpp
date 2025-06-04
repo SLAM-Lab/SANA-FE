@@ -16,25 +16,6 @@ namespace sanafe
 std::string print_format_attributes(const std::map<std::string, std::any> &attr);
 }
 
-
-//#define INFO(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-/*
-#ifdef DEBUG
-#define TRACE1_PYBIND(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-#define SIM_TRACE1(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-#define TRACE1(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-#define TRACE2(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-//#define TRACE3(...) do { fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); fprintf(stdout, __VA_ARGS__); } while (0)
-#define TRACE3(...) do {} while (0)
-#else
-#define TRACE1_PYBIND(...) do {} while (0)
-#define SIM_TRACE1(...) do {} while (0)
-#define TRACE1(...) do {} while (0)
-#define TRACE2(...) do {} while (0)
-#define TRACE3(...) do {} while (0)
-#endif
-*/
-
 // DEBUG and TRACE<n> print with source annotations, TRACE<n> levels offer more
 //  detailed and verbose output for debugging. If you want to add a new category
 //  for tracing you must follow the following steps:
@@ -82,36 +63,49 @@ std::string print_format_attributes(const std::map<std::string, std::any> &attr)
 #endif
 // NOLINTEND
 
-// INFO prints are always enabled
+// Conditional source info based on build configuration
 //NOLINTBEGIN
-#define INFO(...) do { \
-    fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
-    fprintf(stdout, __VA_ARGS__); \
-} while (0)
+#ifdef ENABLE_SOURCE_INFO
+    #define SOURCE_INFO() fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__)
+#else
+    #define SOURCE_INFO() do {} while (0)
+#endif
+// NOLINTEND
 
-// TRACE1 enabled if category debug level >= 1
-#define TRACE1(category, ...) do { \
-    if (DEBUG_LEVEL_##category >= 1) { \
-        fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
+//NOLINTBEGIN
+#ifdef ENABLE_DEBUG_PRINTS
+    #define INFO(...) do { \
+        SOURCE_INFO(); \
         fprintf(stdout, __VA_ARGS__); \
-    } \
-} while (0)
+    } while (0)
 
-// TRACE2 enabled if category debug level >= 2
-#define TRACE2(category, ...) do { \
-    if (DEBUG_LEVEL_##category >= 2) { \
-        fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
-        fprintf(stdout, __VA_ARGS__); \
-    } \
-} while (0)
+    #define TRACE1(category, ...) do { \
+        if (DEBUG_LEVEL_##category >= 1) { \
+            SOURCE_INFO(); \
+            fprintf(stdout, __VA_ARGS__); \
+        } \
+    } while (0)
 
-// TRACE3 enabled if category debug level >= 3
-#define TRACE3(category, ...) do { \
-    if (DEBUG_LEVEL_##category >= 3) { \
-        fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__); \
-        fprintf(stdout, __VA_ARGS__); \
-    } \
-} while (0)
+    #define TRACE2(category, ...) do { \
+        if (DEBUG_LEVEL_##category >= 2) { \
+            SOURCE_INFO(); \
+            fprintf(stdout, __VA_ARGS__); \
+        } \
+    } while (0)
+
+    #define TRACE3(category, ...) do { \
+        if (DEBUG_LEVEL_##category >= 3) { \
+            SOURCE_INFO(); \
+            fprintf(stdout, __VA_ARGS__); \
+        } \
+    } while (0)
+#else
+    // No-op versions for stripped builds
+    #define INFO(...) do {} while (0)
+    #define TRACE1(category, ...) do {} while (0)
+    #define TRACE2(category, ...) do {} while (0)
+    #define TRACE3(category, ...) do {} while (0)
+#endif
 // NOLINTEND
 
 #endif

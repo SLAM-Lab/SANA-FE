@@ -325,7 +325,7 @@ int main(int argc, const char *argv[])
 
         INFO("***** Run Summary *****\n");
         hw.sim_output_run_summary(optional_flags.output_dir, run_summary);
-        const double average_power = hw.get_power();
+        [[maybe_unused]] const double average_power = hw.get_power();
         INFO("Average power consumption: %f W.\n", average_power);
         INFO("Run finished.\n");
 

@@ -10,8 +10,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
+cmake_print_variables(CMAKE_BUILD_TYPE)
 
 if(POLICY CMP0148)
   cmake_policy(SET CMP0148 NEW)
@@ -81,6 +82,29 @@ foreach(category ARCH CHIP DESCRIPTION MODELS NET PLUGINS PYMODULE SCHEDULER)
     # Add compile definitions for each category
     add_compile_definitions(DEBUG_LEVEL_${category}=${DEBUG_LEVEL_${category}})
 endforeach()
+
+# Set conditional defaults based on build type
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    # Release build defaults
+    set(DEFAULT_STANDALONE_DEBUG ON)
+    set(DEFAULT_STANDALONE_SOURCE OFF)  # No source info in release
+    set(DEFAULT_PYTHON_DEBUG OFF)
+    set(DEFAULT_PYTHON_SOURCE OFF)
+else()
+    # Debug/other build defaults
+    set(DEFAULT_STANDALONE_DEBUG ON)
+    set(DEFAULT_STANDALONE_SOURCE ON)
+    set(DEFAULT_PYTHON_DEBUG ON)
+    set(DEFAULT_PYTHON_SOURCE ON)
+endif()
+
+# Define options with conditional defaults
+option(ENABLE_STANDALONE_DEBUG "Enable debug prints for standalone build" ${DEFAULT_STANDALONE_DEBUG})
+option(ENABLE_SOURCE_INFO_STANDALONE "Include source info in standalone debug prints" ${DEFAULT_STANDALONE_SOURCE})
+option(ENABLE_PYTHON_DEBUG "Enable debug prints for Python build" ${DEFAULT_PYTHON_DEBUG})
+option(ENABLE_SOURCE_INFO_PYTHON "Include source info in standalone debug prints" ${DEFAULT_PYTHON_SOURCE})
+
+cmake_print_variables(ENABLE_STANDALONE_DEBUG ENABLE_SOURCE_INFO_STANDALONE ENABLE_PYTHON_DEBUG ENABLE_SOURCE_INFO_PYTHON)
 
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/plugins")
@@ -217,6 +241,12 @@ if(PYTHON_BUILD_ENABLED)
     endif()
     target_link_libraries(sanafecpp PRIVATE Threads::Threads)
 
+    if(ENABLE_PYTHON_DEBUG)
+        target_compile_definitions(sanafecpp PRIVATE ENABLE_DEBUG_PRINTS)
+        if(ENABLE_SOURCE_INFO_PYTHON)
+            target_compile_definitions(sanafecpp PRIVATE ENABLE_SOURCE_INFO)
+        endif()
+    endif()
 endif()
 
 if(STANDALONE_BUILD_ENABLED)
@@ -232,4 +262,11 @@ if(STANDALONE_BUILD_ENABLED)
         target_compile_definitions(sim PRIVATE HAVE_OPENMP)
     endif()
     target_link_libraries(sim PRIVATE Threads::Threads)
+
+    if(ENABLE_STANDALONE_DEBUG)
+        target_compile_definitions(sim PRIVATE ENABLE_DEBUG_PRINTS)
+        if(ENABLE_SOURCE_INFO_STANDALONE)
+            target_compile_definitions(sim PRIVATE ENABLE_SOURCE_INFO)
+        endif()
+    endif()
 endif()
