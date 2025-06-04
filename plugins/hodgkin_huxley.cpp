@@ -19,7 +19,6 @@
 #include "pipeline.hpp"
 #include "print.hpp"
 
-
 class HodgkinHuxley : public sanafe::SomaUnit
 {
     // HodgkinHuxley specific

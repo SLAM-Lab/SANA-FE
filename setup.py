@@ -71,7 +71,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="sanafe",
-    version="0.0.9",
+    version="0.0.10",
     author="James Boyle",
     author_email="james.boyle@utexas.edu",
     description="SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration",
@@ -81,8 +81,6 @@ setup(
     ext_modules=[CMakeExtension("sanafe")],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
-    install_requires=["pybind11>=2.6.0"],
-    setup_requires=["pybind11>=2.6.0"],
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     packages=find_packages()
 )
