@@ -4,6 +4,7 @@
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // pymodule.cpp
 #include <cstddef>
+#include <chrono>
 #include <functional>
 #include <map>
 #include <memory>
@@ -34,6 +35,7 @@
 #include "network.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
+#include "schedule.hpp"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
@@ -530,9 +532,51 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
     self->set_model_attributes(converted_attributes);
 }
 
+// pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
+//         std::string timing_model_str, const int processing_threads,
+//         const int scheduler_threads)
+// {
+//     sanafe::TimingModel timing_model{sanafe::timing_model_detailed};
+//     if (timing_model_str == "simple")
+//     {
+//         timing_model = sanafe::timing_model_simple;
+//     }
+//     else if (timing_model_str == "detailed")
+//     {
+//         timing_model = sanafe::timing_model_detailed;
+//     }
+//     else if (timing_model_str == "cycle")
+//     {
+//         timing_model = sanafe::timing_model_cycle_accurate;
+//     }
+//     else
+//     {
+//         throw std::invalid_argument("Error: unsupoorted timing model");
+//     }
+
+// #ifdef HAVE_OPENMP
+//     // If processing_threads <= 0, just leave it at the system default
+//     if (processing_threads > 0)
+//     {
+//         INFO("Setting processing threads to %d\n", processing_threads);
+//         omp_set_num_threads(processing_threads);
+//     }
+// #else
+//     if (processing_threads > 1)
+//     {
+//         INFO("Warning: OpenMP disabled, no multithreaded support\n");
+//     }
+// #endif
+
+//     return run_data_to_dict(
+//             self->sim(timesteps, timing_model, scheduler_threads));
+// }
+
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         std::string timing_model_str, const int processing_threads,
-        const int scheduler_threads)
+        const int scheduler_threads, const bool spike_trace_enabled,
+        const bool potential_trace_enabled, const bool perf_trace_enabled,
+        const bool message_trace_enabled)
 {
     sanafe::TimingModel timing_model{sanafe::timing_model_detailed};
     if (timing_model_str == "simple")
@@ -552,22 +596,88 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         throw std::invalid_argument("Error: unsupoorted timing model");
     }
 
-#ifdef HAVE_OPENMP
-    // If processing_threads <= 0, just leave it at the system default
-    if (processing_threads > 0)
-    {
-        INFO("Setting processing threads to %d\n", processing_threads);
-        omp_set_num_threads(processing_threads);
-    }
-#else
-    if (processing_threads > 1)
-    {
-        INFO("Warning: OpenMP disabled, no multithreaded support\n");
-    }
-#endif
+    sanafe::RunData rd(self->get_total_timesteps() + 1);
+    rd.timesteps_executed += timesteps;
 
-    return run_data_to_dict(
-            self->sim(timesteps, timing_model, scheduler_threads));
+    sanafe::Scheduler scheduler;
+    scheduler.noc_width_in_tiles = self->noc_width_in_tiles;
+    scheduler.noc_height_in_tiles = self->noc_height_in_tiles;
+    scheduler.buffer_size = self->noc_buffer_size;
+    scheduler.core_count = self->core_count;
+    scheduler.max_cores_per_tile = self->max_cores_per_tile;
+    scheduler.timing_model = timing_model;
+    schedule_create_threads(scheduler, scheduler_threads);
+
+    // if (total_timesteps <= 0)
+    // {
+    //     // If no timesteps have been simulated, open the trace files
+    //     if (spike_trace_enabled)
+    //     {
+    //         self->spike_trace = self->sim_trace_open_spike_trace(out_dir);
+    //     }
+    //     if (potential_trace_enabled)
+    //     {
+    //         self->potential_trace = self->sim_trace_open_potential_trace(out_dir);
+    //     }
+    //     if (perf_trace_enabled)
+    //     {
+    //         self->perf_trace = self->sim_trace_open_perf_trace(out_dir);
+    //     }
+    //     if (message_trace_enabled)
+    //     {
+    //         self->message_trace = self->sim_trace_open_message_trace(out_dir);
+    //     }
+    // }
+
+    auto last_check = std::chrono::steady_clock::now();
+    auto last_print = std::chrono::steady_clock::now();
+
+    const std::string first_message =
+            "Executed steps: [0/" + std::to_string(timesteps) + "]";
+    pybind11::print(first_message, pybind11::arg("end") = "");
+
+    pybind11::gil_scoped_release release;
+    for (long int timestep = 1; timestep <= timesteps; timestep++)
+    {
+        const sanafe::Timestep ts = self->step(scheduler);
+
+        const auto now = std::chrono::steady_clock::now();
+        constexpr std::chrono::milliseconds check_interval{100};
+        constexpr std::chrono::seconds print_interval{1};
+        if ((now - last_check) >= check_interval)
+        {
+            pybind11::gil_scoped_acquire acquire;
+            if (PyErr_CheckSignals() != 0)
+            {
+                throw pybind11::error_already_set();
+            }
+            last_check = now;
+        }
+        if ((now - last_print) >= print_interval)
+        {
+            const std::string message = "\rExecuted steps: [" +
+                    std::to_string(timestep) + "/" + std::to_string(timesteps) +
+                    "]";
+            pybind11::gil_scoped_acquire acquire;
+            pybind11::print(message, pybind11::arg("end") = "");
+            last_print = now;
+        }
+        // Retire and trace messages as we go along. Not strictly required, but
+        //  avoids the message write queue growing too large
+        self->flush_timestep_data(rd, scheduler);
+    }
+
+    const std::string last_message = "\rExecuted steps: [" +
+                    std::to_string(timesteps) + "/" + std::to_string(timesteps) +
+                    "]";
+    pybind11::gil_scoped_acquire acquire;
+    pybind11::print(last_message);
+
+    std::ofstream message_trace; // TODO
+    schedule_stop_all_threads(scheduler, message_trace, rd);
+    self->flush_timestep_data(rd, scheduler);
+
+    return run_data_to_dict(rd);
 }
 
 } // end of anonymous namespace
@@ -970,7 +1080,11 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("sim", &pysim, pybind11::arg("timesteps") = 1,
                     pybind11::arg("timing_model") = "detailed",
                     pybind11::arg("processing_threads") = 0,
-                    pybind11::arg("scheduler_threads") = 0)
+                    pybind11::arg("scheduler_threads") = 0,
+                    pybind11::arg("spike_trace_enabled") = true,
+                    pybind11::arg("potential_trace_enabled") = true,
+                    pybind11::arg("perf_trace_enabled") = true,
+                    pybind11::arg("message_trace_enabled") = true)
             .def("get_power", &sanafe::SpikingChip::get_power)
             .def("reset", &sanafe::SpikingChip::reset);
 }

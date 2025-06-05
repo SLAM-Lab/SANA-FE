@@ -390,7 +390,7 @@ void sanafe::SpikingChip::map_axons()
     sim_print_axon_summary();
 }
 
-void sanafe::SpikingChip::retire_scheduled_messages(
+void sanafe::SpikingChip::flush_timestep_data(
         sanafe::RunData &rd, sanafe::Scheduler &scheduler)
 {
     while (!scheduler.timesteps_to_write.empty())
@@ -412,20 +412,25 @@ void sanafe::SpikingChip::retire_scheduled_messages(
                 }
             }
         }
-        rd.total_energy += ts.total_energy;
-        rd.synapse_energy += ts.synapse_energy;
-        rd.dendrite_energy += ts.dendrite_energy;
-        rd.soma_energy += ts.soma_energy;
-        rd.network_energy += ts.network_energy;
-        rd.sim_time += ts.sim_time;
-        rd.spikes += ts.spike_count;
-        rd.packets_sent += ts.packets_sent;
-        rd.neurons_updated += ts.neurons_updated;
-        rd.neurons_fired += ts.neurons_fired;
-        rd.wall_time = wall_time;
-
+        update_run_data(rd, ts);
         total_sim_time += ts.sim_time;
     }
+}
+
+void sanafe::SpikingChip::update_run_data(
+        sanafe::RunData &rd, const sanafe::Timestep &ts)
+{
+    rd.total_energy += ts.total_energy;
+    rd.synapse_energy += ts.synapse_energy;
+    rd.dendrite_energy += ts.dendrite_energy;
+    rd.soma_energy += ts.soma_energy;
+    rd.network_energy += ts.network_energy;
+    rd.sim_time += ts.sim_time;
+    rd.spikes += ts.spike_count;
+    rd.packets_sent += ts.packets_sent;
+    rd.neurons_updated += ts.neurons_updated;
+    rd.neurons_fired += ts.neurons_fired;
+    rd.wall_time = wall_time;
 }
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
@@ -474,11 +479,12 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const Timestep ts = step(scheduler);
         // Retire and trace messages as we go along. Not strictly required, but
         //  avoids the message write queue growing too large
-        retire_scheduled_messages(rd, scheduler);
+        flush_timestep_data(rd, scheduler);
+        update_run_data(rd, ts);
     }
 
     schedule_stop_all_threads(scheduler, message_trace, rd);
-    retire_scheduled_messages(rd, scheduler);
+    flush_timestep_data(rd, scheduler);
 
     return rd;
 }

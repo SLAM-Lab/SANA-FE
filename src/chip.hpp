@@ -58,12 +58,15 @@ public:
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
     RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1);
+    Timestep step(Scheduler &scheduler);
     void load(const SpikingNetwork &net);
-    void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
+    void flush_timestep_data(RunData &rd, Scheduler &scheduler);
     void reset();
 
     void set_heartbeat(long int timesteps) { heartbeat = timesteps; }
     double get_power() const noexcept;
+    double get_total_timesteps() const noexcept { return total_timesteps; };
+    void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
 
     std::vector<std::reference_wrapper<Core>> cores();
     LookupTable<double> ts_sync_delay_table{};
@@ -111,7 +114,6 @@ private:
     std::ofstream message_trace;
     std::ofstream perf_trace;
 
-    Timestep step(Scheduler &scheduler);
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
     void forward_connection_attributes(const SpikingNetwork &net);
@@ -145,7 +147,7 @@ private:
     void receive_message(Message &m);
     static double process_message(Timestep &ts, Core &c, Message &m);
     static PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
-    void retire_scheduled_messages(RunData &rd, Scheduler &scheduler);
+    void update_run_data(RunData &rd, const Timestep &ts);
 
     static double pipeline_process_axon_in(Core &core, const Message &m);
     PipelineResult pipeline_process_axon_out(Timestep &ts, MappedNeuron &n);
