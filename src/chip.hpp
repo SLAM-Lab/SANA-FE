@@ -82,12 +82,12 @@ public:
 private:
     std::unique_ptr<BookSimConfig> booksim_config;
     std::string out_dir;
+    std::atomic<long int> total_messages_sent{0L};
     size_t total_neurons_mapped{0UL};
     long int total_neurons_updated{0L};
     long int total_neurons_fired{0L};
     long int total_timesteps{0L};
     long int total_spikes{0L};
-    long int total_messages_sent{0L};
     long int heartbeat{default_heartbeat_timesteps};
     double wall_time{0.0};
     double total_sim_time{0.0};

@@ -797,7 +797,10 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
             n.parent_group_name.c_str(), n.id, n.axon_out_addresses.size());
     for (const size_t axon_address : n.axon_out_addresses)
     {
-        Message m(total_messages_sent, *this, axon_address, n, ts.timestep);
+        // Save and increment atomically to ensure each message ID is unique,
+        //  even when creating messages on multiple threads
+        const long int id = total_messages_sent.fetch_add(1);
+        Message m(id, *this, axon_address, n, ts.timestep);
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
         axon_out_hw.energy += axon_out_hw.energy_access;
@@ -809,7 +812,6 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         auto &message_queue = *(ts.messages);
         message_queue[n.core->id].push_back(std::move(m));
         ++axon_out_hw.packets_out;
-        ++total_messages_sent;
 
         axon_result.energy.value() += axon_out_hw.energy_access;
         axon_result.latency.value() += axon_out_hw.latency_access;
