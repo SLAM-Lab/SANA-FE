@@ -55,6 +55,7 @@ struct Message
     ~Message() = default;
     Message& operator=(const Message &copy) = default;
     Message& operator=(Message &&move) = default;
+    std::string info() const noexcept;
 };
 
 }

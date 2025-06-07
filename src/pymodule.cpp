@@ -3,12 +3,16 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // pymodule.cpp
-#include <cstddef>
+#include <algorithm>
+#include <cassert>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -18,8 +22,10 @@
 #include <pybind11/attr.h>
 #include <pybind11/cast.h>
 #include <pybind11/detail/common.h>
+#include <pybind11/gil.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
+#include <pyerrors.h>
 // clang-tidy tries to remove these... not sure why, but it'll break if it does
 #include <pybind11/stl.h> // NOLINT(misc-include-cleaner)
 #include <pybind11/stl/filesystem.h> // NOLINT(misc-include-cleaner)
@@ -32,6 +38,7 @@
 #include "attribute.hpp"
 #include "chip.hpp"
 #include "mapped.hpp"
+#include "message.hpp"
 #include "network.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
@@ -42,6 +49,7 @@
 // Normally we don't suppress these warnings, but in this file, Python allows for
 //  named arguments - removing the risk of accidentally swapping args and
 //  making it easier to specify a large number of args
+//  PyBind11 also relies on a super long function macro, so suppress this too
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-size)
 
 // Forward declarations
@@ -255,6 +263,22 @@ pybind11::dict pymodel_attributes_to_pydict(
     }
 
     return attribute_dict;
+}
+
+std::map<std::string, pybind11::object> timestep_data_to_map(
+        const sanafe::Timestep &ts)
+{
+    std::map<std::string, pybind11::object> ts_map;
+
+    ts_map["timestep"] = pybind11::cast(ts.timestep);
+    ts_map["fired"] = pybind11::cast(ts.neurons_fired);
+    ts_map["updated"] = pybind11::cast(ts.neurons_updated);
+    ts_map["hops"] = pybind11::cast(ts.total_hops);
+    ts_map["spikes"] = pybind11::cast(ts.spike_count);
+    ts_map["sim_time"] = pybind11::cast(ts.sim_time);
+    ts_map["total_energy"] = pybind11::cast(ts.total_energy);
+
+    return ts_map;
 }
 
 pybind11::dict run_data_to_dict(const sanafe::RunData &run)
@@ -532,69 +556,406 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
     self->set_model_attributes(converted_attributes);
 }
 
-// pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-//         std::string timing_model_str, const int processing_threads,
-//         const int scheduler_threads)
-// {
-//     sanafe::TimingModel timing_model{sanafe::timing_model_detailed};
-//     if (timing_model_str == "simple")
-//     {
-//         timing_model = sanafe::timing_model_simple;
-//     }
-//     else if (timing_model_str == "detailed")
-//     {
-//         timing_model = sanafe::timing_model_detailed;
-//     }
-//     else if (timing_model_str == "cycle")
-//     {
-//         timing_model = sanafe::timing_model_cycle_accurate;
-//     }
-//     else
-//     {
-//         throw std::invalid_argument("Error: unsupoorted timing model");
-//     }
+// Determine spike trace mode
+enum TraceMode : uint8_t
+{
+    trace_none = 0UL, // No tracing
+    trace_file = 1UL, // Write to file
+    trace_memory = 2UL, // Store in memory for return
+};
 
-// #ifdef HAVE_OPENMP
-//     // If processing_threads <= 0, just leave it at the system default
-//     if (processing_threads > 0)
-//     {
-//         INFO("Setting processing threads to %d\n", processing_threads);
-//         omp_set_num_threads(processing_threads);
-//     }
-// #else
-//     if (processing_threads > 1)
-//     {
-//         INFO("Warning: OpenMP disabled, no multithreaded support\n");
-//     }
-// #endif
+class PyTrace
+{
+public:
+    PyTrace(sanafe::SpikingChip *chip, pybind11::object &trace_obj,
+            const bool overwrite_trace)
+            : parent_chip(chip)
+    {
+        open(trace_obj, overwrite_trace);
+    }
+    virtual ~PyTrace()
+    {
+        if (file.is_open())
+        {
+            file.close();
+        }
+    }
+    PyTrace(const PyTrace &copy) = delete;
+    PyTrace(const PyTrace &&move) = delete;
+    PyTrace &operator=(const PyTrace &copy) = delete;
 
-//     return run_data_to_dict(
-//             self->sim(timesteps, timing_model, scheduler_threads));
-// }
+    void write_header();
+    void update(const sanafe::Timestep &ts);
+    pybind11::object get_python_object() const
+    {
+        if (mode == TraceMode::trace_memory)
+        {
+            return data;
+        }
+
+        return pybind11::none();
+    }
+
+protected:
+    sanafe::SpikingChip *parent_chip;
+    pybind11::object obj{pybind11::none()};
+    TraceMode mode{TraceMode::trace_none};
+    std::ofstream file;
+    pybind11::object data;
+
+private:
+    void open(pybind11::object trace_obj, bool overwrite_trace);
+
+    // Override these three functions
+    virtual void get_trace_string(
+            std::ostringstream &ss, const sanafe::Timestep &ts) = 0;
+    virtual void get_header_string(std::ostringstream &ss) = 0;
+    virtual void append_trace_data(const sanafe::Timestep &ts) = 0;
+};
+
+void PyTrace::open(pybind11::object trace_obj, const bool overwrite_trace)
+{
+    mode = TraceMode::trace_none;
+    // The trace object can be None, a boolean (True/False) enabling memory
+    //  based traces, a string specifying a trace filename or a Python file
+    //  object
+    obj = trace_obj;
+
+    if (!trace_obj.is_none())
+    {
+        // Check if it's a boolean (True)
+        if (pybind11::isinstance<pybind11::bool_>(trace_obj))
+        {
+            const bool trace_enabled = trace_obj.cast<bool>();
+            if (trace_enabled)
+            {
+                mode = TraceMode::trace_memory;
+            }
+        }
+        // Check if it's a file-like object (i.e., has a 'write' method)
+        else if (pybind11::hasattr(trace_obj, "write"))
+        {
+            mode = TraceMode::trace_file;
+            // File handle will be used directly via Python calls
+
+            if (overwrite_trace)
+            {
+                obj.attr("seek")(0);
+            }
+        }
+        // Check if it's a string (filename)
+        else if (pybind11::isinstance<pybind11::str>(trace_obj))
+        {
+            mode = TraceMode::trace_file;
+            const auto filename = trace_obj.cast<std::string>();
+
+            const std::ios::openmode flags = overwrite_trace ?
+                    (std::ios::out | std::ios::trunc) :
+                    (std::ios::out | std::ios::app);
+            file.open(filename, flags);
+            if (!file.is_open())
+            {
+                throw std::runtime_error(
+                        "Failed to open trace file: " + filename);
+            }
+        }
+        else
+        {
+            throw std::invalid_argument(
+                    "trace_obj must be None, True, a filename string, "
+                    "or a file-like object");
+        }
+    }
+}
+
+void PyTrace::update(const sanafe::Timestep &ts)
+{
+    if (mode == TraceMode::trace_memory)
+    {
+        // Make call to appropriate overriden virtual routine
+        append_trace_data(ts);
+    }
+    else if (mode == TraceMode::trace_file)
+    {
+        std::ostringstream trace_ss;
+        // Make call to appropriate overriden virtual routine
+        get_trace_string(trace_ss, ts);
+        if (file.is_open())
+        {
+            // Write to C++ file stream
+            file << trace_ss.str();
+            file.flush(); // Ensure data is written
+        }
+        else if (!obj.is_none())
+        {
+            // Write to Python file handle
+            const pybind11::gil_scoped_acquire acquire_for_write;
+            obj.attr("write")(trace_ss.str());
+            if (pybind11::hasattr(obj, "flush"))
+            {
+                obj.attr("flush")();
+            }
+        }
+    }
+    // else do nothing
+}
+
+void PyTrace::write_header()
+{
+    if (mode == TraceMode::trace_file)
+    {
+        std::ostringstream trace_ss;
+        get_header_string(trace_ss);
+        if (file.is_open())
+        {
+            // Write to C++ file stream
+            file << trace_ss.str();
+            file.flush(); // Ensure data is written
+        }
+        else if (!obj.is_none())
+        {
+            // Write to Python file handle
+            const pybind11::gil_scoped_acquire acquire_for_write;
+            obj.attr("write")(trace_ss.str());
+            if (pybind11::hasattr(obj, "flush"))
+            {
+                obj.attr("flush")();
+            }
+        }
+    }
+}
+
+class PySpikeTrace : public PyTrace
+{
+public:
+    PySpikeTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
+            const bool overwrite_trace)
+            : PyTrace(chip, trace_obj, overwrite_trace)
+    {
+        data = pybind11::list();
+    }
+    ~PySpikeTrace() override = default;
+    void get_header_string(std::ostringstream &ss) override
+    {
+        sanafe::SpikingChip::sim_trace_write_spike_header(ss);
+    }
+    void get_trace_string(
+            std::ostringstream &ss, const sanafe::Timestep &ts) override
+    {
+        parent_chip->sim_trace_record_spikes(ss, ts.timestep);
+    }
+    void append_trace_data(const sanafe::Timestep & /*ts*/) override
+    {
+        const auto spikes = parent_chip->get_spikes();
+        assert(pybind11::isinstance<pybind11::list>(data) &&
+                "Data should be a Python list for spike traces");
+        auto data_list = data.cast<pybind11::list>();
+        data_list.append(pybind11::cast(spikes));
+    }
+};
+
+class PyPotentialTrace : public PyTrace
+{
+public:
+    PyPotentialTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
+        const bool overwrite_trace)
+            : PyTrace(chip, trace_obj, overwrite_trace)
+    {
+        data = pybind11::list();
+    }
+    ~PyPotentialTrace() override = default;
+    void get_header_string(std::ostringstream &ss) override
+    {
+        parent_chip->sim_trace_write_potential_header(ss);
+    }
+    void get_trace_string(
+            std::ostringstream &ss, const sanafe::Timestep &ts) override
+    {
+        parent_chip->sim_trace_record_potentials(ss, ts.timestep);
+    }
+    void append_trace_data(const sanafe::Timestep & /*ts*/) override
+    {
+        const auto potentials = parent_chip->get_potentials();
+        assert(pybind11::isinstance<pybind11::list>(data) &&
+                "Data should be a Python list for potential traces");
+        auto data_list = data.cast<pybind11::list>();
+        data_list.append(pybind11::cast(potentials));
+    }
+};
+
+class PyPerfTrace : public PyTrace
+{
+public:
+    ~PyPerfTrace() override = default;
+    PyPerfTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
+            const bool overwrite_trace)
+            : PyTrace(chip, trace_obj, overwrite_trace)
+    {
+        data = pybind11::dict();
+    }
+    void get_header_string(std::ostringstream &ss) override
+    {
+        parent_chip->sim_trace_write_perf_header(ss);
+    }
+    void get_trace_string(
+            std::ostringstream &ss, const sanafe::Timestep &ts) override
+    {
+        parent_chip->sim_trace_record_perf(ss, ts);
+    }
+    void append_trace_data(const sanafe::Timestep &ts) override
+    {
+        std::map<std::string, pybind11::object> stats =
+                timestep_data_to_map(ts);
+
+        // Get any optional traces and cast double values to Python objects
+        std::map<std::string, double> optional_perf_traces =
+                parent_chip->sim_trace_get_optional_traces();
+        for (auto &[name, value] : optional_perf_traces)
+        {
+            stats[name] = pybind11::cast(value);
+        }
+
+        // Now access the Python data dict and append all performance traces
+        //  to the list at the given keys
+        assert(pybind11::isinstance<pybind11::dict>(data) &&
+                "Data should be a Python list for perf traces");
+        const auto data_dict = data.cast<pybind11::dict>();
+        for (auto &[key, value] : stats)
+        {
+            if (!data_dict.contains(key))
+            {
+                data_dict[pybind11::str(key)] = pybind11::list();
+            }
+            auto key_list =
+                    data_dict[pybind11::str(key)].cast<pybind11::list>();
+            key_list.append(value);
+        }
+    }
+};
+
+class PyMessageTrace : public PyTrace
+{
+public:
+    PyMessageTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
+        const bool overwrite_trace)
+            : PyTrace(chip, trace_obj, overwrite_trace)
+    {
+        data = pybind11::list();
+    }
+    ~PyMessageTrace() override = default;
+    void get_header_string(std::ostringstream &ss) override
+    {
+        sanafe::SpikingChip::sim_trace_write_message_header(ss);
+    }
+    void get_trace_string(
+            std::ostringstream &ss, const sanafe::Timestep &ts) override
+    {
+        if (ts.messages == nullptr)
+        {
+            return;
+        }
+        std::vector<std::reference_wrapper<const sanafe::Message>> all_messages;
+        for (const sanafe::MessageFifo &q : *(ts.messages))
+        {
+            for (const sanafe::Message &m : q)
+            {
+                all_messages.emplace_back(m);
+            }
+        }
+        // Sort messages in message order, starting at lowest mid first
+        std::sort(all_messages.begin(), all_messages.end(),
+                [](const sanafe::Message &left, const sanafe::Message &right) {
+                    return left.mid < right.mid;
+                });
+        // Save the messages in sorted order
+        for (const sanafe::Message &m : all_messages)
+        {
+            sim_trace_record_message(ss, m);
+        }
+    }
+    void append_trace_data(const sanafe::Timestep &ts) override
+    {
+        std::vector<sanafe::Message> timestep_messages;
+        if (ts.messages == nullptr)
+        {
+            return;
+        }
+
+        // Not crucial, but its nice to print messages in ID order.
+        //  Copy all the messages into a single vector and sort
+        for (const sanafe::MessageFifo &q : *(ts.messages))
+        {
+            for (const sanafe::Message &m : q)
+            {
+                timestep_messages.emplace_back(m);
+            }
+        }
+        // Sort messages in message order, starting at lowest mid first
+        std::sort(timestep_messages.begin(), timestep_messages.end(),
+                [](const sanafe::Message &left, const sanafe::Message &right) {
+                    return left.mid < right.mid;
+                });
+
+        assert(pybind11::isinstance<pybind11::list>(data) &&
+                "Data should be a Python list for message traces");
+        auto data_list = data.cast<pybind11::list>();
+        data_list.append(pybind11::cast(timestep_messages));
+    }
+};
+
+// A similar implementation to SpikingChip::flush_timestep_data, but supporting
+//  Python interfaces and the Python file system
+void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
+        PyPerfTrace &perf, sanafe::Scheduler &scheduler,
+        PyMessageTrace &message_trace)
+{
+    while (!scheduler.timesteps_to_write.empty())
+    {
+        sanafe::Timestep ts;
+        scheduler.timesteps_to_write.pop(ts);
+        TRACE1(CHIP, "retiring ts:%ld\n", ts.timestep);
+        perf.update(ts);
+        if (ts.messages != nullptr)
+        {
+            message_trace.update(ts);
+        }
+        sanafe::SpikingChip::update_run_data(rd, ts);
+        self->retire_timestep(ts);
+    }
+}
 
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         std::string timing_model_str, const int processing_threads,
-        const int scheduler_threads, const bool spike_trace_enabled,
-        const bool potential_trace_enabled, const bool perf_trace_enabled,
-        const bool message_trace_enabled)
+        const int scheduler_threads, pybind11::object spike_trace,
+        pybind11::object potential_trace, pybind11::object perf_trace,
+        pybind11::object message_trace, const bool write_trace_headers)
 {
     sanafe::TimingModel timing_model{sanafe::timing_model_detailed};
-    if (timing_model_str == "simple")
-    {
-        timing_model = sanafe::timing_model_simple;
-    }
-    else if (timing_model_str == "detailed")
-    {
-        timing_model = sanafe::timing_model_detailed;
-    }
-    else if (timing_model_str == "cycle")
-    {
-        timing_model = sanafe::timing_model_cycle_accurate;
-    }
-    else
-    {
-        throw std::invalid_argument("Error: unsupoorted timing model");
-    }
+    timing_model = sanafe::parse_timing_model(timing_model_str);
+
+#ifndef HAVE_OPENMP
+        pybind11::print("Warning: multiple threads not supported; flag ignored");
+        pybind11::print("Processing threads:", processing_threads, "(default)");
+#else
+        const int total_threads_available = omp_get_num_procs();
+        omp_set_num_threads(
+                std::min(total_threads_available, processing_threads));
+#endif
+
+        const bool overwrite_if_trace_exists = write_trace_headers;
+        PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
+        PyPotentialTrace potentials(
+                self, potential_trace, overwrite_if_trace_exists);
+        PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
+        PyPerfTrace perf(self, perf_trace, overwrite_if_trace_exists);
+
+        if (write_trace_headers)
+        {
+            spikes.write_header();
+            potentials.write_header();
+            messages.write_header();
+            perf.write_header();
+        }
 
     sanafe::RunData rd(self->get_total_timesteps() + 1);
     rd.timesteps_executed += timesteps;
@@ -608,27 +969,6 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     scheduler.timing_model = timing_model;
     schedule_create_threads(scheduler, scheduler_threads);
 
-    // if (total_timesteps <= 0)
-    // {
-    //     // If no timesteps have been simulated, open the trace files
-    //     if (spike_trace_enabled)
-    //     {
-    //         self->spike_trace = self->sim_trace_open_spike_trace(out_dir);
-    //     }
-    //     if (potential_trace_enabled)
-    //     {
-    //         self->potential_trace = self->sim_trace_open_potential_trace(out_dir);
-    //     }
-    //     if (perf_trace_enabled)
-    //     {
-    //         self->perf_trace = self->sim_trace_open_perf_trace(out_dir);
-    //     }
-    //     if (message_trace_enabled)
-    //     {
-    //         self->message_trace = self->sim_trace_open_message_trace(out_dir);
-    //     }
-    // }
-
     auto last_check = std::chrono::steady_clock::now();
     auto last_print = std::chrono::steady_clock::now();
 
@@ -636,17 +976,19 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             "Executed steps: [0/" + std::to_string(timesteps) + "]";
     pybind11::print(first_message, pybind11::arg("end") = "");
 
-    pybind11::gil_scoped_release release;
+    const pybind11::gil_scoped_release release;
     for (long int timestep = 1; timestep <= timesteps; timestep++)
     {
         const sanafe::Timestep ts = self->step(scheduler);
+        spikes.update(timestep);
+        potentials.update(timestep);
 
         const auto now = std::chrono::steady_clock::now();
         constexpr std::chrono::milliseconds check_interval{100};
         constexpr std::chrono::seconds print_interval{1};
         if ((now - last_check) >= check_interval)
         {
-            pybind11::gil_scoped_acquire acquire;
+            const pybind11::gil_scoped_acquire acquire;
             if (PyErr_CheckSignals() != 0)
             {
                 throw pybind11::error_already_set();
@@ -658,26 +1000,35 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             const std::string message = "\rExecuted steps: [" +
                     std::to_string(timestep) + "/" + std::to_string(timesteps) +
                     "]";
-            pybind11::gil_scoped_acquire acquire;
+            const pybind11::gil_scoped_acquire acquire;
             pybind11::print(message, pybind11::arg("end") = "");
             last_print = now;
         }
         // Retire and trace messages as we go along. Not strictly required, but
         //  avoids the message write queue growing too large
-        self->flush_timestep_data(rd, scheduler);
+        pyflush_timestep_data(self, rd, perf, scheduler, messages);
     }
 
     const std::string last_message = "\rExecuted steps: [" +
-                    std::to_string(timesteps) + "/" + std::to_string(timesteps) +
-                    "]";
-    pybind11::gil_scoped_acquire acquire;
+            std::to_string(timesteps) + "/" + std::to_string(timesteps) + "]";
+    const pybind11::gil_scoped_acquire acquire;
     pybind11::print(last_message);
 
-    std::ofstream message_trace; // TODO
-    schedule_stop_all_threads(scheduler, message_trace, rd);
-    self->flush_timestep_data(rd, scheduler);
+    schedule_stop_all_threads(scheduler);
+    pyflush_timestep_data(self, rd, perf, scheduler, messages);
 
-    return run_data_to_dict(rd);
+    const auto spike_data = spikes.get_python_object();
+    const auto potential_data = potentials.get_python_object();
+    const auto perf_data = perf.get_python_object();
+    const auto message_data = messages.get_python_object();
+
+    pybind11::dict result = run_data_to_dict(rd);
+    result["spike_trace"] = spike_data;
+    result["potential_trace"] = potential_data;
+    result["perf_trace"] = perf_data;
+    result["message_trace"] = message_data;
+
+    return result;
 }
 
 } // end of anonymous namespace
@@ -1059,6 +1410,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict());
+    pybind11::class_<sanafe::Message>(m, "Message")
+            .def("__repr__", &sanafe::Message::info);
     pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
             .def_property(
                     "mapped_neuron_groups",
@@ -1072,6 +1425,10 @@ PYBIND11_MODULE(sanafecpp, m)
             .def(pybind11::init<sanafe::Architecture &, std::string, bool, bool,
                          bool, bool>(),
                     pybind11::arg("arch"), pybind11::arg("output_dir") = ".",
+                    // TODO: remove these redundant arguments
+                    //  this requires changing the SpikingChip class though to
+                    //  have a different way of opening its traces (not in the)
+                    //  constructor
                     pybind11::arg("record_spikes") = false,
                     pybind11::arg("record_potentials") = false,
                     pybind11::arg("record_perf") = false,
@@ -1081,10 +1438,11 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("timing_model") = "detailed",
                     pybind11::arg("processing_threads") = 0,
                     pybind11::arg("scheduler_threads") = 0,
-                    pybind11::arg("spike_trace_enabled") = true,
-                    pybind11::arg("potential_trace_enabled") = true,
-                    pybind11::arg("perf_trace_enabled") = true,
-                    pybind11::arg("message_trace_enabled") = true)
+                    pybind11::arg("spike_trace") = pybind11::none(),
+                    pybind11::arg("potential_trace") = pybind11::none(),
+                    pybind11::arg("perf_trace") = pybind11::none(),
+                    pybind11::arg("message_trace") = pybind11::none(),
+                    pybind11::arg("write_trace_headers") = true)
             .def("get_power", &sanafe::SpikingChip::get_power)
             .def("reset", &sanafe::SpikingChip::reset);
 }

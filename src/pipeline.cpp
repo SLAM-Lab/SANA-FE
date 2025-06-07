@@ -177,7 +177,8 @@ void sanafe::PipelineUnit::register_attributes(
 void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
 {
     if (supported_attribute_names.find(attribute_name) ==
-            supported_attribute_names.end())
+                    supported_attribute_names.end() &&
+            (attribute_warnings <= max_attribute_warnings))
     {
         INFO("Warning: Attribute (%s) not supported by model: %s, will be "
              "ignored.\nEither remove this attribute from the SNN/Architecture "
@@ -185,6 +186,14 @@ void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
              "(using synapse/dendrite/soma sections) or register the attribute "
              "in the constructor to suppress this warning.\n",
                 attribute_name.c_str(), name.c_str());
+        if (attribute_warnings == max_attribute_warnings)
+        {
+            INFO("Warning: Reached max attribute warnings (%ld) for this h/w "
+                 "unit and future warnings will be suppressed. To print all, "
+                 "rebuild and increase PipelineUnit::max_attribute_warnings\n",
+                    max_attribute_warnings);
+        }
+        attribute_warnings++;
     }
 }
 

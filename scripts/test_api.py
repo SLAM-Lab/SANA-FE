@@ -11,6 +11,3 @@ chip = sanafe.SpikingChip(arch)
 net = sanafe.load_net("snn/example.net", arch, use_netlist_format=True)
 net.save("out", use_netlist_format=True)
 chip.load(net)
-
-result = chip.sim(10)
-print(result)

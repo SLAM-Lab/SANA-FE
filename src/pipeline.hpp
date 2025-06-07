@@ -124,6 +124,10 @@ public:
     long int neurons_fired{0L};
     long int neuron_count{0L};
 
+    // Warning counter (in case we get attributes we don't recognize)
+    long int attribute_warnings{0L};
+    static constexpr long int max_attribute_warnings{100L}; // Stops spam
+
     // Implementation flags, set whichever operations your derived unit supports
     //  to 'true'. Note that a hardware unit must support one or more of these
     bool implements_synapse;

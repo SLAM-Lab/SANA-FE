@@ -157,7 +157,8 @@ if __name__ == "__main__":
         arch = sanafe.load_arch(ARCH_PATH)
         net = sanafe.load_net(GENERATED_NETWORK_PATH, arch,
                               use_netlist_format=True)
-        chip = sanafe.SpikingChip(arch, record_perf=True)
+        #chip = sanafe.SpikingChip(arch, record_perf=True)
+        chip = sanafe.SpikingChip(arch)
         chip.load(net)
 
         #for frame in range(0, 1):
@@ -170,7 +171,9 @@ if __name__ == "__main__":
             for id, mapped_neuron in enumerate(mapped_inputs):
                 mapped_neuron.set_model_attributes(
                     model_attributes={"bias": dvs_inputs[id]})
-            chip.sim(timesteps, timing_model="detailed")
+            is_first_frame = (frame == 0)
+            chip.sim(timesteps, perf_trace="perf.csv",
+                     write_trace_headers=is_first_frame)
             chip.reset()
 
         # Parse the detailed perf statistics

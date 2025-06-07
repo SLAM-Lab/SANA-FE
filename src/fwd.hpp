@@ -38,6 +38,7 @@ class MappedConnection;
 struct NeuronConfiguration;
 struct ModelInfo;
 struct PipelineResult;
+struct NeuronAddress;
 
 class Tile;
 class Core;

@@ -60,12 +60,26 @@ public:
     RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1);
     Timestep step(Scheduler &scheduler);
     void load(const SpikingNetwork &net);
-    void flush_timestep_data(RunData &rd, Scheduler &scheduler);
     void reset();
+    void flush_timestep_data(RunData &rd, Scheduler &scheduler);
+    void retire_timestep(const Timestep &ts);
 
     void set_heartbeat(long int timesteps) { heartbeat = timesteps; }
     double get_power() const noexcept;
-    double get_total_timesteps() const noexcept { return total_timesteps; };
+    std::vector<NeuronAddress> get_spikes() const;
+    std::vector<double> get_potentials() const;
+    long int get_total_timesteps() const noexcept { return total_timesteps; }
+    static void update_run_data(RunData &rd, const Timestep &ts);
+    std::map<std::string, double> sim_trace_get_optional_traces();
+
+    static void sim_trace_write_spike_header(std::ostream &spike_trace_file);
+    void sim_trace_write_potential_header(std::ostream &potential_trace_file);
+    void sim_trace_write_perf_header(std::ostream &perf_trace_file);
+    static void sim_trace_write_message_header(std::ostream &message_trace_file);
+
+    void sim_trace_record_spikes(std::ostream &spike_trace_file, long int timesteps);
+    void sim_trace_record_potentials(std::ostream &potential_trace_file, long int timestep);
+    void sim_trace_record_perf(std::ostream &perf_trace_file, const Timestep &ts);
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
 
     std::vector<std::reference_wrapper<Core>> cores();
@@ -79,6 +93,12 @@ public:
     size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{1UL};
 
+    // Trace flags
+    bool spike_trace_enabled{false};
+    bool potential_trace_enabled{false};
+    bool perf_trace_enabled{false};
+    bool message_trace_enabled{false};
+
 private:
     std::unique_ptr<BookSimConfig> booksim_config;
     std::string out_dir;
@@ -89,7 +109,6 @@ private:
     long int total_timesteps{0L};
     long int total_spikes{0L};
     long int heartbeat{default_heartbeat_timesteps};
-    double wall_time{0.0};
     double total_sim_time{0.0};
     double total_energy{0.0};
     double synapse_energy{0.0};
@@ -104,11 +123,7 @@ private:
     double energy_stats_wall{0.0};
     double scheduler_wall{0.0};
 
-    // Flags and filestreams
-    bool spike_trace_enabled{false};
-    bool potential_trace_enabled{false};
-    bool perf_trace_enabled{false};
-    bool message_trace_enabled{false};
+    // Filestreams
     std::ofstream spike_trace;
     std::ofstream potential_trace;
     std::ofstream message_trace;
@@ -147,7 +162,6 @@ private:
     void receive_message(Message &m);
     static double process_message(Timestep &ts, Core &c, Message &m);
     static PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
-    void update_run_data(RunData &rd, const Timestep &ts);
 
     static double pipeline_process_axon_in(Core &core, const Message &m);
     PipelineResult pipeline_process_axon_out(Timestep &ts, MappedNeuron &n);
@@ -156,19 +170,12 @@ private:
     static std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
     std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
-    static void sim_trace_write_spike_header(std::ofstream &spike_trace_file);
-    void sim_trace_write_potential_header(std::ofstream &potential_trace_file);
-    void sim_trace_write_perf_header(std::ofstream &perf_trace_file);
-    static void sim_trace_write_message_header(std::ofstream &message_trace_file);
-    void sim_trace_record_spikes(std::ofstream &spike_trace_file, long int timesteps);
-    void sim_trace_record_potentials(std::ofstream &potential_trace_file, long int timestep);
-    void sim_trace_record_perf(std::ofstream &perf_trace_file, const Timestep &ts);
-    std::map<std::string, double> sim_trace_get_optional_traces();
 
     static void check_booksim_compatibility(const Scheduler &scheduler, int sim_count);
 };
 
-void sim_trace_record_message(std::ofstream &message_trace_file, const Message &m);
+void sim_trace_record_message(std::ostream &message_trace_file, const Message &m);
+TimingModel parse_timing_model(const std::string_view &timing_model_str);
 
 constexpr long int invalid_timestep = -1L;
 struct Timestep
@@ -187,6 +194,7 @@ struct Timestep
     double soma_energy{0.0};
     double network_energy{0.0};
     double sim_time{0.0};
+    double wall_time{0.0};
 
     Timestep() = default;
     Timestep(long int ts);

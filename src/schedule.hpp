@@ -143,7 +143,7 @@ private:
 };
 
 // For comparing timesteps when maintaining priority queue of timesteps
-struct TimestepComparator
+struct CompareTimesteps
 {
     bool operator()(const Timestep &lhs, const Timestep &rhs) const
     {
@@ -155,9 +155,9 @@ struct Scheduler
 {
     std::vector<std::thread> scheduler_threads;
     std::atomic<bool> should_stop{false};
-    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, TimestepComparator>
+    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, CompareTimesteps>
             timesteps_to_schedule;
-    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, TimestepComparator>
+    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, CompareTimesteps>
             timesteps_to_write;
 
     TimingModel timing_model{timing_model_detailed};
@@ -214,7 +214,7 @@ void schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config,
 
 void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
 void schedule_messages_thread(Scheduler &scheduler, int thread_id);
-void schedule_stop_all_threads(Scheduler &scheduler, std::ofstream &message_trace, RunData &rd);
+void schedule_stop_all_threads(Scheduler &scheduler);
 
 std::vector<MessageFifo> schedule_init_message_queues(Timestep &ts, NocInfo &noc);
 double schedule_messages_timestep(Timestep &ts, Scheduler &scheduler);

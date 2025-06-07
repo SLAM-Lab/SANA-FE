@@ -614,8 +614,7 @@ void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
             thread_id);
 }
 
-void sanafe::schedule_stop_all_threads(Scheduler &scheduler,
-        std::ofstream & /*message_trace*/, sanafe::RunData & /*rd*/)
+void sanafe::schedule_stop_all_threads(Scheduler &scheduler)
 {
     TRACE1(SCHEDULER, "Stopping all scheduling threads.\n");
     scheduler.timesteps_to_schedule.wait_until_empty();

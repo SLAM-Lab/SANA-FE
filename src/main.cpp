@@ -64,32 +64,6 @@ struct RequiredProgramArgs
     long int timesteps_to_execute{0L};
 };
 
-sanafe::TimingModel parse_timing_model(const std::string_view &timing_model_str)
-{
-    sanafe::TimingModel timing_model{
-            sanafe::TimingModel::timing_model_detailed};
-
-    if (timing_model_str == "simple")
-    {
-        timing_model = sanafe::timing_model_simple;
-    }
-    else if (timing_model_str == "detailed")
-    {
-        timing_model = sanafe::timing_model_detailed;
-    }
-    else if (timing_model_str == "cycle")
-    {
-        timing_model = sanafe::timing_model_cycle_accurate;
-    }
-    else
-    {
-        INFO("Error: Timing model %s not recognized, default is 'detailed'.\n",
-                std::string(timing_model_str).c_str());
-    }
-
-    return timing_model;
-}
-
 std::string_view get_next_arg(
         const std::vector<std::string> &args, const size_t current_idx)
 {
@@ -144,7 +118,7 @@ int parse_flag(const std::vector<std::string> args, const size_t current_idx,
     case 't':
         args_consumed = 2;
         flags.timing_model =
-                parse_timing_model(get_next_arg(args, current_idx));
+                sanafe::parse_timing_model(get_next_arg(args, current_idx));
         break;
     case 'v':
         flags.record_potentials = true;
