@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <ios>
 #include <map>
 #include <memory>
 #include <optional>
@@ -620,6 +621,7 @@ public:
     PyTrace(const PyTrace &copy) = delete;
     PyTrace(const PyTrace &&move) = delete;
     PyTrace &operator=(const PyTrace &copy) = delete;
+    PyTrace &operator=(PyTrace &&move) = delete;
 
     void write_header();
     void update(const sanafe::Timestep &ts);
@@ -855,7 +857,7 @@ public:
         std::map<std::string, PerfStatistic> stats = timestep_data_to_map(ts);
 
         // Get any optional traces and cast double values to Python objects
-        std::map<std::string, double> optional_perf_traces =
+        const std::map<std::string, double> optional_perf_traces =
                 parent_chip->sim_trace_get_optional_traces();
         for (const auto &[name, value] : optional_perf_traces)
         {
