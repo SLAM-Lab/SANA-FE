@@ -69,22 +69,13 @@ sanafe::RunData::RunData(const long int start)
 //  will no longer be needed...
 std::atomic<int> sanafe::SpikingChip::chip_count = 0;
 
-sanafe::SpikingChip::SpikingChip(const Architecture &arch,
-        const std::filesystem::path &output_dir, const bool record_spikes,
-        const bool record_potentials, const bool record_perf,
-        const bool record_messages)
+sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         : ts_sync_delay_table(arch.ts_sync_delay_table)
         , core_count(arch.core_count)
         , max_cores_per_tile(arch.max_cores_per_tile)
         , noc_width_in_tiles(arch.noc_width_in_tiles)
         , noc_height_in_tiles(arch.noc_height_in_tiles)
         , noc_buffer_size(arch.noc_buffer_size)
-        , spike_trace_enabled(record_spikes)
-        , potential_trace_enabled(record_potentials)
-        , perf_trace_enabled(record_perf)
-        , message_trace_enabled(record_messages)
-        , out_dir(output_dir)
-
 {
     INFO("Initializing simulation.\n");
     for (const TileConfiguration &tile_config : arch.tiles)
@@ -399,12 +390,12 @@ void sanafe::SpikingChip::flush_timestep_data(
         Timestep ts;
         scheduler.timesteps_to_write.pop(ts);
         TRACE1(CHIP, "Retiring ts:%ld\n", ts.timestep);
-        if (perf_trace_enabled)
+        if (perf_trace.is_open())
         {
             sim_trace_record_perf(perf_trace, ts);
         }
 
-        if (message_trace_enabled && (ts.messages != nullptr))
+        if (message_trace.is_open() && (ts.messages != nullptr))
         {
             // Not crucial, but its nice to print messages in ID order.
             //  Copy all the messages into a single vector and sort
@@ -449,7 +440,12 @@ void sanafe::SpikingChip::update_run_data(
 }
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
-        const TimingModel timing_model, const int scheduler_thread_count)
+        const TimingModel timing_model, const int scheduler_thread_count,
+        const bool record_spikes,
+        const bool record_potentials,
+        const bool record_perf,
+        const bool record_messages,
+        std::string output_dir)
 {
     RunData rd(total_timesteps + 1);
     rd.timesteps_executed += timesteps;
@@ -466,21 +462,21 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     if (total_timesteps <= 0)
     {
         // If no timesteps have been simulated, open the trace files
-        if (spike_trace_enabled)
+        if (record_spikes)
         {
-            spike_trace = sim_trace_open_spike_trace(out_dir);
+            spike_trace = sim_trace_open_spike_trace(output_dir);
         }
-        if (potential_trace_enabled)
+        if (record_potentials)
         {
-            potential_trace = sim_trace_open_potential_trace(out_dir);
+            potential_trace = sim_trace_open_potential_trace(output_dir);
         }
-        if (perf_trace_enabled)
+        if (record_perf)
         {
-            perf_trace = sim_trace_open_perf_trace(out_dir);
+            perf_trace = sim_trace_open_perf_trace(output_dir);
         }
-        if (message_trace_enabled)
+        if (record_messages)
         {
-            message_trace = sim_trace_open_message_trace(out_dir);
+            message_trace = sim_trace_open_message_trace(output_dir);
         }
     }
 
@@ -536,11 +532,11 @@ sanafe::Timestep sanafe::SpikingChip::step(Scheduler &scheduler)
     sim_update_total_energy_and_counts(ts);
     // The total_messages_sent is incremented during the simulation since it's
     //  used to calculate the message id, so nothing needs to be done here
-    if (spike_trace_enabled)
+    if (spike_trace.is_open())
     {
         sim_trace_record_spikes(spike_trace, total_timesteps);
     }
-    if (potential_trace_enabled)
+    if (potential_trace.is_open())
     {
         sim_trace_record_potentials(potential_trace, total_timesteps);
     }

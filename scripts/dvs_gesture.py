@@ -307,7 +307,6 @@ if __name__ == "__main__":
             plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_time.pdf")
             plt.savefig("runs/dvs/dvs_gesture_sim_time.png")
-            print("saved")
 
             # Plot the correlation between simulated and measured time-step latency
             plt.figure(figsize=(1.5, 1.5))

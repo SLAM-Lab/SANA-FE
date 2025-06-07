@@ -758,7 +758,7 @@ class PyPotentialTrace : public PyTrace
 {
 public:
     PyPotentialTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
-        const bool overwrite_trace)
+            const bool overwrite_trace)
             : PyTrace(chip, trace_obj, overwrite_trace)
     {
         data = pybind11::list();
@@ -837,7 +837,7 @@ class PyMessageTrace : public PyTrace
 {
 public:
     PyMessageTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
-        const bool overwrite_trace)
+            const bool overwrite_trace)
             : PyTrace(chip, trace_obj, overwrite_trace)
     {
         data = pybind11::list();
@@ -934,28 +934,27 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     timing_model = sanafe::parse_timing_model(timing_model_str);
 
 #ifndef HAVE_OPENMP
-        pybind11::print("Warning: multiple threads not supported; flag ignored");
-        pybind11::print("Processing threads:", processing_threads, "(default)");
+    pybind11::print("Warning: multiple threads not supported; flag ignored");
+    pybind11::print("Processing threads:", processing_threads, "(default)");
 #else
-        const int total_threads_available = omp_get_num_procs();
-        omp_set_num_threads(
-                std::min(total_threads_available, processing_threads));
+    const int total_threads_available = omp_get_num_procs();
+    omp_set_num_threads(std::min(total_threads_available, processing_threads));
 #endif
 
-        const bool overwrite_if_trace_exists = write_trace_headers;
-        PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
-        PyPotentialTrace potentials(
-                self, potential_trace, overwrite_if_trace_exists);
-        PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
-        PyPerfTrace perf(self, perf_trace, overwrite_if_trace_exists);
+    const bool overwrite_if_trace_exists = write_trace_headers;
+    PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
+    PyPotentialTrace potentials(
+            self, potential_trace, overwrite_if_trace_exists);
+    PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
+    PyPerfTrace perf(self, perf_trace, overwrite_if_trace_exists);
 
-        if (write_trace_headers)
-        {
-            spikes.write_header();
-            potentials.write_header();
-            messages.write_header();
-            perf.write_header();
-        }
+    if (write_trace_headers)
+    {
+        spikes.write_header();
+        potentials.write_header();
+        messages.write_header();
+        perf.write_header();
+    }
 
     sanafe::RunData rd(self->get_total_timesteps() + 1);
     rd.timesteps_executed += timesteps;
@@ -1422,17 +1421,8 @@ PYBIND11_MODULE(sanafecpp, m)
                         return self.mapped_neuron_groups;
                     },
                     nullptr, pybind11::return_value_policy::reference_internal)
-            .def(pybind11::init<sanafe::Architecture &, std::string, bool, bool,
-                         bool, bool>(),
-                    pybind11::arg("arch"), pybind11::arg("output_dir") = ".",
-                    // TODO: remove these redundant arguments
-                    //  this requires changing the SpikingChip class though to
-                    //  have a different way of opening its traces (not in the)
-                    //  constructor
-                    pybind11::arg("record_spikes") = false,
-                    pybind11::arg("record_potentials") = false,
-                    pybind11::arg("record_perf") = false,
-                    pybind11::arg("record_messages") = false)
+            .def(pybind11::init<sanafe::Architecture &>(),
+                    pybind11::arg("arch"))
             .def("load", &sanafe::SpikingChip::load)
             .def("sim", &pysim, pybind11::arg("timesteps") = 1,
                     pybind11::arg("timing_model") = "detailed",

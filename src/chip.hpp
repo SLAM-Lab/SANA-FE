@@ -50,14 +50,14 @@ public:
     // Keep a reference to the different neuron groups mapped to the H/W
     std::map<std::string, std::vector<std::reference_wrapper<MappedNeuron>>> mapped_neuron_groups;
 
-    SpikingChip(const Architecture &arch, const std::filesystem::path &output_dir = ".", bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false);
+    SpikingChip(const Architecture &arch);
     ~SpikingChip();
     // Do not allow copying
     SpikingChip(const SpikingChip &copy) = delete;
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1);
+    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false, std::string output_dir = "");
     Timestep step(Scheduler &scheduler);
     void load(const SpikingNetwork &net);
     void reset();
@@ -93,15 +93,8 @@ public:
     size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{1UL};
 
-    // Trace flags
-    bool spike_trace_enabled{false};
-    bool potential_trace_enabled{false};
-    bool perf_trace_enabled{false};
-    bool message_trace_enabled{false};
-
 private:
     std::unique_ptr<BookSimConfig> booksim_config;
-    std::string out_dir;
     std::atomic<long int> total_messages_sent{0L};
     size_t total_neurons_mapped{0UL};
     long int total_neurons_updated{0L};
