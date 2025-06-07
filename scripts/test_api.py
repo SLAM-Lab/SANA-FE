@@ -12,7 +12,8 @@ net = sanafe.load_net("snn/example.net", arch, use_netlist_format=True)
 net.save("out", use_netlist_format=True)
 chip.load(net)
 
-result = chip.sim(10, message_trace=True)
+result = chip.sim(10, spike_trace=True)
 
 import yaml
 print(yaml.dump(result))
+print(result["spike_trace"])

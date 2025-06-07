@@ -786,7 +786,17 @@ public:
         const pybind11::gil_scoped_acquire acquire;
         if (mode == TraceMode::trace_memory)
         {
-            return pybind11::cast(data);
+            pybind11::list data_list;
+            for (const auto &spikes : data)
+            {
+                pybind11::list spike_list;
+                for (const sanafe::NeuronAddress &spike : spikes)
+                {
+                    spike_list.append(pybind11::cast(spike));
+                }
+                data_list.append(spike_list);
+            }
+            return data_list;
         }
         return pybind11::none();
     }
