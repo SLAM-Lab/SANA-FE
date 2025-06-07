@@ -6,6 +6,19 @@
 #include "message.hpp"
 #include "tile.hpp"
 
+sanafe::Message::Message()
+        : timestep(-1L)
+        , mid(placeholder_mid)
+        , src_neuron_offset(0UL)
+        , src_neuron_group_id("invalid")
+        , src_x(0UL)
+        , src_y(0UL)
+        , src_tile_id(0UL)
+        , src_core_id(0UL)
+        , src_core_offset(0UL)
+{
+}
+
 sanafe::Message::Message(const long int id, const SpikingChip &hw,
         const MappedNeuron &n, const long int timestep)
         : timestep(timestep)
@@ -45,36 +58,4 @@ sanafe::Message::Message(const long int id, const SpikingChip &hw,
     dest_core_offset = dest_core.offset;
     dest_axon_id = src_axon.dest_axon_id;
     dest_axon_hw = 0;
-}
-
-std::string sanafe::Message::info() const noexcept
-{
-    std::ostringstream ss;
-    // Clang-format will do something nasty here, leave with this explicit
-    //  formatting
-    // clang-format off
-    ss << "sanafe::Message(mid=" << mid
-       << ", generation_delay=" << generation_delay
-       << ", network_delay=" << network_delay
-       << ", receive_delay=" << receive_delay
-       << ", blocked_delay=" << blocked_delay
-       << ", sent_timestamp=" << sent_timestamp
-       << ", received_timestamp=" << received_timestamp
-       << ", processed_timestamp=" << processed_timestamp
-       << ", timestep=" << timestep
-       << ", spikes=" << spikes
-       << ", hops=" << hops
-       << ", src_neuron_offset=" << src_neuron_offset
-       << ", src_neuron_group_id='" << src_neuron_group_id << "'"
-       << ", src_x=" << src_x
-       << ", dest_x=" << dest_x
-       << ", src_y=" << src_y
-       << ", dest_y=" << dest_y
-       << ", src_tile_id=" << src_tile_id
-       << ", src_core_offset=" << src_core_offset
-       << ", dest_tile_id=" << dest_tile_id
-       << ", dest_core_offset=" << dest_core_offset
-       << ")";
-    // clang-format on
-    return ss.str();
 }

@@ -28,12 +28,13 @@
 std::string sanafe::NeuronAddress::info() const
 {
     std::ostringstream ss;
-    ss << "sanafe::NeuronAddress(group_name=" << group_name;
+    // Output the address as a string rather than an object, making it easier
+    //  to integrate to other formats later e.g. YAML
+    ss << group_name;
     if (neuron_offset.has_value())
     {
-        ss << " neuron_offset=" << neuron_offset.value();
+        ss << '.' << neuron_offset.value();
     }
-    ss << ")";
 
     return ss.str();
 }

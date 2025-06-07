@@ -46,6 +46,7 @@ struct Message
     bool placeholder{true};
     bool in_noc{false};
 
+    explicit Message();
     explicit Message(long int id, const SpikingChip &hw, const MappedNeuron &n,
             long int timestep);
     explicit Message(long int id, const SpikingChip &hw, size_t axon_address,
@@ -55,7 +56,6 @@ struct Message
     ~Message() = default;
     Message& operator=(const Message &copy) = default;
     Message& operator=(Message &&move) = default;
-    std::string info() const noexcept;
 };
 
 }

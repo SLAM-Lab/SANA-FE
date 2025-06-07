@@ -265,18 +265,20 @@ pybind11::dict pymodel_attributes_to_pydict(
     return attribute_dict;
 }
 
-std::map<std::string, pybind11::object> timestep_data_to_map(
+using PerfStatistic = std::variant<size_t, long int, double>;
+
+std::map<std::string, PerfStatistic> timestep_data_to_map(
         const sanafe::Timestep &ts)
 {
-    std::map<std::string, pybind11::object> ts_map;
+    std::map<std::string, PerfStatistic> ts_map;
 
-    ts_map["timestep"] = pybind11::cast(ts.timestep);
-    ts_map["fired"] = pybind11::cast(ts.neurons_fired);
-    ts_map["updated"] = pybind11::cast(ts.neurons_updated);
-    ts_map["hops"] = pybind11::cast(ts.total_hops);
-    ts_map["spikes"] = pybind11::cast(ts.spike_count);
-    ts_map["sim_time"] = pybind11::cast(ts.sim_time);
-    ts_map["total_energy"] = pybind11::cast(ts.total_energy);
+    ts_map["timestep"] = ts.timestep;
+    ts_map["fired"] = ts.neurons_fired;
+    ts_map["updated"] = ts.neurons_updated;
+    ts_map["hops"] = ts.total_hops;
+    ts_map["spikes"] = ts.spike_count;
+    ts_map["sim_time"] = ts.sim_time;
+    ts_map["total_energy"] = ts.total_energy;
 
     return ts_map;
 }
@@ -301,6 +303,41 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run)
     run_data_dict["neurons_fired"] = run.neurons_fired;
 
     return run_data_dict;
+}
+
+
+pybind11::dict message_to_dict(const sanafe::Message &m)
+{
+    pybind11::dict message_dict;
+
+    message_dict["generation_delay"] = m.generation_delay;
+    message_dict["network_delay"] = m.network_delay;
+    message_dict["receive_delay"] = m.receive_delay;
+    message_dict["blocked_delay"] = m.blocked_delay;
+    message_dict["sent_timestamp"] = m.sent_timestamp;
+    message_dict["received_timestamp"] = m.received_timestamp;
+    message_dict["processed_timestamp"] = m.processed_timestamp;
+    message_dict["timestep"] = m.timestep;
+    message_dict["mid"] = m.mid;
+    message_dict["spikes"] = m.spikes;
+    message_dict["hops"] = m.hops;
+    message_dict["src_neuron_offset"] = m.src_neuron_offset;
+    message_dict["src_neuron_group_id"] = m.src_neuron_group_id;
+    message_dict["src_x"] = m.src_x;
+    message_dict["dest_x"] = m.dest_x;
+    message_dict["src_y"] = m.src_y;
+    message_dict["dest_y"] = m.dest_y;
+    message_dict["src_tile_id"] = m.src_tile_id;
+    message_dict["src_core_id"] = m.src_core_id;
+    message_dict["src_core_offset"] = m.src_core_offset;
+    message_dict["dest_tile_id"] = m.dest_tile_id;
+    message_dict["dest_core_id"] = m.dest_core_id;
+    message_dict["dest_core_offset"] = m.dest_core_offset;
+    message_dict["dest_axon_hw"] = m.dest_axon_hw;
+    message_dict["dest_axon_id"] = m.dest_axon_id;
+    message_dict["placeholder"] = m.placeholder;
+
+    return message_dict;
 }
 
 void pyconnect_neurons_sparse(sanafe::NeuronGroup *self,
@@ -586,27 +623,17 @@ public:
 
     void write_header();
     void update(const sanafe::Timestep &ts);
-    pybind11::object get_python_object() const
-    {
-        if (mode == TraceMode::trace_memory)
-        {
-            return data;
-        }
-
-        return pybind11::none();
-    }
+    virtual pybind11::object get_python_object() const = 0;
 
 protected:
     sanafe::SpikingChip *parent_chip;
     pybind11::object obj{pybind11::none()};
     TraceMode mode{TraceMode::trace_none};
     std::ofstream file;
-    pybind11::object data;
 
 private:
     void open(pybind11::object trace_obj, bool overwrite_trace);
 
-    // Override these three functions
     virtual void get_trace_string(
             std::ostringstream &ss, const sanafe::Timestep &ts) = 0;
     virtual void get_header_string(std::ostringstream &ss) = 0;
@@ -672,6 +699,8 @@ void PyTrace::update(const sanafe::Timestep &ts)
 {
     if (mode == TraceMode::trace_memory)
     {
+        // Note we must always acquire the GIL before modifying Python objects
+        const pybind11::gil_scoped_acquire acquire;
         // Make call to appropriate overriden virtual routine
         append_trace_data(ts);
     }
@@ -732,7 +761,6 @@ public:
             const bool overwrite_trace)
             : PyTrace(chip, trace_obj, overwrite_trace)
     {
-        data = pybind11::list();
     }
     ~PySpikeTrace() override = default;
     void get_header_string(std::ostringstream &ss) override
@@ -746,12 +774,23 @@ public:
     }
     void append_trace_data(const sanafe::Timestep & /*ts*/) override
     {
-        const auto spikes = parent_chip->get_spikes();
-        assert(pybind11::isinstance<pybind11::list>(data) &&
-                "Data should be a Python list for spike traces");
-        auto data_list = data.cast<pybind11::list>();
-        data_list.append(pybind11::cast(spikes));
+        auto spikes = parent_chip->get_spikes();
+        data.emplace_back(std::move(spikes));
     }
+    pybind11::object get_python_object() const override
+    {
+        // Acquire GIL to be safe, even though simulations should have finished
+        //  at this point and the GIL should be reacquired already
+        const pybind11::gil_scoped_acquire acquire;
+        if (mode == TraceMode::trace_memory)
+        {
+            return pybind11::cast(data);
+        }
+        return pybind11::none();
+    }
+
+private:
+    std::vector<std::vector<sanafe::NeuronAddress>> data;
 };
 
 class PyPotentialTrace : public PyTrace
@@ -761,7 +800,6 @@ public:
             const bool overwrite_trace)
             : PyTrace(chip, trace_obj, overwrite_trace)
     {
-        data = pybind11::list();
     }
     ~PyPotentialTrace() override = default;
     void get_header_string(std::ostringstream &ss) override
@@ -775,12 +813,23 @@ public:
     }
     void append_trace_data(const sanafe::Timestep & /*ts*/) override
     {
-        const auto potentials = parent_chip->get_potentials();
-        assert(pybind11::isinstance<pybind11::list>(data) &&
-                "Data should be a Python list for potential traces");
-        auto data_list = data.cast<pybind11::list>();
-        data_list.append(pybind11::cast(potentials));
+        auto potentials = parent_chip->get_potentials();
+        data.emplace_back(std::move(potentials));
     }
+    pybind11::object get_python_object() const override
+    {
+        // Acquire GIL to be safe, even though simulations should have finished
+        //  at this point and the GIL should be reacquired already
+        const pybind11::gil_scoped_acquire acquire;
+        if (mode == TraceMode::trace_memory)
+        {
+            return pybind11::cast(data);
+        }
+        return pybind11::none();
+    }
+
+private:
+    std::vector<std::vector<double>> data;
 };
 
 class PyPerfTrace : public PyTrace
@@ -791,7 +840,6 @@ public:
             const bool overwrite_trace)
             : PyTrace(chip, trace_obj, overwrite_trace)
     {
-        data = pybind11::dict();
     }
     void get_header_string(std::ostringstream &ss) override
     {
@@ -804,33 +852,35 @@ public:
     }
     void append_trace_data(const sanafe::Timestep &ts) override
     {
-        std::map<std::string, pybind11::object> stats =
-                timestep_data_to_map(ts);
+        std::map<std::string, PerfStatistic> stats = timestep_data_to_map(ts);
 
         // Get any optional traces and cast double values to Python objects
         std::map<std::string, double> optional_perf_traces =
                 parent_chip->sim_trace_get_optional_traces();
-        for (auto &[name, value] : optional_perf_traces)
+        for (const auto &[name, value] : optional_perf_traces)
         {
-            stats[name] = pybind11::cast(value);
+            stats[name] = value;
         }
 
-        // Now access the Python data dict and append all performance traces
-        //  to the list at the given keys
-        assert(pybind11::isinstance<pybind11::dict>(data) &&
-                "Data should be a Python list for perf traces");
-        const auto data_dict = data.cast<pybind11::dict>();
-        for (auto &[key, value] : stats)
+        for (const auto &[key, value] : stats)
         {
-            if (!data_dict.contains(key))
-            {
-                data_dict[pybind11::str(key)] = pybind11::list();
-            }
-            auto key_list =
-                    data_dict[pybind11::str(key)].cast<pybind11::list>();
-            key_list.append(value);
+            data[key].emplace_back(value);
         }
     }
+    pybind11::object get_python_object() const override
+    {
+        // Acquire GIL to be safe, even though simulations should have finished
+        //  at this point and the GIL should be reacquired already
+        const pybind11::gil_scoped_acquire acquire;
+        if (mode == TraceMode::trace_memory)
+        {
+            return pybind11::cast(data);
+        }
+        return pybind11::none();
+    }
+
+private:
+    std::map<std::string, std::vector<PerfStatistic>> data;
 };
 
 class PyMessageTrace : public PyTrace
@@ -840,7 +890,6 @@ public:
             const bool overwrite_trace)
             : PyTrace(chip, trace_obj, overwrite_trace)
     {
-        data = pybind11::list();
     }
     ~PyMessageTrace() override = default;
     void get_header_string(std::ostringstream &ss) override
@@ -895,12 +944,34 @@ public:
                 [](const sanafe::Message &left, const sanafe::Message &right) {
                     return left.mid < right.mid;
                 });
-
-        assert(pybind11::isinstance<pybind11::list>(data) &&
-                "Data should be a Python list for message traces");
-        auto data_list = data.cast<pybind11::list>();
-        data_list.append(pybind11::cast(timestep_messages));
+        data.emplace_back(std::move(timestep_messages));
     }
+    pybind11::object get_python_object() const override
+    {
+        // Acquire GIL to be safe, even though simulations should have finished
+        //  at this point and the GIL should be reacquired already
+        const pybind11::gil_scoped_acquire acquire;
+        if (mode == TraceMode::trace_memory)
+        {
+            // Convert each message to a dict, meaning we need to manually
+            //  iterate over every message in data
+            pybind11::list data_list;
+            for (const auto &ts_messages : data)
+            {
+                pybind11::list ts_list;
+                for (const auto &m : ts_messages)
+                {
+                    ts_list.append(message_to_dict(m));
+                }
+                data_list.append(ts_list);
+            }
+            return data_list;
+        }
+        return pybind11::none();
+    }
+
+private:
+    std::vector<std::vector<sanafe::Message>> data;
 };
 
 // A similar implementation to SpikingChip::flush_timestep_data, but supporting
@@ -1344,8 +1415,23 @@ PYBIND11_MODULE(sanafecpp, m)
             .def_readonly("group_name", &sanafe::NeuronAddress::group_name)
             .def_readonly(
                     "neuron_offset", &sanafe::NeuronAddress::neuron_offset)
-            .def("__repr__", &sanafe::NeuronAddress::info);
-
+            .def("__repr__", &sanafe::NeuronAddress::info)
+            // Make this tiny struct picklable so that we can easily dump it to
+            //  YAML in Python
+            .def(pybind11::pickle(
+                    [](const sanafe::NeuronAddress &n) { // __getstate__
+                        // All members except 'in_noc', which is only used by the
+                        //  detailed scheduler
+                        return pybind11::make_tuple(
+                                n.group_name, n.neuron_offset);
+                    },
+                    [](const pybind11::tuple &t)
+                            -> sanafe::NeuronAddress { // __setstate__
+                        sanafe::NeuronAddress n;
+                        n.group_name = pybind11::cast<std::string>(t[0]);
+                        n.neuron_offset = pybind11::cast<long int>(t[1]);
+                        return n;
+                    }));
     pybind11::class_<sanafe::Architecture>(m, "Architecture")
             .def(pybind11::init<std::string,
                     sanafe::NetworkOnChipConfiguration>())
@@ -1409,8 +1495,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict());
-    pybind11::class_<sanafe::Message>(m, "Message")
-            .def("__repr__", &sanafe::Message::info);
     pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
             .def_property(
                     "mapped_neuron_groups",
