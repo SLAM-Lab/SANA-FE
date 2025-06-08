@@ -14,23 +14,15 @@ build:
     - cmake
     - flex
     - bison
-
+  jobs:
+    post_create_environment:
+      - pip install .
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
    configuration: docs/conf.py
+   fail_on_warning: false
 
 python:
    install:
    - requirements: docs/requirements.txt
-   - method: pip
-     path: .
-
-
-python:
-  install:
-    - requirements: docs/requirements.txt
-
-sphinx:
-  configuration: docs/conf.py
-  fail_on_warning: false
