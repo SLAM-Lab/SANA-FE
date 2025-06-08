@@ -70,7 +70,6 @@ These tutorials can be run locally or using Google Colab.
    :maxdepth: 2
    :caption: Contents:
 
-   introduction
    api
 
 Indices and tables

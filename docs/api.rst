@@ -5,27 +5,6 @@ This page contains the API documentation for SANA-FE.
 
 .. currentmodule:: sanafe
 
-Classes
--------
-
-.. autosummary::
-   :toctree: _autosummary
-   :template: class.rst
-
-   SpikingChip
-   Architecture
-   Network
-   NeuronGroup
-
-Functions
----------
-
-.. autosummary::
-   :toctree: _autosummary
-
-    load_arch
-    load_net
-
 Core Classes
 ------------
 
