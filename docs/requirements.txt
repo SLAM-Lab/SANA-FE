@@ -1,1 +1,2 @@
-sphinx-rtd-theme
+sphinx_rtd_theme
+pybind11
