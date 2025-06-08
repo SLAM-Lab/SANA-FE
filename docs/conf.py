@@ -27,3 +27,6 @@ autosummary_generate = True
 html_static_path = ['_static']
 def setup(app):
     app.add_css_file('make_logo_white.css')
+
+# Mock imports for Read the Docs
+autodoc_mock_imports = ['sanafecpp', 'sanafe']
