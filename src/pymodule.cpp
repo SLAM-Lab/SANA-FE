@@ -38,6 +38,7 @@
 #include "arch.hpp"
 #include "attribute.hpp"
 #include "chip.hpp"
+#include "docstrings.hpp"
 #include "mapped.hpp"
 #include "message.hpp"
 #include "network.hpp"
@@ -305,7 +306,6 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run)
 
     return run_data_dict;
 }
-
 
 pybind11::dict message_to_dict(const sanafe::Message &m)
 {
@@ -1173,21 +1173,12 @@ public:
 // NOLINTBEGIN(readability-function-cognitive-complexity)
 PYBIND11_MODULE(sanafecpp, m)
 {
-    m.doc() = R"pbdoc(
-    SANA-FE CPP Kernel Module
-    --------------------------------
+    m.doc() = docstrings::module_doc;
 
-    .. currentmodule:: sanafecpp
-
-    .. autosummary::
-       :toctree: _generate
-
-           SANA_FE
-    )pbdoc";
-
-    m.def("load_arch", &sanafe::load_arch);
-    m.def("load_net", &sanafe::load_net, pybind11::arg("path"),
-            pybind11::arg("arch"), pybind11::arg("use_netlist_format") = false);
+    m.def("load_arch", &sanafe::load_arch, docstrings::load_arch_doc);
+    m.def("load_net", &sanafe::load_net, docstrings::load_net_doc,
+            pybind11::arg("path"), pybind11::arg("arch"),
+            pybind11::arg("use_netlist_format") = false);
 
     pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
             .value("buffer_before_dendrite_unit",
@@ -1197,10 +1188,12 @@ PYBIND11_MODULE(sanafecpp, m)
                     sanafe::buffer_before_axon_out_unit)
             .value("buffer_positions", sanafe::buffer_positions);
 
-    pybind11::class_<sanafe::SpikingNetwork>(m, "Network")
+    pybind11::class_<sanafe::SpikingNetwork>(
+            m, "Network", docstrings::network_doc)
             .def(pybind11::init<>())
             .def("__repr__", &sanafe::SpikingNetwork::info)
             .def("create_neuron_group", &pycreate_neuron_group,
+                    docstrings::network_create_neuron_group_doc,
                     pybind11::return_value_policy::reference_internal,
                     pybind11::arg("group_name"), pybind11::arg("neuron_count"),
                     pybind11::arg("model_attributes") = pybind11::dict(),
@@ -1212,7 +1205,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("log_potential") = false,
                     pybind11::arg("log_spikes") = false,
                     pybind11::arg("soma_hw_name") = "")
-            .def("save", &sanafe::SpikingNetwork::save, pybind11::arg("path"),
+            .def("save", &sanafe::SpikingNetwork::save,
+                    docstrings::network_save_doc, pybind11::arg("path"),
                     pybind11::arg("use_netlist_format") = false)
             .def_property_readonly(
                     "groups",
@@ -1236,12 +1230,16 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::keep_alive<0, 1>(),
                     pybind11::return_value_policy::reference_internal);
 
-    pybind11::class_<sanafe::NeuronGroup>(m, "NeuronGroup")
+    pybind11::class_<sanafe::NeuronGroup>(
+            m, "NeuronGroup", docstrings::neuron_group_doc)
             .def("__repr__", &sanafe::NeuronGroup::info)
             .def("get_name", &sanafe::NeuronGroup::get_name)
-            .def("connect_neurons_dense", &pyconnect_neurons_dense)
-            .def("connect_neurons_sparse", &pyconnect_neurons_sparse)
+            .def("connect_neurons_dense", &pyconnect_neurons_dense,
+                    docstrings::neuron_group_connect_dense_doc)
+            .def("connect_neurons_sparse", &pyconnect_neurons_sparse,
+                    docstrings::neuron_group_connect_sparse_doc)
             .def("connect_neurons_conv2d", &pyconnect_neurons_conv2d,
+                    docstrings::neuron_group_connect_conv2d_doc,
                     pybind11::arg("dest_group"), pybind11::arg("attributes"),
                     pybind11::arg("input_width"), pybind11::arg("input_height"),
                     pybind11::arg("input_channels"),
@@ -1269,7 +1267,6 @@ PYBIND11_MODULE(sanafecpp, m)
                             pybind11::object index) -> pybind11::object {
                         auto &self =
                                 pybind11::cast<sanafe::NeuronGroup &>(self_obj);
-
                         if (pybind11::isinstance<pybind11::int_>(index))
                         {
                             // Integer indexing
@@ -1322,21 +1319,20 @@ PYBIND11_MODULE(sanafecpp, m)
     //  reference class to help with managing object lifetimes. This is partly
     //  due to the fact PyBind11 struggles to keep the parent alive when
     //  returning lists of them e.g., when we want to return a slice of Neuron objects
-    pybind11::class_<PyNeuronRef>(m, "Neuron")
-            .def("__repr__",
-                    [](const PyNeuronRef &ref) {
-                        return ref.get()
-                                ->info(); // Delegate to neuron's info method
-                    })
+    pybind11::class_<PyNeuronRef>(m, "Neuron", docstrings::neuron_doc)
             // Forward all methods from Neuron to PyNeuronRef
+            .def("__repr__",
+                    [](const PyNeuronRef &ref) { return ref.get()->info(); })
             .def("get_id",
                     [](const PyNeuronRef &ref) { return ref.get()->get_id(); })
-            .def("map_to_core",
+            .def(
+                    "map_to_core",
                     [](const PyNeuronRef &ref,
                             const sanafe::CoreConfiguration &core_configuration) {
                         ref.get()->map_to_core(core_configuration);
                         return;
-                    })
+                    },
+                    docstrings::neuron_map_to_core_doc)
             .def(
                     "set_attributes",
                     [](const PyNeuronRef &ref,
@@ -1359,6 +1355,7 @@ PYBIND11_MODULE(sanafecpp, m)
                                 model_attributes, dendrite_specific_attributes,
                                 soma_specific_attributes);
                     },
+                    docstrings::neuron_set_attributes_doc,
                     pybind11::arg("soma_hw_name") = pybind11::none(),
                     pybind11::arg("default_synapse_hw_name") = pybind11::none(),
                     pybind11::arg("dendrite_hw_name") = pybind11::none(),
@@ -1370,13 +1367,13 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict())
-            .def("connect_to_neuron",
+            .def(
+                    "connect_to_neuron",
                     [](const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
                             std::optional<pybind11::dict> attr =
                                     pybind11::none()) -> size_t {
                         // Extract the actual neuron from the destination ref
                         sanafe::Neuron &dest = *(dest_ref.get());
-
                         if (!attr.has_value())
                         {
                             attr = pybind11::dict();
@@ -1398,7 +1395,8 @@ PYBIND11_MODULE(sanafecpp, m)
                             }
                         }
                         return con_idx;
-                    })
+                    },
+                    docstrings::neuron_connect_to_neuron_doc)
             // Expose edges_out as a property
             .def_property_readonly("edges_out",
                     [](const PyNeuronRef &ref)
@@ -1444,11 +1442,13 @@ PYBIND11_MODULE(sanafecpp, m)
                         n.neuron_offset = pybind11::cast<long int>(t[1]);
                         return n;
                     }));
-    pybind11::class_<sanafe::Architecture>(m, "Architecture")
+    pybind11::class_<sanafe::Architecture>(
+            m, "Architecture", docstrings::architecture_doc)
             .def(pybind11::init<std::string,
                     sanafe::NetworkOnChipConfiguration>())
             .def("__repr__", &sanafe::Architecture::info)
             .def("create_tile", &pycreate_tile,
+                    docstrings::architecture_create_tile_doc,
                     pybind11::return_value_policy::reference_internal,
                     pybind11::arg("name"),
                     pybind11::arg("energy_north_hop") = 0.0,
@@ -1461,8 +1461,9 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("latency_west_hop") = 0.0,
                     pybind11::arg("log_energy") = false,
                     pybind11::arg("log_latency") = false)
-            .def("create_core", &pycreate_core, pybind11::arg("name"),
-                    pybind11::arg("parent_tile_id"),
+            .def("create_core", &pycreate_core,
+                    docstrings::architecture_create_core_doc,
+                    pybind11::arg("name"), pybind11::arg("parent_tile_id"),
                     pybind11::arg("buffer_position") =
                             sanafe::buffer_before_soma_unit,
                     pybind11::arg("buffer_inside_unit") = false,
@@ -1473,7 +1474,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::return_value_policy::reference_internal)
             .def_readwrite("tiles", &sanafe::Architecture::tiles)
             .def("cores", &sanafe::Architecture::cores);
-
     pybind11::class_<sanafe::TileConfiguration>(m, "Tile")
             .def(pybind11::init(&pyconstruct_tile), pybind11::arg("name"),
                     pybind11::arg("id"),
@@ -1507,7 +1507,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict());
-    pybind11::class_<sanafe::SpikingChip>(m, "SpikingChip")
+    pybind11::class_<sanafe::SpikingChip>(
+            m, "SpikingChip", docstrings::spiking_chip_doc)
             .def_property(
                     "mapped_neuron_groups",
                     [](sanafe::SpikingChip &self)
@@ -1519,8 +1520,10 @@ PYBIND11_MODULE(sanafecpp, m)
                     nullptr, pybind11::return_value_policy::reference_internal)
             .def(pybind11::init<sanafe::Architecture &>(),
                     pybind11::arg("arch"))
-            .def("load", &sanafe::SpikingChip::load)
-            .def("sim", &pysim, pybind11::arg("timesteps") = 1,
+            .def("load", &sanafe::SpikingChip::load,
+                    docstrings::spiking_chip_load_doc)
+            .def("sim", &pysim, docstrings::spiking_chip_sim_doc,
+                    pybind11::arg("timesteps") = 1,
                     pybind11::arg("timing_model") = "detailed",
                     pybind11::arg("processing_threads") = 0,
                     pybind11::arg("scheduler_threads") = 0,
@@ -1529,9 +1532,10 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("perf_trace") = pybind11::none(),
                     pybind11::arg("message_trace") = pybind11::none(),
                     pybind11::arg("write_trace_headers") = true)
-            .def("get_power", &sanafe::SpikingChip::get_power)
-            .def("reset", &sanafe::SpikingChip::reset);
+            .def("get_power", &sanafe::SpikingChip::get_power,
+                    docstrings::spiking_chip_get_power_doc)
+            .def("reset", &sanafe::SpikingChip::reset,
+                    docstrings::spiking_chip_reset_doc);
 }
-
 // NOLINTEND(readability-function-cognitive-complexity)
 // NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size)
