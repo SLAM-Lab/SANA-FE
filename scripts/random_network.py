@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023 - The University of Texas at Austin
+Copyright (c) 2024 - The University of Texas at Austin
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
@@ -26,7 +26,7 @@ import time
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, PROJECT_DIR)
-import sim
+import sanafe
 
 # Use a dumb seed to get consistent results
 random.seed(1)
@@ -46,10 +46,9 @@ TIMESTEPS = 100000
 
 def create_random_network(cores, neurons_per_core, messages_per_neuron,
                           spikes_per_message):
-    network = sim.Network(save_mappings=True)
-    compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
-                                           neurons_per_core)
-
+    """
+    # TODO: support random network generation again
+    network = kernel.Network(save_mappings=True)
     neurons = cores * neurons_per_core
     mappings = []
     for i in range(0, cores):
@@ -57,8 +56,8 @@ def create_random_network(cores, neurons_per_core, messages_per_neuron,
         mappings.extend((m,) * neurons_per_core)
 
     print("Creating neuron population")
-    population = sim.create_layer(network, neurons,
-                                  compartments, log_spikes=0, log_potential=0,
+    population = utils.create_layer(network, neurons,
+                                  log_spikes=false, log_potential=0,
                                   force_update=0, threshold=0.0, reset=0.0,
                                   leak=0.0, mappings=mappings)
 
@@ -82,28 +81,9 @@ def create_random_network(cores, neurons_per_core, messages_per_neuron,
                 assert(dest_id < neurons)
                 dest = population.neurons[dest_id]
                 src.add_connection(dest, weight)
-
     network.save(NETWORK_FILENAME)
-
-
-def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_message):
-    create_random_network(cores, neurons_per_core, messages_per_core,
-                          spikes_per_message)
-    run_command = ("./sim", ARCH_FILENAME, NETWORK_FILENAME,
-                   "{0}".format(timesteps))
-    print("sana-fe command: {0}".format(" ".join(run_command)))
-    
-    start_time = time.time() 
-    subprocess.call(run_command)
-    run_time = time.time() - start_time
-    print(f"Run_time: {run_time}")
-    print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
-
-    with open("run_summary.yaml", "r") as summary_file:
-        summary = yaml.safe_load(summary_file)
-
-    return summary
-
+    """
+    return
 
 
 def onpick(event, df):
@@ -130,19 +110,18 @@ if __name__ == "__main__":
                 writer.writeheader()
 
             for line in reader:
-                start_time = time.time() 
-                results = sim.run(ARCH_FILENAME, line["network"], TIMESTEPS,
-                                  perf_trace=True)
-                run_time = time.time() - start_time
-                print(f"Run_time: {run_time}")
-                print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
+                arch = sanafe.load_arch(ARCH_FILENAME)
+                net = sanafe.load_net(line["network"], arch, use_netlist_format=True)
 
+                chip = sanafe.SpikingChip(arch, record_perf=True)
+                chip.load(net)
+                results = chip.sim(TIMESTEPS)
                 print(results)
                 df = pd.read_csv("perf.csv")
                 line["total_spikes"] = df.loc[2, "fired"]
                 #line["loihi_energy"] = float(line["loihi_energy"])
                 #line["loihi_latency"] = float(line["loihi_latency"])
-                line["sim_energy"] = results["energy"] / TIMESTEPS
+                line["sim_energy"] = results["energy"]["total"] / TIMESTEPS
                 line["sim_latency"] = results["sim_time"] / TIMESTEPS
                 print(line)
                 with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "a") as out_file:

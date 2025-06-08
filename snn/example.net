@@ -1,15 +1,15 @@
 ### example.net
 #   <count> <attributes>
-g   3       threshold=1.0
-g   3       threshold=2.0 soma_hw_name=demo_soma_alt
+g   3       threshold=1.0 log_spikes=1 log_v=1
+g   3       threshold=2.0 soma_hw_name=demo_soma_alt log_spikes=1 log_v=1
 
 ## Neuron groups
 # gid.nid <attributes>
 n   0.0    bias=1.0  connections_out=1
 n   0.1    bias=0.0  connections_out=1
 n   0.2    bias=1.0  connections_out=1
-n   1.0    bias=0.0
-n   1.1    bias=1.0
+n   1.0    { bias: 0 }
+n   1.1    [bias: 1.0]
 n   1.2    bias=0.0
 
 ## Edges

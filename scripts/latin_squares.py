@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023 - The University of Texas at Austin
+Copyright (c) 2025 - The University of Texas at Austin
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
@@ -22,25 +22,26 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
-import sim
+import sanafe
 
-ARCH_FILENAME = "arch/loihi.yaml"
+ARCH_FILENAME = "arch/loihi_with_noise.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
 LOIHI_COMPARTMENTS = 1024
-TIMESTEPS = 10240
+#TIMESTEPS = 10
+TIMESTEPS = 1024
+#TIMESTEPS = 10240
 
 def calculate_graph_index(N, row, col, digit):
     return ((row*N + col)*N) + digit
 
+"""
 def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
                  neurons_per_core=LOIHI_COMPARTMENTS):
+    # TODO: support this once I can save SNNs again!
     network = sim.Network(save_mappings=True)
     arch = sim.Architecture()
-    # TODO: fix this
-    #compartments = sim.init_compartments(tiles, cores_per_tile,
-    #                                     neurons_per_core)
     print(f"Creating WTA networks for {N} digits")
     #G = nx.DiGraph()
     #G.add_nodes_from(range(0, N**3))
@@ -111,6 +112,7 @@ def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
     network_filename = os.path.join("runs", "dse", f"latin_square_N{N}.net")
     network_path = os.path.join(PROJECT_DIR, network_filename)
     network.save(network_path)
+"""
 
 
 def plot_results(N, network_path):
@@ -121,15 +123,15 @@ def plot_results(N, network_path):
 
     # Now execute the network using SANA-FE and extract the spike timings
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
-    start_time = time.time()
-    sim.run(arch_path, network_path, TIMESTEPS,
-            spike_trace=True, potential_trace=True)
-    run_time = time.time() - start_time
-    print(f"Run_time: {run_time}", flush=True)
-    print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
+    arch = sanafe.load_arch(arch_path)
+    net = sanafe.load_net(network_path, arch, use_netlist_format=True)
+    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
+    chip.load(net)
+
+    chip.sim(TIMESTEPS)
 
     # Use spiking data to create the grid solution produced by the Loihi run
-    with open(os.path.join(PROJECT_DIR, "spikes.trace")) as spikes:
+    with open(os.path.join(PROJECT_DIR, "spikes.csv")) as spikes:
         reader = csv.reader(spikes)
         header = next(reader)
 
@@ -140,11 +142,11 @@ def plot_results(N, network_path):
             timestep = int(spike[1])
 
             digit = nid
-            col = gid % N
-            row = gid // N
-            assert(digit < N)
-            assert(col < N)
-            assert(r < N)
+            col = (gid-1) % N
+            row = (gid-1) // N
+            assert(0 <= digit < N)
+            assert(0 <= col < N)
+            assert(0 <= row < N)
             spike_counts[row][col][digit] += 1
 
     print(spike_counts)
@@ -162,21 +164,22 @@ def plot_results(N, network_path):
     plt.tight_layout()
     plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_square.png"))
 
-    df = pd.read_csv("potential.trace")
+    df = pd.read_csv("potentials.csv")
     plt.figure()
-    df.plot()
+    df.plot(x="timestep")
     plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_potentials.png"))
 
 
-def run_experiment(network_filename):
+def run_experiment(network_filename, timing_model):
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     network_path = os.path.join(PROJECT_DIR, network_filename)
-    start_time = time.time()
-    results = sim.run(arch_path, network_path, TIMESTEPS,
-                      spike_trace=False, potential_trace=False)
-    run_time = time.time() - start_time
-    print(f"Run_time: {run_time}", flush=True)
-    print(f"Throughput: {TIMESTEPS/run_time}", flush=True)
+
+    arch = sanafe.load_arch(arch_path)
+    net = sanafe.load_net(network_path, arch, use_netlist_format=True)
+    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True,
+                              record_messages=True)
+    chip.load(net)
+    results = chip.sim(TIMESTEPS, timing_model=timing_model)
 
     return results
 
@@ -190,7 +193,7 @@ if __name__ == "__main__":
                            "loihi_latin.csv"))):
             with open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
                  "w") as latin_squares_file:
-                latin_squares_file.write("N,network,sim_energy,sim_latency\n")
+                latin_squares_file.write("N,network,sim_energy,sim_latency,sim_cycle\n")
 
             with open(os.path.join(PROJECT_DIR, "runs", "latin",
                                     "loihi_latin.csv")) as latin_squares_file:
@@ -200,14 +203,21 @@ if __name__ == "__main__":
                     # Each line of loihi_latin.csv is another experiment,
                     #  containing the network to run and the results measured
                     #  on Loihi
-                    results = run_experiment(line["network"])
-                    sim_time = results["sim_time"] / TIMESTEPS
-                    energy = results["energy"] / TIMESTEPS
-                    row = (line["N"], line["network"], energy, sim_time)
+                    results = run_experiment(line["network"], timing_model="detailed")
+                    time = results["sim_time"] / TIMESTEPS
+                    energy = results["energy"]["total"] / TIMESTEPS
+                    # Run the same experiment again using the cycle accurate
+                    #  timing model
+                    row = [line["N"], line["network"], energy, time]
+                    results = run_experiment(line["network"], timing_model="cycle")
+                    cycle_accurate = results["sim_time"] / TIMESTEPS
+                    row.append(cycle_accurate)
+
                     with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
                               "a") as csv_file:
                         writer = csv.writer(csv_file)
                         writer.writerow(row)
+                    # plot_results(int(line["N"]), line["network"])
 
     if plot_experiment:
         sim_df = pd.read_csv(os.path.join(PROJECT_DIR,
@@ -219,6 +229,9 @@ if __name__ == "__main__":
         loihi_energy = df["loihi_energy"].values * 1.0e6
         sim_latency = df["sim_latency"].values * 1.0e6
         loihi_latency = df["loihi_latency"].values * 1.0e6
+        booksim_latency = df["sim_cycle"].values * 1.0e6
+        print(booksim_latency)
+        print(loihi_latency)
 
         # Plot the simulated vs measured energy
         plt.rcParams.update({"font.size": 6, "lines.markersize": 5})
@@ -245,6 +258,7 @@ if __name__ == "__main__":
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
 
+        plt.plot(booksim_latency, loihi_latency, "s", mew=1.5, markerfacecolor="none")
         plt.plot(sim_latency, loihi_latency, "x", mew=1.5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")

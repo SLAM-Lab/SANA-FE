@@ -18,10 +18,13 @@ architecture:
       core:
         - name: demo_core[0..3]
           attributes:
-            buffer_before: soma
+            buffer_position: soma
+            max_neurons_supported: 100
           axon_in:
             - name: demo_in
               attributes:
+                energy_message_in: 0.0
+                latency_message_in: 0.0
           synapse:
             - name: demo_synapse
               attributes:
@@ -31,6 +34,10 @@ architecture:
           dendrite:
             - name: demo_dendrite
               attributes:
+                model: accumulator
+                energy_update: 0.0
+                latency_update: 0.0
+                force_update: true
           soma:
             - name: demo_soma_default
               attributes:
@@ -50,6 +57,15 @@ architecture:
                 latency_update_neuron: 10.0e-9
                 energy_spike_out: 30.0e-12
                 latency_spike_out: 3.0e-9
+            - name: demo_input
+              attributes:
+                model: input
+                energy_access_neuron: 0.0
+                latency_access_neuron: 0.0
+                energy_update_neuron: 0.0
+                latency_update_neuron: 0.0
+                energy_spike_out: 0.0
+                latency_spike_out: 0.0
           axon_out:
             - name: demo_out
               attributes:

@@ -1,0 +1,27 @@
+### dendrite.net
+# neuron groups
+g 4 log_v=1
+
+# neurons
+n 0.0 taps=3 threshold=100 time_constant[0]=0.8 time_constant[1]=0.8 time_constant[2]=0.7 space_constant[0]=0.1 space_constant[1]=0.2
+n 0.1 bias=0.0 threshold=1.0 connections_out=1
+n 0.2 bias=0.0 threshold=1.0 connections_out=1
+n 0.3 bias=0.1 threshold=2.0 connections_out=1
+
+#  n(0.3)         n(0.2)         n(0.1)
+#    |              |              |
+#   \ /            \ /            \ /
+# n(0.0:2) <---> n(0.0:1) <---> n(0.0:0) proximal
+#                                  |
+#                                 \ /
+#                                n(0.0)
+
+e 0.1->0.0 weight=10 tap=0
+e 0.2->0.0 weight=10 tap=1
+e 0.3->0.0 weight=10 tap=2
+
+## Map everything to one core
+&   0.0@0.0
+&   0.1@0.0
+&   0.2@0.0
+&   0.3@0.0

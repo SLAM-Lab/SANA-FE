@@ -1,0 +1,24 @@
+network:
+  name: example
+  groups:
+    - name: in
+      attributes: [soma_hw_name: demo_input, log_spikes: true]
+      neurons:
+        - 0: [spikes: [1,0,0,0]]
+        - 1: [spikes: [1,0,0,0]]
+        - 2: [spikes: [0,0,0,1]]
+    - name: 1
+      attributes: [log_spikes: true, threshold: 2.0, soma_hw_name: demo_soma_default]
+      neurons:
+        - 0..2: [bias: 1.0]
+  edges:
+    - in.0 -> 1.0: [weight: -1.0]
+    - in.1 -> 1.2: [weight: -2.0]
+    - in.2 -> 1.2: [weight: 3.0]
+mappings:
+  - in.0: {core: 0.0}
+  - in.1: {core: 0.0}
+  - in.2: {core: 0.1}
+  - 1.0: {core: 0.0}
+  - 1.1: {core: 0.0}
+  - 1.2: {core: 0.1}

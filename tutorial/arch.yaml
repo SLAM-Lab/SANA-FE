@@ -23,10 +23,13 @@ architecture:
       core:
         - name: tutorial_core
           attributes:
-            buffer_before: soma
+            buffer_position: soma
+            max_neurons_supported: 64
           axon_in:
             - name: tutorial_axon_in
               attributes:
+                energy_message_in: 0.0
+                latency_message_in: 0.0
           synapse:
             - name: tutorial_synapse_uncompressed
               attributes:
@@ -36,6 +39,9 @@ architecture:
           dendrite:
             - name: demo_dendrite
               attributes:
+                model: accumulator
+                energy_update: 0.0
+                latency_update: 0.0
           soma:
             - name: tutorial_soma
               attributes:

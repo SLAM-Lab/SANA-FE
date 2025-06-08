@@ -1,0 +1,7 @@
+include CMakeLists.txt
+include src/*.cpp
+include src/*.hpp
+include plugins/CMakeLists.txt
+include plugins/*.cpp
+include plugins/*.hpp
+include __init__.py

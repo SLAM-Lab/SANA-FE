@@ -1,0 +1,22 @@
+### hh_example.net
+### Fully connected hodgkin-huxley network, everything spikes on each timestep ###
+# First define the neuron group, specifying the number of neurons and default values:
+#   <count>   <attributes>
+g   3         synapse_hw_name=loihi_sparse_synapse m=0.0529 n=0.3177 h=0.5961 current=0
+
+## Then define neurons in the group
+# gid nid <attributes>
+n   0.0    connections_out=1 soma_hw_name=hh[0]
+n   0.1    connections_out=1 soma_hw_name=hh[1]
+n   0.2    connections_out=1 soma_hw_name=hh[2]
+
+## Next define the edges between neurons
+e   0.0->0.1   weight=1.0
+e   0.1->0.2   weight=1.0
+e   0.2->0.0   weight=1.0
+
+## Finally map neurons (group.neuron) to hardware (tile.core)
+#   neuron@core
+&   0.0@0.0
+&   0.1@0.0
+&   0.2@0.0

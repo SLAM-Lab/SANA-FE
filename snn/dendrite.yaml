@@ -1,0 +1,31 @@
+## dendrite.yaml
+#  n(0.3)         n(0.2)         n(0.1)
+#    |              |              |
+#   \ /            \ /            \ /
+# n(0.0:2) <---> n(0.0:1) <---> n(0.0:0) proximal
+#                                  |
+#                                 \ /
+#                                n(0.0)
+network:
+  name: dendrite_example_network
+  groups:
+    - name: inputs
+      attributes: {soma_hw_name: dummy_input}
+      neurons:
+        - 0: {spikes: [0,0]}
+        - 1: {}
+        - 2: {spikes: [1,0]}
+    - name: dendrite
+      attributes: {log_potential: true, force_dendrite_update: true}
+      neurons:
+        - 0: {threshold: 100, taps: 3, time_constants: [0.8, 0.8, 0.7],
+              space_constants: [0.1, 0.2]}
+  edges:
+    - inputs.0 -> dendrite.0: {weight: 10, tap: 0}
+    - inputs.1 -> dendrite.0: {weight: 10, tap: 1}
+    - inputs.2 -> dendrite.0: {weight: 10, tap: 2}
+mappings:
+  - dendrite.0: {core: 0.0}
+  - inputs.0: {core: 0.0}
+  - inputs.1: {core: 0.0}
+  - inputs.2: {core: 0.0}
