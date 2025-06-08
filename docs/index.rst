@@ -71,6 +71,7 @@ These tutorials can be run locally or using Google Colab.
    :caption: Contents:
 
    api
+   layers
 
 Indices and tables
 ==================
