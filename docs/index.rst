@@ -26,7 +26,7 @@ Python interfaces. SANA-FE can alternatively be used as a standalone C++
 simulator. For more using SANA-FE without Python, visit the project repository
 homepage at: https://github.com/SLAM-Lab/SANA-FE This library implements the
 Python interface, allowing you to specify and manipulate mapped SNNs,
-control/script simulations, and easily receive prediction outputs/traces.
+control/script simulations, and work output predictions/traces.
 
 Quick-start
 ===========
