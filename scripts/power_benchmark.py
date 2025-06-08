@@ -32,54 +32,8 @@ MAX_CORES = 4
 MAX_COMPARTMENTS = 1024
 ARCH_FILENAME = "arch/loihi.yaml"
 
-<<<<<<< HEAD:scripts/calibration.py
-import random
-def fully_connected(layer_neuron_count, spiking=True, force_update=False,
-                    connection_probability=1.0):
-    # Two layers, fully connected
-    network = sim.Network(save_mappings=True)
-
-    if spiking:  # always spike
-        threshold = -1.0
-    else:  # never spike
-        threshold = 2*layer_neuron_count
-
-    reset = 0
-    log_spikes = False
-    log_potential = False
-    force_update = False
-
-    # Create layers
-    layer_1 = sim.create_layer(network, layer_neuron_count,
-                               log_spikes=False, log_potential=False,
-                               force_update=False, threshold=threshold,
-                               reset=reset, neuron_model="loihi_lif",
-                               synapse_model="loihi_dense_synapse")
-    layer_2 = sim.create_layer(network, layer_neuron_count,
-                               log_spikes=False, log_potential=False,
-                               force_update=False, threshold=threshold,
-                               reset=reset, neuron_model="loihi_lif",
-                               synapse_model="loihi_dense_synapse")
-
-    # Create connections
-    weight = 1.0
-    for src in layer_1.neurons:
-        for dest in layer_2.neurons:
-            if random.random() < connection_probability:
-                # Same weight for all connections
-                src.add_connection(dest, weight)
-
-    return network
-
-
-def connected_layers(weights, spiking=True, mapping="l2_split",
-                     copy_network=False):
-    network = sim.Network(save_mappings=True)
-    #loihi_compartments = sim.init_compartments(32, 4, 1024)
-=======
 def connected_layers(arch, weights, spiking=True, mapping="l2_split",
                      copy_network=False):
->>>>>>> cpp:scripts/power_benchmark.py
 
     net = sanafe.Network()
     layer_neuron_count = len(weights)
@@ -108,16 +62,6 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
         for _ in range(0, neurons_per_core[2]):
             layer1_mapping.append((0, 2))
         for _ in range(0, neurons_per_core[3]):
-<<<<<<< HEAD:scripts/calibration.py
-            layer_mapping.append((0, 3))
-
-        layer_1 = sim.create_layer(network, layer_neuron_count,
-                                   log_spikes=False, log_potential=False,
-                                   force_update=False, threshold=threshold,
-                                   reset=0.0, leak=1.0, mappings=layer_mapping,
-                                   soma_hw_name="loihi_lif",
-                                   synapse_hw_name="loihi_dense_synapse")
-=======
             layer1_mapping.append((0, 3))
 
         layer1_attributes = {
@@ -132,7 +76,6 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
         }
         layer_1 = net.create_neuron_group("input", layer_neuron_count,
                                           layer1_attributes)
->>>>>>> cpp:scripts/power_benchmark.py
 
         neurons_per_core = [0, 0, 0, 0, 0]
         if mapping == "luke":
@@ -166,17 +109,6 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
         for _ in range(0, neurons_per_core[3]):
             layer2_mapping.append((0, 3))
         for _ in range(0, neurons_per_core[4]):
-<<<<<<< HEAD:scripts/calibration.py
-            layer_mapping.append((1, i))
-
-        layer_2 = sim.create_layer(network, layer_neuron_count,
-                                log_spikes=False,
-                                log_potential=False, force_update=False,
-                                threshold=threshold, reset=0.0, leak=1.0,
-                                mappings=layer_mapping,
-                                soma_hw_name="loihi_lif",
-                                synapse_hw_name="loihi_dense_synapse")
-=======
             layer2_mapping.append((1, i))
 
         layer2_attributes = {
@@ -191,7 +123,6 @@ def connected_layers(arch, weights, spiking=True, mapping="l2_split",
         }
         layer_2 = net.create_neuron_group("output", layer_neuron_count,
                                           layer2_attributes)
->>>>>>> cpp:scripts/power_benchmark.py
 
         for src in layer_1.neurons:
             for dest in layer_2.neurons:
@@ -237,18 +168,8 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
         #snn.save_net_description(network_filename)
         chip.load(snn)
 
-<<<<<<< HEAD:scripts/calibration.py
-        print("Testing network with {0} neurons".format(2*layer_neurons))
-        start_time = time.time() 
-        results = sim.run(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"),
-                          network_filename, timesteps)
-        run_time = time.time() - start_time
-        print(f"Run_time: {run_time}")
-        print(f"Throughput: {timesteps/run_time}", flush=True)
-=======
         print(f"Testing network with {2*layer_neurons} neurons")
         results = chip.sim(timesteps, timing_model=timing_model)
->>>>>>> cpp:scripts/power_benchmark.py
 
         with open(os.path.join(PROJECT_DIR, "runs",
                                "power", f"sim_spiking_{timing_model}.csv"),
@@ -261,15 +182,10 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
                 neuron_counts *= 2
             spiking_writer.writerow({"neuron_counts": neuron_counts,
                                       "time": results["sim_time"],
-<<<<<<< HEAD:scripts/calibration.py
-                                      "energy": results["energy"],
-                                      "mapping": mapping})
-=======
                                       "energy": results["energy"]["total"],
                                       "mapping": mapping
                                     })
             print(f"Run results:{results}")
->>>>>>> cpp:scripts/power_benchmark.py
 
     return
 
@@ -379,34 +295,16 @@ if __name__ == "__main__":
         plt.savefig(os.path.join("runs", "power", "power_time_core.pdf"))
         plt.savefig(os.path.join("runs", "power", "power_time_core.png"))
 
-<<<<<<< HEAD:scripts/calibration.py
-        print(f"Total Loihi time (default mapping): {np.array(loihi_times_spikes['luke'][6:])*1.0E5}")
-
-        energy_error = np.mean((np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:]))
-        latency_error = np.mean((np.array(loihi_times_spikes["luke"][6:]) - spiking_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
-=======
         energy_error = 100 * np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:])
         print(energy_error)
         energy_error = np.mean(np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:]))
         latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:]) - spiking_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
         cycle_latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:]) - cycle_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
->>>>>>> cpp:scripts/power_benchmark.py
         print(f"Energy error %: {energy_error*100}")
         print(f"Latency error %: {latency_error*100}")
         print(f"Latency error (Booksim2) %: {cycle_latency_error*100}")
 
-<<<<<<< HEAD:scripts/calibration.py
-        abs_energy_error = 100 * np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:])
-        print(energy_error)
-        abs_energy_error = np.mean(np.abs(np.array(loihi_energy_spikes[6:]) - spiking_energy[6:]) / np.array(loihi_energy_spikes[6:]))
-        abs_latency_error = np.mean(np.abs(np.array(loihi_times_spikes["luke"][6:]) - spiking_times[6:]) / np.array(loihi_times_spikes["luke"][6:]))
-        print(f"Abs Energy error %: {abs_energy_error*100}")
-        print(f"Abs Latency error %: {abs_latency_error*100}")
-
-        plt.figure(figsize=(1.6, 1.6))
-=======
         plt.figure(figsize=(1.6, 1.5))
->>>>>>> cpp:scripts/power_benchmark.py
         plt.plot(neuron_counts[6:], np.array(loihi_energy_spikes[6:]) * 1.0e6, "-")
         plt.plot(neuron_counts[6:], np.array(spiking_energy[6:]) * 1.0e6, "ko",
                  fillstyle="none", mew=0.8)
