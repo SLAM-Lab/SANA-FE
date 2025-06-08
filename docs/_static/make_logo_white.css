@@ -1,0 +1,11 @@
+/* Make logo white for better visibility on dark backgrounds */
+/* Target the logo in RTD theme sidebar */
+.wy-side-nav-search .wy-dropdown > a img,
+.wy-side-nav-search > a img {
+    filter: brightness(0) invert(1);
+}
+
+/* Also target by source path as backup */
+img[src*="logo.svg"] {
+    filter: brightness(0) invert(1);
+}
