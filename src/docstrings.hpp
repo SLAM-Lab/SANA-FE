@@ -39,19 +39,32 @@ constexpr const char *network_create_neuron_group_doc = R"pbdoc(
 Create a new group of neurons with shared properties.
 
 Args:
-:param str group_name: Unique identifier for this neuron group
-:param int neuron_count: Number of neurons to create in this group
-:param dict model_attributes: Model parameters (e.g., threshold, leak). Default is None.
-:param str default_synapse_hw_name: Default synapse hardware type. Default is None.
-:param str default_dendrite_hw_name: Default dendrite hardware type. Default is None.
-:param bool force_dendrite_update: Force dendrite updates every timestep. Default is False.
-:param bool force_synapse_update: Force synapse updates every timestep. Default is False
-:param bool force_soma_update: Force soma updates every timestep. Default is False.
-:param bool log_potential: Enable membrane potential logging. Default is False.
-:param bool log_spikes: Enable spike event logging. Default is False.
-:param str soma_hw_name: Soma hardware implementation name. Default is ""
+
+:param group_name: Unique identifier for this neuron group
+:type str
+:param neuron_count: Number of neurons to create in this group
+:type int
+:param model_attributes: Model parameters (e.g., threshold, leak). Default is None.
+:type dict
+:param default_synapse_hw_name: Default synapse hardware type. Default is None.
+:type str
+:param default_dendrite_hw_name: Default dendrite hardware type. Default is None.
+:type str
+:param force_dendrite_update: Force dendrite updates every timestep. Default is False.
+:type bool
+:param force_synapse_update: Force synapse updates every timestep. Default is False
+:type bool
+:param force_soma_update: Force soma updates every timestep. Default is False.
+:type bool
+:param log_potential: Enable membrane potential logging. Default is False.
+:type bool
+:param log_spikes: Enable spike event logging. Default is False.
+:type bool
+:param soma_hw_name: Soma hardware implementation name. Default is ""
+:type str
 
 Returns:
+
 :returns: NeuronGroup: The created neuron group
 
 Example:
@@ -160,7 +173,7 @@ constexpr const char *neuron_map_to_core_doc = R"pbdoc(
 Assign this neuron to a specific hardware core.
 
 Args:
-    core_configuration (Core): Target core for neuron placement
+:param Core core_configuration: Target core for neuron placement
 )pbdoc";
 
 constexpr const char *neuron_connect_to_neuron_doc = R"pbdoc(
