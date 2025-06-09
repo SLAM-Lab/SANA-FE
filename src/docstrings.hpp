@@ -38,34 +38,31 @@ model attributes as user input.
 constexpr const char *network_create_neuron_group_doc = R"pbdoc(
 Create a new group of neurons with shared properties.
 
-Args:
-
 :param group_name: Unique identifier for this neuron group
-:type str
+:type group_name: str
 :param neuron_count: Number of neurons to create in this group
-:type int
+:type neuron_count: int
 :param model_attributes: Model parameters (e.g., threshold, leak). Default is None.
-:type dict
+:type model_attributes: dict
 :param default_synapse_hw_name: Default synapse hardware type. Default is None.
-:type str
+:type default_synapse_hw_name: str
 :param default_dendrite_hw_name: Default dendrite hardware type. Default is None.
-:type str
+:type default_dendrite_hw_name: str
 :param force_dendrite_update: Force dendrite updates every timestep. Default is False.
-:type bool
+:type force_dendrite_update: bool
 :param force_synapse_update: Force synapse updates every timestep. Default is False
-:type bool
+:type force_synapase_update: bool
 :param force_soma_update: Force soma updates every timestep. Default is False.
-:type bool
+:type force_soma_update: bool
 :param log_potential: Enable membrane potential logging. Default is False.
-:type bool
+:type log_potential: bool
 :param log_spikes: Enable spike event logging. Default is False.
-:type bool
+:type log_spikes: bool
 :param soma_hw_name: Soma hardware implementation name. Default is ""
-:type str
+:type soma_hw_name: str
 
-Returns:
-
-:returns: NeuronGroup: The created neuron group
+:return: The created neuron group
+:rtype: NeuronGroup
 
 Example:
     >>> group = net.create_neuron_group("layer1", 256,
