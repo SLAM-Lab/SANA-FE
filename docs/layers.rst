@@ -65,7 +65,7 @@ Dense Layers
     :undoc-members:
     :show-inheritance:
 
-Architecture Examples
+Application Examples
 =====================
 
 MNIST CNN
