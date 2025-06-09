@@ -24,6 +24,7 @@
 
 #include "chip.hpp"
 #include "fwd.hpp"
+#include "timestep.hpp"
 
 namespace sanafe
 {
@@ -47,7 +48,6 @@ public:
 };
 
 using MessagePriorityQueue = std::priority_queue<Message, std::vector<Message>, CompareMessages>;
-
 
 template <typename T, typename Container = std::vector<T>,
         typename Compare = std::less<T>>
@@ -144,9 +144,9 @@ private:
 // For comparing timesteps when maintaining priority queue of timesteps
 struct CompareTimesteps
 {
-    bool operator()(const Timestep &lhs, const Timestep &rhs) const
+    bool operator()(const TimestepHandle &lhs, const TimestepHandle &rhs) const
     {
-        return lhs.timestep > rhs.timestep;
+        return lhs->timestep > rhs->timestep;
     }
 };
 
@@ -154,9 +154,11 @@ struct Scheduler
 {
     std::vector<std::thread> scheduler_threads;
     std::atomic<bool> should_stop{false};
-    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, CompareTimesteps>
+    ThreadSafePriorityQueue<TimestepHandle, std::vector<TimestepHandle>,
+            CompareTimesteps>
             timesteps_to_schedule;
-    ThreadSafePriorityQueue<Timestep, std::vector<Timestep>, CompareTimesteps>
+    ThreadSafePriorityQueue<TimestepHandle, std::vector<TimestepHandle>,
+            CompareTimesteps>
             timesteps_to_write;
 
     TimingModel timing_model{timing_model_detailed};
@@ -206,17 +208,17 @@ private:
 };
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
-void schedule_messages(Timestep &ts, Scheduler &scheduler, const BookSimConfig &booksim_config);
-void schedule_messages_simple(Timestep &ts, Scheduler &scheduler);
-void schedule_messages_detailed(Timestep &ts, Scheduler &scheduler);
-void schedule_messages_cycle_accurate(Timestep &ts, const BookSimConfig &config, Scheduler &scheduler);
+void schedule_messages(TimestepHandle &timestep_handle, Scheduler &scheduler, const BookSimConfig &booksim_config);
+void schedule_messages_simple(TimestepHandle &timestep_handle, Scheduler &scheduler);
+void schedule_messages_detailed(TimestepHandle &timestep_handle, Scheduler &scheduler);
+void schedule_messages_cycle_accurate(TimestepHandle &timestep_handle, const BookSimConfig &config, Scheduler &scheduler);
 
 void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
 void schedule_messages_thread(Scheduler &scheduler, int thread_id);
 void schedule_stop_all_threads(Scheduler &scheduler);
 
-std::vector<MessageFifo> schedule_init_message_queues(Timestep &ts, NocInfo &noc);
-double schedule_messages_timestep(Timestep &ts, Scheduler &scheduler);
+std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NocInfo &noc);
+double schedule_messages_timestep(TimestepHandle &timestep_handle, Scheduler &scheduler);
 void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);

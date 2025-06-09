@@ -24,18 +24,18 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "arch.hpp"
 #include "core.hpp"
 #include "fwd.hpp"
 #include "pipeline.hpp"
 #include "tile.hpp"
-#include <vector>
 
 namespace sanafe
 {
 
-constexpr long int default_heartbeat_timesteps = 1000L;
+constexpr long int default_heartbeat_timesteps = 100L;
 
 enum TimingModel : uint8_t
 {
@@ -59,7 +59,7 @@ public:
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
     RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false, std::string output_dir = "");
-    Timestep step(Scheduler &scheduler);
+    void step(Scheduler &scheduler);
     void load(const SpikingNetwork &net);
     void reset();
     void flush_timestep_data(RunData &rd, Scheduler &scheduler);
@@ -132,7 +132,7 @@ private:
     void track_mapped_tiles_and_cores() noexcept;
 
     void sim_reset_measurements();
-    void sim_hw_timestep(Timestep &ts, Scheduler &scheduler);
+    TimestepHandle sim_hw_timestep(long int timestep, Scheduler &scheduler);
     void sim_timestep_sync(Scheduler &scheduler) const;
     void sim_update_ts_counters(Timestep &ts);
     static double sim_estimate_network_costs(const Tile &src, Tile &dest);
@@ -170,30 +170,6 @@ private:
 
 void sim_trace_record_message(std::ostream &message_trace_file, const Message &m);
 TimingModel parse_timing_model(const std::string_view &timing_model_str);
-
-constexpr long int invalid_timestep = -1L;
-struct Timestep
-{
-    std::shared_ptr<std::vector<std::list<Message>>> messages;
-    long int timestep{invalid_timestep};
-    long int spike_count{0L};
-    size_t total_hops{0UL};
-    long int packets_sent{0L};
-    long int neurons_updated{0L};
-    long int neurons_fired{0L};
-
-    double total_energy{0.0};
-    double synapse_energy{0.0};
-    double dendrite_energy{0.0};
-    double soma_energy{0.0};
-    double network_energy{0.0};
-    double sim_time{0.0};
-    double wall_time{0.0};
-
-    Timestep() = default;
-    Timestep(long int ts);
-    void set_cores(size_t core_count);
-};
 
 struct RunData
 {

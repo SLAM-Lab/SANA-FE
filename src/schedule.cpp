@@ -33,12 +33,12 @@ sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
         , core_count(scheduler.core_count)
         , max_cores_per_tile(scheduler.max_cores_per_tile)
 {
-    messages_received = std::vector<MessageFifo>(core_count);
+    messages_received = std::vector<sanafe::MessageFifo>(core_count);
     core_finished_receiving = std::vector<double>(core_count);
 }
 
-void sanafe::schedule_messages(
-        Timestep &ts, Scheduler &scheduler, const BookSimConfig &booksim_config)
+void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
+        const BookSimConfig &booksim_config)
 {
     if (scheduler.timing_model == timing_model_simple)
     {
@@ -62,7 +62,8 @@ void sanafe::schedule_messages(
     }
 }
 
-void sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
+void sanafe::schedule_messages_simple(
+        TimestepHandle &ts, Scheduler &scheduler)
 {
     // Simple analytical model, that takes the maximum of either neuron or
     //  message processing for each core, and takes the maximum latency of
@@ -71,17 +72,21 @@ void sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
     // This scheduler is extremely simple and therefore
     //  fast (also easily done in parallel), however, it won't capture any
     //  network interactions or resource contention.
-    const size_t cores = ts.messages->size();
+    Timestep &ts_data = ts.get();
+    const size_t cores = ts_data.messages.size();
     std::vector<double> neuron_processing_latencies(cores, 0.0);
     std::vector<double> message_processing_latencies(cores, 0.0);
-    for (size_t sending_core = 0; sending_core < ts.messages->size();
+    for (size_t sending_core = 0; sending_core < ts_data.messages.size();
             ++sending_core)
     {
-        const std::list<Message> &q = ts.messages->at(sending_core);
-        for (const Message &m : q)
+        std::list<Message> &q = ts_data.messages.at(sending_core);
+        for (Message &m : q)
         {
             neuron_processing_latencies[sending_core] += m.generation_delay;
             message_processing_latencies[m.dest_core_id] += m.receive_delay;
+            // Update message delays using very simple timing model
+            m.blocked_delay = 0.0; // No blocking modeled
+            m.network_delay = m.min_hop_delay;
         }
     }
 
@@ -92,14 +97,14 @@ void sanafe::schedule_messages_simple(Timestep &ts, Scheduler &scheduler)
             *std::max_element(neuron_processing_latencies.begin(),
                     neuron_processing_latencies.end());
 
-    ts.sim_time = std::max(max_message_processing, max_neuron_processing);
+    ts_data.sim_time = std::max(max_message_processing, max_neuron_processing);
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts.sim_time += scheduler.timestep_sync_delay;
+    ts_data.sim_time += scheduler.timestep_sync_delay;
     scheduler.timesteps_to_write.push(ts);
 }
 
 void sanafe::schedule_messages_cycle_accurate(
-        Timestep &ts, const BookSimConfig &config, Scheduler &scheduler)
+        TimestepHandle &ts, const BookSimConfig &config, Scheduler &scheduler)
 {
     // Cycle-accurate (NoC)-based timing model for highly accurate network
     //  simulation, using external simulator Booksim 2. This is the most
@@ -112,7 +117,8 @@ void sanafe::schedule_messages_cycle_accurate(
     // The version of Booksim 2 used here has had substantial modifications,
     //  including a new static library interface (instead of being standalone)
     // TODO: support running across multiple threads like the detailed model
-    for (auto &core_messages : *(ts.messages))
+    Timestep &ts_data = ts.get();
+    for (auto &core_messages : ts_data.messages)
     {
         for (auto &message : core_messages)
         {
@@ -155,9 +161,9 @@ void sanafe::schedule_messages_cycle_accurate(
     TRACE1(SCHEDULER, "Running Booksim2 simulation\n");
     const double booksim_time = booksim_run(config);
 
-    ts.sim_time = booksim_time;
+    ts_data.sim_time = booksim_time;
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts.sim_time += scheduler.timestep_sync_delay;
+    ts_data.sim_time += scheduler.timestep_sync_delay;
     scheduler.timesteps_to_write.push(ts);
 }
 
@@ -175,7 +181,7 @@ void sanafe::schedule_create_threads(
 
 // **** Detailed scheduler implementation ****
 
-void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
+void sanafe::schedule_messages_detailed(TimestepHandle &ts, Scheduler &scheduler)
 {
     if (scheduler.scheduler_threads.empty())
     {
@@ -184,13 +190,14 @@ void sanafe::schedule_messages_detailed(Timestep &ts, Scheduler &scheduler)
     else
     {
         TRACE1(SCHEDULER, "Pushing timestep:%ld to be scheduled\n",
-                ts.timestep);
+                ts->timestep);
         scheduler.timesteps_to_schedule.push(ts);
         return;
     }
 }
 
-double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
+double sanafe::schedule_messages_timestep(
+        TimestepHandle &ts, Scheduler &scheduler)
 {
     // Schedule the global order of messages using a semi-analytical timing
     //  model. This sits in between the complexity of the simple and
@@ -201,8 +208,11 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
     MessagePriorityQueue priority;
     NocInfo noc(scheduler);
     double last_timestamp = 0.0;
+    Timestep &ts_data = ts.get();
 
-    auto messages_sent_per_core = schedule_init_message_queues(ts, noc);
+    auto messages_sent_per_core = schedule_init_message_queues(ts_data, noc);
+    std::vector<MessageFifo> scheduled_messages_per_core(noc.core_count);
+
     priority = schedule_init_timing_priority(messages_sent_per_core);
 
     // Each core has a queue of received messages. A structure tracks how
@@ -244,6 +254,9 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
             TRACE1(SCHEDULER, "\tCore finished simulating\n");
         }
 
+        // Push the updated message with its delays and timestamps set
+        scheduled_messages_per_core[src_core].emplace_back(m);
+
 #ifdef DEBUG
         // Print contents of priority queue. Because of how the queue works,
         //  to view all elements we need to copy and pop off elements
@@ -260,33 +273,27 @@ double sanafe::schedule_messages_timestep(Timestep &ts, Scheduler &scheduler)
     }
     TRACE1(SCHEDULER, "Scheduler finished.\n");
 
-    ts.sim_time = last_timestamp;
+    ts_data.sim_time = last_timestamp;
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts.sim_time += scheduler.timestep_sync_delay;
+    ts_data.sim_time += scheduler.timestep_sync_delay;
+
+    // Update all messages with delays and timestamps set
+    ts_data.messages = std::move(scheduled_messages_per_core);
     scheduler.timesteps_to_write.push(ts);
 
-    return ts.sim_time;
+    return ts_data.sim_time;
 }
 
-std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
-        Timestep &ts, NocInfo &noc)
+std::vector<sanafe::MessageFifo>
+sanafe::schedule_init_message_queues(const Timestep &ts, NocInfo &noc)
 {
     const size_t total_links = noc.noc_height_in_tiles *
             noc.noc_width_in_tiles *
             (sanafe::ndirections + noc.max_cores_per_tile);
     noc.message_density = std::vector<double>(total_links, 0.0);
 
-    std::vector<MessageFifo> messages_sent_per_core(noc.core_count);
-    for (size_t core = 0; core < ts.messages->size(); core++)
-    {
-        auto &q = ts.messages->at(core);
-        for (const Message &m : q)
-        {
-            messages_sent_per_core[core].push_back(m);
-        }
-    }
-
-    return messages_sent_per_core;
+    // Return a local copy of the per-core messages
+    return ts.messages;
 }
 
 void sanafe::schedule_handle_message(
@@ -304,24 +311,30 @@ void sanafe::schedule_handle_message(
     const double messages_along_route = noc.calculate_route_congestion(m);
     const auto path_capacity =
             static_cast<double>((m.hops + 1UL) * scheduler.buffer_size);
+
     if (messages_along_route > path_capacity)
     {
         // Use heuristic for estimating delay based on route congestion,
         //  path capacity in messages and the mean delay per message
-        m.sent_timestamp += (messages_along_route - path_capacity) *
+        m.blocked_delay = (messages_along_route - path_capacity) *
                 noc.mean_in_flight_receive_delay;
+        m.sent_timestamp += m.blocked_delay;
+    }
+    else
+    {
+        m.blocked_delay = 0.0; // Path isn't at capacity; no blocking
     }
 
-    const double network_delay = messages_along_route *
+    const double congestion_delay = messages_along_route *
             noc.mean_in_flight_receive_delay /
             (static_cast<double>(m.hops) + 1.0);
-    TRACE1(SCHEDULER, "Path capacity:%lf messages:%lf delay:%e\n",
-            path_capacity, messages_along_route, network_delay);
+    TRACE1(SCHEDULER, "Path capacity:%lf messages:%lf congestion delay:%e\n",
+            path_capacity, messages_along_route, congestion_delay);
 
     // Update the messages timestamps, both when the message is received and
     //  when the receiving core has finished processing it
-    const double earliest_received_time =
-            m.sent_timestamp + std::max(m.network_delay, network_delay);
+    m.network_delay = std::max(m.min_hop_delay, congestion_delay);
+    const double earliest_received_time = m.sent_timestamp + m.network_delay;
     m.received_timestamp = std::max(
             noc.core_finished_receiving[dest_core], earliest_received_time);
 
@@ -599,12 +612,12 @@ void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
             break;
         }
 
-        Timestep ts;
+        TimestepHandle ts;
         const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
         if (got_ts)
         {
             TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", thread_id,
-                    ts.timestep);
+                    ts->timestep);
             schedule_messages_timestep(ts, scheduler);
         }
     }

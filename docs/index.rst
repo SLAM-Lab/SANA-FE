@@ -14,6 +14,7 @@ different neuromorphic hardware platforms.
    :alt: SANA-FE diagram
    :align: center
 
+
 SANA-FE requires a description of the architecture you want to simulate, a
 specification of the spiking neural network (SNN) application you wish to max
 and execute. Optionally, you can also provide shared library hardware plugins

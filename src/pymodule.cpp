@@ -45,6 +45,7 @@
 #include "pipeline.hpp"
 #include "print.hpp"
 #include "schedule.hpp"
+#include "timestep.hpp"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
@@ -911,12 +912,8 @@ public:
     void get_trace_string(
             std::ostringstream &ss, const sanafe::Timestep &ts) override
     {
-        if (ts.messages == nullptr)
-        {
-            return;
-        }
         std::vector<std::reference_wrapper<const sanafe::Message>> all_messages;
-        for (const sanafe::MessageFifo &q : *(ts.messages))
+        for (const sanafe::MessageFifo &q : ts.messages)
         {
             for (const sanafe::Message &m : q)
             {
@@ -937,14 +934,10 @@ public:
     void append_trace_data(const sanafe::Timestep &ts) override
     {
         std::vector<sanafe::Message> timestep_messages;
-        if (ts.messages == nullptr)
-        {
-            return;
-        }
 
         // Not crucial, but its nice to print messages in ID order.
         //  Copy all the messages into a single vector and sort
-        for (const sanafe::MessageFifo &q : *(ts.messages))
+        for (const sanafe::MessageFifo &q : ts.messages)
         {
             for (const sanafe::Message &m : q)
             {
@@ -994,14 +987,13 @@ void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
 {
     while (!scheduler.timesteps_to_write.empty())
     {
-        sanafe::Timestep ts;
-        scheduler.timesteps_to_write.pop(ts);
+        sanafe::TimestepHandle timestep_handle;
+        scheduler.timesteps_to_write.pop(timestep_handle);
+        sanafe::Timestep &ts = timestep_handle.get();
         TRACE1(CHIP, "retiring ts:%ld\n", ts.timestep);
+
         perf.update(ts);
-        if (ts.messages != nullptr)
-        {
-            message_trace.update(ts);
-        }
+        message_trace.update(ts);
         sanafe::SpikingChip::update_run_data(rd, ts);
         self->retire_timestep(ts);
     }
@@ -1018,7 +1010,6 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
 
 #ifndef HAVE_OPENMP
     pybind11::print("Warning: multiple threads not supported; flag ignored");
-    pybind11::print("Processing threads:", processing_threads, "(default)");
 #else
     const int total_threads_available = omp_get_num_procs();
     omp_set_num_threads(std::min(total_threads_available, processing_threads));
@@ -1061,7 +1052,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     const pybind11::gil_scoped_release release;
     for (long int timestep = 1; timestep <= timesteps; timestep++)
     {
-        const sanafe::Timestep ts = self->step(scheduler);
+        self->step(scheduler);
         spikes.update(timestep);
         potentials.update(timestep);
 
