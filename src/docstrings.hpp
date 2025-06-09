@@ -43,23 +43,23 @@ Create a new group of neurons with shared properties.
 :param neuron_count: Number of neurons to create in this group
 :type neuron_count: int
 :param model_attributes: Model parameters (e.g., threshold, leak). Default is None.
-:type model_attributes: dict
+:type model_attributes: dict, optional
 :param default_synapse_hw_name: Default synapse hardware type. Default is None.
-:type default_synapse_hw_name: str
+:type default_synapse_hw_name: str, optional
 :param default_dendrite_hw_name: Default dendrite hardware type. Default is None.
-:type default_dendrite_hw_name: str
+:type default_dendrite_hw_name: str, optional
 :param force_dendrite_update: Force dendrite updates every timestep. Default is False.
-:type force_dendrite_update: bool
+:type force_dendrite_update: bool, optional
 :param force_synapse_update: Force synapse updates every timestep. Default is False
-:type force_synapase_update: bool
+:type force_synapase_update: bool, optional
 :param force_soma_update: Force soma updates every timestep. Default is False.
-:type force_soma_update: bool
+:type force_soma_update: bool, optional
 :param log_potential: Enable membrane potential logging. Default is False.
-:type log_potential: bool
+:type log_potential: bool, optional
 :param log_spikes: Enable spike event logging. Default is False.
-:type log_spikes: bool
+:type log_spikes: bool, optional
 :param soma_hw_name: Soma hardware implementation name. Default is ""
-:type soma_hw_name: str
+:type soma_hw_name: str, optional
 
 :return: The created neuron group
 :rtype: NeuronGroup
@@ -72,9 +72,11 @@ Example:
 constexpr const char *network_save_doc = R"pbdoc(
 Save network to file in YAML or legacy netlist format.
 
-Args:
-    :param str path: Output file path
-    :param bool use_netlist_format: Use legacy netlist format instead of YAML. Default is False.
+:param path: Output file path
+:type path: str
+:param  use_netlist_format: Use legacy netlist format instead of YAML. Default is False.
+:type use_netlist_format: bool, optional
+
 )pbdoc";
 
 // NeuronGroup class
@@ -93,10 +95,11 @@ Create fully-connected (dense) connections to destination group.
 Connects every neuron in this group to every neuron in the destination
 group. Connection attributes are provided as flattened arrays.
 
-Args:
-    :param NeuronGroup dest_group: Target neuron group
-    :param dict attributes: Connection attributes with lists of values
-        Length must equal source_neurons * dest_neurons
+:param dest_group: Target neuron group
+:type dest_group: NeuronGroup
+:param attributes: Connection attributes with lists of values
+    Length must equal source_neurons * dest_neurons
+:type attributes: dict
 
 Example:
     >>> weights = [random.random() for _ in range(src.neurons * dst.neurons)]
@@ -106,10 +109,12 @@ Example:
 constexpr const char *neuron_group_connect_sparse_doc = R"pbdoc(
 Create sparse connections using explicit source-destination pairs.
 
-Args:
-    :param NeuronGroup dest_group: Target neuron group
-    :param dict attributes: Connection attributes with lists of values
-    :param list src_dest_id_pairs: List of (source_idx, dest_idx) tuples
+:paam dest_group: Target neuron group
+:type dest_group: NeuronGroup
+:param attributes: Connection attributes with lists of values
+:type attributes: dict
+:param src_dest_id_pairs: List of (source_idx, dest_idx) tuples
+:type src_dest_id_pairs: list
 
 Example:
     >>> connections = [(0, 5), (1, 3), (2, 7)]
@@ -123,17 +128,26 @@ Create 2D convolutional connections between neuron groups.
 Implements CNN-style convolution with configurable kernel size, stride,
 and channel dimensions. Input neurons are interpreted as flattened 2D/3D arrays.
 
-Args:
-    :param NeuronGroup dest_group: Output feature map neuron group
-    :param dict attributes: Filter weights and other connection parameters
-    :param int input_width: Width of input feature map
-    :param int input_height: Height of input feature map
-    :param int input_channels: Number of input channels
-    :param int kernel_width: Convolution kernel width
-    :param int kernel_height: Convolution kernel height
-    :param int kernel_count: Number of output channels/filters. Default is 1.
-    :param int stride_width: Horizontal stride. Default is 1.
-    :param int stride_height: Vertical stride. Default is 1.
+:param dest_group: Output feature map neuron group
+:type dest_group: NeuronGroup
+:param attributes: Filter weights and other connection parameters
+:type attributes: dict
+:param input_width: Width of input feature map
+:type input_width: int
+:param input_height: Height of input feature map
+:type input_height: int
+:param input_channels: Number of input channels
+:type input_channels: int
+:param kernel_width: Convolution kernel width
+:type kernel_width: int
+:param kernel_height: Convolution kernel height
+:type kernel_height: int
+:param kernel_count: Number of output channels/filters. Default is 1.
+:type kernel_count: int
+:param stride_width: Horizontal stride. Default is 1.
+:type stride_width: int, optional
+:param stride_height: Vertical stride. Default is 1.
+:type stride_height: int, optional
 
 Example:
     >>> # 28x28x1 -> 26x26x32 convolution (3x3 kernels)
@@ -152,36 +166,36 @@ Access via NeuronGroup indexing or iteration.
 constexpr const char *neuron_set_attributes_doc = R"pbdoc(
 Configure neuron-specific parameters and hardware assignments.
 
-Args:
-    :param str soma_hw_name: Soma processing unit name. Default is None.
-    :param str default_synapse_hw_name: Default synapse type. Default is None.
-    :param str dendrite_hw_name: Dendrite processing unit name. Default is None.
-    :param bool log_spikes: Enable spike logging for this neuron. Default is False.
-    :param bool log_potential: Enable potential logging for this neuron. Default is False.
-    :param bool force_synapse_update: Force synapse updates every timestep. Default is False.
-    :param bool force_dendrite_update: Force dendrite updates every timestep. Default is False.
-    :param bool force_soma_update: Force soma updates every timestep. Default is False.
-    :param dict model_attributes: General model parameters. Default is None.
-    :param dict soma_attributes: Soma-specific parameters. Default is None.
-    :param dict dendrite_attributes: Dendrite-specific parameters. Default is None.
+:param str soma_hw_name: Soma processing unit name. Default is None.
+:param str default_synapse_hw_name: Default synapse type. Default is None.
+:param str dendrite_hw_name: Dendrite processing unit name. Default is None.
+:param bool log_spikes: Enable spike logging for this neuron. Default is False.
+:param bool log_potential: Enable potential logging for this neuron. Default is False.
+:param bool force_synapse_update: Force synapse updates every timestep. Default is False.
+:param bool force_dendrite_update: Force dendrite updates every timestep. Default is False.
+:param bool force_soma_update: Force soma updates every timestep. Default is False.
+:param dict model_attributes: General model parameters. Default is None.
+:param dict soma_attributes: Soma-specific parameters. Default is None.
+:param dict dendrite_attributes: Dendrite-specific parameters. Default is None.
 )pbdoc";
 
 constexpr const char *neuron_map_to_core_doc = R"pbdoc(
 Assign this neuron to a specific hardware core.
 
-Args:
-:param Core core_configuration: Target core for neuron placement
+:param core_configuration: Target core for neuron placement
+:type core_configuration: Core
 )pbdoc";
 
 constexpr const char *neuron_connect_to_neuron_doc = R"pbdoc(
 Create direct connection to another neuron.
 
-Args:
-    :param Neuron dest_neuron: Target neuron
-    :param dict attributes: Connection-specific parameters. Default is None.
+:param dest_neuron: Target neuron
+:type dest_neuron: Neuron
+:param attributes: Connection-specific parameters. Default is None.
+:type attributes: dict
 
-Returns:
-    int: Connection index for later reference
+:return: Connection index for later reference
+:rtype: int
 )pbdoc";
 
 // Architecture class
@@ -200,37 +214,53 @@ Example:
 constexpr const char *architecture_create_tile_doc = R"pbdoc(
 Add a new tile to the architecture with specified power metrics.
 
-Args:
-    :param str name (str): Unique tile identifier
-    :param float energy_north_hop: Energy per northward hop (Joules). Default is 0.0.
-    :param float latency_north_hop: Latency per northward hop (seconds). Default is 0.0.
-    :param float energy_east_hop: Energy per eastward hop (Joules). Default is 0.0.
-    :param float latency_east_hop: Latency per eastward hop (seconds). Default is 0.0.
-    :param float energy_south_hop: Energy per southward hop (Joules). Default is 0.0.
-    :param float latency_south_hop: Latency per southward hop (seconds). Default is 0.0.
-    :param float energy_west_hop: Energy per westward hop (Joules). Default is 0.0.
-    :param float latency_west_hop: Latency per westward hop (seconds). Default is 0.0.
-    :param bool log_energy: Enable tile energy logging. Default is False.
-    :param bool log_latency: Enable tile latency logging. Default is False.
+:param name: Unique tile identifier
+:type name: str
+:param energy_north_hop: Energy per northward hop (Joules). Default is 0.0.
+:type energy_north_hop: float, optional
+:param latency_north_hop: Latency per northward hop (seconds). Default is 0.0.
+:type latency_north_hop: float, optional
+:param energy_east_hop: Energy per eastward hop (Joules). Default is 0.0.
+:type energy_east_hop: float, optional
+:param latency_east_hop: Latency per eastward hop (seconds). Default is 0.0.
+:type latency_east_hop: float, optional
+:param energy_south_hop: Energy per southward hop (Joules). Default is 0.0.
+:type energy_south_hop: float, optional
+:param latency_south_hop: Latency per southward hop (seconds). Default is 0.0.
+:type latency_south_hop: float, optional
+:param energy_west_hop: Energy per westward hop (Joules). Default is 0.0.
+:type energy_west_hop: float, optional
+:param latency_west_hop: Latency per westward hop (seconds). Default is 0.0.
+:type latency_west_hop: float, optional
+:param log_energy: Enable tile energy logging. Default is False.
+:type log_energy: bool, optional
+:param log_latency: Enable tile latency logging. Default is False.
+:type log_latency: bool, optional
 
-Returns:
-    Tile: Reference to created tile configuration
+:return: Reference to created tile configuration
+:rtype: Tile
 )pbdoc";
 
 constexpr const char *architecture_create_core_doc = R"pbdoc(
 Add a processing core to an existing tile.
 
-Args:
-    :param str name: Unique core identifier within tile
-    :param int parent_tile_id: ID of containing tile
-    :param BufferPosition buffer_position: Pipeline buffer location. Default is before_soma.
-    :param bool buffer_inside_unit: Whether buffer is inside processing unit. Default is False.
-    :param int max_neurons_supported: Maximum neurons per core. Default is None.
-    :param bool log_energy: Enable core energy logging. Default is False.
-    :param bool log_latency: Enable core latency logging. Default is False
+:param name: Unique core identifier within tile
+:type name: str
+:param parent_tile_id: ID of containing tile
+:type parent_tile_id: int
+:param buffer_position: Pipeline buffer location. Default is before_soma.
+:type buffer_position: BufferPosition, optional
+:param buffer_inside_unit: Whether buffer is inside processing unit. Default is False.
+:type buffer_inside_unit: bool, optional
+:param max_neurons_supported: Maximum neurons per core. Default is None.
+:type max_neurons_supported: int, optional
+:param log_energy: Enable core energy logging. Default is False.
+:type log_energy: bool, optional
+:param log_latency: Enable core latency logging. Default is False.
+:type log_latency: bool, optional
 
-Returns:
-    Core: Reference to created core configuration
+:return: Reference to created core configuration
+:rtype: Core
 )pbdoc";
 
 // SpikingChip class
@@ -252,38 +282,43 @@ Example:
 constexpr const char *spiking_chip_load_doc = R"pbdoc(
 Map a neural network onto this chip's hardware architecture.
 
-Args:
-    network (Network): Spiking network to map onto hardware
+network (Network): Spiking network to map onto hardware
 )pbdoc";
 
 constexpr const char *spiking_chip_sim_doc = R"pbdoc(
 Execute neuromorphic simulation for specified timesteps.
 
-Args:
-    :param int timesteps: Number of simulation timesteps. Default is 1.
-    :param str timing_model: Timing model ("simple", "detailed", "cycle"). Default is "detailed".
-    :param int processing_threads: Number of processing threads. Default is 1.
-    :param int scheduler_threads: Number of scheduler threads. Default is 0 (run in main thread).
-    :param spike_trace: Spike trace output. Default is None.
-    :type spike_trace: str, file, bool, or None
-    :param potential_trace: Potential trace output. Default is None.
-    :type potential_trace: str, file, bool, or None
-    :param perf_trace: Performance metrics trace output. Default is None.
-    :type perf_trace: str, file, bool, or None
-    :param message_trace: Message trace output. Default is None.
-    :type message_trace: str, file, bool, or None
-    :param bool write_trace_headers: Write CSV headers to trace files. Default is True.
+:param timesteps: Number of simulation timesteps. Default is 1.
+:type timesteps: int, optional
+:param timing_model: Timing model ("simple", "detailed", "cycle"). Default is "detailed".
+:type timing_model: str, optional
+:param processing_threads: Number of processing threads. Default is 1.
+:type processing_threads: int, optional
+:param scheduler_threads: Number of scheduler threads. Default is 0 (run in main thread).
+:type scheduler_threads: int, optional
+:param spike_trace: Spike trace output. Default is None.
+:type spike_trace: str, file, bool, or None, optional
+:param potential_trace: Potential trace output. Default is None.
+:type potential_trace: str, file, bool, or None, optional
+:param perf_trace: Performance metrics trace output. Default is None.
+:type perf_trace: str, file, bool, or None, optional
+:param message_trace: Message trace output. Default is None.
+:type message_trace: str, file, bool, or None, optional
+:param write_trace_headers: Write CSV headers to trace files. Default is True.
+:type write_trace_headers: bool, optional
 
-Returns:
-    :returns: dict: Simulation results including energy, timing, and trace data
-        - timesteps_executed: Number of timesteps simulated
-        - energy: Energy breakdown by component
-        - sim_time: Simulated hardware time (seconds)
-        - spikes: Total spike count
-        - spike_trace: Spike data (if enabled)
-        - potential_trace: Potential data (if enabled)
-        - perf_trace: Performance metrics (if enabled)
-        - message_trace: Network message data (if enabled)
+:return: Simulation results including energy, timing, and trace data:
+
+    - timesteps_executed: Number of timesteps simulated
+    - energy: Energy breakdown by component
+    - sim_time: Simulated hardware time (seconds)
+    - spikes: Total spike count
+    - spike_trace: Spike data (if enabled)
+    - potential_trace: Potential data (if enabled)
+    - perf_trace: Performance metrics (if enabled)
+    - message_trace: Network message data (if enabled)
+
+:rtype: dict
 
 Example:
     >>> results = chip.sim(timesteps=1000, spike_trace=True, perf_trace=True)
@@ -298,8 +333,8 @@ Reset all neuron states and hardware buffers to initial conditions.
 constexpr const char *spiking_chip_get_power_doc = R"pbdoc(
 Calculate average power consumption based on simulation results.
 
-Returns:
-    :returns: float: Average power in Watts (total_energy / sim_time)
+:return: Average power in Watts (total_energy / sim_time)
+:rtype: float
 )pbdoc";
 
 // Connection class
@@ -323,11 +358,11 @@ An architecture is an abstract hardware configuration. To simulate this
 hardware, you must use the configuration to create one or more SpikingChip
 objects.
 
-Args:
-    :param str path: Path to architecture YAML file
+:param path: Path to architecture YAML file
+:type path: str
 
-Returns:
-    :returns: Architecture: Loaded architecture configuration
+:return: Loaded architecture configuration
+:rtype: Architecture
 
 Example:
     >>> arch = sanafe.load_arch("loihi.yaml")
@@ -336,13 +371,15 @@ Example:
 constexpr const char *load_net_doc = R"pbdoc(
 Load neural network from file (YAML or legacy netlist format).
 
-Args:
-    :param str path: Path to network file
-    :param Architecture arch: Target architecture for validation
-    :param bool use_netlist_format: Parse as legacy netlist format. Default is False.
+:param path: Path to network file
+:type path: str
+:param arch: Target architecture for validation
+:type arch: Architecture
+:param use_netlist_format: Parse as legacy netlist format. Default is False.
+:type use_netlist_format: bool, optional
 
-Returns:
-    :returns: Network: Loaded spiking neural network
+:return: Loaded spiking neural network
+:rtype: Network
 
 Example:
     >>> net = sanafe.load_net("snn.yaml", arch)
