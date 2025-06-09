@@ -23,10 +23,10 @@ hardware traces.
 
 The SANA-FE kernel is primarily written in C++, but uses PyBind11 to generate
 Python interfaces. SANA-FE can alternatively be used as a standalone C++
-simulator. For more using SANA-FE without Python, visit the project repository
-homepage at: https://github.com/SLAM-Lab/SANA-FE This library implements the
-Python interface, allowing you to specify and manipulate mapped SNNs,
-control/script simulations, and work output predictions/traces.
+simulator. For more information on using SANA-FE without Python, visit the
+project repository homepage at: https://github.com/SLAM-Lab/SANA-FE
+The SANA-FE Python interface supports creating mapped SNNs, launching
+simulations, and getting prediction data out for analysis.
 
 Quick-start
 ===========

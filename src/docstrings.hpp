@@ -109,7 +109,7 @@ Example:
 constexpr const char *neuron_group_connect_sparse_doc = R"pbdoc(
 Create sparse connections using explicit source-destination pairs.
 
-:paam dest_group: Target neuron group
+:param dest_group: Target neuron group
 :type dest_group: NeuronGroup
 :param attributes: Connection attributes with lists of values
 :type attributes: dict
