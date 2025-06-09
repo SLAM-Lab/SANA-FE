@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://github.com/SLAM-Lab/SANA-FE/blob/main/logo.svg" alt="SANA-FE" style="display: block; margin: 0 auto; width: 50%;">
+<img src="https://raw.githubusercontent.com/SLAM-Lab/SANA-FE/main/logo.svg" alt="SANA-FE" width="400" style="max-width: 100%; height: auto;">
 </p>
 
 Copyright (c) 2025 - The University of Texas at Austin
@@ -42,21 +42,23 @@ Optionally, enable multithreaded builds using the optional flag `-j <nthreads>`
 ## Dependencies
 
 Building this project requires `cmake`, `make`, and a compiler that supports the
-C++17 standard (e.g., GCC >= 8, Clang >= 5). This project makes use of the
-open source projects RapidYAML for all YAML file parsing, and Booksim 2 for
-optional cycle-accurate NoC modeling. To build with Python interfaces, you must
-also have Python 3.x installed with PyBind11. Assuming Python3 is available, you
-can install PyBind11 using:
+C++17 standard (e.g., GCC >= 8, Clang >= 5). This project uses RapidYAML for all
+YAML file parsing, and Booksim 2 for optional cycle-accurate NoC modeling. To
+build the Python interfaces, you must also have Python >= 3.8 installed with
+PyBind11. You can install PyBind11 using:
 
 `pip install pybind11`
 
-Booksim 2 requires the `bison` and `flex` dependencies for config parsing.
+Booksim 2 requires the `bison` and `flex` packages for config parsing.
+For example, in Ubuntu these can be installed using `apt`.
+
+`apt install bison flex`
 
 # To Run an Example
 
-`./sim arch/example.yaml snn/example.yaml 200`
+`./sim arch/example.yaml snn/example.yaml 100`
 
-This simulates 200 time-steps of a tiny connected spiking neural network (SNN).
+This simulates 100 time-steps of a tiny connected spiking neural network (SNN).
 
 General usage:
 
@@ -64,7 +66,7 @@ General usage:
 
 In addition to the standlone simulator, SANA-FE can also be scripted using a
 Python API. For an example of how this can be done, see the Jupyter
-notebook-based tutorial: `tutorial/tutorial.ipynb`.
+notebook-based tutorials in the `tutorial/` directory.
 
 Additional examples and experiments may be found in the `scripts/` directory.
 
@@ -80,9 +82,9 @@ after enabling traces globally, you will still have to create probes at the
 neuron level to get trace output.
 
 Flags:
-* `-o`: Output directory
 * `-m`: Enable message traces to `messages.csv`
 * `-n`: Use the (legacy) netlist format for SNNs, instead of YAML.
+* `-o`: Output directory
 * `-p`: Record the simulated performance of each timestep to `perf.csv`
 * `-s`: Enable spike traces to `spikes.csv`
 * `-t [simple/detailed/cycle]`: Specify the timing model  (default=`detailed`)
