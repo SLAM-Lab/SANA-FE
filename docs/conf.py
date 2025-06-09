@@ -10,7 +10,7 @@ extensions = [
 ]
 
 html_theme = 'sphinx_rtd_theme'
-html_logo = '../sanafe_logo.svg'
+html_logo = '../sana_fe_logo.svg'
 
 # Autodoc settings
 autodoc_default_options = {

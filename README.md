@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/SLAM-Lab/SANA-FE/main/sanafe_logo.svg" alt="SANA-FE" width="400" style="max-width: 100%; height: auto;">
+<img src="https://raw.githubusercontent.com/SLAM-Lab/SANA-FE/main/sana_fe_logo.svg" alt="SANA-FE" width="400" style="max-width: 100%; height: auto;">
 </p>
 
 Copyright (c) 2025 - The University of Texas at Austin
