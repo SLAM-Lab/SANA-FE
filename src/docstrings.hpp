@@ -39,20 +39,20 @@ constexpr const char *network_create_neuron_group_doc = R"pbdoc(
 Create a new group of neurons with shared properties.
 
 Args:
-    :param str group_name: Unique identifier for this neuron group
-    :param int neuron_count: Number of neurons to create in this group
-    :param dict model_attributes: Model parameters (e.g., threshold, leak). Default is None.
-    :param str default_synapse_hw_name: Default synapse hardware type. Default is None.
-    :param str default_dendrite_hw_name: Default dendrite hardware type. Default is None.
-    :param bool force_dendrite_update: Force dendrite updates every timestep. Default is False.
-    :param bool force_synapse_update: Force synapse updates every timestep. Default is False
-    :param bool force_soma_update: Force soma updates every timestep. Default is False.
-    :param bool log_potential: Enable membrane potential logging. Default is False.
-    :param bool log_spikes: Enable spike event logging. Default is False.
-    :param str soma_hw_name: Soma hardware implementation name. Default is ""
+:param str group_name: Unique identifier for this neuron group
+:param int neuron_count: Number of neurons to create in this group
+:param dict model_attributes: Model parameters (e.g., threshold, leak). Default is None.
+:param str default_synapse_hw_name: Default synapse hardware type. Default is None.
+:param str default_dendrite_hw_name: Default dendrite hardware type. Default is None.
+:param bool force_dendrite_update: Force dendrite updates every timestep. Default is False.
+:param bool force_synapse_update: Force synapse updates every timestep. Default is False
+:param bool force_soma_update: Force soma updates every timestep. Default is False.
+:param bool log_potential: Enable membrane potential logging. Default is False.
+:param bool log_spikes: Enable spike event logging. Default is False.
+:param str soma_hw_name: Soma hardware implementation name. Default is ""
 
 Returns:
-    :returns: NeuronGroup: The created neuron group
+:returns: NeuronGroup: The created neuron group
 
 Example:
     >>> group = net.create_neuron_group("layer1", 256,
