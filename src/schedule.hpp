@@ -11,7 +11,6 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <functional> // For std::reference_wrapper
 #include <list>
 #include <mutex>

@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <fstream>
 #include <functional> // For std::reference_wrapper
 #include <list>
 #include <stdexcept>

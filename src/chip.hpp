@@ -23,6 +23,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 
 #include "arch.hpp"
 #include "core.hpp"
