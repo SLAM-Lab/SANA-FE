@@ -57,3 +57,35 @@ sanafe::Message::Message(const long int id, const SpikingChip &hw,
     dest_axon_id = src_axon.dest_axon_id;
     dest_axon_hw = 0;
 }
+
+bool sanafe::CompareMessagesBySentTime::operator()(
+        const Message &first, const Message &second) const noexcept
+{
+    return first.sent_timestamp > second.sent_timestamp;
+}
+
+// Sort messages in message order, starting at lowest mid first. The only
+//  caveat is placeholder messages (id=-1), indicating processing after the last
+//  message is sent. They should therefore be placed at the end of the trace.
+bool sanafe::CompareMessagesByID::operator()(
+        const Message &first, const Message &second) const noexcept
+{
+    // If both are placeholders, they're equivalent
+    //  (use mid for tie-breaking)
+    if (first.placeholder && second.placeholder)
+    {
+        return first.mid < second.mid;
+    }
+    // Placeholders go to the end
+    //  (non-placeholder < placeholder)
+    if (first.placeholder)
+    {
+        return false; // left goes after right
+    }
+    if (second.placeholder)
+    {
+        return true; // left goes before right
+    }
+    // Both are normal messages, sort by mid
+    return first.mid < second.mid;
+}

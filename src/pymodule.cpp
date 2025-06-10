@@ -920,11 +920,9 @@ public:
                 all_messages.emplace_back(m);
             }
         }
-        // Sort messages in message order, starting at lowest mid first
+        // Sort messages in message ID order (with placeholders last)
         std::sort(all_messages.begin(), all_messages.end(),
-                [](const sanafe::Message &left, const sanafe::Message &right) {
-                    return left.mid < right.mid;
-                });
+                sanafe::CompareMessagesByID{});
         // Save the messages in sorted order
         for (const sanafe::Message &m : all_messages)
         {

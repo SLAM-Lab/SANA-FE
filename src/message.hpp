@@ -60,6 +60,18 @@ struct Message
     Message& operator=(Message &&move) = default;
 };
 
+class CompareMessagesBySentTime // Used by scheduler
+{
+public:
+    bool operator()(const Message &first, const Message &second) const noexcept;
+};
+
+class CompareMessagesByID // Used by chip to sort message traces
+{
+public:
+    bool operator()(const Message &first, const Message &second) const noexcept;
+};
+
 }
 
 #endif

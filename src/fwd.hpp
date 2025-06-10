@@ -55,6 +55,8 @@ struct AxonInModel;
 struct AxonOutModel;
 
 struct Message;
+class CompareMessagesBySentTime;
+class CompareMessagesByID;
 
 enum BufferPosition : uint8_t;
 enum NeuronStatus : uint8_t;

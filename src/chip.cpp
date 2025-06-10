@@ -404,11 +404,9 @@ void sanafe::SpikingChip::flush_timestep_data(
                         all_messages.emplace_back(m);
                     }
                 }
-                // Sort messages in message order, starting at lowest mid first
+                // Sort messages in message ID order (with placeholders last)
                 std::sort(all_messages.begin(), all_messages.end(),
-                        [](const Message &left, const Message &right) {
-                            return left.mid < right.mid;
-                        });
+                        CompareMessagesByID{});
                 // Save the messages in sorted order
                 for (const Message &m : all_messages)
                 {
@@ -1512,7 +1510,6 @@ void sanafe::SpikingChip::sim_trace_write_message_header(
     message_trace_file << "send_timestamp,";
     message_trace_file << "received_timestamp,";
     message_trace_file << "processed_timestamp,";
-    message_trace_file << "spikes,";
     message_trace_file << "generation_delay,";
     message_trace_file << "processing_delay,";
     message_trace_file << "network_delay,";

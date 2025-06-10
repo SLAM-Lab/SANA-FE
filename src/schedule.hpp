@@ -40,14 +40,7 @@ enum Direction : uint8_t
 };
 
 using MessageFifo = std::list<Message>;
-
-class CompareMessages
-{
-public:
-    bool operator()(const Message &first, const Message &second) const { return first.sent_timestamp > second.sent_timestamp; }
-};
-
-using MessagePriorityQueue = std::priority_queue<Message, std::vector<Message>, CompareMessages>;
+using MessagePriorityQueue = std::priority_queue<Message, std::vector<Message>, CompareMessagesBySentTime>;
 
 template <typename T, typename Container = std::vector<T>,
         typename Compare = std::less<T>>
