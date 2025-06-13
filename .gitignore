@@ -33,3 +33,5 @@ build/
 CMakeFiles/
 Makefile
 compile_commands.json
+logs/
+Miniforge3-*.sh
