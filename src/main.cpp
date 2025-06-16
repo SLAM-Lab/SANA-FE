@@ -253,8 +253,7 @@ std::vector<std::string> program_args_to_vector(
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,readability-function-size)
 int main(int argc, const char *argv[])
 {
-    const std::vector<std::string> arg_vec =
-            program_args_to_vector(argc, argv);
+    const std::vector<std::string> arg_vec = program_args_to_vector(argc, argv);
     const OptionalProgramFlags optional_flags =
             parse_command_line_flags(arg_vec);
     argc -= optional_flags.total_args_parsed;

@@ -24,7 +24,8 @@ class HodgkinHuxley : public sanafe::SomaUnit
     // HodgkinHuxley specific
 public:
     // system variables
-    double C_m{10.0}; // Effective capacitance per area of membrane; default is 1
+    double C_m{
+            10.0}; // Effective capacitance per area of membrane; default is 1
     double g_Na{1200.0}; // Conductance of sodium
     double g_K{360.0}; // Conductance of potassium
     double g_L{3.0}; // Conductance of leak channel

@@ -437,10 +437,8 @@ void sanafe::SpikingChip::update_run_data(
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const TimingModel timing_model, const int scheduler_thread_count,
-        const bool record_spikes,
-        const bool record_potentials,
-        const bool record_perf,
-        const bool record_messages,
+        const bool record_spikes, const bool record_potentials,
+        const bool record_perf, const bool record_messages,
         std::string output_dir)
 {
     RunData rd(total_timesteps + 1);

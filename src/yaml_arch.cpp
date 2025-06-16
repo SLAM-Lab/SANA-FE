@@ -395,8 +395,8 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
 
     for (int t = range.first; t <= range.second; t++)
     {
-        std::string name = tile_name.substr(0, tile_name.find('[')) +
-                "[" + std::to_string(t) + "]";
+        std::string name = tile_name.substr(0, tile_name.find('[')) + "[" +
+                std::to_string(t) + "]";
         const TilePowerMetrics power_metrics =
                 description_parse_tile_metrics_yaml(
                         parser, tile_node["attributes"]);

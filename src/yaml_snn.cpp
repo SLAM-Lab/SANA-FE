@@ -663,8 +663,7 @@ void sanafe::yaml_parse_conv2d(NeuronGroup &source_group,
             std::vector<ModelAttribute> attribute_list;
             for (const auto &el : attribute)
             {
-                ModelAttribute value =
-                        yaml_parse_attribute(parser, el);
+                ModelAttribute value = yaml_parse_attribute(parser, el);
                 attribute_list.push_back(std::move(value));
             }
             std::string attribute_name;
@@ -707,8 +706,7 @@ void sanafe::yaml_parse_dense(NeuronGroup &source_group,
             attribute >> ryml::key(attribute_name);
             for (const auto &el : attribute)
             {
-                ModelAttribute value =
-                        yaml_parse_attribute(parser, el);
+                ModelAttribute value = yaml_parse_attribute(parser, el);
                 attribute_list.push_back(std::move(value));
             }
             attribute_lists[attribute_name] = std::move(attribute_list);
@@ -1052,8 +1050,7 @@ ryml::NodeRef sanafe::yaml_serialize_network(ryml::NodeRef root,
                 edge_node |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
                 // For now assume there are no default connection attributes
                 const std::map<std::string, ModelAttribute> default_attributes{};
-                yaml_serialize_model_attributes(
-                        default_attributes, edge_node,
+                yaml_serialize_model_attributes(default_attributes, edge_node,
                         connection.synapse_attributes);
 
                 // TODO: support synapse-specific attributes
@@ -1079,9 +1076,8 @@ ryml::NodeRef sanafe::yaml_serialize_network(ryml::NodeRef root,
     return network_node;
 }
 
-ryml::NodeRef sanafe::yaml_serialize_neuron_group(
-        ryml::NodeRef parent, const sanafe::NeuronGroup &group,
-        std::list<std::string> &strings)
+ryml::NodeRef sanafe::yaml_serialize_neuron_group(ryml::NodeRef parent,
+        const sanafe::NeuronGroup &group, std::list<std::string> &strings)
 {
     auto group_node = parent.append_child();
     group_node |= ryml::MAP;
@@ -1095,8 +1091,8 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_group(
     const std::map<std::string, ModelAttribute> no_default_attributes{};
     if (!group.default_neuron_config.model_attributes.empty())
     {
-        yaml_serialize_model_attributes(no_default_attributes,
-                attr_node, group.default_neuron_config.model_attributes);
+        yaml_serialize_model_attributes(no_default_attributes, attr_node,
+                group.default_neuron_config.model_attributes);
     }
 
     // Add neurons
@@ -1124,16 +1120,15 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_group(
 
     for (const auto &neuron_run : neuron_runs)
     {
-        yaml_serialize_neuron_run(
-                neurons_node, neuron_run, group, strings);
+        yaml_serialize_neuron_run(neurons_node, neuron_run, group, strings);
     }
 
     return group_node;
 }
 
-ryml::NodeRef sanafe::yaml_serialize_neuron_run(
-        ryml::NodeRef neurons_node, const std::tuple<int, int> &neuron_run,
-        const NeuronGroup &group, std::list<std::string> &strings)
+ryml::NodeRef sanafe::yaml_serialize_neuron_run(ryml::NodeRef neurons_node,
+        const std::tuple<int, int> &neuron_run, const NeuronGroup &group,
+        std::list<std::string> &strings)
 {
     auto [start_offset, end_offset] = neuron_run;
 

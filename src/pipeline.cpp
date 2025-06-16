@@ -145,7 +145,6 @@ void sanafe::PipelineUnit::check_implemented(
         INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
-
 }
 
 void sanafe::PipelineUnit::check_outputs(
@@ -267,9 +266,8 @@ void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
             con.synapse_hw->default_energy_process_spike.has_value();
     if (energy_simulated && default_synapse_energy_metrics_set)
     {
-        const std::string error(
-                "Synapse unit simulates energy and also has "
-                "default energy metrics set.");
+        const std::string error("Synapse unit simulates energy and also has "
+                                "default energy metrics set.");
         throw std::runtime_error(error);
     }
     if (default_synapse_energy_metrics_set)
@@ -330,9 +328,8 @@ void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
             n.dendrite_hw->default_energy_update.has_value();
     if (energy_simulated && default_dendrite_energy_metrics_set)
     {
-        const std::string error(
-                "Dendrite unit simulates energy and also has "
-                "default energy metrics set.");
+        const std::string error("Dendrite unit simulates energy and also has "
+                                "default energy metrics set.");
         throw std::runtime_error(error);
     }
     if (default_dendrite_energy_metrics_set)
@@ -344,9 +341,8 @@ void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
             n.dendrite_hw->default_latency_update.has_value();
     if (latency_simulated && default_dendrite_latency_metrics_set)
     {
-        const std::string error(
-                "Dendrite unit simulates latency and also has "
-                "default latency metrics set.");
+        const std::string error("Dendrite unit simulates latency and also has "
+                                "default latency metrics set.");
         throw std::runtime_error(error);
     }
 
@@ -552,8 +548,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         {
             if (!key_exists(metric))
             {
-                const std::string error =
-                        "Metric not defined: " + metric;
+                const std::string error = "Metric not defined: " + metric;
                 INFO("Error: %s\n", error.c_str());
                 throw std::invalid_argument(error);
             }
@@ -579,8 +574,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         {
             if (!key_exists(metric))
             {
-                const std::string error =
-                        "Missing metric: " + metric;
+                const std::string error = "Missing metric: " + metric;
                 INFO("Error: %s\n", error.c_str());
                 throw std::invalid_argument(error);
             }

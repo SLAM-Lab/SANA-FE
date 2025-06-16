@@ -7,7 +7,7 @@ commit_hash = `git rev-parse --short HEAD`.strip
 log_file = "logs/commit-#{commit_hash}/format.log"
 
 #find cpp files
-cpp_files = Dir.glob("**/*.cpp")
+cpp_files = Dir.glob("src/**/*.cpp") + Dir.glob("plugins/**/*.cpp")
 
 failed_files = []
 
@@ -28,6 +28,12 @@ File.open(log_file, "w") do |log|
   else
     log.puts "\n#{failed_files.size} file(s) failed formatting."
   end
+end
+
+if failed_files.empty?
+  puts "Format Check: PASS"
+else
+  puts "Format Check: FAIL (#{failed_files.size} file(s) failed, see #{log_file})"
 end
 
 exit(failed_files.empty? ? 0 : 1)

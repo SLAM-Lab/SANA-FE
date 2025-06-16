@@ -13,8 +13,10 @@ puts "-------------------------------"
 
 #run build checker
 build_status = system("ruby ci/check_build.rb")
-puts "Build Check: #{build_status ? 'PASS' : 'FAIL'}"
 
-#run format checker
+#run clang-format
 format_status = system("ruby ci/check_format.rb")
-puts "Format Check: #{format_status ? 'PASS' : 'FAIL'}"
+
+#run clang-tidy
+tidy_status = system("ruby ci/check_tidy.rb")
+puts "Tidy Check: #{tidy_status ? 'PASS' : 'FAIL'}"

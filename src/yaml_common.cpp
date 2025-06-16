@@ -118,8 +118,7 @@ sanafe::description_parse_model_attributes_yaml( // NOLINT(misc-no-recursion)
             if (unit_specific_keys.find(key_str) == unit_specific_keys.end())
             {
                 //INFO("Parsing attribute: %s\n", key.c_str());
-                model_attributes[key_str] =
-                        yaml_parse_attribute(parser, node);
+                model_attributes[key_str] = yaml_parse_attribute(parser, node);
             }
         }
     }
@@ -140,13 +139,11 @@ sanafe::ModelAttribute sanafe::yaml_parse_attribute(
 
     if (attribute_node.is_seq())
     {
-        attribute.value =
-                yaml_parse_attribute_list(parser, attribute_node);
+        attribute.value = yaml_parse_attribute_list(parser, attribute_node);
     }
     else if (attribute_node.is_map())
     {
-        attribute.value =
-                yaml_parse_attribute_map(parser, attribute_node);
+        attribute.value = yaml_parse_attribute_map(parser, attribute_node);
     }
     else
     {
@@ -260,8 +257,7 @@ sanafe::AttributeVariant sanafe::yaml_parse_attribute_scalar(
 }
 // NOLINTEND(readability-function-cognitive-complexity)
 
-std::pair<size_t, size_t> sanafe::yaml_parse_range(
-        const std::string &range_str)
+std::pair<size_t, size_t> sanafe::yaml_parse_range(const std::string &range_str)
 {
     constexpr std::string_view range_delimiter = "..";
     const size_t delimiter_pos = range_str.find(range_delimiter);
