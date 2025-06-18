@@ -48,6 +48,7 @@ class CMakeBuild(build_ext):
                       "-DPYTHON_EXECUTABLE=" + sys.executable,
                       "-DPYTHON_INCLUDE_DIRS=" + sysconfig.get_path('include'),
                       "-DSTANDALONE_BUILD_ENABLED=OFF",
+                      "-DPYTHON_BUILD_ENABLED=ON",
                       "-DPYTHON_FROM_SETUP=ON"]
         print(f"CMake Arguments: {cmake_args}")
         cfg = "Debug" if self.debug else "Release"
@@ -66,6 +67,9 @@ class CMakeBuild(build_ext):
         env["CMAKE_BUILD_PARALLEL_LEVEL"] = jobs
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
+        env["PYTHON_EXECUTABLE"] = sys.executable
+        env["PYTHON_INCLUDE_DIRS"] = sysconfig.get_path('include')
+
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
 

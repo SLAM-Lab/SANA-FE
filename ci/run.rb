@@ -19,4 +19,3 @@ format_status = system("ruby ci/check_format.rb")
 
 #run clang-tidy
 tidy_status = system("ruby ci/check_tidy.rb")
-puts "Tidy Check: #{tidy_status ? 'PASS' : 'FAIL'}"
