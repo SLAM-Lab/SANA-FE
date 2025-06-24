@@ -31,13 +31,17 @@ Systems, doi: 10.1109/TCAD.2025.3537971.
 # To Build
 
 This project uses CMake as its build system and dependency manager. To setup
-compilation, run the following command in the project directory:
-`cmake .`
+compilation, first create a temporary build directory:
+`mkdir build && cd build`
+
+Run the following command in this build directory:
+`cmake ..`
 
 Then compile SANA-FE by using the command:
-`make`
+`make -j 12`
 
-Optionally, enable multithreaded builds using the optional flag `-j <nthreads>`
+The option `-j` indicates the number of parallel threads to use. This should
+be less than the threads supported by your system.
 
 ## Dependencies
 

@@ -35,6 +35,18 @@ if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED)
     )
 endif()
 
+# Prevent in-source builds, which cause issues due to left over CMake caches
+#  For example:
+#  $ pip install . fails if any CMake caches are in the main project directory
+cmake_print_variables(CMAKE_SOURCE_DIR)
+cmake_print_variables(CMAKE_BINARY_DIR)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR
+        "In-source builds are not allowed. "
+        "Please create a separate build directory and run cmake from there. "
+        "E.g., $ mkdir build && cd build")
+endif()
+
 project(sana-fe)
 
 add_compile_options(
@@ -107,7 +119,6 @@ cmake_print_variables(ENABLE_STANDALONE_DEBUG ENABLE_SOURCE_INFO_STANDALONE ENAB
 
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/plugins")
-include(CMakePrintHelpers)
 cmake_print_variables(SRC_DIR)
 file (GLOB SOURCE_FILES "${SRC_DIR}/*.cpp")
 file (GLOB HEADER_FILES "${SRC_DIR}/*.hpp")
