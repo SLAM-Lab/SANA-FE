@@ -2,20 +2,22 @@
 
 require 'fileutils'
 
-#paths
-commit_hash = `git rev-parse --short HEAD`.strip
-log_dir = "logs/commit-#{commit_hash}"
-FileUtils.mkdir_p(log_dir)
+timestamp = Time.now.strftime("%Y%m%d-%H%M%S")            
+commit_hash = `git rev-parse --short HEAD`.strip          
+unique_id = "#{timestamp}-#{commit_hash}"                 
+log_dir = "logs/commit-#{unique_id}"   
+FileUtils.mkdir_p(log_dir)  #create log directory if it doesn't exist
+
+ENV["SANAFE_CI_LOG_DIR"] = log_dir
+ENV["SANAFE_CI_ID"] = unique_id
 
 puts "Running SANA-FE CI for commit #{commit_hash}"
 puts "Logs will be saved to #{log_dir}/"
 puts "-------------------------------"
 
-#run build checker
-build_status = system("ruby ci/check_build.rb")
-
-#run clang-format
-format_status = system("ruby ci/check_format.rb")
-
-#run clang-tidy
-tidy_status = system("ruby ci/check_tidy.rb")
+build_status = system("ruby ci/check_build.rb")     #run build checker
+format_status = system("ruby ci/check_format.rb")   #run clang-format
+tidy_status = system("ruby ci/check_tidy.rb")       #run clang-tidy
+cppcheck_status = system("ruby ci/check_cppcheck.rb")
+#TODO: Optional coverity upload
+perf_status = system("ruby ci/check_perf.rb")

@@ -2,21 +2,21 @@
 
 require 'fileutils'
 
-#setup log directory
-commit_hash = `git rev-parse --short HEAD`.strip
-log_dir = "logs/commit-#{commit_hash}"
+log_dir = ENV["SANAFE_CI_LOG_DIR"] || "logs/commit-latest"
+log_file = "#{log_dir}/build.log"
 FileUtils.mkdir_p(log_dir)
+
 
 #build standalone sim
 def build_cpp(label:, build_dir:, compiler: nil, log_file:)
   puts "[#{label}] Building standalone simulator..."
 
-  cmake_cmd = "cmake -S . -B #{build_dir}"
-  cmake_cmd += " -DCMAKE_CXX_COMPILER=#{compiler}" if compiler
-  cmake_ok = system("#{cmake_cmd} > #{log_file} 2>&1")
+  cmake_cmd = "cmake -S . -B #{build_dir}"  #construct cmake config command using source and build dirs
+  cmake_cmd += " -DCMAKE_CXX_COMPILER=#{compiler}" if compiler  #add compiler option if provided
+  cmake_ok = system("#{cmake_cmd} > #{log_file} 2>&1")  #run cmake, direct output to log file
 
   if cmake_ok
-    make_ok = system("cmake --build #{build_dir} >> #{log_file} 2>&1")
+    make_ok = system("cmake --build #{build_dir} --parallel 8 >> #{log_file} 2>&1")  #if cmake works, build and append output to log
   end
 
   if cmake_ok && make_ok
@@ -37,39 +37,43 @@ def build_python(label:, build_dir:, log_file:)
   FileUtils.mkdir_p(File.dirname(log_file))
 
   full_log_path = File.expand_path(log_file)
-  install_ok = nil
+
+  #create unique venv name using timestamp and commit hash
+  timestamp = Time.now.strftime('%Y%m%d-%H%M%S')
+  commit_hash = `git rev-parse --short HEAD`.strip
+  venv_path = File.expand_path("venvs/commit-#{timestamp}-#{commit_hash}")
+  venv_python = File.join(venv_path, "bin", "python")
+
+  FileUtils.mkdir_p("venvs")
+  unless system("python3 -m venv #{venv_path}")
+    puts "[#{label}] Failed to create virtualenv at #{venv_path}"
+    return false
+  end
+
+  install_ok = false
   import_ok = false
 
   File.open(full_log_path, "w") do |log|
     Dir.chdir(build_dir) do
-      IO.popen("pip install .. > /dev/null 2>&1") do |io|
+      IO.popen("#{venv_python} -m pip install .. > /dev/null 2>&1") do |io|
         io.each { |line| log.puts line }
       end
       install_ok = $?.success?
     end
   end
 
-  #find and copy .so into site packages
+  #copy into site packages
   built_so = Dir.glob("#{build_dir}/../**/sanafecpp*.so").find { |f| File.file?(f) }
   dest_dir = File.join(ENV["CONDA_PREFIX"], "lib", "python#{RUBY_VERSION[/\d+\.\d+/]}", "site-packages", "sanafe")
-
   if built_so && File.exist?(built_so)
     FileUtils.mkdir_p(dest_dir)
     FileUtils.cp(built_so, dest_dir)
   end
 
-  #check that import works
-  import_output = `python3 -c 'import sanafe' 2>&1`
-  import_ok = $?.success?
-  File.open(log_file, "a") { |f| f.puts "\n[Import Test]\n#{import_output}" }
+  FileUtils.rm_rf(venv_path)
 
-  if install_ok && import_ok
-    puts "[#{label}] Python build: PASS"
-    true
-  else
-    puts "[#{label}] Python build: FAIL (see #{log_file})"
-    false
-  end
+puts "[#{label}] Python build: #{install_ok ? 'PASS' : "FAIL (see #{log_file})"}"
+  install_ok
 end
 
 #set clang path

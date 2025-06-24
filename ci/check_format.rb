@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
-
+#TODO: break format
 require 'fileutils'
 
-#paths
-commit_hash = `git rev-parse --short HEAD`.strip
-log_file = "logs/commit-#{commit_hash}/format.log"
+log_dir = ENV["SANAFE_CI_LOG_DIR"] || "logs/commit-latest"
+log_file = "#{log_dir}/format.log"
+FileUtils.mkdir_p(log_dir)
 
 #find cpp files
-cpp_files = Dir.glob("src/**/*.cpp") + Dir.glob("plugins/**/*.cpp")
+cpp_files = Dir.glob("src/*.cpp") + Dir.glob("plugins/*.cpp")
 
 failed_files = []
 

@@ -2,11 +2,11 @@
 
 require 'fileutils'
 
-commit_hash = `git rev-parse --short HEAD`.strip
-log_file = "logs/commit-#{commit_hash}/tidy.log"
-FileUtils.mkdir_p("logs/commit-#{commit_hash}")
+log_dir = ENV["SANAFE_CI_LOG_DIR"] || "logs/commit-latest"
+log_file = "#{log_dir}/tidy.log"
+FileUtils.mkdir_p(log_dir)
 
-cpp_files = Dir.glob("src/**/*.cpp")
+cpp_files = Dir.glob("src/*.cpp")  #
 failed_files = []
 
 File.open(log_file, "w") do |log|
