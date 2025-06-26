@@ -103,7 +103,6 @@ option(ENABLE_STANDALONE_DEBUG "Enable debug prints for standalone build" ${DEFA
 option(ENABLE_SOURCE_INFO_STANDALONE "Include source info in standalone debug prints" ${DEFAULT_STANDALONE_SOURCE})
 option(ENABLE_PYTHON_DEBUG "Enable debug prints for Python build" ${DEFAULT_PYTHON_DEBUG})
 option(ENABLE_SOURCE_INFO_PYTHON "Include source info in standalone debug prints" ${DEFAULT_PYTHON_SOURCE})
-
 cmake_print_variables(ENABLE_STANDALONE_DEBUG ENABLE_SOURCE_INFO_STANDALONE ENABLE_PYTHON_DEBUG ENABLE_SOURCE_INFO_PYTHON)
 
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -127,13 +126,18 @@ add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
 # Find Python using the new FindPython module
 option(PYTHON_FROM_SETUP "Building via setup.py" OFF)
+set(PYTHON_VERSION "" CACHE STRING "Python version to find (e.g., 3.10, 3.11). Leave empty for system default.")
 if(PYTHON_BUILD_ENABLED)
     if(PYTHON_FROM_SETUP)
         if(NOT DEFINED PYTHON_EXECUTABLE OR NOT DEFINED PYTHON_INCLUDE_DIRS)
             message(FATAL_ERROR "PYTHON_EXECUTABLE and PYTHON_INCLUDE_DIRS must be provided when PYTHON_FROM_SETUP=ON")
         endif()
     else()
-        find_package(Python COMPONENTS Interpreter Development REQUIRED)
+        if(PYTHON_VERSION)
+            find_package(Python COMPONENTS Interpreter Development REQUIRED)
+        else()
+            find_package(Python ${PYTHON_VERSION} EXACT COMPONENTS Interpreter Development REQUIRED)
+        endif()
     endif()
 endif()
 
