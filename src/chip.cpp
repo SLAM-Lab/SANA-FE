@@ -1416,7 +1416,7 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
             if (neuron.log_potential)
             {
                 potential_trace_file << "neuron " << group_name;
-                potential_trace_file << "." << neuron.id << ",";
+                potential_trace_file << "." << neuron.offset << ",";
             }
         }
     }
