@@ -1531,7 +1531,7 @@ void sanafe::SpikingChip::sim_trace_record_spikes(
             if (neuron.log_spikes && (neuron.status == sanafe::fired))
             {
                 spike_trace_file << neuron.parent_group_name << ".";
-                spike_trace_file << neuron.id << ",";
+                spike_trace_file << neuron.offset << ",";
                 spike_trace_file << timestep;
                 spike_trace_file << "\n";
                 spike_trace_file.flush();

@@ -257,7 +257,7 @@ if dataset == "shd":
         max_potentials = np.max(timestep_potentials, axis=0)
         category = np.argmax(max_potentials, axis=0)
 
-        print(f"Potentials per class for inference:\n{max_potentials}\n"
+        print(f"Max potentials per class for inference:{max_potentials}\n"
               f"out:{category} actual:{labels[i]}")
 
         if category == labels[i]:
@@ -286,7 +286,7 @@ if dataset == "shd":
                 print(f"Warning: Group {group_name} not recognized!")
 
     ax_spikes = fig.add_subplot(gs[0])
-    ax_spikes.set_title('Analog Neurons Classifying Spiking Digits')
+    ax_spikes.set_title('Mixed-Signal Architecture Classifying Spiking Digits')
     ax_spikes.set_xlim((0, timesteps_per_input[0]))
     ax_spikes.set_ylim((0, in_neurons + hidden_neurons))
 
@@ -320,7 +320,7 @@ if dataset == "shd":
     perf_df = pd.read_csv("perf.csv")
     perf_df["total_energy_uj"] = perf_df["total_energy"] * 1.0e6
     perf_df.plot(x="timestep", y=["total_energy_uj"], ax=ax_perf)
-    ax_perf.set_ylabel("Simulated Soma Energy (uJ)")
+    ax_perf.set_ylabel("Simulated Energy (uJ)")
     ax_perf.get_legend().remove()
 
     ax_perf.set_xlabel("Time-step")
@@ -423,7 +423,7 @@ elif dataset == "mnist":
     # Display the digits
     ax_digits.set_xlim(0, total_timesteps)
     ax_digits.set_ylim(0, display_height)
-    ax_digits.set_title('Analog Neurons Classifying MNIST')
+    ax_digits.set_title('Mixed-Signal Architecture Classifying MNIST')
 
     ax_spikes = fig.add_subplot(gs[1])
     ax_spikes.set_xlim((0, total_timesteps))
