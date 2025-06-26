@@ -6,3 +6,10 @@ requires = [
     "pybind11>=2.6.0"
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.cibuildwheel.linux]
+before-all = "yum install -y flex"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-musllinux*"
+before-all = "apk add flex"

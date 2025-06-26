@@ -30,11 +30,16 @@ if (NOT DEFINED PYTHON_BUILD_ENABLED)
     set(PYTHON_BUILD_ENABLED ON)
 endif()
 
+
+if (NOT DEFINED ENABLE_TESTING)
+    set(ENABLE_TESTING OFF)
+endif()
+
 # Ensure that at least one build target is enabled
-if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED)
+if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED AND NOT ENABLE_TESTING)
     message(
         FATAL_ERROR
-        "No build target enabled: Either STANDALONE_BUILD_ENABLED or PYTHON_BUILD_ENABLED must be ON."
+        "No build target enabled: Either STANDALONE_BUILD_ENABLED or PYTHON_BUILD_ENABLED or ENABLE_TESTING must be ON."
     )
 endif()
 
@@ -170,6 +175,8 @@ FetchContent_MakeAvailable(ryml)
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 ##### END OF rapid-yaml
 
+message(STATUS "got ryml")
+
 ############## booksim2
 project(booksim2-quickstart LANGUAGES CXX)
 set(BOOKSIM_VERSION "110ad1b80e493241f6e57587bc11354ac84f91f8")
@@ -277,4 +284,26 @@ if(STANDALONE_BUILD_ENABLED)
             target_compile_definitions(sim PRIVATE ENABLE_SOURCE_INFO)
         endif()
     endif()
+endif()
+
+if(ENABLE_TESTING)
+    list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
+    add_library(sanafe SHARED ${SOURCE_FILES} ${HEADER_FILES})
+    target_link_libraries(sanafe PUBLIC ryml::ryml)
+    target_link_libraries(sanafe PUBLIC booksim)
+    target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
+    if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
+        target_link_libraries(sanafe PRIVATE OpenMP::OpenMP_CXX)
+        target_compile_definitions(sanafe PRIVATE HAVE_OPENMP)
+    endif()
+    target_link_libraries(sanafe PRIVATE Threads::Threads)
+    target_include_directories(sanafe PUBLIC
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    message(STATUS "Testing enabled")
+    include(CTest)
+    add_subdirectory(tests)
+
+    find_program(CTEST_MEMORYCHECK_COMMAND valgrind)
+    set(CTEST_MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=10")
 endif()
