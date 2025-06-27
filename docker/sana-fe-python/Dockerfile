@@ -22,6 +22,8 @@ RUN apt update && apt install -y \
 WORKDIR /app
 COPY . /app
 
+RUN rm -rf build
+
 RUN pip3 install --break-system-packages cibuildwheel pybind11
 
 # workaround for cibuildwheel issue with flex

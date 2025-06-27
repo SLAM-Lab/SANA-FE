@@ -10,4 +10,4 @@ else
     exit 1
 fi
 
-docker run --rm -v "$(pwd)/arch":/data/arch -v "$(pwd)/snn":/data/snn $IMAGE_NAME "/data/$1" "/data/$2" $3
+docker run --rm -v "$(pwd)/arch":/data/arch -v "$(pwd)/snn":/data/snn $IMAGE_NAME "$@"
