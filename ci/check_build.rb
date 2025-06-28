@@ -38,10 +38,9 @@ def build_python(label:, build_dir:, log_file:)
 
   full_log_path = File.expand_path(log_file)
 
-  #create unique venv name using timestamp and commit hash
-  timestamp = Time.now.strftime('%Y%m%d-%H%M%S')
-  commit_hash = `git rev-parse --short HEAD`.strip
-  venv_path = File.expand_path("venvs/commit-#{timestamp}-#{commit_hash}")
+  #create venv name
+  unique_id = ENV["SANAFE_CI_ID"]
+  venv_path = File.expand_path("#{File.dirname(log_file)}/venv")
   venv_python = File.join(venv_path, "bin", "python")
 
   FileUtils.mkdir_p("venvs")
@@ -61,16 +60,6 @@ def build_python(label:, build_dir:, log_file:)
       install_ok = $?.success?
     end
   end
-
-  #copy into site packages
-  built_so = Dir.glob("#{build_dir}/../**/sanafecpp*.so").find { |f| File.file?(f) }
-  dest_dir = File.join(ENV["CONDA_PREFIX"], "lib", "python#{RUBY_VERSION[/\d+\.\d+/]}", "site-packages", "sanafe")
-  if built_so && File.exist?(built_so)
-    FileUtils.mkdir_p(dest_dir)
-    FileUtils.cp(built_so, dest_dir)
-  end
-
-  FileUtils.rm_rf(venv_path)
 
 puts "[#{label}] Python build: #{install_ok ? 'PASS' : "FAIL (see #{log_file})"}"
   install_ok
