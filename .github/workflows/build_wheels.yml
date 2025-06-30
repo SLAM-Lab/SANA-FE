@@ -14,6 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install flex and bison (platform-specific)
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install bison flex
+            echo 'PATH="/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/flex/bin:$PATH"' >> $GITHUB_ENV
+          elif [[ "$RUNNER_OS" == "Windows" ]]; then
+            choco install winflexbison3
+            echo 'C:\ProgramData\chocolatey\bin' >> $GITHUB_PATH
+          fi
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.0.0
         # env:
