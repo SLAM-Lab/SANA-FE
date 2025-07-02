@@ -33,11 +33,5 @@ build/
 CMakeFiles/
 Makefile
 compile_commands.json
-logs/
-Miniforge3-*.sh
-.env
-coverity_tool.tgz
-cov-analysis-*
-venvs/
 test_venv/
 *.so

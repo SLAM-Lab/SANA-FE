@@ -65,13 +65,15 @@ puts "[#{label}] Python build: #{install_ok ? 'PASS' : "FAIL (see #{log_file})"}
   install_ok
 end
 
-#set clang path
-clang_path = "/home/jab23579/useful/clang-20/bin/clang++"
+#set clang and gcc path
+clang_path = ENV["CLANG_PATH"]
+gcc_path = ENV["GCC_PATH"]
 
 #gcc builds
 gcc_sim_ok = build_cpp(
   label: "GCC",
   build_dir: "build_gcc",
+  compiler: gcc_path,
   log_file: "#{log_dir}/build_gcc_sim.log"
 )
 gcc_py_ok = build_python(
