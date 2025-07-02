@@ -151,25 +151,28 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
                            "weights_loihi.pkl"), "rb") as weights_file:
         weights = pickle.load(weights_file)
 
-    #timesteps = 1
-    timesteps = 1e5
-    #for i in range(1, max_size):
-    for i in range(max_size-1, max_size):
+    timesteps = 1
+    #timesteps = 100000
+    for i in range(1, max_size):
+    #for i in range(max_size-1, max_size):
         # Sweep across range of network sizes
         layer_neurons = i*i
         copy_network = (True if mapping == "split_2_diff_tiles" else False)
         arch = sanafe.load_arch(ARCH_FILENAME)
-        chip = sanafe.SpikingChip(arch, record_perf=True, record_messages=True)
+        chip = sanafe.SpikingChip(arch)
 
-        snn = connected_layers(arch, weights[i-1].transpose(), spiking=True,
-                               mapping=mapping, copy_network=copy_network)
+        # TODO: in future maybe save the files as we go?
         #network_filename = os.path.join(PROJECT_DIR, "runs", "power", "snn",
         #                                f"connected_layers_N{layer_neurons}_map_{mapping}.net")
         #snn.save_net_description(network_filename)
+
+        snn = connected_layers(arch, weights[i-1].transpose(), spiking=True,
+                               mapping=mapping, copy_network=copy_network)
         chip.load(snn)
 
         print(f"Testing network with {2*layer_neurons} neurons")
-        results = chip.sim(timesteps, timing_model=timing_model)
+        results = chip.sim(timesteps=timesteps, timing_model=timing_model,
+                           perf_trace="perf.csv", message_trace="messages.csv")
 
         with open(os.path.join(PROJECT_DIR, "runs",
                                "power", f"sim_spiking_{timing_model}.csv"),
@@ -193,7 +196,7 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
 #mappings = ("split_2_diff_tiles",)
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
 
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}

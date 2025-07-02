@@ -43,6 +43,18 @@ if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED AND NOT ENABLE_TEST
     )
 endif()
 
+# Prevent in-source builds, which cause issues due to left over CMake caches
+#  For example:
+#  $ pip install . fails if any CMake caches are in the main project directory
+cmake_print_variables(CMAKE_SOURCE_DIR)
+cmake_print_variables(CMAKE_BINARY_DIR)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR
+        "In-source builds are not allowed. "
+        "Please create a separate build directory and run cmake from there. "
+        "E.g., $ mkdir build && cd build")
+endif()
+
 project(sana-fe)
 
 add_compile_options(
@@ -111,12 +123,10 @@ option(ENABLE_STANDALONE_DEBUG "Enable debug prints for standalone build" ${DEFA
 option(ENABLE_SOURCE_INFO_STANDALONE "Include source info in standalone debug prints" ${DEFAULT_STANDALONE_SOURCE})
 option(ENABLE_PYTHON_DEBUG "Enable debug prints for Python build" ${DEFAULT_PYTHON_DEBUG})
 option(ENABLE_SOURCE_INFO_PYTHON "Include source info in standalone debug prints" ${DEFAULT_PYTHON_SOURCE})
-
 cmake_print_variables(ENABLE_STANDALONE_DEBUG ENABLE_SOURCE_INFO_STANDALONE ENABLE_PYTHON_DEBUG ENABLE_SOURCE_INFO_PYTHON)
 
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/plugins")
-include(CMakePrintHelpers)
 cmake_print_variables(SRC_DIR)
 file (GLOB SOURCE_FILES "${SRC_DIR}/*.cpp")
 file (GLOB HEADER_FILES "${SRC_DIR}/*.hpp")
@@ -135,13 +145,19 @@ add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 
 # Find Python using the new FindPython module
 option(PYTHON_FROM_SETUP "Building via setup.py" OFF)
+set(PYTHON_VERSION "" CACHE STRING "Python version to find (e.g., 3.10, 3.11). Leave empty for system default.")
+cmake_print_variables(PYTHON_VERSION)
 if(PYTHON_BUILD_ENABLED)
     if(PYTHON_FROM_SETUP)
         if(NOT DEFINED PYTHON_EXECUTABLE OR NOT DEFINED PYTHON_INCLUDE_DIRS)
             message(FATAL_ERROR "PYTHON_EXECUTABLE and PYTHON_INCLUDE_DIRS must be provided when PYTHON_FROM_SETUP=ON")
         endif()
     else()
-        find_package(Python COMPONENTS Interpreter Development REQUIRED)
+        if(PYTHON_VERSION)
+            find_package(Python ${PYTHON_VERSION} EXACT COMPONENTS Interpreter Development REQUIRED)
+        else()
+            find_package(Python COMPONENTS Interpreter Development REQUIRED)
+        endif()
     endif()
 endif()
 

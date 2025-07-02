@@ -1414,7 +1414,7 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
             if (neuron.log_potential)
             {
                 potential_trace_file << "neuron " << group_name;
-                potential_trace_file << "." << neuron.id << ",";
+                potential_trace_file << "." << neuron.offset << ",";
             }
         }
     }
@@ -1529,7 +1529,7 @@ void sanafe::SpikingChip::sim_trace_record_spikes(
             if (neuron.log_spikes && (neuron.status == sanafe::fired))
             {
                 spike_trace_file << neuron.parent_group_name << ".";
-                spike_trace_file << neuron.id << ",";
+                spike_trace_file << neuron.offset << ",";
                 spike_trace_file << timestep;
                 spike_trace_file << "\n";
                 spike_trace_file.flush();

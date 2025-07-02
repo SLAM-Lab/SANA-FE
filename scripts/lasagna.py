@@ -28,7 +28,7 @@ except ImportError:
 
 #dataset = "mnist"
 dataset = "shd"
-analog_neurons = False
+analog_neurons = True
 
 if dataset == "mnist":
     timesteps = 100
@@ -195,8 +195,7 @@ for src in range(hidden_neurons):
 
 # Run a simulation
 print("Building h/w")
-hw = sanafe.SpikingChip(arch, record_spikes=True,
-                        record_potentials=True, record_perf=True)
+hw = sanafe.SpikingChip(arch)
 print("Loading SNN")
 hw.load(network)
 print(f"Running simulation for {timesteps} timesteps")
@@ -223,9 +222,10 @@ for input in range(num_inputs):
         raise Exception(f"Dataset: {dataset} not recognized!")
 
     print(f"Simulating for {timesteps} timesteps")
-    results = hw.sim(timesteps)
+    results = hw.sim(timesteps,  spike_trace="spikes.csv",
+                     potential_trace="potentials.csv", perf_trace="perf.csv")
     timesteps_per_input.append(timesteps)
-    print(results)
+    # print(results)
     hw.reset()
 #"""
 
@@ -257,7 +257,7 @@ if dataset == "shd":
         max_potentials = np.max(timestep_potentials, axis=0)
         category = np.argmax(max_potentials, axis=0)
 
-        print(f"Potentials per class for inference:\n{max_potentials}\n"
+        print(f"Max potentials per class for inference:{max_potentials}\n"
               f"out:{category} actual:{labels[i]}")
 
         if category == labels[i]:
@@ -286,7 +286,7 @@ if dataset == "shd":
                 print(f"Warning: Group {group_name} not recognized!")
 
     ax_spikes = fig.add_subplot(gs[0])
-    ax_spikes.set_title('Analog Neurons Classifying Spiking Digits')
+    ax_spikes.set_title('Mixed-Signal Architecture Classifying Spiking Digits')
     ax_spikes.set_xlim((0, timesteps_per_input[0]))
     ax_spikes.set_ylim((0, in_neurons + hidden_neurons))
 
@@ -318,9 +318,9 @@ if dataset == "shd":
     ax_perf = fig.add_subplot(gs[2])
     ax_perf.set_xlim((0, timesteps_per_input[0]))
     perf_df = pd.read_csv("perf.csv")
-    perf_df["total_energy_pj"] = perf_df["total_energy"] * 1.0e12
-    perf_df.plot(x="timestep", y=["total_energy_pj"], ax=ax_perf)
-    ax_perf.set_ylabel("Simulated Soma Energy (pJ)")
+    perf_df["total_energy_uj"] = perf_df["total_energy"] * 1.0e6
+    perf_df.plot(x="timestep", y=["total_energy_uj"], ax=ax_perf)
+    ax_perf.set_ylabel("Simulated Energy (uJ)")
     ax_perf.get_legend().remove()
 
     ax_perf.set_xlabel("Time-step")
@@ -423,7 +423,7 @@ elif dataset == "mnist":
     # Display the digits
     ax_digits.set_xlim(0, total_timesteps)
     ax_digits.set_ylim(0, display_height)
-    ax_digits.set_title('Analog Neurons Classifying MNIST')
+    ax_digits.set_title('Mixed-Signal Architecture Classifying MNIST')
 
     ax_spikes = fig.add_subplot(gs[1])
     ax_spikes.set_xlim((0, total_timesteps))
@@ -468,11 +468,11 @@ elif dataset == "mnist":
     ax_perf = fig.add_subplot(gs[3])
     ax_perf.set_xlim((0, total_timesteps))
     perf_df = pd.read_csv("perf.csv")
-    perf_df["total_energy_pj"] = perf_df["total_energy"] * 1.0e12
-    perf_df.plot(x="timestep", y=["total_energy_pj"], ax=ax_perf)
+    perf_df["total_energy_uj"] = perf_df["total_energy"] * 1.0e6
+    perf_df.plot(x="timestep", y=["total_energy_uj"], ax=ax_perf)
     for i in range(num_inputs + 1):
         ax_perf.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
-    ax_perf.set_ylabel("Simulated Soma Energy (pJ)")
+    ax_perf.set_ylabel("Simulated Energy (uJ)")
     ax_perf.get_legend().remove()
 
     ax_perf.set_xlabel("Time-step")
