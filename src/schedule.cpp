@@ -62,8 +62,7 @@ void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
     }
 }
 
-void sanafe::schedule_messages_simple(
-        TimestepHandle &ts, Scheduler &scheduler)
+void sanafe::schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler)
 {
     // Simple analytical model, that takes the maximum of either neuron or
     //  message processing for each core, and takes the maximum latency of
@@ -181,7 +180,8 @@ void sanafe::schedule_create_threads(
 
 // **** Detailed scheduler implementation ****
 
-void sanafe::schedule_messages_detailed(TimestepHandle &ts, Scheduler &scheduler)
+void sanafe::schedule_messages_detailed(
+        TimestepHandle &ts, Scheduler &scheduler)
 {
     if (scheduler.scheduler_threads.empty())
     {
@@ -284,8 +284,8 @@ double sanafe::schedule_messages_timestep(
     return ts_data.sim_time;
 }
 
-std::vector<sanafe::MessageFifo>
-sanafe::schedule_init_message_queues(const Timestep &ts, NocInfo &noc)
+std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
+        const Timestep &ts, NocInfo &noc)
 {
     const size_t total_links = noc.noc_height_in_tiles *
             noc.noc_width_in_tiles *
@@ -588,7 +588,6 @@ double sanafe::NocInfo::calculate_route_congestion(const Message &m) const
     return flow_density;
 }
 
-
 std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
         const Message &m) noexcept
 {
@@ -597,7 +596,6 @@ std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
 
     return std::make_pair(x_increment, y_increment);
 }
-
 
 // **** Thread management ****
 // TODO: make this agnostic to scheduling algorithm, so it can be applied to

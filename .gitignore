@@ -33,3 +33,5 @@ build/
 CMakeFiles/
 Makefile
 compile_commands.json
+test_venv/
+*.so

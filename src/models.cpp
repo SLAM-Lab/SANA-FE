@@ -275,8 +275,8 @@ void sanafe::MultiTapModel1D::print_taps()
     }
 }
 
-void sanafe::MultiTapModel1D::input_current(const double current,
-        const std::optional<size_t> synapse_address)
+void sanafe::MultiTapModel1D::input_current(
+        const double current, const std::optional<size_t> synapse_address)
 {
     constexpr int default_tap = 0;
 

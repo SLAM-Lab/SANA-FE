@@ -54,7 +54,6 @@ void sanafe::PipelineUnit::check_implemented(
         INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
-
 }
 
 void sanafe::PipelineUnit::check_outputs(
@@ -176,8 +175,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         {
             if (!key_exists(metric))
             {
-                const std::string error =
-                        "Metric not defined: " + metric;
+                const std::string error = "Metric not defined: " + metric;
                 INFO("Error: %s\n", error.c_str());
                 throw std::invalid_argument(error);
             }
@@ -203,8 +201,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         {
             if (!key_exists(metric))
             {
-                const std::string error =
-                        "Missing metric: " + metric;
+                const std::string error = "Missing metric: " + metric;
                 INFO("Error: %s\n", error.c_str());
                 throw std::invalid_argument(error);
             }
