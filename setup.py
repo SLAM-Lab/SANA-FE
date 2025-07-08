@@ -49,10 +49,11 @@ class CMakeBuild(build_ext):
                       "-DPYTHON_INCLUDE_DIRS=" + sysconfig.get_path('include'),
                       "-DSTANDALONE_BUILD_ENABLED=OFF",
                       "-DPYTHON_BUILD_ENABLED=ON",
-                      "-DPYTHON_FROM_SETUP=ON"]
+                      "-DPYTHON_FROM_SETUP=ON",
+                      "-DBUILD_WHEEL=ON"]
         print(f"CMake Arguments: {cmake_args}")
         cfg = "Debug" if self.debug else "Release"
-        build_args = ["--config", cfg]
+        build_args = ["--config", cfg, "-j 10"]
 
         if platform.system() == "Windows":
             cmake_args += [f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"]
