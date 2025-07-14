@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.22)
+project(sanafe_tests LANGUAGES CXX)
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -7,20 +10,19 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-add_executable(
-    sanafe_tests
+enable_testing()
+
+set(SANAFE_SRC
+    ../src/models.cpp
+    ../src/pipeline.cpp
     tests.cpp
 )
 
-target_link_libraries(
-    sanafe_tests
-    GTest::gtest_main
-)
+add_executable(sanafe_tests ${SANAFE_SRC})
 
-target_link_libraries(
-    sanafe_tests
-    sanafe
-)
+target_include_directories(sanafe_tests PRIVATE ../src)
+
+target_link_libraries(sanafe_tests PRIVATE GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(sanafe_tests)
