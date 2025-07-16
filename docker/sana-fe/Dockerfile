@@ -7,9 +7,7 @@ RUN apt-get update && apt-get install -y python3 python3-pip python3-dev make gc
     git flex bison cmake pybind11-dev && \
     apt-get clean
 
-RUN mkdir build && \
-    cd build && \
-    cmake -DPYTHON_BUILD_ENABLED=OFF -DSTANDALONE_BUILD_ENABLED=ON .. && \
-    make
+RUN cmake -DPYTHON_BUILD_ENABLED=OFF -DSTANDALONE_BUILD_ENABLED=ON -S . -B build && \
+    cmake --build build -j 10
 
 ENTRYPOINT [ "/opt/app/build/sim" ]

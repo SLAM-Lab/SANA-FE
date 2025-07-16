@@ -1,6 +1,3 @@
-cmake_minimum_required(VERSION 3.22)
-project(sanafe_tests LANGUAGES CXX)
-
 include(FetchContent)
 
 FetchContent_Declare(
@@ -10,19 +7,27 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-enable_testing()
+# add unit_tests directory to the gtest suite
+# MAKE SURE TO SET UP CMakeLists.txt IN ANY DIRECTORY YOU WANT TO ADD TO THE TEST SUITE
+# you can follow the template in tests/unit_tests/CMakeLists.txt
+add_subdirectory(unit_tests)
 
-set(SANAFE_SRC
-    ../src/models.cpp
-    ../src/pipeline.cpp
-    tests.cpp
-)
+# # don't worry about this
+# file(GLOB TEST_SOURCES
+#     "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp"
+# )
 
-add_executable(sanafe_tests ${SANAFE_SRC})
+# add_executable(sanafe_tests ${TEST_SOURCES})
 
-target_include_directories(sanafe_tests PRIVATE ../src)
+# target_link_libraries(
+#     sanafe_tests
+#     GTest::gtest_main
+# )
 
-target_link_libraries(sanafe_tests PRIVATE GTest::gtest_main)
+# target_link_libraries(
+#     sanafe_tests
+#     sanafe
+# )
 
-include(GoogleTest)
-gtest_discover_tests(sanafe_tests)
+# include(GoogleTest)
+# gtest_discover_tests(sanafe_tests)

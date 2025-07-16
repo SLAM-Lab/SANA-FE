@@ -1,70 +1,16 @@
-// Copyright (c) 2025 - The University of Texas at Austin
-//  This work was produced under contract #2317831 to National Technology and
-//  Engineering Solutions of Sandia, LLC which is under contract
-//  No. DE-NA0003525 with the U.S. Department of Energy.
-// main.cpp - Command line interface
-// Performance simulation of neuromorphic architectures
+#include "arg_parsing.hpp"
+
 #include <algorithm>
-#include <cstdint>
-#include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <exception>
-#include <filesystem> // For std::filesystem::path
+#include <iostream>
 #include <stdexcept>
-#include <string>
-#include <string_view>
-#include <vector>
 
 #if HAVE_OPENMP
 #include <omp.h>
 #endif
-#include <booksim_lib.hpp>
 
-#include "arch.hpp"
-#include "chip.hpp"
-#include "network.hpp"
-#include "print.hpp"
-#include "yaml_common.hpp"
-
-#include "arg_parsing.hpp"
-/*
-namespace // anonymous to keep members private
-{
-
-struct OptionalProgramFlags
-{
-    std::filesystem::path output_dir{std::filesystem::current_path()};
-    bool record_spikes{false};
-    bool record_potentials{false};
-    bool record_perf{false};
-    bool record_messages{false};
-    bool use_netlist_format{false};
-    int total_args_parsed{0};
-    int total_threads_available{1}; // NOLINT(misc-const-correctness)
-    int processing_threads{1};
-    int scheduler_threads{0};
-    // Select the timing model on the command line. The default is the
-    //  detailed build-in timing model (using a scheduler). Select only one of
-    //  these two flags to enable either the simple analytical timing model or
-    //  an external cycle-accurate timing model (Booksim2).
-    sanafe::TimingModel timing_model = sanafe::timing_model_detailed;
-};
-
-struct RequiredProgramArgs
-{
-    enum ArgIdx : uint8_t
-    {
-        // Ignoring optional flags
-        arch_filename_idx = 0,
-        network_filename_idx = 1,
-        timesteps_to_execute_idx = 2,
-        program_nargs = 3,
-    };
-    std::string arch_filename;
-    std::string network_filename;
-    long int timesteps_to_execute{0L};
-};
+namespace {
 
 std::string_view get_next_arg(
         const std::vector<std::string> &args, const size_t current_idx)
@@ -154,6 +100,8 @@ int parse_flag(const std::vector<std::string> args, const size_t current_idx,
 
     return args_consumed;
 }
+
+} // anonymous namespace
 
 OptionalProgramFlags parse_command_line_flags(
         const std::vector<std::string> &args)
@@ -249,83 +197,3 @@ std::vector<std::string> program_args_to_vector(
 
     return args;
 }
-
-}
-*/
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,readability-function-size)
-int main(int argc, const char *argv[])
-{
-    const std::vector<std::string> arg_vec = program_args_to_vector(argc, argv);
-    const OptionalProgramFlags optional_flags =
-            parse_command_line_flags(arg_vec);
-    argc -= optional_flags.total_args_parsed;
-    if (argc < RequiredProgramArgs::program_nargs)
-    {
-        INFO("Usage: ./sim [-psvmo] <arch description> <network description> "
-             "<timesteps>\n");
-        return 0;
-    }
-
-    // Read in program args, sanity check and parse inputs
-    try
-    {
-#ifndef GIT_COMMIT
-#define GIT_COMMIT "git-hash-unknown"
-#endif
-        INFO("Running SANA-FE simulation (build:%s)\n", GIT_COMMIT);
-        booksim_init();
-
-        const RequiredProgramArgs required_args =
-                parse_required_args(arg_vec, optional_flags.total_args_parsed);
-        sanafe::Architecture arch =
-                sanafe::load_arch(required_args.arch_filename);
-        INFO("Architecture initialized.\n");
-        const sanafe::SpikingNetwork net =
-                sanafe::load_net(required_args.network_filename, arch,
-                        optional_flags.use_netlist_format);
-        INFO("Network initialized.\n");
-
-        sanafe::SpikingChip hw(arch);
-        hw.load(net);
-
-        INFO("Running simulation.\n");
-        const sanafe::RunData run_summary = hw.sim(
-                required_args.timesteps_to_execute, optional_flags.timing_model,
-                optional_flags.scheduler_threads, optional_flags.record_spikes,
-                optional_flags.record_potentials, optional_flags.record_perf,
-                optional_flags.record_messages, optional_flags.output_dir);
-
-        INFO("Closing Booksim2 library\n");
-        booksim_close();
-
-        INFO("***** Run Summary *****\n");
-        hw.sim_output_run_summary(optional_flags.output_dir, run_summary);
-        [[maybe_unused]] const double average_power = hw.get_power();
-        INFO("Average power consumption: %f W.\n", average_power);
-        INFO("Run finished.\n");
-
-        return 0;
-    }
-    catch (const sanafe::YamlDescriptionParsingError &exc)
-    {
-        INFO("%s", exc.what());
-        return 1;
-    }
-    catch (const std::runtime_error &exc)
-    {
-        INFO("Error: runtime exception thrown: %s\n", exc.what());
-        return 1;
-    }
-    catch (const std::invalid_argument &exc)
-    {
-        INFO("Error: invalid argument thrown: %s\n", exc.what());
-        return 1;
-    }
-}
-
-// Project TODOs and wishlist roughly in priority order
-//
-// ** New simulator features **
-// TODO: Add support for Fugu and Lava frameworks as extra (optional) Python
-//  dependencies
