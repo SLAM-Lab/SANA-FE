@@ -1,35 +1,41 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -e                                     
 
-SRC_DIR=$(realpath ../src)
-ROOT_DIR=$(realpath ..)
-BUILD_DIR=build
+ROOT_DIR=$(realpath ..)   # SANA-FE               
+SRC_DIR="$ROOT_DIR/src"
+BUILD_DIR="$PWD/build"                     
 COVERAGE_FILE=coverage.html
 
-# Clean previous builds
-rm -rf $BUILD_DIR
-mkdir -p $BUILD_DIR
-cd $BUILD_DIR
+rm -rf  "$BUILD_DIR"
+mkdir  -p "$BUILD_DIR"
 
-# CMake configuration with coverage flags
-echo "Configuring build with coverage flags..."
-cmake -DCMAKE_BUILD_TYPE=Debug \
+cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
+      -DCMAKE_BUILD_TYPE=Debug \
       -DCMAKE_CXX_FLAGS="--coverage -g -O0" \
-      ..
+      -DENABLE_TESTING=ON
 
-# Build the project
+# Portable build
 echo "Building project..."
-make -j$(nproc)
+cmake --build "$BUILD_DIR" -j"$(nproc)"  
 
-# Run tests
-echo "Running tests..."
-ctest --output-on-failure
+# Temporarily ignore failures
+set +e                          
+CTEST_OUTPUT_ON_FAILURE=1 ctest --test-dir "$BUILD_DIR"
+TEST_RC=$?
+set -e   
 
-# Generate HTML coverage report
-gcovr -r "$ROOT_DIR" --filter "$SRC_DIR/.*" --html --html-details -o coverage.html
+if ((TEST_RC != 0)); then
+  echo
+  echo "Some tests failed ($TEST_RC)."
+fi
 
-# Terminal summary
+# Gcovr report
+echo "Generating coverage report..."
+gcovr -r "$ROOT_DIR" --filter "$SRC_DIR/.*" \
+      --html --html-details -o "$BUILD_DIR/$COVERAGE_FILE"
 gcovr -r "$ROOT_DIR" --filter "$SRC_DIR/.*" --txt
 
-echo ""
+echo
 echo "Coverage report saved to: $BUILD_DIR/$COVERAGE_FILE"
+
+exit "$TEST_RC"
