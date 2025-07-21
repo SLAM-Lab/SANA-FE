@@ -4,8 +4,6 @@ release/
 etc/
 dist/
 sanafe.egg-info/
-tutorial/dvs_challenge.net
-tutorial/loihi.yaml
 *.swp
 *.yaml
 *.png
@@ -35,3 +33,4 @@ Makefile
 compile_commands.json
 test_venv/
 *.so
+logs/*
