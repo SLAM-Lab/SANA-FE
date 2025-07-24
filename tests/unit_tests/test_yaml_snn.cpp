@@ -2,11 +2,10 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
-#include "arg_parsing.hpp"
 #include "arch.hpp"
 #include "yaml_common.hpp"
-#include "yaml_arch.hpp"
 #include "yaml_snn.hpp"
+#include "network.hpp"
 
 // any helper functions go here
 namespace {
@@ -47,7 +46,57 @@ TEST(YamlSnnTest, CountNeurons_WithRangesAndSingles) {
     EXPECT_EQ(count, 3 + 1 + 3);  // 0,1,2 + 5 + 10,11,12
 }
 
-TEST(YamlSnnTest, CountNeurons_Empty)
-{
+TEST(YamlSnnTest, CountNeurons_InvalidFormatThrows) {
+    const std::string yaml = R"(
+invalid: stuff
+)";
+    // NOLINTBEGIN(misc-include-cleaner)
+    ryml::EventHandlerTree event_handler = {};
+    // Enable location tracking for helpful error prints
+    ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    auto tree = parse_yaml_snippet(yaml, parser);
+    auto node = tree.rootref();
+    EXPECT_THROW(sanafe::description_count_neurons(parser, node), sanafe::YamlDescriptionParsingError);
+}
 
+TEST(YamlSnnTest, ParseFullNetworkSection) {
+    const std::string yaml = R"(
+  name: example
+  groups:
+    - name: Input
+      neurons:
+        - 0..1
+    - name: Output
+      neurons:
+        - 0..1
+  edges:
+    - Input.0 -> Output.0: [weight: -1.0]
+    - Input.1 -> Output.1: [weight: -2.0]
+)";
+    // NOLINTBEGIN(misc-include-cleaner)
+    ryml::EventHandlerTree event_handler = {};
+    // Enable location tracking for helpful error prints
+    ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    auto tree = parse_yaml_snippet(yaml, parser);
+    auto node = tree.rootref();
+
+    sanafe::SpikingNetwork net = sanafe::yaml_parse_network_section(parser, node);
+    ASSERT_EQ(net.groups.size(), 2);
+    ASSERT_TRUE(net.groups.find("Input") != net.groups.end());
+    ASSERT_TRUE(net.groups.find("Output") != net.groups.end());
+
+    EXPECT_EQ(net.groups.at("Input").neurons.size(), 2);
+    EXPECT_EQ(net.groups.at("Output").neurons.size(), 2);
+
+    const auto& input0 = net.groups.at("Input").neurons[0];
+    const auto& input1 = net.groups.at("Input").neurons[1];
+
+    ASSERT_EQ(input0.edges_out.size(), 1);
+    ASSERT_EQ(input1.edges_out.size(), 1);
+
+    EXPECT_EQ(input0.edges_out[0].post_neuron.group_name, "Output");
+    EXPECT_EQ(input1.edges_out[0].post_neuron.group_name, "Output");
+
+    EXPECT_EQ(input0.edges_out[0].post_neuron.neuron_offset, 0);
+    EXPECT_EQ(input1.edges_out[0].post_neuron.neuron_offset, 1);
 }
