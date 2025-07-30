@@ -1164,7 +1164,6 @@ double sanafe::SpikingChip::sim_calculate_tile_energy(Timestep &ts, Tile &tile)
 double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
 {
     double axon_in_energy{0.0};
-    double axon_out_energy{0.0};
     for (const auto &axon : core.axon_in_hw)
     {
         axon_in_energy = static_cast<double>(axon.spike_messages_in) *
@@ -1173,7 +1172,6 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
                 axon.energy_spike_message);
     }
     ts.network_energy += axon_in_energy;
-    ts.network_energy += axon_out_energy;
 
     double pipeline_energy{0.0};
     for (auto &pipeline_unit : core.pipeline_hw)
@@ -1197,12 +1195,14 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
         }
     }
 
+    double axon_out_energy{0.0};
     for (const auto &axon : core.axon_out_hw)
     {
         axon_out_energy = axon.energy;
         TRACE1(CHIP, "packets: %ld, energy per packet:%e\n", axon.packets_out,
                 axon.energy_access);
     }
+    ts.network_energy += axon_out_energy;
 
     core.energy = axon_in_energy;
     core.energy += pipeline_energy;
