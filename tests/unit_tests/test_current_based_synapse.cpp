@@ -55,3 +55,14 @@ TEST_F(TestCurrentBasedSynapseModel, MultipleWeightsMaintainValues) {
     auto result2 = model.update(2, true);
     ASSERT_TRUE(result2.current.has_value());
 }
+
+TEST_F(TestCurrentBasedSynapseModel, TestReset) {
+    model.set_attribute_edge(0, "weight", make_attr_double(1.23));
+    model.set_attribute_edge(1, "w", make_attr_double(4.56));
+
+    EXPECT_NO_THROW(model.reset());
+
+    auto result = model.update(0, true);
+    ASSERT_TRUE(result.current.has_value());
+    EXPECT_DOUBLE_EQ(result.current.value(), 1.23);
+}

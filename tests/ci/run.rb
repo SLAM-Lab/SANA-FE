@@ -15,10 +15,9 @@ puts "Running SANA-FE CI for commit #{commit_hash}"
 puts "Logs will be saved to #{log_dir}/"
 puts "-------------------------------"
 
-build_status = system("ruby ci/check_build.rb")    
-format_status = system("ruby ci/check_format.rb")   
-tidy_status = system("ruby ci/check_tidy.rb")       
-cppcheck_status = system("ruby ci/check_cppcheck.rb")
-#TODO: Optional coverity integration
-dynamic_status = system("ruby ci/check_dynamic.rb")
-perf_status = system("ruby ci/check_perf.rb")
+build_status = system("ruby tests/ci/check_build.rb")    
+format_status = system("ruby tests/ci/check_format.rb")   
+tidy_status = system("ruby tests/ci/check_tidy.rb")       
+cppcheck_status = system("ruby tests/ci/check_cppcheck.rb")
+dynamic_status = system("ruby tests/ci/check_dynamic.rb")
+perf_status = system("ruby tests/ci/check_perf.rb")
