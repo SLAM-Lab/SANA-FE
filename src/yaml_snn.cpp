@@ -937,7 +937,7 @@ void sanafe::yaml_write_network(
     const bool file_empty =
             (previous_content.peek() == std::ifstream::traits_type::eof());
 
-    if (!(!previous_content.is_open() || file_empty))
+    if (previous_content.is_open() && !file_empty)
     {
         // Read existing YAML content
         const std::string existing_content(

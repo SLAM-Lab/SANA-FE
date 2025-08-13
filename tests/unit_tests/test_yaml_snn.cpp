@@ -161,10 +161,7 @@ TEST(YamlSnnTest, WriteEdgeFormat) {
 }
 
 TEST(YamlSnnTest, SerializeNetworkToYaml) {
-    std::filesystem::path path = std::filesystem::current_path();
-    while (path.filename() != "SANA-FE") {
-        path = path.parent_path();
-    }
+    std::filesystem::path path(SANAFE_ROOT_PATH);
     // FAIL() << "Current path: " << path.string() + "/arch/example.yaml";
     sanafe::Architecture arch = sanafe::load_arch(path.string() + "/arch/example.yaml");
     sanafe::SpikingNetwork net = sanafe::load_net(path.string() + "/snn/example.yaml", arch);

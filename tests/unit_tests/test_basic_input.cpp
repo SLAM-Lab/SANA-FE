@@ -54,10 +54,7 @@ TEST(BasicInputTest, FileDoesNotExist)
 
 TEST(BasicInputTest, ValidFile)
 {
-    std::filesystem::path path = std::filesystem::current_path();
-    while (path.filename() != "SANA-FE") {
-        path = path.parent_path();
-    }
+    std::filesystem::path path(SANAFE_ROOT_PATH);
     // std::cout << "Current path: " << path.string() << std::endl;
     std::vector<std::string> args = {path.string() + "/arch/example.yaml", path.string() + "/snn/example.yaml", "100"};
     RequiredProgramArgs parsed_args = parse_required_args(args, 0);

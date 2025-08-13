@@ -15,6 +15,13 @@ target_link_libraries(
     sanafe
 )
 
+# Get the absolute path to the root project directory (SANA-FE)
+get_filename_component(SANAFE_ROOT "${CMAKE_SOURCE_DIR}" ABSOLUTE)
+
+target_compile_definitions(unit_tests PRIVATE
+    SANAFE_ROOT_PATH="${SANAFE_ROOT}"
+)
+
 include(GoogleTest)
 gtest_discover_tests(unit_tests
   PROPERTIES LABELS "dev;ci;unit_tests"
