@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
+#define private public
+#define protected public
 #include "models.hpp"
+#undef private
+#undef protected
 #include "attribute.hpp"
+#include <cstdlib>  
 
 using namespace sanafe;
 
@@ -73,7 +78,6 @@ TEST_F(TestTrueNorthModel, LeakTowardsZeroBothDirections) {
     model.set_attribute_neuron(0, "leak", make_attr_double(1.0));
     model.set_attribute_neuron(0, "leak_towards_zero", make_attr_bool(true));
 
-    // Positive potential case
     model.reset();
     model.update(0, 3.0); // apply current
     double pos_before = model.get_potential(0);
@@ -81,7 +85,6 @@ TEST_F(TestTrueNorthModel, LeakTowardsZeroBothDirections) {
     model.update(0, std::nullopt);
     EXPECT_LT(model.get_potential(0), pos_before);
 
-    // Negative potential case
     model.reset();
     model.set_attribute_neuron(0, "bias", make_attr_double(0.0)); // no bias now
     model.update(0, -3.0); // force negative potential
@@ -105,12 +108,10 @@ TEST_F(TestTrueNorthModel, ThresholdAndResetModes) {
     model.set_attribute_neuron(0, "threshold", make_attr_double(1.0));
     model.set_attribute_neuron(0, "reset", make_attr_double(0.0));
 
-    // Soft reset
     model.set_attribute_neuron(0, "reset_mode", make_attr_string("soft"));
     model.update(0, 2.0);
     EXPECT_GE(model.get_potential(0), 0.0);
 
-    // Saturate reset
     model.set_attribute_neuron(0, "reset_mode", make_attr_string("saturate"));
     model.update(0, 2.0);
     EXPECT_LE(model.get_potential(0), model.get_potential(0));
@@ -121,15 +122,12 @@ TEST_F(TestTrueNorthModel, ReverseResetModes) {
     model.set_attribute_neuron(0, "reverse_threshold", make_attr_double(0.0));
     model.set_attribute_neuron(0, "reverse_reset", make_attr_double(-2.0));
 
-    // Hard reverse reset
     model.set_attribute_neuron(0, "reverse_reset_mode", make_attr_string("hard"));
     model.update(0, -5.0);
 
-    // Soft reverse reset
     model.set_attribute_neuron(0, "reverse_reset_mode", make_attr_string("soft"));
     model.update(0, -5.0);
 
-    // Saturate reverse reset
     model.set_attribute_neuron(0, "reverse_reset_mode", make_attr_string("saturate"));
     model.update(0, -5.0);
 }
@@ -141,4 +139,16 @@ TEST_F(TestTrueNorthModel, RandomizedThresholdAffectsPotential) {
 
     model.update(0, 10.0);
     EXPECT_GE(model.get_potential(0), 0.0);
+}
+
+TEST_F(TestTrueNorthModel, RandomizeThresholdBranchExecutes) {
+    std::srand(1234);
+
+    model.neurons[0].random_range_mask = 0xFF;
+
+    model.set_attribute_neuron(0, "threshold", make_attr_double(1000.0));
+    model.reset();
+    (void) model.update(0, 0.0); 
+
+    SUCCEED();
 }

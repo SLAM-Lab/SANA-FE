@@ -10,10 +10,6 @@ if (NOT BUILD_WHEEL)
     set(BUILD_WHEEL OFF)
 endif()
 
-if (NOT BUILD_WHEEL)
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-endif()
-
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
 endif()
@@ -262,9 +258,6 @@ if(PYTHON_BUILD_ENABLED)
         ${SOURCE_FILES}
     )
 
-    set_target_properties(sanafecpp PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sanafe
-    )
     target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
     target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
     target_link_libraries(sanafecpp PUBLIC ryml::ryml)
@@ -322,6 +315,8 @@ if(ENABLE_TESTING)
     target_include_directories(sanafe PUBLIC
         ${CMAKE_SOURCE_DIR}/src
     )
+    target_compile_definitions(sanafe PRIVATE ENABLE_DEBUG_PRINTS)
+
     message(STATUS "Testing enabled")
     include(CTest)
     add_subdirectory(tests)

@@ -289,3 +289,29 @@ TEST(LoihiLifModelTest, NoiseEOFTriggersReset) {
         neuron.update(0, 1.0); // by 2nd or 3rd iteration, EOF will trigger reset
     }
 }
+
+TEST(LoihiLifModelTest, NoiseStreamNotOpenOnUpdateTriggersInfo) {
+    TestLoihiLifModel neuron;
+
+    try {
+        neuron.set_attribute_hw("noise", make_attr_string("definitely_missing_noise_file.txt"));
+        FAIL() << "set_attribute_hw should have thrown";
+    } catch (const std::runtime_error&) {
+    }
+
+    neuron.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
+    neuron.reset();
+    neuron.set_simulation_time(1);
+
+    EXPECT_THROW(neuron.update(0, 1.0), std::runtime_error);
+}
+
+TEST(LoihiLifModelTest, SetForceSomaUpdate) {
+    TestLoihiLifModel neuron;
+    EXPECT_NO_THROW(neuron.set_attribute_neuron(0, "force_soma_update", make_attr_bool(true)));
+
+    neuron.reset();
+    neuron.set_simulation_time(1);
+    auto result = neuron.update(0, std::nullopt);
+    EXPECT_EQ(result.status, NeuronStatus::updated);
+}
