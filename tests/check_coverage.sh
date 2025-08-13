@@ -12,7 +12,9 @@ mkdir  -p "$BUILD_DIR"
 cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
       -DCMAKE_BUILD_TYPE=Debug \
       -DCMAKE_CXX_FLAGS="--coverage -g -O0" \
-      -DENABLE_TESTING=ON
+      -DENABLE_TESTING=ON \
+      -DPYTHON_BUILD_ENABLED=OFF \
+      -DSTANDALONE_BUILD_ENABLED=OFF
 
 # Portable build
 echo "Building project..."

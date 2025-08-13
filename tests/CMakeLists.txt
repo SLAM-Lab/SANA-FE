@@ -11,23 +11,3 @@ FetchContent_MakeAvailable(googletest)
 # MAKE SURE TO SET UP CMakeLists.txt IN ANY DIRECTORY YOU WANT TO ADD TO THE TEST SUITE
 # you can follow the template in tests/unit_tests/CMakeLists.txt
 add_subdirectory(unit_tests)
-
-# # don't worry about this
-# file(GLOB TEST_SOURCES
-#     "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp"
-# )
-
-# add_executable(sanafe_tests ${TEST_SOURCES})
-
-# target_link_libraries(
-#     sanafe_tests
-#     GTest::gtest_main
-# )
-
-# target_link_libraries(
-#     sanafe_tests
-#     sanafe
-# )
-
-# include(GoogleTest)
-# gtest_discover_tests(sanafe_tests)

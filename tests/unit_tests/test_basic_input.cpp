@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
+#include <filesystem>
 #include "arg_parsing.hpp"
 
 // Testing valid argument parsing
@@ -53,7 +54,12 @@ TEST(BasicInputTest, FileDoesNotExist)
 
 TEST(BasicInputTest, ValidFile)
 {
-    std::vector<std::string> args = {"../../../tests/data/arch/test1.yaml", "../../../tests/data/snn/test1.yaml", "100"};
+    std::filesystem::path path = std::filesystem::current_path();
+    while (path.filename() != "SANA-FE") {
+        path = path.parent_path();
+    }
+    // std::cout << "Current path: " << path.string() << std::endl;
+    std::vector<std::string> args = {path.string() + "/arch/example.yaml", path.string() + "/snn/example.yaml", "100"};
     RequiredProgramArgs parsed_args = parse_required_args(args, 0);
     EXPECT_NO_THROW(sanafe::load_arch(parsed_args.arch_filename));
 }

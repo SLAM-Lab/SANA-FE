@@ -75,7 +75,7 @@ if leaks_found
   puts "[#{label}] Dynamic Tests: FAIL"
   exit 2
 else
-  puts "[#{label}] All tests passed successfully. Hooray!"
+  puts "[#{label}] All tests passed successfully with no memory leaks. Hooray!"
   puts "[#{label}] Dynamic Tests: PASS"
   exit 0
 end
