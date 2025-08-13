@@ -16,4 +16,6 @@ target_link_libraries(
 )
 
 include(GoogleTest)
-gtest_discover_tests(unit_tests PROPERTIES LABELS "unit_tests")
+gtest_discover_tests(unit_tests
+  PROPERTIES LABELS "dev;ci;unit_tests"
+)

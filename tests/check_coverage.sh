@@ -14,7 +14,8 @@ cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
       -DCMAKE_CXX_FLAGS="--coverage -g -O0" \
       -DENABLE_TESTING=ON \
       -DPYTHON_BUILD_ENABLED=OFF \
-      -DSTANDALONE_BUILD_ENABLED=OFF
+      -DSTANDALONE_BUILD_ENABLED=OFF \
+      -DDEBUG_LEVEL_MODELS=1
 
 # Portable build
 echo "Building project..."
@@ -22,7 +23,7 @@ cmake --build "$BUILD_DIR" -j"$(nproc)"
 
 # Temporarily ignore failures
 set +e                          
-CTEST_OUTPUT_ON_FAILURE=1 ctest --test-dir "$BUILD_DIR"
+CTEST_OUTPUT_ON_FAILURE=1 ctest --test-dir "$BUILD_DIR" -LE "ci|lint|static|dynamic|perf" -j"$(nproc)"
 TEST_RC=$?
 set -e   
 

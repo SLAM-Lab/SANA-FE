@@ -15,7 +15,7 @@ steps = 100000
 perf_output = `(/usr/bin/time -f "%e" #{sim_path} #{arch_file} #{snn_file} #{steps} > /dev/null) 2>&1`
 runtime = perf_output.to_f
 
-baseline_file = "ci/perf_baseline.txt"
+baseline_file = "tests/ci/perf_baseline.txt"
 commit_perf_file = "#{log_dir}/perf_runtime.txt"
 
 #first time 

@@ -38,30 +38,62 @@ def build_python(label:, build_dir:, log_file:)
 
   full_log_path = File.expand_path(log_file)
 
-  #create venv name
-  unique_id = ENV["SANAFE_CI_ID"]
-  venv_path = File.expand_path("#{File.dirname(log_file)}/venv")
+  venv_path   = File.expand_path("#{File.dirname(log_file)}/venv_#{label.downcase}")
   venv_python = File.join(venv_path, "bin", "python")
 
-  FileUtils.mkdir_p("venvs")
   unless system("python3 -m venv #{venv_path}")
     puts "[#{label}] Failed to create virtualenv at #{venv_path}"
     return false
   end
 
+  gcc   = ENV["GCC_PATH"]   || "/usr/bin/gcc"
+  clang = ENV["CLANG_PATH"] || "/usr/bin/clang"
+  cc    = (label == "GCC" ? gcc : clang)
+  cxx   = cc.sub(/gcc(\Z|$)/, "g++").sub(/clang(\Z|$)/, "clang++")
+
+  # GCC needs -lgomp; Clang needs -lomp
+  omp_lib_flag = (label == "Clang") ? "-lomp" : "-lgomp"
+  omp_flags    = "-fopenmp #{omp_lib_flag} -Wl,--no-as-needed"
+
   install_ok = false
-  import_ok = false
 
   File.open(full_log_path, "w") do |log|
+    log.sync = true
+
+    cmds = []
+    cmds << "#{venv_python} -m pip install --upgrade pip wheel setuptools"
+    cmds << "#{venv_python} -m pip install cmake ninja pybind11 scikit-build-core"
+
+    env_prefix = []
+    env_prefix << "CC=#{cc}"
+    env_prefix << "CXX=#{cxx}"
+    env_prefix << "CMAKE_BUILD_PARALLEL_LEVEL=8"
+
+    cmake_args = [
+      "-DCMAKE_C_COMPILER=#{cc}",
+      "-DCMAKE_CXX_COMPILER=#{cxx}",
+      "-DCMAKE_CXX_FLAGS=-fopenmp",
+      "-DCMAKE_EXE_LINKER_FLAGS=#{omp_flags}",
+      "-DCMAKE_SHARED_LINKER_FLAGS=#{omp_flags}",
+      "-DCMAKE_VERBOSE_MAKEFILE=ON"
+    ].join(" ")
+
+    # scikit-build-core's CMAKE_ARGS passthrough
+    env_prefix << "CMAKE_ARGS=\"#{cmake_args}\""
+
+    cmds << "#{env_prefix.join(' ')} #{venv_python} -m pip install --no-build-isolation --verbose .."
+
     Dir.chdir(build_dir) do
-      IO.popen("#{venv_python} -m pip install .. > /dev/null 2>&1") do |io|
-        io.each { |line| log.puts line }
+      cmds.each do |cmd|
+        log.puts("$ #{cmd}")
+        IO.popen(cmd + " 2>&1") { |io| io.each { |line| log.write(line) } }
+        break unless $?.success?
       end
       install_ok = $?.success?
     end
   end
 
-puts "[#{label}] Python build: #{install_ok ? 'PASS' : "FAIL (see #{log_file})"}"
+  puts "[#{label}] Python build: #{install_ok ? 'PASS' : "FAIL (see #{log_file})"}"
   install_ok
 end
 
