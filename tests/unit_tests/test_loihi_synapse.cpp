@@ -1,58 +1,65 @@
-#include <gtest/gtest.h>
-#include "models.hpp"
-#include "attribute.hpp"
-#include "network.hpp"
-#include "mapped.hpp"
-#include "core.hpp"
 #include "arch.hpp"
+#include "attribute.hpp"
 #include "chip.hpp"
+#include "core.hpp"
+#include "mapped.hpp"
+#include "models.hpp"
+#include "network.hpp"
+#include <gtest/gtest.h>
 
-using namespace sanafe;
+namespace
+{
 
-namespace {
-
-class TestLoihiSynapseModel : public ::testing::Test {
+class TestLoihiSynapseModel : public ::testing::Test
+{
 protected:
-    LoihiSynapseModel model;
+    sanafe::LoihiSynapseModel model;
 
-    ModelAttribute make_attr_double(double val) {
-        ModelAttribute attr;
+    sanafe::ModelAttribute make_attr_double(double val)
+    {
+        sanafe::ModelAttribute attr;
         attr.value = val;
         return attr;
     }
 
-    ModelAttribute make_attr_int(int val) {
-        ModelAttribute attr;
+    sanafe::ModelAttribute make_attr_int(int val)
+    {
+        sanafe::ModelAttribute attr;
         attr.value = val;
         return attr;
     }
 
-    ModelAttribute make_attr_bool(bool val) {
-        ModelAttribute attr;
+    sanafe::ModelAttribute make_attr_bool(bool val)
+    {
+        sanafe::ModelAttribute attr;
         attr.value = val;
         return attr;
     }
 
-    void set_weight(size_t idx, double val) {
+    void set_weight(size_t idx, double val)
+    {
         model.set_attribute_edge(idx, "weight", make_attr_double(val));
     }
 };
 }
 
-TEST_F(TestLoihiSynapseModel, WeightIsReturnedWhenReadIsTrue) {
+TEST_F(TestLoihiSynapseModel, WeightIsReturnedWhenReadIsTrue)
+{
     set_weight(0, 2.5);
     auto result = model.update(0, true);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 2.5);
 }
 
-TEST_F(TestLoihiSynapseModel, CurrentIsZeroWhenReadIsFalse) {
+TEST_F(TestLoihiSynapseModel, CurrentIsZeroWhenReadIsFalse)
+{
     set_weight(0, 3.3);
     auto result = model.update(0, false);
     EXPECT_FALSE(result.current.has_value());
 }
 
-TEST_F(TestLoihiSynapseModel, LatencyAttributeIsReturned) {
+TEST_F(TestLoihiSynapseModel, LatencyAttributeIsReturned)
+{
     model.set_attribute_edge(0, "latency", make_attr_double(4.0));
     set_weight(0, 1.0);
 
@@ -61,21 +68,24 @@ TEST_F(TestLoihiSynapseModel, LatencyAttributeIsReturned) {
     EXPECT_DOUBLE_EQ(result.latency.value(), 4.0);
 }
 
-TEST_F(TestLoihiSynapseModel, InvalidIndexDoesNotCrash) {
+TEST_F(TestLoihiSynapseModel, InvalidIndexDoesNotCrash)
+{
     EXPECT_NO_THROW({
         auto result = model.update(999, false);
         EXPECT_FALSE(result.current.has_value());
     });
 }
 
-TEST_F(TestLoihiSynapseModel, MixedSignModeCanBeSet) {
+TEST_F(TestLoihiSynapseModel, MixedSignModeCanBeSet)
+{
     EXPECT_NO_THROW({
         model.set_attribute_edge(0, "mixed", make_attr_bool(true));
         model.set_attribute_edge(1, "mixed", make_attr_bool(false));
     });
 }
 
-TEST_F(TestLoihiSynapseModel, ResetIsSafeAndSilent) {
+TEST_F(TestLoihiSynapseModel, ResetIsSafeAndSilent)
+{
     set_weight(0, 2.0);
     model.reset();
     auto result = model.update(0, true);
@@ -83,20 +93,21 @@ TEST_F(TestLoihiSynapseModel, ResetIsSafeAndSilent) {
     EXPECT_DOUBLE_EQ(result.current.value(), 2.0);
 }
 
-TEST_F(TestLoihiSynapseModel, GroupAttributeIsSetCorrectly) {
-    EXPECT_NO_THROW({
-        model.set_attribute_edge(0, "g", make_attr_int(5));
-    });
+TEST_F(TestLoihiSynapseModel, GroupAttributeIsSetCorrectly)
+{
+    EXPECT_NO_THROW({ model.set_attribute_edge(0, "g", make_attr_int(5)); });
 }
 
-TEST_F(TestLoihiSynapseModel, ReadSynapseWithLatencyFirstAccessThrows) {
+TEST_F(TestLoihiSynapseModel, ReadSynapseWithLatencyFirstAccessThrows)
+{
     set_weight(0, 1.0);
     model.set_attribute_hw("latency_concurrent_access", make_attr_double(2.0));
 
     EXPECT_THROW(model.update(0, true), std::out_of_range);
 }
 
-TEST_F(TestLoihiSynapseModel, ReadSynapseSubsequentAccessThrows) {
+TEST_F(TestLoihiSynapseModel, ReadSynapseSubsequentAccessThrows)
+{
     set_weight(0, 1.0);
     model.set_attribute_hw("latency_concurrent_access", make_attr_double(1.0));
 
@@ -104,7 +115,8 @@ TEST_F(TestLoihiSynapseModel, ReadSynapseSubsequentAccessThrows) {
     EXPECT_THROW(model.update(0, true), std::out_of_range); // second access
 }
 
-TEST_F(TestLoihiSynapseModel, ReadSynapseClearsConcurrentAccessesThrows) {
+TEST_F(TestLoihiSynapseModel, ReadSynapseClearsConcurrentAccessesThrows)
+{
     model.set_attribute_hw("latency_concurrent_access", make_attr_double(1.0));
 
     set_weight(0, 1.0);
@@ -114,8 +126,9 @@ TEST_F(TestLoihiSynapseModel, ReadSynapseClearsConcurrentAccessesThrows) {
     EXPECT_THROW(model.update(1, true), std::out_of_range);
 }
 
-TEST_F(TestLoihiSynapseModel, ConcurrentLatency_FirstThenSubsequent) {
-    LoihiSynapseModel m;
+TEST_F(TestLoihiSynapseModel, ConcurrentLatency_FirstThenSubsequent)
+{
+    sanafe::LoihiSynapseModel m;
     // Create mock recurrent connection
     m.track_connection(0, 42, -1);
 
@@ -124,7 +137,7 @@ TEST_F(TestLoihiSynapseModel, ConcurrentLatency_FirstThenSubsequent) {
     m.set_attribute_hw("latency_concurrent_access", make_attr_double(2.0));
     m.set_attribute_edge(0, "weight", make_attr_double(1.0));
 
-    auto r1 = m.update(0, /*read=*/true);  // first -> 3 * 2.0 = 6
+    auto r1 = m.update(0, /*read=*/true); // first -> 3 * 2.0 = 6
     ASSERT_TRUE(r1.latency.has_value());
     EXPECT_DOUBLE_EQ(r1.latency.value(), 6.0);
 
@@ -133,16 +146,17 @@ TEST_F(TestLoihiSynapseModel, ConcurrentLatency_FirstThenSubsequent) {
     EXPECT_DOUBLE_EQ(r2.latency.value(), 0.0);
 }
 
-TEST_F(TestLoihiSynapseModel, ConcurrentLatency_ClearsOnMaxParallel) {
-    LoihiSynapseModel m;
+TEST_F(TestLoihiSynapseModel, ConcurrentLatency_ClearsOnMaxParallel)
+{
+    sanafe::LoihiSynapseModel m;
     m.track_connection(0, 7, -1); // Same sender for all calls
 
     m.set_attribute_hw("latency_concurrent_access", make_attr_double(1.0));
     m.set_attribute_edge(0, "weight", make_attr_double(1.0));
 
-    auto a1 = m.update(0, true);  // first -> 3
-    (void)m.update(0, true); 
-    (void)m.update(0, true);    
+    auto a1 = m.update(0, true); // first -> 3
+    (void) m.update(0, true);
+    (void) m.update(0, true);
 
     // size() is now 3; next call triggers clear -> treated as first again
     auto a4 = m.update(0, true);
@@ -152,8 +166,9 @@ TEST_F(TestLoihiSynapseModel, ConcurrentLatency_ClearsOnMaxParallel) {
     EXPECT_DOUBLE_EQ(a4.latency.value(), 3.0);
 }
 
-TEST_F(TestLoihiSynapseModel, ConcurrentLatency_ClearsOnDifferentSender) {
-    LoihiSynapseModel m;
+TEST_F(TestLoihiSynapseModel, ConcurrentLatency_ClearsOnDifferentSender)
+{
+    sanafe::LoihiSynapseModel m;
 
     // Map both connections to the model
     m.track_connection(0, 100, -1);
@@ -173,8 +188,9 @@ TEST_F(TestLoihiSynapseModel, ConcurrentLatency_ClearsOnDifferentSender) {
     EXPECT_DOUBLE_EQ(b1.latency.value(), 6.0);
 }
 
-TEST_F(TestLoihiSynapseModel, UsesPerSynapseCostWhenNoConcurrentLatency) {
-    LoihiSynapseModel m;
+TEST_F(TestLoihiSynapseModel, UsesPerSynapseCostWhenNoConcurrentLatency)
+{
+    sanafe::LoihiSynapseModel m;
     m.set_attribute_edge(5, "weight", make_attr_double(1.0));
     m.set_attribute_edge(5, "latency", make_attr_double(4.5)); // costs[5] = 4.5
 
@@ -183,8 +199,9 @@ TEST_F(TestLoihiSynapseModel, UsesPerSynapseCostWhenNoConcurrentLatency) {
     EXPECT_DOUBLE_EQ(r.latency.value(), 4.5);
 }
 
-TEST_F(TestLoihiSynapseModel, CoversTrackConnection) {
-    LoihiSynapseModel model;
+TEST_F(TestLoihiSynapseModel, CoversTrackConnection)
+{
+    sanafe::LoihiSynapseModel model;
     model.set_attribute_edge(0, "weight", make_attr_double(1.0));
     model.set_attribute_hw("latency_concurrent_access", make_attr_double(1.0));
 
