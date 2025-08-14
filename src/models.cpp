@@ -343,8 +343,8 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
     }
     else if (attribute_name == "time_constants")
     {
+        const size_t n_taps = tap_voltages.size();
         time_constants = static_cast<std::vector<double>>(param);
-        const size_t n_taps = time_constants.size();
         if (time_constants.size() < n_taps)
         {
             const std::string error = "Error: Expected " +
@@ -362,8 +362,8 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
     }
     else if (attribute_name == "space_constants")
     {
+        const size_t n_taps = tap_voltages.size();
         space_constants = static_cast<std::vector<double>>(param);
-        const size_t n_taps = space_constants.size() + 1;
         if (space_constants.size() < (n_taps - 1))
         {
             const std::string error = "Error: Expected " +
