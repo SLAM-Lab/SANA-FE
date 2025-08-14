@@ -64,7 +64,7 @@ public:
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override;
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void reset() override;
-    void map_connection(MappedConnection &con) override;
+    void track_connection(size_t synapse_address, size_t src_neuron_id, size_t /*dest_neuron_id*/) override;
 
 private:
     static inline const std::set<std::string> loihi_synapse_attributes{

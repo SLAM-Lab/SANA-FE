@@ -83,7 +83,7 @@ public:
     {
         throw std::logic_error("Error: Soma input not implemented");
     }
-    virtual void map_connection(MappedConnection &con) {}
+    virtual void track_connection(size_t /*synapse_address*/, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) {}
     virtual double get_potential(size_t /*neuron_address*/)
     {
         return 0.0;
@@ -252,7 +252,7 @@ public:
         throw std::logic_error("Error: Soma H/W called with dendrite inputs");
     }
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) final {};
-    void map_connection(MappedConnection &con) final {};
+    void track_connection(size_t /*synapse_address*/, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) final {};
 };
 
 BufferPosition pipeline_parse_buffer_pos_str(

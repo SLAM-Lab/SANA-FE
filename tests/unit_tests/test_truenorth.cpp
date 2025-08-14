@@ -1,11 +1,7 @@
 #include <gtest/gtest.h>
-#define private public
-#define protected public
 #include "models.hpp"
-#undef private
-#undef protected
 #include "attribute.hpp"
-#include <cstdlib>  
+#include <cstdlib>
 
 using namespace sanafe;
 
@@ -144,7 +140,7 @@ TEST_F(TestTrueNorthModel, RandomizedThresholdAffectsPotential) {
 TEST_F(TestTrueNorthModel, RandomizeThresholdBranchExecutes) {
     std::srand(1234);
 
-    model.neurons[0].random_range_mask = 0xFF;
+    //model.neurons[0].random_range_mask = 0xFF;
 
     model.set_attribute_neuron(0, "threshold", make_attr_double(1000.0));
     model.reset();

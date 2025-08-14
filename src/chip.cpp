@@ -1259,19 +1259,21 @@ void sanafe::SpikingChip::sim_add_connection_to_axon(
             post_core.axons_out.size() - 1UL);
 
     // TODO: this is difficult because we don't want to duplicate all the stored
-    //  information about synapses twice. However, the connection info may be
-    //  useful to the synaptic model when creating the synapses. We can't really
-    //  store pointers to the connections because this array will grow as we map
-    //  connections and invalidate references.. we also have the challenge of
-    //  referencing synapses with a single address value.. what does this mean
-    //  with multiple synapse hw elements. unless maybe we leave the lines below
-    //  here and go back to pointers again.
+    //  information about synapses twice. However, some of the connection info
+    //  may be useful to the synaptic model when creating the synapses. We can't
+    //  really store pointers to the connections because this array will grow as
+    //  we map connections and invalidate references.. we also have the
+    //  challenge of referencing synapses with a single address value.. what
+    //  does this mean with multiple synapse hw elements.
     //
     // TODO: these 3 lines should be moved to where we map the connection to h/w
     //  I think
     post_core.connections_in.push_back(&con);
     con.synapse_address = post_core.connections_in.size() - 1;
-    con.synapse_hw->map_connection(con);
+    MappedNeuron &pre_neuron = con.pre_neuron_ref.get();
+    MappedNeuron &post_neuron = con.post_neuron_ref.get();
+    con.synapse_hw->track_connection(
+            con.synapse_address, pre_neuron.id, post_neuron.id);
 
     // Access the most recently created axon in for the post-synaptic core
     AxonInModel &last_added_target_axon = post_core.axons_in.back();

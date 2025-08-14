@@ -188,12 +188,10 @@ void sanafe::LoihiSynapseModel::set_attribute_edge(const size_t synapse_address,
     min_synaptic_resolution = (1.0 / weight_bits);
 }
 
-void sanafe::LoihiSynapseModel::map_connection(MappedConnection &con)
+void sanafe::LoihiSynapseModel::track_connection(const size_t synapse_address,
+        const size_t src_neuron_id, const size_t /*dest_neuron_id*/)
 {
-    const size_t synapse_address = con.synapse_address;
-    // Get unique identifier for spiking neuron
-    const MappedNeuron &pre_neuron = con.pre_neuron_ref;
-    synapse_to_pre_neuron[synapse_address] = pre_neuron.id;
+    synapse_to_pre_neuron[synapse_address] = src_neuron_id;
 }
 
 // *** Dendrite models ***
@@ -722,6 +720,16 @@ void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,
     else if (attribute_name == "leak_towards_zero")
     {
         n.leak_towards_zero = static_cast<bool>(param);
+    }
+    else if (attribute_name == "random_mask")
+    {
+        const int mask_signed = static_cast<int>(param);
+        if (mask_signed < 0)
+        {
+            INFO("Error: random_mask < 0; must be unsigned.");
+            throw std::invalid_argument("random_mask < 0; must be unsigned.");
+        }
+        n.random_range_mask = static_cast<unsigned int>(mask_signed);
     }
 }
 

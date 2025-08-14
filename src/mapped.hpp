@@ -75,6 +75,7 @@ public:
     ~MappedNeuron() = default;
     MappedNeuron& operator=(const MappedNeuron& other) = default;
     MappedNeuron(MappedNeuron&& other) = default;
+
     MappedNeuron& operator=(MappedNeuron&& other) = default;
     void set_model_attributes(const std::map<std::string, ModelAttribute> &model_attributes) const;
 
