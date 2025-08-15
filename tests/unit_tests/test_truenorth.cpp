@@ -27,6 +27,10 @@ protected:
         attr.value = val;
         return attr;
     }
+
+    ModelAttribute make_attr_int(int val) {
+    ModelAttribute attr; attr.value = val; return attr;
+    }
 };
 }
 
@@ -137,14 +141,21 @@ TEST_F(TestTrueNorthModel, RandomizedThresholdAffectsPotential) {
     EXPECT_GE(model.get_potential(0), 0.0);
 }
 
-TEST_F(TestTrueNorthModel, RandomizeThresholdBranchExecutes) {
-    std::srand(1234);
+TEST_F(TestTrueNorthModel, RandomMaskNegativeThrows) {
+    EXPECT_THROW(
+        model.set_attribute_neuron(0, "random_mask", make_attr_int(-1)),
+        std::invalid_argument
+    );
+}
 
-    //model.neurons[0].random_range_mask = 0xFF;
+TEST_F(TestTrueNorthModel, RandomMaskEnablesRandomizedThreshold) {
+    std::srand(1); 
 
-    model.set_attribute_neuron(0, "threshold", make_attr_double(1000.0));
-    model.reset();
-    (void) model.update(0, 0.0); 
+    model.set_attribute_neuron(0, "threshold", make_attr_double(1.0));
+    model.set_attribute_neuron(0, "reset_mode", make_attr_string("hard"));
+    model.set_attribute_neuron(0, "reset", make_attr_double(0.0));
+    model.set_attribute_neuron(0, "random_mask", make_attr_int(0xFF));
 
-    SUCCEED();
+    auto r = model.update(0, std::nullopt); 
+    EXPECT_EQ(r.status, sanafe::fired);     
 }

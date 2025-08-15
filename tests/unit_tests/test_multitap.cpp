@@ -164,3 +164,19 @@ TEST_F(TestMultiTapModel1D, ReduceNumberOfTapsTriggersWarningPath) {
     attr_small.value = static_cast<int>(2);
     EXPECT_NO_THROW(model.set_attribute_neuron(0, "taps", attr_small));
 }
+
+TEST_F(TestMultiTapModel1D, TimeConstantsTooFewThrows) {
+    model.set_attribute_neuron(0, "taps", make_attr_int(3));
+    EXPECT_THROW(
+        model.set_attribute_neuron(0, "time_constants", make_attr_vec({0.9, 0.8})),
+        std::invalid_argument
+    );
+}
+
+TEST_F(TestMultiTapModel1D, SpaceConstantsTooFewThrows) {
+    model.set_attribute_neuron(0, "taps", make_attr_int(3));
+    EXPECT_THROW(
+        model.set_attribute_neuron(0, "space_constants", make_attr_vec({0.5})),
+        std::invalid_argument
+    );
+}
