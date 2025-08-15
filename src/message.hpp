@@ -27,6 +27,7 @@ struct Message
     double sent_timestamp{-std::numeric_limits<double>::infinity()};
     double received_timestamp{-std::numeric_limits<double>::infinity()};
     double processed_timestamp{-std::numeric_limits<double>::infinity()};
+    double messages_along_route{0.0};
     long int timestep;
     long int mid;
     size_t spikes{0UL};

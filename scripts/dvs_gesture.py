@@ -158,7 +158,6 @@ if __name__ == "__main__":
         arch = sanafe.load_arch(ARCH_PATH)
         net = sanafe.load_net(GENERATED_NETWORK_PATH, arch,
                               use_netlist_format=True)
-        #chip = sanafe.SpikingChip(arch, record_perf=True)
         chip = sanafe.SpikingChip(arch)
         chip.load(net)
 
@@ -173,7 +172,7 @@ if __name__ == "__main__":
                 mapped_neuron.set_model_attributes(
                     model_attributes={"bias": dvs_inputs[id]})
             is_first_frame = (frame == 0)
-            chip.sim(timesteps, perf_trace="perf.csv",
+            chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",
                      write_trace_headers=is_first_frame)
             chip.reset()
 
@@ -305,7 +304,7 @@ if __name__ == "__main__":
 
             #plt.plot(np.arange(1, timesteps-1), event_based_times[1:(timesteps-1)] * 1.0e6, ":k")
             plt.plot(np.arange(1, timesteps-1), cycle_based_times[0:(timesteps-2)] * 1.0e6, ":r")
-            plt.legend(("Measured on Loihi", "SANA-FE predictions", "Event-based predictions"),
+            plt.legend(("Measured on Loihi", "SANA-FE predictions", "Cycle-accurate predictions"),
                        fontsize=6)
             plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")

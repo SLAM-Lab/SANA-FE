@@ -1512,7 +1512,8 @@ void sanafe::SpikingChip::sim_trace_write_message_header(
     message_trace_file << "processing_delay,";
     message_trace_file << "network_delay,";
     message_trace_file << "blocking_delay,";
-    message_trace_file << "min_hop_delay\n";
+    message_trace_file << "min_hop_delay,";
+    message_trace_file << "messages_along_route\n";
     message_trace_file.flush();
 }
 
@@ -1622,7 +1623,9 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.receive_delay << ",";
     message_trace_file << m.network_delay << ",";
     message_trace_file << m.blocked_delay << ",";
-    message_trace_file << m.min_hop_delay << "\n";
+    message_trace_file << m.min_hop_delay << ",";
+    message_trace_file << m.messages_along_route;
+    message_trace_file << "\n";
     message_trace_file.flush();
 }
 
