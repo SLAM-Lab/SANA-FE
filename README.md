@@ -16,17 +16,24 @@ neuromorphic hardware.
 
 We hope that you find this project useful. If you use SANA-FE in your work,
 please cite our paper:
-J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
-"SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
-in IEEE Transactions on Computer-Aided Design of Integrated Circuits and
-Systems, doi: 10.1109/TCAD.2025.3537971.
 
-    @article{boyle2025sanafe,
-      title={SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration},
-      author={Boyle, James A and Plagge, Mark and Cardwell, Suma George and Chance, Frances S and Gerstlauer, Andreas},
-      journal={IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems},
-      year={2025},
-    }
+James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
+"SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration," in
+IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, 2025,
+[doi:10.1109/TCAD.2025.3537971](https://doi.org/10.1109/TCAD.2025.3537971).
+
+```bibtex
+@article{boyle2025sanafe,
+  title={SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration},
+  author={James A. Boyle and Mark Plagge and Suma George Cardwell and Frances S. Chance and Andreas Gerstlauer},
+  journal={IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems},
+  volume={44},
+  number={8},
+  pages={3165--3178},
+  year={2025},
+  doi={10.1109/TCAD.2025.3537971}
+}
+```
 
 # To Build
 
@@ -359,22 +366,24 @@ C++ code has been written using the C++17 standard.
 
 # References
 
-J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
+James A. Boyle, Jason Ho, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
+"Exploring Dendrites in Large-Scale Neuromorphic Architectures,"
+in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA,
+[doi:](https://doi.org/).
+
+James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
-in IEEE Transactions on Computer-Aided Design of Integrated Circuits and
-Systems, 2025,
+in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, 2025,
 [doi:10.1109/TCAD.2025.3537971](https://doi.org/10.1109/TCAD.2025.3537971).
 
-J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
-"Tutorial: Large-Scale Spiking Neuromorphic Architecture Exploration using
-SANA-FE," in 2024 International Conference on Hardware/Software Codesign and
-System Synthesis (CODES+ISSS), Raleigh, NC, USA,
+James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
+"Tutorial: Large-Scale Spiking Neuromorphic Architecture Exploration using SANA-FE,"
+in International Conference on Hardware/Software Codesign and System Synthesis (CODES+ISSS), Raleigh, NC, USA,
 [doi:10.1109/CODES-ISSS60120.2024.00007](https://doi.org/10.1109/CODES-ISSS60120.2024.00007).
 
-J. A. Boyle, M. Plagge, S. G. Cardwell, F. S. Chance and A. Gerstlauer,
-"Performance and Energy Simulation of Spiking Neuromorphic Architectures for
-Fast Exploration," in 2023 International Conference on Neuromorphic Systems
-(ICONS), Santa Fe, NM, USA,
+James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
+"Performance and Energy Simulation of Spiking Neuromorphic Architectures for Fast Exploration,"
+in International Conference on Neuromorphic Systems (ICONS), Santa Fe, NM, USA,
 [doi:10.1145/3589737.3605970](https://doi.org/10.1145/3589737.3605970).
 
 # Contact

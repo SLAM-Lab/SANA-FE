@@ -84,7 +84,8 @@ Indices and tables
 Citation
 ========
 
-If you use SANA-FE in your work, please cite:
+We hope that you find this project useful. If you use SANA-FE in your work,
+please cite our paper:
 
 .. code-block:: bibtex
 
@@ -100,6 +101,11 @@ If you use SANA-FE in your work, please cite:
 References
 ==========
 
+James A. Boyle, Jason Ho, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
+"Exploring Dendrites in Large-Scale Neuromorphic Architectures,"
+in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA,
+`doi: <https://doi.org/>`_.
+
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
 in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, 2025,
@@ -107,13 +113,14 @@ in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Tutorial: Large-Scale Spiking Neuromorphic Architecture Exploration using SANA-FE,"
-in 2024 International Conference on Hardware/Software Codesign and System Synthesis (CODES+ISSS), Raleigh, NC, USA,
+in International Conference on Hardware/Software Codesign and System Synthesis (CODES+ISSS), Raleigh, NC, USA,
 `doi:10.1109/CODES-ISSS60120.2024.00007 <https://doi.org/10.1109/CODES-ISSS60120.2024.00007>`_.
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Performance and Energy Simulation of Spiking Neuromorphic Architectures for Fast Exploration,"
-in 2023 International Conference on Neuromorphic Systems (ICONS), Santa Fe, NM, USA,
+in International Conference on Neuromorphic Systems (ICONS), Santa Fe, NM, USA,
 `doi:10.1145/3589737.3605970 <https://doi.org/10.1145/3589737.3605970>`_.
+
 
 Acknowledgement
 ===============

@@ -308,15 +308,15 @@ void sanafe::schedule_handle_message(
     //  network i.e., is the route to the dest core
     //  saturated and likely to block? Sum along the route
     //  and see the density of messages along all links.
-    const double messages_along_route = noc.calculate_route_congestion(m);
+    m.messages_along_route = noc.calculate_route_congestion(m);
     const auto path_capacity =
             static_cast<double>((m.hops + 1UL) * scheduler.buffer_size);
 
-    if (messages_along_route > path_capacity)
+    if (m.messages_along_route > path_capacity)
     {
         // Use heuristic for estimating delay based on route congestion,
         //  path capacity in messages and the mean delay per message
-        m.blocked_delay = (messages_along_route - path_capacity) *
+        m.blocked_delay = (m.messages_along_route - path_capacity) *
                 noc.mean_in_flight_receive_delay;
         m.sent_timestamp += m.blocked_delay;
     }
@@ -325,11 +325,11 @@ void sanafe::schedule_handle_message(
         m.blocked_delay = 0.0; // Path isn't at capacity; no blocking
     }
 
-    const double congestion_delay = messages_along_route *
+    const double congestion_delay = m.messages_along_route *
             noc.mean_in_flight_receive_delay /
             (static_cast<double>(m.hops) + 1.0);
     TRACE1(SCHEDULER, "Path capacity:%lf messages:%lf congestion delay:%e\n",
-            path_capacity, messages_along_route, congestion_delay);
+            path_capacity, m.messages_along_route, congestion_delay);
 
     // Update the messages timestamps, both when the message is received and
     //  when the receiving core has finished processing it

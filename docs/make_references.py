@@ -56,20 +56,27 @@ def generate_markdown_citation(entries: dict) -> str:
     authors = format_authors(main_entry['author'])
     title = main_entry['title']
     journal = main_entry['journal']
+    volume = main_entry['volume']
+    number = main_entry['number']
+    pages = main_entry['pages']
     year = main_entry['year']
     doi = main_entry['doi']
 
-    citation_text = f"""## Citation
+    citation_text = f"""# Citation
 
-If you use SANA-FE in your work, please cite:
+We hope that you find this project useful. If you use SANA-FE in your work,
+please cite our paper:
 
-{authors}, "{title}," in {journal}, {year}, [doi:{doi}](https://doi.org/{doi}).
+{authors},\n"{title}," in\n{journal}, {year},\n[doi:{doi}](https://doi.org/{doi}).
 
 ```bibtex
 @article{{boyle2025sanafe,
   title={{{title}}},
   author={{{main_entry['author']}}},
   journal={{{journal}}},
+  volume={{{volume}}},
+  number={{{number}}},
+  pages={{{pages}}},
   year={{{year}}},
   doi={{{doi}}}
 }}
@@ -80,14 +87,9 @@ If you use SANA-FE in your work, please cite:
 def generate_markdown_references(entries: dict) -> str:
     """Generate markdown references section for README.md."""
     # Order: main paper, tutorial, icons
-    ordered_keys = ['boyle2025sanafe', 'boyle2024tutorial', 'boyle2023performance']
     references = []
 
-    for key in ordered_keys:
-        if key not in entries:
-            continue
-
-        entry = entries[key]
+    for entry in entries.values():
         authors = format_authors(entry['author'])
         title = entry['title']
         year = entry['year']
@@ -95,18 +97,18 @@ def generate_markdown_references(entries: dict) -> str:
 
         if entry['ENTRYTYPE'] == 'article':
             journal = entry['journal']
-            ref = f'{authors}, "{title}," in {journal}, {year}, [doi:{doi}](https://doi.org/{doi}).'
+            ref = f'{authors},\n"{title},"\nin {journal}, {year},\n[doi:{doi}](https://doi.org/{doi}).'
         else:  # inproceedings
             booktitle = entry['booktitle']
             address = entry.get('address', '')
             if address:
-                ref = f'{authors}, "{title}," in {booktitle}, {address}, [doi:{doi}](https://doi.org/{doi}).'
+                ref = f'{authors},\n"{title},"\nin {booktitle}, {address},\n[doi:{doi}](https://doi.org/{doi}).'
             else:
-                ref = f'{authors}, "{title}," in {booktitle}, {year}, [doi:{doi}](https://doi.org/{doi}).'
+                ref = f'{authors},\n"{title},"\nin {booktitle}, {year},\n[doi:{doi}](https://doi.org/{doi}).'
 
         references.append(ref)
 
-    references_text = "## References\n\n" + "\n\n".join(references)
+    references_text = "# References\n\n" + "\n\n".join(references)
     return references_text
 
 
@@ -125,7 +127,8 @@ def generate_rst_citation(entries: dict) -> str:
     citation_text = f"""Citation
 ========
 
-If you use SANA-FE in your work, please cite:
+We hope that you find this project useful. If you use SANA-FE in your work,
+please cite our paper:
 
 .. code-block:: bibtex
 
@@ -141,14 +144,10 @@ If you use SANA-FE in your work, please cite:
 
 def generate_rst_references(entries: dict) -> str:
     """Generate RST references section for index.rst."""
-    ordered_keys = ['boyle2025sanafe', 'boyle2024tutorial', 'boyle2023performance']
     references = []
 
-    for key in ordered_keys:
-        if key not in entries:
-            continue
-
-        entry = entries[key]
+    for entry in entries.values():
+        print(entry)
         authors = format_authors(entry['author'])
         title = entry['title']
         year = entry['year']
@@ -205,12 +204,12 @@ def main():
         print("\nUpdating README.md...")
 
         # Update citation section
-        citation_pattern = r'## Citation.*?(?=## [A-Z]|\Z)'
+        citation_pattern = r'# Citation.*?(?=# [A-Z]|\Z)'
         new_citation = generate_markdown_citation(entries)
         update_file_section(readme_file, citation_pattern, new_citation, "Citation")
 
         # Update references section
-        references_pattern = r'## References.*?(?=## [A-Z]|\Z)'
+        references_pattern = r'# References.*?(?=# [A-Z]|\Z)'
         new_references = generate_markdown_references(entries)
         update_file_section(readme_file, references_pattern, new_references, "References")
 
@@ -226,6 +225,7 @@ def main():
         # Update references section
         references_pattern = r'References\n==========.*?(?=\n[A-Z][a-z]*\n=+|\Z)'
         new_references = generate_rst_references(entries)
+        print(new_references)
         update_file_section(rst_file, references_pattern, new_references, "References")
 
     print("\nCitation update complete!")

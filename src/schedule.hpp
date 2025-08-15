@@ -215,13 +215,12 @@ double schedule_messages_timestep(TimestepHandle &timestep_handle, Scheduler &sc
 void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);
-double schedule_calculate_messages_along_route(const Message &m, NocInfo &noc);
 void noc_update_all_tracked_messages(double t, NocInfo &noc);
 
 // TODO: in the future, allow these strings to be setup dynamically. That way
 //  the user can specify the NoC parameters within the architecture
 //  description file.
-constexpr std::array<std::string_view, 27> booksim_config_str = {{
+constexpr std::array<std::string_view, 26> booksim_config_str = {{
         "topology = cmesh",
         "subnets = 2",
         "k = 8",
@@ -235,7 +234,6 @@ constexpr std::array<std::string_view, 27> booksim_config_str = {{
         "use_noc_latency = 0",
         "num_vcs = 1",
         "vc_buf_size = 8",
-        "wait_for_tail_credit = 1",
         "vc_allocator = islip",
         "sw_allocator = islip",
         "alloc_iters = 1",
