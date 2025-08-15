@@ -215,7 +215,6 @@ double schedule_messages_timestep(TimestepHandle &timestep_handle, Scheduler &sc
 void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);
-double schedule_calculate_messages_along_route(const Message &m, NocInfo &noc);
 void noc_update_all_tracked_messages(double t, NocInfo &noc);
 
 // TODO: in the future, allow these strings to be setup dynamically. That way
