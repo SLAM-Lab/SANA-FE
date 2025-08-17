@@ -19,7 +19,7 @@ please cite our paper:
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration," in
-IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, 2025,
+IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, vol. 44, no. 8, pp. 3165–3178, 2025,
 [doi:10.1109/TCAD.2025.3537971](https://doi.org/10.1109/TCAD.2025.3537971).
 
 ```bibtex
@@ -368,22 +368,22 @@ C++ code has been written using the C++17 standard.
 
 James A. Boyle, Jason Ho, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Exploring Dendrites in Large-Scale Neuromorphic Architectures,"
-in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA,
+in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA, 2025,
 [doi:](https://doi.org/).
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
-in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, 2025,
+in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, vol. 44, no. 8, pp. 3165–3178, 2025,
 [doi:10.1109/TCAD.2025.3537971](https://doi.org/10.1109/TCAD.2025.3537971).
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Tutorial: Large-Scale Spiking Neuromorphic Architecture Exploration using SANA-FE,"
-in International Conference on Hardware/Software Codesign and System Synthesis (CODES+ISSS), Raleigh, NC, USA,
+in International Conference on Hardware/Software Codesign and System Synthesis (CODES+ISSS), Raleigh, NC, USA, 2024,
 [doi:10.1109/CODES-ISSS60120.2024.00007](https://doi.org/10.1109/CODES-ISSS60120.2024.00007).
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Performance and Energy Simulation of Spiking Neuromorphic Architectures for Fast Exploration,"
-in International Conference on Neuromorphic Systems (ICONS), Santa Fe, NM, USA,
+in International Conference on Neuromorphic Systems (ICONS), Santa Fe, NM, USA, 2023,
 [doi:10.1145/3589737.3605970](https://doi.org/10.1145/3589737.3605970).
 
 # Contact

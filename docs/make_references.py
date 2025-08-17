@@ -62,12 +62,14 @@ def generate_markdown_citation(entries: dict) -> str:
     year = main_entry['year']
     doi = main_entry['doi']
 
+    page_start = pages.split("--")[0]
+    page_end = pages.split("--")[1]
     citation_text = f"""# Citation
 
 We hope that you find this project useful. If you use SANA-FE in your work,
 please cite our paper:
 
-{authors},\n"{title}," in\n{journal}, {year},\n[doi:{doi}](https://doi.org/{doi}).
+{authors},\n"{title}," in\n{journal}, vol. {volume}, no. {number}, pp. {page_start}–{page_end}, {year},\n[doi:{doi}](https://doi.org/{doi}).
 
 ```bibtex
 @article{{boyle2025sanafe,
@@ -86,23 +88,28 @@ please cite our paper:
 
 def generate_markdown_references(entries: dict) -> str:
     """Generate markdown references section for README.md."""
-    # Order: main paper, tutorial, icons
     references = []
 
     for entry in entries.values():
         authors = format_authors(entry['author'])
         title = entry['title']
         year = entry['year']
+        volume = entry.get('volume')
+        number = entry.get('number')
+        pages = entry.get('pages')
+        year = entry['year']
         doi = entry['doi']
 
         if entry['ENTRYTYPE'] == 'article':
             journal = entry['journal']
-            ref = f'{authors},\n"{title},"\nin {journal}, {year},\n[doi:{doi}](https://doi.org/{doi}).'
+            page_start = pages.split("--")[0]
+            page_end = pages.split("--")[1]
+            ref = f'{authors},\n"{title},"\nin {journal}, vol. {volume}, no. {number}, pp. {page_start}–{page_end}, {year},\n[doi:{doi}](https://doi.org/{doi}).'
         else:  # inproceedings
             booktitle = entry['booktitle']
             address = entry.get('address', '')
             if address:
-                ref = f'{authors},\n"{title},"\nin {booktitle}, {address},\n[doi:{doi}](https://doi.org/{doi}).'
+                ref = f'{authors},\n"{title},"\nin {booktitle}, {address}, {year},\n[doi:{doi}](https://doi.org/{doi}).'
             else:
                 ref = f'{authors},\n"{title},"\nin {booktitle}, {year},\n[doi:{doi}](https://doi.org/{doi}).'
 
@@ -121,6 +128,10 @@ def generate_rst_citation(entries: dict) -> str:
     title = main_entry['title']
     author = main_entry['author']
     journal = main_entry['journal']
+    doi = main_entry['doi']
+    volume = main_entry['volume']
+    number = main_entry['number']
+    pages = main_entry['pages']
     year = main_entry['year']
     doi = main_entry['doi']
 
@@ -136,6 +147,9 @@ please cite our paper:
      title={{{title}}},
      author={{{author}}},
      journal={{{journal}}},
+     volume={{{volume}}},
+     number={{{number}}},
+     pages={{{pages}}},
      year={{{year}}},
      doi={{{doi}}}
    }}"""
@@ -153,9 +167,21 @@ def generate_rst_references(entries: dict) -> str:
         year = entry['year']
         doi = entry['doi']
 
+        # Optional entries
+        volume = entry.get('volume', None)
+        number = entry.get('number', None)
+        pages = entry.get('pages', None)
+
         if entry['ENTRYTYPE'] == 'article':
             journal = entry['journal']
-            ref = f'{authors},\n"{title},"\nin {journal}, {year},\n`doi:{doi} <https://doi.org/{doi}>`_.'
+            # TODO: Right now we assume that all fields are available, but it is
+            #  possible for preprints that the volume, article and page numbers
+            #  are not available
+            # TODO: This isn't guaranteed to apply to all citations, but for now
+            #  assume pages are provided as a range
+            page_start = pages.split("--")[0]
+            page_end = pages.split("--")[1]
+            ref = f'{authors},\n"{title},"\nin {journal}, vol. {volume}, no. {number}, pp. {page_start}–{page_end}, {year},\n`doi:{doi} <https://doi.org/{doi}>`_.'
         else:  # inproceedings
             booktitle = entry['booktitle']
             address = entry.get('address', '')
