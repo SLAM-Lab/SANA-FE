@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-TEST(InitialTest, CheckTestFunctionality) {
+TEST(InitialTest, CheckTestFunctionality)
+{
     // Making sure that the test framework is working correctly
     EXPECT_EQ(0, 0);
 }

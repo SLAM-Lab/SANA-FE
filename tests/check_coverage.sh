@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-set -e                                     
+set -e
 
-ROOT_DIR=$(realpath ..)   # SANA-FE               
+ROOT_DIR=$(realpath ..)   # SANA-FE
 SRC_DIR="$ROOT_DIR/src"
-BUILD_DIR="$PWD/build"                     
+BUILD_DIR="$PWD/build"
 COVERAGE_FILE=coverage.html
 
 rm -rf  "$BUILD_DIR"
@@ -19,13 +19,13 @@ cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
 
 # Portable build
 echo "Building project..."
-cmake --build "$BUILD_DIR" -j"$(nproc)"  
+cmake --build "$BUILD_DIR" -j"$(nproc)"
 
 # Temporarily ignore failures
-set +e                          
+set +e
 CTEST_OUTPUT_ON_FAILURE=1 ctest --test-dir "$BUILD_DIR" -LE "ci|lint|static|dynamic|perf" -j"$(nproc)"
 TEST_RC=$?
-set -e   
+set -e
 
 if ((TEST_RC != 0)); then
   echo

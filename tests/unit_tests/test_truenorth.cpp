@@ -1,40 +1,48 @@
-#include <gtest/gtest.h>
-#include "models.hpp"
-#include "attribute.hpp"
 #include <cstdlib>
+#include <gtest/gtest.h>
 
-using namespace sanafe;
+#include "attribute.hpp"
+#include "models.hpp"
 
-namespace {
-class TestTrueNorthModel : public ::testing::Test {
+namespace
+{
+class TestTrueNorthModel : public ::testing::Test
+{
 protected:
-    TrueNorthModel model;
+    sanafe::TrueNorthModel model;
 
-    ModelAttribute make_attr_double(double val) {
-        ModelAttribute attr;
+    sanafe::ModelAttribute make_attr_double(double val)
+    {
+        sanafe::ModelAttribute attr;
         attr.value = val;
         return attr;
     }
 
-    ModelAttribute make_attr_string(const std::string &val) {
-        ModelAttribute attr;
+    sanafe::ModelAttribute make_attr_string(const std::string &val)
+    {
+        sanafe::ModelAttribute attr;
         attr.value = val;
         return attr;
     }
 
-    ModelAttribute make_attr_bool(bool val) {
-        ModelAttribute attr;
+    sanafe::ModelAttribute make_attr_bool(bool val)
+    {
+        sanafe::ModelAttribute attr;
         attr.value = val;
         return attr;
     }
 
-    ModelAttribute make_attr_int(int val) {
-    ModelAttribute attr; attr.value = val; return attr;
+    sanafe::ModelAttribute make_attr_int(int val)
+    {
+        sanafe::ModelAttribute attr;
+        attr.value = val;
+        return attr;
     }
 };
 }
 
-TEST_F(TestTrueNorthModel, SetThresholdAndUpdateFires) {
+TEST_F(TestTrueNorthModel, SetThresholdAndUpdateFires)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(0.5));
     model.set_attribute_neuron(0, "reset_mode", make_attr_string("hard"));
     model.set_attribute_neuron(0, "reset", make_attr_double(0.0));
@@ -43,7 +51,8 @@ TEST_F(TestTrueNorthModel, SetThresholdAndUpdateFires) {
     EXPECT_EQ(result.status, sanafe::fired);
 }
 
-TEST_F(TestTrueNorthModel, LeakReducesPotential) {
+TEST_F(TestTrueNorthModel, LeakReducesPotential)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
     model.set_attribute_neuron(0, "leak", make_attr_double(0.5));
     model.set_attribute_neuron(0, "leak_towards_zero", make_attr_bool(true));
@@ -57,7 +66,8 @@ TEST_F(TestTrueNorthModel, LeakReducesPotential) {
     EXPECT_LT(after, before);
 }
 
-TEST_F(TestTrueNorthModel, ResetClearsPotential) {
+TEST_F(TestTrueNorthModel, ResetClearsPotential)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(5.0));
     model.update(0, 3.0);
     model.reset();
@@ -65,15 +75,22 @@ TEST_F(TestTrueNorthModel, ResetClearsPotential) {
     EXPECT_DOUBLE_EQ(model.get_potential(0), 0.0);
 }
 
-TEST_F(TestTrueNorthModel, SetReverseAttributesAndBias) {
-    EXPECT_NO_THROW(model.set_attribute_neuron(0, "reverse_threshold", make_attr_double(-2.0)));
-    EXPECT_NO_THROW(model.set_attribute_neuron(0, "reverse_reset", make_attr_double(-1.0)));
-    EXPECT_NO_THROW(model.set_attribute_neuron(0, "reverse_reset_mode", make_attr_string("soft")));
-    EXPECT_NO_THROW(model.set_attribute_neuron(0, "bias", make_attr_double(0.5)));
-    EXPECT_NO_THROW(model.set_attribute_neuron(0, "force_soma_update", make_attr_bool(true)));
+TEST_F(TestTrueNorthModel, SetReverseAttributesAndBias)
+{
+    EXPECT_NO_THROW(model.set_attribute_neuron(
+            0, "reverse_threshold", make_attr_double(-2.0)));
+    EXPECT_NO_THROW(model.set_attribute_neuron(
+            0, "reverse_reset", make_attr_double(-1.0)));
+    EXPECT_NO_THROW(model.set_attribute_neuron(
+            0, "reverse_reset_mode", make_attr_string("soft")));
+    EXPECT_NO_THROW(
+            model.set_attribute_neuron(0, "bias", make_attr_double(0.5)));
+    EXPECT_NO_THROW(model.set_attribute_neuron(
+            0, "force_soma_update", make_attr_bool(true)));
 }
 
-TEST_F(TestTrueNorthModel, LeakTowardsZeroBothDirections) {
+TEST_F(TestTrueNorthModel, LeakTowardsZeroBothDirections)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
     model.set_attribute_neuron(0, "leak", make_attr_double(1.0));
     model.set_attribute_neuron(0, "leak_towards_zero", make_attr_bool(true));
@@ -93,7 +110,8 @@ TEST_F(TestTrueNorthModel, LeakTowardsZeroBothDirections) {
     EXPECT_LT(std::fabs(model.get_potential(0)), std::fabs(neg_before));
 }
 
-TEST_F(TestTrueNorthModel, LeakWithoutTowardsZeroIncreasesPotential) {
+TEST_F(TestTrueNorthModel, LeakWithoutTowardsZeroIncreasesPotential)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
     model.set_attribute_neuron(0, "leak", make_attr_double(1.0));
     model.set_attribute_neuron(0, "leak_towards_zero", make_attr_bool(false));
@@ -104,7 +122,8 @@ TEST_F(TestTrueNorthModel, LeakWithoutTowardsZeroIncreasesPotential) {
     EXPECT_GT(model.get_potential(0), before);
 }
 
-TEST_F(TestTrueNorthModel, ThresholdAndResetModes) {
+TEST_F(TestTrueNorthModel, ThresholdAndResetModes)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(1.0));
     model.set_attribute_neuron(0, "reset", make_attr_double(0.0));
 
@@ -117,22 +136,27 @@ TEST_F(TestTrueNorthModel, ThresholdAndResetModes) {
     EXPECT_LE(model.get_potential(0), model.get_potential(0));
 }
 
-TEST_F(TestTrueNorthModel, ReverseResetModes) {
+TEST_F(TestTrueNorthModel, ReverseResetModes)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
     model.set_attribute_neuron(0, "reverse_threshold", make_attr_double(0.0));
     model.set_attribute_neuron(0, "reverse_reset", make_attr_double(-2.0));
 
-    model.set_attribute_neuron(0, "reverse_reset_mode", make_attr_string("hard"));
+    model.set_attribute_neuron(
+            0, "reverse_reset_mode", make_attr_string("hard"));
     model.update(0, -5.0);
 
-    model.set_attribute_neuron(0, "reverse_reset_mode", make_attr_string("soft"));
+    model.set_attribute_neuron(
+            0, "reverse_reset_mode", make_attr_string("soft"));
     model.update(0, -5.0);
 
-    model.set_attribute_neuron(0, "reverse_reset_mode", make_attr_string("saturate"));
+    model.set_attribute_neuron(
+            0, "reverse_reset_mode", make_attr_string("saturate"));
     model.update(0, -5.0);
 }
 
-TEST_F(TestTrueNorthModel, RandomizedThresholdAffectsPotential) {
+TEST_F(TestTrueNorthModel, RandomizedThresholdAffectsPotential)
+{
     model.set_attribute_neuron(0, "threshold", make_attr_double(5.0));
     model.set_attribute_neuron(0, "reset_mode", make_attr_string("hard"));
     model.set_attribute_neuron(0, "reset", make_attr_double(0.0));
@@ -141,21 +165,22 @@ TEST_F(TestTrueNorthModel, RandomizedThresholdAffectsPotential) {
     EXPECT_GE(model.get_potential(0), 0.0);
 }
 
-TEST_F(TestTrueNorthModel, RandomMaskNegativeThrows) {
+TEST_F(TestTrueNorthModel, RandomMaskNegativeThrows)
+{
     EXPECT_THROW(
-        model.set_attribute_neuron(0, "random_mask", make_attr_int(-1)),
-        std::invalid_argument
-    );
+            model.set_attribute_neuron(0, "random_mask", make_attr_int(-1)),
+            std::invalid_argument);
 }
 
-TEST_F(TestTrueNorthModel, RandomMaskEnablesRandomizedThreshold) {
-    std::srand(1); 
+TEST_F(TestTrueNorthModel, RandomMaskEnablesRandomizedThreshold)
+{
+    std::srand(1);
 
     model.set_attribute_neuron(0, "threshold", make_attr_double(1.0));
     model.set_attribute_neuron(0, "reset_mode", make_attr_string("hard"));
     model.set_attribute_neuron(0, "reset", make_attr_double(0.0));
     model.set_attribute_neuron(0, "random_mask", make_attr_int(0xFF));
 
-    auto r = model.update(0, std::nullopt); 
-    EXPECT_EQ(r.status, sanafe::fired);     
+    auto r = model.update(0, std::nullopt);
+    EXPECT_EQ(r.status, sanafe::fired);
 }

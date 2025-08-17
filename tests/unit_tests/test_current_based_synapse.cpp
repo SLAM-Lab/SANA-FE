@@ -1,45 +1,50 @@
 #include <gtest/gtest.h>
-#include "models.hpp"
+
 #include "attribute.hpp"
+#include "models.hpp"
 
-using namespace sanafe;
+namespace
+{
+class TestCurrentBasedSynapseModel : public ::testing::Test
+{
+protected:
+    sanafe::CurrentBasedSynapseModel model;
 
-namespace {
-    class TestCurrentBasedSynapseModel : public ::testing::Test {
-    protected:
-        CurrentBasedSynapseModel model;
-    
-        ModelAttribute make_attr_double(double val) {
-            ModelAttribute attr;
-            attr.value = val;
-            return attr;
-        }
-    };
+    sanafe::ModelAttribute make_attr_double(double val)
+    {
+        sanafe::ModelAttribute attr;
+        attr.value = val;
+        return attr;
+    }
+};
 }
 
-TEST_F(TestCurrentBasedSynapseModel, ReadReturnsCorrectWeight) {
+TEST_F(TestCurrentBasedSynapseModel, ReadReturnsCorrectWeight)
+{
     model.set_attribute_edge(0, "weight", make_attr_double(1.23));
-    PipelineResult result = model.update(0, true);
+    sanafe::PipelineResult result = model.update(0, true);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 1.23);
-
 }
 
-TEST_F(TestCurrentBasedSynapseModel, WriteReturnsZero) {
+TEST_F(TestCurrentBasedSynapseModel, WriteReturnsZero)
+{
     model.set_attribute_edge(0, "w", make_attr_double(2.5));
-    PipelineResult result = model.update(0, false);
+    sanafe::PipelineResult result = model.update(0, false);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 0.0);
 }
 
-TEST_F(TestCurrentBasedSynapseModel, ResizesCorrectlyOnLargeIndex) {
+TEST_F(TestCurrentBasedSynapseModel, ResizesCorrectlyOnLargeIndex)
+{
     model.set_attribute_edge(100, "weight", make_attr_double(3.14));
-    PipelineResult result = model.update(100, true);
+    sanafe::PipelineResult result = model.update(100, true);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 3.14);
 }
 
-TEST_F(TestCurrentBasedSynapseModel, MultipleWeightsMaintainValues) {
+TEST_F(TestCurrentBasedSynapseModel, MultipleWeightsMaintainValues)
+{
     model.set_attribute_edge(0, "w", make_attr_double(1.0));
     model.set_attribute_edge(1, "w", make_attr_double(2.0));
     model.set_attribute_edge(2, "w", make_attr_double(3.0));
@@ -56,7 +61,8 @@ TEST_F(TestCurrentBasedSynapseModel, MultipleWeightsMaintainValues) {
     ASSERT_TRUE(result2.current.has_value());
 }
 
-TEST_F(TestCurrentBasedSynapseModel, TestReset) {
+TEST_F(TestCurrentBasedSynapseModel, TestReset)
+{
     model.set_attribute_edge(0, "weight", make_attr_double(1.23));
     model.set_attribute_edge(1, "w", make_attr_double(4.56));
 

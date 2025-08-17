@@ -1,12 +1,14 @@
+#include <filesystem>
 #include <gtest/gtest.h>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <stdexcept>
-#include <filesystem>
+
 #include "arg_parsing.hpp"
 
 // Testing valid argument parsing
-TEST(BasicInputTest, ParseValidInput) {
+TEST(BasicInputTest, ParseValidInput)
+{
     std::vector<std::string> input = {"arch.yaml", "net.yaml", "100"};
     EXPECT_NO_THROW({
         RequiredProgramArgs args = parse_required_args(input, 0);
@@ -47,16 +49,19 @@ TEST(BasicInputTest, InvalidTimestepZero)
 // Trying to open a non-existent architecture file
 TEST(BasicInputTest, FileDoesNotExist)
 {
-    std::vector<std::string> args = {"nonexistent_arch.yaml", "net.yaml", "100"};
+    std::vector<std::string> args = {
+            "nonexistent_arch.yaml", "net.yaml", "100"};
     RequiredProgramArgs parsed_args = parse_required_args(args, 0);
-    EXPECT_THROW(sanafe::load_arch(parsed_args.arch_filename), std::system_error);
+    EXPECT_THROW(
+            sanafe::load_arch(parsed_args.arch_filename), std::system_error);
 }
 
 TEST(BasicInputTest, ValidFile)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     // std::cout << "Current path: " << path.string() << std::endl;
-    std::vector<std::string> args = {path.string() + "/arch/example.yaml", path.string() + "/snn/example.yaml", "100"};
+    std::vector<std::string> args = {path.string() + "/arch/example.yaml",
+            path.string() + "/snn/example.yaml", "100"};
     RequiredProgramArgs parsed_args = parse_required_args(args, 0);
     EXPECT_NO_THROW(sanafe::load_arch(parsed_args.arch_filename));
 }
