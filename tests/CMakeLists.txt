@@ -7,10 +7,10 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-# add unit_tests directory to the gtest suite
+# add unit tests directory to the gtest suite
 # MAKE SURE TO SET UP CMakeLists.txt IN ANY DIRECTORY YOU WANT TO ADD TO THE TEST SUITE
-# you can follow the template in tests/unit_tests/CMakeLists.txt
-add_subdirectory(unit_tests)
+# you can follow the template in tests/unit/CMakeLists.txt
+add_subdirectory(unit)
 
 find_program(RUBY_EXE ruby REQUIRED)
 
@@ -60,7 +60,7 @@ set(NPROC 10)
 endif()
 
 add_custom_target(check-fast
-DEPENDS unit_tests
+DEPENDS unit
 COMMAND ${CMAKE_CTEST_COMMAND} -L dev --output-on-failure -j ${NPROC}
 USES_TERMINAL)
 add_custom_target(check-full
