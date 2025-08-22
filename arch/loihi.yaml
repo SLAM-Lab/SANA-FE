@@ -8,7 +8,7 @@ architecture:
     topology: mesh
     width: 8
     height: 4
-    link_buffer_size: 16
+    link_buffer_size: 8
     sync_model: table
     latency_sync: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
   tile:

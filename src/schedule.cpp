@@ -526,8 +526,10 @@ void sanafe::schedule_handle_message_new(
     //  saturated and likely to block? Sum along the route
     //  and see the density of messages along all links.
     m.messages_along_route = noc.calculate_route_congestion(m, scheduler);
+    // TODO: HACK review this once I've figured subnetworks out. Add 1 for the
+    //  in buffer and 2 for the out buffer
     const auto path_capacity =
-            static_cast<double>((m.hops + 1UL) * scheduler.buffer_size);
+            static_cast<double>((m.hops + 3UL) * scheduler.buffer_size);
 
     if (m.messages_along_route > path_capacity)
     {
@@ -550,13 +552,13 @@ void sanafe::schedule_handle_message_new(
     //  take into account the parallel servicing of messages by different
     //  receiving cores.. maybe this would move logic into the route congestion
     //  calculation
-    // TODO: we may need this additional check
+    // TODO: we may need this additional check? Just in case. Again review
+    //  this when doing subnets
     const double max_messages_within_path =
-            std::min(static_cast<double>((m.hops + 1) * scheduler.buffer_size),
+            std::min(static_cast<double>((m.hops + 3UL) * scheduler.buffer_size),
                     m.messages_along_route);
      const double congestion_delay = max_messages_within_path *
              noc.mean_in_flight_receive_delay;
-    //const double congestion_delay = 0.0;
     TRACE1(SCHEDULER, "Path capacity:%lf messages:%lf congestion delay:%e\n",
             path_capacity, m.messages_along_route, congestion_delay);
 
@@ -662,18 +664,33 @@ double sanafe::NewNocInfo::calculate_route_congestion(
         const auto &f_existing = flows.at(src_dest);
         messages = static_cast<double>(f_existing.messages_in_flight);
 
-        // INFO("flow src:%zu dst:%zu messages:%lf\n", src_dest.first, src_dest.second, messages);
+        INFO("flow src:%zu dst:%zu messages:%lf\n", src_dest.first, src_dest.second, messages);
         // Work out any messages on links shared with this flow
-        const auto total_links = m.hops + 2;
+        // TODO: HACK count the last link twice to make sure we correctly account
+        //  for its buffer size (which was twice as large as each subnet's link
+        //  during calibration)
+        auto total_links = m.hops + 3UL;
         for (auto &[shared_src_dest, shared_links_start_end_pair] :
                 f_existing.flows_sharing_links)
         {
-            const auto [optional_start_link, shared_links] =
+            auto [optional_start_link, shared_links] =
                     shared_links_start_end_pair;
             const bool flow_sharing_links_exists =
                     flows.count(shared_src_dest) > 0;
+
+            // TODO: HACK If the dest core for both flows is the same i.e. the
+            //  last link is shared then increase the buffer capacity. The
+            //  link to the destination core must be size 16. Model this by
+            //  just adding one more shared link for now...
+            if (m.dest_core_id == shared_src_dest.second)
+            {
+                assert(shared_links > 0);
+                ++shared_links;
+            }
             if (flow_sharing_links_exists && optional_start_link.has_value())
             {
+                // TODO: the first link should have double the capacity compared to each subnet link (so 16 in these experiments)
+
                 // If there is overlapping paths between the flows, figure out
                 //  if there might be messages buffered along those shared links
                 auto &flow_sharing_links = flows.at(shared_src_dest);
@@ -693,28 +710,29 @@ double sanafe::NewNocInfo::calculate_route_congestion(
                             std::min(maximum_messages_sharing_buffers,
                                     flow_sharing_links.messages_in_flight -
                                             minimum_buffered_for_contention);
-                    // INFO("shared flow src:%zu dst:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
-                    //         shared_src_dest.first, shared_src_dest.second, flow_sharing_links.messages_in_flight,
-                    //         optional_start_link.value_or(-1), shared_links,
-                    //         last_shared_link, total_links,
-                    //         minimum_buffered_for_contention,
-                    //         maximum_messages_sharing_buffers,
-                    //         messages_sharing_buffers,
-                    //         m.hops);
+                    INFO("shared flow src:%zu dst:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
+                            shared_src_dest.first, shared_src_dest.second, flow_sharing_links.messages_in_flight,
+                            optional_start_link.value_or(-1), shared_links,
+                            last_shared_link, total_links,
+                            minimum_buffered_for_contention,
+                            maximum_messages_sharing_buffers,
+                            messages_sharing_buffers,
+                            m.hops);
                     messages += messages_sharing_buffers;
                 }
                 else
                 {
-                    // INFO("shared flow src:%zu dst:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
-                    //         shared_src_dest.first, shared_src_dest.second,
-                    //         flow_sharing_links.messages_in_flight,
-                    //         optional_start_link.value_or(-1), shared_links,
-                    //         last_shared_link, total_links,
-                    //         minimum_buffered_for_contention,
-                    //         maximum_messages_sharing_buffers, 0UL, m.hops);
+                    INFO("shared flow src:%zu dst:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
+                            shared_src_dest.first, shared_src_dest.second,
+                            flow_sharing_links.messages_in_flight,
+                            optional_start_link.value_or(-1), shared_links,
+                            last_shared_link, total_links,
+                            minimum_buffered_for_contention,
+                            maximum_messages_sharing_buffers, 0UL, m.hops);
                 }
             }
-            // TODO: removed the check limiting the messages in the path
+            // TODO: removed the check limiting the messages in the path here
+            //  we can figure this out later
         }
     }
 
