@@ -36,6 +36,7 @@ namespace sanafe
 {
 
 constexpr long int default_heartbeat_timesteps = 100L;
+//constexpr long int default_heartbeat_timesteps = 1L;
 
 enum TimingModel : uint8_t
 {

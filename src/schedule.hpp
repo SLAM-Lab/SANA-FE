@@ -134,6 +134,9 @@ private:
     bool terminated_ = false;
 };
 
+class Flow;
+class NewNocInfo;
+
 // For comparing timesteps when maintaining priority queue of timesteps
 struct CompareTimesteps
 {
@@ -162,6 +165,9 @@ struct Scheduler
     size_t max_cores_per_tile;
     double timestep_sync_delay;
 };
+
+[[nodiscard]] std::pair<int, int> get_path_xy_increments(const Message &m) noexcept;
+[[nodiscard]] std::pair<int, int> get_path_xy_increments(const Flow &flow, const NewNocInfo &noc) noexcept;
 
 // NocInfo is used by the scheduler to track the high-level state of the NoC
 //  at a given time
@@ -193,11 +199,58 @@ public:
 
     void update_message_density(const Message &message, bool entering_noc);
     void update_rolling_averages(const Message& message, bool entering_noc);
-    [[nodiscard]] double calculate_route_congestion(
-            const Message &message) const;
+    [[nodiscard]] double calculate_route_congestion(const Message &message) const;
+};
 
-private:
-    static std::pair<int, int> get_route_xy_increments(const Message &m) noexcept;
+// ****************************************************************************
+
+class Flow
+{
+public:
+    // TODO: simplify this mess of a structure
+    // indexed by the src/dest pair, indexes into the optional relative first link overlapping and its overlapping link count
+    std::map<std::pair<size_t, size_t>, std::pair<std::optional<size_t>, size_t>> flows_sharing_links;
+    size_t src;
+    size_t dest;
+    size_t messages_in_flight{0UL};
+    // TODO: should we track flows with flow id?
+
+    Flow(const int src, const int dest) : src(src), dest(dest) {}
+
+    std::vector<size_t> generate_path(const NewNocInfo &noc) const;
+};
+
+class NewNocInfo
+{
+public:
+    std::map<std::pair<size_t, size_t>, Flow> flows; // src/dest mapping as index
+    std::vector<MessageFifo> messages_received;
+    size_t noc_width_in_tiles;
+    size_t noc_height_in_tiles;
+    size_t core_count;
+    size_t max_cores_per_tile;
+
+    std::vector<double> core_finished_receiving;
+    double mean_in_flight_receive_delay{0.0};
+    long int messages_in_noc{0L};
+
+    NewNocInfo(const Scheduler &scheduler);
+    [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
+    {
+        const size_t links_per_router = ndirections + (2 * max_cores_per_tile);
+        return (x * noc_height_in_tiles * links_per_router) + (y * links_per_router) +
+                link;
+    }
+    void update_message_density(const Message &message, bool entering_noc);
+    void update_rolling_averages(const Message& message, bool entering_noc);
+    [[nodiscard]] double calculate_route_congestion(const Message &message, const Scheduler &scheduler) const;
+
+    // TODO: make private or protected
+    std::pair<std::optional<size_t>, size_t> find_overlapping_links(const Flow &flow1, const Flow &flow2) const;
+    //std::vector<size_t> generate_path(const sanafe::Flow &flow) const;
+
+//private:
+    //std::pair<int, int> get_route_xy_increments(const Flow &flow) const noexcept;
 };
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
@@ -216,6 +269,13 @@ void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);
 void noc_update_all_tracked_messages(double t, NocInfo &noc);
+
+std::vector<MessageFifo> schedule_init_message_queues_new(const Timestep &ts, NewNocInfo &noc);
+void schedule_handle_message_new(Message &m, Scheduler &scheduler, NewNocInfo &noc);
+double schedule_messages_timestep_new(TimestepHandle &ts, Scheduler &scheduler);
+void schedule_handle_message_new(Message &m, Scheduler &scheduler, NewNocInfo &noc);
+void noc_update_message_tracking_new(const Message &m, NewNocInfo &noc, bool entering_noc);
+void noc_update_all_tracked_messages_new(double t, NewNocInfo &noc);
 
 // TODO: in the future, allow these strings to be setup dynamically. That way
 //  the user can specify the NoC parameters within the architecture
