@@ -17,6 +17,7 @@
 #include <list>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -103,7 +104,9 @@ sanafe::NewNocInfo::NewNocInfo(const Scheduler &scheduler)
     core_finished_receiving = std::vector<double>(core_count);
 }
 
-std::pair<std::optional<size_t>, size_t> sanafe::NewNocInfo::find_overlapping_links(const sanafe::Flow &flow1, const sanafe::Flow &flow2) const
+std::pair<std::optional<size_t>, size_t>
+sanafe::NewNocInfo::find_overlapping_links(
+        const sanafe::Flow &flow1, const sanafe::Flow &flow2) const
 {
     auto path1 = flow1.generate_path(*this);
     auto path2 = flow2.generate_path(*this);
@@ -182,17 +185,18 @@ void sanafe::NewNocInfo::update_message_density(const Message &message, bool ent
             // Find all overlapping links. TODO: we'll do this more efficiently in future
             //  Associate links with their flows and just go over all links to
             //  avoid searching through every possible flow...
-            for (auto &[s, f_exist] : flows)
-            {
-                auto overlap_with_new = find_overlapping_links(new_flow, f_exist);
-                // Simply pushing back is useless, we need to associate the flow f_exist
-                //  with the information...
-                std::tuple<size_t, size_t, size_t> existing_src_dest_subnet = {f_exist.src, f_exist.dest, f_exist.subnet};
-                new_flow.flows_sharing_links[existing_src_dest_subnet] = overlap_with_new;
+            // for (auto &[s, f_exist] : flows)
+            // {
+            //     auto overlap_with_new = find_overlapping_links(new_flow, f_exist);
+            //     // Simply pushing back is useless, we need to associate the flow f_exist
+            //     //  with the information...
+            //     std::tuple<size_t, size_t, size_t> existing_src_dest_subnet = {f_exist.src, f_exist.dest, f_exist.subnet};
+            //     new_flow.flows_sharing_links[existing_src_dest_subnet] = overlap_with_new;
 
-                auto overlap_with_existing = find_overlapping_links(f_exist, new_flow);
-                f_exist.flows_sharing_links[src_dest_subnet] = overlap_with_existing;
-            }
+            //     auto overlap_with_existing = find_overlapping_links(f_exist, new_flow);
+            //     f_exist.flows_sharing_links[src_dest_subnet] = overlap_with_existing;
+            // }
+            register_new_flow_with_overlaps(new_flow, src_dest_subnet);
             // Add new flow
             new_flow.messages_in_flight = 1;
             flows.try_emplace(src_dest_subnet, new_flow);
@@ -757,6 +761,116 @@ double sanafe::NewNocInfo::calculate_route_congestion(
 
     //INFO("src:%zu dest:%zu messages:%lf\n", src_dest.first, src_dest.second, messages);
     return messages;
+}
+
+void sanafe::NewNocInfo::register_new_flow_with_overlaps(
+        Flow &new_flow, const std::tuple<size_t, size_t, size_t> &new_flow_key)
+{
+    auto new_path = new_flow.generate_path(*this);
+
+    // Track overlap information for each existing flow we encounter
+    std::map<std::tuple<size_t, size_t, size_t>,
+            std::pair<std::optional<size_t>, size_t>>
+            new_flow_overlaps;
+    std::map<std::tuple<size_t, size_t, size_t>,
+            std::pair<std::optional<size_t>, size_t>>
+            existing_flow_overlaps;
+
+    // Traverse the new flow's path and calculate overlaps directly
+    for (size_t link_idx = 0; link_idx < new_path.size(); ++link_idx)
+    {
+        size_t link_id = new_path[link_idx];
+
+        // Find all existing flows that use this link
+        auto link_flows_it = link_to_flows.find(link_id);
+        if (link_flows_it != link_to_flows.end())
+        {
+            for (const auto &existing_flow_key : link_flows_it->second)
+            {
+                auto existing_flow_it = flows.find(existing_flow_key);
+                if (existing_flow_it == flows.end())
+                {
+                    continue; // Flow no longer exists
+                }
+
+                Flow &existing_flow = existing_flow_it->second;
+
+                // Handle subnet overlap rules
+                if (new_flow.subnet != existing_flow.subnet)
+                {
+                    // Different subnets: only destination core can overlap
+                    if (new_flow.dest == existing_flow.dest &&
+                            link_idx == new_path.size() - 1)
+                    {
+                        new_flow_overlaps[existing_flow_key] =
+                                std::make_pair(link_idx, 1);
+                        // For existing flow, find its destination link position
+                        auto existing_path = existing_flow.generate_path(*this);
+                        existing_flow_overlaps[existing_flow_key] =
+                                std::make_pair(existing_path.size() - 1, 1);
+                    }
+                }
+                else
+                {
+                    // Same subnet: track all overlapping links
+
+                    // Initialize overlap tracking for new flow if not seen before
+                    if (new_flow_overlaps.find(existing_flow_key) ==
+                            new_flow_overlaps.end())
+                    {
+                        new_flow_overlaps[existing_flow_key] =
+                                std::make_pair(std::nullopt, 0);
+                    }
+
+                    // Update new flow overlap info
+                    auto &[first_overlap_new, count_new] =
+                            new_flow_overlaps[existing_flow_key];
+                    if (!first_overlap_new.has_value())
+                    {
+                        first_overlap_new = link_idx;
+                    }
+                    ++count_new;
+
+                    // Calculate existing flow's overlap info (need to find link position in existing path)
+                    if (existing_flow_overlaps.find(existing_flow_key) ==
+                            existing_flow_overlaps.end())
+                    {
+                        auto existing_path = existing_flow.generate_path(*this);
+                        auto it = std::find(existing_path.begin(),
+                                existing_path.end(), link_id);
+                        if (it != existing_path.end())
+                        {
+                            size_t existing_link_idx =
+                                    std::distance(existing_path.begin(), it);
+                            existing_flow_overlaps[existing_flow_key] =
+                                    std::make_pair(existing_link_idx, 1);
+                        }
+                    }
+                    else
+                    {
+                        // Just increment count, first overlap already set
+                        ++existing_flow_overlaps[existing_flow_key].second;
+                    }
+                }
+            }
+        }
+
+        // Add this link to the reverse index for the new flow
+        link_to_flows[link_id].insert(new_flow_key);
+    }
+
+    // Register all calculated overlaps
+    for (const auto &[existing_flow_key, overlap_info] : new_flow_overlaps)
+    {
+        new_flow.flows_sharing_links[existing_flow_key] = overlap_info;
+
+        auto existing_flow_it = flows.find(existing_flow_key);
+        if (existing_flow_it != flows.end())
+        {
+            existing_flow_it->second.flows_sharing_links[new_flow_key] =
+                    existing_flow_overlaps[existing_flow_key];
+        }
+    }
 }
 
 std::pair<int, int> sanafe::get_path_xy_increments(

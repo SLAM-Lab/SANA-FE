@@ -209,6 +209,10 @@ class Flow
 public:
     // TODO: simplify this mess of a structure
     // indexed by the src/dest pair, indexes into the optional relative first link overlapping and its overlapping link count
+    // TODO: also, in future it might make more sense to store this as a simpler list? Is a map
+    //  needed? It would be nice to ignore flows without any messages in,
+    //  although this would be difficult to manage dynamically. Often many of
+    //  the links won't have any messages in anymore
     std::map<std::tuple<size_t, size_t, size_t>, std::pair<std::optional<size_t>, size_t>> flows_sharing_links;
     size_t src;
     size_t dest;
@@ -235,6 +239,8 @@ public:
     double mean_in_flight_receive_delay{0.0};
     long int messages_in_noc{0L};
 
+    std::map<size_t, std::set<std::tuple<size_t, size_t, size_t>>> link_to_flows;
+
     NewNocInfo(const Scheduler &scheduler);
     [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
     {
@@ -243,6 +249,7 @@ public:
                 link;
     }
     void update_message_density(const Message &message, bool entering_noc);
+    void register_new_flow_with_overlaps(Flow &new_flow, const std::tuple<size_t, size_t, size_t> &new_flow_key);
     void update_rolling_averages(const Message& message, bool entering_noc);
     [[nodiscard]] double calculate_route_congestion(const Message &message, const Scheduler &scheduler) const;
 
