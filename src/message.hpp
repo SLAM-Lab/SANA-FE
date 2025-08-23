@@ -44,6 +44,7 @@ struct Message
     size_t dest_tile_id{0UL};
     size_t dest_core_id{0UL};
     size_t dest_core_offset{0UL};
+    size_t subnet{0UL};
     int dest_axon_hw{0};
     size_t dest_axon_id{0UL};
     bool placeholder{true};

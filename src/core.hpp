@@ -90,6 +90,7 @@ public:
     size_t offset;
     size_t parent_tile_id;
     int message_count{0};
+    int last_subnet{0};
     bool log_energy{false};
     bool log_latency{false};
 

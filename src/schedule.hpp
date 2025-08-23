@@ -209,13 +209,14 @@ class Flow
 public:
     // TODO: simplify this mess of a structure
     // indexed by the src/dest pair, indexes into the optional relative first link overlapping and its overlapping link count
-    std::map<std::pair<size_t, size_t>, std::pair<std::optional<size_t>, size_t>> flows_sharing_links;
+    std::map<std::tuple<size_t, size_t, size_t>, std::pair<std::optional<size_t>, size_t>> flows_sharing_links;
     size_t src;
     size_t dest;
+    size_t subnet; // TODO: see if needed
     size_t messages_in_flight{0UL};
-    // TODO: should we track flows with flow id?
+    // TODO: should we track flows with flow ids?
 
-    Flow(const int src, const int dest) : src(src), dest(dest) {}
+    Flow(const int src, const int dest, const int subnet) : src(src), dest(dest), subnet(subnet) {}
 
     std::vector<size_t> generate_path(const NewNocInfo &noc) const;
 };
@@ -223,7 +224,7 @@ public:
 class NewNocInfo
 {
 public:
-    std::map<std::pair<size_t, size_t>, Flow> flows; // src/dest mapping as index
+    std::map<std::tuple<size_t, size_t, size_t>, Flow> flows; // src/dest mapping as index
     std::vector<MessageFifo> messages_received;
     size_t noc_width_in_tiles;
     size_t noc_height_in_tiles;

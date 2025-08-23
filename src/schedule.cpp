@@ -113,6 +113,24 @@ std::pair<std::optional<size_t>, size_t> sanafe::NewNocInfo::find_overlapping_li
 
     std::optional<size_t> first_overlapping_link;
     size_t overlapping_links = 0UL;
+
+    // If the networks are on different subnets, the only link that can overlap
+    //  is at the destination core
+    if (flow1.subnet != flow2.subnet)
+    {
+        if (flow1.dest == flow2.dest)
+        {
+            // Last link (to the dest core) has a shared buffer between
+            //  subnets
+            return std::make_pair(path1.size() - 1, 1);
+        }
+        else
+        {
+            // Separate physical networks, paths do not overlap
+            return std::make_pair(std::nullopt, 0);
+        }
+    }
+
     // Iterate through path1 to find common links with path2
     for (size_t i = 0; i < path1.size(); ++i)
     {
@@ -151,16 +169,16 @@ void sanafe::NewNocInfo::update_message_density(const Message &message, bool ent
     //  flow, we would need to consider the relative link position of the
     //  overlap, and the number of overlapping links, both of which could be
     //  easily obtained as we follow the path and its reverse indexes!
-    std::pair<size_t, size_t> src_dest_pair = {
-            message.src_core_id, message.dest_core_id};
+    std::tuple<size_t, size_t, size_t> src_dest_subnet = {
+            message.src_core_id, message.dest_core_id, message.subnet};
     if (entering_noc)
     {
-        auto flow_it = flows.find(src_dest_pair);
+        auto flow_it = flows.find(src_dest_subnet);
 
         bool flow_exists = (flow_it != flows.end());
         if (!flow_exists)
         {
-            Flow new_flow(message.src_core_id, message.dest_core_id);
+            Flow new_flow(message.src_core_id, message.dest_core_id, message.subnet);
             // Find all overlapping links. TODO: we'll do this more efficiently in future
             //  Associate links with their flows and just go over all links to
             //  avoid searching through every possible flow...
@@ -169,18 +187,20 @@ void sanafe::NewNocInfo::update_message_density(const Message &message, bool ent
                 auto overlap_with_new = find_overlapping_links(new_flow, f_exist);
                 // Simply pushing back is useless, we need to associate the flow f_exist
                 //  with the information...
-                std::pair<size_t, size_t> existing_src_dest_pair = {f_exist.src, f_exist.dest};
-                new_flow.flows_sharing_links[existing_src_dest_pair] = overlap_with_new;
+                std::tuple<size_t, size_t, size_t> existing_src_dest_subnet = {f_exist.src, f_exist.dest, f_exist.subnet};
+                new_flow.flows_sharing_links[existing_src_dest_subnet] = overlap_with_new;
 
                 auto overlap_with_existing = find_overlapping_links(f_exist, new_flow);
-                f_exist.flows_sharing_links[src_dest_pair] = overlap_with_existing;
+                f_exist.flows_sharing_links[src_dest_subnet] = overlap_with_existing;
             }
             // Add new flow
             new_flow.messages_in_flight = 1;
-            flows.try_emplace(src_dest_pair, new_flow);
+            flows.try_emplace(src_dest_subnet, new_flow);
 
-            // INFO("Added new flows src:%zu dest:%zu (total=%zu)\n",
-            //         src_dest_pair.first, src_dest_pair.second, flows.size());
+            // INFO("Added new flows src:%zu dest:%zu subnet:%zu (total=%zu)\n",
+            //         std::get<0>(src_dest_subnet),
+            //         std::get<1>(src_dest_subnet),
+            //         std::get<2>(src_dest_subnet), flows.size());
         }
         else
         {
@@ -193,12 +213,12 @@ void sanafe::NewNocInfo::update_message_density(const Message &message, bool ent
     }
     else // removing message from noc
     {
-        if (flows.at(src_dest_pair).messages_in_flight <= 0)
+        if (flows.at(src_dest_subnet).messages_in_flight <= 0)
         {
             INFO("Error: no messages in flow, can't pop\n");
             throw std::logic_error("No messages in flow");
         }
-        --flows.at(src_dest_pair).messages_in_flight;
+        --flows.at(src_dest_subnet).messages_in_flight;
         // INFO("Removing from flow src:%zu dest:%zu (in flight:%zu)\n",
         //         flows.at(src_dest_pair).src, flows.at(src_dest_pair).dest,
         //         flows.at(src_dest_pair).messages_in_flight);
@@ -543,8 +563,8 @@ void sanafe::schedule_handle_message_new(
     {
         m.blocked_delay = 0.0; // Path isn't at capacity; no blocking
     }
-    INFO("mid:%zu path_capacity:%lf messages_along_route:%lf blocked:%e\n", m.mid,
-            path_capacity, m.messages_along_route, m.blocked_delay);
+    // INFO("mid:%zu path_capacity:%lf messages_along_route:%lf blocked:%e subnet:%zu\n", m.mid,
+    //         path_capacity, m.messages_along_route, m.blocked_delay, m.subnet);
 
     // HACK: TODO: this is my major change to algorithm. Also need to develop this
     //  further to consider when there are multiple destinations handling
@@ -641,48 +661,44 @@ double sanafe::NewNocInfo::calculate_route_congestion(
     // Currently tracks messages in the direct flow, and then also messages
     //  in overlapping flows (that may impact congestion)
     // TODO: we don't consider when multiple destination cores are processing
-    //   messages, since this will affect the service rate, possibly significantly
-    // TODO: we don't consider multiple subnetworks. Although this seems like
-    //  a small detail, it has a large impact on the network latency, especially
-    //  for small or large delays.
+    //   messages, since this will affect the service rate, possibly significantly?
+    //   (will ignore this potentially)
     //
     // Currently, simulations are much more accurate when modeling buffer size of
     //  8 rather than 16 (so basically ignoring 1 of the subnets, 1/2 of the total
     //  buffer capacity). However, the destination core Rx buffers should be twice
     //  as large, which I think would hide some of the latency for smaller delays
     //  (in some cases there would be less backpressure congestion in the NoC)
-    //  However, I think effects have compounded since there should be many more
-    //  messages buffered within the NoC, and this should ultimately halve the
-    //  service rate (two subnets competing over destination cores). Maybe some
-    //  inaccuracies are cancelling one another out though.
-    const auto src_dest = std::make_pair(m.src_core_id, m.dest_core_id);
+    const auto src_dest_subnet = std::make_tuple(m.src_core_id, m.dest_core_id, m.subnet);
 
     double messages = 0.0;
-    const bool flow_exists = flows.count(src_dest) > 0;
+    const bool flow_exists = flows.count(src_dest_subnet) > 0;
     if (flow_exists)
     {
-        const auto &f_existing = flows.at(src_dest);
+        const auto &f_existing = flows.at(src_dest_subnet);
         messages = static_cast<double>(f_existing.messages_in_flight);
 
-        INFO("flow src:%zu dst:%zu messages:%lf\n", src_dest.first, src_dest.second, messages);
+        // INFO("flow src:%zu dst:%zu subnet:%zu messages:%lf\n",
+        //         std::get<0>(src_dest_subnet), std::get<1>(src_dest_subnet),
+        //         std::get<2>(src_dest_subnet), messages);
         // Work out any messages on links shared with this flow
         // TODO: HACK count the last link twice to make sure we correctly account
         //  for its buffer size (which was twice as large as each subnet's link
         //  during calibration)
         auto total_links = m.hops + 3UL;
-        for (auto &[shared_src_dest, shared_links_start_end_pair] :
+        for (auto &[shared_src_dest_subnet, shared_links_start_end_pair] :
                 f_existing.flows_sharing_links)
         {
             auto [optional_start_link, shared_links] =
                     shared_links_start_end_pair;
             const bool flow_sharing_links_exists =
-                    flows.count(shared_src_dest) > 0;
+                    flows.count(shared_src_dest_subnet) > 0;
 
             // TODO: HACK If the dest core for both flows is the same i.e. the
             //  last link is shared then increase the buffer capacity. The
             //  link to the destination core must be size 16. Model this by
             //  just adding one more shared link for now...
-            if (m.dest_core_id == shared_src_dest.second)
+            if (m.dest_core_id == std::get<1>(shared_src_dest_subnet))
             {
                 assert(shared_links > 0);
                 ++shared_links;
@@ -693,7 +709,7 @@ double sanafe::NewNocInfo::calculate_route_congestion(
 
                 // If there is overlapping paths between the flows, figure out
                 //  if there might be messages buffered along those shared links
-                auto &flow_sharing_links = flows.at(shared_src_dest);
+                auto &flow_sharing_links = flows.at(shared_src_dest_subnet);
                 const size_t maximum_messages_sharing_buffers =
                         shared_links * scheduler.buffer_size;
 
@@ -710,25 +726,28 @@ double sanafe::NewNocInfo::calculate_route_congestion(
                             std::min(maximum_messages_sharing_buffers,
                                     flow_sharing_links.messages_in_flight -
                                             minimum_buffered_for_contention);
-                    INFO("shared flow src:%zu dst:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
-                            shared_src_dest.first, shared_src_dest.second, flow_sharing_links.messages_in_flight,
-                            optional_start_link.value_or(-1), shared_links,
-                            last_shared_link, total_links,
-                            minimum_buffered_for_contention,
-                            maximum_messages_sharing_buffers,
-                            messages_sharing_buffers,
-                            m.hops);
+                    // INFO("shared flow src:%zu dst:%zu subnet:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
+                    //         std::get<0>(shared_src_dest_subnet),
+                    //         std::get<1>(shared_src_dest_subnet),
+                    //         std::get<2>(shared_src_dest_subnet),
+                    //         flow_sharing_links.messages_in_flight,
+                    //         optional_start_link.value_or(-1), shared_links,
+                    //         last_shared_link, total_links,
+                    //         minimum_buffered_for_contention,
+                    //         maximum_messages_sharing_buffers,
+                    //         messages_sharing_buffers, m.hops);
                     messages += messages_sharing_buffers;
                 }
                 else
                 {
-                    INFO("shared flow src:%zu dst:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
-                            shared_src_dest.first, shared_src_dest.second,
-                            flow_sharing_links.messages_in_flight,
-                            optional_start_link.value_or(-1), shared_links,
-                            last_shared_link, total_links,
-                            minimum_buffered_for_contention,
-                            maximum_messages_sharing_buffers, 0UL, m.hops);
+                    // INFO("shared flow src:%zu dst:%zu subnet:%zu msg:%zu start_link:%zu shared_links:%zu end_link:%zu total_links:%zu shared_min:%zu shared_max:%zu sharing:%zu hops:%zu\n",
+                    //         std::get<0>(shared_src_dest_subnet), std::get<1>(shared_src_dest_subnet),
+                    //         std::get<2>(shared_src_dest_subnet),
+                    //         flow_sharing_links.messages_in_flight,
+                    //         optional_start_link.value_or(-1), shared_links,
+                    //         last_shared_link, total_links,
+                    //         minimum_buffered_for_contention,
+                    //         maximum_messages_sharing_buffers, 0UL, m.hops);
                 }
             }
             // TODO: removed the check limiting the messages in the path here

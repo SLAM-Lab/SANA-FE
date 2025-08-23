@@ -551,6 +551,7 @@ void sanafe::SpikingChip::reset()
         for (Core &core : tile.cores)
         {
             core.timestep_buffer.clear();
+            core.last_subnet = 0; // TODO: keep if subnets needed
             for (const auto &hw : core.pipeline_hw)
             {
                 hw->reset();
@@ -802,6 +803,17 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         //  even when creating messages on multiple threads
         const long int id = total_messages_sent.fetch_add(1);
         Message m(id, *this, axon_address, n, ts.timestep);
+
+        //  TODO: generalise this code for multiple subnets if the subnet code
+        //   is required. This requires specific NoC information that may not
+        //   be available yet (should it be in the neuron struct, or in the
+        //   axon struct even. Could it be encoded another way)? Also allow different
+        //   strategies to be chosen for the subnet, it could be encoded in the
+        //   edge or maybe even dynamically chosen i.e. left unspecified here?
+        // TODO this doesn't work, the core needs to track
+        m.subnet = n.core->last_subnet;
+        n.core->last_subnet = (n.core->last_subnet + 1) % 2;
+
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
         axon_out_hw.energy += axon_out_hw.energy_access;
@@ -1515,7 +1527,8 @@ void sanafe::SpikingChip::sim_trace_write_message_header(
     message_trace_file << "network_delay,";
     message_trace_file << "blocking_delay,";
     message_trace_file << "min_hop_delay,";
-    message_trace_file << "messages_along_route\n";
+    message_trace_file << "messages_along_route,";
+    message_trace_file << "subnet\n";
     message_trace_file.flush();
 }
 
@@ -1626,7 +1639,9 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.network_delay << ",";
     message_trace_file << m.blocked_delay << ",";
     message_trace_file << m.min_hop_delay << ",";
-    message_trace_file << m.messages_along_route;
+    message_trace_file << m.messages_along_route << ",";
+    // TODO: not sure if needed or useful
+    message_trace_file << m.subnet;
     message_trace_file << "\n";
     message_trace_file.flush();
 }

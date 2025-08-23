@@ -68,10 +68,21 @@ architecture:
                 #
             - name: loihi_conv_synapse
               attributes:
-                model: current_based
-                latency_process_spike: 3.1e-9
+                ## simple synaptic model, fixed cost per op
                 energy_process_spike: 24.0e-12
-                #model: loihi
+                # model: current_based
+                # #latency_process_spike: 3.1e-9
+                # latency_process_spike: 3.8e-9 # Latency when _idxBits=3
+
+                ## Advanced synaptic model using tagged synapses
+                model: loihi
+                # Optionally force a simpler concurrent access model
+                # Modeling concurrent access in this way doesn't seem to really
+                #  make any difference compared to the simpler per-op cost.
+                #  We need to at least account for things like different synapseFmt
+                #  (e.g., sign changes) causing flushes of concurrent access
+                #  to increase the access latency as the fully tagged model does
+                ##latency_concurrent_access: 3.8e-9
           dendrite:
           - name: loihi_dendrites
             attributes:
