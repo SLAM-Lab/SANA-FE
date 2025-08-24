@@ -9,6 +9,9 @@ Run DVS Gesture and extract some performance statistics
 #import matplotlib
 #matplotlib.use('Agg')
 
+# TODO: modified version of the script so that we can compare the new SANA-FE
+#  algorithms against Booksim2
+
 import csv
 import yaml
 from matplotlib import pyplot as plt
@@ -111,6 +114,8 @@ if __name__ == "__main__":
     #timesteps = 100000
     frames = 100
     #frames = 1
+    #frames = 10
+
 
     #loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
@@ -163,7 +168,7 @@ if __name__ == "__main__":
 
         #for frame in range(0, 1):
         ##for frame in range(1, 2):
-        ##for frame in range(50, frames):
+        #for frame in range(79, 80):
         for frame in range(0, frames):
             print(f"Running for input: {frame}")
             dvs_inputs = inputs[frame, :]
@@ -172,9 +177,43 @@ if __name__ == "__main__":
                 mapped_neuron.set_model_attributes(
                     model_attributes={"bias": dvs_inputs[id]})
             is_first_frame = (frame == 0)
-            chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",
-                     write_trace_headers=is_first_frame)
+            chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv.sanafe",
+                     write_trace_headers=is_first_frame, processing_threads=1)
             chip.reset()
+
+        # TODO: run the booksim2 enabled runs and compare network results
+        booksim_arch = sanafe.load_arch(ARCH_PATH)
+        booksim_net = sanafe.load_net(GENERATED_NETWORK_PATH, arch,
+                              use_netlist_format=True)
+        booksim_chip = sanafe.SpikingChip(booksim_arch)
+        # Create a separate Booksim instance
+        booksim_chip.load(booksim_net)
+        cycle_accurate_stats = pd.DataFrame()
+        for frame in range(0, frames):
+            print(f"Running booksim2 for input: {frame}")
+            dvs_inputs = inputs[frame, :]
+            mapped_inputs = booksim_chip.mapped_neuron_groups["0"]
+            for id, mapped_neuron in enumerate(mapped_inputs):
+                mapped_neuron.set_model_attributes(
+                    model_attributes={"bias": dvs_inputs[id]})
+            for timestep in range(1, timesteps + 1):
+                # HACK: Since my modified version of Booksim will overwrite
+                #  its trace files every timestep.
+                # TODO: clean this up, possibly passing the network delay and
+                #  blocking delay back to SANA-FE through memory, avoiding the
+                #  need to loop over each timestep
+                booksim_chip.sim(1, timing_model="cycle", processing_threads=1)
+                timestep_stats = pd.read_csv(
+                    os.path.join(PROJECT_DIR, "messages_cycle_accurate.csv"))
+                timestep_stats["timestep"] = timestep
+                timestep_stats["frame"] = frame  # Add frame info too
+
+                # Append to the main dataframe
+                cycle_accurate_stats = pd.concat([cycle_accurate_stats, timestep_stats],
+                                                    ignore_index=True)
+            booksim_chip.reset()
+
+        cycle_accurate_stats.to_csv("messages.csv.booksim")
 
         # Parse the detailed perf statistics
         print("Reading performance data")
@@ -196,6 +235,50 @@ if __name__ == "__main__":
         print("Finished running experiments")
 
     if plot_experiments:
+        sanafe_messages = pd.read_csv(os.path.join(PROJECT_DIR, "messages.csv.sanafe"))
+        booksim_messages = pd.read_csv(os.path.join(PROJECT_DIR, "messages.csv.booksim"))
+
+        sanafe_messages["frame"] = (sanafe_messages["timestep"] - 1) // 128
+        ts_messages_sanafe = sanafe_messages[(sanafe_messages["timestep"] == 128) & (sanafe_messages["mid"] >= 0)]
+        ts_messages_booksim = booksim_messages[(booksim_messages["frame"] == 0) & (booksim_messages["timestep"] == 128)]
+
+        plt.figure()
+        plt.plot(ts_messages_sanafe["network_delay"].to_numpy(),
+                    ts_messages_booksim["network_cycles"].to_numpy() * 1.0e-9,
+                    "o", ms=10, alpha=0.5)
+        plt.gca().set_box_aspect(1)
+        plt.ylabel("SANA-FE model")
+        plt.ylabel("Booksim2 model")
+        plt.xlim((0, 2E-5))
+        plt.ylim((0, 2E-5))
+        plt.savefig("runs/dvs/compare_booksim1_single_ts_correlation.png")
+
+        plt.figure(figsize=(10, 3))
+        plt.plot(ts_messages_sanafe["network_delay"].to_numpy(), lw=2)
+        plt.plot(ts_messages_booksim["network_cycles"].to_numpy() * 1.0e-9, lw=2)
+        plt.legend(("SANA-FE", "Booksim2"))
+        plt.minorticks_on()
+        plt.tight_layout()
+        plt.savefig("runs/dvs/compare_booksim2_series.png")
+
+        # Third plot: Total network delays grouped by timestep
+        plt.figure()
+        sanafe_messages = sanafe_messages[(sanafe_messages["mid"] >= 0)]
+
+        sanafe_per_timestep = sanafe_messages.groupby("timestep")["network_delay"].sum()
+        booksim_per_timestep = booksim_messages.groupby(["frame", "timestep"])["network_cycles"].sum() * 1.0e-9
+        plt.scatter(sanafe_per_timestep, booksim_per_timestep, s=10, alpha=0.05)
+        plt.xlabel("Total SANA-FE Network Delay [s]")
+        plt.ylabel("Total Booksim2 Network Delay [s]")
+        plt.title("Total Network Delays by Timestep: SANA-FE vs Booksim2")
+        plt.grid(True, alpha=0.3)
+        plt.gca().set_box_aspect(1)
+        plt.xlim((0, 0.02))
+        plt.ylim((0, 0.02))
+        plt.tight_layout()
+        plt.savefig("runs/dvs/compare_booksim3_cumulative.png")
+
+
         """
         plt.figure(figsize=(5.5, 5.5))
         plt.bar(1, spiking_update_energy)
