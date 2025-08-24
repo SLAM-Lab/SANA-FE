@@ -193,7 +193,7 @@ message(STATUS "got ryml")
 
 ############## booksim2
 project(booksim2-quickstart LANGUAGES CXX)
-set(BOOKSIM_VERSION "110ad1b80e493241f6e57587bc11354ac84f91f8")
+set(BOOKSIM_VERSION "34e65b03202067eb70199e731b60b9f130cafdd2")
 FetchContent_Declare(booksim
     GIT_REPOSITORY https://github.com/SLAM-Lab/booksim2-sanafe.git
     GIT_TAG ${BOOKSIM_VERSION}
