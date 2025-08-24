@@ -165,13 +165,6 @@ void sanafe::NewNocInfo::update_message_density(const Message &message, bool ent
     //    if flow is empty:
     //      for now do nothing, leave it as an empty flow in case used later
 
-    // TODO: in the future, change this code to build a reverse index within
-    //  each link that tracks all flows over that link. This way we can
-    //  efficiently search for overlapping flows when adding a new flow without
-    //  having to scan through all possible flows. As we track the overlapping
-    //  flow, we would need to consider the relative link position of the
-    //  overlap, and the number of overlapping links, both of which could be
-    //  easily obtained as we follow the path and its reverse indexes!
     std::tuple<size_t, size_t, size_t> src_dest_subnet = {
             message.src_core_id, message.dest_core_id, message.subnet};
     if (entering_noc)
@@ -378,7 +371,8 @@ void sanafe::schedule_messages_cycle_accurate(
                         std::make_pair(static_cast<int>(message.dest_tile_id),
                                 static_cast<int>(message.dest_core_offset));
 
-                booksim_create_spike_event(static_cast<int>(message.timestep),
+                booksim_create_spike_event(message.mid,
+                        static_cast<int>(message.timestep),
                         std::move(src_neuron), std::move(src_hw),
                         std::move(dest_hw), message.generation_delay,
                         message.receive_delay);
@@ -427,12 +421,7 @@ void sanafe::schedule_messages_detailed(
 {
     if (scheduler.scheduler_threads.empty())
     {
-        // For 1000 tests
-        // TODO: old function real runtime 0m5.9s
         //schedule_messages_timestep(ts, scheduler);
-        // TODO: new function real runtime 12s about 2x slower with optimization
-        //  if the algorithm is accurate, we can optimize it to hopefully get it around
-        //  the same ballpark
         schedule_messages_timestep_new(ts, scheduler);
     }
     else
@@ -767,6 +756,24 @@ void sanafe::NewNocInfo::register_new_flow_with_overlaps(
         Flow &new_flow, const std::tuple<size_t, size_t, size_t> &new_flow_key)
 {
     auto new_path = new_flow.generate_path(*this);
+
+    // TODO: HACK: New code to generate a reverse index of the NoC links and
+    //  the flows associated with each link. This means we can find all
+    //  overlapping flows easily by simply traversing the path. This basic
+    //  optimization speeds up the algorithm by over 4x (compared to searching
+    //  through all existing flows whenever generating a new one)
+    //
+    // There are still more optimizations that can easily be done, that may
+    //  lead to even more performance improvements. I can investigate this once
+    //  I have more experimental data...
+    //  1) We don't need to generate paths multiple times. At flow creation
+    //   we can generate and cache the path as a vector within the Flow. A flow
+    //   should be defined as its path regardless.
+    //  2) At path generation we can build an (unordered) map of link indexes to
+    //   relative position within a flow. That way, its easy to find the
+    //   position of a given link in a flow (when tracking a new overlapping flow
+    //   within an existing flow). The naive approach is just to search the whole
+    //   path every time, which might be(?) expensive.
 
     // Track overlap information for each existing flow we encounter
     std::map<std::tuple<size_t, size_t, size_t>,
@@ -1357,3 +1364,211 @@ void sanafe::schedule_stop_all_threads(Scheduler &scheduler)
 
     TRACE1(SCHEDULER, "All threads stopped successfully.\n");
 }
+
+// The code below could be useful as a reference for improving the new scheduler
+//  code, when/if we return to this work
+// // Enhanced Flow class with single-pass cache generation:
+// class Flow {
+// public:
+//     size_t src;
+//     size_t dest;
+//     size_t subnet;
+//     size_t messages_in_flight = 0;
+//     std::map<std::tuple<size_t, size_t, size_t>, std::pair<std::optional<size_t>, size_t>> flows_sharing_links;
+
+//     // Cached path and O(1) position lookup
+//     std::vector<size_t> path;
+//     std::unordered_map<size_t, size_t> link_to_position; // link_id -> position in path
+
+//     // Constructor that generates both path and position cache in one pass
+//     Flow(size_t src_core, size_t dest_core, size_t subnet_id, const NewNocInfo& noc_info)
+//         : src(src_core), dest(dest_core), subnet(subnet_id)
+//     {
+//         generate_path_with_cache(noc_info);
+//     }
+
+//     // O(1) lookup for link position
+//     std::optional<size_t> get_link_position(size_t link_id) const {
+//         auto it = link_to_position.find(link_id);
+//         return (it != link_to_position.end()) ?
+//                std::make_optional(it->second) : std::nullopt;
+//     }
+
+//     // Original generate_path for backward compatibility (if needed elsewhere)
+//     std::vector<size_t> generate_path(const NewNocInfo& noc_info) const;
+
+// private:
+//     void generate_path_with_cache(const NewNocInfo& noc_info) {
+//         // Clear any existing data
+//         path.clear();
+//         link_to_position.clear();
+
+//         // Generate path using your existing routing logic
+//         // This is a placeholder - replace with your actual routing algorithm
+//         std::vector<size_t> generated_path = generate_path(noc_info);
+
+//         // Reserve space for efficiency
+//         path.reserve(generated_path.size());
+//         link_to_position.reserve(generated_path.size());
+
+//         // Single pass: build both path vector and position cache
+//         for (size_t i = 0; i < generated_path.size(); ++i) {
+//             size_t link_id = generated_path[i];
+//             path.push_back(link_id);
+//             link_to_position[link_id] = i;
+//         }
+//     }
+// };
+
+// // Alternative: If you want to modify generate_path directly to return both
+// struct PathWithCache {
+//     std::vector<size_t> path;
+//     std::unordered_map<size_t, size_t> link_to_position;
+// };
+
+// class FlowAlternative {
+// public:
+//     size_t src, dest, subnet;
+//     size_t messages_in_flight = 0;
+//     std::map<std::tuple<size_t, size_t, size_t>, std::pair<std::optional<size_t>, size_t>> flows_sharing_links;
+
+//     std::vector<size_t> path;
+//     std::unordered_map<size_t, size_t> link_to_position;
+
+//     FlowAlternative(size_t src_core, size_t dest_core, size_t subnet_id, const NewNocInfo& noc_info)
+//         : src(src_core), dest(dest_core), subnet(subnet_id)
+//     {
+//         auto path_cache = generate_path_with_positions(noc_info);
+//         path = std::move(path_cache.path);
+//         link_to_position = std::move(path_cache.link_to_position);
+//     }
+
+//     // O(1) lookup for link position
+//     std::optional<size_t> get_link_position(size_t link_id) const {
+//         auto it = link_to_position.find(link_id);
+//         return (it != link_to_position.end()) ?
+//                std::make_optional(it->second) : std::nullopt;
+//     }
+
+// private:
+//     PathWithCache generate_path_with_positions(const NewNocInfo& noc_info) const {
+//         PathWithCache result;
+
+//         // Your existing routing algorithm here, but building both structures
+//         // Example routing logic (replace with your actual implementation):
+
+//         // Reserve space for efficiency if you know approximate path length
+//         result.path.reserve(16); // Adjust based on typical path lengths
+//         result.link_to_position.reserve(16);
+
+//         // Placeholder routing logic - replace with your actual algorithm
+//         // For example, if routing from src to dest through intermediate nodes:
+//         size_t current_node = src;
+//         size_t position = 0;
+
+//         while (current_node != dest) {
+//             // Your routing logic to find next link
+//             size_t next_link_id = find_next_link(current_node, dest, subnet, noc_info);
+
+//             // Add to both structures in single operation
+//             result.path.push_back(next_link_id);
+//             result.link_to_position[next_link_id] = position++;
+
+//             // Update current node based on link traversal
+//             current_node = get_next_node_from_link(current_node, next_link_id, noc_info);
+//         }
+
+//         return result;
+//     }
+
+//     // Helper functions for routing (implement based on your NoC topology)
+//     size_t find_next_link(size_t from_node, size_t to_node, size_t subnet, const NewNocInfo& noc_info) const {
+//         // Your routing logic here
+//         return 0; // placeholder
+//     }
+
+//     size_t get_next_node_from_link(size_t current_node, size_t link_id, const NewNocInfo& noc_info) const {
+//         // Your topology traversal logic here
+//         return 0; // placeholder
+//     }
+// };
+
+// // Updated registration function using O(1) position lookup
+// void sanafe::NewNocInfo::register_new_flow_with_overlaps_optimized(
+//     Flow& new_flow,
+//     const std::tuple<size_t, size_t, size_t>& new_flow_key)
+// {
+//     const auto& new_path = new_flow.path;
+
+//     // Track overlap information for each existing flow
+//     std::map<std::tuple<size_t, size_t, size_t>, size_t> overlap_counts;
+//     std::map<std::tuple<size_t, size_t, size_t>, size_t> new_flow_first_positions;
+//     std::map<std::tuple<size_t, size_t, size_t>, size_t> existing_flow_first_positions;
+
+//     // Single traversal with O(1) position lookups
+//     for (size_t link_idx = 0; link_idx < new_path.size(); ++link_idx)
+//     {
+//         size_t link_id = new_path[link_idx];
+
+//         // Add this link to reverse index for new flow
+//         link_to_flows[link_id].insert(new_flow_key);
+
+//         // Check existing flows on this link
+//         auto link_flows_it = link_to_flows.find(link_id);
+//         if (link_flows_it != link_to_flows.end())
+//         {
+//             for (const auto& existing_flow_key : link_flows_it->second)
+//             {
+//                 if (existing_flow_key == new_flow_key) continue;
+
+//                 auto existing_flow_it = flows.find(existing_flow_key);
+//                 if (existing_flow_it == flows.end()) continue;
+
+//                 const Flow& existing_flow = existing_flow_it->second;
+
+//                 // Handle subnet-specific overlap rules
+//                 if (new_flow.subnet != existing_flow.subnet)
+//                 {
+//                     if (new_flow.dest == existing_flow.dest && link_idx == new_path.size() - 1)
+//                     {
+//                         overlap_counts[existing_flow_key] = 1;
+//                         new_flow_first_positions[existing_flow_key] = link_idx;
+//                         existing_flow_first_positions[existing_flow_key] = existing_flow.path.size() - 1;
+//                     }
+//                 }
+//                 else
+//                 {
+//                     // Same subnet: count all overlaps with O(1) position lookup
+//                     if (overlap_counts.find(existing_flow_key) == overlap_counts.end())
+//                     {
+//                         new_flow_first_positions[existing_flow_key] = link_idx;
+
+//                         // O(1) position lookup instead of std::find!
+//                         auto existing_pos = existing_flow.get_link_position(link_id);
+//                         existing_flow_first_positions[existing_flow_key] = existing_pos.value_or(0);
+
+//                         overlap_counts[existing_flow_key] = 1;
+//                     }
+//                     else
+//                     {
+//                         ++overlap_counts[existing_flow_key];
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     // Register overlaps for both directions
+//     for (const auto& [existing_flow_key, overlap_count] : overlap_counts)
+//     {
+//         new_flow.flows_sharing_links[existing_flow_key] =
+//             std::make_pair(new_flow_first_positions[existing_flow_key], overlap_count);
+
+//         auto existing_flow_it = flows.find(existing_flow_key);
+//         if (existing_flow_it != flows.end())
+//         {
+//             existing_flow_it->second.flows_sharing_links[new_flow_key] =
+//                 std::make_pair(existing_flow_first_positions[existing_flow_key], overlap_count);
+//         }
+//     }
+// }
