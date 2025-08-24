@@ -811,8 +811,8 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         //   strategies to be chosen for the subnet, it could be encoded in the
         //   edge or maybe even dynamically chosen i.e. left unspecified here?
         // TODO this doesn't work, the core needs to track
-        m.subnet = n.core->last_subnet;
         n.core->last_subnet = (n.core->last_subnet + 1) % 2;
+        m.subnet = n.core->last_subnet;
 
         // Add axon access cost to message latency and energy
         AxonOutUnit &axon_out_hw = *(n.axon_out_hw);
@@ -1051,7 +1051,7 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
     auto scheduler_start_tm = energy_calculation_end_tm;
     if (scheduler.timing_model == timing_model_cycle_accurate)
     {
-        check_booksim_compatibility(scheduler, chip_count);
+        //check_booksim_compatibility(scheduler, chip_count);
     }
     schedule_messages(ts, scheduler, *booksim_config);
     auto scheduler_end_tm = std::chrono::high_resolution_clock::now();
@@ -1377,6 +1377,7 @@ void sanafe::SpikingChip::sim_reset_measurements()
             // Reset core
             c.energy = 0.0;
             c.next_message_generation_delay = 0.0;
+            //c.last_subnet = 0; // TODO: keep if using subnets, reset every timestep
 
             for (auto &axon : c.axon_in_hw)
             {
