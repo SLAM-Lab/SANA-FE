@@ -96,7 +96,7 @@ def parse_loihi_spiketrains(total_timesteps):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
     experiment = "time"
     #experiment = "energy"
@@ -242,10 +242,22 @@ if __name__ == "__main__":
         ts_messages_sanafe = sanafe_messages[(sanafe_messages["timestep"] == 128) & (sanafe_messages["mid"] >= 0)]
         ts_messages_booksim = booksim_messages[(booksim_messages["frame"] == 0) & (booksim_messages["timestep"] == 128)]
 
+        # Calculate R² value
+        x_data = ts_messages_sanafe["network_delay"].to_numpy()
+        y_data = ts_messages_booksim["network_cycles"].to_numpy() * 1.0e-9
+        # Calculate correlation coefficient and R2
+        correlation_matrix = np.corrcoef(x_data, y_data)
+        correlation = correlation_matrix[0, 1]
+        r_squared = correlation ** 2
+
+        print(f"R² value for one timestep: {r_squared:.4f}")
+        print(f"Correlation coefficient for one timestep: {correlation:.4f}")
+
         plt.figure()
-        plt.plot(ts_messages_sanafe["network_delay"].to_numpy(),
-                    ts_messages_booksim["network_cycles"].to_numpy() * 1.0e-9,
-                    "o", ms=10, alpha=0.5)
+        plt.plot(x_data, y_data, "o", ms=10, alpha=0.5)
+        # Add R² to the plot
+        plt.text(0.05, 0.95, f'R² = {r_squared:.4f}', transform=plt.gca().transAxes,
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
         plt.gca().set_box_aspect(1)
         plt.ylabel("SANA-FE model")
         plt.ylabel("Booksim2 model")
@@ -263,11 +275,21 @@ if __name__ == "__main__":
 
         # Third plot: Total network delays grouped by timestep
         plt.figure()
-        sanafe_messages = sanafe_messages[(sanafe_messages["mid"] >= 0)]
+        sanafe_messages = sanafe_messages[(sanafe_messages["mid"] >= 0) & (sanafe_messages["frame"] == 0)]
+        booksim_messages = booksim_messages[booksim_messages["frame"] == 0]
 
-        sanafe_per_timestep = sanafe_messages.groupby("timestep")["network_delay"].sum()
-        booksim_per_timestep = booksim_messages.groupby(["frame", "timestep"])["network_cycles"].sum() * 1.0e-9
-        plt.scatter(sanafe_per_timestep, booksim_per_timestep, s=10, alpha=0.05)
+        x_data = sanafe_messages.groupby("timestep")["network_delay"].sum()
+        y_data = booksim_messages.groupby(["frame", "timestep"])["network_cycles"].sum() * 1.0e-9
+        # Calculate correlation coefficient and R2
+        correlation_matrix = np.corrcoef(x_data, y_data)
+        correlation = correlation_matrix[0, 1]
+        r_squared = correlation ** 2
+        print(f"R² value for one frame: {r_squared:.4f}")
+        print(f"Correlation coefficient for one frame: {correlation:.4f}")
+
+        plt.scatter(x_data, y_data, s=10, alpha=0.5)
+        plt.text(0.05, 0.95, f'R² = {r_squared:.4f}', transform=plt.gca().transAxes,
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
         plt.xlabel("Total SANA-FE Network Delay [s]")
         plt.ylabel("Total Booksim2 Network Delay [s]")
         plt.title("Total Network Delays by Timestep: SANA-FE vs Booksim2")
