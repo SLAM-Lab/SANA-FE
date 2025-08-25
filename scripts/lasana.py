@@ -58,7 +58,7 @@ if dataset == "mnist":
     # I didn't store the labels during training, so load these from the original
     #  dataset
     # TODO: scrap the csv and just use this for inputs too..
-    test_dataset = datasets.MNIST(root="./runs/lasagna/data", train=False,
+    test_dataset = datasets.MNIST(root="./runs/lasana/data", train=False,
                                   download=True)
     labels = test_dataset.targets
 elif dataset == "shd":
@@ -77,7 +77,7 @@ elif dataset == "shd":
         transforms.Downsample(time_factor=0.1, spatial_factor=0.1),
         transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
     ])
-    testset = tonic.datasets.SHD(save_to=os.path.join(PROJECT_DIR, "runs", "lasagna", "data"),
+    testset = tonic.datasets.SHD(save_to=os.path.join(PROJECT_DIR, "runs", "lasana", "data"),
                                  transform=frame_transform, train=False)
     dataloader = torch.utils.data.DataLoader(testset, batch_size=1)
 
@@ -101,7 +101,7 @@ out_neurons = weights["fc2.weight"].shape[0]
 print(f"in:{in_neurons}, hidden:{hidden_neurons}, out:{out_neurons}")
 #"""
 # Load the LASAGNA architecture with analog neurons
-arch = sanafe.load_arch("/home/james/code/lasagna/lasagna.yaml")
+arch = sanafe.load_arch("/home/usr1/jboyle/neuro/lasana/lasana.yaml")
 
 print("Creating network in SANA-FE")
 network = sanafe.Network()
@@ -248,7 +248,7 @@ if dataset == "shd":
 
     #potentials_df.plot(x="timestep", y=columns_to_extract, ax=ax)
     #potentials_df.plot(x="timestep", ax=ax)
-    #plt.savefig("runs/lasagna/shd.png")
+    #plt.savefig("runs/lasana/shd.png")
 
     correct = 0
     start_timestep = 0
@@ -324,7 +324,7 @@ if dataset == "shd":
     ax_perf.get_legend().remove()
 
     ax_perf.set_xlabel("Time-step")
-    plt.savefig("runs/lasagna/shd_raster.png")
+    plt.savefig("runs/lasana/shd_raster.png")
 
 
 elif dataset == "mnist":
@@ -476,7 +476,7 @@ elif dataset == "mnist":
     ax_perf.get_legend().remove()
 
     ax_perf.set_xlabel("Time-step")
-    plt.savefig("runs/lasagna/mnist_raster.png")
+    plt.savefig("runs/lasana/mnist_raster.png")
 
 accuracy = (correct / num_inputs) * 100
 print(f"Accuracy: {accuracy}%")
