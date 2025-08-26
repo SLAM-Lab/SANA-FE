@@ -87,6 +87,17 @@ std::optional<T> yaml_optional_field(
     return optional_value;
 }
 
+template <typename T>
+void yaml_set_optional(const ryml::ConstNodeRef attributes,
+        const std::string field, std::optional<T> &value)
+{
+    const auto optional_value = yaml_optional_field<T>(attributes, field);
+    if (optional_value.has_value())
+    {
+        value = optional_value;
+    }
+}
+
 // Helper functions
 std::map<std::string, ModelAttribute> description_parse_model_attributes_yaml(const ryml::Parser &parser, ryml::ConstNodeRef attributes_node);
 ModelAttribute yaml_parse_attribute(const ryml::Parser &parser, ryml::ConstNodeRef attribute_node);

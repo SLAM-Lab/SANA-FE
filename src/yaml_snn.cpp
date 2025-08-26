@@ -334,22 +334,22 @@ sanafe::NeuronConfiguration sanafe::yaml_parse_neuron_attributes(
         return neuron_template;
     }
 
-    neuron_template.log_potential =
-            yaml_optional_field<bool>(attributes, "log_potential");
-    neuron_template.log_spikes =
-            yaml_optional_field<bool>(attributes, "log_spikes");
-    neuron_template.force_synapse_update =
-            yaml_optional_field<bool>(attributes, "force_synapse_update");
-    neuron_template.force_dendrite_update =
-            yaml_optional_field<bool>(attributes, "force_dendrite_update");
-    neuron_template.force_soma_update =
-            yaml_optional_field<bool>(attributes, "force_soma_update");
-    neuron_template.default_synapse_hw_name =
-            yaml_optional_field<std::string>(attributes, "synapse_hw_name");
-    neuron_template.dendrite_hw_name =
-            yaml_optional_field<std::string>(attributes, "dendrite_hw_name");
-    neuron_template.soma_hw_name =
-            yaml_optional_field<std::string>(attributes, "soma_hw_name");
+    yaml_set_optional<bool>(
+            attributes, "log_potential", neuron_template.log_potential);
+    yaml_set_optional<bool>(
+            attributes, "log_spikes", neuron_template.log_spikes);
+    yaml_set_optional<bool>(attributes, "force_synapse_update",
+            neuron_template.force_synapse_update);
+    yaml_set_optional<bool>(attributes, "force_dendrite_update",
+            neuron_template.force_dendrite_update);
+    yaml_set_optional<bool>(attributes, "force_soma_update",
+            neuron_template.force_soma_update);
+    yaml_set_optional<std::string>(attributes, "synapse_hw_name",
+            neuron_template.default_synapse_hw_name);
+    yaml_set_optional<std::string>(
+            attributes, "dendrite_hw_name", neuron_template.dendrite_hw_name);
+    yaml_set_optional<std::string>(
+            attributes, "soma_hw_name", neuron_template.soma_hw_name);
 
     // Parse and add shared attributes, which are in the same section. We assume
     //  that all attributes not listed above are model specific
