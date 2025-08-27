@@ -71,6 +71,80 @@ invalid: stuff
             sanafe::YamlDescriptionParsingError);
 }
 
+TEST(YamlSnnTest, ParseNeuronSimAttributesListOfMapsFlow)
+{
+    const std::string yaml = R"(
+- log_spikes: True
+- log_potential: True
+)";
+    // NOLINTBEGIN(misc-include-cleaner)
+    ryml::EventHandlerTree event_handler = {};
+    // Enable location tracking for helpful error prints
+    ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    auto tree = parse_yaml_snippet(yaml, parser);
+    auto node = tree.rootref();
+    auto config = sanafe::yaml_parse_neuron_attributes(parser, node);
+    EXPECT_EQ(config.log_spikes, true);
+    EXPECT_EQ(config.log_potential, true);
+    // Other attributes should be unset
+    EXPECT_EQ(config.default_synapse_hw_name, std::nullopt);
+}
+
+TEST(YamlSnnTest, ParseNeuronSimAttributesMapFlow)
+{
+    const std::string yaml = R"(
+log_spikes: True
+log_potential: False
+)";
+    // NOLINTBEGIN(misc-include-cleaner)
+    ryml::EventHandlerTree event_handler = {};
+    // Enable location tracking for helpful error prints
+    ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    auto tree = parse_yaml_snippet(yaml, parser);
+    auto node = tree.rootref();
+    auto config = sanafe::yaml_parse_neuron_attributes(parser, node);
+    EXPECT_EQ(config.log_spikes, true);
+    EXPECT_EQ(config.log_potential, false);
+    // Other attributes should be unset
+    EXPECT_EQ(config.default_synapse_hw_name, std::nullopt);
+}
+
+TEST(YamlSnnTest, ParseNeuronSimAttributesListOfMapsInline)
+{
+    const std::string yaml = R"(
+[log_spikes: True, log_potential: True]
+)";
+    // NOLINTBEGIN(misc-include-cleaner)
+    ryml::EventHandlerTree event_handler = {};
+    // Enable location tracking for helpful error prints
+    ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    auto tree = parse_yaml_snippet(yaml, parser);
+    auto node = tree.rootref();
+    auto config = sanafe::yaml_parse_neuron_attributes(parser, node);
+    EXPECT_EQ(config.log_spikes, true);
+    EXPECT_EQ(config.log_potential, true);
+    // Other attributes should be unset
+    EXPECT_EQ(config.default_synapse_hw_name, std::nullopt);
+}
+
+TEST(YamlSnnTest, ParseNeuronSimAttributesMapInline)
+{
+    const std::string yaml = R"(
+{log_spikes: True, log_potential: False}
+)";
+    // NOLINTBEGIN(misc-include-cleaner)
+    ryml::EventHandlerTree event_handler = {};
+    // Enable location tracking for helpful error prints
+    ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    auto tree = parse_yaml_snippet(yaml, parser);
+    auto node = tree.rootref();
+    auto config = sanafe::yaml_parse_neuron_attributes(parser, node);
+    EXPECT_EQ(config.log_spikes, true);
+    EXPECT_EQ(config.log_potential, false);
+    // Other attributes should be unset
+    EXPECT_EQ(config.default_synapse_hw_name, std::nullopt);
+}
+
 TEST(YamlSnnTest, ParseFullNetworkSection)
 {
     const std::string yaml = R"(
