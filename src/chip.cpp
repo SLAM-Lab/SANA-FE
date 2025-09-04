@@ -132,6 +132,18 @@ void sanafe::SpikingChip::load(const SpikingNetwork &net)
 {
     map_neurons(net);
     map_connections(net);
+    update_hw_in_use();
+}
+
+void sanafe::SpikingChip::update_hw_in_use()
+{
+    for (auto &tile : tiles)
+    {
+        for (auto &core : tile.cores)
+        {
+            core.update_hw_in_use();
+        }
+    }
 }
 
 void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
@@ -338,6 +350,7 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
                 (choose_first_by_default || (con.synapse_hw_name == hw->name)))
         {
             mapped_con.synapse_hw = hw.get();
+            mapped_con.synapse_hw->is_used = true;
             synapse_found = true;
             break;
         }
@@ -551,7 +564,7 @@ void sanafe::SpikingChip::reset()
         for (Core &core : tile.cores)
         {
             core.timestep_buffer.clear();
-            for (const auto &hw : core.pipeline_hw)
+            for (auto &hw : core.pipeline_hw)
             {
                 hw->reset();
             }
@@ -996,20 +1009,23 @@ void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
     for (auto &tile : tiles)
     {
         ts.total_hops += tile.hops;
-        for (auto &c : tile.cores)
+        for (auto &core : tile.cores)
         {
-            for (const auto &hw : c.pipeline_hw)
+            for (const auto &hw_ref : core.pipeline_hw_in_use)
             {
-                ts.spike_count += hw->spikes_processed;
-                ts.neurons_updated += hw->neurons_updated;
-                ts.neurons_fired += hw->neurons_fired;
+                PipelineUnit &hw = hw_ref.get();
+                assert(hw.is_used);
+                ts.spike_count += hw.spikes_processed;
+                ts.neurons_updated += hw.neurons_updated;
+                ts.neurons_fired += hw.neurons_fired;
             }
-            for (const auto &axon_out : c.axon_out_hw)
+            for (const auto &axon_out : core.axon_out_hw)
             {
                 ts.packets_sent += axon_out.packets_out;
             }
         }
     }
+
     TRACE1(CHIP, "Spikes sent: %ld\n", ts.spike_count);
 }
 
@@ -1174,24 +1190,25 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
     ts.network_energy += axon_in_energy;
 
     double pipeline_energy{0.0};
-    for (auto &pipeline_unit : core.pipeline_hw)
+    for (auto &pipeline_unit_ref : core.pipeline_hw_in_use)
     {
+        PipelineUnit &pipeline_unit = pipeline_unit_ref.get();
         // Separately track the total pipeline energy, as the same
         //  energy values may be added to multiple categories, i.e., if
         //  the pipeline h/w unit implements multiple functionality
-        pipeline_energy += pipeline_unit->energy;
+        pipeline_energy += pipeline_unit.energy;
 
-        if (pipeline_unit->implements_synapse)
+        if (pipeline_unit.implements_synapse)
         {
-            ts.synapse_energy += pipeline_unit->energy;
+            ts.synapse_energy += pipeline_unit.energy;
         }
-        if (pipeline_unit->implements_dendrite)
+        if (pipeline_unit.implements_dendrite)
         {
-            ts.dendrite_energy += pipeline_unit->energy;
+            ts.dendrite_energy += pipeline_unit.energy;
         }
-        if (pipeline_unit->implements_soma)
+        if (pipeline_unit.implements_soma)
         {
-            ts.soma_energy += pipeline_unit->energy;
+            ts.soma_energy += pipeline_unit.energy;
         }
     }
 

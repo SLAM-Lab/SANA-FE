@@ -125,6 +125,7 @@ private:
 
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
+    void update_hw_in_use();
     void forward_connection_attributes(const SpikingNetwork &net);
     MappedConnection &map_connection(const Connection &con);
     void map_axons();

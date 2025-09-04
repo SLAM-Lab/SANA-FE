@@ -139,6 +139,9 @@ public:
     bool log_energy{false};
     bool log_latency{false};
 
+    // Track whether the hardware is used by any mapped neurons
+    bool is_used{false};
+
 protected:
     std::set<std::string> supported_attribute_names{
             "log_spikes",

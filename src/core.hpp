@@ -73,6 +73,12 @@ public:
     std::vector<std::shared_ptr<PipelineUnit>> pipeline_hw;
     std::vector<AxonOutUnit> axon_out_hw;
 
+    // Store a subset of pipeline hw that is currently in use by the
+    //  mapped application. This is an optimization that improves performance
+    //  when there are a large number of h/w units e.g., circuits, and avoids
+    //  us making redundant updates
+    std::vector<std::reference_wrapper<PipelineUnit>> pipeline_hw_in_use;
+
     std::vector<std::reference_wrapper<Message>> messages_in;
     std::vector<AxonInModel> axons_in;
     std::vector<MappedNeuron> neurons;
@@ -98,6 +104,7 @@ public:
     AxonInUnit &create_axon_in(const AxonInConfiguration &config);
     PipelineUnit &create_pipeline_unit(const PipelineUnitConfiguration &config);
     AxonOutUnit &create_axon_out(const AxonOutConfiguration &config);
+    void update_hw_in_use();
     [[nodiscard]] size_t get_id() const { return id; }
     [[nodiscard]] size_t get_offset() const { return offset; }
     [[nodiscard]] std::string info() const noexcept;

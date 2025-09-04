@@ -68,8 +68,24 @@ sanafe::PipelineUnit *sanafe::Core::map_neuron_to_dendrite(
                 neuron_to_map.offset, neuron_to_map.dendrite_hw_name.c_str());
         throw std::runtime_error("Error: Could not map neuron to dendrite h/w");
     }
+    mapped_dendrite->neuron_count++;
+    mapped_dendrite->is_used = true;
 
     return mapped_dendrite;
+}
+
+void sanafe::Core::update_hw_in_use()
+{
+    std::vector<std::reference_wrapper<PipelineUnit>> hw_list;
+    for (const auto &hw : pipeline_hw)
+    {
+        if (hw->is_used)
+        {
+            hw_list.push_back(*hw);
+        }
+    }
+
+    pipeline_hw_in_use = hw_list;
 }
 
 sanafe::PipelineUnit *sanafe::Core::map_neuron_to_soma(
@@ -98,6 +114,7 @@ sanafe::PipelineUnit *sanafe::Core::map_neuron_to_soma(
         throw std::runtime_error("Error: Could not map neuron to soma h/w");
     }
     mapped_soma->neuron_count++;
+    mapped_soma->is_used = true;
 
     return mapped_soma;
 }
