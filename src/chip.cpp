@@ -136,10 +136,10 @@ void sanafe::SpikingChip::load(const SpikingNetwork &net, const bool overwrite)
     }
     map_neurons(net);
     map_connections(net);
-    update_hw_in_use();
+    record_hw_in_use();
 }
 
-void sanafe::SpikingChip::update_hw_in_use()
+void sanafe::SpikingChip::record_hw_in_use()
 {
     for (auto &tile : tiles)
     {
@@ -566,8 +566,6 @@ void sanafe::SpikingChip::step(Scheduler &scheduler)
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
     ++total_timesteps;
-    //Timestep ts = Timestep(total_timesteps);
-    //ts.set_cores(core_count);
 
     // Run and measure the wall-clock time taken to run the simulation
     const auto timestep_handle = sim_hw_timestep(total_timesteps, scheduler);

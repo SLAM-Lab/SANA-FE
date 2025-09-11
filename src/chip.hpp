@@ -127,7 +127,7 @@ private:
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
     std::string get_synapse_hw_name(const SpikingNetwork &net, const Connection &con);
-    void update_hw_in_use();
+    void record_hw_in_use();
     void map_connection(const Connection &con, const std::string hw_name);
     void map_axons();
     void track_mapped_neurons();

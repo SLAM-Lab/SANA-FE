@@ -116,14 +116,12 @@ sanafe::PipelineResult sanafe::LoihiSynapseModel::read_synapse(
 sanafe::PipelineResult sanafe::LoihiSynapseModel::update(
         const size_t synapse_address, const bool read)
 {
-    // TODO: add lookup table with different synapse read costs?
-    // More detailed Loihi synaptic model
-    // Either use a latency cost per synapse from earlier conversion/mapping stages
-    //  (most detailed) e.g., using additional info from the Loihi synapse
-    //  compiler to tag each edge. Or, if this isn't available, use a slightly
-    //  more detailed h/w model that considers the parallel 4-way processing
-    //  in the synapse unit, noting that we only parallelize reads from a single
-    //  spike message
+    // Either use a latency cost per synapse from earlier conversion/mapping
+    //  stages (most detailed) e.g., using additional info from the Loihi
+    //  synapse compiler to tag each edge. Or, if this isn't available, use a
+    //  slightly more detailed h/w model that considers the parallel 4-way
+    //  processing in the synapse unit, noting that we only parallelize reads
+    //  from a single spike message
     if (read)
     {
         return read_synapse(synapse_address);

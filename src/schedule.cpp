@@ -598,8 +598,8 @@ std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
 }
 
 // **** Thread management ****
-// TODO: make this agnostic to scheduling algorithm, so it can be applied to
-//  the simple and cycle accurate models in future
+// TODO: make the thread management agnostic to scheduling algorithm used, so it
+//  can be applied to the simple and cycle accurate models
 
 void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
 {

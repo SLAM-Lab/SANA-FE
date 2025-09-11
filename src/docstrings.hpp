@@ -247,7 +247,7 @@ constexpr const char *spiking_chip_load_doc = R"pbdoc(
 Map a neural network onto this chip's hardware architecture.
 
 network (Network): Spiking network to map onto hardware
-overwrite (bool, optional): Overwrite network on chip. Default is True.
+overwrite (bool, optional): Overwrite programmed spiking network. Default is True.
 )pbdoc";
 
 constexpr const char *spiking_chip_sim_doc = R"pbdoc(

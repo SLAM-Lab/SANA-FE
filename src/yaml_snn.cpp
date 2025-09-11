@@ -1172,7 +1172,7 @@ ryml::NodeRef sanafe::yaml_serialize_model_attributes(
     for (const auto &[key, attribute] : attributes)
     {
         TRACE1(DESCRIPTION, "Adding attribute %s\n", key.c_str());
-        // TODO: support model-specific attributes
+        // TODO: support saving model-specific attributes
         if ((key == "synapse") || (key == "dendrite") || (key == "soma"))
         {
             continue;
