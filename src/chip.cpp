@@ -344,14 +344,18 @@ sanafe::MappedConnection &sanafe::SpikingChip::map_connection(
 
     const bool choose_first_by_default = (con.synapse_hw_name.empty());
     bool synapse_found = false;
+    TRACE3(CHIP, "Searching for synapse unit: %s\n",
+            con.synapse_hw_name.c_str());
     for (auto &hw : post_core.pipeline_hw)
     {
+        TRACE3(CHIP, "Checking against synapse unit: %s\n", hw->name.c_str());
         if (hw->implements_synapse &&
                 (choose_first_by_default || (con.synapse_hw_name == hw->name)))
         {
             mapped_con.synapse_hw = hw.get();
             mapped_con.synapse_hw->is_used = true;
             synapse_found = true;
+            TRACE3(CHIP, "Found match: %s\n", hw->name.c_str());
             break;
         }
     }
