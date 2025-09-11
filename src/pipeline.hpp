@@ -262,7 +262,7 @@ BufferPosition pipeline_parse_buffer_pos_str(
         const std::string &buffer_pos_str, bool buffer_inside_unit);
 }
 
-// Include these member function definition in-line rather than in pipeline.cpp
+// Include these member function definition inline rather than in pipeline.cpp
 //  to avoid linkage issues with plug-ins. Generally, header-only approaches
 //  are useful in this situation. In this case, I've inlined only public and
 //  protected members. Private members can be defined externally.
@@ -358,6 +358,15 @@ inline sanafe::PipelineUnit::PipelineUnit(const bool implements_synapse,
     //  already been handled above
 }
 
+inline void sanafe::PipelineUnit::register_attributes(
+        const std::set<std::string> &attribute_names)
+{
+    for (const auto &attr : attribute_names)
+    {
+        supported_attribute_names.insert(attr);
+    }
+}
+
 inline void sanafe::PipelineUnit::process_synapse_output(MappedNeuron & /*n*/,
         std::optional<MappedConnection *> con, PipelineResult &output)
 {
@@ -381,14 +390,21 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
         Timestep & /*ts*/, MappedNeuron & /*n*/,
         std::optional<MappedConnection *> con, const PipelineResult & /*input*/)
 {
+    bool read = false;
+    size_t synapse_address = 0UL;
+
     if (!con.has_value())
     {
-        throw std::runtime_error(
-                "Pipeline error, didn't receive "
-                "synaptic connection info. Check that no h/w unit is being "
-                "invoked before this one in the pipeline.");
+        INFO("Pipeline warning, didn't receive "
+             "synaptic connection info. Check that no h/w unit is being "
+             "invoked before this one in the pipeline.");
     }
-    PipelineResult output = update(con.value()->synapse_address, true);
+    else
+    {
+        synapse_address = con.value()->synapse_address;
+        read = true;
+    }
+    PipelineResult output = update(synapse_address, read);
     ++spikes_processed;
 
     return output;

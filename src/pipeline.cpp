@@ -73,15 +73,6 @@ void sanafe::PipelineUnit::check_outputs(
     }
 }
 
-void sanafe::PipelineUnit::register_attributes(
-        const std::set<std::string> &attribute_names)
-{
-    for (const auto &attr : attribute_names)
-    {
-        supported_attribute_names.insert(attr);
-    }
-}
-
 void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
 {
     if (supported_attribute_names.find(attribute_name) ==
