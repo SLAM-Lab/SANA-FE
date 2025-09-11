@@ -128,9 +128,12 @@ sanafe::SpikingChip::~SpikingChip()
     chip_count--;
 }
 
-void sanafe::SpikingChip::load(const SpikingNetwork &net)
+void sanafe::SpikingChip::load(const SpikingNetwork &net, const bool overwrite)
 {
-    // TODO: reset h/w unit usage counters whenever loading new app
+    if (overwrite)
+    {
+        clear_hw();
+    }
     map_neurons(net);
     map_connections(net);
     update_hw_in_use();
@@ -145,6 +148,38 @@ void sanafe::SpikingChip::update_hw_in_use()
             core.update_hw_in_use();
         }
     }
+}
+
+void sanafe::SpikingChip::clear_hw()
+{
+    INFO("Cleared programmed h/w\n");
+    // Reset h/w ready to be programmed with a spiking network
+    for (Tile &tile : tiles)
+    {
+        for (Core &core : tile.cores)
+        {
+            // Tear down connectivity structures, these can be reprogrammed
+            core.neurons.clear();
+            core.axons_in.clear();
+            core.axons_out.clear();
+            core.connections_in.clear();
+            core.timestep_buffer.clear();
+
+            mapped_tiles = 0UL;
+            mapped_cores = 0UL;
+
+            for (auto &hw : core.pipeline_hw)
+            {
+                // Reset counters and any internal model state
+                hw->neuron_count = 0;
+                hw->connection_count = 0;
+                hw->is_used = false;
+                hw->reset();
+            }
+        }
+    }
+
+    mapped_neuron_groups.clear();
 }
 
 void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)

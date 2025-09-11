@@ -60,7 +60,7 @@ public:
     SpikingChip &operator=(SpikingChip &&other) = delete;
     RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false, std::string output_dir = "");
     void step(Scheduler &scheduler);
-    void load(const SpikingNetwork &net);
+    void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
     void flush_timestep_data(RunData &rd, Scheduler &scheduler);
     void retire_timestep(const Timestep &ts);
@@ -123,6 +123,7 @@ private:
     std::ofstream message_trace;
     std::ofstream perf_trace;
 
+    void clear_hw();
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
     std::string get_synapse_hw_name(const SpikingNetwork &net, const Connection &con);
