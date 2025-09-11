@@ -33,9 +33,11 @@ public:
     std::reference_wrapper<MappedNeuron> post_neuron_ref;
     PipelineUnit *synapse_hw{nullptr};
     std::vector<PipelineUnit *> message_processing_pipeline;
-    size_t synapse_address{0UL};
+    size_t connection_offset{0UL};
+    size_t mapped_synapse_hw_address{0UL};
 
     explicit MappedConnection(std::reference_wrapper<MappedNeuron> pre_neuron, std::reference_wrapper<MappedNeuron> post_neuron);
+    void set_model_attributes(const std::map<std::string, sanafe::ModelAttribute> &model_attributes) const;
     void build_message_processing_pipeline();
 };
 
@@ -56,7 +58,9 @@ public:
     AxonOutUnit *axon_out_hw{nullptr};
     std::vector<PipelineUnit *> neuron_processing_pipeline;
 
-    size_t mapped_address{-1ULL};
+    size_t mapped_offset_within_core{-1ULL};
+    size_t mapped_dendrite_hw_address{-1ULL};
+    size_t mapped_soma_hw_address{-1ULL};
     size_t mapping_order;
     int spike_count{0};
     int maps_in_count{0};
@@ -70,7 +74,7 @@ public:
     bool log_spikes{false};
     bool log_potential{false};
 
-    MappedNeuron(const Neuron &neuron_to_map, size_t nid, Core *mapped_core, PipelineUnit *mapped_soma, size_t mapped_address, AxonOutUnit *mapped_axon_out, PipelineUnit *mapped_dendrite);
+    MappedNeuron(const Neuron &neuron_to_map, size_t nid, size_t mapped_offset_within_core, Core *mapped_core, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
     MappedNeuron(const MappedNeuron &copy) = default;
     ~MappedNeuron() = default;
     MappedNeuron& operator=(const MappedNeuron& other) = default;

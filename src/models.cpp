@@ -346,9 +346,9 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
         time_constants = static_cast<std::vector<double>>(param);
         if (time_constants.size() < n_taps)
         {
-            const std::string error = "Expected " +
-                    std::to_string(n_taps) + " but received " +
-                    std::to_string(time_constants.size()) + "time constants.";
+            const std::string error = "Expected " + std::to_string(n_taps) +
+                    " but received " + std::to_string(time_constants.size()) +
+                    "time constants.";
             throw std::invalid_argument(error);
         }
         if (time_constants.size() > n_taps)
@@ -365,9 +365,9 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
         space_constants = static_cast<std::vector<double>>(param);
         if (space_constants.size() < (n_taps - 1))
         {
-            const std::string error = "Expected " +
-                    std::to_string(n_taps - 1) + " but received " +
-                    std::to_string(time_constants.size()) + "time constants.";
+            const std::string error = "Expected " + std::to_string(n_taps - 1) +
+                    " but received " + std::to_string(time_constants.size()) +
+                    "time constants.";
             throw std::invalid_argument(error);
         }
         if (space_constants.size() > (n_taps - 1))

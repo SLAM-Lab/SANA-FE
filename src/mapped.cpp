@@ -29,7 +29,9 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
 
     // We don't support putting the buffer inside or before the synapse unit, so
     //  unconditionally push the synapse h/w. This is because putting the buffer
-    //  here could cause a spike sent that shouldn't be
+    //  here could result in a spike being sent before all computation for the
+    //  time-step has being completed (i.e. the order of spike arrival can
+    //  affect the results)
     message_processing_pipeline.push_back(synapse_hw);
     if ((mapped_core.pipeline_config.buffer_position >
                 buffer_before_dendrite_unit) &&
@@ -45,10 +47,32 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
     }
 }
 
+void sanafe::MappedConnection::set_model_attributes(
+        const std::map<std::string, sanafe::ModelAttribute> &model_attributes)
+        const
+{
+    for (const auto &[key, value] : model_attributes)
+    {
+        if (value.forward_to_synapse)
+        {
+            synapse_hw->check_attribute(key);
+            synapse_hw->set_attribute_edge(
+                    mapped_synapse_hw_address, key, value);
+        }
+        if (value.forward_to_dendrite)
+        {
+            MappedNeuron &n = post_neuron_ref;
+            n.dendrite_hw->check_attribute(key);
+            n.dendrite_hw->set_attribute_edge(
+                    mapped_synapse_hw_address, key, value);
+        }
+    }
+}
+
 sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
-        const size_t nid, Core *mapped_core, PipelineUnit *mapped_soma,
-        const size_t mapped_address, AxonOutUnit *mapped_axon_out,
-        PipelineUnit *mapped_dendrite)
+        const size_t nid, const size_t mapped_offset_within_core,
+        Core *mapped_core, PipelineUnit *mapped_dendrite,
+        PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out)
         : parent_group_name(neuron_to_map.parent_group_name)
         , offset(neuron_to_map.offset)
         , id(nid)
@@ -56,7 +80,7 @@ sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
         , dendrite_hw(mapped_dendrite)
         , soma_hw(mapped_soma)
         , axon_out_hw(mapped_axon_out)
-        , mapped_address(mapped_address)
+        , mapped_offset_within_core(mapped_offset_within_core)
         , mapping_order(neuron_to_map.mapping_order)
         , force_synapse_update(neuron_to_map.force_synapse_update)
         , force_dendrite_update(neuron_to_map.force_dendrite_update)
@@ -65,7 +89,6 @@ sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
         , log_potential(neuron_to_map.log_potential)
 
 {
-    set_model_attributes(neuron_to_map.model_attributes);
     build_neuron_processing_pipeline();
 }
 
@@ -81,12 +104,14 @@ void sanafe::MappedNeuron::set_model_attributes(
         if (attribute.forward_to_dendrite && (dendrite_hw != nullptr))
         {
             dendrite_hw->check_attribute(key);
-            dendrite_hw->set_attribute_neuron(mapped_address, key, attribute);
+            dendrite_hw->set_attribute_neuron(
+                    mapped_dendrite_hw_address, key, attribute);
         }
         if (attribute.forward_to_soma && (soma_hw != nullptr))
         {
             soma_hw->check_attribute(key);
-            soma_hw->set_attribute_neuron(mapped_address, key, attribute);
+            soma_hw->set_attribute_neuron(
+                    mapped_soma_hw_address, key, attribute);
         }
     }
 }

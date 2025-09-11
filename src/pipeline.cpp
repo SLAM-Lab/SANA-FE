@@ -56,6 +56,31 @@ void sanafe::PipelineUnit::check_implemented(
     }
 }
 
+size_t sanafe::PipelineUnit::add_connection(const MappedConnection &con)
+{
+    // Add connection and update connection's address
+    MappedNeuron &pre_neuron = con.pre_neuron_ref.get();
+    MappedNeuron &post_neuron = con.post_neuron_ref.get();
+
+    // Allow the implemented h/w unit to add its own tracking for each
+    //  connection if needed
+    track_connection(
+            con.mapped_synapse_hw_address, pre_neuron.id, post_neuron.id);
+
+    is_used = true;
+    connection_count++;
+
+    return (connection_count - 1);
+}
+
+size_t sanafe::PipelineUnit::add_neuron()
+{
+    neuron_count++;
+    is_used = true;
+
+    return (neuron_count - 1);
+}
+
 void sanafe::PipelineUnit::check_outputs(
         const MappedNeuron & /*n*/, const PipelineResult &result) const
 {

@@ -42,7 +42,7 @@ sanafe::Core::Core(const CoreConfiguration &config)
     timestep_buffer.resize(pipeline_config.max_neurons_supported);
 }
 
-sanafe::PipelineUnit *sanafe::Core::map_neuron_to_dendrite(
+sanafe::PipelineUnit *sanafe::Core::get_dendrite_hw_to_map(
         const Neuron &neuron_to_map)
 {
     PipelineUnit *mapped_dendrite{nullptr};
@@ -68,8 +68,6 @@ sanafe::PipelineUnit *sanafe::Core::map_neuron_to_dendrite(
                 neuron_to_map.offset, neuron_to_map.dendrite_hw_name.c_str());
         throw std::runtime_error("Error: Could not map neuron to dendrite h/w");
     }
-    mapped_dendrite->neuron_count++;
-    mapped_dendrite->is_used = true;
 
     return mapped_dendrite;
 }
@@ -88,7 +86,7 @@ void sanafe::Core::update_hw_in_use()
     pipeline_hw_in_use = hw_list;
 }
 
-sanafe::PipelineUnit *sanafe::Core::map_neuron_to_soma(
+sanafe::PipelineUnit *sanafe::Core::get_soma_hw_to_map(
         const Neuron &neuron_to_map)
 {
     PipelineUnit *mapped_soma{nullptr};
@@ -113,8 +111,6 @@ sanafe::PipelineUnit *sanafe::Core::map_neuron_to_soma(
                 neuron_to_map.offset, neuron_to_map.soma_hw_name.c_str());
         throw std::runtime_error("Error: Could not map neuron to soma h/w");
     }
-    mapped_soma->neuron_count++;
-    mapped_soma->is_used = true;
 
     return mapped_soma;
 }
@@ -132,17 +128,17 @@ void sanafe::Core::map_neuron(
         throw std::runtime_error("Error: Exceeded maximum neurons per core.");
     }
 
-    // Map neuron model to dendrite and soma hardware units in this core.
+    // Map neuron model to dendrite and soma h/w units in this core.
     //  Search through all models implemented by this core and return the
-    //  one that matches. If no dendrite / soma hardware is specified,
+    //  one that matches. If no dendrite / soma h/w is specified,
     //  default to the first one defined
     if (pipeline_hw.empty())
     {
         INFO("Error: No pipeline units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No units defined");
     }
-    PipelineUnit *mapped_dendrite = map_neuron_to_dendrite(neuron_to_map);
-    PipelineUnit *mapped_soma = map_neuron_to_soma(neuron_to_map);
+    PipelineUnit *mapped_dendrite_hw = get_dendrite_hw_to_map(neuron_to_map);
+    PipelineUnit *mapped_soma_hw = get_soma_hw_to_map(neuron_to_map);
 
     if (axon_out_hw.empty())
     {
@@ -151,10 +147,27 @@ void sanafe::Core::map_neuron(
     }
     AxonOutUnit *mapped_axon_out = axon_out_hw.data();
 
-    // Map the neuron to the core and its hardware units
-    const size_t address = neurons.size();
-    neurons.emplace_back(neuron_to_map, neuron_id, this, mapped_soma, address,
-            mapped_axon_out, mapped_dendrite);
+    // Map the neuron to the core and its h/w units
+    const size_t neuron_offset_within_core = neurons.size();
+    MappedNeuron &mapped_neuron = neurons.emplace_back(neuron_to_map, neuron_id,
+            neuron_offset_within_core, this, mapped_dendrite_hw, mapped_soma_hw,
+            mapped_axon_out);
+
+    mapped_neuron.mapped_dendrite_hw_address =
+            static_cast<size_t>(mapped_dendrite_hw->add_neuron());
+    if (mapped_soma_hw != mapped_dendrite_hw)
+    {
+        mapped_neuron.mapped_soma_hw_address =
+                static_cast<size_t>(mapped_soma_hw->add_neuron());
+    }
+    else // is a combined dendrite/soma h/w unit
+    {
+        // For combined units, do not map a neuron to the same h/w unit twice
+        mapped_neuron.mapped_soma_hw_address =
+                mapped_neuron.mapped_dendrite_hw_address;
+    }
+
+     mapped_neuron.set_model_attributes(neuron_to_map.model_attributes);
 }
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(

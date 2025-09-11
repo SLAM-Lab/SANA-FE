@@ -110,8 +110,8 @@ public:
     [[nodiscard]] std::string info() const noexcept;
 
 private:
-    PipelineUnit *map_neuron_to_dendrite(const Neuron &neuron_to_map);
-    PipelineUnit *map_neuron_to_soma(const Neuron &neuron_to_map);
+    PipelineUnit *get_dendrite_hw_to_map(const Neuron &neuron_to_map);
+    PipelineUnit *get_soma_hw_to_map(const Neuron &neuron_to_map);
 };
 
 }

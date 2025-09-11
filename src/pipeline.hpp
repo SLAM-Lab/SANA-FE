@@ -96,9 +96,8 @@ public:
     void register_attributes(const std::set<std::string> &attribute_names);
     void check_attribute(std::string attribute_name);
     void check_implemented(bool check_implements_synapse, bool check_implements_dendrite, bool check_implements_soma) const;
-
-    // using InputInterfaceFunc = PipelineResult (PipelineUnit:: *)(Timestep &, MappedNeuron &, std::optional<MappedConnection*>, const PipelineResult &);
-    // using OutputInterfaceFunc = void (*)(MappedNeuron &, std::optional<MappedConnection *>, PipelineResult &);
+    size_t add_neuron();
+    size_t add_connection(const MappedConnection &con);
 
     using InputInterfaceFunc = std::function<PipelineResult(Timestep&, MappedNeuron&, std::optional<MappedConnection*>, const PipelineResult&)>;
     using OutputInterfaceFunc = std::function<void(MappedNeuron&, std::optional<MappedConnection*>, PipelineResult&)>;
@@ -123,7 +122,10 @@ public:
     long int spikes_processed{0L};
     long int neurons_updated{0L};
     long int neurons_fired{0L};
+
+    // Mapped neuron and connection counts
     long int neuron_count{0L};
+    long int connection_count{0L};
 
     // Warning counter (in case we get attributes we don't recognize)
     long int attribute_warnings{0L};
@@ -139,7 +141,7 @@ public:
     bool log_energy{false};
     bool log_latency{false};
 
-    // Track whether the hardware is used by any mapped neurons
+    // Track whether the hardware is used by any mapped neurons or connections
     bool is_used{false};
 
 protected:
@@ -401,7 +403,7 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
     }
     else
     {
-        synapse_address = con.value()->synapse_address;
+        synapse_address = con.value()->mapped_synapse_hw_address;
         read = true;
     }
     PipelineResult output = update(synapse_address, read);
@@ -419,9 +421,10 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_input(
     std::optional<size_t> synapse_address{std::nullopt};
     if (con.has_value() && (con.value() != nullptr))
     {
-        synapse_address = con.value()->synapse_address;
+        synapse_address = con.value()->mapped_synapse_hw_address;
     }
-    output = update(n.mapped_address, input.current, synapse_address);
+    output = update(
+            n.mapped_dendrite_hw_address, input.current, synapse_address);
 
     return output;
 }
@@ -430,7 +433,7 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_soma_input(
         Timestep & /*ts*/, MappedNeuron &n,
         std::optional<MappedConnection *> /*con*/, const PipelineResult &input)
 {
-    PipelineResult output = update(n.mapped_address, input.current);
+    PipelineResult output = update(n.mapped_soma_hw_address, input.current);
     return output;
 }
 

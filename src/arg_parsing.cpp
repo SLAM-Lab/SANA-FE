@@ -10,7 +10,8 @@
 #include <omp.h>
 #endif
 
-namespace {
+namespace
+{
 
 std::string_view get_next_arg(
         const std::vector<std::string> &args, const size_t current_idx)

@@ -342,8 +342,8 @@ sanafe::NeuronConfiguration sanafe::yaml_parse_neuron_attributes(
             neuron_template.force_synapse_update);
     yaml_set_optional<bool>(attributes, "force_dendrite_update",
             neuron_template.force_dendrite_update);
-    yaml_set_optional<bool>(attributes, "force_soma_update",
-            neuron_template.force_soma_update);
+    yaml_set_optional<bool>(
+            attributes, "force_soma_update", neuron_template.force_soma_update);
     yaml_set_optional<std::string>(attributes, "synapse_hw_name",
             neuron_template.default_synapse_hw_name);
     yaml_set_optional<std::string>(
@@ -908,14 +908,20 @@ void sanafe::description_parse_mapping_info(const ryml::Parser &parser,
         if (!info.find_child("synapse").invalid())
         {
             info["synapse"] >> n.default_synapse_hw_name;
+            TRACE3(DESCRIPTION, "Parsed default synapse unit name: %s\n",
+                    n.default_synapse_hw_name.c_str());
         }
         if (!info.find_child("dendrite").invalid())
         {
             info["dendrite"] >> n.dendrite_hw_name;
+            TRACE3(DESCRIPTION, "Parsed dendrite unit name: %s",
+                    n.default_synapse_hw_name.c_str());
         }
         if (!info.find_child("soma").invalid())
         {
             info["soma"] >> n.soma_hw_name;
+            TRACE3(DESCRIPTION, "Parsed soma unit name: %s",
+                    n.default_synapse_hw_name.c_str());
         }
         if (!info.find_child("core").invalid())
         {
@@ -1336,21 +1342,18 @@ void sanafe::yaml_create_mappings(ryml::NodeRef &node,
         const std::string &core_ref = strings.emplace_back(core_address);
         mapping_info["core"] << core_ref;
 
-        // Add hardware component names if consistently used by all neurons in
-        //  range
-        if (!neuron.soma_hw_name.empty())
+        // Add h/w unit names if defined for all given neurons in range
+        if (!neuron.default_synapse_hw_name.empty())
         {
-            mapping_info["soma"] << neuron.soma_hw_name;
+            mapping_info["synapse"] << neuron.default_synapse_hw_name;
         }
-
         if (!neuron.dendrite_hw_name.empty())
         {
             mapping_info["dendrite"] << neuron.dendrite_hw_name;
         }
-
-        if (!neuron.default_synapse_hw_name.empty())
+        if (!neuron.soma_hw_name.empty())
         {
-            mapping_info["synapse"] << neuron.default_synapse_hw_name;
+            mapping_info["soma"] << neuron.soma_hw_name;
         }
     }
 }
