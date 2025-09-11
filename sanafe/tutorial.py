@@ -124,7 +124,7 @@ def check_exercise_snns_2(snn):
         print(f"{red_text}Exercise 2: FAIL - Expected 3 edges but got {len(edges)}{default_text}")
         return
 
-    # TODO: check weights are correct
+    # TODO: check weight values are correct
 
     print(f"{green_text}Exercise 2: PASS{default_text}")
 

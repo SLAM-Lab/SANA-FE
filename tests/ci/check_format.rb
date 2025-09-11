@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-#TODO: break format
 require 'fileutils'
 
 log_dir = ENV["SANAFE_CI_LOG_DIR"] || "logs/commit-latest"
