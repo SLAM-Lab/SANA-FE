@@ -286,8 +286,7 @@ void sanafe::MultiTapModel1D::input_current(
     }
     if ((tap < 0) || (static_cast<size_t>(tap) >= tap_voltages.size()))
     {
-        const std::string error(
-                "Error: tap should be >= 0 and less than taps.\n");
+        const std::string error("Tap should be >= 0 and less than taps.\n");
         throw std::logic_error(error);
     }
 
@@ -329,7 +328,7 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
         const size_t n_taps = static_cast<int>(param);
         if (n_taps == 0)
         {
-            throw std::invalid_argument("Error: Number of taps must be > 0\n");
+            throw std::invalid_argument("Number of taps must be > 0\n");
         }
         if (tap_voltages.size() > n_taps)
         {
@@ -347,7 +346,7 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
         time_constants = static_cast<std::vector<double>>(param);
         if (time_constants.size() < n_taps)
         {
-            const std::string error = "Error: Expected " +
+            const std::string error = "Expected " +
                     std::to_string(n_taps) + " but received " +
                     std::to_string(time_constants.size()) + "time constants.";
             throw std::invalid_argument(error);
@@ -366,7 +365,7 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
         space_constants = static_cast<std::vector<double>>(param);
         if (space_constants.size() < (n_taps - 1))
         {
-            const std::string error = "Error: Expected " +
+            const std::string error = "Expected " +
                     std::to_string(n_taps - 1) + " but received " +
                     std::to_string(time_constants.size()) + "time constants.";
             throw std::invalid_argument(error);
@@ -424,7 +423,7 @@ void sanafe::LoihiLifModel::set_attribute_hw(
         {
             INFO("Error: Failed to open noise stream: %s.\n",
                     noise_filename.c_str());
-            throw std::runtime_error("Error: Failed to open noise stream");
+            throw std::runtime_error("Failed to open noise stream");
         }
     }
 }
@@ -538,14 +537,13 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     LoihiCompartment &cx = compartments[neuron_address];
     if (cx.timesteps_simulated == simulation_time)
     {
-        throw std::runtime_error("Error: This Loihi model does not support "
-                                 "multiple updates to the same compartment "
-                                 "in one time-step.");
+        throw std::runtime_error(
+                "This model does not support multiple updates to the "
+                "same compartment in one time-step.");
     }
     if (cx.timesteps_simulated < (simulation_time - 1))
     {
-        throw std::runtime_error(
-                "Error: This Loihi model must update every time-step.\n");
+        throw std::runtime_error("This model must update every time-step.\n");
     }
 
     // Calculate the change in potential since the last update e.g.
@@ -645,8 +643,8 @@ int sanafe::LoihiLifModel::loihi_read_noise_stream()
     }
     else
     {
-        INFO("Error: Couldn't read noise entry from file\n");
-        throw std::runtime_error("Couldn't read noise entry");
+        INFO("Error: Couldn't read noise entry from file.\n");
+        throw std::runtime_error("Couldn't read noise entry from file");
     }
 
     return random_val;
@@ -878,10 +876,9 @@ sanafe::PipelineResult sanafe::InputModel::update(
     if (current_in.has_value() && (current_in.value() != 0.0))
     {
         const std::string error =
-                "Error: Current sent to input neuron which cannot "
-                "be processed (" +
+                "Current sent to input neuron which cannot be processed (" +
                 std::to_string(current_in.value()) + ")";
-        INFO("%s\n", error.c_str());
+        INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
 
@@ -934,7 +931,7 @@ sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
     }
     else
     {
-        throw std::invalid_argument("Error: reset mode not recognized");
+        throw std::invalid_argument("Reset mode not recognized");
     }
 
     return reset_mode;
