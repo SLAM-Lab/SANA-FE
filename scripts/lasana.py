@@ -36,10 +36,10 @@ if dataset == "mnist":
     #num_inputs = 10000
 elif dataset == "shd":
     timesteps = None
-    num_inputs = 1
+    #num_inputs = 1
     #num_inputs = 10
     #num_inputs = 100
-    #num_inputs = 2264
+    num_inputs = 2264  # Entire test set
 
 print(f"Loading models for {dataset}")
 weights = {}
@@ -62,19 +62,41 @@ if dataset == "mnist":
                                   download=True)
     labels = test_dataset.targets
 elif dataset == "shd":
+    # TODO: clean this up for future, or export the indiveri pt file to not have
+    #  all of these dependencies
+    import spiking_digits_indiveri
+    from spiking_digits_indiveri import *
+    import predict_ml_model_helpers
+    from predict_ml_model_helpers import *
     # Load the Spiking Digits network
     spiking_digits_model = torch.load(
-            os.path.join(PROJECT_DIR, "etc", "spiking_digits.pt"),
+            #os.path.join(PROJECT_DIR, "etc", "spiking_digits.pt"),
+            os.path.join(PROJECT_DIR, "etc", "spiking_digits_indiveri_best_71-2.pt"),
             pickle_module=dill,
             map_location=torch.device("cpu"))
     weights = {}
     for attribute_name, param in spiking_digits_model.named_parameters():
         weights[attribute_name] = param.detach().numpy()
 
+    spiking_digits_old_model = torch.load(
+            os.path.join(PROJECT_DIR, "etc", "spiking_digits.pt"),
+            pickle_module=dill,
+            map_location=torch.device("cpu"))
+    old_weights = {}
+    for attribute_name, param in spiking_digits_old_model.named_parameters():
+        old_weights[attribute_name] = param.detach().numpy()
+
+    #print(weights.keys())
+    #print(weights["fc2.bias"])
+    # input()
+    #print(old_weights["fc2.bias"])
+    # exit()
+
     # Load the spiking digits test inputs from the raw dataset, applying the
     #  same transformations as the training scripts
     frame_transform = transforms.Compose([
-        transforms.Downsample(time_factor=0.1, spatial_factor=0.1),
+        #transforms.Downsample(time_factor=0.1, spatial_factor=0.1), # For my trained experiments
+        transforms.Downsample(time_factor=0.05, spatial_factor=0.1),  # For Jason's circuit aware trained experiments
         transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
     ])
     testset = tonic.datasets.SHD(save_to=os.path.join(PROJECT_DIR, "runs", "lasana", "data"),
@@ -124,7 +146,8 @@ for id, neuron in enumerate(hidden_layer):
         "reset_mode": "hard",
     }
     if dataset == "shd":
-        hidden_parameters["input_decay"] = weights["lif1.alpha"][id]
+        #hidden_parameters["input_decay"] = weights["lif1.alpha"][id]
+        hidden_parameters["input_decay"] = 0.0
 
     if analog_neurons:
         neuron.set_attributes(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
@@ -222,8 +245,10 @@ for input in range(num_inputs):
         raise Exception(f"Dataset: {dataset} not recognized!")
 
     print(f"Simulating for {timesteps} timesteps")
-    results = hw.sim(timesteps,  spike_trace="spikes.csv",
-                     potential_trace="potentials.csv", perf_trace="perf.csv")
+    is_first_input = (input == 0)
+    results = hw.sim(timesteps, spike_trace="spikes.csv",
+                     potential_trace="potentials.csv", perf_trace="perf.csv",
+                     write_trace_headers=is_first_input, processing_threads=16)
     timesteps_per_input.append(timesteps)
     # print(results)
     hw.reset()
