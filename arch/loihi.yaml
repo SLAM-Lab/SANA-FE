@@ -9,6 +9,9 @@ architecture:
     width: 8
     height: 4
     link_buffer_size: 16
+    #sync_model: fixed
+    #latency_sync: 0.0
+    # Enable this if simulating with more detailed timing models
     sync_model: table
     latency_sync: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
   tile:
@@ -60,18 +63,18 @@ architecture:
                 latency_process_spike: 3.8e-9
             - name: loihi_sparse_synapse
               attributes:
-                model: current_based
                 energy_process_spike: 33.6e-12
+                model: current_based
                 latency_process_spike: 4.7e-9
-                # model: loihi
-                # latency_concurrent_access: 4.7e-9
-                #
+                #model: loihi
+                #latency_concurrent_access: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
-                model: current_based
-                latency_process_spike: 3.1e-9
+                #model: current_based
+                #latency_process_spike: 3.1e-9
+                #latency_process_spike: 4.7e-9
                 energy_process_spike: 24.0e-12
-                #model: loihi
+                model: loihi
           dendrite:
           - name: loihi_dendrites
             attributes:
