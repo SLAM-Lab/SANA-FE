@@ -1510,7 +1510,9 @@ PYBIND11_MODULE(sanafecpp, m)
             .def(pybind11::init<sanafe::Architecture &>(),
                     pybind11::arg("arch"))
             .def("load", &sanafe::SpikingChip::load,
-                    docstrings::spiking_chip_load_doc)
+                    docstrings::spiking_chip_load_doc,
+                    pybind11::arg("net"),
+                    pybind11::arg("overwrite") = false)
             .def("sim", &pysim, docstrings::spiking_chip_sim_doc,
                     pybind11::arg("timesteps") = 1,
                     pybind11::arg("timing_model") = "detailed",
