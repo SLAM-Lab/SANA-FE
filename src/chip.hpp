@@ -123,16 +123,19 @@ private:
     std::ofstream message_trace;
     std::ofstream perf_trace;
 
+    // Private helper routines
+    //
+    // Chip SNN programming and clearing
     void clear_hw();
     void map_neurons(const SpikingNetwork &net);
     void map_connections(const SpikingNetwork &net);
-    std::string get_synapse_hw_name(const SpikingNetwork &net, const Connection &con);
+    static std::string get_synapse_hw_name(const SpikingNetwork &net, const Connection &con);
     void record_hw_in_use();
-    void map_connection(const Connection &con, const std::string hw_name);
     void map_axons();
     void track_mapped_neurons();
     void track_mapped_tiles_and_cores() noexcept;
 
+    // Energy and latency measurements
     void sim_reset_measurements();
     TimestepHandle sim_hw_timestep(long int timestep, Scheduler &scheduler);
     void sim_timestep_sync(Scheduler &scheduler) const;
@@ -143,30 +146,35 @@ private:
     static double sim_calculate_core_energy(Timestep &ts, Core &core);
     void sim_update_total_energy_and_counts(const Timestep &ts);
 
+    // Misc outputting and formatting
     void sim_format_run_summary(std::ostream &out, const RunData &run_data) const;
     void sim_print_axon_summary() const noexcept;
 
+    // Axon allocation
     static void sim_create_neuron_axons(MappedNeuron &pre_neuron);
     static void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
     static void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);
+    static std::set<Core *> sim_get_post_synaptic_cores(const MappedNeuron &neuron);
 
+    // Essential time-step loop and pipeline modeling
     void process_neurons(Timestep &ts);
     void process_messages(Timestep &ts);
     void forced_updates(const Timestep &ts);
-
     void process_neuron(Timestep &ts, MappedNeuron &n);
     void receive_message(Message &m);
     static double process_message(Timestep &ts, Core &c, Message &m);
     static PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
-
     static double pipeline_process_axon_in(Core &core, const Message &m);
     PipelineResult pipeline_process_axon_out(Timestep &ts, MappedNeuron &n);
 
+    // Spike/potential/message traces
+    void sim_sort_and_record_messages(const Timestep &ts);
     std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
     std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
 
+    // Booksim 2
     static void check_booksim_compatibility(const Scheduler &scheduler, int sim_count);
 };
 

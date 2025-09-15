@@ -15,7 +15,6 @@
 #include <functional>
 #include <iostream>
 #include <iterator>
-#include <limits>
 #include <list>
 #include <map>
 #include <memory>
@@ -238,13 +237,14 @@ void sanafe::SpikingChip::track_mapped_neurons()
     auto list_of_cores = cores();
 
     //  Push neurons first in their mapped order, causing this vector to
-    //  initially be out of order i.e., with vector idx != correct offset.
-    //  As a second pass we sort the vectors by offset order. Note we can't
-    //  populate this vector earlier when we map neurons, because the core's
-    //  neuron vector is dynamically populated. As the vector grows, previous
-    //  references would be invalidated. Also, as we use reference_wrappers
-    //  instead of pointers, we can't simply resize() the vector at the
-    //  beginning and fill them as we go
+    //  initially be out of order i.e., with vector idx != correct group offset.
+    //  As a second pass we sort the vectors by group offset order.
+    //
+    //  Note we can't populate this vector earlier when we map neurons, because
+    //  the core's neuron vector is dynamically populated. As the vector grows,
+    //  previous references would be invalidated. Also, as we use
+    //  reference_wrappers instead of pointers, we can't simply resize() the
+    //  vector at the beginning and fill them as we go
     for (Core &core : list_of_cores)
     {
         for (MappedNeuron &mapped_neuron : core.neurons)
@@ -254,8 +254,8 @@ void sanafe::SpikingChip::track_mapped_neurons()
         }
     }
 
-    // Now for every neuron group, sort by offset so that we should get the
-    //  vector in offset order
+    // Now for every neuron group, sort by group offset so that we should get
+    //  the vector in offset order
     for (auto &[group_name, neuron_refs] : mapped_neuron_groups)
     {
         std::sort(neuron_refs.begin(), neuron_refs.end(),
@@ -305,19 +305,26 @@ std::string sanafe::SpikingChip::get_synapse_hw_name(
         const SpikingNetwork &net, const Connection &con)
 {
     const NeuronAddress address = con.post_neuron;
+    if (!address.neuron_offset.has_value())
+    {
+        throw std::invalid_argument("Neuron doesn't specify group offset");
+    }
     const NeuronGroup &post_group = net.groups.at(address.group_name);
     const Neuron &post_neuron =
             post_group.neurons[address.neuron_offset.value()];
 
     const bool use_per_connection_mapping = (!con.synapse_hw_name.empty());
+    std::string hw_name;
     if (use_per_connection_mapping)
     {
-        return con.synapse_hw_name;
+        hw_name = con.synapse_hw_name;
     }
     else
     {
-        return post_neuron.default_synapse_hw_name;
+        hw_name = post_neuron.default_synapse_hw_name;
     }
+
+    return hw_name;
 }
 
 void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
@@ -403,7 +410,7 @@ void sanafe::SpikingChip::flush_timestep_data(
     {
         TimestepHandle timestep_handle;
         const bool got_ts = scheduler.timesteps_to_write.pop(timestep_handle);
-        Timestep &ts = timestep_handle.get();
+        const Timestep &ts = timestep_handle.get();
 
         // Attempt to get the timestep. Note that if someone else is writing to
         //  the queue, we will have to wait until they are finished
@@ -417,29 +424,34 @@ void sanafe::SpikingChip::flush_timestep_data(
 
             if (message_trace.is_open())
             {
-                // Not crucial, but its nice to print messages in ID order.
-                //  Copy all the messages into a single vector and sort
-                std::vector<std::reference_wrapper<const Message>> all_messages;
-                for (auto &q : ts.messages)
-                {
-                    for (const Message &m : q)
-                    {
-                        all_messages.emplace_back(m);
-                    }
-                }
-                // Sort messages in message ID order (with placeholders last)
-                std::sort(all_messages.begin(), all_messages.end(),
-                        CompareMessagesByID{});
-                // Save the messages in sorted order
-                for (const Message &m : all_messages)
-                {
-                    sim_trace_record_message(message_trace, m);
-                }
+                sim_sort_and_record_messages(ts);
             }
             update_run_data(rd, ts);
             retire_timestep(ts);
         }
         // else someone else was writing, try again
+    }
+}
+
+void sanafe::SpikingChip::sim_sort_and_record_messages(const Timestep &ts)
+{
+    // Not crucial, but its nice to print messages in ID order.
+    //  Copy all the messages into a single vector and sort
+    std::vector<std::reference_wrapper<const Message>> all_messages;
+    for (const auto &q : ts.messages)
+    {
+        for (const Message &m : q)
+        {
+            all_messages.emplace_back(m);
+        }
+    }
+    // Sort messages in message ID order (with placeholders last)
+    std::sort(all_messages.begin(), all_messages.end(),
+            CompareMessagesByID{});
+    // Save the messages in sorted order
+    for (const Message &m : all_messages)
+    {
+        sim_trace_record_message(message_trace, m);
     }
 }
 
@@ -547,8 +559,6 @@ void sanafe::SpikingChip::step(Scheduler &scheduler)
     {
         sim_trace_record_potentials(potential_trace, total_timesteps);
     }
-
-    return;
 }
 
 void sanafe::SpikingChip::sim_timestep_sync(Scheduler &scheduler) const
@@ -1021,7 +1031,7 @@ void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
         {
             for (const auto &hw_ref : core.pipeline_hw_in_use)
             {
-                PipelineUnit &hw = hw_ref.get();
+                const PipelineUnit &hw = hw_ref.get();
                 assert(hw.is_used);
                 ts.spike_count += hw.spikes_processed;
                 ts.neurons_updated += hw.neurons_updated;
@@ -1200,7 +1210,7 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
     double pipeline_energy{0.0};
     for (auto &pipeline_unit_ref : core.pipeline_hw_in_use)
     {
-        PipelineUnit &pipeline_unit = pipeline_unit_ref.get();
+        const PipelineUnit &pipeline_unit = pipeline_unit_ref.get();
         // Separately track the total pipeline energy, as the same
         //  energy values may be added to multiple categories, i.e., if
         //  the pipeline h/w unit implements multiple functionality
@@ -1239,19 +1249,7 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
 void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
 {
     // Setup the connections between neurons and map them to hardware
-    assert(pre_neuron.core != nullptr);
-
-    // Figure out the unique set of cores that this neuron broadcasts to
-    TRACE1(CHIP, "Counting connections for neuron nid:%zu\n", pre_neuron.id);
-    std::set<Core *> cores_out;
-    for (const MappedConnection &curr_connection : pre_neuron.connections_out)
-    {
-        const MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
-        Core *dest_core = post_neuron.core;
-        cores_out.insert(dest_core);
-        TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
-    }
-
+    const auto cores_out = sim_get_post_synaptic_cores(pre_neuron);
     TRACE1(CHIP, "Creating connections for neuron nid:%zu to %zu core(s)\n",
             pre_neuron.id, cores_out.size());
     for (Core *dest_core : cores_out)
@@ -1278,6 +1276,24 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     TRACE1(CHIP, "Finished mapping connections to hardware for nid:%s.%zu.\n",
             pre_neuron.parent_group_name.c_str(), pre_neuron.id);
 }
+
+std::set<sanafe::Core *> sanafe::SpikingChip::sim_get_post_synaptic_cores(
+        const MappedNeuron &neuron)
+{
+    // Get the set of cores that this neuron broadcasts
+    TRACE1(CHIP, "Counting connections for neuron nid:%zu\n", neuron.id);
+    std::set<Core *> cores_out;
+    for (const MappedConnection &curr_connection : neuron.connections_out)
+    {
+        const MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
+        Core *dest_core = post_neuron.core;
+        cores_out.insert(dest_core);
+        TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
+    }
+
+    return cores_out;
+}
+
 
 void sanafe::SpikingChip::sim_add_connection_to_axon(
         MappedConnection &con, Core &post_core)
@@ -1332,9 +1348,10 @@ void sanafe::SpikingChip::sim_print_axon_summary() const noexcept
 void sanafe::SpikingChip::sim_allocate_axon(
         MappedNeuron &pre_neuron, Core &post_core)
 {
-    // Create a new input axon at a receiving (destination) core
-    //  Then create the output axon at the sending core. Finally
-    //  update the presynaptic neuron and postsynaptic neuron
+    // Create a new input axon at a receiving (destination) core. Then create
+    //  the output axon at the sending core. Finally update the presynaptic
+    //  neuron and postsynaptic neuron
+    assert(pre_neuron.core != nullptr);
     Core &pre_core = *(pre_neuron.core);
 
     TRACE3(CHIP, "Adding connection to core.\n");
