@@ -101,6 +101,7 @@ public:
 
     explicit Core(const CoreConfiguration &config);
     void map_neuron(const Neuron &n, size_t neuron_id);
+    void map_connection(const Connection &con, MappedNeuron &pre_neuron, MappedNeuron &post_neuron, std::string synapse_hw_name);
     AxonInUnit &create_axon_in(const AxonInConfiguration &config);
     PipelineUnit &create_pipeline_unit(const PipelineUnitConfiguration &config);
     AxonOutUnit &create_axon_out(const AxonOutConfiguration &config);
@@ -110,8 +111,10 @@ public:
     [[nodiscard]] std::string info() const noexcept;
 
 private:
-    PipelineUnit *get_dendrite_hw_to_map(const Neuron &neuron_to_map);
-    PipelineUnit *get_soma_hw_to_map(const Neuron &neuron_to_map);
+    PipelineUnit *get_hw(const std::string &hw_name, bool is_synapse, bool is_dendrite, bool is_soma);
+    PipelineUnit *get_synapse_hw(const std::string &synapse_hw_name);
+    PipelineUnit *get_dendrite_hw(const std::string &dendrite_hw_name);
+    PipelineUnit *get_soma_hw(const std::string &soma_hw_name);
 };
 
 }

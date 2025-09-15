@@ -333,70 +333,39 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                         con.pre_neuron.neuron_offset.value(),
                         con.post_neuron.group_name.c_str(),
                         con.post_neuron.neuron_offset.value());
+
+                // Sanity check the connection before we go looking for the
+                //  mapped neurons to connect
+                if (!con.pre_neuron.neuron_offset.has_value())
+                {
+                    throw std::invalid_argument(
+                            "Pre neuron doesn't specify group offset");
+                }
+                if (!con.post_neuron.neuron_offset.has_value())
+                {
+                    throw std::invalid_argument(
+                            "Post neuron doesn't specify group offset");
+                }
+
+                // Find the pre-synaptic and post-synaptic mapped neurons
+                auto &pre_group =
+                        mapped_neuron_groups.at(con.pre_neuron.group_name);
+                auto &post_group =
+                        mapped_neuron_groups.at(con.post_neuron.group_name);
+                MappedNeuron &pre_neuron =
+                        pre_group[con.pre_neuron.neuron_offset.value()];
+                MappedNeuron &post_neuron =
+                        post_group[con.post_neuron.neuron_offset.value()];
+
+                Core &post_core = *(post_neuron.core);
                 std::string hw_name = get_synapse_hw_name(net, con);
-                map_connection(con, std::move(hw_name));
+                post_core.map_connection(
+                        con, pre_neuron, post_neuron, std::move(hw_name));
             }
         }
     }
 
     map_axons();
-}
-
-void sanafe::SpikingChip::map_connection(
-        const Connection &con, const std::string synapse_hw_name)
-{
-    // Create the mapped connection and find the associated hardware unit
-    if (!con.pre_neuron.neuron_offset.has_value())
-    {
-        throw std::invalid_argument("Pre neuron doesn't specify group offset");
-    }
-    if (!con.post_neuron.neuron_offset.has_value())
-    {
-        throw std::invalid_argument("Post neuron doesn't specify group offset");
-    }
-
-    // Find the pre-synaptic and post-synaptic mapped neurons
-    auto &pre_group = mapped_neuron_groups.at(con.pre_neuron.group_name);
-    MappedNeuron &pre_neuron = pre_group[con.pre_neuron.neuron_offset.value()];
-
-    auto &post_group = mapped_neuron_groups.at(con.post_neuron.group_name);
-    MappedNeuron &post_neuron =
-            post_group[con.post_neuron.neuron_offset.value()];
-
-    pre_neuron.connections_out.emplace_back(pre_neuron, post_neuron);
-    MappedConnection &mapped_con = pre_neuron.connections_out.back();
-
-    // Map to synapse hardware unit
-    Core &post_core = *(post_neuron.core);
-    mapped_con.synapse_hw = post_core.pipeline_hw[0].get();
-
-    const bool choose_first_by_default = synapse_hw_name.empty();
-    bool synapse_found = false;
-    TRACE3(CHIP, "Searching for synapse unit: %s\n", synapse_hw_name.c_str());
-    for (auto &hw : post_core.pipeline_hw)
-    {
-        TRACE3(CHIP, "\tchecking against synapse unit: %s\n", hw->name.c_str());
-        if (hw->implements_synapse &&
-                (choose_first_by_default || (synapse_hw_name == hw->name)))
-        {
-            mapped_con.synapse_hw = hw.get();
-            synapse_found = true;
-            TRACE3(CHIP, "\tfound match: %s\n", hw->name.c_str());
-            break;
-        }
-    }
-    if (!synapse_found)
-    {
-        INFO("Error: Could not map connection to any synapse h/w (%s).\n",
-                con.synapse_hw_name.c_str());
-        throw std::runtime_error("Could not map connection to synapse h/w");
-    }
-
-    mapped_con.synapse_hw->add_connection(mapped_con);
-    mapped_con.build_message_processing_pipeline();
-    mapped_con.set_model_attributes(con.synapse_attributes);
-    TRACE2(CHIP, "Mapped connection to hw: %s\n",
-            mapped_con.synapse_hw->name.c_str());
 }
 
 void sanafe::SpikingChip::map_axons()

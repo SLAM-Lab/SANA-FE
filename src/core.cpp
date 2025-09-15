@@ -4,11 +4,14 @@
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 #include <cstddef>
 #include <filesystem>
+#include <functional> // For std::reference_wrapper
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 #include "arch.hpp"
 #include "core.hpp"
+#include "mapped.hpp"
 #include "models.hpp"
 #include "network.hpp"
 #include "pipeline.hpp"
@@ -42,36 +45,6 @@ sanafe::Core::Core(const CoreConfiguration &config)
     timestep_buffer.resize(pipeline_config.max_neurons_supported);
 }
 
-sanafe::PipelineUnit *sanafe::Core::get_dendrite_hw_to_map(
-        const Neuron &neuron_to_map)
-{
-    PipelineUnit *mapped_dendrite{nullptr};
-
-    const bool choose_first_dendrite_by_default =
-            (neuron_to_map.dendrite_hw_name.empty());
-    bool dendrite_found = false;
-    for (auto &hw : pipeline_hw)
-    {
-        if (hw->implements_dendrite &&
-                (choose_first_dendrite_by_default ||
-                        neuron_to_map.dendrite_hw_name == hw->name))
-        {
-            mapped_dendrite = hw.get();
-            dendrite_found = true;
-            break;
-        }
-    }
-    if (!dendrite_found)
-    {
-        INFO("Error: Could not map neuron nid:%zu (hw:%s) "
-             "to any dendrite h/w.\n",
-                neuron_to_map.offset, neuron_to_map.dendrite_hw_name.c_str());
-        throw std::runtime_error("Error: Could not map neuron to dendrite h/w");
-    }
-
-    return mapped_dendrite;
-}
-
 void sanafe::Core::update_hw_in_use()
 {
     std::vector<std::reference_wrapper<PipelineUnit>> hw_list;
@@ -79,40 +52,63 @@ void sanafe::Core::update_hw_in_use()
     {
         if (hw->is_used)
         {
-            hw_list.push_back(*hw);
+            hw_list.emplace_back(*hw);
         }
     }
 
     pipeline_hw_in_use = hw_list;
 }
 
-sanafe::PipelineUnit *sanafe::Core::get_soma_hw_to_map(
-        const Neuron &neuron_to_map)
+sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
+        const bool is_synapse, const bool is_dendrite, const bool is_soma)
 {
-    PipelineUnit *mapped_soma{nullptr};
-    const bool choose_first_soma_by_default =
-            (neuron_to_map.soma_hw_name.empty());
-    bool soma_found = false;
+    PipelineUnit *hw_unit{nullptr};
+    const bool choose_first_available_by_default = (hw_name.empty());
+
+    bool hw_found{false};
     for (auto &hw : pipeline_hw)
     {
-        if (hw->implements_soma &&
-                (choose_first_soma_by_default ||
-                        neuron_to_map.soma_hw_name == hw->name))
+        if ((is_synapse && !hw->implements_synapse) ||
+                (is_dendrite && !hw->implements_dendrite) ||
+                (is_soma && !hw->implements_soma))
         {
-            mapped_soma = hw.get();
-            soma_found = true;
+            // H/w does not support the required operations, skip
+            continue;
+        }
+        if (choose_first_available_by_default || (hw_name == hw->name))
+        {
+            hw_unit = hw.get();
+            hw_found = true;
             break;
         }
     }
-    if (!soma_found)
+
+    if (!hw_found)
     {
-        INFO("Error: Could not map neuron nid:%zu (hw:%s) "
-             "to any soma h/w.\n",
-                neuron_to_map.offset, neuron_to_map.soma_hw_name.c_str());
-        throw std::runtime_error("Error: Could not map neuron to soma h/w");
+        INFO("Error: Could not find h/w with name:%s (that implements "
+             "synapse:%d, dendrite:%d, soma:%d)\n ",
+                hw_name.c_str(), is_synapse, is_dendrite, is_soma);
+        throw std::runtime_error("Error: Could not find dendrite h/w");
     }
 
-    return mapped_soma;
+    return hw_unit;
+}
+
+sanafe::PipelineUnit *sanafe::Core::get_synapse_hw(
+        const std::string &synapse_hw_name)
+{
+    return get_hw(synapse_hw_name, true, false, false);
+}
+
+sanafe::PipelineUnit *sanafe::Core::get_dendrite_hw(
+        const std::string &dendrite_hw_name)
+{
+    return get_hw(dendrite_hw_name, false, true, false);
+}
+
+sanafe::PipelineUnit *sanafe::Core::get_soma_hw(const std::string &soma_hw_name)
+{
+    return get_hw(soma_hw_name, false, false, true);
 }
 
 void sanafe::Core::map_neuron(
@@ -137,8 +133,9 @@ void sanafe::Core::map_neuron(
         INFO("Error: No pipeline units defined for cid:%zu\n", id);
         throw std::runtime_error("Error: No units defined");
     }
-    PipelineUnit *mapped_dendrite_hw = get_dendrite_hw_to_map(neuron_to_map);
-    PipelineUnit *mapped_soma_hw = get_soma_hw_to_map(neuron_to_map);
+    PipelineUnit *mapped_dendrite_hw =
+            get_dendrite_hw(neuron_to_map.dendrite_hw_name);
+    PipelineUnit *mapped_soma_hw = get_soma_hw(neuron_to_map.soma_hw_name);
 
     if (axon_out_hw.empty())
     {
@@ -153,12 +150,10 @@ void sanafe::Core::map_neuron(
             neuron_offset_within_core, this, mapped_dendrite_hw, mapped_soma_hw,
             mapped_axon_out);
 
-    mapped_neuron.mapped_dendrite_hw_address =
-            static_cast<size_t>(mapped_dendrite_hw->add_neuron());
+    mapped_neuron.mapped_dendrite_hw_address = mapped_dendrite_hw->add_neuron();
     if (mapped_soma_hw != mapped_dendrite_hw)
     {
-        mapped_neuron.mapped_soma_hw_address =
-                static_cast<size_t>(mapped_soma_hw->add_neuron());
+        mapped_neuron.mapped_soma_hw_address = mapped_soma_hw->add_neuron();
     }
     else // is a combined dendrite/soma h/w unit
     {
@@ -167,7 +162,22 @@ void sanafe::Core::map_neuron(
                 mapped_neuron.mapped_dendrite_hw_address;
     }
 
-     mapped_neuron.set_model_attributes(neuron_to_map.model_attributes);
+    mapped_neuron.set_model_attributes(neuron_to_map.model_attributes);
+}
+
+void sanafe::Core::map_connection(const Connection &con,
+        MappedNeuron &pre_neuron, MappedNeuron &post_neuron,
+        std::string synapse_hw_name)
+{
+    pre_neuron.connections_out.emplace_back(pre_neuron, post_neuron);
+    MappedConnection &mapped_con = pre_neuron.connections_out.back();
+
+    mapped_con.synapse_hw = get_synapse_hw(synapse_hw_name);
+    mapped_con.synapse_hw->add_connection(mapped_con);
+    mapped_con.build_message_processing_pipeline();
+    mapped_con.set_model_attributes(con.synapse_attributes);
+    TRACE2(CHIP, "Mapped connection to hw: %s\n",
+            mapped_con.synapse_hw->name.c_str());
 }
 
 sanafe::AxonInUnit &sanafe::Core::create_axon_in(
