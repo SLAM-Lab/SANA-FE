@@ -34,7 +34,6 @@ struct ModelAttribute
             TRACE1(ARCH, "Warning: Casting integer value to bool type.\n");
             return (std::get<int>(value) != 0);
         }
-        INFO("index: %zu\n", value.index());
 
         std::string error = "Error: Attribute ";
         if (name.has_value())
@@ -70,7 +69,6 @@ struct ModelAttribute
         error += " cannot be cast to a double";
         throw std::runtime_error(error);
     }
-
     operator std::string() const
     {
         return std::get<std::string>(value);

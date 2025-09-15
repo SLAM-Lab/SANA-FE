@@ -97,7 +97,7 @@ public:
     void check_attribute(std::string attribute_name);
     void check_implemented(bool check_implements_synapse, bool check_implements_dendrite, bool check_implements_soma) const;
     size_t add_neuron();
-    size_t add_connection(const MappedConnection &con);
+    size_t add_connection(MappedConnection &con);
 
     using InputInterfaceFunc = std::function<PipelineResult(Timestep&, MappedNeuron&, std::optional<MappedConnection*>, const PipelineResult&)>;
     using OutputInterfaceFunc = std::function<void(MappedNeuron&, std::optional<MappedConnection*>, PipelineResult&)>;

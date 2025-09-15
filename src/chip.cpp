@@ -392,9 +392,7 @@ void sanafe::SpikingChip::map_connection(
         throw std::runtime_error("Could not map connection to synapse h/w");
     }
 
-    mapped_con.mapped_synapse_hw_address =
-            mapped_con.synapse_hw->add_connection(mapped_con);
-
+    mapped_con.synapse_hw->add_connection(mapped_con);
     mapped_con.build_message_processing_pipeline();
     mapped_con.set_model_attributes(con.synapse_attributes);
     TRACE2(CHIP, "Mapped connection to hw: %s\n",
