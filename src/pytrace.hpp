@@ -6,6 +6,7 @@
 #ifndef PYTRACE_HEADER_INCLUDED_
 #define PYTRACE_HEADER_INCLUDED_
 
+#include <fstream>
 #include <map>
 #include <variant>
 
@@ -72,12 +73,12 @@ class PyHardwareTrace : public PyTrace
 public:
     PyHardwareTrace(sanafe::SpikingChip *chip, pybind11::object &trace_obj,
             const bool overwrite_trace) : PyTrace(chip, trace_obj, overwrite_trace) {}
-    void record_timestep(const sanafe::Timestep &ts);
+    void record_hw_metrics(const sanafe::Timestep &ts);
 
 private:
-    virtual void get_trace_string(
+    virtual void write_hw_trace_to_stream(
             std::ostringstream &ss, const sanafe::Timestep &ts) = 0;
-    virtual void append_trace_data(const sanafe::Timestep &ts) = 0;
+    virtual void append_hw_metrics_to_memory(const sanafe::Timestep &ts) = 0;
 };
 
 class PyNetworkTrace : public PyTrace
@@ -86,11 +87,11 @@ public:
     PyNetworkTrace(sanafe::SpikingChip *chip, pybind11::object &trace_obj,
             const bool overwrite_trace)
             : PyTrace(chip, trace_obj, overwrite_trace) {}
-    void record_chip_data(long int timestep);
+    void record_net_activity(long int timestep);
 
 private:
-    virtual void get_trace_string(std::ostringstream &ss, long int timestep) = 0;
-    virtual void append_trace_data() = 0;
+    virtual void write_net_trace_to_stream(std::ostringstream &ss, long int timestep) = 0;
+    virtual void append_net_activity_to_memory() = 0;
 };
 
 class PySpikeTrace : public PyNetworkTrace
@@ -106,12 +107,12 @@ public:
     {
         sanafe::SpikingChip::sim_trace_write_spike_header(ss);
     }
-    void get_trace_string(
+    void write_net_trace_to_stream(
             std::ostringstream &ss, const long int timestep) override
     {
         parent_chip->sim_trace_record_spikes(ss, timestep);
     }
-    void append_trace_data() override
+    void append_net_activity_to_memory() override
     {
         auto spikes = parent_chip->get_spikes();
         data.emplace_back(std::move(spikes));
@@ -155,12 +156,12 @@ public:
     {
         parent_chip->sim_trace_write_potential_header(ss);
     }
-    void get_trace_string(
+    void write_net_trace_to_stream(
             std::ostringstream &ss, const long int timestep) override
     {
         parent_chip->sim_trace_record_potentials(ss, timestep);
     }
-    void append_trace_data() override
+    void append_net_activity_to_memory() override
     {
         auto potentials = parent_chip->get_potentials();
         data.emplace_back(std::move(potentials));
@@ -194,12 +195,12 @@ public:
     {
         parent_chip->sim_trace_write_perf_header(ss);
     }
-    void get_trace_string(
+    void write_hw_trace_to_stream(
             std::ostringstream &ss, const sanafe::Timestep &ts) override
     {
         parent_chip->sim_trace_record_perf(ss, ts);
     }
-    void append_trace_data(const sanafe::Timestep &ts) override
+    void append_hw_metrics_to_memory(const sanafe::Timestep &ts) override
     {
         std::map<std::string, PerfStatistic> stats = timestep_data_to_map(ts);
 
@@ -245,7 +246,7 @@ public:
     {
         sanafe::SpikingChip::sim_trace_write_message_header(ss);
     }
-    void get_trace_string(
+    void write_hw_trace_to_stream(
             std::ostringstream &ss, const sanafe::Timestep &ts) override
     {
         std::vector<std::reference_wrapper<const sanafe::Message>> all_messages;
@@ -265,7 +266,7 @@ public:
             sim_trace_record_message(ss, m);
         }
     }
-    void append_trace_data(const sanafe::Timestep &ts) override
+    void append_hw_metrics_to_memory(const sanafe::Timestep &ts) override
     {
         std::vector<sanafe::Message> timestep_messages;
 

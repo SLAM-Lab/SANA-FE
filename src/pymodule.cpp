@@ -557,8 +557,8 @@ void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
         sanafe::Timestep &ts = timestep_handle.get();
         TRACE1(CHIP, "retiring ts:%ld\n", ts.timestep);
 
-        perf.record_timestep(ts);
-        message_trace.record_timestep(ts);
+        perf.record_hw_metrics(ts);
+        message_trace.record_hw_metrics(ts);
         sanafe::SpikingChip::update_run_data(rd, ts);
         self->retire_timestep(ts);
     }
@@ -619,8 +619,8 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     {
         self->step(scheduler);
         const long int total_timesteps = self->get_total_timesteps();
-        spikes.record_chip_data(total_timesteps);
-        potentials.record_chip_data(total_timesteps);
+        spikes.record_net_activity(total_timesteps);
+        potentials.record_net_activity(total_timesteps);
 
         const auto now = std::chrono::steady_clock::now();
         constexpr std::chrono::milliseconds check_interval{100};

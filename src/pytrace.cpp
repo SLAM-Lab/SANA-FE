@@ -131,20 +131,20 @@ void PyTrace::write_header()
     }
 }
 
-void PyHardwareTrace::record_timestep(const sanafe::Timestep &ts)
+void PyHardwareTrace::record_hw_metrics(const sanafe::Timestep &ts)
 {
     if (mode == TraceMode::trace_memory)
     {
         // Note we must always acquire the GIL before modifying Python objects
         const pybind11::gil_scoped_acquire acquire;
         // Make call to appropriate overriden virtual routine
-        append_trace_data(ts);
+        append_hw_metrics_to_memory(ts);
     }
     else if (mode == TraceMode::trace_file)
     {
         std::ostringstream trace_ss;
         // Make call to appropriate overriden virtual routine
-        get_trace_string(trace_ss, ts);
+        write_hw_trace_to_stream(trace_ss, ts);
         if (file.is_open())
         {
             // Write to C++ file stream
@@ -165,20 +165,20 @@ void PyHardwareTrace::record_timestep(const sanafe::Timestep &ts)
     // else do nothing
 }
 
-void PyNetworkTrace::record_chip_data(const long int timestep)
+void PyNetworkTrace::record_net_activity(const long int timestep)
 {
     if (mode == TraceMode::trace_memory)
     {
         // Note we must always acquire the GIL before modifying Python objects
         const pybind11::gil_scoped_acquire acquire;
         // Make call to appropriate overriden virtual routine
-        append_trace_data();
+        append_net_activity_to_memory();
     }
     else if (mode == TraceMode::trace_file)
     {
         std::ostringstream trace_ss;
         // Make call to appropriate overriden virtual routine
-        get_trace_string(trace_ss, timestep);
+        write_net_trace_to_stream(trace_ss, timestep);
         if (file.is_open())
         {
             // Write to C++ file stream
