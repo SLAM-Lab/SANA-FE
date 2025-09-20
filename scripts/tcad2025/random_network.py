@@ -24,7 +24,7 @@ import time
 
 # SANA-FE libraries
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
 sys.path.insert(0, PROJECT_DIR)
 import sanafe
 
@@ -32,8 +32,8 @@ import sanafe
 random.seed(1)
 
 #EXPERIMENT = "tiny"
-#EXPERIMENT = "full"
-EXPERIMENT = "extremes"
+EXPERIMENT = "full"
+#EXPERIMENT = "extremes"
 # Global experiment parameters
 NETWORK_PATH = os.path.join("runs", "random", EXPERIMENT)
 NETWORK_FILENAME = os.path.join(NETWORK_PATH, "random.net")
@@ -41,8 +41,8 @@ ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
-#TIMESTEPS = 100
-TIMESTEPS = 100000
+TIMESTEPS = 100
+#TIMESTEPS = 100000
 
 def create_random_network(cores, neurons_per_core, messages_per_neuron,
                           spikes_per_message):
@@ -95,7 +95,7 @@ def onpick(event, df):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     if run_experiments:
         with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),
@@ -113,9 +113,11 @@ if __name__ == "__main__":
                 arch = sanafe.load_arch(ARCH_FILENAME)
                 net = sanafe.load_net(line["network"], arch, use_netlist_format=True)
 
-                chip = sanafe.SpikingChip(arch, record_perf=True)
+                chip = sanafe.SpikingChip(arch)
                 chip.load(net)
-                results = chip.sim(TIMESTEPS)
+                results = chip.sim(TIMESTEPS, perf_trace="perf.csv",
+                                   processing_threads=16, scheduler_threads=0,
+                                   timing_model="cycle")
                 print(results)
                 df = pd.read_csv("perf.csv")
                 line["total_spikes"] = df.loc[2, "fired"]

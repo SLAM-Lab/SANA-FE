@@ -18,7 +18,7 @@ import numpy as np
 import os
 import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
 sys.path.insert(0, PROJECT_DIR)
 import sanafe
 
@@ -110,6 +110,7 @@ if __name__ == "__main__":
     timesteps = 128
     #timesteps = 100000
     frames = 100
+    #frames = 10
     #frames = 1
 
     #loihi_spiketrains = parse_loihi_spiketrains(timesteps)
@@ -173,7 +174,9 @@ if __name__ == "__main__":
                     model_attributes={"bias": dvs_inputs[id]})
             is_first_frame = (frame == 0)
             chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",
-                     write_trace_headers=is_first_frame)
+                     write_trace_headers=is_first_frame, timing_model="cycle",
+                     processing_threads=1)
+                     #processing_threads=16, scheduler_threads=8)
             chip.reset()
 
         # Parse the detailed perf statistics
@@ -303,9 +306,8 @@ if __name__ == "__main__":
             plt.plot(np.arange(1, timesteps-1), times[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "--")
 
             #plt.plot(np.arange(1, timesteps-1), event_based_times[1:(timesteps-1)] * 1.0e6, ":k")
-            plt.plot(np.arange(1, timesteps-1), cycle_based_times[0:(timesteps-2)] * 1.0e6, ":r")
-            plt.legend(("Measured on Loihi", "SANA-FE predictions", "Cycle-accurate predictions"),
-                       fontsize=6)
+            #plt.plot(np.arange(1, timesteps-1), cycle_based_times[0:(timesteps-2)] * 1.0e6, ":r")
+            plt.legend(("Measured on Loihi", "SANA-FE predictions"), fontsize=6)
             plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")
             plt.yticks(np.arange(0, 61, 10))
@@ -335,7 +337,7 @@ if __name__ == "__main__":
             #print(total_hops)
             #exit()
             #plt.scatter(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, marker="x", s=0.1, cmap=cm, c=np.array(total_hops))
-            scatter = plt.plot(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "x", alpha=0.5)[0]
+            scatter = plt.plot(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "x", alpha=0.8)[0]
             plt.plot(np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6),
                      np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6), "k--")
             #plt.colorbar(label="Total Hops", shrink=0.5)
@@ -349,7 +351,7 @@ if __name__ == "__main__":
             plt.yticks(np.arange(10, 31, 10))
             plt.tight_layout(pad=0.3)
             plt.savefig("runs/dvs/dvs_gesture_sim_correlation.pdf")
-            plt.savefig("runs/dvs/dvs_gesture_sim_correlation.png")
+            plt.savefig("runs/dvs/dvs_gesture_sim_correlation.png", dpi=300)
 
             # Calculate total error
             print("Calculating errors")
@@ -359,6 +361,24 @@ if __name__ == "__main__":
 
             total_error =  (np.sum(loihi_total_times) - np.sum(total_times)) / np.sum(loihi_total_times)
             print("Time Total error: {0} ({1} %)".format(total_error, total_error * 100))
+
+            # Calculate correlation
+            frame_correlation = np.corrcoef(loihi_average_times[0:frames], average_times[0:frames])[0,1]
+            print(f"Pearson correlation for frame: {frame_correlation}")
+
+            # Do some per time-step analysis since this should be more revealing
+            predicted_latency = np.array(0)
+            loihi_latency = np.array(0)
+            for i in range(0, frames):
+                predicted_latency = np.append(predicted_latency, times[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
+                loihi_latency = np.append(loihi_latency, loihi_times[0:timesteps-2, i])
+            per_timestep_correlation =  np.corrcoef(predicted_latency, loihi_latency)[0,1]
+            print(f"Pearson correlation for ts: {per_timestep_correlation}")
+
+            mask = loihi_latency != 0
+            error = np.abs(loihi_latency[mask] - predicted_latency[mask]) / loihi_latency[mask]
+            error = np.sum(error) / len(error)
+            print(f"Timestep MAPE: {error} ({error * 100} %)")
 
             """
             plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
@@ -390,6 +410,23 @@ if __name__ == "__main__":
 
         # Connect the click event to the figure
         plt.gcf().canvas.mpl_connect('button_press_event', on_click)
+
+        plt.figure(figsize=(3.0, 3.0))
+        scatter = plt.plot(predicted_latency[0:1000]*1.0e6, loihi_latency[0:1000]*1.0e6, "o", alpha=0.8)[0]
+        plt.plot(np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6),
+                    np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6), "k--")
+        #plt.colorbar(label="Total Hops", shrink=0.5)
+        #plt.xticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
+        #plt.yticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
+        plt.ylabel("Measured Latency ($\mu$s)")
+        plt.xlabel("Simulated Latency ($\mu$s)")
+        #plt.xlim((10, 30))
+        #plt.ylim((10, 30))
+        #plt.xticks(np.arange(10, 31, 10))
+        #plt.yticks(np.arange(10, 31, 10))
+        plt.tight_layout(pad=0.3)
+        plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.pdf")
+        plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.png", dpi=300)
 
         print("Showing plots")
         plt.show()
