@@ -1,3 +1,17 @@
+"""
+Copyright (c) 2025 - The University of Texas at Austin
+This work was produced under contract #2317831 to National Technology and
+Engineering Solutions of Sandia, LLC which is under contract
+No. DE-NA0003525 with the U.S. Department of Energy.
+
+Explore the usage of analog neuron circuits [Indiveri, 2003] within a Loihi-
+based architecture running rate-encoded MNIST and spiking digits applications.
+"""
+# TODO: clean up the circuit-aware trained implementation of Spiking Digits,
+#  which requires a bunch of extra unncecessary libraries to be successfully
+#  imported (ultimately we just want the weights to be extracted)
+# TODO: make sure rate-encoded MNIST is still working ok
+
 import csv
 import torch
 import os
@@ -13,7 +27,6 @@ import tonic.transforms as transforms
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-
 # Try importing the installed sanafe library. If not installed, require a
 #  fall-back to a local build of the sanafe Python library
 try:
@@ -28,6 +41,19 @@ except ImportError:
 
 #dataset = "mnist"
 dataset = "shd"
+# Spiking Heidelberg Digits (SHD) is the second neuromorphic application.
+#  I have trained two SNNs for SHD for this script:
+#  The first SNN was trained using a modified LIF (Leaky) behavioral model (that
+#  captured the effects of positive and negative clipping) and then converting
+#  to the analog Indiveri neurons. The abstract SNN was trained to ~70% accuracy
+#  but after conversion and deploying onto analog neurons, accuracy drops to
+#  under ~50%.
+#
+#  The second SNN was trained using the LASANA model directly (by Jason). This
+#   circuit-aware training has no accuracy degredation and so achieves ~70%
+#   which is comparable to the SHD benchmark paper.
+
+
 analog_neurons = True
 
 if dataset == "mnist":
@@ -63,7 +89,7 @@ if dataset == "mnist":
     labels = test_dataset.targets
 elif dataset == "shd":
     # TODO: clean this up for future, or export the indiveri pt file to not have
-    #  all of these dependencies
+    #  all of these dependencies.. (just export the weights as a state dict?)
     import spiking_digits_indiveri
     from spiking_digits_indiveri import *
     import predict_ml_model_helpers
@@ -95,8 +121,8 @@ elif dataset == "shd":
     # Load the spiking digits test inputs from the raw dataset, applying the
     #  same transformations as the training scripts
     frame_transform = transforms.Compose([
-        #transforms.Downsample(time_factor=0.1, spatial_factor=0.1), # For my trained experiments
-        transforms.Downsample(time_factor=0.05, spatial_factor=0.1),  # For Jason's circuit aware trained experiments
+        #transforms.Downsample(time_factor=0.1, spatial_factor=0.1), # For my original trained SNN
+        transforms.Downsample(time_factor=0.05, spatial_factor=0.1),  # For Jason's circuit-aware trained SNN
         transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
     ])
     testset = tonic.datasets.SHD(save_to=os.path.join(PROJECT_DIR, "runs", "lasana", "data"),
@@ -146,6 +172,8 @@ for id, neuron in enumerate(hidden_layer):
         "reset_mode": "hard",
     }
     if dataset == "shd":
+        # In the previously trained network lif1.alpha was available in the
+        #  trained SNN
         #hidden_parameters["input_decay"] = weights["lif1.alpha"][id]
         hidden_parameters["input_decay"] = 0.0
 
