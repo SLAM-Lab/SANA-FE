@@ -34,9 +34,9 @@ except ImportError:
 
 analog_synpases = True
 
-#timesteps = 100
 timesteps = 30
 num_inputs = 100
+#num_inputs = 1
 
 print(f"Loading models for binarized MNIST")
 # Data loading
@@ -98,7 +98,7 @@ out_neurons = weights["fc3"].shape[0]
 print(f"in:{in_neurons}, hidden 1:{hidden_1_neurons}, hidden 2:{hidden_2_neurons}, out:{out_neurons}")
 #"""
 # Load the LASANA architecture with analog neurons
-arch = sanafe.load_arch("/home/usr1/jboyle/neuro/lasana/lasana_crossbar.yaml")
+arch = sanafe.load_arch("/home/usr1/jboyle/neuro/lasana/crossbar/lasana_crossbar.yaml")
 
 print("Creating network in SANA-FE")
 network = sanafe.Network()
@@ -110,7 +110,7 @@ out_layer = network.create_neuron_group("out", out_neurons)
 print("Creating input layer")
 for id, neuron in enumerate(in_layer):
     neuron.set_attributes(dendrite_hw_name="default_dendrite",
-                          soma_hw_name=f"input[{id}]", log_spikes=True)
+                          soma_hw_name=f"input[{id}]", log_spikes=False)
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 print("Creating hidden layer")
@@ -125,8 +125,8 @@ for id, neuron in enumerate(hidden_layer_1):
     neuron.set_attributes(soma_hw_name="loihi_lif",
                           dendrite_hw_name=f"synapse_crossbar[{id}]",
                           default_synapse_hw_name=f"synapse_crossbar[{id}]",
-                          log_spikes=True,
-                          log_potential=True,
+                          log_spikes=False,
+                          log_potential=False,
                           model_attributes=hidden_parameters)
     neuron.map_to_core(arch.tiles[0].cores[1])
 
@@ -140,7 +140,7 @@ for id, neuron in enumerate(hidden_layer_2):
     neuron.set_attributes(soma_hw_name=f"loihi_lif",
                           dendrite_hw_name=f"synapse_crossbar[{id}]",
                           default_synapse_hw_name=f"synapse_crossbar[{id}]",
-                          log_spikes=True, log_potential=True,
+                          log_spikes=False, log_potential=False,
                           model_attributes=hidden_parameters)
     neuron.map_to_core(arch.tiles[0].cores[2])
 
@@ -199,13 +199,13 @@ for input_idx in range(num_inputs):
     for id, mapped_neuron in enumerate(mapped_inputs):
         # print(list(inputs[:, id]))
         mapped_neuron.set_model_attributes(#model_attributes={"spikes": list(inputs[:, id])})
-            model_attributes={"poisson": mnist_input[id]})
+            model_attributes={"rate": mnist_input[id]})
 
     print(f"Simulating for {timesteps} timesteps")
     is_first_input = (input_idx == 0)
     results = hw.sim(timesteps, spike_trace="spikes.csv",
-                     potential_trace="potentials.csv", perf_trace="perf.csv",
-                     write_trace_headers=is_first_input, processing_threads=1,
+                     perf_trace="perf.csv",
+                     write_trace_headers=is_first_input, processing_threads=16,
                      scheduler_threads=8)
     timesteps_per_input.append(timesteps)
     # print(results)
@@ -256,28 +256,8 @@ for i in range(0, num_inputs):
 accuracy = (correct / num_inputs) * 100
 print(f"Accuracy: {accuracy}%")
 
-# def calculate_cumulative_spikes(out_spikes, out_neurons, total_timesteps, timesteps_per_input):
-#     # Initialize array to store cumulative counts for each output neuron at each timestep
-#     cumulative_counts = np.zeros((out_neurons, total_timesteps))
-
-#     # For each output neuron
-#     for neuron_idx, spikes in enumerate(out_spikes):
-#         # Sort spikes by timestep for cumulative counting
-#         sorted_spikes = sorted([s for s in spikes if s <= total_timesteps])
-#         # Process each timestep
-#         for t in range(total_timesteps):
-#             # Calculate which input period we're in
-#             input_image = t // timesteps_per_input
-#             period_start = input_image * timesteps_per_input
-
-#             # Count spikes from start of current input period up to current timestep
-#             count = sum(1 for spike in sorted_spikes
-#                     if spike <= t + 1 and spike > period_start)
-
-#             cumulative_counts[neuron_idx, t] = count
-
-#     return cumulative_counts
 
 
-# cumulative_counts = calculate_cumulative_spikes(
-#     out_spikes, out_neurons, timesteps * num_inputs, timesteps)
+# MNIST Data-set info (trained 23 Sep 2025 for 10 epochs)
+# Train set: Average loss: 0.1868, Accuracy: 56680/60000 (94.47%)
+# Test set: Accuracy: 9475/10000 (94.75%)

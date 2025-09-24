@@ -186,7 +186,7 @@ def generate_rst_references(entries: dict) -> str:
             booktitle = entry['booktitle']
             address = entry.get('address', '')
             if address:
-                ref = f'{authors},\n"{title},"\nin {booktitle}, {address},\n`doi:{doi} <https://doi.org/{doi}>`_.'
+                ref = f'{authors},\n"{title},"\nin {booktitle}, {address}, {year},\n`doi:{doi} <https://doi.org/{doi}>`_.'
             else:
                 ref = f'{authors},\n"{title},"\nin {booktitle}, {year},\n`doi:{doi} <https://doi.org/{doi}>`_.'
 
