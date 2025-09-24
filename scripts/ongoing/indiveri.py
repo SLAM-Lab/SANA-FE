@@ -72,7 +72,7 @@ weights = {}
 if dataset == "mnist":
     # Load the MNIST network
     mnist_model = torch.load(
-            os.path.join(PROJECT_DIR, "etc", "mnist.pt"),
+            os.path.join(PROJECT_DIR, "etc", "mnist_784_128_10.pt"),
             pickle_module=dill,
             map_location=torch.device("cpu"))
     for attribute_name, param in mnist_model.named_parameters():
@@ -88,7 +88,7 @@ if dataset == "mnist":
                                   download=True)
     labels = test_dataset.targets
 elif dataset == "shd":
-    # TODO: clean this up for future, or export the indiveri pt file to not have
+    # TODO: clean this up for future, or export the iFndiveri pt file to not have
     #  all of these dependencies.. (just export the weights as a state dict?)
     import spiking_digits_indiveri
     from spiking_digits_indiveri import *

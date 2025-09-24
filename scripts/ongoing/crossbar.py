@@ -3,6 +3,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+import dill
 # Plotting
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -32,7 +33,8 @@ except ImportError:
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
 
-analog_synpases = True
+analog_synapses = True
+#analog_synapses = False
 
 timesteps = 30
 num_inputs = 100
@@ -67,27 +69,45 @@ for input_frame, label in dataloader:
 # inputs = df.to_numpy()
 # print(inputs)
 
-snn_path = "/home/usr1/jboyle/neuro/binary_mnist/binarized_mnist_model.pth"
-snn = torch.load(snn_path, weights_only=True)
-weights = {}
-weights["fc1"] = ternary_weight(snn["fc1.weight"])
-weights["fc2"] = ternary_weight(snn["fc2.weight"])
-weights["fc3"] = ternary_weight(snn["fc_out.weight"])
+if analog_synapses:
+    snn_path = "/home/usr1/jboyle/neuro/binary_mnist/binarized_mnist_model.pth"
+    snn = torch.load(snn_path, weights_only=True)
+else:
+    snn = torch.load(
+            os.path.join(PROJECT_DIR, "etc", "mnist_400_128_84_10.pt"),
+            pickle_module=dill,
+            map_location=torch.device("cpu")).state_dict()
 
-biases = {}
-biases[1] = ternary_weight(snn["fc1.bias"])
-biases[2] = ternary_weight(snn["fc2.bias"])
-biases[3] = ternary_weight(snn["fc_out.bias"])
+weights = {}
+if analog_synapses:
+    weights["fc1"] = ternary_weight(snn["fc1.weight"])
+    weights["fc2"] = ternary_weight(snn["fc2.weight"])
+    weights["fc3"] = ternary_weight(snn["fc_out.weight"])
+
+    crossbar_biases = {}
+    crossbar_biases[1] = ternary_weight(snn["fc1.bias"])
+    crossbar_biases[2] = ternary_weight(snn["fc2.bias"])
+    crossbar_biases[3] = ternary_weight(snn["fc_out.bias"])
+else:
+    weights["fc1"] = snn["fc1.weight"]
+    weights["fc2"] = snn["fc2.weight"]
+    weights["fc3"] = snn["fc_out.weight"]
+
 
 decays = {}
 decays[1] = float(snn["lif1.beta"])
 decays[2] = float(snn["lif2.beta"])
 decays[3] = float(snn["lif_out.beta"])
 
+
 thresholds = {}
 thresholds[1] = float(snn["lif1.threshold"])
 thresholds[2] = float(snn["lif2.threshold"])
 thresholds[3] = float(snn["lif_out.threshold"])
+
+print(weights)
+print(decays)
+print(thresholds)
 
 # PyTorch stores weights in an array with dims (num out x num in)
 in_neurons = weights["fc1"].shape[1]
@@ -98,7 +118,10 @@ out_neurons = weights["fc3"].shape[0]
 print(f"in:{in_neurons}, hidden 1:{hidden_1_neurons}, hidden 2:{hidden_2_neurons}, out:{out_neurons}")
 #"""
 # Load the LASANA architecture with analog neurons
-arch = sanafe.load_arch("/home/usr1/jboyle/neuro/lasana/crossbar/lasana_crossbar.yaml")
+if analog_synapses:
+    arch = sanafe.load_arch("/home/usr1/jboyle/neuro/lasana/crossbar/lasana_crossbar.yaml")
+else:
+    arch = sanafe.load_arch(os.path.join(PROJECT_DIR, "arch", "loihi.yaml"))
 
 print("Creating network in SANA-FE")
 network = sanafe.Network()
@@ -107,55 +130,72 @@ hidden_layer_1 = network.create_neuron_group("hidden_1", hidden_1_neurons)
 hidden_layer_2 = network.create_neuron_group("hidden_2", hidden_2_neurons)
 out_layer = network.create_neuron_group("out", out_neurons)
 
+# Defaults for Loihi baseline
+synapse_hw = "loihi_dense_synapse"
+dendrite_hw = "loihi_dendrites"
+
 print("Creating input layer")
 for id, neuron in enumerate(in_layer):
-    neuron.set_attributes(dendrite_hw_name="default_dendrite",
-                          soma_hw_name=f"input[{id}]", log_spikes=False)
+    neuron.set_attributes(dendrite_hw_name=dendrite_hw,
+                          soma_hw_name=f"loihi_inputs[{id}]",
+                          log_spikes=False)
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 print("Creating hidden layer")
+soma_hw = "loihi_lif"
 for id, neuron in enumerate(hidden_layer_1):
     hidden_parameters = {
         "threshold": thresholds[1],
         "leak_decay": decays[1],
-        "reset_mode": "hard",
-        "crossbar_bias": int(biases[1][id])
+        "reset_mode": "hard"
     }
+    if analog_synapses:
+        hidden_parameters["crossbar_bias"] = int(crossbar_biases[1][id])
+        synapse_hw = f"synapse_crossbar[{id}]"
+        dendrite_hw = synapse_hw
 
-    neuron.set_attributes(soma_hw_name="loihi_lif",
-                          dendrite_hw_name=f"synapse_crossbar[{id}]",
-                          default_synapse_hw_name=f"synapse_crossbar[{id}]",
-                          log_spikes=False,
-                          log_potential=False,
-                          model_attributes=hidden_parameters)
+    neuron.set_attributes(soma_hw_name=soma_hw,
+                          dendrite_hw_name=dendrite_hw,
+                          default_synapse_hw_name=synapse_hw,
+                          model_attributes=hidden_parameters,
+                          log_spikes=True)
     neuron.map_to_core(arch.tiles[0].cores[1])
 
 for id, neuron in enumerate(hidden_layer_2):
     hidden_parameters = {
         "threshold": thresholds[2],
         "leak_decay": decays[2],
-        "reset_mode": "hard",
-        "crossbar_bias": int(biases[2][id])
+        "reset_mode": "hard"
     }
-    neuron.set_attributes(soma_hw_name=f"loihi_lif",
-                          dendrite_hw_name=f"synapse_crossbar[{id}]",
-                          default_synapse_hw_name=f"synapse_crossbar[{id}]",
-                          log_spikes=False, log_potential=False,
+    if analog_synapses:
+        hidden_parameters["crossbar_bias"] = int(crossbar_biases[2][id])
+        synapse_hw = f"synapse_crossbar[{id}]"
+        dendrite_hw = synapse_hw
+
+
+    neuron.set_attributes(soma_hw_name=soma_hw,
+                          dendrite_hw_name=dendrite_hw,
+                          default_synapse_hw_name=synapse_hw,
                           model_attributes=hidden_parameters)
     neuron.map_to_core(arch.tiles[0].cores[2])
 
 print("Creating output layer")
 for id, neuron in enumerate(out_layer):
-    neuron.set_attributes(soma_hw_name=f"loihi_lif",
-                          dendrite_hw_name=f"synapse_crossbar[{id}]",
-                          default_synapse_hw_name=f"synapse_crossbar[{id}]",
+    hidden_parameters = {
+        "threshold": thresholds[3],
+        "leak_decay": decays[3],
+        "reset_mode": "hard"
+    }
+    if analog_synapses:
+        hidden_parameters["crossbar_bias"] = int(crossbar_biases[3][id])
+        synapse_hw = f"synapse_crossbar[{id}]"
+        dendrite_hw = synapse_hw
+
+    neuron.set_attributes(soma_hw_name=soma_hw,
+                          dendrite_hw_name=dendrite_hw,
+                          default_synapse_hw_name=synapse_hw,
                           log_spikes=True,
-                          model_attributes={
-                            "threshold": thresholds[3],
-                            "leak_decay": decays[3],
-                            "reset_mode": "hard",
-                            "crossbar_bias": int(biases[3][id])
-                        })
+                          model_attributes=hidden_parameters)
     neuron.map_to_core(arch.tiles[0].cores[3])
 
 # Connect neurons in both layers
@@ -165,21 +205,39 @@ print("Adding first layer connections")
 
 for src in range(in_neurons):
     for dst in range(hidden_1_neurons):
-        weight = int(weights["fc1"][dst, src])
+        connection_parameters = {}
+        if analog_synapses:
+            connection_parameters["weight"] = int(weights["fc1"][dst, src])
+            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
+        else:
+            connection_parameters["weight"] = float(weights["fc1"][dst, src])
+
         network["in"][src].connect_to_neuron(
-            network["hidden_1"][dst], {"weight": weight, "synapse_hw_name": f"analog_crossbar[{dst}]"})
+            network["hidden_1"][dst], connection_parameters)
 
 for src in range(hidden_1_neurons):
     for dst in range(hidden_2_neurons):
-        weight = int(weights["fc2"][dst, src])
+        connection_parameters = {}
+        if analog_synapses:
+            connection_parameters["weight"] = int(weights["fc2"][dst, src])
+            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
+        else:
+            connection_parameters["weight"] = float(weights["fc2"][dst, src])
+
         network["hidden_1"][src].connect_to_neuron(
-            network["hidden_2"][dst], {"weight": weight, "synapse_hw_name": f"analog_crossbar[{dst}]"})
+            network["hidden_2"][dst], connection_parameters)
 
 for src in range(hidden_2_neurons):
     for dst in range(out_neurons):
-        weight = int(weights["fc3"][dst, src])
+        connection_parameters = {}
+        if analog_synapses:
+            connection_parameters["weight"] = int(weights["fc3"][dst, src])
+            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
+        else:
+            connection_parameters["weight"] = float(weights["fc3"][dst, src])
+
         network["hidden_2"][src].connect_to_neuron(
-            network["out"][dst], {"weight": weight, "synapse_hw_name": f"analog_crossbar[{dst}]"})
+            network["out"][dst], connection_parameters)
 
 network.save("snn/crossbar_mnist.yaml")
 
@@ -203,9 +261,11 @@ for input_idx in range(num_inputs):
 
     print(f"Simulating for {timesteps} timesteps")
     is_first_input = (input_idx == 0)
-    results = hw.sim(timesteps, spike_trace="spikes.csv",
+    results = hw.sim(timesteps,
+                     spike_trace="spikes.csv",
                      perf_trace="perf.csv",
-                     write_trace_headers=is_first_input, processing_threads=16,
+                     write_trace_headers=is_first_input,
+                     processing_threads=4,
                      scheduler_threads=8)
     timesteps_per_input.append(timesteps)
     # print(results)
@@ -258,6 +318,9 @@ print(f"Accuracy: {accuracy}%")
 
 
 
-# MNIST Data-set info (trained 23 Sep 2025 for 10 epochs)
+# MNIST Data-set info (circuit-aware trained 23 Sep 2025 for 10 epochs)
 # Train set: Average loss: 0.1868, Accuracy: 56680/60000 (94.47%)
 # Test set: Accuracy: 9475/10000 (94.75%)
+
+# TODO: run both with and without analog synapses
+# TODO: plot and compare performance of both crossbar/synaptic memory
