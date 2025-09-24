@@ -627,9 +627,13 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         constexpr std::chrono::seconds print_interval{1};
         if ((now - last_check) >= check_interval)
         {
+            // Periodically check for user interrupts or errors from Python
             const pybind11::gil_scoped_acquire acquire;
             if (PyErr_CheckSignals() != 0)
             {
+                // Received an interrupt or error, so clean-up and kill the run
+                schedule_stop_all_threads(scheduler);
+                pyflush_timestep_data(self, rd, perf, scheduler, messages);
                 throw pybind11::error_already_set();
             }
             last_check = now;
@@ -643,7 +647,6 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             pybind11::print(message, pybind11::arg("end") = "");
             last_print = now;
         }
-        // Retire and trace messages as we go along. Not strictly required, but
         //  avoids the message write queue growing too large
         pyflush_timestep_data(self, rd, perf, scheduler, messages);
     }
