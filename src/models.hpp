@@ -49,39 +49,6 @@ private:
     int weight_bits{default_weight_bits};
 };
 
-// More detailed Loihi-specific synapse model
-class LoihiSynapseModel : public SynapseUnit
-{
-public:
-    LoihiSynapseModel() { register_attributes(loihi_synapse_attributes); }
-    LoihiSynapseModel(const LoihiSynapseModel &copy) = default;
-    LoihiSynapseModel(LoihiSynapseModel &&other) = default;
-    ~LoihiSynapseModel() override = default;
-    LoihiSynapseModel &operator=(const LoihiSynapseModel &other) = delete;
-    LoihiSynapseModel &operator=(LoihiSynapseModel &&other) = delete;
-
-    PipelineResult update(size_t synapse_address, bool read) override;
-    void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override;
-    void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
-    void reset() override;
-    void track_connection(size_t synapse_address, size_t src_neuron_id, size_t /*dest_neuron_id*/) override;
-
-private:
-    static inline const std::set<std::string> loihi_synapse_attributes{
-            "weight", "w", "latency", "latency_concurrent_access"};
-    std::vector<double> weights;
-    std::vector<double> groups;
-    std::vector<double> costs;
-    std::vector<std::pair<size_t, size_t>> concurrent_accesses;
-    std::map<size_t, size_t> synapse_to_pre_neuron;
-    std::optional<double> concurrent_access_latency{std::nullopt};
-    double min_synaptic_resolution{0.0};
-    int weight_bits{default_weight_bits};
-    bool mixed_sign_mode{true};
-
-    PipelineResult read_synapse(size_t synapse_address);
-};
-
 class AccumulatorModel : public DendriteUnit
 {
 public:
