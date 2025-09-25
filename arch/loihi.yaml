@@ -46,7 +46,7 @@ architecture:
                 latency_update_neuron: 3.7e-9
                 energy_spike_out: 69.3e-12
                 latency_spike_out: 30.0e-9
-            - name: loihi_inputs
+            - name: loihi_inputs[0..1023]
               attributes:
                 model: input
                 energy_access_neuron: 0.0
@@ -70,11 +70,10 @@ architecture:
                 #latency_concurrent_access: 4.7e-9
             - name: loihi_conv_synapse
               attributes:
-                #model: current_based
-                #latency_process_spike: 3.1e-9
-                #latency_process_spike: 4.7e-9
+                model: current_based
+                latency_process_spike: 3.1e-9
                 energy_process_spike: 24.0e-12
-                model: loihi
+                #model: loihi
           dendrite:
           - name: loihi_dendrites
             attributes:

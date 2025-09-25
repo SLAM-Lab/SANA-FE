@@ -6,12 +6,10 @@ import pandas as pd
 import dill
 # Plotting
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
 
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-
 
 def ternary_weight(weight):
     threshold = 0.7 * torch.mean(torch.abs(weight))
@@ -137,8 +135,7 @@ dendrite_hw = "loihi_dendrites"
 print("Creating input layer")
 for id, neuron in enumerate(in_layer):
     neuron.set_attributes(dendrite_hw_name=dendrite_hw,
-                          soma_hw_name=f"loihi_inputs[{id}]",
-                          log_spikes=False)
+                          soma_hw_name=f"loihi_inputs[{id}]")
     neuron.map_to_core(arch.tiles[0].cores[0])
 
 print("Creating hidden layer")
@@ -157,8 +154,7 @@ for id, neuron in enumerate(hidden_layer_1):
     neuron.set_attributes(soma_hw_name=soma_hw,
                           dendrite_hw_name=dendrite_hw,
                           default_synapse_hw_name=synapse_hw,
-                          model_attributes=hidden_parameters,
-                          log_spikes=True)
+                          model_attributes=hidden_parameters)
     neuron.map_to_core(arch.tiles[0].cores[1])
 
 for id, neuron in enumerate(hidden_layer_2):
