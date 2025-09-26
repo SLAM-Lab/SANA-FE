@@ -817,19 +817,21 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
     const bool neuron_defined = dot_pos != std::string::npos;
 
     const std::string group_name = neuron_address.substr(0, dot_pos);
-    NeuronGroup &group = net.groups.at(group_name);
+    const bool group_found = (net.groups.find(group_name) != net.groups.end());
+    if (!group_found)
+    {
+        std::string error =
+                "While mapping, group not found (" + group_name + ")";
+        INFO("Error: %s\n", error.c_str());
+        throw YamlDescriptionParsingError(error, parser, mapping_info);
+    }
+    NeuronGroup &group = net.groups.at(group_name); // No default constructor
 
     size_t start_id = 0;
     size_t end_id = 0;
     if (neuron_defined)
     {
         const std::string neuron_str = neuron_address.substr(dot_pos + 1);
-        if (net.groups.find(group_name) == net.groups.end())
-        {
-            const std::string error = "Invalid neuron group:" + group_name;
-            throw YamlDescriptionParsingError(error, parser, mapping_info);
-        }
-
         if (neuron_str.find("..") != std::string::npos)
         {
             std::tie(start_id, end_id) = yaml_parse_range(neuron_str);
