@@ -606,6 +606,42 @@ bool sanafe::yaml_parse_conv2d_attributes(
     return parsed;
 }
 
+#include <iostream>
+bool sanafe::yaml_parse_sparse_attributes(ryml::ConstNodeRef attribute,
+        std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
+{
+    if (attribute.key() == "source_target_pairs")
+    {
+        std::cout << attribute;
+        if (attribute.is_seq())
+        {
+            for (const auto &pair_node : attribute)
+            {
+                if (pair_node.is_seq() && pair_node.num_children() == 2)
+                {
+                    size_t source_id, target_id;
+                    pair_node[0] >> source_id;
+                    pair_node[1] >> target_id;
+                    source_dest_id_pairs.emplace_back(source_id, target_id);
+                }
+                else
+                {
+                    throw std::runtime_error("Invalid source/target format: "
+                                            "expected [source, target]");
+                }
+            }
+        }
+        else
+        {
+            throw std::runtime_error(
+                    "Source/target pair must be a list of pairs");
+        }
+        return true;
+    }
+
+    return false;
+}
+
 void sanafe::yaml_parse_unit_specific_attributes(const ryml::Parser &parser,
         ryml::ConstNodeRef parent_node,
         std::map<std::string, std::vector<ModelAttribute>> &attribute_lists)
@@ -676,13 +712,38 @@ void sanafe::yaml_parse_conv2d(NeuronGroup &source_group,
             target_group, attribute_lists, convolution);
 }
 
-void sanafe::yaml_parse_sparse(NeuronGroup & /*source_group*/,
-        const ryml::Parser & /*parser*/,
-        const ryml::ConstNodeRef /*hyperedge_node*/,
-        NeuronGroup & /*target_group*/)
+void sanafe::yaml_parse_sparse(NeuronGroup &source_group,
+        const ryml::Parser & parser,
+        const ryml::ConstNodeRef hyperedge_node,
+        NeuronGroup &target_group)
 {
-    // TODO: placeholder
-    throw std::logic_error("Sparse hyperconnections not implemented yet\n");
+    std::map<std::string, std::vector<ModelAttribute>> attribute_lists{};
+    std::vector<std::pair<size_t, size_t>> source_dest_id_pairs;
+
+    for (const auto &attribute : hyperedge_node.children())
+    {
+        if (yaml_parse_sparse_attributes(attribute, source_dest_id_pairs))
+        {
+            // Ignore the standard sparse attributes which shouldn't be
+            //  forwarded onto the hardware models
+            continue;
+        }
+
+        if ((attribute.key() == "synapse") || (attribute.key() == "dendrite"))
+        {
+            yaml_parse_unit_specific_attributes(
+                    parser, attribute, attribute_lists);
+        }
+        else if (attribute.key() != "type")
+        {
+            // Parse assumed list of attributes
+            std::vector<ModelAttribute> attribute_list;
+            std::string attribute_name;
+            attribute >> ryml::key(attribute_name);
+        }
+    }
+    source_group.connect_neurons_sparse(
+            target_group, attribute_lists, source_dest_id_pairs);
 }
 
 void sanafe::yaml_parse_dense(NeuronGroup &source_group,

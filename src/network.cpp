@@ -534,11 +534,11 @@ void sanafe::NeuronGroup::connect_neurons_dense(NeuronGroup &dest_group,
             {
                 if (attribute_list.size() <= list_index)
                 {
-                    INFO("Error: Not enough entries defined "
-                         "for attribute: %s\n",
-                            key.c_str());
-                    throw std::invalid_argument("Not enough entries defined "
-                                                "for attribute");
+                    INFO("Error: Not enough entries defined for attribute:%s "
+                         "(actual:%zu idx:%zu)\n",
+                            key.c_str(), attribute_list.size(), list_index);
+                    throw std::invalid_argument(
+                            "Not enough entries defined for attribute");
                 }
                 const ModelAttribute &attribute = attribute_list[list_index];
                 if (attribute.forward_to_synapse)

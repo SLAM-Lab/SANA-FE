@@ -65,6 +65,7 @@ void yaml_parse_sparse(NeuronGroup &source_group, const ryml::Parser &parser,
 void yaml_parse_dense(NeuronGroup &source_group, const ryml::Parser &parser,
         ryml::ConstNodeRef hyperedge_node, NeuronGroup &target_group);
 bool yaml_parse_conv2d_attributes(ryml::ConstNodeRef attribute, Conv2DParameters &convolution);
+bool yaml_parse_sparse_attributes(ryml::ConstNodeRef attribute, std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs);
 void yaml_parse_unit_specific_attributes(const ryml::Parser &parser, ryml::ConstNodeRef parent_node, std::map<std::string, std::vector<ModelAttribute>> &attribute_lists);
 
 void description_parse_edge_attributes(Connection &edge,

@@ -221,5 +221,3 @@ if plot_results:
     plt.ylabel("Energy Delay Product")
     plt.tight_layout(pad=0.3)
     plt.savefig("runs/dse/dvs_dse_product.png")
-
-# TODO: range of tile configurations
