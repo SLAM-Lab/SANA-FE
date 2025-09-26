@@ -532,7 +532,8 @@ double sanafe::LoihiLifModel::loihi_generate_noise()
     }
     // else, don't generate any noise and return 0.0
 
-    // Get the number of noise bits required TODO: generalize
+    // Get the number of noise bits required
+    // TODO: generalize to different numbers of noise bits
     const int sign_bit = random_val & 0x100;
     random_val &= 0x7f; // TODO: hack, fixed for 8 bits
     if (sign_bit != 0)

@@ -258,10 +258,10 @@ Args:
     timing_model (str, optional): Timing model ("simple", "detailed", "cycle"). Default is "detailed".
     processing_threads (int, optional): Number of processing threads. Default is 1.
     scheduler_threads (int, optional): Number of scheduler threads. Default is 0 (run in main thread).
-    spike_trace (object, optional): Spike trace output (file, True, or None). Default is None.
-    potential_trace (object, optional): Potential trace output (file, True, or None). Default is None.
-    perf_trace (object, optional): Performance metrics trace output (file, True, or None). Default is None.
-    message_trace (object, optional): Message trace output (file, True, or None). Default is None.
+    spike_trace (object, optional): Spike trace output (file, string, True, or None). Default is None.
+    potential_trace (object, optional): Potential trace output (file, string, True, or None). Default is None.
+    perf_trace (object, optional): Performance metrics trace output (file, string, True, or None). Default is None.
+    message_trace (object, optional): Message trace output (file, string, True, or None). Default is None.
     write_trace_headers (bool, optional): Write CSV headers to trace files. Default is True.
 
 Returns:

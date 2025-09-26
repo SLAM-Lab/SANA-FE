@@ -735,6 +735,7 @@ PYBIND11_MODULE(sanafecpp, m)
 {
     m.doc() = docstrings::module_doc;
 
+    // TODO: support loading arch and net from file object like we do for traces
     m.def("load_arch", &sanafe::load_arch, docstrings::load_arch_doc);
     m.def("load_net", &sanafe::load_net, docstrings::load_net_doc,
             pybind11::arg("path"), pybind11::arg("arch"),
