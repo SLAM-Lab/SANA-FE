@@ -8,12 +8,15 @@ import sanafe
 arch = sanafe.load_arch("arch/example.yaml")
 chip = sanafe.SpikingChip(arch)
 
-net = sanafe.load_net("snn/example.net", arch, use_netlist_format=True)
-net.save("out", use_netlist_format=True)
+#net = sanafe.load_net("snn/example.net", arch, use_netlist_format=True)
+net = sanafe.load_net("snn/example.yaml", arch)
+#net.save("out", use_netlist_format=True)
+net.save("out")
 chip.load(net)
 
 result = chip.sim(10, spike_trace=True)
 
-import yaml
-print(yaml.dump(result))
+print(result)
+#import yaml
+#print(yaml.dump(result))
 print(result["spike_trace"])

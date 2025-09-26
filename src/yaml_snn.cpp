@@ -1060,23 +1060,6 @@ ryml::NodeRef sanafe::yaml_serialize_network(ryml::NodeRef root,
                 const std::map<std::string, ModelAttribute> default_attributes{};
                 yaml_serialize_model_attributes(default_attributes, edge_node,
                         connection.synapse_attributes);
-
-                // TODO: support synapse-specific attributes
-                // if (!connection.synapse_attributes.empty())
-                // {
-                //     auto synapse_node = edge_node["synapse"];
-                //     synapse_node |= ryml::MAP;
-                //     description_serialize_model_attributes_to_yaml(
-                //             synapse_node, connection.synapse_attributes);
-                // }
-                // // Add dendrite-specific attributes
-                // if (!connection.dendrite_attributes.empty())
-                // {
-                //     auto dendrite_node = edge_node["dendrite"];
-                //     dendrite_node |= ryml::MAP;
-                //     description_serialize_model_attributes_to_yaml(
-                //             dendrite_node, connection.dendrite_attributes);
-                // }
             }
         }
     }
@@ -1174,19 +1157,51 @@ ryml::NodeRef sanafe::yaml_serialize_model_attributes(
     for (const auto &[key, attribute] : attributes)
     {
         TRACE1(DESCRIPTION, "Adding attribute %s\n", key.c_str());
-        // TODO: support saving model-specific attributes
-        if ((key == "synapse") || (key == "dendrite") || (key == "soma"))
+        // Check for attribute that are h/w specific
+        const bool default_value_exists = default_values.find(key) !=
+                default_values.end();
+        const bool same_as_default = default_value_exists &&
+                (default_values.at(key) != attribute);
+        if (same_as_default)
         {
             continue;
         }
 
-        if ((default_values.find(key) == default_values.end()) ||
-                (default_values.at(key) != attribute))
+        // If the parsed value does not have a default value or is different
+        //  from the default value, output it
+        const bool forward_to_all_hw =
+                        attribute.forward_to_synapse &&
+                attribute.forward_to_dendrite && attribute.forward_to_soma;
+        if (forward_to_all_hw)
         {
-            // Its safe to reference into these strings; they will still valid
-            //  over the duration of the save
+            // Its safe to reference into these strings; they will remain
+            //  valid over the duration of the save
             description_serialize_variant_value_to_yaml(
                     parent[key.c_str()], attribute.value);
+        }
+        else
+        {
+            if (attribute.forward_to_synapse)
+            {
+                ryml::NodeRef synapse_section = parent["synapse"];
+                synapse_section |= ryml::MAP;
+                description_serialize_variant_value_to_yaml(
+                        synapse_section[key.c_str()], attribute.value);
+            }
+            if (attribute.forward_to_dendrite)
+            {
+                ryml::NodeRef dendrite_section = parent["dendrite"];
+                dendrite_section |= ryml::MAP;
+                description_serialize_variant_value_to_yaml(
+                        dendrite_section[key.c_str()], attribute.value);
+            }
+            if (attribute.forward_to_soma)
+            {
+                ryml::NodeRef soma_section = parent["soma"];
+                soma_section |= ryml::MAP;
+                description_serialize_variant_value_to_yaml(
+                        soma_section[key.c_str()], attribute.value);
+            }
         }
     }
 
