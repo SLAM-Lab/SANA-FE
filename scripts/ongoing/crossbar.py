@@ -61,16 +61,12 @@ for input_frame, label in dataloader:
     if count >= num_inputs:
         break
 
-# TODO: hacky just to debug
-# import pandas as pd
-# df = pd.read_csv("/home/usr1/jboyle/neuro/binary_mnist/inputs.csv")
-# inputs = df.to_numpy()
-# print(inputs)
-
 if analog_synapses:
     snn_path = "/home/usr1/jboyle/neuro/binary_mnist/binarized_mnist_model.pth"
     snn = torch.load(snn_path, weights_only=True)
 else:
+    # Load a normally trained rate-coded MNIST model to deploy on Loihi
+    #  (normal digital) synapses
     snn = torch.load(
             os.path.join(PROJECT_DIR, "etc", "mnist_400_128_84_10.pt"),
             pickle_module=dill,

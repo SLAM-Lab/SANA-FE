@@ -7,10 +7,9 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 Explore the usage of analog neuron circuits [Indiveri, 2003] within a Loihi-
 based architecture running rate-encoded MNIST and spiking digits applications.
 """
-# TODO: clean up the circuit-aware trained implementation of Spiking Digits,
-#  which requires a bunch of extra unncecessary libraries to be successfully
-#  imported (ultimately we just want the weights to be extracted)
 # TODO: make sure rate-encoded MNIST is still working ok
+# TODO: add plots and final values for Indiveri vs Loihi soma performance
+# TODO: copy across retrained Loihi model with the correct time-scale i.e. is comparable
 
 import csv
 import torch
@@ -35,6 +34,9 @@ except ImportError:
     # Not installed, fall-back to local build
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
+
+    LASANA_DIR = os.path.abspath(os.path.join(
+        "/", "home", "usr1", "jboyle", "neuro", "lasana"))
     print(f"Project dir: {PROJECT_DIR}")
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
@@ -51,8 +53,7 @@ dataset = "shd"
 #
 #  The second SNN was trained using the LASANA model directly (by Jason). This
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
-#   which is comparable to the SHD benchmark paper.
-
+#   accuracy, which is comparable to the SHD benchmark paper.
 
 analog_neurons = True
 
@@ -88,45 +89,43 @@ if dataset == "mnist":
                                   download=True)
     labels = test_dataset.targets
 elif dataset == "shd":
-    # TODO: clean this up for future, or export the iFndiveri pt file to not have
-    #  all of these dependencies.. (just export the weights as a state dict?)
-    import spiking_digits_indiveri
-    from spiking_digits_indiveri import *
-    import predict_ml_model_helpers
-    from predict_ml_model_helpers import *
-    # Load the Spiking Digits network
-    spiking_digits_model = torch.load(
-            #os.path.join(PROJECT_DIR, "etc", "spiking_digits.pt"),
-            os.path.join(PROJECT_DIR, "etc", "spiking_digits_indiveri_best_71-2.pt"),
-            pickle_module=dill,
-            map_location=torch.device("cpu"))
     weights = {}
-    for attribute_name, param in spiking_digits_model.named_parameters():
-        weights[attribute_name] = param.detach().numpy()
 
-    spiking_digits_old_model = torch.load(
-            os.path.join(PROJECT_DIR, "etc", "spiking_digits.pt"),
-            pickle_module=dill,
-            map_location=torch.device("cpu"))
-    old_weights = {}
-    for attribute_name, param in spiking_digits_old_model.named_parameters():
-        old_weights[attribute_name] = param.detach().numpy()
+    # Load the Spiking Heidelberg Digits (SHD) network
+    if analog_neurons: # Use Indiveri neural circuits
+        # Use a SNN that was trained using circuit-aware methods i.e. was
+        #  trained specifically on the Indiveri neuron circuit model
+        spiking_digits_model = torch.load(
+                os.path.join(PROJECT_DIR, "etc", "spiking_digits_indiveri.pt"),
+                weights_only=True,
+                map_location=torch.device("cpu"))
 
-    #print(weights.keys())
-    #print(weights["fc2.bias"])
-    # input()
-    #print(old_weights["fc2.bias"])
-    # exit()
+        for attribute_name, param in spiking_digits_model.items():
+            weights[attribute_name] = param.detach().numpy()
+    else: # Use digital LIF neuron models
+        # Use an SNN trained on a generic/abstract LIF neuron, applying clipping
+        #  to mimic the Indiveri behavior as close as is possible with an LIF
+        #  (Leaky in SNNTorch) neuron
+        spiking_digits = torch.load(
+                os.path.join(PROJECT_DIR, "etc", "spiking_digits_lif.pt"),
+                pickle_module=dill,
+                map_location=torch.device("cpu"))
+
+        for attribute_name, param in spiking_digits.named_parameters():
+            weights[attribute_name] = param.detach().numpy()
 
     # Load the spiking digits test inputs from the raw dataset, applying the
     #  same transformations as the training scripts
+    # TODO: retrain the LIF model to be at a different time scale for LIF
     frame_transform = transforms.Compose([
         #transforms.Downsample(time_factor=0.1, spatial_factor=0.1), # For my original trained SNN
         transforms.Downsample(time_factor=0.05, spatial_factor=0.1),  # For Jason's circuit-aware trained SNN
         transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
     ])
-    testset = tonic.datasets.SHD(save_to=os.path.join(PROJECT_DIR, "runs", "lasana", "data"),
-                                 transform=frame_transform, train=False)
+    testset = tonic.datasets.SHD(
+        save_to="./runs/lasana/data",
+        transform=frame_transform, train=False
+    )
     dataloader = torch.utils.data.DataLoader(testset, batch_size=1)
 
     inputs = []
@@ -149,7 +148,8 @@ out_neurons = weights["fc2.weight"].shape[0]
 print(f"in:{in_neurons}, hidden:{hidden_neurons}, out:{out_neurons}")
 #"""
 # Load the LASAGNA architecture with analog neurons
-arch = sanafe.load_arch("/home/usr1/jboyle/neuro/lasana/lasana.yaml")
+arch = sanafe.load_arch(
+    os.path.abspath(os.path.join(LASANA_DIR, "indiveri", "lasana.yaml")))
 
 print("Creating network in SANA-FE")
 network = sanafe.Network()
@@ -278,7 +278,6 @@ for input in range(num_inputs):
                      potential_trace="potentials.csv", perf_trace="perf.csv",
                      write_trace_headers=is_first_input, processing_threads=16)
     timesteps_per_input.append(timesteps)
-    # print(results)
     hw.reset()
 #"""
 
@@ -291,17 +290,14 @@ timestep_inputs = np.array(timestep_inputs)
 if dataset == "shd":
     fig = plt.figure(figsize=(12.0, 8.0))
     gs = GridSpec(3, 1, height_ratios=[4, 4, 4], hspace=0.1)
-    columns_to_extract = ["neuron out.0", "neuron out.1", "neuron out.2", "neuron out.3",
-                    "neuron out.4", "neuron out.5", "neuron out.6", "neuron out.7",
-                    "neuron out.8", "neuron out.9", "neuron out.10", "neuron out.11",
-                    "neuron out.12", "neuron out.13", "neuron out.14", "neuron out.15",
-                    "neuron out.16", "neuron out.17", "neuron out.18", "neuron out.19"]
+    columns_to_extract = [
+        "neuron out.0", "neuron out.1", "neuron out.2", "neuron out.3",
+        "neuron out.4", "neuron out.5", "neuron out.6", "neuron out.7",
+        "neuron out.8", "neuron out.9", "neuron out.10", "neuron out.11",
+        "neuron out.12", "neuron out.13", "neuron out.14", "neuron out.15",
+        "neuron out.16", "neuron out.17", "neuron out.18", "neuron out.19"]
     potentials_df = pd.read_csv("potentials.csv")
     potentials = potentials_df[columns_to_extract].to_numpy()
-
-    #potentials_df.plot(x="timestep", y=columns_to_extract, ax=ax)
-    #potentials_df.plot(x="timestep", ax=ax)
-    #plt.savefig("runs/lasana/shd.png")
 
     correct = 0
     start_timestep = 0
@@ -365,8 +361,6 @@ if dataset == "shd":
     ax_potentials.set_xticks([])
     ax_potentials.set_xlabel("")  # Remove label
     ax_potentials.plot(timestep_potentials)
-    #ax_potentials.legend(("0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    #                      "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"), ncol=10)
 
     ax_perf = fig.add_subplot(gs[2])
     ax_perf.set_xlim((0, timesteps_per_input[0]))
@@ -378,6 +372,10 @@ if dataset == "shd":
 
     ax_perf.set_xlabel("Time-step")
     plt.savefig("runs/lasana/shd_raster.png")
+
+    # Plot the comparison of dynamic energy for Loihi LIF vs Indiveri somas
+    #  And print the average comparison. Potentially plot this stacking the
+    #  energy of different h/w on one another
 
 
 elif dataset == "mnist":
