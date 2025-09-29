@@ -301,7 +301,6 @@ void sanafe::LoihiLifModel::set_attribute_hw(
     else if (attribute_name == "noise_bits")
     {
         noise_bits = static_cast<int>(param);
-        sign_mask = (1ULL << noise_bits);
         random_mask = (1ULL << noise_bits) - 1;
     }
 }
@@ -538,7 +537,7 @@ double sanafe::LoihiLifModel::loihi_generate_noise()
     }
     // else, don't generate any noise and return 0.0
 
-    // Get the number of noise bits required
+    // Get the required noise bits (set by the noise exponent in Loihi)
     const int sign_bit = random_val & sign_mask;
     random_val &= random_mask;
     if (sign_bit != 0)

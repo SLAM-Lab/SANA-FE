@@ -170,9 +170,9 @@ private:
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{noise_none};
     std::ifstream noise_stream;
-    long unsigned int sign_mask{0x100};
-    long unsigned int random_mask{0xff};
-    int noise_bits{8};
+    long unsigned int sign_mask{0x100}; // One more than the max noise bits (=8)
+    long unsigned int random_mask{0x7f};
+    int noise_bits{7};
 
     static void loihi_leak_and_quantize(LoihiCompartment &cx);
     static bool loihi_threshold_and_reset(LoihiCompartment &cx);
