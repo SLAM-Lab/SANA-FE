@@ -534,8 +534,7 @@ double sanafe::NocInfo::calculate_route_congestion(const Message &m) const
     // Calculate the total flow density as a metric for route congestion along a
     //  spike message's route. This is given by the sum of the densities, for
     //  all links the message will travel i.e., the message path. Note that we
-    //  calculat ethe path assuming a dimension-order routing scheme.
-    // TODO: extend this to generalize to different routing schemes.
+    //  calculate the path assuming a dimension-order routing scheme.
     auto [x_increment, y_increment] = get_route_xy_increments(m);
     double flow_density = 0.0;
 

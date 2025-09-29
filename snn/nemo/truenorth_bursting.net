@@ -8,9 +8,6 @@ e 0.0->1.0 w=1.0
 e 0.0->2.0 w=0
 
 # neuron 0 in paper
-# TODO: to make sure we update the neuron every timestep, set a small
-#  negative bias. This is a bit of a hack. I should fix force_update to
-#  mean what it says
 n 1.0 bias=0.0 log_spikes=1 log_v=1 force_update=1 connections_out=1
 e 1.0->2.0 w=1.0
 

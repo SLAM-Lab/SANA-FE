@@ -4,8 +4,7 @@ This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
 """
-# TODO: I seem to be getting an issue where NeMo is freezing after a number of
-#  timestep / ticks
+# TODO: adapt this for the new version of SANA-FE
 
 # External libraries, plotting
 import matplotlib
@@ -100,8 +99,6 @@ def run_sim_sanafe(cores, timesteps):
 
 # Run the same simulation on NeMo, for a given number of cores and timesteps
 #  Return the runtime measured by Python.
-# TODO: should we add changes to measure the runtime of simulation and ignore
-#  setup time? Is this even possible
 def run_sim_nemo(cores, timesteps, debug=True):
     run_command = ["mpirun", "-np", "12", NEMO_BIN_PATH,
                    f"--cores={cores}", f"--end={timesteps}",  "--sync=3",

@@ -161,13 +161,15 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
         arch = sanafe.load_arch(ARCH_FILENAME)
         chip = sanafe.SpikingChip(arch)
 
-        # TODO: in future maybe save the files as we go?
-        #network_filename = os.path.join(PROJECT_DIR, "runs", "power", "snn",
-        #                                f"connected_layers_N{layer_neurons}_map_{mapping}.net")
-        #snn.save_net_description(network_filename)
-
         snn = connected_layers(arch, weights[i-1].transpose(), spiking=True,
                                mapping=mapping, copy_network=copy_network)
+        network_filename = os.path.join(
+            PROJECT_DIR, "runs", "power", "snn",
+            f"connected_layers_N{layer_neurons}_map_{mapping}.net"
+        )
+
+        # Save a copy of the SNN for archiving purposes/reproducibility
+        snn.save(network_filename, use_netlist_format=True)
         chip.load(snn)
 
         print(f"Testing network with {2*layer_neurons} neurons")

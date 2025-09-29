@@ -9,7 +9,6 @@ based architecture running rate-encoded MNIST and spiking digits applications.
 """
 # TODO: make sure rate-encoded MNIST is still working ok
 # TODO: add plots and final values for Indiveri vs Loihi soma performance
-# TODO: copy across retrained Loihi model with the correct time-scale i.e. is comparable
 
 import csv
 import torch
@@ -55,7 +54,8 @@ dataset = "shd"
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
 #   accuracy, which is comparable to the SHD benchmark paper.
 
-analog_neurons = True
+#analog_neurons = True
+analog_neurons = False
 
 if dataset == "mnist":
     timesteps = 100
@@ -172,8 +172,10 @@ for id, neuron in enumerate(hidden_layer):
     if dataset == "shd":
         # In the previously trained network lif1.alpha was available in the
         #  trained SNN
-        #hidden_parameters["input_decay"] = weights["lif1.alpha"][id]
-        hidden_parameters["input_decay"] = 0.0
+        if analog_neurons:
+            hidden_parameters["input_decay"] = 0.0
+        else:
+            hidden_parameters["input_decay"] = weights["lif1.alpha"][id]
 
     if analog_neurons:
         neuron.set_attributes(soma_hw_name=f"analog_lif[{id + hidden_neurons}]",
