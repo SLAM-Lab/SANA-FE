@@ -324,8 +324,11 @@ int main(int argc, const char *argv[])
     }
 }
 
-// Project TODOs and wishlist roughly in priority order
+// SANA-FE tasklist roughly in priority order
 //
-// ** New simulator features **
-// TODO: Add support for Fugu and Lava frameworks as extra (optional) Python
-//  dependencies
+// * Get older experimental scripts fully running again (random/latin/nemo)
+// * Implement and test missing SNN netlist export features
+// * Finish & integrate backends for Fugu, Lava, NIR, and SNNTorch
+// * Support different multithreaded schedulers and clean-up interface
+// * Implement multi-threaded BookSim 2
+// * Create and push new docker images to DockerHub

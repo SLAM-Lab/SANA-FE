@@ -24,7 +24,7 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 import sanafe
 
-ARCH_FILENAME = "arch/loihi_with_noise.yaml"
+ARCH_FILENAME = os.path.join("arch", "loihi_with_noise.yaml")
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
@@ -33,38 +33,94 @@ LOIHI_COMPARTMENTS = 1024
 TIMESTEPS = 1024
 #TIMESTEPS = 10240
 
+MAX_COMPARTMENTS = 1024
+TOTAL_CORES = 128
+
+
 def calculate_graph_index(N, row, col, digit):
     return ((row*N + col)*N) + digit
 
-"""
-def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
-                 neurons_per_core=LOIHI_COMPARTMENTS):
-    # TODO: support this once I can save SNNs again!
-    network = sim.Network(save_mappings=True)
-    arch = sim.Architecture()
+
+def map_group_to_core(N, free_compartments):
+    neuron_count = N
+    # Track whenever we are mapping to a core that has previously not been
+    #  mapped to. This occurs either the very first neuron we map (i.e. the
+    #  the first should have all neurons free) or on subsequent calls where we
+    #  run out of mappable neurons in the current core
+    new_core_mapped_to = (free_compartments[0] == MAX_COMPARTMENTS)
+
+    for curr, _ in enumerate(free_compartments):
+        if curr is not None and free_compartments[curr] is not None:
+            if free_compartments[curr] < neuron_count:
+                new_core_mapped_to = True
+                # Mark the core as unavailable for future mappings. Distinguish
+                #  this from 0 so we can figure out when a new core is being mapped
+                #  to (allowing us to apply a Loihi bug fix)
+                free_compartments[curr] = None
+            elif free_compartments[curr] >= neuron_count:
+                if new_core_mapped_to:
+                    # Account for the dummy neuron
+                    free_compartments[curr] -= 1
+                free_compartments[curr] -= neuron_count
+                return curr, new_core_mapped_to
+
+    # No free compartments left
+    return None, None
+
+
+def latin_square(N, arch):
+    # Track free compartments for simple greedy mapping algorithm
+    free_compartments = [MAX_COMPARTMENTS] * TOTAL_CORES
+
+    network = sanafe.Network()
     print(f"Creating WTA networks for {N} digits")
     #G = nx.DiGraph()
     #G.add_nodes_from(range(0, N**3))
 
     # For every position in the square, create a WTA layer representing all
     #  possible digit choices
+    wta_attributes = {
+        "log_spikes": True,
+        "log_potential": False,
+        "force_update": True,
+        "threshold": 64,
+        "reset": 0,
+        "leak": 1,
+        "reverse_threshold": -2**7 + 1,
+        "reverse_reset_mode": "saturate",
+        "soma_hw_name": "loihi_stochastic_lif",
+        "synapse_hw_name": "loihi_sparse_synapse"
+    }
+
+    # Create a dummy neuron group to workaround a Loihi bug with randomized
+    #  compartments
+    cores = arch.cores()
+
+    # Zero pad the group names, ensuring they are in alphabetical order and
+    #  appear in the expected order in the netlist file
+    maximum_groups = LOIHI_CORES + (N * N)
+    zero_padding = len(str(maximum_groups - 1))
+
+    groups = 1
     square = []
     for i in range(0, N):
         row = []
         for j in range(0, N):
-            wta = sim.create_layer(network, N,
-                                   log_spikes=False,
-                                   log_potential=False,
-                                   force_update=False,
-                                   threshold=64.0,
-                                   reset=0.0,
-                                   leak=1,
-                                   reverse_threshold=-2**7 + 1.0,
-                                   reverse_reset_mode="saturate",
-                                   soma_hw_name="loihi_stochastic_lif",
-                                   synapse_hw_name="loihi_sparse_synapse")
+            core_id, add_dummy = map_group_to_core(N, free_compartments)
+            if add_dummy:
+                dummy_group = network.create_neuron_group(
+                    f"group_{groups:0{zero_padding}d}", 1, wta_attributes)
+                groups += 1
+                dummy_group.neurons[0].map_to_core(cores[core_id])
+
+            wta = network.create_neuron_group(
+                f"group_{groups:0{zero_padding}d}", N, wta_attributes)
+            groups += 1
+
             for neuron in wta.neurons:
-                neuron.add_bias(1 * 2**7)
+                neuron.set_attributes(model_attributes={"bias": 1 * 2**7})
+                neuron.map_to_core(cores[core_id])
+
             row.append(wta)
         square.append(row)
 
@@ -81,7 +137,8 @@ def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
                         # Add inhibiting connection for all other digits at this
                         #  position
                         post_neuron = pos.neurons[d]
-                        pre_neuron.add_connection(post_neuron, -1)
+                        pre_neuron.connect_to_neuron(
+                            post_neuron, {"weight": -128})
                         i = calculate_graph_index(N, row, col, digit)
                         j = calculate_graph_index(N, row, col, d)
                         # G.add_edge(i, j, weights=-1)
@@ -93,7 +150,8 @@ def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
                         #  rows
                         dest = square[r][col]
                         post_neuron = dest.neurons[digit]
-                        pre_neuron.add_connection(post_neuron, -1)
+                        pre_neuron.connect_to_neuron(
+                            post_neuron, {"weight": -128})
                         j = calculate_graph_index(N, r, col, digit)
                         # G.add_edge(i, j, weights=-1)
                         connections += 1
@@ -103,16 +161,16 @@ def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
                         # Add inhibiting connection for this digit at other cols
                         dest = square[row][c]
                         post_neuron = dest.neurons[digit]
-                        pre_neuron.add_connection(post_neuron, -1)
+                        pre_neuron.connect_to_neuron(
+                            post_neuron, {"weight": -128})
                         j = calculate_graph_index(N, row, c, digit)
                         # G.add_edge(i, j, weights=-1)
                         connections += 1
 
     print(f"Latin square network has {connections} connections")
-    network_filename = os.path.join("runs", "dse", f"latin_square_N{N}.net")
+    network_filename = os.path.join("runs", "latin", f"latin_square_N{N}.net")
     network_path = os.path.join(PROJECT_DIR, network_filename)
-    network.save(network_path)
-"""
+    network.save(network_path, use_netlist_format=True)
 
 
 def plot_results(N, network_path):
@@ -128,7 +186,7 @@ def plot_results(N, network_path):
     chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
     chip.load(net)
 
-    chip.sim(TIMESTEPS)
+    chip.sim(TIMESTEPS, perf_trace=True, spike_trace=True, potential_trace=True)
 
     # Use spiking data to create the grid solution produced by the Loihi run
     with open(os.path.join(PROJECT_DIR, "spikes.csv")) as spikes:
@@ -170,14 +228,15 @@ def plot_results(N, network_path):
     plt.savefig(os.path.join(PROJECT_DIR, "runs/latin/latin_potentials.png"))
 
 
-def run_experiment(network_filename, timing_model):
+def run_experiment(N, network_filename, timing_model):
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     network_path = os.path.join(PROJECT_DIR, network_filename)
-
     arch = sanafe.load_arch(arch_path)
+
+    if not os.path.exists(network_path):
+        latin_square(N, arch)
     net = sanafe.load_net(network_path, arch, use_netlist_format=True)
-    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True,
-                              record_messages=True)
+    chip = sanafe.SpikingChip(arch)
     chip.load(net)
     results = chip.sim(TIMESTEPS, timing_model=timing_model)
 
@@ -185,7 +244,7 @@ def run_experiment(network_filename, timing_model):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiment = True
 
     if run_experiments:
@@ -203,15 +262,17 @@ if __name__ == "__main__":
                     # Each line of loihi_latin.csv is another experiment,
                     #  containing the network to run and the results measured
                     #  on Loihi
-                    results = run_experiment(line["network"], timing_model="detailed")
+                    results = run_experiment(int(line["N"]), line["network"],
+                                             timing_model="detailed")
                     time = results["sim_time"] / TIMESTEPS
                     energy = results["energy"]["total"] / TIMESTEPS
+                    row = [line["N"], line["network"], energy, time]
                     # Run the same experiment again using the cycle accurate
                     #  timing model
-                    row = [line["N"], line["network"], energy, time]
-                    results = run_experiment(line["network"], timing_model="cycle")
-                    cycle_accurate = results["sim_time"] / TIMESTEPS
-                    row.append(cycle_accurate)
+                    # results = run_experiment(int(line["N"]), line["network"],
+                    #                          timing_model="cycle")
+                    # cycle_accurate = results["sim_time"] / TIMESTEPS
+                    # row.append(cycle_accurate)
 
                     with open(os.path.join(PROJECT_DIR, "runs/latin/sim_latin.csv"),
                               "a") as csv_file:

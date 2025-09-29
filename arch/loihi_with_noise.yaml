@@ -78,13 +78,11 @@ architecture:
                 model: current_based
                 energy_process_spike: 33.6e-12
                 latency_process_spike: 4.7e-9
-                #model: loihi
-                #latency_concurrent_access: 4.7e-9
-                #latency_concurrent_access: 4.0e-9
             - name: loihi_conv_synapse
               attributes:
-                model: loihi
+                model: current_based
                 energy_process_spike: 24.0e-12
+                latency_process_spike: 3.1e-9
           dendrite:
           - name: loihi_dendrites
             attributes:

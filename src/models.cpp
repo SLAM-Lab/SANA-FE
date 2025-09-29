@@ -364,11 +364,11 @@ void sanafe::LoihiLifModel::loihi_leak_and_quantize(LoihiCompartment &cx)
 {
     cx.input_current *= cx.input_decay;
     cx.potential *= cx.leak_decay;
-    // TODO: formalize quantization for Loihi and remove hack
-    //  Make sure we multiple all biases and thresholds by 64 in the snn
-    //  description for loihi benchmarks, it shouldn't be managed here
-    //  Then we can simply apply quantization without multiplication first..
-    //  Again, this has a pretty tiny effect on simulator predictions
+    // Loihi uses a simple fixed point representation where all weights and
+    //  thresholds are shifted by 6 bits before being accumulated (i.e. the
+    //  minimum weight is 1*2^6=64). Take into account this minimum resolution
+    //  i.e., 1/64, when quantizing. This only has a small impact on SNN
+    //  behavior.
     cx.potential = static_cast<int>(cx.potential * 64.0) / 64.0;
 }
 
