@@ -35,8 +35,7 @@ random.seed(1)
 EXPERIMENT = "full"
 #EXPERIMENT = "extremes"
 # Global experiment parameters
-NETWORK_PATH = os.path.join("runs", "random", EXPERIMENT)
-NETWORK_FILENAME = os.path.join(NETWORK_PATH, "random.net")
+RUN_PATH = os.path.join("runs", "random", EXPERIMENT)
 ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
@@ -44,46 +43,85 @@ LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
 TIMESTEPS = 100
 #TIMESTEPS = 100000
 
-def create_random_network(cores, neurons_per_core, messages_per_neuron,
-                          spikes_per_message):
-    """
-    # TODO: support random network generation again
-    network = kernel.Network(save_mappings=True)
+
+def create_random_network(arch, cores, neurons_per_core, messages_per_neuron,
+                          spikes_per_message, spike_percentage,
+                          seed=None, randomize_spikes_per_message=False,
+                          randomize_messages_per_neuron=False):
+    if seed is None:
+        seed = (cores * neurons_per_core * messages_per_neuron *
+                spikes_per_message * spike_percentage) % 2**31
+    random.seed(seed)
+    network = sanafe.Network()
+
     neurons = cores * neurons_per_core
     mappings = []
     for i in range(0, cores):
-        m = (i/4, i%4)
-        mappings.extend((m,) * neurons_per_core)
+        mappings.extend((i,) * neurons_per_core)
 
     print("Creating neuron population")
-    population = utils.create_layer(network, neurons,
-                                  log_spikes=false, log_potential=0,
-                                  force_update=0, threshold=0.0, reset=0.0,
-                                  leak=0.0, mappings=mappings)
+    threshold = 64
+    attributes = {
+        "log_spikes": False,
+        "log_potential": False,
+        "force_update": True,
+        "threshold": threshold,
+        "reset": 0,
+    }
+    population = network.create_neuron_group("pop", neurons, attributes)
 
     print("Generating randomized network connections")
-    weight = 1.0
+    weight = 128
     print(f"Cores: {cores}, messages per neuron: {messages_per_neuron}")
     print(f"neurons per core: {neurons_per_core}, spikes per message: {spikes_per_message}")
     for n in range(0, neurons):
         src = population.neurons[n]
-        # All neurons with outgoing connections should fire every timestep
-        src.add_bias(1.0)
         if (n % 1024) == 0:
             print(f"Generating synaptic connections for neuron {n}")
 
-        dest_core = random.sample(range(0, cores), messages_per_neuron)
+        if random.random() >= (spike_percentage/100):
+            # This neuron doesn't spike, so don't both creating the outgoing
+            #  connections
+            continue
+
+        # All neurons with outgoing connections should fire every timestep
+        src.set_attributes(model_attributes={"bias": 128})
+
+        if randomize_messages_per_neuron:
+            m = random.randrange(messages_per_neuron)
+        else:
+            m = messages_per_neuron
+        dest_core = random.sample(range(0, cores), m)
         for c in dest_core:
-            dest_neurons = random.sample(range(0, neurons_per_core),
-                                         spikes_per_message)
+            if randomize_spikes_per_message:
+                s = random.randrange(spikes_per_message)
+            else:
+                s = spikes_per_message
+            dest_neurons = random.sample(range(0, neurons_per_core), s)
             for d in dest_neurons:
                 dest_id = (c * neurons_per_core) + d
                 assert(dest_id < neurons)
                 dest = population.neurons[dest_id]
-                src.add_connection(dest, weight)
-    network.save(NETWORK_FILENAME)
-    """
-    return
+                src.connect_to_neuron(dest, {"weight": weight})
+
+    network_filename = f"random_c{cores}_n{neurons_per_core}_"
+    if randomize_messages_per_neuron:
+        network_filename += f"m0-{messages_per_neuron}_"
+    else:
+        network_filename += f"m{messages_per_neuron}_"
+    if randomize_spikes_per_message:
+        network_filename += f"s0-{spikes_per_message}_"
+    else:
+        network_filename += f"s{spikes_per_message}_"
+    network_filename += f"p{spike_percentage}_r{seed}.net"
+    snn_path = os.path.join(RUN_PATH, "snn", network_filename)
+
+    cores = arch.cores()
+    for mappings, neuron in zip(mappings, population.neurons):
+        neuron.map_to_core(cores[mappings])
+    network.save(snn_path, use_netlist_format=True)
+
+    return network_filename, network
 
 
 def onpick(event, df):
@@ -97,22 +135,27 @@ def onpick(event, df):
 if __name__ == "__main__":
     run_experiments = True
     plot_experiments = True
+
     if run_experiments:
-        with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),
+        # For reruns, we reuse random networks previously generated on the
+        #  INRC servers during our initial Loihi measurements. These need
+        #  to match exactly with what ran on the h/w. However, if you want
+        #  to generate new random networks for simulation, use the function
+        #  we used to generate these SNNs: create_random_network()
+        with open(os.path.join(RUN_PATH, "loihi_random.csv"),
             "r") as csv_file:
             reader = csv.DictReader(csv_file)
             fieldnames = reader.fieldnames
             fieldnames.append("sim_energy")
             fieldnames.append("sim_latency")
             fieldnames.append("total_spikes")
-            with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "w") as out_file:
+            with open(os.path.join(RUN_PATH, "sim_random.csv"), "w") as out_file:
                 writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                 writer.writeheader()
 
             for line in reader:
                 arch = sanafe.load_arch(ARCH_FILENAME)
                 net = sanafe.load_net(line["network"], arch, use_netlist_format=True)
-
                 chip = sanafe.SpikingChip(arch)
                 chip.load(net)
                 results = chip.sim(TIMESTEPS, perf_trace="perf.csv",
@@ -126,13 +169,13 @@ if __name__ == "__main__":
                 line["sim_energy"] = results["energy"]["total"] / TIMESTEPS
                 line["sim_latency"] = results["sim_time"] / TIMESTEPS
                 print(line)
-                with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "a") as out_file:
+                with open(os.path.join(RUN_PATH, "sim_random.csv"), "a") as out_file:
                     writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                     writer.writerow(line)
 
     if plot_experiments:
-        sim_df = pd.read_csv(os.path.join(NETWORK_PATH, "sim_random.csv"))
-        loihi_df = pd.read_csv(os.path.join(NETWORK_PATH, "loihi_random.csv"))
+        sim_df = pd.read_csv(os.path.join(RUN_PATH, "sim_random.csv"))
+        loihi_df = pd.read_csv(os.path.join(RUN_PATH, "loihi_random.csv"))
         df = pd.merge(sim_df, loihi_df)
         # The smallest measurements hit the limits of Loihi's time measuring
         #  precision. Filter out these rows
@@ -167,8 +210,8 @@ if __name__ == "__main__":
         plt.xticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.yticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.tight_layout(pad=0.1)
-        plt.savefig(os.path.join(NETWORK_PATH, "random_energy.pdf"))
-        plt.savefig(os.path.join(NETWORK_PATH, "random_energy.png"))
+        plt.savefig(os.path.join(RUN_PATH, "random_energy.pdf"))
+        plt.savefig(os.path.join(RUN_PATH, "random_energy.png"))
 
         # Plot the simulated vs measured latency
         #fig = plt.figure(figsize=(3.0, 2.2))
@@ -196,8 +239,8 @@ if __name__ == "__main__":
         plt.xticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.yticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.tight_layout(pad=0.1)
-        plt.savefig(os.path.join(NETWORK_PATH, "random_latency.pdf"))
-        plt.savefig(os.path.join(NETWORK_PATH, "random_latency.png"))
+        plt.savefig(os.path.join(RUN_PATH, "random_latency.pdf"))
+        plt.savefig(os.path.join(RUN_PATH, "random_latency.png"))
         #plt.show()
 
         print(f"Min total Loihi latency: {np.min(loihi_latency * 1E5)}")
@@ -217,7 +260,7 @@ if __name__ == "__main__":
 
 # The old code for another experiment, where we measure simulator performance
 #  across a range of SNNs. Currently just ignore all of this - I didn't figure
-#  how to get meaningful plots
+#  how to create any meaningful plots
 """
 # Run the simulation on SANA-FE, generating the network and immediately using it
 #  Return the total runtime measured by Python, including setup and processing
