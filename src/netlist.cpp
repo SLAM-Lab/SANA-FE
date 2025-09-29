@@ -620,7 +620,6 @@ void sanafe::netlist_read_mapping(const std::vector<std::string_view> &fields,
 
 std::string sanafe::netlist_group_to_netlist(const NeuronGroup &group)
 {
-    // TODO: support attribute specific to certain h/w units
     std::string entry = "g " + std::to_string(group.neurons.size());
 
     if (group.default_neuron_config.default_synapse_hw_name.has_value() &&
@@ -712,7 +711,6 @@ std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
         const SpikingNetwork &net,
         const std::map<std::string, size_t> &group_name_to_id)
 {
-    // TODO: support attributes specific to certain h/w units
     TRACE1(DESCRIPTION, "Saving neuron nid:%s.%zu to netlist\n",
             neuron.parent_group_name.c_str(), neuron.get_id());
     const NeuronGroup &parent_group = net.groups.at(neuron.parent_group_name);
@@ -746,7 +744,7 @@ std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
             default_config.log_potential);
 
     entry += netlist_attributes_to_netlist(neuron.model_attributes,
-            parent_group.default_neuron_config.model_attributes);
+            default_config.model_attributes);
 
     return entry;
 }
@@ -775,7 +773,6 @@ std::string sanafe::netlist_mapping_to_netlist(const Neuron &neuron,
 std::string sanafe::netlist_connection_to_netlist(const Connection &con,
         const std::map<std::string, size_t> &group_name_to_id)
 {
-    // TODO: support attributes specific to only synapse or dendrite h/w
     std::string pre_neuron_offset_str;
     if (con.pre_neuron.neuron_offset.has_value())
     {
@@ -844,10 +841,19 @@ std::string sanafe::netlist_attributes_to_netlist(
         TRACE2(DESCRIPTION, "Parsing attributes using normal format\n");
         for (const auto &attribute : model_attributes)
         {
-            attribute_str += " ";
-            attribute_str += attribute.first;
-            attribute_str += "=";
-            attribute_str += attribute.second.print();
+            const std::string &attribute_name = attribute.first;
+            const sanafe::ModelAttribute &attribute_value = attribute.second;
+            const bool no_default_attribute =
+                    (default_attributes.find(attribute_name) ==
+                            default_attributes.end());
+            if (no_default_attribute ||
+                    (default_attributes.at(attribute_name) != attribute_value))
+            {
+                attribute_str += " ";
+                attribute_str += attribute_name;
+                attribute_str += "=";
+                attribute_str += attribute_value.print();
+            }
         }
     }
 
