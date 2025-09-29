@@ -113,23 +113,9 @@ if __name__ == "__main__":
     #frames = 10
     #frames = 1
 
-    #loihi_spiketrains = parse_loihi_spiketrains(timesteps)
     if run_experiments:
         neurons = ""
         groups = ""
-
-        # neuron_groups_filename = os.path.join(NETWORK_DIR, "neuron_groups.net")
-        # with open(neuron_groups_filename, "r") as group_file:
-        #     group_data = group_file.read()
-
-        # snn_filename = os.path.join(NETWORK_DIR, "dvs_gesture.net")
-        # with open(snn_filename, "r") as snn_file:
-        #     snn_data = snn_file.read()
-
-        # print("Reading mapping file")
-        # mappings_filename = os.path.join(NETWORK_DIR, "mappings.net")
-        # with open(mappings_filename, "r") as mappings_file:
-        #     mapping_data = mappings_file.read()
 
         print("Reading input CSV file")
 
@@ -139,20 +125,9 @@ if __name__ == "__main__":
         elif experiment == "time":
             open(SIM_TIME_DATA_PATH, "w")
 
-        # input_filename = os.path.join(NETWORK_DIR, "inputs0.net")
         input_csv_filename = os.path.join(NETWORK_DIR, "inputs.csv")
-        # with open(input_filename, "r") as input_file:
-        #     input_data = input_file.read()
         with open(input_csv_filename, "r") as input_csv:
             inputs = np.loadtxt(input_csv, delimiter=",", skiprows=1)
-
-        # First create the network file from the inputs and SNN
-        # data = (group_data + "\n" + input_data + "\n" + snn_data + "\n" +
-        #         mapping_data)
-        # TODO: clean up this first part of the script which is redundant now
-        #  basically
-        #with open(GENERATED_NETWORK_PATH, "w") as network_file:
-        #    network_file.write(data)
 
         # Use a pre-generated network for a realistic use case i.e.
         #  dvs-gesture
@@ -187,8 +162,6 @@ if __name__ == "__main__":
         energies = np.append(energies, analysis["total_energy"] / timesteps)
         hops = np.append(hops, analysis["hops"])
 
-        #with open("hops.csv", "a") as hops_file:
-        #    np.savetxt("hops.csv", hops, delimiter=",")
         if experiment == "time":
             with open(SIM_TIME_DATA_PATH, "a") as time_file:
                 np.savetxt(SIM_TIME_DATA_PATH, times, delimiter=",")
@@ -199,18 +172,6 @@ if __name__ == "__main__":
         print("Finished running experiments")
 
     if plot_experiments:
-        """
-        plt.figure(figsize=(5.5, 5.5))
-        plt.bar(1, spiking_update_energy)
-        plt.bar(2, spiking_spike_gen_energy, color="orange")
-        plt.bar(3, spiking_synapse_energy, color="red")
-        plt.bar(4, spiking_network_energy, color="green")
-        plt.xticks([1,2,3,4], ["Update", "Spike Gen", "Synapse", "Network"])
-        plt.ylabel("Energy (J)")
-        plt.xlabel("Operation Type")
-        plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-        plt.savefig("energy_breakdown.png")
-        """
         # Plot the latency
         if experiment == "time":
             plt.rcParams.update({'font.size': 6, 'lines.markersize': 4})
@@ -222,7 +183,6 @@ if __name__ == "__main__":
             cycle_based_data = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "noc", "dvs", "cycle_based_latencies.csv"))
 
             print("Preprocessing data")
-            #loihi_times = np.array(loihi_data.loc[:, "spiking"] / 1.0e6)
             loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
             event_based_times = np.array(event_based_data.loc[:, :])
             cycle_based_times = np.array(cycle_based_data.loc[:, :])
@@ -237,46 +197,6 @@ if __name__ == "__main__":
             #  timestep-1)
             times = np.delete(times,
                             list(range(timesteps, timesteps*frames, timesteps)))
-            #hops = np.delete(hops,
-            #                list(range(timesteps, timesteps*frames, timesteps)))
-            #loihi_times = np.delete(loihi_times,
-            #                list(range(timesteps, timesteps*frames, timesteps)))
-
-            """
-            print("Creating plots")
-            plt.figure(figsize=(7, 8))
-            plt.subplot(311)
-            #FRAMES = 100
-            FRAMES = 1
-            plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), times[0:(timesteps-1)*FRAMES], '-')
-            plt.plot(np.arange(1, ((timesteps-1)*FRAMES+1)), np.mean(loihi_times[0:(timesteps-1)*FRAMES], axis=1), '--')
-            plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
-            plt.legend(("Simulated", "Measured on Loihi"))
-            plt.ylabel("Latency (s)")
-            plt.xlabel("Timestep")
-
-            # Also plot underneath the different activity on the chip for both my
-            #  simulator and Loihi
-            #plt.subplot(312)
-            #plt.plot(np.arange(1, timesteps+1), analysis["packets"], marker='x')
-            #plt.plot(np.arange(1, timesteps+1), analysis["hops"], marker='x')
-            #plt.legend(("Packets Sent", "Total Hops"))
-            #plt.xlabel("Timestep")
-
-            #plt.subplot(313)
-            #plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
-            # Figure out how many neurons fired in the Loihi data
-            #fired_count = [len(loihi_spiketrains[i]) for
-            #            i in range(0, len(loihi_spiketrains))]
-            #plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
-            #plt.ylabel("Neurons Fired")
-            #plt.xlabel("Timestep")
-            #plt.legend(("Simulated", "Measured on Loihi"))
-
-            #print("diff = {}".format(
-            #    analysis["fired"] - np.array(fired_count[0:timesteps])))
-            plt.savefig("runs/dvs/dvs_gesture_sim_time_stats.pdf")
-            """
 
             # Plot the latency
             print("Plotting latency")
@@ -296,17 +216,11 @@ if __name__ == "__main__":
                 loihi_total_times[i] = np.sum(loihi_times[0:timesteps-2, i])
 
             plt.figure(figsize=(7.0, 1.6))
-            ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), times[0:(timesteps-1)*frames], marker='x')
-            ##plt.plot(np.arange(1, ((timesteps-1)*frames+1)), loihi_times[0:(timesteps-1), frames], marker='x')
             plt.rcParams.update({'font.size': 6})
-            #plt.plot(np.arange(1, timesteps-1), loihi_times[0:(timesteps-2), 0] * 1.0e6, "-")
-            #plt.plot(np.arange(1, timesteps-1), times[1:(timesteps-1)] * 1.0e6, "--")
             start_frame = 0
             plt.plot(np.arange(1, timesteps-1), loihi_times[0:timesteps-2, start_frame] * 1.0e6, "-")
             plt.plot(np.arange(1, timesteps-1), times[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "--")
 
-            #plt.plot(np.arange(1, timesteps-1), event_based_times[1:(timesteps-1)] * 1.0e6, ":k")
-            #plt.plot(np.arange(1, timesteps-1), cycle_based_times[0:(timesteps-2)] * 1.0e6, ":r")
             plt.legend(("Measured on Loihi", "SANA-FE predictions"), fontsize=6)
             plt.ylabel("Time-step Latency ($\mu$s)")
             plt.xlabel("Time-step")
@@ -320,29 +234,13 @@ if __name__ == "__main__":
             plt.figure(figsize=(1.5, 1.5))
             plt.minorticks_on()
             plt.gca().set_box_aspect(1)
-            #plt.plot(times[0:frames*(timesteps-1)], loihi_times[0:frames*(timesteps-1)], "x")
-
-            #average_times = total_times / 128
-            #loihi_average_times = loihi_total_times / 128
 
             average_times = total_times / 127
             loihi_average_times = loihi_total_times / 127
             plt.rcParams.update({'font.size': 6, 'lines.markersize': 2})
-            #plt.plot(average_times[0:frames] * 1.0e6, loihi_average_times[0:frames] * 1.0e6, "x")
-            #plt.plot(np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6,
-            #         np.linspace(min(average_times) * 1.0e6, max(average_times)) * 1.0e6, "k--")
-
-            #cm = plt.colormaps['coolwarm']
-
-            #print(total_hops)
-            #exit()
-            #plt.scatter(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, marker="x", s=0.1, cmap=cm, c=np.array(total_hops))
             scatter = plt.plot(average_times[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "x", alpha=0.8)[0]
             plt.plot(np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6),
                      np.linspace(min(average_times)*1.0e6, max(average_times)*1.0e6), "k--")
-            #plt.colorbar(label="Total Hops", shrink=0.5)
-            #plt.xticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
-            #plt.yticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
             plt.ylabel("Measured Latency ($\mu$s)")
             plt.xlabel("Simulated Latency ($\mu$s)")
             plt.xlim((10, 30))
@@ -380,20 +278,6 @@ if __name__ == "__main__":
             error = np.sum(error) / len(error)
             print(f"Timestep MAPE: {error} ({error * 100} %)")
 
-            """
-            plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
-            # Figure out how many neurons fired in the Loihi data
-            fired_count = [len(loihi_spiketrains[i]) for
-                        i in range(0, len(loihi_spiketrains))]
-            plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
-            plt.ylabel("Neurons Fired")
-            plt.xlabel("Timestep")
-            plt.legend(("Simulated", "Measured on Loihi"))
-
-            print("diff = {}".format(
-                analysis["fired"] - np.array(fired_count[0:timesteps])))
-            plt.savefig("runs/dvs/dvs_gesture_sim_time2.png")
-            """
             def on_click(event):
                 if event.inaxes != scatter.axes:
                     return
@@ -415,15 +299,8 @@ if __name__ == "__main__":
         scatter = plt.plot(predicted_latency[0:1000]*1.0e6, loihi_latency[0:1000]*1.0e6, "o", alpha=0.8)[0]
         plt.plot(np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6),
                     np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6), "k--")
-        #plt.colorbar(label="Total Hops", shrink=0.5)
-        #plt.xticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
-        #plt.yticks((1.0e-5, 1.5e-5, 2.0e-5, 2.5e-5, 3.0e-5))
         plt.ylabel("Measured Latency ($\mu$s)")
         plt.xlabel("Simulated Latency ($\mu$s)")
-        #plt.xlim((10, 30))
-        #plt.ylim((10, 30))
-        #plt.xticks(np.arange(10, 31, 10))
-        #plt.yticks(np.arange(10, 31, 10))
         plt.tight_layout(pad=0.3)
         plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.pdf")
         plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.png", dpi=300)
@@ -461,21 +338,7 @@ if __name__ == "__main__":
 
             total_error = (sum(loihi_energies[0:frames]) - sum(energies[0:frames])) / sum(loihi_energies[0:frames])
             print(f"Energy Total error: {total_error} ({total_error*100.0} %)")
-        """
-        plt.figure()
-        plt.plot(np.arange(1, timesteps+1), analysis["fired"], marker='x')
-        # Figure out how many neurons fired in the Loihi data
-        fired_count = [len(loihi_spiketrains[i]) for
-                    i in range(0, len(loihi_spiketrains))]
-        plt.plot(np.arange(1, timesteps+1), fired_count[0:timesteps], marker='x')
-        plt.ylabel("Neurons Fired")
-        plt.xlabel("Timestep")
-        plt.legend(("Simulated", "Measured on Loihi"))
-        print("diff = {}".format(
-            analysis["fired"] - np.array(fired_count[0:timesteps])))
-        plt.savefig("runs/dvs/dvs_gesture_spikes_i16.png")
-        """
-        exit()
+
         # These experiments not used for now
         # Plot the potential probes from simulationm this was used to compared
         #  simulated functional behavior against actual
@@ -499,10 +362,8 @@ if __name__ == "__main__":
                 plt.plot(np.arange(1, timesteps+1), potentials*64, "-x")
                 plt.plot(np.arange(1, timesteps+1),
                         np.ones(timesteps) * thresholds[layer_id] * 64)
-                #plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
                 plt.ylabel("Membrane Potential")
                 plt.xlabel("Time-step")
-                #plt.ylim((-0.2, 1.0))
                 plt.tight_layout()
                 plt.savefig("{0}/probe_potential_{1}.png".format(layer_path,
                                                             neuron_id))
@@ -510,9 +371,5 @@ if __name__ == "__main__":
 
         with open("run_summary.yaml", "r") as results_file:
             results = yaml.safe_load(results_file)
-        #network_percentage = (results["network_time"] /
-        #                                    results["time"]) * 100.0
-        #print("Percentage of time used for only network: {0}".format(
-        #      network_percentage))
 
         #plt.show()

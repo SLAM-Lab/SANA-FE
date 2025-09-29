@@ -326,8 +326,6 @@ int main(int argc, const char *argv[])
 
 // SANA-FE tasklist roughly in priority order
 //
-// * Get older experimental scripts fully running again (random/latin/nemo)
-// * Implement and test missing SNN netlist export features
 // * Finish & integrate backends for Fugu, Lava, NIR, and SNNTorch
 // * Support different multithreaded schedulers and clean-up interface
 // * Implement multi-threaded BookSim 2
