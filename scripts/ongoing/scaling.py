@@ -21,8 +21,8 @@ okabe_ito_colors = [
     '#E69F00',  # Orange
     '#56B4E9',  # Sky Blue
     '#009E73',  # Bluish Green
-#    '#F0E442',  # Yellow
-#    '#0072B2',  # Blue
+    '#F0E442',  # Yellow
+    '#0072B2',  # Blue
     '#D55E00',  # Vermillion
     '#CC79A7',  # Reddish Purple
     '#000000'   # Black

@@ -4,6 +4,9 @@
 # object to the SNN representation runnable on SANA-FE
 
 # Implemented by Lance Lui as part of the capstone senior design project
+
+# TODO: adapt to work with updated SANA-FE
+# TODO: update to actually pull parameters from the Lava process
 import lava.utils.serialization
 from lava.magma.core.process.process import AbstractProcess
 from lava.magma.compiler.executable import Executable

@@ -1382,7 +1382,7 @@ for timestep in range(0, timesteps):
             m.network_delay = 0
             #m.network_delay = 25*flow_delays[core, m.dest_core]
             # TODO: this delay seems off by about a factor of 4?
-            # TOD+O: hack removed but see what is needed
+            # TODO: hack removed but see what is needed
             #m.generation_delay += 0.2*send_block_times[core]
             #m.generation_delay += 5.0e-9
             #message_generation_latencies[core, m.dest_core] += 5.0e-9

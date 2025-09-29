@@ -174,13 +174,13 @@ def generate_rst_references(entries: dict) -> str:
 
         if entry['ENTRYTYPE'] == 'article':
             journal = entry['journal']
-            # TODO: Right now we assume that all fields are available, but it is
-            #  possible for preprints that the volume, article and page numbers
-            #  are not available
             # TODO: This isn't guaranteed to apply to all citations, but for now
             #  assume pages are provided as a range
             page_start = pages.split("--")[0]
             page_end = pages.split("--")[1]
+            # TODO: Right now we assume that all fields are available, but it is
+            #  possible for preprints that the volume, article and page numbers
+            #  are not available
             ref = f'{authors},\n"{title},"\nin {journal}, vol. {volume}, no. {number}, pp. {page_start}–{page_end}, {year},\n`doi:{doi} <https://doi.org/{doi}>`_.'
         else:  # inproceedings
             booktitle = entry['booktitle']

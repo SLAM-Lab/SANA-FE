@@ -84,7 +84,7 @@ if dataset == "mnist":
                           delimiter=',')
     # I didn't store the labels during training, so load these from the original
     #  dataset
-    # TODO: scrap the csv and just use this for inputs too..
+    # TODO: scrap the csv and just use the DataLoader for inputs too..
     test_dataset = datasets.MNIST(root="./runs/lasana/data", train=False,
                                   download=True)
     labels = test_dataset.targets
@@ -116,9 +116,7 @@ elif dataset == "shd":
 
     # Load the spiking digits test inputs from the raw dataset, applying the
     #  same transformations as the training scripts
-    # TODO: retrain the LIF model to be at a different time scale for LIF
     frame_transform = transforms.Compose([
-        #transforms.Downsample(time_factor=0.1, spatial_factor=0.1), # For my original trained SNN
         transforms.Downsample(time_factor=0.05, spatial_factor=0.1),  # For Jason's circuit-aware trained SNN
         transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
     ])
