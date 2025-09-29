@@ -166,10 +166,13 @@ public:
 private:
     static inline const std::set<std::string> loihi_lif_attributes{"reset_mode",
             "reverse_reset_mode", "reset", "reverse_reset", "bias", "threshold",
-            "reverse_threshold", "leak_decay", "noise"};
+            "reverse_threshold", "leak_decay", "noise", "noise_bits"};
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{noise_none};
     std::ifstream noise_stream;
+    long unsigned int sign_mask{0x100};
+    long unsigned int random_mask{0xff};
+    int noise_bits{8};
 
     static void loihi_leak_and_quantize(LoihiCompartment &cx);
     static bool loihi_threshold_and_reset(LoihiCompartment &cx);

@@ -298,6 +298,12 @@ void sanafe::LoihiLifModel::set_attribute_hw(
             throw std::runtime_error("Failed to open noise stream");
         }
     }
+    else if (attribute_name == "noise_bits")
+    {
+        noise_bits = static_cast<int>(param);
+        sign_mask = (1ULL << noise_bits);
+        random_mask = (1ULL << noise_bits) - 1;
+    }
 }
 
 void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
@@ -533,13 +539,11 @@ double sanafe::LoihiLifModel::loihi_generate_noise()
     // else, don't generate any noise and return 0.0
 
     // Get the number of noise bits required
-    // TODO: generalize to different numbers of noise bits
-    const int sign_bit = random_val & 0x100;
-    random_val &= 0x7f; // TODO: hack, fixed for 8 bits
+    const int sign_bit = random_val & sign_mask;
+    random_val &= random_mask;
     if (sign_bit != 0)
     {
-        // Sign extend
-        random_val |= ~(0x7f);
+        random_val |= ~random_mask; // Sign extend
     }
 
     return static_cast<double>(random_val);
