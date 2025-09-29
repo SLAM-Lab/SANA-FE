@@ -174,14 +174,34 @@ def generate_rst_references(entries: dict) -> str:
 
         if entry['ENTRYTYPE'] == 'article':
             journal = entry['journal']
-            # TODO: This isn't guaranteed to apply to all citations, but for now
-            #  assume pages are provided as a range
-            page_start = pages.split("--")[0]
-            page_end = pages.split("--")[1]
-            # TODO: Right now we assume that all fields are available, but it is
-            #  possible for preprints that the volume, article and page numbers
-            #  are not available
-            ref = f'{authors},\n"{title},"\nin {journal}, vol. {volume}, no. {number}, pp. {page_start}–{page_end}, {year},\n`doi:{doi} <https://doi.org/{doi}>`_.'
+            page_info = ""
+            if pages:
+                # Page(s) could be given as a range or single value
+                if "--" in pages:
+                    page_start = pages.split("--")[0]
+                    page_end = pages.split("--")[1]
+                    page_info = f"pp. {page_start}–{page_end}"
+                else:
+                    page_info = f"p. {pages.strip()}"
+
+            # Build reference up with some optional fields
+            ref_parts = [f'{authors},\n"{title},"']
+            ref_parts.append(f'in {journal}')
+
+            # Add volume and number if available
+            if volume and number:
+                ref_parts.append(f", vol. {volume}, no. {number}")
+            elif volume:
+                ref_parts.append(f", vol. {volume}")
+            elif number:
+                ref_parts.append(f", no. {number}")
+
+            # Add page info if available
+            if page_info:
+                ref_parts.append(f', {page_info}')
+
+            ref_parts.append(f', {year},\n`doi:{doi} <https://doi.org/{doi}>`_.')
+            ref = ''.join(ref_parts)
         else:  # inproceedings
             booktitle = entry['booktitle']
             address = entry.get('address', '')

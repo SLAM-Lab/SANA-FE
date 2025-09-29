@@ -110,8 +110,7 @@ in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA, 2
 `doi: <https://doi.org/>`_.
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
-"SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
-in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems (TCAD), vol. 44, no. 8, pp. 3165–3178, 2025,
+"SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems (TCAD), vol. 44, no. 8, pp. 3165–3178, 2025,
 `doi:10.1109/TCAD.2025.3537971 <https://doi.org/10.1109/TCAD.2025.3537971>`_.
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
