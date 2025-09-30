@@ -21,11 +21,16 @@ import numpy as np
 import pandas as pd
 import time
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+try:
+    import sanafe
+except ImportError:
+    # Not installed, fall-back to local build
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
+    print(f"Project dir: {PROJECT_DIR}")
+    sys.path.insert(0, PROJECT_DIR)
+    import sanafe
 
-sys.path.insert(0, PROJECT_DIR)
-import sanafe
 
 MAX_TILES = 32
 MAX_CORES = 4
@@ -198,7 +203,7 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
 #mappings = ("split_2_diff_tiles",)
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
 
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}

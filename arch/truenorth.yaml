@@ -3,43 +3,58 @@ architecture:
   name: truenorth_chip
   attributes:
     topology: mesh
-    dimensions: 2
     width: 64
     height: 64
-
+    link_buffer_size: 1
+    sync_model: fixed
+    latency_sync: 0.0
   tile:
     - name: truenorth_tile[0..4095]
       attributes:
-        blocking: False
+        energy_north_hop: 0.0
+        latency_north_hop: 0.0
+        energy_east_hop: 0.0
+        latency_east_hop: 0.0
+        energy_south_hop: 0.0
+        latency_south_hop: 0.0
+        energy_west_hop: 0.0
+        latency_west_hop: 0.0
       core:
         - name: truenorth_core
           attributes:
-            blocking: False
+            buffer_position: soma
+            buffer_inside_unit: false
+            max_neurons_supported: 256
           axon_in:
             - name: core_in
-              # axon_in acts like input ports to the arch or subtree.
-              #  For Loihi we have at most 4096 slots to route packets to
-              #  different cores.
               attributes:
-                fan_in: 256
-                protocol: dest_axon
+                energy_message_in: 0.0
+                latency_message_in: 0.0
           soma:
             - name: core_soma
               attributes:
-                type: digital
                 model: truenorth
+                energy_access_neuron: 0.0
+                latency_access_neuron: 0.0
+                energy_update_neuron: 0.0
+                latency_update_neuron: 0.0
+                energy_spike_out: 0.0
+                latency_spike_out: 0.0
           synapse:
             - name: core_synapses
               attributes:
                 model: current_based
-                weight_bits: 8
+                energy_process_spike: 0.0
+                latency_process_spike: 0.0
           dendrite:
           - name: core_dendrites
             attributes:
+              model: accumulator
+              energy_update: 0.0
+              latency_update: 0.0
 
           axon_out:
             - name: core_out
               attributes:
-                fan_out: 1
-                protocol: dest_axon
-
+                energy_message_out: 0.0
+                latency_message_out: 0.0

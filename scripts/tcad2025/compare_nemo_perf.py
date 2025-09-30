@@ -4,8 +4,6 @@ This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
 """
-# TODO: adapt this for the new version of SANA-FE
-
 # External libraries, plotting
 import matplotlib
 matplotlib.use('Agg')
@@ -24,11 +22,15 @@ import sys
 import os
 
 # SANA-FE libraries
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
-
-sys.path.insert(0, PROJECT_DIR)
-import utils
+try:
+    import sanafe
+except ImportError:
+    # Not installed, fall-back to local build
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
+    print(f"Project dir: {PROJECT_DIR}")
+    sys.path.insert(0, PROJECT_DIR)
+    import sanafe
 
 # Use a dumb seed to get consistent results
 random.seed(1)
@@ -47,61 +49,81 @@ CSV_RESULTS_FILENAME = os.path.join(PROJECT_DIR, "runs", "nemo",
 
 # Create a random truenorth network, 80% connected to neuron within same
 # core, 20% connected to neurons outside
-def create_nemo_network(cores):
-    network = sim.Network(save_mappings=True)
-    compartments = sim.init_compartments(cores, 1, TRUENORTH_COMPARTMENTS)
+def create_nemo_network(arch, core_count):
+    network = sanafe.Network()
     print("Creating neuron population")
+    cores = list(arch.cores())
 
     mappings = []
-    for i in range(0, cores):
-        m = (i, 0)
-        mappings.extend((m,) * TRUENORTH_COMPARTMENTS)
+    for i in range(0, core_count):
+        mappings.extend((i,) * TRUENORTH_COMPARTMENTS)
+
     # Create neurons to fill every TrueNorth compartment, with a negative
     #  threshold and forced updates i.e., spikes every timestep
-    population = sim.create_layer(network, cores*TRUENORTH_COMPARTMENTS,
-                                    compartments, 0, 0, 1, 0.0, -1.0, 0.0,
-                                    mappings=mappings, connections_out=1,
-                                    soma_hw_name="core_soma",
-                                    synapse_hw_name="core_synapses")
+    attributes = {
+        "log_spikes": False,
+        "log_potential": False,
+        "force_update": True,
+        "threshold": 0.0,
+        "reset": -1.0,
+        "leak": 0.0,
+        "soma_hw_name": "core_soma",
+        "synapse_hw_name": "core_synapse"
+    }
+    population = network.create_neuron_group(
+        "tn", core_count * TRUENORTH_COMPARTMENTS, attributes)
 
     print("Generating randomized network connections")
     weight = 1
-    for c in range(0, cores):
+    neurons = list(population.neurons)
+
+    for c in range(0, core_count):
         if (c % 32) == 0:
             print(f"Generating synaptic connections for core {c}")
         for n in range(0, TRUENORTH_AXONS):
+            print(f"n:{n}/{TRUENORTH_AXONS}")
             if random.random() < SPIKE_INTRA_CORE_PROB:
-                possible_cores = list(range(0, cores))
+                possible_cores = list(range(0, core_count))
                 del(possible_cores[c])
                 dest_core = random.choice(possible_cores)
             else:  # 20% chance of picking the same core
                 dest_core = c
             dest_axon = random.randrange(0, TRUENORTH_AXONS)
-            src = population.neurons[(c*TRUENORTH_AXONS) + n]
-            dest = population.neurons[(dest_core*TRUENORTH_AXONS) + dest_axon]
-            src.add_connection(dest, weight)
+            src = neurons[(c*TRUENORTH_AXONS) + n]
+            dest = neurons[(dest_core*TRUENORTH_AXONS) + dest_axon]
+            src.connect_to_neuron(dest, {"weight": weight})
 
-    network.save(NETWORK_FILENAME)
+    print("Mapping population neurons")
+    for i, n in enumerate(population.neurons):
+        core_id = mappings[i]
+        n.map_to_core(cores[core_id])
+
+    #network.save(NETWORK_FILENAME, use_netlist_format=True)
+    return network
 
 
 # Run the simulation on SANA-FE, generating the network and immediately using it
 #  Return the total runtime measured by Python, including setup and processing
 #  time.
-def run_sim_sanafe(cores, timesteps):
-    create_nemo_network(cores)
+def run_sim_sanafe(core_count, timesteps):
+    arch = sanafe.load_arch(ARCH_FILENAME)
+    snn = create_nemo_network(arch, core_count)
+    chip = sanafe.SpikingChip(arch)
+    chip.load(snn)
+
     start = time.time()
-    sim.run(ARCH_FILENAME, NETWORK_FILENAME, timesteps)
+    chip.sim(timesteps)
     end = time.time()
     run_time = end - start
-    print(f"sanafe runtime for {cores} cores was {run_time} s")
+    print(f"sanafe runtime for {core_count} cores was {run_time} s")
     return run_time
 
 
-# Run the same simulation on NeMo, for a given number of cores and timesteps
+# Run the same simulation on NeMo, for a given number of core_count and timesteps
 #  Return the runtime measured by Python.
-def run_sim_nemo(cores, timesteps, debug=True):
+def run_sim_nemo(core_count, timesteps, debug=True):
     run_command = ["mpirun", "-np", "12", NEMO_BIN_PATH,
-                   f"--cores={cores}", f"--end={timesteps}",  "--sync=3",
+                   f"--core_count={core_count}", f"--end={timesteps}",  "--sync=3",
                    "--rand"]
     if debug:
         run_command.append("--svouts")
@@ -110,7 +132,7 @@ def run_sim_nemo(cores, timesteps, debug=True):
     subprocess.call(run_command)
     end = time.time()
     run_time = end - start
-    print(f"nemo runtime for {cores} cores was {run_time} s")
+    print(f"nemo runtime for {core_count} cores was {run_time} s")
 
     if debug:
         # See how many spikes were sent, i.e., how many line entries are in the
@@ -186,7 +208,6 @@ if __name__ == "__main__":
             sanafe_runtimes[i] = run_sim_sanafe(cores, TIMESTEPS)
             nemo_runtimes[i] = run_sim_nemo(cores, TIMESTEPS, debug=False)
 
-        print(sanafe_runtimes)
         with open(CSV_RESULTS_FILENAME, "w") as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(("cores", "SANA-FE", "NeMo"))
