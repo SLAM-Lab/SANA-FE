@@ -75,7 +75,6 @@ def create_nemo_network(arch, core_count):
 
     print("Generating randomized network connections")
     weight = 1
-    neurons = list(population.neurons)
 
     for c in range(0, core_count):
         if (c % 32) == 0:
@@ -89,8 +88,8 @@ def create_nemo_network(arch, core_count):
             else:  # 20% chance of picking the same core
                 dest_core = c
             dest_axon = random.randrange(0, TRUENORTH_AXONS)
-            src = neurons[(c*TRUENORTH_AXONS) + n]
-            dest = neurons[(dest_core*TRUENORTH_AXONS) + dest_axon]
+            src = population.neurons[(c*TRUENORTH_AXONS) + n]
+            dest = population.neurons[(dest_core*TRUENORTH_AXONS) + dest_axon]
             src.connect_to_neuron(dest, {"weight": weight})
 
     print("Mapping population neurons")

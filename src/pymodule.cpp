@@ -704,7 +704,7 @@ public:
 };
 
 // Custom iterator class for iterating over NeuronRef objects efficiently
-class NeuronGroupIterator
+class PyNeuronRefIterator
 {
 private:
     pybind11::object group_ref_;
@@ -713,7 +713,7 @@ private:
     size_t size_;
 
 public:
-    NeuronGroupIterator(pybind11::object group_ref, sanafe::NeuronGroup *group)
+    PyNeuronRefIterator(pybind11::object group_ref, sanafe::NeuronGroup *group)
             : group_ref_(std::move(group_ref))
             , group_(group)
             , size_(group->neurons.size())
@@ -727,6 +727,86 @@ public:
             throw pybind11::stop_iteration();
         }
         return {group_ref_, &group_->neurons[current_++]};
+    }
+};
+
+class PyNeuronRefView
+{
+private:
+    pybind11::object group_ref_; // Keeps the Python object for the group alive
+    sanafe::NeuronGroup *group_;
+
+public:
+    PyNeuronRefView(pybind11::object group_ref, sanafe::NeuronGroup *group)
+            : group_ref_(std::move(group_ref))
+            , group_(group)
+    {
+    }
+
+    [[nodiscard]] size_t __len__() const
+    {
+        return group_->neurons.size();
+    }
+
+    // Handles both integer and slice indexing, returning a NeuronRef or a list of NeuronRefs
+    pybind11::object __getitem__(pybind11::object index) const
+    {
+        pybind11::gil_scoped_acquire acquire;
+
+        if (pybind11::isinstance<pybind11::int_>(index))
+        {
+            // Integer indexing: return a single PyNeuronRef
+            const long i = pybind11::cast<long>(index);
+            // Handle negative indexing
+            size_t idx = (i < 0) ? (group_->neurons.size() + i) : i;
+
+            if (idx >= group_->neurons.size())
+            {
+                throw pybind11::index_error();
+            }
+            // Return a PyNeuronRef, holding onto the group_ref_ to keep the NeuronGroup alive
+            return pybind11::cast(
+                    PyNeuronRef(group_ref_, &group_->neurons[idx]));
+        }
+
+        if (pybind11::isinstance<pybind11::slice>(index))
+        {
+            // Slice indexing: return a list of PyNeuronRef objects
+            const auto slice = pybind11::cast<pybind11::slice>(index);
+            size_t start = 0;
+            size_t stop = 0;
+            size_t step = 0;
+            size_t slice_length = 0;
+            if (!slice.compute(group_->neurons.size(), &start, &stop, &step,
+                        &slice_length))
+            {
+                throw pybind11::error_already_set();
+            }
+
+            // Create a Python list of NeuronRef objects
+            pybind11::list result;
+            for (size_t i = 0; i < slice_length; ++i)
+            {
+                const size_t idx = start + (i * step);
+                result.append(pybind11::cast(
+                        PyNeuronRef(group_ref_, &group_->neurons[idx])));
+            }
+            return result;
+        }
+
+        throw pybind11::type_error("Index must be int or slice");
+    }
+
+    // Support iteration directly on the view object
+    PyNeuronRefIterator __iter__() const
+    {
+        return PyNeuronRefIterator(group_ref_, group_);
+    }
+
+    [[nodiscard]] std::string info() const
+    {
+        return "<NeuronGroupView of " + std::to_string(group_->neurons.size()) +
+                " neurons>";
     }
 };
 
@@ -790,6 +870,14 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::keep_alive<0, 1>(),
                     pybind11::return_value_policy::reference_internal);
 
+    pybind11::class_<PyNeuronRefView>(m, "NeuronRefView")
+        .def("__len__", &PyNeuronRefView::__len__)
+        .def("__getitem__", &PyNeuronRefView::__getitem__)
+        .def("__iter__", &PyNeuronRefView::__iter__)
+        .def("__repr__", &PyNeuronRefView::info);
+
+// Now change the NeuronGroup binding...
+
     pybind11::class_<sanafe::NeuronGroup>(
             m, "NeuronGroup", docstrings::neuron_group_doc)
             .def("__repr__", &sanafe::NeuronGroup::info)
@@ -810,18 +898,13 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("stride_height") = 1)
             .def_property_readonly(
                     "neurons",
-                    [](pybind11::object &self_obj) -> pybind11::object {
+                    [](pybind11::object &self_obj) -> PyNeuronRefView {
                         auto &self =
                                 pybind11::cast<sanafe::NeuronGroup &>(self_obj);
-                        std::vector<pybind11::object> neuron_refs;
-                        for (sanafe::Neuron &neuron : self.neurons)
-                        {
-                            neuron_refs.emplace_back(pybind11::cast(
-                                    PyNeuronRef(self_obj, &neuron)));
-                        }
-                        return pybind11::cast(neuron_refs);
+                        // Return the view object, passing in the Python object ref
+                        return PyNeuronRefView(self_obj, &self);
                     },
-                    pybind11::return_value_policy::reference_internal)
+                    pybind11::return_value_policy::move)
             .def("__getitem__",
                     [](pybind11::object self_obj,
                             pybind11::object index) -> pybind11::object {
@@ -873,7 +956,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     })
             .def("__iter__", [](pybind11::object self_obj) {
                 auto &self = pybind11::cast<sanafe::NeuronGroup &>(self_obj);
-                return NeuronGroupIterator(self_obj, &self);
+                return PyNeuronRefIterator(self_obj, &self);
             });
     // Neuron bindings are a little more complicated, because we use a wrapper
     //  reference class to help with managing object lifetimes. This is partly
@@ -963,12 +1046,12 @@ PYBIND11_MODULE(sanafecpp, m)
                             -> const std::vector<sanafe::Connection> & {
                         return ref.edges_out();
                     });
-    pybind11::class_<NeuronGroupIterator>(m, "NeuronGroupIterator")
+    pybind11::class_<PyNeuronRefIterator>(m, "NeuronRefIterator")
             .def("__iter__",
-                    [](NeuronGroupIterator &it) -> NeuronGroupIterator & {
+                    [](PyNeuronRefIterator &it) -> PyNeuronRefIterator & {
                         return it;
                     })
-            .def("__next__", &NeuronGroupIterator::next);
+            .def("__next__", &PyNeuronRefIterator::next);
     pybind11::class_<sanafe::Connection>(m, "Connection")
             .def_readonly("pre_neuron", &sanafe::Connection::pre_neuron)
             .def_readonly("post_neuron", &sanafe::Connection::post_neuron)
@@ -1081,8 +1164,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .def(pybind11::init<sanafe::Architecture &>(),
                     pybind11::arg("arch"))
             .def("load", &sanafe::SpikingChip::load,
-                    docstrings::spiking_chip_load_doc,
-                    pybind11::arg("net"),
+                    docstrings::spiking_chip_load_doc, pybind11::arg("net"),
                     pybind11::arg("overwrite") = false)
             .def("sim", &pysim, docstrings::spiking_chip_sim_doc,
                     pybind11::arg("timesteps") = 1,
