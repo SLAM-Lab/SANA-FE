@@ -911,7 +911,8 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
         end_id = group.neurons.size() - 1UL;
     }
 
-    //INFO("Mapping neuron: %s.%zu\n", group_name.c_str(), neuron_id);
+    TRACE2(DESCRIPTION, "Mapping neuron: %s.%zu..%zu\n", group_name.c_str(),
+            start_id, end_id);
     for (size_t neuron_offset = start_id; neuron_offset <= end_id;
             ++neuron_offset)
     {
@@ -1008,13 +1009,28 @@ void sanafe::yaml_write_network(
 
     if (previous_content.is_open() && !file_empty)
     {
+        TRACE1(DESCRIPTION, "Reading existing YAML content\n");
         // Read existing YAML content
         const std::string existing_content(
                 (std::istreambuf_iterator<char>(previous_content)),
                 std::istreambuf_iterator<char>());
 
         // Parse existing content
-        tree = ryml::parse_in_arena(existing_content.c_str());
+        try
+        {
+            tree = ryml::parse_in_arena(existing_content.c_str());
+        }
+        catch (const std::runtime_error &e)
+        {
+            // Check for invalid YAML in the existing file (it may not even be
+            //  a YAML file at all). In this case, we should warn the user and
+            //  go no further
+            throw std::runtime_error(
+                    "Attempted to read existing file: " + path.string() +
+                    " but it is not a valid YAML document. "
+                    "Please ensure the file contains valid YAML or delete it "
+                    "to allow a new file to be created.");
+        }
         root = tree.rootref();
         previous_content.close();
 
@@ -1339,7 +1355,22 @@ void sanafe::yaml_write_mappings_file(
                 std::istreambuf_iterator<char>());
 
         // Parse existing content
-        tree = ryml::parse_in_arena(existing_content.c_str());
+        TRACE1(DESCRIPTION, "Reading existing YAML content\n");
+        try
+        {
+            tree = ryml::parse_in_arena(existing_content.c_str());
+        }
+        catch (const std::runtime_error &e)
+        {
+            // Check for invalid YAML in the existing file (it may not even be
+            //  a YAML file at all). In this case, we should warn the user and
+            //  go no further
+            throw std::runtime_error(
+                    "Attempted to read existing file: " + path.string() +
+                    " but it is not a valid YAML document. "
+                    "Please ensure the file contains valid YAML or delete it "
+                    "to allow a new file to be created.");
+        }
         root = tree.rootref();
         previous_content.close();
 

@@ -178,6 +178,7 @@ endif()
 project(ryml-quickstart LANGUAGES CXX)
 set(RYML_VERSION "v0.9.0")
 message(STATUS "FetchContent for tag: ${RYML_VERSION}")
+set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 
 include(FetchContent)
 FetchContent_Declare(ryml
@@ -186,7 +187,6 @@ FetchContent_Declare(ryml
     GIT_SHALLOW FALSE  # ensure submodules are checked out
 )
 FetchContent_MakeAvailable(ryml)
-set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 ##### END OF rapid-yaml
 
 message(STATUS "got ryml")
