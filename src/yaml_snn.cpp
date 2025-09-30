@@ -1177,14 +1177,16 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_group(ryml::NodeRef parent,
         if (neuron_it->model_attributes != prev_neuron->model_attributes)
         {
             neuron_runs.emplace_back(run_start, prev_neuron->offset);
-            INFO("adding new run %zu..%zu\n", run_start, prev_neuron->offset);
+            TRACE1(DESCRIPTION, "Adding new run %zu..%zu\n", run_start,
+                    prev_neuron->offset);
             // Set up the next run of unique neurons
             run_start = neuron_it->offset;
         }
         prev_neuron = neuron_it;
     }
     neuron_runs.emplace_back(run_start, prev_neuron->offset);
-    INFO("adding new run %zu..%zu\n", run_start, prev_neuron->offset);
+    TRACE1(DESCRIPTION, "Adding new run %zu..%zu\n", run_start,
+            prev_neuron->offset);
 
     for (const auto &neuron_run : neuron_runs)
     {
