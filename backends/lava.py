@@ -60,7 +60,7 @@ def serial_to_sanafe(filename: str, name:str = "converted_abstract_process.net")
     neurons_per_core = LOIHI_NEURONS_PER_CORE
     compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                         neurons_per_core)
-    
+
     num_proc = len(p[0])
     print(num_proc)
 
@@ -80,7 +80,7 @@ def serial_to_sanafe(filename: str, name:str = "converted_abstract_process.net")
                                             neuron_parameters=dict)
             if group.id > 0: sim.connect_layers(network, group.id-1, group.id)
             prev = group.id
-    
+
     network.save(filename=name)
     return
 
@@ -90,7 +90,7 @@ def process_to_sanafe(process: AbstractProcess, name:str = "converted_abstract_p
     neurons_per_core = LOIHI_NEURONS_PER_CORE
     compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
                                         neurons_per_core)
-    
+
     dict = process.proc_params._parameters
     dim = dict['shape']
     dim1 = dim[0]

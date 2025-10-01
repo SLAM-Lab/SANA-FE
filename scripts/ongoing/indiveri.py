@@ -22,6 +22,8 @@ import tonic.transforms as transforms
 # Plotting
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+from matplotlib.path import Path
+import matplotlib.patches as patches
 
 # Try importing the installed sanafe library. If not installed, require a
 #  fall-back to a local build of the sanafe Python library
@@ -34,14 +36,10 @@ except ImportError:
 
     LASANA_DIR = os.path.abspath(os.path.join(
         "/", "home", "usr1", "jboyle", "neuro", "lasana"))
+    RUN_PATH =  os.path.abspath((os.path.join(PROJECT_DIR, "runs", "lasana")))
     print(f"Project dir: {PROJECT_DIR}")
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
-
-# Global parameters and paths
-SPIKE_PATH =  os.path.abspath((os.path.join(PROJECT_DIR, "runs", "lasana", "spikes.csv")))
-POTENTIAL_PATH = os.path.abspath((os.path.join(PROJECT_DIR, "runs", "lasana", "potentials.csv")))
-PERF_PATH = os.path.abspath((os.path.join(PROJECT_DIR, "runs", "lasana", "perf.csv")))
 
 
 def load_dataset(dataset, analog_neurons):
@@ -135,6 +133,8 @@ def create_net(arch, dataset, weights, analog_neurons):
     in_neurons = weights["fc1.weight"].shape[1]
     hidden_neurons = weights["fc1.weight"].shape[0]
     out_neurons = weights["fc2.weight"].shape[0]
+    print(weights)
+    exit()
     print(f"in:{in_neurons}, hidden:{hidden_neurons}, out:{out_neurons}")
 
     print("Creating network in SANA-FE")
@@ -178,7 +178,7 @@ def create_net(arch, dataset, weights, analog_neurons):
                 hidden_parameters["reverse_threshold"] = 0.0
                 hidden_parameters["reverse_reset_mode"] = "saturate"
             neuron.set_attributes(
-                soma_hw_name=f"loihi",
+                soma_hw_name=f"loihi_lif",
                 log_spikes=True,
                 model_attributes=hidden_parameters
             )
@@ -188,13 +188,12 @@ def create_net(arch, dataset, weights, analog_neurons):
     for id, neuron in enumerate(out_layer):
         if dataset == "shd":
             neuron.set_attributes(
-                soma_hw_name=f"loihi",
+                soma_hw_name=f"loihi_lif",
                 log_potential=True,
                 model_attributes={
                     "leak_decay": 0.85,
                     "reset_mode": "none",
-                    "input_decay":
-                    weights["lif2.alpha"][id]
+                    "input_decay": weights["lif2.alpha"][id]
                 }
             )
         elif dataset == "mnist":
@@ -205,7 +204,7 @@ def create_net(arch, dataset, weights, analog_neurons):
                 )
             else:
                 neuron.set_attributes(
-                    soma_hw_name=f"loihi",
+                    soma_hw_name=f"loihi_lif",
                     log_spikes=True,
                     model_attributes={
                         "threshold": 1.0,
@@ -257,7 +256,11 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
     arch = sanafe.load_arch(
         os.path.abspath(os.path.join(LASANA_DIR, "indiveri", "lasana.yaml")))
     snn = create_net(arch, dataset, weights, analog_neurons)
-    print(snn)
+
+    platform = "analog" if analog_neurons else "loihi"
+    spike_filename = f"spikes_{platform}_{dataset}.csv"
+    perf_filename = f"perf_{platform}_{dataset}.csv"
+    potential_filename = f"potential_{platform}_{dataset}.csv"
 
     # Run a simulation
     print("Building h/w")
@@ -289,8 +292,9 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
 
         print(f"Simulating for {timesteps} timesteps")
         is_first_input = (input == 0)
-        hw.sim(timesteps, spike_trace=SPIKE_PATH,
-               potential_trace=POTENTIAL_PATH, perf_trace=PERF_PATH,
+        hw.sim(timesteps, spike_trace=os.path.join(RUN_PATH, spike_filename),
+               potential_trace=os.path.join(RUN_PATH, potential_filename),
+               perf_trace=os.path.join(RUN_PATH, perf_filename),
                write_trace_headers=is_first_input, processing_threads=16)
         timesteps_per_input.append(timesteps)
         hw.reset()
@@ -346,9 +350,13 @@ def calculate_accuracy(dataset, analog_neurons, timesteps_per_input):
     hidden_neurons = weights["fc1.weight"].shape[0]
     out_neurons = weights["fc2.weight"].shape[0]
 
+    spike_filename = f"spikes_{arch}_{dataset}.csv"
+    perf_filename = f"perf_{arch}_{dataset}.csv"
+    potential_filename = f"potential_{arch}_{dataset}.csv"
+
     if dataset == "mnist":
         # Read in simulation results
-        with open(SPIKE_PATH) as spike_csv:
+        with open(os.path.join(RUN_PATH, spike_filename)) as spike_csv:
             spike_data = csv.DictReader(spike_csv)
 
             in_spikes = [[] for _ in range(0, in_neurons)]
@@ -391,7 +399,7 @@ def calculate_accuracy(dataset, analog_neurons, timesteps_per_input):
             "neuron out.8", "neuron out.9", "neuron out.10", "neuron out.11",
             "neuron out.12", "neuron out.13", "neuron out.14", "neuron out.15",
             "neuron out.16", "neuron out.17", "neuron out.18", "neuron out.19"]
-        potentials_df = pd.read_csv(POTENTIAL_PATH)
+        potentials_df = pd.read_csv(os.path.join(RUN_PATH, potential_filename))
         potentials = potentials_df[columns_to_extract].to_numpy()
 
         correct = 0
@@ -401,14 +409,14 @@ def calculate_accuracy(dataset, analog_neurons, timesteps_per_input):
             max_potentials = np.max(timestep_potentials, axis=0)
             category = np.argmax(max_potentials, axis=0)
 
-            print(f"Max potentials per class for inference:{max_potentials}\n"
-                f"out:{category} actual:{labels[i]}")
+            # print(f"Max potentials per class for inference:{max_potentials}\n"
+            #     f"out:{category} actual:{labels[i]}")
 
             if category == labels[i]:
                 correct += 1
             start_timestep += timesteps
 
-            with open(SPIKE_PATH) as spike_csv:
+            with open(os.path.join(RUN_PATH, spike_filename)) as spike_csv:
                 spike_data = csv.DictReader(spike_csv)
 
                 in_spikes = [[] for _ in range(0, in_neurons)]
@@ -433,48 +441,77 @@ def calculate_accuracy(dataset, analog_neurons, timesteps_per_input):
     print(f"Accuracy: {accuracy}% ({correct}/{num_inputs})")
 
 
+# Okabe-Ito color palette (colorblind-friendly)
+okabe_ito_colors = [
+    '#E69F00',  # Orange
+    '#56B4E9',  # Sky Blue
+    '#009E73',  # Bluish Green
+    '#F0E442',  # Yellow
+    '#0072B2',  # Blue
+    '#D55E00',  # Vermillion
+    '#CC79A7',  # Reddish Purple
+    '#000000'   # Black
+]
+
+
 def plot_experiments(dataset):
     # Plot both sets of experiments:
     #  Raster plot of a small number of inputs e.g. 10 inputs
     #  Time series plot of a small number of inputs
     #  Statistics for a longer run showing accuracy
-    timesteps_per_input = np.loadtxt(os.path.join(PROJECT_DIR, "runs", "lasana", f"indiveri_{dataset}.csv"), dtype=int)
+    timesteps_per_input = list(np.loadtxt(
+        os.path.join(PROJECT_DIR, "runs", "lasana", f"indiveri_{dataset}.csv"),
+        dtype=int, ndmin=1))
 
     inputs, labels, weights = load_dataset(dataset, True)
     if dataset == "shd":
-        plot_shd(True, timesteps_per_input, labels, weights)
+        plot_shd(timesteps_per_input, labels, weights)
     elif dataset == "mnist":
+        print(timesteps_per_input)
         plot_mnist(True, timesteps_per_input[0], inputs, weights)
 
     # Calculate accuracy for both sets of runs
     calculate_accuracy(dataset, False, timesteps_per_input)
     calculate_accuracy(dataset, True, timesteps_per_input)
 
-    # plot comparisons between both sets of runs, looking at the energies per
-    #  timestep only
 
+def plot_shd(timesteps_per_input, labels, weights):
+    analog_spike_filename = f"spikes_analog_shd.csv"
+    analog_perf_filename = f"perf_analog_shd.csv"
+    analog_potential_filename = f"potential_analog_shd.csv"
 
-def plot_shd(analog_neurons, timesteps_per_input, labels, weights):
+    loihi_perf_filename = f"perf_loihi_shd.csv"
+
     in_neurons = weights["fc1.weight"].shape[1]
     hidden_neurons = weights["fc1.weight"].shape[0]
     out_neurons = weights["fc2.weight"].shape[0]
 
+    plt.rcParams.update({
+        "font.size": 6,
+        "font.family": "sans-serif",
+        "font.sans-serif": "Arial",
+        "pdf.fonttype": 42
+    })
+
     # Create an array tracking the input corresponding to each timestep
-    fig = plt.figure(figsize=(12.0, 8.0))
-    gs = GridSpec(3, 1, height_ratios=[4, 4, 4], hspace=0.1)
     columns_to_extract = [
         "neuron out.0", "neuron out.1", "neuron out.2", "neuron out.3",
         "neuron out.4", "neuron out.5", "neuron out.6", "neuron out.7",
         "neuron out.8", "neuron out.9", "neuron out.10", "neuron out.11",
         "neuron out.12", "neuron out.13", "neuron out.14", "neuron out.15",
         "neuron out.16", "neuron out.17", "neuron out.18", "neuron out.19"]
-    potentials_df = pd.read_csv(POTENTIAL_PATH)
+    potentials_df = pd.read_csv(os.path.join(RUN_PATH, analog_potential_filename))
     potentials = potentials_df[columns_to_extract].to_numpy()
+
+    analog_perf_df = pd.read_csv(os.path.join(RUN_PATH, analog_perf_filename))
+    analog_perf_df["total_energy_uj"] = analog_perf_df["total_energy"] * 1.0e6
+    loihi_perf_df = pd.read_csv(os.path.join(RUN_PATH, loihi_perf_filename))
+    analog_perf_df["total_energy_loihi_uj"] = (loihi_perf_df["total_energy"] - loihi_perf_df["soma_energy"]) * 1.0e6
 
     num_inputs = min(len(timesteps_per_input), 10)
     total_timesteps = sum(timesteps_per_input[0:num_inputs])
 
-    with open(SPIKE_PATH) as spike_csv:
+    with open(os.path.join(RUN_PATH, analog_spike_filename)) as spike_csv:
         spike_data = csv.DictReader(spike_csv)
 
         in_spikes = [[] for _ in range(0, in_neurons)]
@@ -495,6 +532,91 @@ def plot_shd(analog_neurons, timesteps_per_input, labels, weights):
             else:
                 print(f"Warning: Group {group_name} not recognized!")
 
+    fig = plt.figure(figsize=(7.2, 2.5))
+    gs = GridSpec(2, 1, height_ratios=[1.0, 1.0], hspace=0.1, left=0.06, right=0.94, top=0.99, bottom=0.12)
+
+    ax_spikes = fig.add_subplot(gs[0])
+    ax_spikes.set_xlim((0, total_timesteps))
+    ax_spikes.set_ylim((0, in_neurons + hidden_neurons))
+
+    total_neurons = 0
+    for neuron_id in range(0, in_neurons):
+        ax_spikes.scatter(in_spikes[neuron_id],
+                          [total_neurons] * len(in_spikes[neuron_id]),
+                          c='k', s=1, marker='.', linewidths=0.3)
+        total_neurons += 1
+
+    for neuron_id in range(0, hidden_neurons):
+        ax_spikes.scatter(hidden_spikes[neuron_id],
+                          [total_neurons] * len(hidden_spikes[neuron_id]),
+                          c='k', s=1, marker='.', linewidths=0.3)
+        total_neurons += 1
+
+    ax_spikes.set_ylabel("Spiking Neuron ID")
+    # Add brackets on the right side
+    bracket_x = total_timesteps * 1.015  # Slightly beyond the plot edge
+
+    bracket_width = total_timesteps * 0.01
+    input_verts = [
+        (bracket_x - bracket_width, 2),
+        (bracket_x, 2),
+        (bracket_x, in_neurons-2),
+        (bracket_x - bracket_width, in_neurons-2)
+    ]
+    input_codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO]
+    input_path = Path(input_verts, input_codes)
+    input_patch = patches.PathPatch(input_path, facecolor='none', edgecolor='k', linewidth=1.0, clip_on=False)
+    ax_spikes.add_patch(input_patch)
+
+    ax_spikes.text(bracket_x + total_timesteps*0.005, in_neurons/2, 'Input',
+                va='center', fontsize=5)
+
+    # Hidden neurons bracket - single path
+    hidden_verts = [
+        (bracket_x - bracket_width, in_neurons+2),
+        (bracket_x, in_neurons+2),
+        (bracket_x, total_neurons-2),
+        (bracket_x - bracket_width, total_neurons-2)
+    ]
+    hidden_codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO]
+    hidden_path = Path(hidden_verts, hidden_codes)
+    hidden_patch = patches.PathPatch(hidden_path, facecolor='none', edgecolor='k', linewidth=1.0, clip_on=False)
+    ax_spikes.add_patch(hidden_patch)
+
+    ax_spikes.text(bracket_x + total_timesteps*0.005, in_neurons + hidden_neurons/2, 'Hidden',
+                va='center', fontsize=5)
+
+    ax_spikes.set_xticks([])
+
+    ax_perf = fig.add_subplot(gs[1])
+    ax_perf.set_ylabel("Simulated Energy (µJ)")
+    analog_perf_df.plot(x="timestep", y=["total_energy_loihi_uj", "total_energy_uj"],
+                        ax=ax_perf, color=[okabe_ito_colors[0], okabe_ito_colors[4]],
+                        style=["--", "-"])
+    ax_perf.set_xlim((0, total_timesteps))
+    ax_perf.set_xlabel("Time-step")
+    ax_perf.legend(("Loihi", "Loihi-Ind"), fontsize=5, bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
+    ax_perf.minorticks_on()
+
+    plt.savefig(os.path.join("runs", "lasana", "shd_raster.png"), dpi=300)
+    plt.savefig(os.path.join("runs", "lasana", "shd_raster.pdf"))
+
+    print(f"Mean per-timestep Indiveri total energy: {analog_perf_df['total_energy'].mean()} J")
+    print(f"Mean per-timestep Indiveri synapse energy: {analog_perf_df['synapse_energy'].mean()} J")
+    print(f"Mean per-timestep Indiveri soma energy: {analog_perf_df['soma_energy'].mean()} J")
+    print(f"Mean per-timestep Indiveri fired: {analog_perf_df['fired'].mean()}")
+    print("***")
+
+    print(f"Mean per-timestep Loihi total energy: {loihi_perf_df['total_energy'].mean()} J")
+    print(f"Mean per-timestep Loihi synapse energy: {loihi_perf_df['synapse_energy'].mean()} J")
+    print(f"Mean per-timestep Loihi soma energy: {loihi_perf_df['soma_energy'].mean()} J")
+    print(f"Mean per-timestep Loihi fired: {loihi_perf_df['fired'].mean()}")
+
+    fig = plt.figure(figsize=(12.0, 8.0))
+    gs = GridSpec(3, 1, height_ratios=[4, 4, 4], hspace=0.1)
+    # *** Other plots ***
+    # Plot a detailed set of figures with raster, potentials and energies
+    #  This isn't for publication but is useful/interesting either way
     ax_spikes = fig.add_subplot(gs[0])
     ax_spikes.set_title('Mixed-Signal Architecture Classifying Spiking Digits')
     ax_spikes.set_xlim((0, total_timesteps))
@@ -504,20 +626,24 @@ def plot_shd(analog_neurons, timesteps_per_input, labels, weights):
     for neuron_id in range(0, in_neurons):
         ax_spikes.scatter(in_spikes[neuron_id],
                     [total_neurons]*len(in_spikes[neuron_id]), c='r', s=2,
-                    marker='.', linewidths=0.5)
+                    marker='.', linewidths=1)
         total_neurons += 1
 
     for neuron_id in range(0, hidden_neurons):
         ax_spikes.scatter(hidden_spikes[neuron_id],
                     [total_neurons]*len(hidden_spikes[neuron_id]), c='b', s=2,
-                    marker='.', linewidths=0.5)
+                    marker='.', linewidths=1)
         total_neurons += 1
+
+    # The output layer is a leaky-integrator layer with *no* spiking (the output
+    #  is taken from the maximum potential on the integrators). Therefore,
+    #  don't add output spikes (if any) to the raster
+
     ax_spikes.set_ylabel("Neuron")
     ax_spikes.set_xticks([])
 
     # Plot the output neuron spike counts
     ax_potentials = fig.add_subplot(gs[1])
-    print(potentials)
     ax_potentials.set_xlim((0, total_timesteps))
     ax_potentials.set_ylabel("Output Potentials")
     ax_potentials.set_xticks([])
@@ -525,27 +651,26 @@ def plot_shd(analog_neurons, timesteps_per_input, labels, weights):
     ax_potentials.plot(potentials)
 
     ax_perf = fig.add_subplot(gs[2])
-    perf_df = pd.read_csv(PERF_PATH)
-    perf_df["total_energy_uj"] = perf_df["total_energy"] * 1.0e6
-    print(perf_df["total_energy_uj"])
-    ax_perf.set_ylabel("Simulated Energy (uJ)")
-    perf_df.plot(x="timestep", y=["total_energy_uj"], ax=ax_perf)
+    ax_perf.set_ylabel("Simulated Energy (µJ)")
+    analog_perf_df.plot(x="timestep", y=["total_energy_uj", "total_energy_loihi_uj"], ax=ax_perf)
     ax_perf.set_xlim((0, total_timesteps))
     ax_perf.set_xlabel("Time-step")
-    ax_perf.get_legend().remove()
 
-    plt.savefig(os.path.join("runs", "lasana", "shd_raster.png"))
-    # Plot the comparison of dynamic energy for Loihi LIF vs Indiveri somas
-    #  And print the average comparison. Potentially plot this stacking the
-    #  energy of different h/w on one another
+    plt.savefig(os.path.join("runs", "lasana", "shd.png"), dpi=300)
+
+
 
 def plot_mnist(analog_neurons, timesteps_per_input, inputs, weights):
+    platform = "analog" if analog_neurons else "loihi"
+    spike_filename = f"spikes_{platform}_mnist.csv"
+    perf_filename = f"perf_{platform}_mnist.csv"
+
     in_neurons = weights["fc1.weight"].shape[1]
     hidden_neurons = weights["fc1.weight"].shape[0]
     out_neurons = weights["fc2.weight"].shape[0]
 
     # Read in simulation results
-    with open(SPIKE_PATH) as spike_csv:
+    with open(os.path.join(RUN_PATH, spike_filename)) as spike_csv:
         spike_data = csv.DictReader(spike_csv)
 
         in_spikes = [[] for _ in range(0, in_neurons)]
@@ -644,19 +769,25 @@ def plot_mnist(analog_neurons, timesteps_per_input, inputs, weights):
 
     ax_perf = fig.add_subplot(gs[3])
     ax_perf.set_xlim((0, total_timesteps))
-    perf_df = pd.read_csv(PERF_PATH)
+    perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
     perf_df["total_energy_uj"] = perf_df["total_energy"] * 1.0e6
-    perf_df.plot(x="timestep", y=["total_energy_uj"], ax=ax_perf)
+    perf_df["soma_energy_uj"] = perf_df["soma_energy"] * 1.0e6
+    perf_df.plot(x="timestep", y=["total_energy_uj", "soma_energy_uj"], ax=ax_perf)
+    #perf_df.plot(x="timestep", y=["soma_energy_uj",], ax=ax_perf)
     for i in range(num_inputs + 1):
         ax_perf.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
     ax_perf.set_ylabel("Simulated Energy (uJ)")
     ax_perf.get_legend().remove()
 
     ax_perf.set_xlabel("Time-step")
-    plt.savefig("runs/lasana/mnist_raster.png")
+    plt.savefig("runs/lasana/mnist_raster.png", dpi=300)
+    plt.savefig("runs/lasana/mnist_raster.pdf")
 
+    print(perf_df["total_energy_uj"])
+    print(perf_df["soma_energy_uj"])
 
-dataset = "mnist"
+# Rate-encoded MNIST as a toy demo
+#dataset = "mnist"
 # Spiking Heidelberg Digits (SHD) is the second neuromorphic application.
 #  I have trained two SNNs for SHD for this script:
 #  The first SNN was trained using a modified LIF (Leaky) behavioral model (that
@@ -668,13 +799,14 @@ dataset = "mnist"
 #  The second SNN was trained using the LASANA model directly (by Jason). This
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
 #   accuracy, which is comparable to the SHD benchmark paper.
-#dataset = "shd"
+dataset = "shd"
 
 run_experiments = False
 create_plots = True
 
 if dataset == "mnist":
     num_inputs = 10
+    #num_inputs = 1
     #num_inputs = 10000 # Entire test set
 elif dataset == "shd":
     timesteps = None
@@ -684,8 +816,8 @@ elif dataset == "shd":
     #num_inputs = 2264  # Entire test set
 
 if run_experiments:
-    run_experiment(num_inputs, dataset, True)
-    run_experiment(num_inputs, dataset, False)
+    run_experiment(num_inputs, dataset, analog_neurons=True)
+    run_experiment(num_inputs, dataset, analog_neurons=False)
 
 if create_plots:
     plot_experiments(dataset)
