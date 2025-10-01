@@ -39,7 +39,6 @@ sanafe::Core::Core(const CoreConfiguration &config)
         , offset(config.address.offset_within_tile)
         , parent_tile_id(config.address.parent_tile_id)
         , log_energy(config.pipeline.log_energy)
-        , log_latency(config.pipeline.log_latency)
 
 {
     timestep_buffer.resize(pipeline_config.max_neurons_supported);

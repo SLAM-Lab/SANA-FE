@@ -116,7 +116,7 @@ public:
     std::optional<SomaEnergyMetrics> default_soma_energy_metrics;
     std::optional<SomaLatencyMetrics> default_soma_latency_metrics;
     double energy{0.0};
-    double time{0.0};
+    double latency{0.0};
 
     // Performance counters
     long int spikes_processed{0L};

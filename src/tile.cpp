@@ -21,7 +21,6 @@ sanafe::Tile::Tile(const TileConfiguration &config)
         , x(config.x)
         , y(config.y)
         , log_energy(config.power_metrics.log_energy)
-        , log_latency(config.power_metrics.log_latency)
 {
 }
 

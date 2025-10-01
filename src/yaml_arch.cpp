@@ -325,12 +325,6 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
     {
         energy_node >> pipeline_config.log_energy;
     }
-    const ryml::ConstNodeRef latency_node =
-            attributes.find_child("log_latency");
-    if (!latency_node.invalid())
-    {
-        latency_node >> pipeline_config.log_latency;
-    }
 
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
             yaml_required_field<std::string>(
@@ -371,11 +365,6 @@ sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
     {
         const ryml::ConstNodeRef energy = attributes["log_energy"];
         energy >> tile_metrics.log_energy;
-    }
-    if (!attributes.find_child("log_latency").invalid())
-    {
-        const ryml::ConstNodeRef latency = attributes["log_latency"];
-        latency >> tile_metrics.log_latency;
     }
 
     return tile_metrics;

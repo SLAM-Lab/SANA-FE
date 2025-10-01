@@ -44,7 +44,7 @@ public:
     std::string name;
     long int spike_messages_in{0L};
     double energy{0.0};
-    double time{0.0};
+    double latency{0.0};
     double energy_spike_message;
     double latency_spike_message;
 
@@ -59,7 +59,7 @@ public:
     std::string name;
     long int packets_out{0L};
     double energy{0.0};
-    double time{0.0};
+    double latency{0.0};
     double energy_access;
     double latency_access;
 
@@ -97,7 +97,6 @@ public:
     size_t parent_tile_id;
     int message_count{0};
     bool log_energy{false};
-    bool log_latency{false};
 
     explicit Core(const CoreConfiguration &config);
     void map_neuron(const Neuron &n, size_t neuron_id);

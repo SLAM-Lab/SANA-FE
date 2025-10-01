@@ -410,7 +410,6 @@ sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
     tile_power_metrics.energy_west_hop = energy_west_hop;
     tile_power_metrics.latency_west_hop = latency_west_hop;
     tile_power_metrics.log_energy = log_energy;
-    tile_power_metrics.log_latency = log_latency;
 
     return self->create_tile(std::move(name), tile_power_metrics);
 }
@@ -432,7 +431,6 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
     tile_power_metrics.energy_west_hop = energy_west_hop;
     tile_power_metrics.latency_west_hop = latency_west_hop;
     tile_power_metrics.log_energy = log_energy;
-    tile_power_metrics.log_latency = log_latency;
 
     return std::make_unique<sanafe::TileConfiguration>(
             name, tile_id, tile_power_metrics);
@@ -449,7 +447,6 @@ std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
             buffer_position, buffer_inside_unit);
     pipeline_config.max_neurons_supported = max_neurons_supported;
     pipeline_config.log_energy = log_energy;
-    pipeline_config.log_latency = log_latency;
 
     sanafe::CoreAddress core_address{};
     core_address.parent_tile_id = parent_tile_id;
@@ -471,7 +468,6 @@ sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
             buffer_position, buffer_inside_unit);
     pipeline_config.max_neurons_supported = max_neurons_supported;
     pipeline_config.log_energy = log_energy;
-    pipeline_config.log_latency = log_latency;
 
     return self->create_core(std::move(name), parent_tile_id, pipeline_config);
 }

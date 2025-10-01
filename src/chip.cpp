@@ -724,9 +724,9 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
             n.neuron_processing_pipeline, ts, n, std::nullopt, input);
     n.core->next_message_generation_delay +=
             pipeline_output.latency.value_or(0.0);
-    // INFO("nid:%s.%d +%e:%e\n", n.parent_group_name.c_str(), n.id,
-    //         pipeline_output.latency.value_or(0.0),
-    //         n.core->next_message_generation_delay);
+    TRACE2(CHIP, "nid:%s.%zu +%e:%e\n", n.parent_group_name.c_str(), n.offset,
+            pipeline_output.latency.value_or(0.0),
+            n.core->next_message_generation_delay);
     if (n.status == fired)
     {
         pipeline_process_axon_out(ts, n);
@@ -782,27 +782,6 @@ sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
 
     output.energy = total_energy;
     output.latency = total_latency;
-    return output;
-}
-
-sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
-        MappedNeuron &n, std::optional<MappedConnection *> con,
-        const PipelineResult &input)
-{
-    TRACE2(CHIP, "Updating nid:%zu (ts:%ld)\n", n.id, ts.timestep);
-    set_time(ts.timestep);
-
-    // Process inputs
-    PipelineResult output = process_input_fn(ts, n, con, input);
-
-    // Post-processing on outputs
-    process_output_fn(n, con, output);
-
-#ifndef NDEBUG
-    check_outputs(n, output);
-#endif
-    energy += output.energy.value_or(0.0);
-
     return output;
 }
 
@@ -1157,10 +1136,10 @@ double sanafe::SpikingChip::sim_estimate_network_costs(
 void sanafe::SpikingChip::sim_calculate_ts_energy(Timestep &ts)
 {
     // Returns the total energy across the design, for this timestep
-    ts.network_energy = 0.0;
     ts.synapse_energy = 0.0;
     ts.dendrite_energy = 0.0;
     ts.soma_energy = 0.0;
+    ts.network_energy = 0.0;
     ts.total_energy = 0.0;
 
     for (auto &tile : tiles)
@@ -1385,7 +1364,6 @@ void sanafe::SpikingChip::sim_reset_measurements()
     {
         // Reset tile
         t.energy = 0.0;
-
         t.hops = 0;
         t.east_hops = 0;
         t.west_hops = 0;
@@ -1402,13 +1380,13 @@ void sanafe::SpikingChip::sim_reset_measurements()
             {
                 axon.spike_messages_in = 0L;
                 axon.energy = 0.0;
-                axon.time = 0;
+                axon.latency = 0.0;
             }
 
             for (auto &hw : c.pipeline_hw)
             {
                 hw->energy = 0.0;
-                hw->time = 0.0;
+                hw->latency = 0.0;
                 hw->spikes_processed = 0;
                 hw->neurons_updated = 0L;
                 hw->neurons_fired = 0L;
@@ -1417,7 +1395,7 @@ void sanafe::SpikingChip::sim_reset_measurements()
             for (auto &axon : c.axon_out_hw)
             {
                 axon.energy = 0.0;
-                axon.time = 0.0;
+                axon.latency = 0.0;
                 axon.packets_out = 0;
             }
 
@@ -1466,21 +1444,12 @@ sanafe::SpikingChip::sim_trace_get_optional_traces()
         {
             optional_perf_traces[t.name + ".energy"] = t.energy;
         }
-        if (t.log_latency)
-        {
-            optional_perf_traces[t.name + ".latency"] = 0.0; // TODO
-        }
         for (const Core &c : t.cores)
         {
             if (c.log_energy)
             {
                 optional_perf_traces[t.name + "." + c.name + ".energy"] =
                         c.energy;
-            }
-            if (c.log_latency)
-            {
-                // TODO
-                optional_perf_traces[t.name + "." + c.name + ".latency"] = 0.0;
             }
 
             for (const auto &hw : c.pipeline_hw)
@@ -1493,7 +1462,7 @@ sanafe::SpikingChip::sim_trace_get_optional_traces()
                 if (hw->log_latency)
                 {
                     optional_perf_traces[t.name + "." + c.name + "." +
-                            hw->name + ".latency"] = 0.0; // TODO
+                            hw->name + ".latency"] = hw->latency;
                 }
             }
         }
@@ -1515,6 +1484,10 @@ void sanafe::SpikingChip::sim_trace_write_perf_header(
     perf_trace_file << "hops,";
     perf_trace_file << "spikes,";
     perf_trace_file << "sim_time,";
+    perf_trace_file << "synapse_energy,";
+    perf_trace_file << "dendrite_energy,";
+    perf_trace_file << "soma_energy,";
+    perf_trace_file << "network_energy,";
     perf_trace_file << "total_energy";
 
     // Optional performance metrics
@@ -1616,6 +1589,10 @@ void sanafe::SpikingChip::sim_trace_record_perf(
     perf_trace_file << ts.total_hops << ",";
     perf_trace_file << ts.spike_count << ",";
     perf_trace_file << std::scientific << ts.sim_time << ",";
+    perf_trace_file << std::scientific << ts.synapse_energy << ",";
+    perf_trace_file << std::scientific << ts.dendrite_energy << ",";
+    perf_trace_file << std::scientific << ts.soma_energy << ",";
+    perf_trace_file << std::scientific << ts.network_energy << ",";
     perf_trace_file << std::scientific << ts.total_energy;
     // Finish with the optional traces, which can be enabled or disabled per
     //  tile, core, or pipeline h/w unit

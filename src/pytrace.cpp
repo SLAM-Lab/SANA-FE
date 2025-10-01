@@ -46,6 +46,11 @@ std::map<std::string, PerfStatistic> timestep_data_to_map(
     ts_map["hops"] = ts.total_hops;
     ts_map["spikes"] = ts.spike_count;
     ts_map["sim_time"] = ts.sim_time;
+    // Energy values
+    ts_map["synapse_energy"] = ts.synapse_energy;
+    ts_map["dendrite_energy"] = ts.dendrite_energy;
+    ts_map["soma_energy"] = ts.soma_energy;
+    ts_map["network_energy"] = ts.network_energy;
     ts_map["total_energy"] = ts.total_energy;
 
     return ts_map;

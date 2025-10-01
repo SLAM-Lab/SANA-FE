@@ -113,7 +113,6 @@ struct TilePowerMetrics
     double energy_west_hop{0.0};
     double latency_west_hop{0.0};
     bool log_energy{false};
-    bool log_latency{false};
 };
 
 struct TileConfiguration
@@ -135,7 +134,6 @@ struct CorePipelineConfiguration
     BufferPosition buffer_position{buffer_before_soma_unit};
     size_t max_neurons_supported{default_max_neurons};
     bool log_energy{false};
-    bool log_latency{false};
 };
 
 struct CoreAddress

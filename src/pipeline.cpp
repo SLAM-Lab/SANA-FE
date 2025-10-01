@@ -16,6 +16,7 @@
 #include "mapped.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
+#include "timestep.hpp"
 
 void sanafe::PipelineUnit::check_implemented(
         const bool check_implements_synapse,
@@ -80,6 +81,28 @@ size_t sanafe::PipelineUnit::add_neuron()
     is_used = true;
 
     return (neuron_count - 1);
+}
+
+sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
+        MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &input)
+{
+    TRACE2(CHIP, "Updating nid:%zu (ts:%ld)\n", n.id, ts.timestep);
+    set_time(ts.timestep);
+
+    // Process inputs
+    PipelineResult output = process_input_fn(ts, n, con, input);
+
+    // Post-processing on outputs
+    process_output_fn(n, con, output);
+
+#ifndef NDEBUG
+    check_outputs(n, output);
+#endif
+    energy += output.energy.value_or(0.0);
+    latency += output.energy.value_or(0.0);
+
+    return output;
 }
 
 void sanafe::PipelineUnit::check_outputs(

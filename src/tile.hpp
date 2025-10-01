@@ -40,7 +40,6 @@ public:
     size_t x{0};
     size_t y{0};
     bool log_energy{false};
-    bool log_latency{false};
 
     explicit Tile(const TileConfiguration &config);
     [[nodiscard]] size_t get_id() const { return id; }
