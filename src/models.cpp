@@ -355,6 +355,10 @@ void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
     {
         cx.force_update = static_cast<bool>(param);
     }
+    else if (attribute_name == "refractory_delay")
+    {
+        cx.refractory_delay = static_cast<int>(param);
+    }
 
     TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
 }
@@ -375,7 +379,8 @@ bool sanafe::LoihiLifModel::loihi_threshold_and_reset(LoihiCompartment &cx)
 {
     bool fired = false;
 
-    if (cx.potential > cx.threshold)
+    const bool in_refractory_period = cx.refractory_count > 0;
+    if ((cx.potential > cx.threshold) && !in_refractory_period)
     {
         if (cx.reset_mode == sanafe::neuron_reset_hard)
         {
@@ -386,6 +391,9 @@ bool sanafe::LoihiLifModel::loihi_threshold_and_reset(LoihiCompartment &cx)
             cx.potential -= cx.threshold;
         }
         TRACE1(MODELS, "Neuron fired.\n");
+        // Set the refractory period countdown which decrements every timestep,
+        //  when this gets to zero, the neuron can spike again
+        cx.refractory_count = cx.refractory_delay;
         fired = true;
     }
     // Check against reverse threshold
@@ -446,12 +454,9 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     // Add the synaptic / dendrite current to the potential
     TRACE1(MODELS, "bias:%lf potential before:%lf\n", cx.bias, cx.potential);
     cx.potential += cx.bias;
-
-    if (current_in.has_value())
-    {
-        cx.input_current += current_in.value();
-    }
+    cx.input_current += current_in.value_or(0.0);
     cx.potential += cx.input_current;
+
     TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n", neuron_address,
             cx.potential);
 
@@ -461,7 +466,10 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
         state = sanafe::fired;
     }
 
+    // Manage timestep counters
     ++(cx.timesteps_simulated);
+    cx.refractory_count = std::max(0, cx.refractory_count - 1);
+
     PipelineResult output{};
     output.status = state;
     return output;

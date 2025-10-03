@@ -155,6 +155,8 @@ public:
         double reverse_threshold{0.0};
         double reset{0.0};
         double reverse_reset{0.0};
+        int refractory_delay{0};
+        int refractory_count{0};
     };
 
     enum NoiseType : uint8_t
@@ -166,7 +168,8 @@ public:
 private:
     static inline const std::set<std::string> loihi_lif_attributes{"reset_mode",
             "reverse_reset_mode", "reset", "reverse_reset", "bias", "threshold",
-            "reverse_threshold", "leak_decay", "noise", "noise_bits"};
+            "reverse_threshold", "leak_decay", "noise", "noise_bits",
+            "refractory_delay"};
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{noise_none};
     std::ifstream noise_stream;
