@@ -78,12 +78,18 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
         // Apply leak for 1 or more timesteps
         ++(timesteps_simulated[neuron_address]);
         accumulated_charges[neuron_address] *= leak_decay;
+
+        // TODO: shift the rest of the accumulators by one timestep if we have
+        //  dendritic delay enabled. Should this replace leak_decay for the
+        //  dendrite? Check the dendrite code to see if we use this feature ever
+        //  if not, replace it...
     }
     if (current.has_value())
     {
         // Integrate input charges
         accumulated_charges[neuron_address] += current.value();
     }
+
     output.current = accumulated_charges[neuron_address];
 
     return output;

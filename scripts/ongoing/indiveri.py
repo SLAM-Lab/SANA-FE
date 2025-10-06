@@ -592,8 +592,8 @@ def plot_shd(timesteps_per_input, labels, weights):
     #  model is due to reduced spiking activity (likely due to the SNN being
     #  trained slightly differently). The energy savings seen in this plot are
     #  due to reduced synaptic energy usage...
-    plt.savefig(os.path.join("runs", "lasana", "shd_raster.png"), dpi=300)
-    plt.savefig(os.path.join("runs", "lasana", "shd_raster.pdf"))
+    plt.savefig(os.path.join("runs", "lasana", "shd_indiveri_raster.png"), dpi=300)
+    plt.savefig(os.path.join("runs", "lasana", "shd_indiveri_raster.pdf"))
 
     # Aggregate the metrics per inference
     per_input_metrics = []

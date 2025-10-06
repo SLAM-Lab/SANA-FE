@@ -66,8 +66,12 @@ public:
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void set_attribute_edge(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
 
+    // TODO: add a dendrite accumulator struct that allows for multiple timesteps to be accumulated
+    // TODO: add total accumulators supported (1024*5), we can either have one accumulator per
+    //  neuron, or have fewer neurons and longer delays
+
 private:
-    // Technically soma attributes, but due to common usage, suppres warnings
+    // Technically soma attributes, but due to common usage, suppress warnings
     //  for these in the dendrite H/W too
     static inline const std::set<std::string> accumulator_attributes{
             "reset_mode",
