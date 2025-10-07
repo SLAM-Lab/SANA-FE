@@ -471,6 +471,22 @@ void sanafe::NocInfo::update_rolling_averages(
 void sanafe::NocInfo::update_message_density(
         const Message &message, const bool entering_noc)
 {
+    // Start with some sanity checks
+    if ((message.src_x > noc_width_in_tiles) ||
+            (message.dest_x > noc_width_in_tiles))
+    {
+        INFO("Error: Message x > noc width. Fix the NoC dimensions in the arch "
+             "description.\n");
+        throw std::runtime_error("Message x > NoC width");
+    }
+    if ((message.src_y > noc_height_in_tiles) ||
+            (message.dest_y > noc_height_in_tiles))
+    {
+        INFO("Error: message y > noc width. Fix the NoC dimensions in the arch "
+             "description.\n");
+        throw std::runtime_error("Message y > NoC height");
+    }
+
     // Adjust by dividing by the total number of links along the path, also
     //  including the output link at the sending core and input link at the
     //  receiving core, i.e. the hops plus 2. The total sum of the added
