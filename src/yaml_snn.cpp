@@ -1449,7 +1449,7 @@ void sanafe::yaml_create_mappings(ryml::NodeRef &node,
         // Add core address
         const std::string core_address =
                 std::to_string(neuron.core_address->parent_tile_id) + "." +
-                std::to_string(neuron.core_address->id);
+                std::to_string(neuron.core_address->offset_within_tile);
         const std::string &core_ref = strings.emplace_back(core_address);
         mapping_info["core"] << core_ref;
 
