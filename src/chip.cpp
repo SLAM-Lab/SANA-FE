@@ -162,10 +162,15 @@ void sanafe::SpikingChip::clear_hw()
             core.axons_in.clear();
             core.axons_out.clear();
             core.connections_in.clear();
-            core.timestep_buffer.clear();
 
             mapped_tiles = 0UL;
             mapped_cores = 0UL;
+
+            // Clear any core pipeline buffers
+            for (auto &val : core.timestep_buffer)
+            {
+                val = PipelineResult();
+            }
 
             for (auto &hw : core.pipeline_hw)
             {
@@ -581,7 +586,12 @@ void sanafe::SpikingChip::reset()
     {
         for (Core &core : tile.cores)
         {
-            core.timestep_buffer.clear();
+            // Clear any core pipeline buffer entries
+            for (auto &val : core.timestep_buffer)
+            {
+                val = PipelineResult();
+            }
+
             for (auto &hw : core.pipeline_hw)
             {
                 hw->reset();

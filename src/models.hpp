@@ -60,7 +60,9 @@ public:
     AccumulatorModel &operator=(AccumulatorModel &&other) = delete;
 
     PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
-    void reset() override {
+    void reset() override
+    {
+        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
     }
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
