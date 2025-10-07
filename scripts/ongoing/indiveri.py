@@ -876,7 +876,7 @@ def plot_mnist(timesteps_per_input, inputs, weights):
 
 
 # Rate-encoded MNIST as a toy demo
-#dataset = "mnist"
+dataset = "mnist"
 # Spiking Heidelberg Digits (SHD) is the second neuromorphic application.
 #  I have trained two SNNs for SHD for this script:
 #  The first SNN was trained using a modified LIF (Leaky) behavioral model (that
@@ -888,7 +888,7 @@ def plot_mnist(timesteps_per_input, inputs, weights):
 #  The second SNN was trained using the LASANA model directly (by Jason). This
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
 #   accuracy, which is comparable to the SHD benchmark paper.
-dataset = "shd"
+#dataset = "shd"
 
 run_experiments = False
 create_plots = True
