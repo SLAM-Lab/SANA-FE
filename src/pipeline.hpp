@@ -311,22 +311,25 @@ inline sanafe::PipelineUnit::PipelineUnit(const bool implements_synapse,
     // Set input interface
     if (implements_synapse)
     {
-        process_input_fn = [this](auto &&ts, auto &&n, auto &&con,
-                                auto &&input) {
+        process_input_fn = [this](Timestep &ts, MappedNeuron &n,
+                                   std::optional<MappedConnection *> con,
+                                   const PipelineResult &input) {
             return this->process_synapse_input(ts, n, con, input);
         };
     }
     else if (implements_dendrite)
     {
-        process_input_fn = [this](auto &&ts, auto &&n, auto &&con,
-                                auto &&input) {
+        process_input_fn = [this](Timestep &ts, MappedNeuron &n,
+                                   std::optional<MappedConnection *> con,
+                                   const PipelineResult &input) {
             return this->process_dendrite_input(ts, n, con, input);
         };
     }
     else if (implements_soma)
     {
-        process_input_fn = [this](auto &&ts, auto &&n, auto &&con,
-                                auto &&input) {
+        process_input_fn = [this](Timestep &ts, MappedNeuron &n,
+                                   std::optional<MappedConnection *> con,
+                                   const PipelineResult &input) {
             return this->process_soma_input(ts, n, con, input);
         };
     }

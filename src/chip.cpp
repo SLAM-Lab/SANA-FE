@@ -730,8 +730,9 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
         input = c.timestep_buffer[n.mapped_offset_within_core];
         c.timestep_buffer[n.mapped_offset_within_core] = PipelineResult{};
     }
+    std::optional<MappedConnection *> no_con{std::nullopt};
     const PipelineResult pipeline_output = execute_pipeline(
-            n.neuron_processing_pipeline, ts, n, std::nullopt, input);
+            n.neuron_processing_pipeline, ts, n, no_con, input);
     n.core->next_message_generation_delay +=
             pipeline_output.latency.value_or(0.0);
     TRACE2(CHIP, "nid:%s.%zu +%e:%e\n", n.parent_group_name.c_str(), n.offset,
@@ -761,6 +762,7 @@ double sanafe::SpikingChip::process_message(
         //  outputs/inputs until we hit the time-step buffer, where outputs
         //  are stored as inputs ready for the next time-step
         MappedNeuron &n = con.post_neuron_ref;
+
         const PipelineResult pipeline_output = execute_pipeline(
                 con.message_processing_pipeline, ts, n, &con, empty_input);
         core.timestep_buffer[n.mapped_offset_within_core] = pipeline_output;
