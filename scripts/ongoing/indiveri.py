@@ -36,7 +36,7 @@ except ImportError:
 
     LASANA_DIR = os.path.abspath(os.path.join(
         "/", "home", "usr1", "jboyle", "neuro", "lasana"))
-    RUN_PATH =  os.path.abspath((os.path.join(PROJECT_DIR, "runs", "lasana")))
+    RUN_PATH =  os.path.abspath((os.path.join(PROJECT_DIR, "runs", "indiveri")))
     print(f"Project dir: {PROJECT_DIR}")
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
@@ -52,10 +52,8 @@ def load_dataset(dataset, analog_neurons):
         #  works reasonably well for both Indiveri and Loihi neurons. We found
         #  that MNIST is generally not super sensitive to small circuit
         #  variations (unlike spiking digits)
-        #
-        # This network was trained using the script: TODO
         mnist_model = torch.load(
-                os.path.join(PROJECT_DIR, "etc", "mnist_784_128_10.pt"),
+                os.path.join(RUN_PATH, "app_models", "mnist_784_128_10.pt"),
                 pickle_module=dill,
                 map_location=torch.device("cpu"))
         for attribute_name, param in mnist_model.named_parameters():
@@ -66,7 +64,7 @@ def load_dataset(dataset, analog_neurons):
             torchvision.transforms.Grayscale(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0,), (1,))])
-        test_dataset = datasets.MNIST(root="./runs/lasana/data", train=False,
+        test_dataset = datasets.MNIST(root="./runs/indiveri/data", train=False,
                                       download=True, transform=transform)
         labels = test_dataset.targets
 
@@ -92,7 +90,7 @@ def load_dataset(dataset, analog_neurons):
             #  Jason Ho and uses LASANA surrogate model layers in between
             #  regular Linear synapses.
             spiking_digits_model = torch.load(
-                    os.path.join(PROJECT_DIR, "etc", "spiking_digits_indiveri.pt"),
+                    os.path.join(RUN_PATH, "app_models", "shd_70_200_20_circuit_aware.pt"),
                     weights_only=True,
                     map_location=torch.device("cpu"))
 
@@ -103,7 +101,7 @@ def load_dataset(dataset, analog_neurons):
             #  to mimic the Indiveri behavior as close as is possible with an LIF
             #  (Leaky in SNNTorch) neuron
             spiking_digits = torch.load(
-                    os.path.join(PROJECT_DIR, "etc", "spiking_digits_lif.pt"),
+                    os.path.join(RUN_PATH, "app_models", "shd_70_200_20.pt"),
                     pickle_module=dill,
                     map_location=torch.device("cpu"))
 
@@ -117,7 +115,7 @@ def load_dataset(dataset, analog_neurons):
             transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
         ])
         testset = tonic.datasets.SHD(
-            save_to="./runs/lasana/data",
+            save_to="./runs/indiveri/data",
             transform=frame_transform, train=False
         )
         dataloader = torch.utils.data.DataLoader(testset, batch_size=1)
@@ -143,6 +141,7 @@ def create_net(arch, dataset, weights, analog_neurons):
     # PyTorch stores weights in an array with dims (num out x num in)
     in_neurons = weights["fc1.weight"].shape[1]
     hidden_neurons = weights["fc1.weight"].shape[0]
+    print(hidden_neurons)
     out_neurons = weights["fc2.weight"].shape[0]
     print(f"in:{in_neurons}, hidden:{hidden_neurons}, out:{out_neurons}")
 
@@ -309,10 +308,10 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
         hw.reset()
 
     platform = "analog" if analog_neurons else "loihi"
-    snn.save(os.path.join(PROJECT_DIR, "runs", "lasana", f"indiveri_{platform}_{dataset}.yaml"))
+    snn.save(os.path.join(RUN_PATH, f"indiveri_{platform}_{dataset}.yaml"))
     # The inputs (and therefore timesteps per input) will be the same across
     #  Loihi/analog neuron runs. Only store this once.
-    np.savetxt(os.path.join(PROJECT_DIR, "runs", "lasana", f"indiveri_{dataset}.csv"),
+    np.savetxt(os.path.join(RUN_PATH, f"indiveri_{dataset}.csv"),
                np.array(timesteps_per_input), fmt="%d")
     return
 
@@ -448,7 +447,7 @@ def plot_experiments(dataset):
     #  Statistics for a longer run showing accuracy
     print("Plotting experiments")
     timesteps_per_input = list(np.loadtxt(
-        os.path.join(PROJECT_DIR, "runs", "lasana", f"indiveri_{dataset}.csv"),
+        os.path.join(RUN_PATH, f"indiveri_{dataset}.csv"),
         dtype=int, ndmin=1))
 
     inputs, labels, weights = load_dataset(dataset, True)
@@ -592,8 +591,8 @@ def plot_shd(timesteps_per_input, labels, weights):
     #  model is due to reduced spiking activity (likely due to the SNN being
     #  trained slightly differently). The energy savings seen in this plot are
     #  due to reduced synaptic energy usage...
-    plt.savefig(os.path.join("runs", "lasana", "shd_indiveri_raster.png"), dpi=300)
-    plt.savefig(os.path.join("runs", "lasana", "shd_indiveri_raster.pdf"))
+    plt.savefig(os.path.join(RUN_PATH, "shd_indiveri_raster.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_PATH, "shd_indiveri_raster.pdf"))
 
     # Aggregate the metrics per inference
     per_input_metrics = []
@@ -731,7 +730,7 @@ def plot_shd(timesteps_per_input, labels, weights):
 
     # Save a larger plot with more information for debug. This figure isn't
     #  intended for publication or presentation.
-    plt.savefig(os.path.join("runs", "lasana", "shd.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_PATH, "shd.png"), dpi=300)
 
 
 def plot_mnist(timesteps_per_input, inputs, weights):
@@ -853,8 +852,8 @@ def plot_mnist(timesteps_per_input, inputs, weights):
     ax_perf.get_legend().remove()
 
     ax_perf.set_xlabel("Time-step")
-    plt.savefig("runs/lasana/mnist_raster.png", dpi=300)
-    plt.savefig("runs/lasana/mnist_raster.pdf")
+    plt.savefig("runs/indiveri/mnist_raster.png", dpi=300)
+    plt.savefig("runs/indiveri/mnist_raster.pdf")
 
     print("***")
     mean_energy = perf_df['total_energy'].mean()
@@ -890,7 +889,7 @@ dataset = "mnist"
 #   accuracy, which is comparable to the SHD benchmark paper.
 #dataset = "shd"
 
-run_experiments = False
+run_experiments = True
 create_plots = True
 
 if dataset == "mnist":

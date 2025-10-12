@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.path import Path
 import matplotlib.patches as patches
+import math
 
 import torch
 from torchvision import datasets, transforms
@@ -150,6 +151,12 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
     print("Creating hidden layer")
     soma_hw = "loihi_lif"
 
+    num_crossbar_rows_per_core = 256
+    input_cores = 1
+    total_rows_per_neuron = int(math.ceil(in_neurons / 32) + math.ceil(hidden_neurons / 32))
+    hidden_neurons_per_core = num_crossbar_rows_per_core // total_rows_per_neuron
+    hidden_cores = int(math.ceil(hidden_neurons / hidden_neurons_per_core))
+    output_cores = 1
 
     for id, neuron in enumerate(hidden_layer_1):
         hidden_parameters = {
@@ -167,7 +174,14 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
                             log_spikes=True,
                             log_potential=True,
                             model_attributes=hidden_parameters)
-        neuron.map_to_core(arch.tiles[0].cores[1])
+        # We assume that there are 256 crossbar rows available per core
+        core_id = input_cores + (id // hidden_neurons_per_core)
+        print(f"id:{id} hidden_per_core:{hidden_neurons_per_core} core_id:{core_id}")
+        tile_id = core_id // 4
+        core_offset = core_id % 4
+        assert(tile_id < 4)
+        assert(core_offset < 4)
+        neuron.map_to_core(arch.tiles[tile_id].cores[core_offset])
 
     for id, neuron in enumerate(out_layer):
         hidden_parameters = {
@@ -184,13 +198,14 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
                               default_synapse_hw_name=synapse_hw,
                               log_spikes=True,
                               model_attributes=hidden_parameters)
-
-        # TODO: rethink mapping, maybe determine based on a max number of crossbar rows
-        #  available (to some sensible number)
-        neuron.map_to_core(arch.tiles[0].cores[2])
+        core_id = input_cores + hidden_cores
+        tile_id = core_id // 4
+        core_offset = core_id % 4
+        assert(tile_id < 4)
+        assert(core_offset < 4)
+        neuron.map_to_core(arch.tiles[tile_id].cores[core_offset])
 
     # Connect neurons in both layers
-
     print("Connecting neurons")
     print("Adding first layer connections")
 
@@ -252,7 +267,7 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
             network["hidden"][src].connect_to_neuron(
                 network["out"][dst], connection_parameters)
 
-    network.save("snn/crossbar_shd.yaml")
+    network.save(os.path.join(RUN_PATH, f"{platform}_shd.yaml"))
 
     # Run a simulation
     print("Building h/w")
@@ -302,14 +317,14 @@ def load_dataset(analog_neurons=True):
         # Use a SNN trained using circuit-aware methods i.e. was
         #  trained specifically on an IMAC-sim crossbar model.
         spiking_digits_model = torch.load(
-                "/home/usr1/jboyle/neuro/sana-fe/runs/lasana/app_models/crossbar/shd_70_256R_20_bin_crossbar_aware.pt",
+                "/home/usr1/jboyle/neuro/sana-fe/runs/crossbar/app_models/shd_70_256R_20_bin_crossbar_aware.pt",
                 map_location=torch.device("cpu")).state_dict()
 
         for attribute_name, param in spiking_digits_model.items():
             weights[attribute_name] = param.detach().numpy()
     else: # Use digital LIF neuron models
         # Use an SNN trained on a normal (linear) synapses
-        spiking_digits_model = torch.load("/home/usr1/jboyle/neuro/sana-fe/runs/lasana/app_models/crossbar/shd_70_256R_20.pt")
+        spiking_digits_model = torch.load("/home/usr1/jboyle/neuro/sana-fe/runs/crossbar/app_models/shd_70_256R_20.pt")
 
         #for attribute_name, param in spiking_digits.named_parameters():
         #    weights[attribute_name] = param.detach().numpy()
@@ -523,14 +538,19 @@ def plot_spiking_digits():
 
     ax_perf = fig.add_subplot(gs[1])
     ax_perf.set_ylabel("Simulated Energy (µJ)")
+
     analog_perf_df = pd.read_csv(os.path.join(RUN_PATH, "perf_crossbar_shd.csv"))
     analog_perf_df["total_energy_uj"] = analog_perf_df["total_energy"] * 1.0e6
-    analog_perf_df.plot(x="timestep", y=["total_energy_uj"],
+
+    loihi_perf_df = pd.read_csv(os.path.join(RUN_PATH, "perf_loihi_shd.csv"))
+    analog_perf_df["loihi_energy_uj"] = loihi_perf_df["total_energy"] * 1.0e6
+
+    analog_perf_df.plot(x="timestep", y=["loihi_energy_uj", "total_energy_uj"],
                         ax=ax_perf, color=[okabe_ito_colors[0], okabe_ito_colors[4]],
                         style=["--", "-"])
     ax_perf.set_xlim((0, raster_total_timesteps))
     ax_perf.set_xlabel("Time-step")
-    ax_perf.legend(("Loihi", "Loihi-IMACSim"), fontsize=5, bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
+    ax_perf.legend(("Loihi", "Loihi-IMAC"), fontsize=5, bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
     ax_perf.minorticks_on()
 
     # Currently, I'm not planning to put this figure anywhere. Other data shows
@@ -542,16 +562,19 @@ def plot_spiking_digits():
     plt.savefig(os.path.join(RUN_PATH, "shd_crossbar_raster.png"), dpi=300)
     plt.savefig(os.path.join(RUN_PATH, "shd_crossbar_raster.pdf"))
 
+    # TODO: accumulate and print per inference stats like I do for indiveri
+
 
 if __name__ == "__main__":
     num_inputs = 2264  # Number of inferences
+    #num_inputs = 10
     run_spiking_digits(num_inputs=num_inputs, analog_synapses=False)
-    calculate_accuracy(analog_synapses=False)
-    exit()
     run_spiking_digits(num_inputs=num_inputs, analog_synapses=True)
-    calculate_accuracy(analog_synapses=True)
-    plot_spiking_digits()
 
+    calculate_accuracy(analog_synapses=False)
+    calculate_accuracy(analog_synapses=True)
+
+    plot_spiking_digits()
 
 # Legacy scripts that may be useful at some point to someone, but is not
 #  currently needed for any publication
