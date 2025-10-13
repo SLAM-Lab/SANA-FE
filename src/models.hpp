@@ -65,12 +65,8 @@ public:
         accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
     }
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
-    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
-    void set_attribute_edge(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
-
-    // TODO: add a dendrite accumulator struct that allows for multiple timesteps to be accumulated
-    // TODO: add total accumulators supported (1024*5), we can either have one accumulator per
-    //  neuron, or have fewer neurons and longer delays
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
+    void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override {};
 
 private:
     // Technically soma attributes, but due to common usage, suppress warnings
@@ -89,9 +85,61 @@ private:
             "w",
             "latency"
     };
-    std::vector<double> accumulated_charges{std::vector<double>(loihi_max_compartments, 0.0)};
+    std::vector<double> accumulated_charges{loihi_max_compartments, 0.0};
     std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
-    double leak_decay{0.0};
+};
+
+class AccumulatorWithDelayModel : public DendriteUnit
+{
+public:
+    AccumulatorWithDelayModel()
+    {
+        for (auto &accumulator : accumulated_charges)
+        {
+            accumulator = std::vector<double>(loihi_max_compartments, 0.0);
+        }
+        register_attributes(accumulator_attributes);
+    }
+    AccumulatorWithDelayModel(const AccumulatorWithDelayModel &copy) = default;
+    AccumulatorWithDelayModel(AccumulatorWithDelayModel &&other) = default;
+    ~AccumulatorWithDelayModel() override = default;
+    AccumulatorWithDelayModel &operator=(const AccumulatorWithDelayModel &other) = delete;
+    AccumulatorWithDelayModel &operator=(AccumulatorWithDelayModel &&other) = delete;
+
+    PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
+    void reset() override
+    {
+        for (auto &accumulator : accumulated_charges)
+        {
+            accumulator = std::vector<double>(loihi_max_compartments, 0.0);
+        }
+    }
+    void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
+    void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
+
+private:
+    // Technically soma attributes, but due to common usage, suppress warnings
+    //  for these in the dendrite H/W too
+    const size_t max_delay{5UL};
+    static inline const std::set<std::string> accumulator_attributes{
+            "reset_mode",
+            "reverse_reset_mode",
+            "reset",
+            "reverse_reset",
+            "bias",
+            "threshold",
+            "reverse_threshold",
+            "leak_decay",
+            "noise",
+            "weight",
+            "w",
+            "latency",
+            "delay",
+    };
+    std::vector<std::vector<double>> accumulated_charges{max_delay};
+    std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
+    std::vector<size_t> delays;
 };
 
 class MultiTapModel1D : public DendriteUnit

@@ -77,12 +77,7 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
     {
         // Apply leak for 1 or more timesteps
         ++(timesteps_simulated[neuron_address]);
-        accumulated_charges[neuron_address] *= leak_decay;
-
-        // TODO: shift the rest of the accumulators by one timestep if we have
-        //  dendritic delay enabled. Should this replace leak_decay for the
-        //  dendrite? Check the dendrite code to see if we use this feature ever
-        //  if not, replace it...
+        accumulated_charges[neuron_address] = 0.0;
     }
     if (current.has_value())
     {
@@ -95,13 +90,51 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
     return output;
 }
 
-void sanafe::AccumulatorModel::set_attribute_neuron(
-        const size_t /*neuron_address*/, const std::string &attribute_name,
+sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(size_t neuron_address,
+        std::optional<double> current,
+        std::optional<size_t> synapse_address)
+{
+    PipelineResult output;
+
+    while (timesteps_simulated[neuron_address] < simulation_time)
+    {
+        // Apply leak for 1 or more timesteps
+        ++(timesteps_simulated[neuron_address]);
+
+        for (size_t i = 0; i < accumulated_charges.size() - 1UL; i++)
+        {
+            accumulated_charges[i][neuron_address] =
+                    accumulated_charges[i + 1][neuron_address];
+        }
+        accumulated_charges[accumulated_charges.size() - 1UL][neuron_address] =
+                0.0;
+    }
+    if (current.has_value())
+    {
+        // Integrate input charges
+        const size_t delay = delays[synapse_address.value_or(0UL)];
+        accumulated_charges[delay][neuron_address] += current.value();
+    }
+
+    output.current = accumulated_charges[0UL][neuron_address];
+
+    return output;
+}
+
+void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
+        size_t synapse_address, const std::string &attribute_name,
         const ModelAttribute &param)
 {
-    if (attribute_name == "dendrite_leak_decay")
+    if (delays.size() <= synapse_address)
     {
-        leak_decay = static_cast<double>(param);
+        TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
+        delays.resize(std::max(delays.size() * 2, synapse_address + 1), 0UL);
+    }
+
+    if (attribute_name == "delay")
+    {
+        const int delay = static_cast<int>(param);
+        delays[synapse_address] = static_cast<size_t>(delay);
     }
 }
 
@@ -837,6 +870,10 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     if (model_name == "accumulator")
     {
         return std::shared_ptr<PipelineUnit>(new AccumulatorModel());
+    }
+    if (model_name == "accumulator_with_delay")
+    {
+        return std::shared_ptr<PipelineUnit>(new AccumulatorWithDelayModel());
     }
     if (model_name == "taps")
     {
