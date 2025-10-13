@@ -1,0 +1,89 @@
+# Energy and time estimates of different events, generated from SPICE
+#  simulations of Loihi.  All numbers were taken from:
+#  "Loihi: A Neuromorphic Manycore Processor with On-Chip Learning" (2018)
+#  M. Davies et al
+architecture:
+  name: loihi_chip
+  attributes:
+    topology: mesh
+    width: 8
+    height: 4
+    link_buffer_size: 16
+    #sync_model: fixed
+    #latency_sync: 0.0
+    # Enable this if simulating with more detailed timing models
+    sync_model: table
+    latency_sync: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
+  tile:
+    - name: loihi_tile[0..1023]  # Equivalent of 32 Loihi chips
+      attributes:
+        energy_north_hop: 4.2e-12
+        latency_north_hop: 6.5e-9
+        energy_east_hop: 3.0e-12
+        latency_east_hop: 4.1e-9
+        energy_south_hop: 4.2e-12
+        latency_south_hop: 6.5e-9
+        energy_west_hop: 3.0e-12
+        latency_west_hop: 4.1e-9
+      core:
+        - name: loihi_core[0..3]
+          attributes:
+            buffer_position: soma
+            buffer_inside_unit: false
+            max_neurons_supported: 1024
+          axon_in:
+            - name: loihi_in
+              attributes:
+                energy_message_in: 0.0e-12
+                latency_message_in: 16.0e-9
+          soma:
+            - name: loihi_lif
+              attributes:
+                model: leaky_integrate_fire
+                energy_access_neuron: 51.2e-12
+                latency_access_neuron: 6.0e-9
+                energy_update_neuron: 21.6e-12
+                latency_update_neuron: 3.7e-9
+                energy_spike_out: 69.3e-12
+                latency_spike_out: 30.0e-9
+            - name: loihi_inputs[0..1023]
+              attributes:
+                model: input
+                energy_access_neuron: 0.0
+                latency_access_neuron: 0.0
+                energy_update_neuron: 0.0
+                latency_update_neuron: 0.0
+                energy_spike_out: 0.0
+                latency_spike_out: 0.0
+          synapse:
+            - name: loihi_dense_synapse  # Use the name to link
+              attributes:
+                model: current_based
+                energy_process_spike: 35.5e-12
+                latency_process_spike: 3.8e-9
+            - name: loihi_sparse_synapse
+              attributes:
+                energy_process_spike: 33.6e-12
+                model: current_based
+                latency_process_spike: 4.7e-9
+            - name: loihi_conv_synapse
+              attributes:
+                model: current_based
+                latency_process_spike: 3.1e-9
+                energy_process_spike: 24.0e-12
+          dendrite:
+            - name: loihi_dendrites
+              attributes:
+                model: accumulator
+                energy_update: 0.0
+                latency_update: 0.0
+            - name: loihi_dendrites_delay
+              attributes:
+                model: accumulator_with_delay
+                energy_update: 0.0
+                latency_update: 0.0
+          axon_out:
+            - name: loihi_out
+              attributes:
+                energy_message_out: 111.0e-12
+                latency_message_out: 5.1e-9
