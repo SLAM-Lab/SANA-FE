@@ -41,6 +41,7 @@ enum Direction : uint8_t
 
 using MessageFifo = std::list<Message>;
 using MessagePriorityQueue = std::priority_queue<Message, std::vector<Message>, CompareMessagesBySentTime>;
+constexpr size_t max_buffered_timesteps{256UL};
 
 template <typename T, typename Container = std::vector<T>,
         typename Compare = std::less<T>>

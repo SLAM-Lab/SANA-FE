@@ -51,6 +51,12 @@ public:
     explicit TimestepHandle();
     explicit TimestepHandle(long int timestep_num);
 
+    TimestepHandle(TimestepHandle&&) = default;
+    TimestepHandle& operator=(TimestepHandle&&) = default;
+
+    TimestepHandle(const TimestepHandle&) = default;
+    TimestepHandle& operator=(const TimestepHandle&) = default;
+
     Timestep &operator*() { return *handle; }
     const Timestep &operator*() const { return *handle; }
 

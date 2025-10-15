@@ -179,7 +179,6 @@ void sanafe::schedule_create_threads(
 }
 
 // **** Detailed scheduler implementation ****
-
 void sanafe::schedule_messages_detailed(
         TimestepHandle &ts, Scheduler &scheduler)
 {
@@ -189,6 +188,13 @@ void sanafe::schedule_messages_detailed(
     }
     else
     {
+        // Make sure the timestep queue stays within sensible size bounds
+        while (scheduler.timesteps_to_schedule.size() > max_buffered_timesteps)
+        {
+            TRACE1(SCHEDULER, "Warning: Timestep queue full (%zu>%zu)\n",
+                    scheduler.timesteps_to_schedule.size(),
+                    max_buffered_timesteps);
+        }
         TRACE1(SCHEDULER, "Pushing timestep:%ld to be scheduled\n",
                 ts->timestep);
         scheduler.timesteps_to_schedule.push(ts);
@@ -629,8 +635,8 @@ void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
         const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
         if (got_ts)
         {
-            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld\n", thread_id,
-                    ts->timestep);
+            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld sz:%zu\n", thread_id,
+                    ts->timestep, scheduler.timesteps_to_schedule.size());
             schedule_messages_timestep(ts, scheduler);
         }
     }
