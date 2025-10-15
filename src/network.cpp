@@ -126,8 +126,11 @@ void sanafe::Neuron::set_attributes(const NeuronConfiguration &config)
         force_synapse_update = config.force_synapse_update.value();
     }
 
-    model_attributes.insert(
-            config.model_attributes.begin(), config.model_attributes.end());
+    for (const auto &[key, attribute] : config.model_attributes)
+    {
+        model_attributes.insert_or_assign(key, attribute);
+    }
+
 }
 
 std::string sanafe::Neuron::info() const
