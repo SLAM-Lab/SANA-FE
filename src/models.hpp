@@ -94,7 +94,9 @@ class AccumulatorWithDelayModel : public DendriteUnit
 public:
     AccumulatorWithDelayModel()
     {
-        for (auto &accumulator : accumulated_charges)
+        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
+        next_accumulated_charges.resize(max_delay + 1UL);
+        for (auto &accumulator : next_accumulated_charges)
         {
             accumulator = std::vector<double>(loihi_max_compartments, 0.0);
         }
@@ -109,7 +111,8 @@ public:
     PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
     void reset() override
     {
-        for (auto &accumulator : accumulated_charges)
+        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
+        for (auto &accumulator : next_accumulated_charges)
         {
             accumulator = std::vector<double>(loihi_max_compartments, 0.0);
         }
@@ -117,6 +120,7 @@ public:
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    void track_connection(size_t synapse_address, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) override;
 
 private:
     // Technically soma attributes, but due to common usage, suppress warnings
@@ -136,8 +140,10 @@ private:
             "w",
             "latency",
             "delay",
+            "d",
     };
-    std::vector<std::vector<double>> accumulated_charges{max_delay};
+    std::vector<double> accumulated_charges;
+    std::vector<std::vector<double>> next_accumulated_charges;
     std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
     std::vector<size_t> delays;
 };
@@ -192,6 +198,8 @@ public:
     {
         return compartments[neuron_address].potential;
     }
+    std::uniform_real_distribution<double> uniform_distribution{0.0, 1.0}; // TODO: hack
+    std::mt19937 gen{1}; // TODO: hack
 
     struct LoihiCompartment
     {
@@ -299,7 +307,7 @@ private:
 class InputModel : public SomaUnit
 {
 public:
-    InputModel() { register_attributes(input_attributes); }
+    InputModel() : gen(++instance_counter) { register_attributes(input_attributes); }
     InputModel(const InputModel &copy) = delete; // Because of random_device
     InputModel(InputModel &&other) = delete; // Because of random_device
     ~InputModel() override = default;
@@ -314,6 +322,7 @@ public:
 
 private:
     static inline const std::set<std::string> input_attributes{"rate", "poisson", "spikes"};
+    static inline unsigned int instance_counter = 0;
     std::vector<bool> spikes;
     std::vector<bool>::const_iterator curr_spike{spikes.begin()};
     std::uniform_real_distribution<double> uniform_distribution{0.0, 1.0};
@@ -321,7 +330,7 @@ private:
     // To truly randomize, use:
     //std::random_device rd;
     //std::mt19937 gen{rd()};
-    std::mt19937 gen{1};
+    std::mt19937 gen;
     double poisson_probability{0.0};
     double rate{0.0};
     bool send_spike{false};

@@ -90,7 +90,8 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
     return output;
 }
 
-sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(size_t neuron_address,
+sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
+        size_t neuron_address,
         std::optional<double> current,
         std::optional<size_t> synapse_address)
 {
@@ -101,22 +102,25 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(size_t neuron_a
         // Apply leak for 1 or more timesteps
         ++(timesteps_simulated[neuron_address]);
 
-        for (size_t i = 0; i < accumulated_charges.size() - 1UL; i++)
+        accumulated_charges[neuron_address] =
+                next_accumulated_charges[0UL][neuron_address];
+        for (size_t i = 0; i < next_accumulated_charges.size() - 1UL; i++)
         {
-            accumulated_charges[i][neuron_address] =
-                    accumulated_charges[i + 1][neuron_address];
+            next_accumulated_charges[i][neuron_address] =
+                    next_accumulated_charges[i + 1][neuron_address];
         }
-        accumulated_charges[accumulated_charges.size() - 1UL][neuron_address] =
+        next_accumulated_charges[next_accumulated_charges.size() - 1UL][neuron_address] =
                 0.0;
     }
     if (current.has_value())
     {
         // Integrate input charges
-        const size_t delay = delays[synapse_address.value_or(0UL)];
-        accumulated_charges[delay][neuron_address] += current.value();
+        const size_t syn = synapse_address.value_or(0UL);
+        const size_t delay = (syn < delays.size()) ? delays[syn] : 0UL;
+        next_accumulated_charges[delay][neuron_address] += current.value();
     }
 
-    output.current = accumulated_charges[0UL][neuron_address];
+    output.current = accumulated_charges[neuron_address];
 
     return output;
 }
@@ -128,13 +132,29 @@ void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
     if (delays.size() <= synapse_address)
     {
         TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
-        delays.resize(std::max(delays.size() * 2, synapse_address + 1), 0UL);
+        delays.resize(synapse_address + 1, 0UL);
     }
 
-    if (attribute_name == "delay")
+    if ((attribute_name == "delay") || (attribute_name == "d"))
     {
         const int delay = static_cast<int>(param);
+        if (static_cast<size_t>(delay) > max_delay)
+        {
+            throw std::runtime_error("Error: delay > max delay\n");
+        }
         delays[synapse_address] = static_cast<size_t>(delay);
+    }
+}
+
+// TODO: this isn't getting called, at the moment the framework doesn't add and
+//  track connections in the dendrite h/w properly, only per neuron
+void sanafe::AccumulatorWithDelayModel::track_connection(
+        const size_t synapse_address, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/)
+{
+    if (delays.size() <= synapse_address)
+    {
+        TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
+        delays.resize(synapse_address, 0UL);
     }
 }
 
@@ -418,8 +438,7 @@ bool sanafe::LoihiLifModel::loihi_threshold_and_reset(LoihiCompartment &cx)
 {
     bool fired = false;
 
-    const bool in_refractory_period = cx.refractory_count > 0;
-    if ((cx.potential > cx.threshold) && !in_refractory_period)
+    if (cx.potential > cx.threshold)
     {
         if (cx.reset_mode == sanafe::neuron_reset_hard)
         {
@@ -492,17 +511,22 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     }
     // Add the synaptic / dendrite current to the potential
     TRACE1(MODELS, "bias:%lf potential before:%lf\n", cx.bias, cx.potential);
-    cx.potential += cx.bias;
-    cx.input_current += current_in.value_or(0.0);
-    cx.potential += cx.input_current;
 
-    TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n", neuron_address,
-            cx.potential);
-
-    // Check against threshold potential (for spiking)
-    if (loihi_threshold_and_reset(cx))
+    const bool in_refractory_period = cx.refractory_count > 0;
+    if (!in_refractory_period)
     {
-        state = sanafe::fired;
+        cx.potential += cx.bias;
+        cx.input_current += current_in.value_or(0.0);
+        cx.potential += cx.input_current;
+
+        TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n", neuron_address,
+               cx.potential);
+
+        // Check against threshold potential (for spiking)
+        if (loihi_threshold_and_reset(cx))
+        {
+            state = sanafe::fired;
+        }
     }
 
     // Manage timestep counters
@@ -793,7 +817,7 @@ void sanafe::TrueNorthModel::reset()
 }
 
 sanafe::PipelineResult sanafe::InputModel::update(
-        const size_t /*neuron_address*/, std::optional<double> current_in)
+        const size_t neuron_address, std::optional<double> current_in)
 {
     // This models a dummy input node
     if (current_in.has_value() && (current_in.value() != 0.0))
@@ -815,7 +839,8 @@ sanafe::PipelineResult sanafe::InputModel::update(
     if (poisson_probability > uniform_distribution(gen))
     {
         send_spike = true;
-        TRACE2(MODELS, "Randomly generating spike (Poisson).\n");
+        TRACE2(MODELS, "n:%zu randomly generating spike (Poisson).\n",
+                neuron_address);
     }
 
     TRACE1(MODELS, "Simulation time:%ld\n", simulation_time);
@@ -823,7 +848,8 @@ sanafe::PipelineResult sanafe::InputModel::update(
             ((simulation_time % static_cast<long int>(1.0 / rate)) == 0))
     {
         send_spike = true;
-        TRACE2(MODELS, "Randomly generating spikes (rate).\n");
+        TRACE2(MODELS, "n:%zu randomly generating spikes (rate).\n",
+                neuron_address);
     }
 
     const NeuronStatus status = send_spike ? fired : idle;
