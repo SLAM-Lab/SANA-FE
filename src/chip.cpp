@@ -903,6 +903,8 @@ void sanafe::SpikingChip::sim_format_run_summary(
     out << "  message_processing: " << std::fixed << message_processing_wall
         << "\n";
     out << "  scheduler: " << std::fixed << scheduler_wall << "\n";
+    out << "  setup: " << std::fixed << setup_wall
+        << "\n";
     out << "  energy: " << std::fixed << energy_stats_wall << "\n";
 }
 
@@ -1042,20 +1044,24 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
         const long int timestep, Scheduler &scheduler)
 {
     // Start the next time-step, clear all buffers
+    auto setup_start_tm = std::chrono::high_resolution_clock::now();
     auto ts = TimestepHandle(timestep);
     Timestep &ts_data = ts.get(); // Get reference to timestep data
     ts_data.set_cores(core_count);
     sim_reset_measurements();
+    auto setup_end_tm = std::chrono::high_resolution_clock::now();
 
-    auto neuron_processing_start_tm = std::chrono::high_resolution_clock::now();
+    auto neuron_processing_start_tm = setup_end_tm;
     process_neurons(ts_data);
     auto neuron_processing_end_tm = std::chrono::high_resolution_clock::now();
+
     auto message_processing_start_tm = neuron_processing_end_tm;
     process_messages(ts_data);
     forced_updates(ts_data);
     // The timestep ends once cores are synchronized
     sim_timestep_sync(scheduler);
     auto message_processing_end_tm = std::chrono::high_resolution_clock::now();
+
     auto energy_calculation_start_tm = message_processing_end_tm;
     sim_calculate_ts_energy(ts_data);
     sim_update_ts_counters(ts_data);
@@ -1071,6 +1077,11 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
 
     // Calculate various simulator timings
     constexpr double ns_to_second = 1.0e-9;
+    const long int setup_cycles =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    setup_end_tm - setup_start_tm)
+                    .count();
+    setup_wall += static_cast<double>(setup_cycles) * ns_to_second;
     const long int neuron_processing_cycles =
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                     neuron_processing_end_tm - neuron_processing_start_tm)
@@ -1372,6 +1383,10 @@ void sanafe::SpikingChip::sim_reset_measurements()
 {
     // Reset any energy, time latency or other measurements of network hardware
     //  This is called every timestep
+
+#ifdef HAVE_OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     for (auto &t : tiles)
     {
         // Reset tile
@@ -1395,13 +1410,14 @@ void sanafe::SpikingChip::sim_reset_measurements()
                 axon.latency = 0.0;
             }
 
-            for (auto &hw : c.pipeline_hw)
+            for (auto &hw_ref : c.pipeline_hw_in_use)
             {
-                hw->energy = 0.0;
-                hw->latency = 0.0;
-                hw->spikes_processed = 0;
-                hw->neurons_updated = 0L;
-                hw->neurons_fired = 0L;
+                PipelineUnit &hw = hw_ref.get();
+                hw.energy = 0.0;
+                hw.latency = 0.0;
+                hw.spikes_processed = 0;
+                hw.neurons_updated = 0L;
+                hw.neurons_fired = 0L;
             }
 
             for (auto &axon : c.axon_out_hw)
@@ -1412,7 +1428,7 @@ void sanafe::SpikingChip::sim_reset_measurements()
             }
 
             // Reset the message buffer
-            c.messages_in = std::vector<std::reference_wrapper<Message>>();
+            c.messages_in.clear();
         }
     }
 }

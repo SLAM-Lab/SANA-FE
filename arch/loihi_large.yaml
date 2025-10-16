@@ -6,8 +6,8 @@ architecture:
   name: loihi_chip
   attributes:
     topology: mesh
-    width: 8
-    height: 4
+    width: 256
+    height: 128
     link_buffer_size: 16
     #sync_model: fixed
     #latency_sync: 0.0
@@ -28,8 +28,8 @@ architecture:
       core:
         - name: loihi_core[0..3]
           attributes:
-            buffer_position: soma
-            buffer_inside_unit: false
+            buffer_position: dendrite
+            buffer_inside_unit: true
             max_neurons_supported: 1024
           axon_in:
             - name: loihi_in

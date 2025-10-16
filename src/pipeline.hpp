@@ -91,7 +91,7 @@ public:
 
     // Normal member functions and function pointers
     void set_time(long int timestep) { simulation_time = timestep; }
-    void set_attributes(std::string unit_name, const ModelInfo &model);
+    void set_attributes_hw(std::string unit_name, const ModelInfo &model);
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     void register_attributes(const std::set<std::string> &attribute_names);
     void check_attribute(std::string attribute_name);
@@ -129,7 +129,7 @@ public:
 
     // Warning counter (in case we get attributes we don't recognize)
     long int attribute_warnings{0L};
-    static constexpr long int max_attribute_warnings{100L}; // Stops spam
+    static constexpr long int max_attribute_warnings{10L}; // Stops spam
 
     // Implementation flags, set whichever operations your derived unit supports
     //  to 'true'. Note that a hardware unit must support one or more of these

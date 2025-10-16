@@ -130,7 +130,6 @@ void sanafe::Neuron::set_attributes(const NeuronConfiguration &config)
     {
         model_attributes.insert_or_assign(key, attribute);
     }
-
 }
 
 std::string sanafe::Neuron::info() const

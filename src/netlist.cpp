@@ -834,7 +834,6 @@ std::string sanafe::netlist_attributes_to_netlist(
         std::ostringstream ss;
         ss << tree;
         attribute_str = " " + ss.str();
-        INFO("attribute str:%s\n", attribute_str.c_str());
     }
     else
     {

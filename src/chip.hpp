@@ -112,6 +112,7 @@ private:
 
     // Performance and other misc tracking
     static std::atomic<int> chip_count;
+    double setup_wall{0.0};
     double neuron_processing_wall{0.0};
     double message_processing_wall{0.0};
     double energy_stats_wall{0.0};

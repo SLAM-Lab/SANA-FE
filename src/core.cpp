@@ -173,6 +173,7 @@ void sanafe::Core::map_connection(const Connection &con,
 
     mapped_con.synapse_hw = get_synapse_hw(synapse_hw_name);
     mapped_con.synapse_hw->add_connection(mapped_con);
+
     mapped_con.build_message_processing_pipeline();
     mapped_con.set_model_attributes(con.synapse_attributes);
     TRACE2(CHIP, "Mapped connection to hw: %s\n",
@@ -213,7 +214,7 @@ sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
 
     auto &new_unit = pipeline_hw.back();
     // Forward all attributes onto the new h/w unit
-    new_unit->set_attributes(config.name, config.model_info);
+    new_unit->set_attributes_hw(config.name, config.model_info);
     // Set the input/output interface of the pipeline unit and in doing so we
     //  configure which functionality the h/w unit supports
     new_unit->check_implemented(config.implements_synapse,

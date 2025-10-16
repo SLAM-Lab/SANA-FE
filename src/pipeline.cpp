@@ -63,6 +63,8 @@ size_t sanafe::PipelineUnit::add_connection(MappedConnection &con)
     MappedNeuron &pre_neuron = con.pre_neuron_ref.get();
     MappedNeuron &post_neuron = con.post_neuron_ref.get();
 
+    // TODO: we track this in the synapse but not the dendrite h/w?
+
     // Allow the implemented h/w unit to add its own tracking for each
     //  connection if needed
     con.mapped_synapse_hw_address = connection_count;
@@ -145,7 +147,7 @@ void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
     }
 }
 
-void sanafe::PipelineUnit::set_attributes(
+void sanafe::PipelineUnit::set_attributes_hw(
         std::string unit_name, const ModelInfo &model)
 {
     model_attributes = model.model_attributes;

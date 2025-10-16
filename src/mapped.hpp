@@ -34,6 +34,7 @@ public:
     PipelineUnit *synapse_hw{nullptr};
     std::vector<PipelineUnit *> message_processing_pipeline;
     size_t connection_offset{0UL};
+    size_t mapped_dendrite_hw_address{0UL};
     size_t mapped_synapse_hw_address{0UL};
 
     explicit MappedConnection(std::reference_wrapper<MappedNeuron> pre_neuron, std::reference_wrapper<MappedNeuron> post_neuron);
