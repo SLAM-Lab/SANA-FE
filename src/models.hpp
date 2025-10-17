@@ -43,7 +43,7 @@ public:
     void reset() override;
 
 private:
-    static inline const std::set<std::string> current_based_synapse_attributes{"weight", "w"};
+    static inline const std::set<std::string> current_based_synapse_attributes{"weight", "w", "delay", "d"};
     std::vector<double> weights;
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};
@@ -94,11 +94,11 @@ class AccumulatorWithDelayModel : public DendriteUnit
 public:
     AccumulatorWithDelayModel()
     {
-        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
+        accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
         next_accumulated_charges.resize(max_delay + 1UL);
         for (auto &accumulator : next_accumulated_charges)
         {
-            accumulator = std::vector<double>(loihi_max_compartments, 0.0);
+            accumulator = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
         }
         register_attributes(accumulator_attributes);
     }
@@ -111,10 +111,10 @@ public:
     PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
     void reset() override
     {
-        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
+        accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
         for (auto &accumulator : next_accumulated_charges)
         {
-            accumulator = std::vector<double>(loihi_max_compartments, 0.0);
+            accumulator = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
         }
     }
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
@@ -142,8 +142,8 @@ private:
             "delay",
             "d",
     };
-    std::vector<double> accumulated_charges;
-    std::vector<std::vector<double>> next_accumulated_charges;
+    std::vector<std::optional<double>> accumulated_charges;
+    std::vector<std::vector<std::optional<double>>> next_accumulated_charges;
     std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
     std::vector<size_t> delays;
 };

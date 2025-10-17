@@ -109,15 +109,17 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
             next_accumulated_charges[i][neuron_address] =
                     next_accumulated_charges[i + 1][neuron_address];
         }
-        next_accumulated_charges[next_accumulated_charges.size() - 1UL][neuron_address] =
-                0.0;
+        next_accumulated_charges[next_accumulated_charges.size() - 1UL]
+                                [neuron_address] = std::nullopt;
     }
     if (current.has_value())
     {
         // Integrate input charges
         const size_t syn = synapse_address.value_or(0UL);
         const size_t delay = (syn < delays.size()) ? delays[syn] : 0UL;
-        next_accumulated_charges[delay][neuron_address] += current.value();
+        next_accumulated_charges[delay][neuron_address] =
+                next_accumulated_charges[delay][neuron_address].value_or(0.0) +
+                current.value();
     }
 
     output.current = accumulated_charges[neuron_address];
