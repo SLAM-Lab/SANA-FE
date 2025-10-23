@@ -517,7 +517,6 @@ void sanafe::description_parse_neuron_connection(
 
 }
 
-#include <iostream>
 std::string sanafe::description_parse_hyperedge_type(const ryml::Parser &parser,
         const ryml::ConstNodeRef attributes_node)
 {
@@ -526,7 +525,6 @@ std::string sanafe::description_parse_hyperedge_type(const ryml::Parser &parser,
     {
         for (const auto &attribute : attributes_node)
         {
-            std::cout << attribute << "\n";
             if (!attribute.find_child("type").invalid())
             {
                 attribute["type"] >> type;
@@ -589,42 +587,43 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
     }
 }
 
-bool sanafe::yaml_parse_conv2d_attributes(
-        ryml::ConstNodeRef attribute, Conv2DParameters &convolution)
+bool sanafe::yaml_parse_conv2d_attribute(
+        const std::string attribute_name,
+        const ModelAttribute &attribute, Conv2DParameters &convolution)
 {
     bool parsed = true;
 
-    if (attribute.key() == "input_height")
+    if (attribute_name == "input_height")
     {
-        attribute >> convolution.input_height;
+        convolution.input_height = attribute;
     }
-    else if (attribute.key() == "input_width")
+    else if (attribute_name == "input_width")
     {
-        attribute >> convolution.input_width;
+        convolution.input_width = attribute;
     }
-    else if (attribute.key() == "input_channels")
+    else if (attribute_name == "input_channels")
     {
-        attribute >> convolution.input_channels;
+        convolution.input_channels = attribute;
     }
-    else if (attribute.key() == "kernel_width")
+    else if (attribute_name == "kernel_width")
     {
-        attribute >> convolution.kernel_width;
+        convolution.kernel_width = attribute;
     }
-    else if (attribute.key() == "kernel_height")
+    else if (attribute_name == "kernel_height")
     {
-        attribute >> convolution.kernel_height;
+        convolution.kernel_height = attribute;
     }
-    else if (attribute.key() == "kernel_count")
+    else if (attribute_name == "kernel_count")
     {
-        attribute >> convolution.kernel_count;
+        convolution.kernel_count = attribute;
     }
-    else if (attribute.key() == "stride_width")
+    else if (attribute_name == "stride_width")
     {
-        attribute >> convolution.stride_width;
+        convolution.stride_width = attribute;
     }
-    else if (attribute.key() == "stride_height")
+    else if (attribute_name == "stride_height")
     {
-        attribute >> convolution.stride_height;
+        convolution.stride_height = attribute;
     }
     else
     {
@@ -634,21 +633,28 @@ bool sanafe::yaml_parse_conv2d_attributes(
     return parsed;
 }
 
-bool sanafe::yaml_parse_sparse_attributes(ryml::ConstNodeRef attribute,
+bool sanafe::yaml_parse_sparse_attribute(
+        const std::string attribute_name,
+        const sanafe::ModelAttribute &attribute,
         std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
 {
-    if (attribute.key() == "source_target_pairs")
+    if (attribute_name == "source_target_pairs")
     {
-        std::cout << attribute;
-        if (attribute.is_seq())
+        if (attribute.is_list())
         {
-            for (const auto &pair_node : attribute)
+            const std::vector<sanafe::ModelAttribute> attribute_list = attribute;
+            for (const auto &src_tgt_pair : attribute_list)
             {
-                if (pair_node.is_seq() && pair_node.num_children() == 2)
+                if (!src_tgt_pair.is_list())
                 {
-                    size_t source_id, target_id;
-                    pair_node[0] >> source_id;
-                    pair_node[1] >> target_id;
+                    throw std::runtime_error("Invalid source/target type: "
+                                            "expected tuple [source, target]");
+                }
+                std::vector<ModelAttribute> src_target_vec = src_tgt_pair;
+                if (src_target_vec.size() == 2)
+                {
+                    const size_t source_id = static_cast<int>(src_target_vec[0]);
+                    const size_t target_id = static_cast<int>(src_target_vec[1]);
                     source_dest_id_pairs.emplace_back(source_id, target_id);
                 }
                 else
@@ -704,33 +710,31 @@ void sanafe::yaml_parse_conv2d(NeuronGroup &source_group,
         const ryml::Parser &parser, const ryml::ConstNodeRef hyperedge_node,
         NeuronGroup &target_group)
 {
-    std::map<std::string, std::vector<ModelAttribute>> attribute_lists{};
+    const auto attributes =
+            description_parse_model_attributes_yaml(parser, hyperedge_node);
     Conv2DParameters convolution{};
 
-    for (const auto &attribute : hyperedge_node.children())
+    std::map<std::string, std::vector<ModelAttribute>> attribute_lists{};
+    for (const auto &[attribute_name, attribute] : attributes)
     {
-        if (yaml_parse_conv2d_attributes(attribute, convolution))
+        if (yaml_parse_conv2d_attribute(attribute_name, attribute, convolution))
         {
             // Ignore the standard convolutional attributes which shouldn't be
             //  forwarded onto the hardware models
             continue;
         }
-        if ((attribute.key() == "synapse") || (attribute.key() == "dendrite"))
+        else if (attribute_name != "type")
         {
-            yaml_parse_unit_specific_attributes(
-                    parser, attribute, attribute_lists);
-        }
-        else if (attribute.key() != "type")
-        {
-            // Parse assumed list of attributes
-            std::vector<ModelAttribute> attribute_list;
-            for (const auto &el : attribute)
+            if (!attribute.is_list())
             {
-                ModelAttribute value = yaml_parse_attribute(parser, el);
-                attribute_list.push_back(std::move(value));
+                const std::string error =
+                        "Attribute must be a list with "
+                        "an entry for each kernel connection (name: " +
+                        attribute_name + ")";
+                throw YamlDescriptionParsingError(
+                        error, parser, hyperedge_node);
             }
-            std::string attribute_name;
-            attribute >> ryml::key(attribute_name);
+            std::vector<ModelAttribute> attribute_list = attribute;
             attribute_lists[attribute_name] = std::move(attribute_list);
         }
     }
@@ -739,34 +743,39 @@ void sanafe::yaml_parse_conv2d(NeuronGroup &source_group,
             target_group, attribute_lists, convolution);
 }
 
+
 void sanafe::yaml_parse_sparse(NeuronGroup &source_group,
         const ryml::Parser & parser,
         const ryml::ConstNodeRef hyperedge_node,
         NeuronGroup &target_group)
 {
+    const auto attributes =
+            description_parse_model_attributes_yaml(parser, hyperedge_node);
     std::map<std::string, std::vector<ModelAttribute>> attribute_lists{};
     std::vector<std::pair<size_t, size_t>> source_dest_id_pairs;
 
-    for (const auto &attribute : hyperedge_node.children())
+    for (const auto &[attribute_name, attribute] : attributes)
     {
-        if (yaml_parse_sparse_attributes(attribute, source_dest_id_pairs))
+        if (yaml_parse_sparse_attribute(
+                    attribute_name, attribute, source_dest_id_pairs))
         {
             // Ignore the standard sparse attributes which shouldn't be
             //  forwarded onto the hardware models
             continue;
         }
-
-        if ((attribute.key() == "synapse") || (attribute.key() == "dendrite"))
+        if (attribute_name != "type")
         {
-            yaml_parse_unit_specific_attributes(
-                    parser, attribute, attribute_lists);
-        }
-        else if (attribute.key() != "type")
-        {
-            // Parse assumed list of attributes
-            std::vector<ModelAttribute> attribute_list;
-            std::string attribute_name;
-            attribute >> ryml::key(attribute_name);
+            if (!attribute.is_list())
+            {
+                const std::string error =
+                        "Attribute must be a list with "
+                        "an entry for each connection pair (name: " +
+                        attribute_name + ")";
+                throw YamlDescriptionParsingError(
+                        error, parser, hyperedge_node);
+            }
+            std::vector<ModelAttribute> attribute_list = attribute;
+            attribute_lists[attribute_name] = std::move(attribute_list);
         }
     }
     source_group.connect_neurons_sparse(
@@ -782,13 +791,11 @@ void sanafe::yaml_parse_dense(NeuronGroup &source_group,
 
     std::map<std::string, std::vector<ModelAttribute>> attribute_lists{};
 
-    for (const auto &attribute : attributes)
+    for (const auto &[attribute_name, attribute] : attributes)
     {
-        const std::string attribute_name = attribute.first;
         if (attribute_name != "type")
         {
-            const auto attribute_val = attribute.second;
-            if (!attribute_val.is_list())
+            if (!attribute.is_list())
             {
                 const std::string error =
                         "Attribute must be a list with "
@@ -797,7 +804,7 @@ void sanafe::yaml_parse_dense(NeuronGroup &source_group,
                 throw YamlDescriptionParsingError(
                         error, parser, hyperedge_node);
             }
-            std::vector<ModelAttribute> attribute_list = attribute_val;
+            std::vector<ModelAttribute> attribute_list = attribute;
             attribute_lists[attribute_name] = std::move(attribute_list);
         }
     }

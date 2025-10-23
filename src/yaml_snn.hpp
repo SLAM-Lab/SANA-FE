@@ -35,44 +35,29 @@ void yaml_parse_edges_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRe
 void yaml_parse_group(const ryml::Parser &parser, ryml::ConstNodeRef neuron_group_node, SpikingNetwork &net);
 void yaml_parse_neuron_section(const ryml::Parser &parser, ryml::ConstNodeRef neuron_node, NeuronGroup &neuron_group);
 // Neuron to Hardware Mapping
-void description_parse_mapping_section_yaml(const ryml::Parser &parser,
-        ryml::ConstNodeRef mappings_node, Architecture &arch,
-        SpikingNetwork &net);
-void description_parse_mapping(const ryml::Parser &parser,
-        ryml::ConstNodeRef mapping_info, Architecture &arch,
-        SpikingNetwork &net);
-void description_parse_mapping_info(const ryml::Parser &parser,
-        ryml::ConstNodeRef info, Neuron &n, std::string &core_name);
-void description_parse_neuron(const std::string &id, const ryml::Parser &parser,
-        ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
-NeuronConfiguration yaml_parse_neuron_attributes(const ryml::Parser &parser,
-        ryml::ConstNodeRef attributes,
-        const NeuronConfiguration &default_template = NeuronConfiguration());
-void description_parse_edge(const std::string &description,
-        const ryml::Parser &parser, ryml::ConstNodeRef attributes_node,
-        SpikingNetwork &network);
-void description_parse_neuron_connection(const NeuronAddress &source_address,
-        const NeuronAddress &target_address, const ryml::Parser &parser,
-        ryml::ConstNodeRef attributes_node, SpikingNetwork &net);
+void description_parse_mapping_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef mappings_node, Architecture &arch, SpikingNetwork &net);
+void description_parse_mapping(const ryml::Parser &parser, ryml::ConstNodeRef mapping_info, Architecture &arch, SpikingNetwork &net);
+void description_parse_mapping_info(const ryml::Parser &parser, ryml::ConstNodeRef info, Neuron &n, std::string &core_name);
+void description_parse_neuron(const std::string &id, const ryml::Parser &parser, ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
+NeuronConfiguration yaml_parse_neuron_attributes(const ryml::Parser &parser,ryml::ConstNodeRef attributes, const NeuronConfiguration &default_template = NeuronConfiguration());
+void description_parse_edge(const std::string &description, const ryml::Parser &parser, ryml::ConstNodeRef attributes_node, SpikingNetwork &network);
+void description_parse_neuron_connection(const NeuronAddress &source_address, const NeuronAddress &target_address, const ryml::Parser &parser, ryml::ConstNodeRef attributes_node, SpikingNetwork &net);
 
 void description_parse_hyperedge(const NeuronAddress &source_address, const NeuronAddress &target_address, const ryml::Parser &parser, ryml::ConstNodeRef hyperedge_node, SpikingNetwork &net);
 std::string description_parse_hyperedge_type(const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node);
 void yaml_parse_conv2d(NeuronGroup &source_group, const ryml::Parser &parser, ryml::ConstNodeRef hyperedge_node, NeuronGroup &target_group);
 void yaml_parse_sparse(NeuronGroup &source_group, const ryml::Parser &parser, ryml::ConstNodeRef hyperedge_node, NeuronGroup &target_group);
 void yaml_parse_dense(NeuronGroup &source_group, const ryml::Parser &parser, ryml::ConstNodeRef hyperedge_node, NeuronGroup &target_group);
-bool yaml_parse_conv2d_attributes(ryml::ConstNodeRef attribute, Conv2DParameters &convolution);
-bool yaml_parse_sparse_attributes(ryml::ConstNodeRef attribute, std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs);
+bool yaml_parse_conv2d_attribute(const std::string attribute_name, const sanafe::ModelAttribute &attribute, Conv2DParameters &convolution);
+bool yaml_parse_sparse_attribute(const std::string attribute_name, const sanafe::ModelAttribute &attribute, std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs);
 void yaml_parse_unit_specific_attributes(const ryml::Parser &parser, ryml::ConstNodeRef parent_node, std::map<std::string, std::vector<ModelAttribute>> &attribute_lists);
 
-void description_parse_edge_attributes(Connection &edge,
-        const ryml::Parser &parser, ryml::ConstNodeRef attributes_node);
+void description_parse_edge_attributes(Connection &edge, const ryml::Parser &parser, ryml::ConstNodeRef attributes_node);
 std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description);
 
 // Functions for writing YAML
-void yaml_write_network(
-        std::filesystem::path path, const sanafe::SpikingNetwork &network);
-void yaml_write_mappings_file(
-        std::filesystem::path path, const SpikingNetwork &network);
+void yaml_write_network(std::filesystem::path path, const sanafe::SpikingNetwork &network);
+void yaml_write_mappings_file(std::filesystem::path path, const SpikingNetwork &network);
 void yaml_create_mappings(ryml::NodeRef &node, std::vector<std::reference_wrapper<const Neuron>> &all_neurons, std::list<std::string> &strings);
 c4::yml::NodeRef yaml_serialize_network(c4::yml::NodeRef root, const sanafe::SpikingNetwork &network, std::list<std::string> &strings);
 c4::yml::NodeRef yaml_serialize_neuron_group(c4::yml::NodeRef parent, const NeuronGroup &group, std::list<std::string> &strings);
