@@ -514,6 +514,32 @@ void sanafe::description_parse_neuron_connection(
     const size_t edge_idx = source_neuron.connect_to_neuron(target_neuron);
     Connection &edge = source_neuron.edges_out[edge_idx];
     description_parse_edge_attributes(edge, parser, attributes_node);
+
+}
+
+#include <iostream>
+std::string sanafe::description_parse_hyperedge_type(const ryml::Parser &parser,
+        const ryml::ConstNodeRef attributes_node)
+{
+    std::string type;
+    if (attributes_node.is_seq())
+    {
+        for (const auto &attribute : attributes_node)
+        {
+            std::cout << attribute << "\n";
+            if (!attribute.find_child("type").invalid())
+            {
+                attribute["type"] >> type;
+            }
+        }
+    }
+    else
+    {
+        type = yaml_required_field<std::string>(
+                parser, attributes_node, "type");
+    }
+
+    return type;
 }
 
 void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
@@ -537,11 +563,13 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
 
     NeuronGroup &target_group = net.groups.at(target_address.group_name);
 
-    // First parse the lists of attributes, this is common for all hyperedge
-    //  connectivity
-    const auto type =
-            yaml_required_field<std::string>(parser, hyperedge_node, "type");
-
+    const std::string type =
+            description_parse_hyperedge_type(parser, hyperedge_node);
+    if (type.empty())
+    {
+        const std::string error = "No hyperedge type specified.";
+        throw YamlDescriptionParsingError(error, parser, hyperedge_node);
+    }
     if (type == "conv2d")
     {
         yaml_parse_conv2d(source_group, parser, hyperedge_node, target_group);
@@ -606,7 +634,6 @@ bool sanafe::yaml_parse_conv2d_attributes(
     return parsed;
 }
 
-#include <iostream>
 bool sanafe::yaml_parse_sparse_attributes(ryml::ConstNodeRef attribute,
         std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
 {
@@ -750,29 +777,31 @@ void sanafe::yaml_parse_dense(NeuronGroup &source_group,
         const ryml::Parser &parser, const ryml::ConstNodeRef hyperedge_node,
         NeuronGroup &target_group)
 {
+    const auto attributes =
+            description_parse_model_attributes_yaml(parser, hyperedge_node);
+
     std::map<std::string, std::vector<ModelAttribute>> attribute_lists{};
 
-    for (const auto &attribute : hyperedge_node.children())
+    for (const auto &attribute : attributes)
     {
-        if ((attribute.key() == "synapse") || (attribute.key() == "dendrite"))
+        const std::string attribute_name = attribute.first;
+        if (attribute_name != "type")
         {
-            yaml_parse_unit_specific_attributes(
-                    parser, attribute, attribute_lists);
-        }
-        else if (attribute.key() != "type")
-        {
-            // Parse assumed list of attributes
-            std::vector<ModelAttribute> attribute_list;
-            std::string attribute_name;
-            attribute >> ryml::key(attribute_name);
-            for (const auto &el : attribute)
+            const auto attribute_val = attribute.second;
+            if (!attribute_val.is_list())
             {
-                ModelAttribute value = yaml_parse_attribute(parser, el);
-                attribute_list.push_back(std::move(value));
+                const std::string error =
+                        "Attribute must be a list with "
+                        "an entry for each connection (name: " +
+                        attribute_name + ")";
+                throw YamlDescriptionParsingError(
+                        error, parser, hyperedge_node);
             }
+            std::vector<ModelAttribute> attribute_list = attribute_val;
             attribute_lists[attribute_name] = std::move(attribute_list);
         }
     }
+
     source_group.connect_neurons_dense(target_group, attribute_lists);
 }
 

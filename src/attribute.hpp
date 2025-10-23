@@ -137,6 +137,8 @@ struct ModelAttribute
         throw std::runtime_error("Unknown variant type in ModelAttribute");
     }
 
+    bool is_list() const { return std::holds_alternative<std::vector<ModelAttribute>>(value); }
+
     // In C++17, we cannot use std::map (which would be the natural choice) with
     //  incomplete types i.e., cannot use std::map in such a recursive
     //  structure. Considering this, and the fact that performance is not as
