@@ -8,17 +8,7 @@ namespace
 class TestMultiTapModel1D : public ::testing::Test
 {
 protected:
-    class MultiTapModelExposed : public sanafe::MultiTapModel1D
-    {
-    public:
-        void set_simulation_time(long int t)
-        {
-            simulation_time = t;
-        }
-    };
-
-    MultiTapModelExposed model;
-
+    sanafe::MultiTapModel1D model;
     sanafe::ModelAttribute make_attr_double(double val)
     {
         sanafe::ModelAttribute attr;
@@ -115,7 +105,7 @@ TEST_F(TestMultiTapModel1D, InputCurrentAdds)
     model.set_attribute_neuron(0, "time_constants", make_attr_vec({1.0, 1.0}));
     model.set_attribute_neuron(0, "space_constants", make_attr_vec({0.0}));
 
-    auto result_before = model.update(0, 1.5, std::nullopt);
+    auto result_before = model.update(1, 0, 1.5, std::nullopt);
     ASSERT_TRUE(result_before.current.has_value());
     EXPECT_DOUBLE_EQ(result_before.current.value(), 1.5);
 }
@@ -130,9 +120,9 @@ TEST_F(TestMultiTapModel1D, InputCurrentToMappedTap)
     tap_attr.value = static_cast<int>(1);
     model.set_attribute_edge(0, "tap", tap_attr);
 
-    model.update(0, std::nullopt, std::nullopt);
+    model.update(1, 0, std::nullopt, std::nullopt);
 
-    EXPECT_NO_THROW(model.update(0, 2.0, 0));
+    EXPECT_NO_THROW(model.update(1, 0, 2.0, 0));
 }
 
 TEST_F(TestMultiTapModel1D, InvalidTapThrows)
@@ -145,7 +135,7 @@ TEST_F(TestMultiTapModel1D, InvalidTapThrows)
     tap_attr.value = static_cast<int>(5);
     model.set_attribute_edge(0, "tap", tap_attr);
 
-    EXPECT_THROW(model.update(0, 1.0, 0), std::logic_error);
+    EXPECT_THROW(model.update(1, 0, 1.0, 0), std::logic_error);
 }
 
 TEST_F(TestMultiTapModel1D, ResetClearsVoltages)
@@ -154,10 +144,10 @@ TEST_F(TestMultiTapModel1D, ResetClearsVoltages)
     taps_attr.value = static_cast<int>(1);
     model.set_attribute_neuron(0, "taps", taps_attr);
 
-    model.update(0, 3.0, std::nullopt);
+    model.update(1, 0, 3.0, std::nullopt);
     model.reset();
 
-    auto result = model.update(0, std::nullopt, std::nullopt);
+    auto result = model.update(1, 0, std::nullopt, std::nullopt);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 0.0);
 }
@@ -171,10 +161,8 @@ TEST_F(TestMultiTapModel1D, CalculateNextStateChangesVoltages)
     model.set_attribute_neuron(0, "time_constants", make_attr_vec({0.5, 0.5}));
     model.set_attribute_neuron(0, "space_constants", make_attr_vec({0.0}));
 
-    model.update(0, 2.0, std::nullopt);
-    model.set_simulation_time(1);
-
-    auto result = model.update(0, std::nullopt, std::nullopt);
+    model.update(1, 0, 2.0, std::nullopt);
+    auto result = model.update(2, 0, std::nullopt, std::nullopt);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_LT(result.current.value(), 2.0);
 }

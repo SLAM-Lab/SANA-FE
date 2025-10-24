@@ -90,8 +90,6 @@ sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
         const PipelineResult &input)
 {
     TRACE2(CHIP, "Updating nid:%zu (ts:%ld)\n", n.id, ts.timestep);
-    set_time(ts.timestep);
-
     // Process inputs
     PipelineResult output = process_input_fn(ts, n, con, input);
 

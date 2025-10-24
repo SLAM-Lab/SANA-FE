@@ -651,10 +651,13 @@ bool sanafe::yaml_parse_sparse_attribute(
                                             "expected tuple [source, target]");
                 }
                 std::vector<ModelAttribute> src_target_vec = src_tgt_pair;
+
                 if (src_target_vec.size() == 2)
                 {
-                    const size_t source_id = static_cast<int>(src_target_vec[0]);
-                    const size_t target_id = static_cast<int>(src_target_vec[1]);
+                    const size_t source_id =
+                            static_cast<int>(src_target_vec[0]);
+                    const size_t target_id =
+                            static_cast<int>(src_target_vec[1]);
                     source_dest_id_pairs.emplace_back(source_id, target_id);
                 }
                 else

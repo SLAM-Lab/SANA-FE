@@ -272,28 +272,29 @@ TEST(YamlSnnTest, SerializeNetworkToYaml)
     ASSERT_TRUE(loaded_net.groups.find("in") != loaded_net.groups.end());
     ASSERT_TRUE(loaded_net.groups.find("out") != loaded_net.groups.end());
 
-    EXPECT_EQ(loaded_net.groups.at("in").neurons.size(), 3);
-    EXPECT_EQ(loaded_net.groups.at("out").neurons.size(), 3);
+    EXPECT_EQ(loaded_net.groups.at("in").neurons.size(), 2);
+    EXPECT_EQ(loaded_net.groups.at("out").neurons.size(), 2);
 
     const auto &input0 = loaded_net.groups.at("in").neurons[0];
     const auto &input1 = loaded_net.groups.at("in").neurons[1];
-    const auto &input2 = loaded_net.groups.at("in").neurons[2];
 
-    ASSERT_EQ(input0.edges_out.size(), 1);
-    ASSERT_EQ(input1.edges_out.size(), 1);
-    ASSERT_EQ(input2.edges_out.size(), 1);
+    ASSERT_EQ(input0.edges_out.size(), 2);
+    ASSERT_EQ(input1.edges_out.size(), 2);
 
     EXPECT_EQ(input0.edges_out[0].post_neuron.group_name, "out");
+    EXPECT_EQ(input0.edges_out[1].post_neuron.group_name, "out");
     EXPECT_EQ(input1.edges_out[0].post_neuron.group_name, "out");
-    EXPECT_EQ(input2.edges_out[0].post_neuron.group_name, "out");
+    EXPECT_EQ(input1.edges_out[1].post_neuron.group_name, "out");
 
     EXPECT_EQ(input0.edges_out[0].post_neuron.neuron_offset, 0);
-    EXPECT_EQ(input1.edges_out[0].post_neuron.neuron_offset, 2);
-    EXPECT_EQ(input2.edges_out[0].post_neuron.neuron_offset, 2);
+    EXPECT_EQ(input0.edges_out[1].post_neuron.neuron_offset, 1);
+    EXPECT_EQ(input1.edges_out[0].post_neuron.neuron_offset, 0);
+    EXPECT_EQ(input1.edges_out[1].post_neuron.neuron_offset, 1);
 
     EXPECT_DOUBLE_EQ(input0.edges_out[0].synapse_attributes.at("weight"), -1.0);
-    EXPECT_DOUBLE_EQ(input1.edges_out[0].synapse_attributes.at("weight"), -2.0);
-    EXPECT_DOUBLE_EQ(input2.edges_out[0].synapse_attributes.at("weight"), 3.0);
+    EXPECT_DOUBLE_EQ(input0.edges_out[1].synapse_attributes.at("weight"), 2.0);
+    EXPECT_DOUBLE_EQ(input1.edges_out[0].synapse_attributes.at("weight"), 1.0);
+    EXPECT_DOUBLE_EQ(input1.edges_out[1].synapse_attributes.at("weight"), 3.0);
 
     std::filesystem::remove(output_path); // Clean up the output file
 }

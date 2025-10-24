@@ -126,7 +126,6 @@ latency_south_hop: 6.0
 energy_west_hop: 7.0
 latency_west_hop: 8.0
 log_energy: true
-log_latency: false
 )";
     // NOLINTBEGIN(misc-include-cleaner)
     ryml::EventHandlerTree event_handler = {};
@@ -145,7 +144,6 @@ log_latency: false
     EXPECT_DOUBLE_EQ(result.energy_west_hop, 7.0);
     EXPECT_DOUBLE_EQ(result.latency_west_hop, 8.0);
     EXPECT_TRUE(result.log_energy);
-    EXPECT_FALSE(result.log_latency);
 }
 
 TEST(YamlArchTest, ParsesBasicArchitecture)

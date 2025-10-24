@@ -17,6 +17,7 @@
 #include "attribute.hpp"
 #include "fwd.hpp"
 #include "mapped.hpp"
+#include "timestep.hpp"  // For Timestep reference
 
 namespace sanafe
 {
@@ -65,20 +66,20 @@ public:
     //  Depending on whether you want to support Synapse, Dendrite, Soma
     //  operations, or a combination of the three.
     // If using synaptic inputs (address and read vs. synapse update without read)
-    virtual PipelineResult update(
-            size_t /*synapse_address*/, bool /*read*/ = false)
+    virtual PipelineResult update(long int /*timestep*/, size_t /*synapse_address*/,
+            bool /*read*/ = false)
     {
         throw std::logic_error("Error: Synapse input not implemented");
     }
     // If using dendritic inputs (neuron address, synaptic current and synaptic address for additional info)
-    virtual PipelineResult update(size_t /*neuron_address*/,
-            std::optional<double> /*current_in*/,
+    virtual PipelineResult update(long int /*timestep*/,
+            size_t /*neuron_address*/, std::optional<double> /*current_in*/,
             std::optional<size_t> /*synaptic_address*/)
     {
         throw std::logic_error("Error: Dendrite input not implemented");
     }
     // If using somatic inputs (address and current in)
-    virtual PipelineResult update(
+    virtual PipelineResult update(long int /*timestep*/,
             size_t /*neuron_address*/, std::optional<double> /*current_in*/)
     {
         throw std::logic_error("Error: Soma input not implemented");
@@ -90,7 +91,6 @@ public:
     }
 
     // Normal member functions and function pointers
-    void set_time(long int timestep) { simulation_time = timestep; }
     void set_attributes_hw(std::string unit_name, const ModelInfo &model);
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     void register_attributes(const std::set<std::string> &attribute_names);
@@ -177,7 +177,6 @@ protected:
     };
     InputInterfaceFunc process_input_fn;
     OutputInterfaceFunc process_output_fn;
-    long int simulation_time{0L};
 
     PipelineResult process_synapse_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     PipelineResult process_dendrite_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
@@ -197,6 +196,8 @@ private:
     void synapse_set_default_attributes();
     void dendrite_set_default_attributes();
     void soma_set_default_attributes();
+
+    //long int simulation_time{0L};
 };
 
 // Specific unit base classes, for the normal use case where the model
@@ -206,15 +207,16 @@ class SynapseUnit : public PipelineUnit
 {
 public:
     SynapseUnit() : PipelineUnit(true, false, false) {}
-    PipelineResult update(size_t synapse_address, bool read = false) override = 0;
-    PipelineResult update(size_t /*neuron_address*/,
+    PipelineResult update(long int /*timestep*/, size_t synapse_address,
+            bool read = false) override = 0;
+    PipelineResult update(long int /*timestep*/, size_t /*neuron_address*/,
             std::optional<double> /*current_in*/,
             std::optional<size_t> /*synaptic_address*/) final
     {
         throw std::logic_error(
                 "Error: Synapse H/W called with dendrite inputs");
     }
-    PipelineResult update(size_t /*neuron_address*/,
+    PipelineResult update(long int /*timestep*/, size_t /*neuron_address*/,
             std::optional<double> /*current_in*/) final
     {
         throw std::logic_error("Error: Synapse H/W called with soma inputs");
@@ -226,14 +228,16 @@ class DendriteUnit : public PipelineUnit
 {
 public:
     DendriteUnit() : PipelineUnit(false, true, false) {}
-    PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synaptic_address) override = 0;
-    PipelineResult update(
+    PipelineResult update(long int timestep, size_t neuron_address,
+            std::optional<double> current_in,
+            std::optional<size_t> synaptic_address) override = 0;
+    PipelineResult update(long int /*timestep*/,
             size_t /*synapse_address*/, bool /*read*/ = false) final
     {
         throw std::logic_error(
                 "Error: Dendrite H/W called with synapse inputs");
     }
-    PipelineResult update(size_t /*neuron_address*/,
+    PipelineResult update(long int /*timestep*/, size_t /*neuron_address*/,
             std::optional<double> /*current_in*/) final
     {
         throw std::logic_error("Error: Dendrite H/W called with soma inputs");
@@ -244,13 +248,13 @@ class SomaUnit : public PipelineUnit
 {
 public:
     SomaUnit() : PipelineUnit(false, false, true) {}
-    PipelineResult update(size_t neuron_address, std::optional<double> current_in) override = 0;
-    PipelineResult update(
+    PipelineResult update(long int timestep, size_t neuron_address, std::optional<double> current_in) override = 0;
+    PipelineResult update(long int /*timestep*/,
             size_t /*synapse_address*/, bool /*read*/ = false) final
     {
         throw std::logic_error("Error: Soma H/W called with synapse inputs");
     }
-    PipelineResult update(size_t /*neuron_address*/,
+    PipelineResult update(long int /*timestep*/, size_t /*neuron_address*/,
             std::optional<double> /*current_in*/,
             std::optional<size_t> /*synaptic_address*/) final
     {
@@ -392,7 +396,7 @@ inline void sanafe::PipelineUnit::process_soma_output(MappedNeuron &n,
 }
 
 inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
-        Timestep & /*ts*/, MappedNeuron & /*n*/,
+        Timestep &ts, MappedNeuron & /*n*/,
         std::optional<MappedConnection *> con, const PipelineResult & /*input*/)
 {
     bool read = false;
@@ -409,14 +413,14 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
         synapse_address = con.value()->mapped_synapse_hw_address;
         read = true;
     }
-    PipelineResult output = update(synapse_address, read);
+    PipelineResult output = update(ts.timestep, synapse_address, read);
     ++spikes_processed;
 
     return output;
 }
 
 inline sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_input(
-        Timestep & /*ts*/, MappedNeuron &n,
+        Timestep &ts, MappedNeuron &n,
         std::optional<MappedConnection *> con, const PipelineResult &input)
 {
     PipelineResult output{};
@@ -426,17 +430,18 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_input(
     {
         synapse_address = con.value()->mapped_synapse_hw_address;
     }
-    output = update(
-            n.mapped_dendrite_hw_address, input.current, synapse_address);
+    output = update(ts.timestep, n.mapped_dendrite_hw_address,
+            input.current, synapse_address);
 
     return output;
 }
 
 inline sanafe::PipelineResult sanafe::PipelineUnit::process_soma_input(
-        Timestep & /*ts*/, MappedNeuron &n,
+        Timestep &ts, MappedNeuron &n,
         std::optional<MappedConnection *> /*con*/, const PipelineResult &input)
 {
-    PipelineResult output = update(n.mapped_soma_hw_address, input.current);
+    PipelineResult output =
+            update(ts.timestep, n.mapped_soma_hw_address, input.current);
     return output;
 }
 
