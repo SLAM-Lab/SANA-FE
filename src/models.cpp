@@ -75,11 +75,10 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(
 {
     PipelineResult output;
 
-    while (timesteps_simulated[neuron_address] < simulation_time)
+    if (timesteps_simulated[neuron_address] < simulation_time)
     {
-        // Apply leak for 1 or more timesteps
-        ++(timesteps_simulated[neuron_address]);
         accumulated_charges[neuron_address] = 0.0;
+        timesteps_simulated[neuron_address] = simulation_time;
     }
     if (current.has_value())
     {

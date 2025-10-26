@@ -52,7 +52,12 @@ private:
 class AccumulatorModel : public DendriteUnit
 {
 public:
-    AccumulatorModel() { register_attributes(accumulator_attributes); }
+    AccumulatorModel()
+    {
+        register_attributes(accumulator_attributes);
+        timesteps_simulated = std::vector<long int>(loihi_max_compartments, 0UL);
+        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
+    }
     AccumulatorModel(const AccumulatorModel &copy) = default;
     AccumulatorModel(AccumulatorModel &&other) = default;
     ~AccumulatorModel() override = default;
@@ -85,8 +90,8 @@ private:
             "w",
             "latency"
     };
-    std::vector<double> accumulated_charges{loihi_max_compartments, 0.0};
-    std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
+    std::vector<double> accumulated_charges;
+    std::vector<long int> timesteps_simulated;
 };
 
 class AccumulatorWithDelayModel : public DendriteUnit
@@ -94,6 +99,7 @@ class AccumulatorWithDelayModel : public DendriteUnit
 public:
     AccumulatorWithDelayModel()
     {
+        timesteps_simulated = std::vector<long int>(loihi_max_compartments, 0UL);
         accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
         next_accumulated_charges.resize(max_delay + 1UL);
         for (auto &accumulator : next_accumulated_charges)
@@ -144,7 +150,7 @@ private:
     };
     std::vector<std::optional<double>> accumulated_charges;
     std::vector<std::vector<std::optional<double>>> next_accumulated_charges;
-    std::vector<long int> timesteps_simulated{std::vector<long int>(loihi_max_compartments, 0)};
+    std::vector<long int> timesteps_simulated;
     std::vector<size_t> delays;
 };
 

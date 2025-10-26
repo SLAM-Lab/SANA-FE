@@ -149,8 +149,8 @@ if __name__ == "__main__":
                     model_attributes={"bias": dvs_inputs[id]})
             is_first_frame = (frame == 0)
             chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",
-                     write_trace_headers=is_first_frame, timing_model="cycle",
-                     processing_threads=1)
+                     write_trace_headers=is_first_frame, timing_model="detailed",
+                     processing_threads=8, scheduler_threads=8)
                      #processing_threads=16, scheduler_threads=8)
             chip.reset()
 
@@ -342,6 +342,7 @@ if __name__ == "__main__":
         # These experiments not used for now
         # Plot the potential probes from simulationm this was used to compared
         #  simulated functional behavior against actual
+        """
         layers = ("inputs", "0Conv2D_15x15x16", "1Conv2D_13x13x32",
                 "2Conv2D_11x11x64", "3Conv2D_9x9x11", "5Dense_11")
         layer_sizes = (1024, 3600, 5408, 7744, 891, 11)
@@ -372,4 +373,5 @@ if __name__ == "__main__":
         with open("run_summary.yaml", "r") as results_file:
             results = yaml.safe_load(results_file)
 
+        """
         #plt.show()
