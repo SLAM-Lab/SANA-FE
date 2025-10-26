@@ -116,6 +116,13 @@ sanafe::ModelInfo sanafe::yaml_parse_processing_unit_attributes(
         latency_node >> model_details.log_latency;
     }
 
+    const ryml::ConstNodeRef update_node =
+            attributes.find_child("update_every_timestep");
+    if (!update_node.invalid())
+    {
+        update_node >> model_details.update_every_timestep;
+    }
+
     // Handle plugin path NOLINTNEXTLINE(misc-include-cleaner)
     const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
     if (!plugin_path_node.invalid())

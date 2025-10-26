@@ -210,7 +210,7 @@ public:
     struct LoihiCompartment
     {
         std::vector<double> biases;
-        bool force_update{false};
+        bool force_update_every_timestep{false};
         long int timesteps_simulated{0L};
         int reset_mode{neuron_reset_hard};
         int reverse_reset_mode{neuron_no_reset};
@@ -237,7 +237,7 @@ private:
     static inline const std::set<std::string> loihi_lif_attributes{"reset_mode",
             "reverse_reset_mode", "reset", "reverse_reset", "bias", "threshold",
             "reverse_threshold", "leak_decay", "noise", "noise_bits",
-            "refractory_delay"};
+            "refractory_delay", "force_update", "force_update_every_timestep"};
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{noise_none};
     std::ifstream noise_stream;

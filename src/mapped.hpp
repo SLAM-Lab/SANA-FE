@@ -69,11 +69,9 @@ public:
     NeuronStatus status{invalid_neuron_state};
 
     // Flags and traces
-    bool force_synapse_update{false};
-    bool force_dendrite_update{false};
-    bool force_soma_update{false};
     bool log_spikes{false};
     bool log_potential{false};
+    bool check_for_synapse_updates_every_timestep{false};
 
     MappedNeuron(const Neuron &neuron_to_map, size_t nid, size_t mapped_offset_within_core, Core *mapped_core, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
     MappedNeuron(const MappedNeuron &copy) = default;

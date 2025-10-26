@@ -92,10 +92,8 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(
 }
 
 sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
-        const long int simulation_time,
-        size_t neuron_address,
-        std::optional<double> current,
-        std::optional<size_t> synapse_address)
+        const long int simulation_time, size_t neuron_address,
+        std::optional<double> current, std::optional<size_t> synapse_address)
 {
     PipelineResult output;
 
@@ -153,7 +151,8 @@ void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
 // TODO: this isn't getting called, at the moment the framework doesn't add and
 //  track connections in the dendrite h/w properly, only per neuron
 void sanafe::AccumulatorWithDelayModel::track_connection(
-        const size_t synapse_address, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/)
+        const size_t synapse_address, size_t /*src_neuron_id*/,
+        size_t /*dest_neuron_id*/)
 {
     if (delays.size() <= synapse_address)
     {
@@ -415,9 +414,9 @@ void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         TRACE2(MODELS, "Setting bias of %zu=%lf\n", neuron_address, cx.bias);
     }
     else if ((attribute_name == "force_update") ||
-            (attribute_name == "force_soma_update"))
+            (attribute_name == "force_update_every_timestep"))
     {
-        cx.force_update = static_cast<bool>(param);
+        cx.force_update_every_timestep = static_cast<bool>(param);
     }
     else if (attribute_name == "refractory_delay")
     {
@@ -503,7 +502,7 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
     // Update soma, if there are any received spikes, there is a non-zero
     //  bias or we force the neuron to update every time-step
     if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
-            (std::fabs(cx.bias) > 0.0) || cx.force_update)
+            (std::fabs(cx.bias) > 0.0) || cx.force_update_every_timestep)
     {
         // Neuron is turned on and potential write
         state = sanafe::updated;
@@ -525,8 +524,8 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
         cx.input_current += current_in.value_or(0.0);
         cx.potential += cx.input_current;
 
-        TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n", neuron_address,
-               cx.potential);
+        TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n",
+                neuron_address, cx.potential);
 
         // Check against threshold potential (for spiking)
         if (loihi_threshold_and_reset(cx))
@@ -664,7 +663,8 @@ void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,
     {
         n.bias = static_cast<double>(param);
     }
-    else if (attribute_name == "force_soma_update")
+    else if (attribute_name == "force_update_every_timestep" ||
+        attribute_name == "force_update")
     {
         n.force_update = static_cast<bool>(param);
     }
@@ -760,8 +760,8 @@ bool sanafe::TrueNorthModel::truenorth_threshold_and_reset(TrueNorthNeuron &n)
 }
 
 sanafe::PipelineResult sanafe::TrueNorthModel::update(
-        const long int simulation_time,
-        const size_t neuron_address, const std::optional<double> current_in)
+        const long int simulation_time, const size_t neuron_address,
+        const std::optional<double> current_in)
 {
     sanafe::NeuronStatus state = sanafe::idle;
     TrueNorthNeuron &n = neurons[neuron_address];

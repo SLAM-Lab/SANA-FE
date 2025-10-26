@@ -153,6 +153,7 @@ void sanafe::PipelineUnit::set_attributes_hw(
     name = std::move(unit_name);
     log_energy = model.log_energy;
     log_latency = model.log_latency;
+    update_every_timestep = model.update_every_timestep;
 
     synapse_set_default_attributes();
     dendrite_set_default_attributes();

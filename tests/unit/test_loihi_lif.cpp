@@ -319,7 +319,7 @@ TEST(LoihiLifModelTest, SetForceSomaUpdate)
 {
     sanafe::LoihiLifModel neuron;
     EXPECT_NO_THROW(neuron.set_attribute_neuron(
-            0, "force_soma_update", make_attr_bool(true)));
+            0, "force_update", make_attr_bool(true)));
 
     neuron.reset();
     auto result = neuron.update(1, 0, std::nullopt);

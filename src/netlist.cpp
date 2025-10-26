@@ -441,11 +441,6 @@ void sanafe::netlist_read_group(const std::vector<std::string_view> &fields,
         neuron_config.soma_hw_name =
                 static_cast<std::string>(attributes["soma_hw_name"]);
     }
-    if (attributes.find("force_update") != attributes.end())
-    {
-        neuron_config.force_soma_update =
-                static_cast<bool>(attributes["force_update"]);
-    }
     if (attributes.find("log_spikes") != attributes.end())
     {
         neuron_config.log_spikes = static_cast<bool>(attributes["log_spikes"]);
@@ -499,11 +494,6 @@ void sanafe::netlist_read_neuron(const std::vector<std::string_view> &fields,
     {
         neuron_config.soma_hw_name =
                 static_cast<std::string>(attributes["soma_hw_name"]);
-    }
-    if (attributes.find("force_update") != attributes.end())
-    {
-        neuron_config.force_soma_update =
-                static_cast<bool>(attributes["force_update"]);
     }
     if (attributes.find("log_spikes") != attributes.end())
     {
@@ -634,27 +624,6 @@ std::string sanafe::netlist_group_to_netlist(const NeuronGroup &group)
         entry += " dendrite_hw_name=" +
                 group.default_neuron_config.dendrite_hw_name.value();
     }
-    if (group.default_neuron_config.force_dendrite_update.has_value() &&
-            group.default_neuron_config.force_dendrite_update.value())
-    {
-        entry += " force_dendrite_update=" +
-                std::to_string(static_cast<int>(group.default_neuron_config
-                                .force_dendrite_update.value()));
-    }
-    if (group.default_neuron_config.force_soma_update.has_value() &&
-            group.default_neuron_config.force_soma_update.value())
-    {
-        entry += " force_soma_update=" +
-                std::to_string(static_cast<int>(
-                        group.default_neuron_config.force_soma_update.value()));
-    }
-    if (group.default_neuron_config.force_synapse_update.has_value() &&
-            group.default_neuron_config.force_synapse_update.value())
-    {
-        entry += " force_synapse_update=" +
-                std::to_string(static_cast<int>(group.default_neuron_config
-                                .force_synapse_update.value()));
-    }
     if (group.default_neuron_config.log_potential.has_value() &&
             group.default_neuron_config.log_potential.value())
     {
@@ -729,22 +698,14 @@ std::string sanafe::netlist_neuron_to_netlist(const Neuron &neuron,
     add_string_attribute_if_unique(entry, "dendrite_hw_name",
             neuron.dendrite_hw_name, default_config.dendrite_hw_name);
 
-    // Add force update flags if they differ from group defaults
-    add_bool_attribute_if_unique(entry, "force_synapse_update",
-            neuron.force_synapse_update, default_config.force_synapse_update);
-    add_bool_attribute_if_unique(entry, "force_dendrite_update",
-            neuron.force_dendrite_update, default_config.force_dendrite_update);
-    add_bool_attribute_if_unique(entry, "force_soma_update",
-            neuron.force_soma_update, default_config.force_soma_update);
-
     // Add logging flags if they differ from group defaults
     add_bool_attribute_if_unique(
             entry, "log_spikes", neuron.log_spikes, default_config.log_spikes);
     add_bool_attribute_if_unique(entry, "log_potential", neuron.log_potential,
             default_config.log_potential);
 
-    entry += netlist_attributes_to_netlist(neuron.model_attributes,
-            default_config.model_attributes);
+    entry += netlist_attributes_to_netlist(
+            neuron.model_attributes, default_config.model_attributes);
 
     return entry;
 }

@@ -37,7 +37,7 @@ architecture:
                 model: accumulator
                 energy_update: 0.0
                 latency_update: 0.0
-                force_update: true
+                update_every_timestep: true
           soma:
             - name: demo_soma_default
               attributes:

@@ -39,7 +39,6 @@ sanafe::Core::Core(const CoreConfiguration &config)
         , offset(config.address.offset_within_tile)
         , parent_tile_id(config.address.parent_tile_id)
         , log_energy(config.pipeline.log_energy)
-
 {
     timestep_buffer.resize(pipeline_config.max_neurons_supported);
 }
@@ -196,6 +195,7 @@ sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
     // Create the synapse model
     if (config.model_info.plugin_library_path.has_value())
     {
+        // Use external plug-in model
         const std::filesystem::path plugin_lib_path =
                 config.model_info.plugin_library_path.value();
         TRACE1(CHIP, "Creating unit from plugin: %s.\n",
@@ -205,7 +205,7 @@ sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
     }
     else
     {
-        // Use built in models
+        // Use built in model
         TRACE1(CHIP, "Creating built-in model %s.\n",
                 config.model_info.name.c_str());
         pipeline_hw.emplace_back(
@@ -213,7 +213,8 @@ sanafe::PipelineUnit &sanafe::Core::create_pipeline_unit(
     }
 
     auto &new_unit = pipeline_hw.back();
-    // Forward all attributes onto the new h/w unit
+    // Forward relevant h/w attributes onto the new pipeline unit, e.g., whether
+    //  to log energy/latency or force updates every time-step
     new_unit->set_attributes_hw(config.name, config.model_info);
     // Set the input/output interface of the pipeline unit and in doing so we
     //  configure which functionality the h/w unit supports

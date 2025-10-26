@@ -44,9 +44,6 @@ Args:
     model_attributes (dict, optional): Model parameters (e.g., threshold, leak). Default is None.
     default_synapse_hw_name (str, optional): Default synapse hardware type. Default is None.
     default_dendrite_hw_name (str, optional): Default dendrite hardware type. Default is None.
-    force_dendrite_update (bool, optional): Force dendrite updates every timestep. Default is False.
-    force_synapse_update (bool, optional): Force synapse updates every timestep. Default is False.
-    force_soma_update (bool, optional): Force soma updates every timestep. Default is False.
     log_potential (bool, optional): Enable membrane potential logging. Default is False.
     log_spikes (bool, optional): Enable spike event logging. Default is False.
     soma_hw_name (str, optional): Soma hardware implementation name. Default is None.
@@ -149,9 +146,6 @@ Args:
     dendrite_hw_name (str, optional): Dendrite processing unit name. Default is None.
     log_spikes (bool, optional): Enable spike logging for this neuron. Default is False.
     log_potential (bool, optional): Enable potential logging for this neuron. Default is False.
-    force_synapse_update (bool, optional): Force synapse updates every timestep. Default is False.
-    force_dendrite_update (bool, optional): Force dendrite updates every timestep. Default is False.
-    force_soma_update (bool, optional): Force soma updates every timestep. Default is False.
     model_attributes (dict, optional): General model parameters. Default is None.
     soma_attributes (dict, optional): Soma-specific parameters. Default is None.
     dendrite_attributes (dict, optional): Dendrite-specific parameters. Default is None.

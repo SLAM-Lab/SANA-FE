@@ -200,14 +200,14 @@ The pipeline contains the following units:
   other cores' pipelines.
 
 For an example, see `arch/loihi.yaml`. There are a nested series of
-keywords, where keywords define required hardware blocks. Each block must be
+keywords, where keywords define required hardware units. Each block must be
 contain a `name` keyword, which may optionally specify the number of instances.
-Blocks are duplicated the number specified in the range, for example:
+Units are duplicated the number specified in the range, for example:
 
     # Define 8 cores, 0 through 7
     -name: neuromorphic_core[0..7]
 
-Blocks much also have both an `attributes` section and the next hardware blocks
+Units must also have both an `attributes` section and the next hardware units
 in the hierarchy. The attributes section will generate one or more parameters
 that are passed to be parsed by the simulator and the relevant hardware models
 implemented either internally (`models.cpp`) or externally (plugins).

@@ -371,16 +371,12 @@ void pyconnect_neurons_dense(sanafe::NeuronGroup *self,
 sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
         const std::string &group_name, const int neuron_count,
         pybind11::dict &model_dict, std::string default_synapse_hw_name,
-        std::string dendrite_hw_name, bool force_dendrite_update,
-        bool force_soma_update, bool force_synapse_update, bool log_potential,
-        bool log_spikes, std::string soma_hw_name)
+        std::string dendrite_hw_name, bool log_potential, bool log_spikes,
+        std::string soma_hw_name)
 {
     sanafe::NeuronConfiguration default_neuron_config;
     default_neuron_config.default_synapse_hw_name = default_synapse_hw_name;
     default_neuron_config.dendrite_hw_name = dendrite_hw_name;
-    default_neuron_config.force_dendrite_update = force_dendrite_update;
-    default_neuron_config.force_synapse_update = force_synapse_update;
-    default_neuron_config.force_soma_update = force_soma_update;
     default_neuron_config.log_potential = log_potential;
     default_neuron_config.log_spikes = log_spikes;
     default_neuron_config.soma_hw_name = std::move(soma_hw_name);
@@ -477,9 +473,7 @@ void pyset_attributes(sanafe::Neuron *self,
         std::optional<std::string> default_synapse_hw_name,
         std::optional<std::string> dendrite_hw_name,
         std::optional<bool> log_spikes, std::optional<bool> log_potential,
-        std::optional<bool> force_synapse_update,
-        std::optional<bool> force_dendrite_update,
-        std::optional<bool> force_soma_update, pybind11::dict model_attributes,
+        pybind11::dict model_attributes,
         pybind11::dict dendrite_specific_attributes,
         pybind11::dict soma_specific_attributes)
 {
@@ -490,9 +484,6 @@ void pyset_attributes(sanafe::Neuron *self,
     neuron_template.dendrite_hw_name = dendrite_hw_name;
     neuron_template.log_spikes = log_spikes;
     neuron_template.log_potential = log_potential;
-    neuron_template.force_synapse_update = force_synapse_update;
-    neuron_template.force_dendrite_update = force_dendrite_update;
-    neuron_template.force_soma_update = force_soma_update;
 
     auto parsed = pydict_to_model_attributes(model_attributes);
     neuron_template.model_attributes.insert(parsed.begin(), parsed.end());
@@ -835,9 +826,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("default_synapse_hw_name") = "",
                     pybind11::arg("default_dendrite_hw_name") = "",
-                    pybind11::arg("force_dendrite_update") = false,
-                    pybind11::arg("force_synapse_update") = false,
-                    pybind11::arg("force_soma_update") = false,
                     pybind11::arg("log_potential") = false,
                     pybind11::arg("log_spikes") = false,
                     pybind11::arg("soma_hw_name") = "")
@@ -867,12 +855,12 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::return_value_policy::reference_internal);
 
     pybind11::class_<PyNeuronRefView>(m, "NeuronRefView")
-        .def("__len__", &PyNeuronRefView::__len__)
-        .def("__getitem__", &PyNeuronRefView::__getitem__)
-        .def("__iter__", &PyNeuronRefView::__iter__)
-        .def("__repr__", &PyNeuronRefView::info);
+            .def("__len__", &PyNeuronRefView::__len__)
+            .def("__getitem__", &PyNeuronRefView::__getitem__)
+            .def("__iter__", &PyNeuronRefView::__iter__)
+            .def("__repr__", &PyNeuronRefView::info);
 
-// Now change the NeuronGroup binding...
+    // Now change the NeuronGroup binding...
 
     pybind11::class_<sanafe::NeuronGroup>(
             m, "NeuronGroup", docstrings::neuron_group_doc)
@@ -980,18 +968,14 @@ PYBIND11_MODULE(sanafecpp, m)
                             std::optional<std::string> dendrite_hw_name,
                             std::optional<bool> log_spikes,
                             std::optional<bool> log_potential,
-                            std::optional<bool> force_synapse_update,
-                            std::optional<bool> force_dendrite_update,
-                            std::optional<bool> force_soma_update,
                             pybind11::dict model_attributes,
                             pybind11::dict dendrite_specific_attributes,
                             pybind11::dict soma_specific_attributes) {
                         pyset_attributes(ref.get(), std::move(soma_hw_name),
                                 std::move(default_synapse_hw_name),
                                 std::move(dendrite_hw_name), log_spikes,
-                                log_potential, force_synapse_update,
-                                force_dendrite_update, force_soma_update,
-                                model_attributes, dendrite_specific_attributes,
+                                log_potential, model_attributes,
+                                dendrite_specific_attributes,
                                 soma_specific_attributes);
                     },
                     docstrings::neuron_set_attributes_doc,
@@ -1000,9 +984,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("dendrite_hw_name") = pybind11::none(),
                     pybind11::arg("log_spikes") = pybind11::none(),
                     pybind11::arg("log_potential") = pybind11::none(),
-                    pybind11::arg("force_synapse_update") = pybind11::none(),
-                    pybind11::arg("force_dendrite_update") = pybind11::none(),
-                    pybind11::arg("force_soma_update") = pybind11::none(),
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict())

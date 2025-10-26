@@ -24,8 +24,16 @@ sanafe::MappedConnection::MappedConnection(
 
 void sanafe::MappedConnection::build_message_processing_pipeline()
 {
-    const MappedNeuron &n = post_neuron_ref;
+    MappedNeuron &n = post_neuron_ref;
     const Core &mapped_core = *(n.core);
+
+    // Cache whether *any* of the post-synaptic neuron's connections requires
+    //  forcing updates every time-step. The connections might be mapped to
+    //  different synapse units, so if this is true we still need to check each
+    //  connection before updating. However, if false, it avoids us iterating
+    //  over every connection every time-step
+    n.check_for_synapse_updates_every_timestep |=
+            synapse_hw->update_every_timestep;
 
     // We don't support putting the buffer inside or before the synapse unit, so
     //  unconditionally push the synapse h/w. This is because putting the buffer
@@ -82,13 +90,13 @@ sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
         , axon_out_hw(mapped_axon_out)
         , mapped_offset_within_core(mapped_offset_within_core)
         , mapping_order(neuron_to_map.mapping_order)
-        , force_synapse_update(neuron_to_map.force_synapse_update)
-        , force_dendrite_update(neuron_to_map.force_dendrite_update)
-        , force_soma_update(neuron_to_map.force_soma_update)
         , log_spikes(neuron_to_map.log_spikes)
         , log_potential(neuron_to_map.log_potential)
 
 {
+    // The neuron processing pipeline is a sequence of hardware to update the
+    //  neuron, the message processing pipeline is built later when mapping
+    //  connections
     build_neuron_processing_pipeline();
 }
 

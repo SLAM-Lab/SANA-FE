@@ -113,18 +113,6 @@ void sanafe::Neuron::set_attributes(const NeuronConfiguration &config)
     {
         log_potential = config.log_potential.value();
     }
-    if (config.force_dendrite_update)
-    {
-        force_dendrite_update = config.force_dendrite_update.value();
-    }
-    if (config.force_soma_update.has_value())
-    {
-        force_soma_update = config.force_soma_update.value();
-    }
-    if (config.force_synapse_update)
-    {
-        force_synapse_update = config.force_synapse_update.value();
-    }
 
     for (const auto &[key, attribute] : config.model_attributes)
     {

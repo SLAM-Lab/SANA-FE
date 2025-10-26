@@ -451,8 +451,7 @@ void sanafe::SpikingChip::sim_sort_and_record_messages(const Timestep &ts)
         }
     }
     // Sort messages in message ID order (with placeholders last)
-    std::sort(all_messages.begin(), all_messages.end(),
-            CompareMessagesByID{});
+    std::sort(all_messages.begin(), all_messages.end(), CompareMessagesByID{});
     // Save the messages in sorted order
     for (const Message &m : all_messages)
     {
@@ -903,8 +902,7 @@ void sanafe::SpikingChip::sim_format_run_summary(
     out << "  message_processing: " << std::fixed << message_processing_wall
         << "\n";
     out << "  scheduler: " << std::fixed << scheduler_wall << "\n";
-    out << "  setup: " << std::fixed << setup_wall
-        << "\n";
+    out << "  setup: " << std::fixed << setup_wall << "\n";
     out << "  energy: " << std::fixed << energy_stats_wall << "\n";
 }
 
@@ -971,7 +969,7 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
 {
     // You can optionally force a neuron to update its associated h/w
     //  every time-step, regardless of whether it received inputs or not.
-    // Note that energy is accounted for, but latency is not considered here.
+    //  Note that energy is accounted for, but latency is not considered here.
     auto core_list = cores();
 #ifdef ENABLE_OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -981,24 +979,30 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
         Core &core = idx;
         for (MappedNeuron &n : core.neurons)
         {
-            if (n.force_synapse_update)
+            // We cache whether to update one or more synapse units for each
+            //  neuron, to avoid costly iterations over all connections every
+            //  time-step
+            if (n.check_for_synapse_updates_every_timestep)
             {
+                INFO("checking for synapse updates every timestep\n");
                 for (MappedConnection &con : n.connections_out)
                 {
-                    //con.synapse_hw->set_time(ts.timestep);
-                    PipelineResult result = con.synapse_hw->update(
-                            ts.timestep, con.mapped_synapse_hw_address);
-                    if (result.energy.has_value())
+                    if (con.synapse_hw->update_every_timestep)
                     {
-                        con.synapse_hw->energy += result.energy.value();
+                        PipelineResult result = con.synapse_hw->update(
+                                ts.timestep, con.mapped_synapse_hw_address);
+                        if (result.energy.has_value())
+                        {
+                            con.synapse_hw->energy += result.energy.value();
+                        }
+                        // Latency is not considered; as it isn't within
+                        //  either neuron processing or message processing
                     }
-                    // Latency is not considered; as it isn't within
-                    //  either neuron processing or message processing
                 }
             }
-            if (n.force_dendrite_update)
+            if (n.dendrite_hw->update_every_timestep)
             {
-                //n.dendrite_hw->set_time(ts.timestep);
+                INFO("checking for dendrite updates every timestep\n");
                 sanafe::PipelineResult result = n.dendrite_hw->update(
                         ts.timestep, n.mapped_dendrite_hw_address, std::nullopt,
                         std::nullopt);
@@ -1009,7 +1013,7 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
                 // Latency is not considered; as it isn't within
                 //  either neuron processing or message processing
             }
-            // Note that soma updates will always be handed in the neuron
+            // Note that soma updates will always be handled in the neuron
             //  processing loop and so don't need to be supported here
         }
     }
@@ -1295,7 +1299,6 @@ std::set<sanafe::Core *> sanafe::SpikingChip::sim_get_post_synaptic_cores(
 
     return cores_out;
 }
-
 
 void sanafe::SpikingChip::sim_add_connection_to_axon(
         MappedConnection &con, Core &post_core)

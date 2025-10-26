@@ -144,14 +144,17 @@ public:
     // Track whether the hardware is used by any mapped neurons or connections
     bool is_used{false};
 
+    // Track whether to update the hardware every time-step, regardless of
+    //  whether it received input from the network/preceding hardware unit.
+    //  This may be needed in some cases e.g., for an analog hardware circuit
+    //  that has a small leakage.
+    bool update_every_timestep{false};
+
 protected:
     std::set<std::string> supported_attribute_names{
             "log_spikes",
             "log_potential",
             "force_update",
-            "force_synapse_update",
-            "force_dendrite_update",
-            "force_soma_update",
             "synapse_hw_name",
             "dendrite_hw_name",
             "soma_hw_name",
@@ -526,45 +529,42 @@ inline void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
     }
     if (default_dendrite_energy_metrics_set)
     {
-        simulation_result.energy = n.dendrite_hw->default_energy_update;
+        simulation_result.energy = n.dendrite_hw->default_energy_update.value();
     }
 
     const bool default_dendrite_latency_metrics_set =
             n.dendrite_hw->default_latency_update.has_value();
+    //INFO("default dendrite latency metric set:%d\n", default_dendrite_latency_metrics_set);
     if (latency_simulated && default_dendrite_latency_metrics_set)
     {
         const std::string error(
                 "Dendrite unit simulates latency and also has "
                 "default latency metrics set.");
+        INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
-
     if (default_dendrite_latency_metrics_set)
     {
-        if (simulation_result.latency.has_value())
-        {
-            const std::string error(
-                    "Error: Dendrite unit simulates latency and also has "
-                    "default latency metrics set.");
-            throw std::runtime_error(error);
-        }
-        simulation_result.latency = n.dendrite_hw->default_latency_update;
+        simulation_result.latency =
+                n.dendrite_hw->default_latency_update.value();
     }
 
     if (!simulation_result.energy.has_value())
     {
         const std::string error(
-                "Error: Dendrite unit does not simulate energy or provide "
+                "Dendrite unit does not simulate energy or provide "
                 "a default energy cost in the architecture "
                 "description.");
+        INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
     if (!simulation_result.latency.has_value())
     {
         const std::string error(
-                "Error: Dendrite unit does not simulate latency or "
+                "Dendrite unit does not simulate latency or "
                 "provide a default latency cost in the architecture "
                 "description.");
+        INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
 }

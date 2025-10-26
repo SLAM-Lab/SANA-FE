@@ -55,6 +55,7 @@ struct ModelInfo
     std::string name;
     bool log_energy{false};
     bool log_latency{false};
+    bool update_every_timestep{false};
 };
 
 enum NeuronResetModes : uint8_t

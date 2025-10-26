@@ -338,12 +338,6 @@ sanafe::NeuronConfiguration sanafe::yaml_parse_neuron_attributes(
             attributes, "log_potential", neuron_template.log_potential);
     yaml_set_optional<bool>(
             attributes, "log_spikes", neuron_template.log_spikes);
-    yaml_set_optional<bool>(attributes, "force_synapse_update",
-            neuron_template.force_synapse_update);
-    yaml_set_optional<bool>(attributes, "force_dendrite_update",
-            neuron_template.force_dendrite_update);
-    yaml_set_optional<bool>(
-            attributes, "force_soma_update", neuron_template.force_soma_update);
     yaml_set_optional<std::string>(attributes, "synapse_hw_name",
             neuron_template.default_synapse_hw_name);
     yaml_set_optional<std::string>(
@@ -514,11 +508,10 @@ void sanafe::description_parse_neuron_connection(
     const size_t edge_idx = source_neuron.connect_to_neuron(target_neuron);
     Connection &edge = source_neuron.edges_out[edge_idx];
     description_parse_edge_attributes(edge, parser, attributes_node);
-
 }
 
-std::string sanafe::description_parse_hyperedge_type(const ryml::Parser &parser,
-        const ryml::ConstNodeRef attributes_node)
+std::string sanafe::description_parse_hyperedge_type(
+        const ryml::Parser &parser, const ryml::ConstNodeRef attributes_node)
 {
     std::string type;
     if (attributes_node.is_seq())
@@ -587,8 +580,7 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
     }
 }
 
-bool sanafe::yaml_parse_conv2d_attribute(
-        const std::string attribute_name,
+bool sanafe::yaml_parse_conv2d_attribute(const std::string attribute_name,
         const ModelAttribute &attribute, Conv2DParameters &convolution)
 {
     bool parsed = true;
@@ -633,8 +625,7 @@ bool sanafe::yaml_parse_conv2d_attribute(
     return parsed;
 }
 
-bool sanafe::yaml_parse_sparse_attribute(
-        const std::string attribute_name,
+bool sanafe::yaml_parse_sparse_attribute(const std::string attribute_name,
         const sanafe::ModelAttribute &attribute,
         std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
 {
@@ -642,13 +633,14 @@ bool sanafe::yaml_parse_sparse_attribute(
     {
         if (attribute.is_list())
         {
-            const std::vector<sanafe::ModelAttribute> attribute_list = attribute;
+            const std::vector<sanafe::ModelAttribute> attribute_list =
+                    attribute;
             for (const auto &src_tgt_pair : attribute_list)
             {
                 if (!src_tgt_pair.is_list())
                 {
                     throw std::runtime_error("Invalid source/target type: "
-                                            "expected tuple [source, target]");
+                                             "expected tuple [source, target]");
                 }
                 std::vector<ModelAttribute> src_target_vec = src_tgt_pair;
 
@@ -663,7 +655,7 @@ bool sanafe::yaml_parse_sparse_attribute(
                 else
                 {
                     throw std::runtime_error("Invalid source/target format: "
-                                            "expected [source, target]");
+                                             "expected [source, target]");
                 }
             }
         }
@@ -746,10 +738,8 @@ void sanafe::yaml_parse_conv2d(NeuronGroup &source_group,
             target_group, attribute_lists, convolution);
 }
 
-
 void sanafe::yaml_parse_sparse(NeuronGroup &source_group,
-        const ryml::Parser & parser,
-        const ryml::ConstNodeRef hyperedge_node,
+        const ryml::Parser &parser, const ryml::ConstNodeRef hyperedge_node,
         NeuronGroup &target_group)
 {
     const auto attributes =
@@ -1287,8 +1277,7 @@ ryml::NodeRef sanafe::yaml_serialize_model_attributes(
 
         // If the parsed value does not have a default value or is different
         //  from the default value, output it
-        const bool forward_to_all_hw =
-                        attribute.forward_to_synapse &&
+        const bool forward_to_all_hw = attribute.forward_to_synapse &&
                 attribute.forward_to_dendrite && attribute.forward_to_soma;
         if (forward_to_all_hw)
         {

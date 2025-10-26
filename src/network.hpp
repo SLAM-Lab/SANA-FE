@@ -35,9 +35,6 @@ struct NeuronConfiguration
     std::optional<std::string> dendrite_hw_name;
     std::optional<bool> log_spikes;
     std::optional<bool> log_potential;
-    std::optional<bool> force_synapse_update;
-    std::optional<bool> force_dendrite_update;
-    std::optional<bool> force_soma_update;
 };
 
 struct NeuronAddress
@@ -104,9 +101,6 @@ public:
     std::optional<CoreAddress> core_address{std::nullopt};
     size_t mapping_order{};
     // Optionally set flags for updating and traces
-    bool force_synapse_update{false};
-    bool force_dendrite_update{false};
-    bool force_soma_update{false};
     bool log_spikes{false};
     bool log_potential{false};
 

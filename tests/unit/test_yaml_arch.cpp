@@ -188,7 +188,7 @@ architecture:
                 model: accumulator
                 energy_update: 0.0
                 latency_update: 0.0
-                force_update: true
+                update_every_timestep: true
           soma:
             - name: soma
               attributes:
@@ -261,7 +261,8 @@ architecture:
     EXPECT_DOUBLE_EQ(
             pipeline_hw[1].model_info.model_attributes.at("latency_update"),
             0.0);
-    EXPECT_TRUE(pipeline_hw[1].model_info.model_attributes.at("force_update"));
+    EXPECT_TRUE(pipeline_hw[1].model_info.model_attributes.at(
+            "update_every_timestep"));
 
     EXPECT_EQ(pipeline_hw[2].name, "soma");
     EXPECT_EQ(pipeline_hw[2].model_info.name, "leaky_integrate_fire");

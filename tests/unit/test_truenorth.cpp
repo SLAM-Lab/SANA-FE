@@ -86,7 +86,7 @@ TEST_F(TestTrueNorthModel, SetReverseAttributesAndBias)
     EXPECT_NO_THROW(
             model.set_attribute_neuron(0, "bias", make_attr_double(0.5)));
     EXPECT_NO_THROW(model.set_attribute_neuron(
-            0, "force_soma_update", make_attr_bool(true)));
+            0, "force_update", make_attr_bool(true)));
 }
 
 TEST_F(TestTrueNorthModel, LeakTowardsZeroBothDirections)

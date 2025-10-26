@@ -55,6 +55,17 @@ architecture:
                 latency_update_neuron: 0.0
                 energy_spike_out: 0.0
                 latency_spike_out: 0.0
+          dendrite:
+            - name: loihi_dendrites
+              attributes:
+                model: accumulator
+                energy_update: 0.0
+                latency_update: 0.0
+            - name: loihi_dendrites_delay
+              attributes:
+                model: accumulator_with_delay
+                energy_update: 0.0
+                latency_update: 0.0
           synapse:
             - name: loihi_dense_synapse  # Use the name to link
               attributes:
@@ -71,17 +82,6 @@ architecture:
                 model: current_based
                 latency_process_spike: 3.1e-9
                 energy_process_spike: 24.0e-12
-          dendrite:
-            - name: loihi_dendrites
-              attributes:
-                model: accumulator
-                energy_update: 0.0
-                latency_update: 0.0
-            - name: loihi_dendrites_delay
-              attributes:
-                model: accumulator_with_delay
-                energy_update: 0.0
-                latency_update: 0.0
           axon_out:
             - name: loihi_out
               attributes:

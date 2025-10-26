@@ -150,6 +150,7 @@ if __name__ == "__main__":
             is_first_frame = (frame == 0)
             chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",
                      write_trace_headers=is_first_frame, timing_model="detailed",
+                     #write_trace_headers=is_first_frame, timing_model="detailed",
                      processing_threads=8, scheduler_threads=8)
                      #processing_threads=16, scheduler_threads=8)
             chip.reset()
