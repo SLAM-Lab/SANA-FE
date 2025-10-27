@@ -83,7 +83,9 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(
     if (current.has_value())
     {
         // Integrate input charges
-        accumulated_charges[neuron_address] += current.value();
+        accumulated_charges[neuron_address] =
+                accumulated_charges[neuron_address].value_or(0.0) +
+                current.value();
     }
 
     output.current = accumulated_charges[neuron_address];

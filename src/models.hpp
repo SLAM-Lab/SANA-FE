@@ -53,10 +53,11 @@ class AccumulatorModel : public DendriteUnit
 {
 public:
     AccumulatorModel()
+            : accumulated_charges(loihi_max_compartments, std::nullopt)
+            , timesteps_simulated(loihi_max_compartments, 0UL)
+
     {
         register_attributes(accumulator_attributes);
-        timesteps_simulated = std::vector<long int>(loihi_max_compartments, 0UL);
-        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
     }
     AccumulatorModel(const AccumulatorModel &copy) = default;
     AccumulatorModel(AccumulatorModel &&other) = default;
@@ -67,7 +68,7 @@ public:
     PipelineResult update(long int simulation_time, size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
     void reset() override
     {
-        accumulated_charges = std::vector<double>(loihi_max_compartments, 0.0);
+        accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
     }
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
@@ -90,7 +91,7 @@ private:
             "w",
             "latency"
     };
-    std::vector<double> accumulated_charges;
+    std::vector<std::optional<double>> accumulated_charges;
     std::vector<long int> timesteps_simulated;
 };
 
@@ -98,6 +99,8 @@ class AccumulatorWithDelayModel : public DendriteUnit
 {
 public:
     AccumulatorWithDelayModel()
+            : accumulated_charges(loihi_max_compartments, std::nullopt)
+            , timesteps_simulated(loihi_max_compartments, 0UL)
     {
         timesteps_simulated = std::vector<long int>(loihi_max_compartments, 0UL);
         accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
