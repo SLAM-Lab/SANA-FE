@@ -34,7 +34,7 @@ end
 
 puts "[#{label}] Build successful. Running tests..."
 
-test = system("ctest --memcheck --test-dir build --output-on-failure --timeout #{timeout} \
+test = system("ctest -T MemCheck --test-dir build --output-on-failure --timeout #{timeout} \
   -E '^(build|format|tidy|cppcheck|dynamic|perf)$' > #{test_log_file} 2>&1")
 exitcode = $?.exitstatus
 

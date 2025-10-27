@@ -26,6 +26,7 @@
 #include "message.hpp"
 #include "print.hpp"
 #include "schedule.hpp"
+#include "timestep.hpp"
 
 sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
         : noc_width_in_tiles(scheduler.noc_width_in_tiles)

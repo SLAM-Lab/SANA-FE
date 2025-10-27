@@ -144,9 +144,9 @@ void sanafe::Core::map_neuron(
 
     // Map the neuron to the core and its h/w units
     const size_t neuron_offset_within_core = neurons.size();
-    MappedNeuron &mapped_neuron = neurons.emplace_back(neuron_to_map, neuron_id,
-            neuron_offset_within_core, this, mapped_dendrite_hw, mapped_soma_hw,
-            mapped_axon_out);
+    MappedNeuron &mapped_neuron = neurons.emplace_back(neuron_id, neuron_to_map,
+            neuron_offset_within_core, this, mapped_soma_hw, mapped_axon_out,
+            mapped_dendrite_hw);
 
     mapped_neuron.mapped_dendrite_hw_address = mapped_dendrite_hw->add_neuron();
     if (mapped_soma_hw != mapped_dendrite_hw)

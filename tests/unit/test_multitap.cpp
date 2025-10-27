@@ -105,7 +105,7 @@ TEST_F(TestMultiTapModel1D, InputCurrentAdds)
     model.set_attribute_neuron(0, "time_constants", make_attr_vec({1.0, 1.0}));
     model.set_attribute_neuron(0, "space_constants", make_attr_vec({0.0}));
 
-    auto result_before = model.update(1, 0, 1.5, std::nullopt);
+    auto result_before = model.update(0UL, 1.5, std::nullopt, 1);
     ASSERT_TRUE(result_before.current.has_value());
     EXPECT_DOUBLE_EQ(result_before.current.value(), 1.5);
 }
@@ -120,9 +120,9 @@ TEST_F(TestMultiTapModel1D, InputCurrentToMappedTap)
     tap_attr.value = static_cast<int>(1);
     model.set_attribute_edge(0, "tap", tap_attr);
 
-    model.update(1, 0, std::nullopt, std::nullopt);
+    model.update(0UL, std::nullopt, std::nullopt, 1L);
 
-    EXPECT_NO_THROW(model.update(1, 0, 2.0, 0));
+    EXPECT_NO_THROW(model.update(0UL, 2.0, 0UL, 1L));
 }
 
 TEST_F(TestMultiTapModel1D, InvalidTapThrows)
@@ -135,7 +135,7 @@ TEST_F(TestMultiTapModel1D, InvalidTapThrows)
     tap_attr.value = static_cast<int>(5);
     model.set_attribute_edge(0, "tap", tap_attr);
 
-    EXPECT_THROW(model.update(1, 0, 1.0, 0), std::logic_error);
+    EXPECT_THROW(model.update(0UL, 1.0, 0UL, 1L), std::logic_error);
 }
 
 TEST_F(TestMultiTapModel1D, ResetClearsVoltages)
@@ -144,10 +144,10 @@ TEST_F(TestMultiTapModel1D, ResetClearsVoltages)
     taps_attr.value = static_cast<int>(1);
     model.set_attribute_neuron(0, "taps", taps_attr);
 
-    model.update(1, 0, 3.0, std::nullopt);
+    model.update(0UL, 3.0, std::nullopt, 1L);
     model.reset();
 
-    auto result = model.update(1, 0, std::nullopt, std::nullopt);
+    auto result = model.update(0UL, std::nullopt, std::nullopt, 1L);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 0.0);
 }
@@ -161,8 +161,8 @@ TEST_F(TestMultiTapModel1D, CalculateNextStateChangesVoltages)
     model.set_attribute_neuron(0, "time_constants", make_attr_vec({0.5, 0.5}));
     model.set_attribute_neuron(0, "space_constants", make_attr_vec({0.0}));
 
-    model.update(1, 0, 2.0, std::nullopt);
-    auto result = model.update(2, 0, std::nullopt, std::nullopt);
+    model.update(0UL, 2.0, std::nullopt, 1L);
+    auto result = model.update(0UL, std::nullopt, std::nullopt, 2L);
     ASSERT_TRUE(result.current.has_value());
     EXPECT_LT(result.current.value(), 2.0);
 }
@@ -171,7 +171,7 @@ TEST_F(TestMultiTapModel1D, ReduceNumberOfTapsTriggersWarningPath)
 {
     sanafe::ModelAttribute attr_large;
     attr_large.value = static_cast<int>(4);
-    model.set_attribute_neuron(0, "taps", attr_large);
+    model.set_attribute_neuron(0UL, "taps", attr_large);
 
     sanafe::ModelAttribute attr_small;
     attr_small.value = static_cast<int>(2);
@@ -180,7 +180,7 @@ TEST_F(TestMultiTapModel1D, ReduceNumberOfTapsTriggersWarningPath)
 
 TEST_F(TestMultiTapModel1D, TimeConstantsTooFewThrows)
 {
-    model.set_attribute_neuron(0, "taps", make_attr_int(3));
+    model.set_attribute_neuron(0UL, "taps", make_attr_int(3));
     EXPECT_THROW(model.set_attribute_neuron(
                          0, "time_constants", make_attr_vec({0.9, 0.8})),
             std::invalid_argument);
@@ -188,7 +188,7 @@ TEST_F(TestMultiTapModel1D, TimeConstantsTooFewThrows)
 
 TEST_F(TestMultiTapModel1D, SpaceConstantsTooFewThrows)
 {
-    model.set_attribute_neuron(0, "taps", make_attr_int(3));
+    model.set_attribute_neuron(0UL, "taps", make_attr_int(3));
     EXPECT_THROW(model.set_attribute_neuron(
                          0, "space_constants", make_attr_vec({0.5})),
             std::invalid_argument);

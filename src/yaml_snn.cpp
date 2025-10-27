@@ -718,7 +718,7 @@ void sanafe::yaml_parse_conv2d(NeuronGroup &source_group,
             //  forwarded onto the hardware models
             continue;
         }
-        else if (attribute_name != "type")
+        if (attribute_name != "type")
         {
             if (!attribute.is_list())
             {
@@ -910,7 +910,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
     const bool group_found = (net.groups.find(group_name) != net.groups.end());
     if (!group_found)
     {
-        std::string error =
+        const std::string error =
                 "While mapping, group not found (" + group_name + ")";
         INFO("Error: %s\n", error.c_str());
         throw YamlDescriptionParsingError(error, parser, mapping_info);
@@ -936,7 +936,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
     {
         // No neuron given so map all neurons in the group
         start_id = 0UL;
-        assert(group.neurons.size() > 0);
+        assert(!group.neurons.empty());
         end_id = group.neurons.size() - 1UL;
     }
 

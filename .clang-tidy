@@ -38,11 +38,12 @@ CheckOptions:
   readability-identifier-naming.ConstantCase: 'lower_case'
   readability-identifier-naming.MacroCase: 'UPPER_CASE'
 
-  # Function length limits
+  # Function length and complexity limits
   readability-function-size.LineThreshold: 100
   readability-function-size.StatementThreshold: 50
   readability-function-size.BranchThreshold: 20
   readability-function-size.ParameterThreshold: 8
+  readability-function-cognitive-complexity.Threshold: 50
 
   # Performance options
   performance-for-range-copy.WarnOnAllAutoCopies: true

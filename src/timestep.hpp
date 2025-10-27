@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "fwd.hpp"
+#include "message.hpp" // For Message (used with std::vector)
 
 namespace sanafe
 {
@@ -48,7 +49,7 @@ struct Timestep
 class TimestepHandle
 {
 public:
-    explicit TimestepHandle();
+    explicit TimestepHandle() = default;
     explicit TimestepHandle(long int timestep_num);
 
     TimestepHandle(TimestepHandle&&) = default;

@@ -113,9 +113,9 @@ public:
         }
     }
 
-    sanafe::PipelineResult update(const long int /*timestep*/,
-            const size_t /*neuron_address*/,
-            const std::optional<double> /*current_in*/) override
+    sanafe::PipelineResult update(const size_t /*neuron_address*/,
+            const std::optional<double> /*current_in*/,
+            const long int /*timestep*/) override
     {
         sanafe::NeuronStatus status = sanafe::idle;
 

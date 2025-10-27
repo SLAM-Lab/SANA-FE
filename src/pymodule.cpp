@@ -3,17 +3,13 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // pymodule.cpp
-#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <functional>
-#include <ios>
 #include <map>
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -40,7 +36,6 @@
 #include "chip.hpp"
 #include "docstrings.hpp"
 #include "mapped.hpp"
-#include "message.hpp"
 #include "network.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
@@ -393,8 +388,7 @@ sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
         std::string name, double energy_north_hop, double latency_north_hop,
         double energy_east_hop, double latency_east_hop,
         double energy_south_hop, double latency_south_hop,
-        double energy_west_hop, double latency_west_hop, bool log_energy,
-        bool log_latency)
+        double energy_west_hop, double latency_west_hop, bool log_energy)
 {
     sanafe::TilePowerMetrics tile_power_metrics{};
     tile_power_metrics.energy_north_hop = energy_north_hop;
@@ -414,8 +408,7 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
         size_t tile_id, double energy_north_hop, double latency_north_hop,
         double energy_east_hop, double latency_east_hop,
         double energy_south_hop, double latency_south_hop,
-        double energy_west_hop, double latency_west_hop, bool log_energy,
-        bool log_latency)
+        double energy_west_hop, double latency_west_hop, bool log_energy)
 {
     sanafe::TilePowerMetrics tile_power_metrics{};
     tile_power_metrics.energy_north_hop = energy_north_hop;
@@ -435,7 +428,7 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
 std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
         size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
         std::string buffer_position, bool buffer_inside_unit,
-        size_t max_neurons_supported, bool log_energy, bool log_latency)
+        size_t max_neurons_supported, bool log_energy)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
@@ -455,8 +448,7 @@ std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
 
 sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
         std::string name, size_t parent_tile_id, std::string buffer_position,
-        bool buffer_inside_unit, size_t max_neurons_supported, bool log_energy,
-        bool log_latency)
+        bool buffer_inside_unit, size_t max_neurons_supported, bool log_energy)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
@@ -541,7 +533,7 @@ void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
     {
         sanafe::TimestepHandle timestep_handle;
         scheduler.timesteps_to_write.pop(timestep_handle);
-        sanafe::Timestep &ts = timestep_handle.get();
+        const sanafe::Timestep &ts = timestep_handle.get();
         TRACE1(CHIP, "retiring ts:%ld\n", ts.timestep);
 
         perf.record_hw_metrics(ts);
@@ -561,7 +553,8 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     timing_model = sanafe::parse_timing_model(timing_model_str);
 
 #ifndef HAVE_OPENMP
-    pybind11::print("Warning: multiple threads not supported; flag ignored");
+    pybind11::print("Warning: multiple threads not supported; flag ignored (",
+            processing_threads, ")");
 #else
     const int total_threads_available = omp_get_num_procs();
     omp_set_num_threads(std::min(total_threads_available, processing_threads));
@@ -730,28 +723,30 @@ public:
     {
     }
 
-    [[nodiscard]] size_t __len__() const
+    [[nodiscard]] size_t len() const // NOLINT(bugprone-reserved-identifier)
     {
         return group_->neurons.size();
     }
 
-    // Handles both integer and slice indexing, returning a NeuronRef or a list of NeuronRefs
-    pybind11::object __getitem__(pybind11::object index) const
+    // Handles both integer and slice indexing, returning a NeuronRef or a list
+    //  of NeuronRefs
+    [[nodiscard]] pybind11::object __getitem__(pybind11::object index) const // NOLINT(bugprone-reserved-identifier)
     {
-        pybind11::gil_scoped_acquire acquire;
+        const pybind11::gil_scoped_acquire acquire;
 
         if (pybind11::isinstance<pybind11::int_>(index))
         {
             // Integer indexing: return a single PyNeuronRef
             const long i = pybind11::cast<long>(index);
             // Handle negative indexing
-            size_t idx = (i < 0) ? (group_->neurons.size() + i) : i;
+            const size_t idx = (i < 0) ? (group_->neurons.size() + i) : i;
 
             if (idx >= group_->neurons.size())
             {
                 throw pybind11::index_error();
             }
-            // Return a PyNeuronRef, holding onto the group_ref_ to keep the NeuronGroup alive
+            // Return a PyNeuronRef, holding onto the group_ref_ to keep the
+            //  NeuronGroup alive
             return pybind11::cast(
                     PyNeuronRef(group_ref_, &group_->neurons[idx]));
         }
@@ -785,9 +780,9 @@ public:
     }
 
     // Support iteration directly on the view object
-    PyNeuronRefIterator __iter__() const
+    [[nodiscard]] PyNeuronRefIterator __iter__() const // NOLINT(bugprone-reserved-identifier)
     {
-        return PyNeuronRefIterator(group_ref_, group_);
+        return {group_ref_, group_};
     }
 
     [[nodiscard]] std::string info() const
@@ -840,7 +835,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     },
                     pybind11::return_value_policy::reference_internal)
             .def(
-                    "__getitem__",
+                    "__getitem__", // NOLINT(bugprone-reserved-identifier)
                     [](sanafe::SpikingNetwork &self,
                             std::string g) -> sanafe::NeuronGroup & {
                         if (self.groups.find(g) == self.groups.end())
@@ -855,7 +850,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::return_value_policy::reference_internal);
 
     pybind11::class_<PyNeuronRefView>(m, "NeuronRefView")
-            .def("__len__", &PyNeuronRefView::__len__)
+            .def("__len__", &PyNeuronRefView::len)
             .def("__getitem__", &PyNeuronRefView::__getitem__)
             .def("__iter__", &PyNeuronRefView::__iter__)
             .def("__repr__", &PyNeuronRefView::info);
@@ -886,7 +881,7 @@ PYBIND11_MODULE(sanafecpp, m)
                         auto &self =
                                 pybind11::cast<sanafe::NeuronGroup &>(self_obj);
                         // Return the view object, passing in the Python object ref
-                        return PyNeuronRefView(self_obj, &self);
+                        return {self_obj, &self};
                     },
                     pybind11::return_value_policy::move)
             .def("__getitem__",
@@ -1079,8 +1074,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("latency_south_hop") = 0.0,
                     pybind11::arg("energy_west_hop") = 0.0,
                     pybind11::arg("latency_west_hop") = 0.0,
-                    pybind11::arg("log_energy") = false,
-                    pybind11::arg("log_latency") = false)
+                    pybind11::arg("log_energy") = false)
             .def("create_core", &pycreate_core,
                     docstrings::architecture_create_core_doc,
                     pybind11::arg("name"), pybind11::arg("parent_tile_id"),
@@ -1090,7 +1084,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
                     pybind11::arg("log_energy") = false,
-                    pybind11::arg("log_latency") = false,
                     pybind11::return_value_policy::reference_internal)
             .def_readwrite("tiles", &sanafe::Architecture::tiles)
             .def("cores", &sanafe::Architecture::cores);
@@ -1105,8 +1098,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("latency_south_hop") = 0.0,
                     pybind11::arg("energy_west_hop") = 0.0,
                     pybind11::arg("latency_west_hop") = 0.0,
-                    pybind11::arg("log_energy") = false,
-                    pybind11::arg("log_latency") = false)
+                    pybind11::arg("log_energy") = false)
             .def_readwrite("cores", &sanafe::TileConfiguration::cores);
 
     pybind11::class_<sanafe::CoreConfiguration,
@@ -1120,8 +1112,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
-                    pybind11::arg("log_energy") = false,
-                    pybind11::arg("log_latency") = false);
+                    pybind11::arg("log_energy") = false);
     pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
             .def("set_model_attributes", &pyset_model_attributes,
                     pybind11::arg("model_attributes") = pybind11::dict(),

@@ -73,7 +73,7 @@ public:
     bool log_potential{false};
     bool check_for_synapse_updates_every_timestep{false};
 
-    MappedNeuron(const Neuron &neuron_to_map, size_t nid, size_t mapped_offset_within_core, Core *mapped_core, PipelineUnit *mapped_dendrite, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out);
+    MappedNeuron(size_t nid, const Neuron &neuron_to_map, size_t mapped_offset_within_core, Core *mapped_core, PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out, PipelineUnit *mapped_dendrite);
     MappedNeuron(const MappedNeuron &copy) = default;
     ~MappedNeuron() = default;
     MappedNeuron& operator=(const MappedNeuron& other) = default;

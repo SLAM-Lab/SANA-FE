@@ -4,16 +4,12 @@
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // main.cpp - Command line interface
 // Performance simulation of neuromorphic architectures
-#include <algorithm>
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <exception>
 #include <filesystem> // For std::filesystem::path
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #if HAVE_OPENMP
@@ -22,12 +18,12 @@
 #include <booksim_lib.hpp>
 
 #include "arch.hpp"
+#include "arg_parsing.hpp"
 #include "chip.hpp"
 #include "network.hpp"
 #include "print.hpp"
 #include "yaml_common.hpp"
 
-#include "arg_parsing.hpp"
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,readability-function-size)
 int main(int argc, const char *argv[])

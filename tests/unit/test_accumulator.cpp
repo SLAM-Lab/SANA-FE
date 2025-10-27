@@ -21,8 +21,8 @@ protected:
 
 TEST_F(TestAccumulatorModel, IntegratesCurrent)
 {
-    model.update(1, 0, 5.0, std::nullopt);
-    auto result = model.update(1, 0, std::nullopt, std::nullopt);
+    model.update(0UL, 5.0, std::nullopt, 1L);
+    auto result = model.update(0UL, std::nullopt, std::nullopt, 1L);
 
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 5.0);
@@ -30,9 +30,9 @@ TEST_F(TestAccumulatorModel, IntegratesCurrent)
 
 TEST_F(TestAccumulatorModel, AccumulatesChargeOverTime)
 {
-    model.update(1, 0, 2.0, std::nullopt);
-    model.update(1, 0, 3.0, std::nullopt);
-    auto result = model.update(1, 0, std::nullopt, std::nullopt);
+    model.update(0UL, 2.0, std::nullopt, 1L);
+    model.update(0UL, 3.0, std::nullopt, 1L);
+    auto result = model.update(0UL, std::nullopt, std::nullopt, 1L);
 
     ASSERT_TRUE(result.current.has_value());
     EXPECT_DOUBLE_EQ(result.current.value(), 5.0);

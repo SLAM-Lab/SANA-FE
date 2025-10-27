@@ -3,6 +3,7 @@
 #include <functional>
 #include <map>
 #include <stdexcept>
+#include <string>
 
 #include "arch.hpp"
 #include "attribute.hpp"
@@ -77,10 +78,10 @@ void sanafe::MappedConnection::set_model_attributes(
     }
 }
 
-sanafe::MappedNeuron::MappedNeuron(const Neuron &neuron_to_map,
-        const size_t nid, const size_t mapped_offset_within_core,
-        Core *mapped_core, PipelineUnit *mapped_dendrite,
-        PipelineUnit *mapped_soma, AxonOutUnit *mapped_axon_out)
+sanafe::MappedNeuron::MappedNeuron(const size_t nid,
+        const Neuron &neuron_to_map, const size_t mapped_offset_within_core,
+        Core *mapped_core, PipelineUnit *mapped_soma,
+        AxonOutUnit *mapped_axon_out, PipelineUnit *mapped_dendrite)
         : parent_group_name(neuron_to_map.parent_group_name)
         , offset(neuron_to_map.offset)
         , id(nid)

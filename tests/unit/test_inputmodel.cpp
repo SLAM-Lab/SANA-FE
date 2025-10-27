@@ -37,7 +37,7 @@ TEST_F(TestInputModel, GeneratesSpikeWhenSpikeValueSet)
 {
     model.set_attribute_neuron(0, "spikes", make_attr_spike_vector({true}));
 
-    auto result = model.update(1, 0, std::nullopt);
+    auto result = model.update(0UL, std::nullopt, 1L);
     EXPECT_EQ(result.status, sanafe::fired); // Check status instead of current
 }
 
@@ -45,45 +45,45 @@ TEST_F(TestInputModel, NoSpikeWhenSpikeValueZero)
 {
     model.set_attribute_neuron(0, "spikes", make_attr_spike_vector({false}));
 
-    auto result = model.update(1, 0, std::nullopt);
+    auto result = model.update(0UL, std::nullopt, 1L);
     EXPECT_EQ(result.status, sanafe::idle);
 }
 
 TEST_F(TestInputModel, ResetClearsState)
 {
     model.set_attribute_neuron(0, "spikes", make_attr_spike_vector({true}));
-    model.update(1, 0, std::nullopt); // consume the spike
+    model.update(0UL, std::nullopt, 1L); // consume the spike
 
     model.reset();
-    auto result = model.update(1, 0, std::nullopt);
+    auto result = model.update(0UL, std::nullopt, 1L);
     EXPECT_EQ(result.status, sanafe::idle);
 }
 
 TEST_F(TestInputModel, ExternalCurrentThrows)
 {
-    EXPECT_THROW(model.update(1, 0, 3.5), std::runtime_error);
+    EXPECT_THROW(model.update(0UL, 3.5, 1L), std::runtime_error);
 }
 
 TEST_F(TestInputModel, SetsPoissonProbability)
 {
     sanafe::ModelAttribute attr;
     attr.value = 0.8; // high probability
-    model.set_attribute_neuron(0, "poisson", attr);
+    model.set_attribute_neuron(0UL, "poisson", attr);
 }
 
 TEST_F(TestInputModel, SetsRate)
 {
     sanafe::ModelAttribute attr;
     attr.value = 1.0; // 1 Hz
-    model.set_attribute_neuron(0, "rate", attr);
+    model.set_attribute_neuron(0UL, "rate", attr);
 }
 
 TEST_F(TestInputModel, GeneratesSpikeWithPoisson)
 {
     sanafe::ModelAttribute attr;
     attr.value = 1.0; // guaranteed spike (since uniform_distribution ∈ [0,1))
-    model.set_attribute_neuron(0, "poisson", attr);
-    auto result = model.update(1, 0, std::nullopt);
+    model.set_attribute_neuron(0UL, "poisson", attr);
+    auto result = model.update(0UL, std::nullopt, 1L);
     EXPECT_EQ(result.status, sanafe::fired);
 }
 
@@ -91,8 +91,8 @@ TEST_F(TestInputModel, GeneratesSpikeWithRate)
 {
     sanafe::ModelAttribute attr;
     attr.value = 1.0; // 1 spike per timestep
-    model.set_attribute_neuron(0, "rate", attr);
-    auto result = model.update(1, 0, std::nullopt);
+    model.set_attribute_neuron(0UL, "rate", attr);
+    auto result = model.update(0UL, std::nullopt, 1L);
     EXPECT_EQ(result.status, sanafe::fired);
 }
 

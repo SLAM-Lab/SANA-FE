@@ -1,10 +1,14 @@
 #include "arg_parsing.hpp"
+#include "chip.hpp"
+#include "print.hpp"
 
 #include <algorithm>
 #include <cstdlib>
 #include <exception>
-#include <iostream>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #if HAVE_OPENMP
 #include <omp.h>

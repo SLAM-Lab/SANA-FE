@@ -33,7 +33,6 @@
 
 #include "arch.hpp"
 #include "chip.hpp"
-
 #include "core.hpp"
 #include "mapped.hpp"
 #include "message.hpp"
@@ -729,7 +728,7 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
         input = c.timestep_buffer[n.mapped_offset_within_core];
         c.timestep_buffer[n.mapped_offset_within_core] = PipelineResult{};
     }
-    std::optional<MappedConnection *> no_con{std::nullopt};
+    const std::optional<MappedConnection *> no_con{std::nullopt};
     const PipelineResult pipeline_output = execute_pipeline(
             n.neuron_processing_pipeline, ts, n, no_con, input);
     n.core->next_message_generation_delay +=
@@ -990,7 +989,7 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
                     if (con.synapse_hw->update_every_timestep)
                     {
                         PipelineResult result = con.synapse_hw->update(
-                                ts.timestep, con.mapped_synapse_hw_address);
+                                con.mapped_synapse_hw_address, false, ts.timestep);
                         if (result.energy.has_value())
                         {
                             con.synapse_hw->energy += result.energy.value();
@@ -1004,8 +1003,8 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
             {
                 INFO("checking for dendrite updates every timestep\n");
                 sanafe::PipelineResult result = n.dendrite_hw->update(
-                        ts.timestep, n.mapped_dendrite_hw_address, std::nullopt,
-                        std::nullopt);
+                        n.mapped_dendrite_hw_address, std::nullopt,
+                        std::nullopt, ts.timestep);
                 if (result.energy.has_value())
                 {
                     n.dendrite_hw->energy += result.energy.value();

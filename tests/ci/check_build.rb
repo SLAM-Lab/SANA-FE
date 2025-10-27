@@ -75,6 +75,7 @@ def build_python(label:, build_dir:, log_file:)
       "-DCMAKE_CXX_FLAGS=-fopenmp",
       "-DCMAKE_EXE_LINKER_FLAGS=#{omp_flags}",
       "-DCMAKE_SHARED_LINKER_FLAGS=#{omp_flags}",
+      "-DPYTHON_EXECUTABLE=#{venv_python}",
       "-DCMAKE_VERBOSE_MAKEFILE=ON"
     ].join(" ")
 

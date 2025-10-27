@@ -12,7 +12,6 @@
 #include <utility>
 
 #include "arch.hpp"
-#include "chip.hpp"
 #include "mapped.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
@@ -60,8 +59,8 @@ void sanafe::PipelineUnit::check_implemented(
 size_t sanafe::PipelineUnit::add_connection(MappedConnection &con)
 {
     // Add connection and update connection's address
-    MappedNeuron &pre_neuron = con.pre_neuron_ref.get();
-    MappedNeuron &post_neuron = con.post_neuron_ref.get();
+    const MappedNeuron &pre_neuron = con.pre_neuron_ref.get();
+    const MappedNeuron &post_neuron = con.post_neuron_ref.get();
 
     // TODO: we track this in the synapse but not the dendrite h/w?
 

@@ -29,59 +29,59 @@ TEST(LoihiLifModelTest, FiresWhenAboveThreshold)
 {
     sanafe::LoihiLifModel neuron;
 
-    neuron.set_attribute_neuron(0, "threshold", make_attr_double(64.0));
-    neuron.set_attribute_neuron(0, "reset", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "reset_mode", make_attr_string("hard"));
-    neuron.set_attribute_neuron(0, "leak_decay", make_attr_double(1.0));
-    neuron.set_attribute_neuron(0, "input_decay", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "bias", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "force_update", make_attr_bool(false));
+    neuron.set_attribute_neuron(0UL, "threshold", make_attr_double(64.0));
+    neuron.set_attribute_neuron(0UL, "reset", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "reset_mode", make_attr_string("hard"));
+    neuron.set_attribute_neuron(0UL, "leak_decay", make_attr_double(1.0));
+    neuron.set_attribute_neuron(0UL, "input_decay", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "bias", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "force_update", make_attr_bool(false));
 
     neuron.reset();
 
-    auto result = neuron.update(1, 0, 80.0);
+    auto result = neuron.update(0UL, 80.0, 1L);
     EXPECT_EQ(result.status, sanafe::NeuronStatus::fired);
-    EXPECT_NEAR(neuron.get_potential(0), 0.0, 1e-6);
+    EXPECT_NEAR(neuron.get_potential(0UL), 0.0, 1e-6);
 }
 
 TEST(LoihiLifModelTest, DoesNotFireBelowThreshold)
 {
     sanafe::LoihiLifModel neuron;
 
-    neuron.set_attribute_neuron(0, "threshold", make_attr_double(64.0));
-    neuron.set_attribute_neuron(0, "reset", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "reset_mode", make_attr_string("hard"));
-    neuron.set_attribute_neuron(0, "leak_decay", make_attr_double(1.0));
-    neuron.set_attribute_neuron(0, "input_decay", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "bias", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "force_update", make_attr_bool(false));
+    neuron.set_attribute_neuron(0UL, "threshold", make_attr_double(64.0));
+    neuron.set_attribute_neuron(0UL, "reset", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "reset_mode", make_attr_string("hard"));
+    neuron.set_attribute_neuron(0UL, "leak_decay", make_attr_double(1.0));
+    neuron.set_attribute_neuron(0UL, "input_decay", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "bias", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "force_update", make_attr_bool(false));
 
     neuron.reset();
 
-    auto result = neuron.update(1, 0, 50.0);
+    auto result = neuron.update(0UL, 50.0, 1L);
     EXPECT_EQ(result.status, sanafe::NeuronStatus::updated);
-    EXPECT_NEAR(neuron.get_potential(0), 50.0, 1e-6);
+    EXPECT_NEAR(neuron.get_potential(0UL), 50.0, 1e-6);
 }
 
 TEST(LoihiLifModelTest, StableWithoutInput)
 {
     sanafe::LoihiLifModel neuron;
 
-    neuron.set_attribute_neuron(0, "threshold", make_attr_double(64.0));
-    neuron.set_attribute_neuron(0, "reset", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "reset_mode", make_attr_string("hard"));
-    neuron.set_attribute_neuron(0, "leak_decay", make_attr_double(1.0));
-    neuron.set_attribute_neuron(0, "input_decay", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "bias", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "force_update", make_attr_bool(false));
+    neuron.set_attribute_neuron(0UL, "threshold", make_attr_double(64.0));
+    neuron.set_attribute_neuron(0UL, "reset", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "reset_mode", make_attr_string("hard"));
+    neuron.set_attribute_neuron(0UL, "leak_decay", make_attr_double(1.0));
+    neuron.set_attribute_neuron(0UL, "input_decay", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "bias", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "force_update", make_attr_bool(false));
 
     neuron.reset();
-    neuron.update(1, 0, 50.0);
+    neuron.update(0UL, 50.0, 1L);
 
-    auto result = neuron.update(2, 0, std::nullopt);
+    auto result = neuron.update(0UL, std::nullopt, 2L);
 
     EXPECT_EQ(result.status, sanafe::NeuronStatus::updated);
-    EXPECT_NEAR(neuron.get_potential(0), 50.0, 1e-6);
+    EXPECT_NEAR(neuron.get_potential(0UL), 50.0, 1e-6);
 }
 
 TEST(LoihiLifModelTest, NoiseFileFailsToOpen)
@@ -97,31 +97,31 @@ TEST(LoihiLifModelTest, SetReverseAttributesAndBias)
     sanafe::LoihiLifModel neuron;
 
     EXPECT_NO_THROW(neuron.set_attribute_neuron(
-            0, "reverse_threshold", make_attr_double(-10.0)));
+            0UL, "reverse_threshold", make_attr_double(-10.0)));
     EXPECT_NO_THROW(neuron.set_attribute_neuron(
-            0, "reverse_reset", make_attr_double(-5.0)));
+            0UL, "reverse_reset", make_attr_double(-5.0)));
     EXPECT_NO_THROW(neuron.set_attribute_neuron(
-            0, "reverse_reset_mode", make_attr_string("hard")));
+            0UL, "reverse_reset_mode", make_attr_string("hard")));
     EXPECT_NO_THROW(neuron.set_attribute_neuron(
-            0, "input_decay", make_attr_double(0.5)));
+            0UL, "input_decay", make_attr_double(0.5)));
     EXPECT_NO_THROW(
-            neuron.set_attribute_neuron(0, "bias", make_attr_double(1.5)));
+            neuron.set_attribute_neuron(0UL, "bias", make_attr_double(1.5)));
     EXPECT_NO_THROW(neuron.set_attribute_neuron(
-            0, "force_update", make_attr_bool(true)));
+            0UL, "force_update", make_attr_bool(true)));
 }
 
 TEST(LoihiLifModelTest, LeakAndQuantizeReducesPotential)
 {
     sanafe::LoihiLifModel neuron;
-    neuron.set_attribute_neuron(0, "leak_decay", make_attr_double(0.5));
-    neuron.set_attribute_neuron(0, "threshold", make_attr_double(100.0));
+    neuron.set_attribute_neuron(0UL, "leak_decay", make_attr_double(0.5));
+    neuron.set_attribute_neuron(0UL, "threshold", make_attr_double(100.0));
 
     neuron.reset();
-    neuron.update(1, 0, 80.0);
+    neuron.update(0, 80.0, 1L);
 
-    double before = neuron.get_potential(0);
-    neuron.update(2, 0, std::nullopt);
-    double after = neuron.get_potential(0);
+    double before = neuron.get_potential(0UL);
+    neuron.update(0UL, std::nullopt, 2L);
+    double after = neuron.get_potential(0UL);
     EXPECT_LT(after, before);
 }
 
@@ -133,31 +133,31 @@ TEST(LoihiLifModelTest, FiresWithSoftReset)
     neuron.set_attribute_neuron(0, "reset", make_attr_double(5.0));
 
     neuron.reset();
-    auto result = neuron.update(1, 0, 25.0);
+    auto result = neuron.update(0UL, 25.0, 1L);
     EXPECT_EQ(result.status, sanafe::NeuronStatus::fired);
-    EXPECT_GT(neuron.get_potential(0), 0.0); // soft reset subtracts threshold
+    EXPECT_GT(neuron.get_potential(0UL), 0.0); // soft reset subtracts threshold
 }
 
 TEST(LoihiLifModelTest, ReverseThresholdBranches)
 {
     sanafe::LoihiLifModel neuron;
-    neuron.set_attribute_neuron(0, "threshold", make_attr_double(100.0));
-    neuron.set_attribute_neuron(0, "reverse_threshold", make_attr_double(0.0));
-    neuron.set_attribute_neuron(0, "reset", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "threshold", make_attr_double(100.0));
+    neuron.set_attribute_neuron(0UL, "reverse_threshold", make_attr_double(0.0));
+    neuron.set_attribute_neuron(0UL, "reset", make_attr_double(0.0));
 
     neuron.reset();
 
     neuron.set_attribute_neuron(
-            0, "reverse_reset_mode", make_attr_string("soft"));
-    neuron.update(1, 0, -10.0);
+            0UL, "reverse_reset_mode", make_attr_string("soft"));
+    neuron.update(0UL, -10.0, 1L);
 
     neuron.set_attribute_neuron(
-            0, "reverse_reset_mode", make_attr_string("hard"));
-    neuron.update(2, 0, -10.0);
+            0UL, "reverse_reset_mode", make_attr_string("hard"));
+    neuron.update(0UL, -10.0, 2L);
 
     neuron.set_attribute_neuron(
-            0, "reverse_reset_mode", make_attr_string("saturate"));
-    neuron.update(3, 0, -10.0);
+            0UL, "reverse_reset_mode", make_attr_string("saturate"));
+    neuron.update(0UL, -10.0, 3L);
 }
 
 TEST(LoihiLifModelTest, GenerateNoiseFromFile)
@@ -172,9 +172,9 @@ TEST(LoihiLifModelTest, GenerateNoiseFromFile)
     neuron.set_attribute_neuron(0, "threshold", make_attr_double(100.0));
     neuron.reset();
 
-    double before = neuron.get_potential(0);
-    neuron.update(1, 0, 10.0); // update will internally add noise
-    double after = neuron.get_potential(0);
+    double before = neuron.get_potential(0UL);
+    neuron.update(0UL, 10.0, 1L); // update will internally add noise
+    double after = neuron.get_potential(0UL);
 
     EXPECT_NE(before, after); // potential should change due to noise or input
 }
@@ -196,7 +196,7 @@ TEST(LoihiLifModelTest, ThrowsWhenUpdatingTwiceSameTimeStep)
     neuron.update(1, 0, 5.0);
 
     EXPECT_THROW(
-            neuron.update(1, 0, 5.0), std::runtime_error);  // Same sim time
+            neuron.update(0UL, 5.0, 1L), std::runtime_error);  // Same sim time
 }
 
 TEST(LoihiLifModelTest, ThrowsWhenSkippingTimestep)
@@ -205,9 +205,9 @@ TEST(LoihiLifModelTest, ThrowsWhenSkippingTimestep)
     neuron.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
 
     neuron.reset();
-    neuron.update(1, 0, 5.0);
+    neuron.update(0UL, 5.0, 1L);
 
-    EXPECT_THROW(neuron.update(3, 0, 5.0), std::runtime_error);
+    EXPECT_THROW(neuron.update(0UL, 5.0, 3L), std::runtime_error);
 }
 
 TEST(LoihiLifModelTest, AddsInputCurrentWhenProvided)
@@ -216,8 +216,8 @@ TEST(LoihiLifModelTest, AddsInputCurrentWhenProvided)
     neuron.set_attribute_neuron(0, "threshold", make_attr_double(100.0));
 
     neuron.reset();
-    neuron.update(1, 0, 2.0); // provide input current
-    EXPECT_GT(neuron.get_potential(0), 0.0);
+    neuron.update(0UL, 2.0, 1L); // provide input current
+    EXPECT_GT(neuron.get_potential(0UL), 0.0);
 }
 
 TEST(LoihiLifModelTest, ResetClearsState)
@@ -226,10 +226,10 @@ TEST(LoihiLifModelTest, ResetClearsState)
     neuron.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
 
     neuron.reset();
-    neuron.update(1, 0, 5.0);
+    neuron.update(0UL, 5.0, 1L);
 
     neuron.reset(); // clear potential
-    EXPECT_DOUBLE_EQ(neuron.get_potential(0), 0.0);
+    EXPECT_DOUBLE_EQ(neuron.get_potential(0UL), 0.0);
 }
 
 TEST(LoihiLifModelTest, NoiseStreamEOFTriggersResetAndInvalidEntry)
@@ -245,7 +245,7 @@ TEST(LoihiLifModelTest, NoiseStreamEOFTriggersResetAndInvalidEntry)
 
     for (int i = 1; i <= 3; i++)
     {
-        neuron.update(i, 0, 5.0); // triggers file reads, EOF, reset
+        neuron.update(0UL, 5.0, i); // triggers file reads, EOF, reset
     }
 }
 
@@ -260,7 +260,7 @@ TEST(LoihiLifModelTest, NoiseFileEmptyThrows)
 
     neuron.reset();
 
-    EXPECT_THROW(neuron.update(1, 0, 5.0), std::runtime_error);
+    EXPECT_THROW(neuron.update(0UL, 5.0, 1L), std::runtime_error);
 }
 
 TEST(LoihiLifModelTest, NoiseGeneratesSignBit)
@@ -274,7 +274,7 @@ TEST(LoihiLifModelTest, NoiseGeneratesSignBit)
     neuron.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
 
     neuron.reset();
-    neuron.update(1, 0, 1.0); // should read 256 and sign-extend
+    neuron.update(0UL, 1.0, 1L); // should read 256 and sign-extend
 }
 
 TEST(LoihiLifModelTest, NoiseEOFTriggersReset)
@@ -290,8 +290,8 @@ TEST(LoihiLifModelTest, NoiseEOFTriggersReset)
     neuron.reset();
     for (int i = 1; i <= 3; i++)
     {
-        neuron.update(i,
-                0, 1.0); // by 2nd or 3rd iteration, EOF will trigger reset
+        // by 2nd or 3rd iteration, EOF will trigger reset
+        neuron.update(0UL, 1.0, i);
     }
 }
 
@@ -312,7 +312,7 @@ TEST(LoihiLifModelTest, NoiseStreamNotOpenOnUpdateTriggersInfo)
     neuron.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
     neuron.reset();
 
-    EXPECT_THROW(neuron.update(1, 0, 1.0), std::runtime_error);
+    EXPECT_THROW(neuron.update(0UL, 1.0, 1L), std::runtime_error);
 }
 
 TEST(LoihiLifModelTest, SetForceSomaUpdate)
@@ -322,6 +322,6 @@ TEST(LoihiLifModelTest, SetForceSomaUpdate)
             0, "force_update", make_attr_bool(true)));
 
     neuron.reset();
-    auto result = neuron.update(1, 0, std::nullopt);
+    auto result = neuron.update(0UL, std::nullopt, 1L);
     EXPECT_EQ(result.status, sanafe::NeuronStatus::updated);
 }

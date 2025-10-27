@@ -37,7 +37,7 @@ public:
     CurrentBasedSynapseModel &operator=(const CurrentBasedSynapseModel &other) = delete;
     CurrentBasedSynapseModel &operator=(CurrentBasedSynapseModel &&other) = delete;
 
-    PipelineResult update(long int simulation_time, size_t synapse_address, bool read) override;
+    PipelineResult update(size_t synapse_address, bool read, long int simulation_time) override;
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void reset() override;
@@ -65,7 +65,7 @@ public:
     AccumulatorModel &operator=(const AccumulatorModel &other) = delete;
     AccumulatorModel &operator=(AccumulatorModel &&other) = delete;
 
-    PipelineResult update(long int simulation_time, size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address, long int simulation_time) override;
     void reset() override
     {
         accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
@@ -117,7 +117,7 @@ public:
     AccumulatorWithDelayModel &operator=(const AccumulatorWithDelayModel &other) = delete;
     AccumulatorWithDelayModel &operator=(AccumulatorWithDelayModel &&other) = delete;
 
-    PipelineResult update(long int simulation_time, size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address, long int simulation_time) override;
     void reset() override
     {
         accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
@@ -167,7 +167,7 @@ public:
     MultiTapModel1D &operator=(const MultiTapModel1D &other) = delete;
     MultiTapModel1D &operator=(MultiTapModel1D &&other) = delete;
 
-    PipelineResult update(long int simulation_time, size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current, std::optional<size_t> synapse_address, long int simulation_time) override;
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
@@ -201,7 +201,7 @@ public:
 
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override;
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
-    PipelineResult update(long int simulation_time, size_t neuron_address, std::optional<double> current_in) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
     void reset() override;
     double get_potential(const size_t neuron_address) override
     {
@@ -271,8 +271,8 @@ public:
     void set_attribute_neuron(size_t neuron_address,
             const std::string &attribute_name,
             const ModelAttribute &param) override;
-    PipelineResult update(long int simulation_time, size_t neuron_address,
-            std::optional<double> current_in = std::nullopt) override;
+    PipelineResult update(size_t neuron_address,
+            std::optional<double> current_in, long int simulation_time) override;
     void reset() override;
     double get_potential(const size_t neuron_address) override
     {
@@ -325,7 +325,7 @@ public:
 
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
-    PipelineResult update(long int simulation_time, size_t neuron_address, std::optional<double> current_in = std::nullopt) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
     void reset() override { send_spike = false;
     }
 

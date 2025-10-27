@@ -9,13 +9,11 @@
 #include <cstdlib>
 #include <ios>
 #include <iterator>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "arch.hpp"
@@ -27,8 +25,8 @@
 
 // *** Synapse hardware unit models ***
 sanafe::PipelineResult sanafe::CurrentBasedSynapseModel::update(
-        const long int simulation_time, const size_t synapse_address,
-        const bool read)
+        const size_t synapse_address, const bool read,
+        const long int /*simulation_time*/)
 {
     PipelineResult output;
     if (read)
@@ -68,10 +66,10 @@ void sanafe::CurrentBasedSynapseModel::reset()
 }
 
 // *** Dendrite models ***
-sanafe::PipelineResult sanafe::AccumulatorModel::update(
-        const long int simulation_time, size_t neuron_address,
+sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
         std::optional<double> current,
-        std::optional<size_t> /*synapse_address*/)
+        std::optional<size_t> /*synapse_address*/,
+        const long int simulation_time)
 {
     PipelineResult output;
 
@@ -94,8 +92,8 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(
 }
 
 sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
-        const long int simulation_time, size_t neuron_address,
-        std::optional<double> current, std::optional<size_t> synapse_address)
+        size_t neuron_address, std::optional<double> current,
+        std::optional<size_t> synapse_address, const long int simulation_time)
 {
     PipelineResult output;
 
@@ -230,9 +228,9 @@ void sanafe::MultiTapModel1D::input_current(
     TRACE2(MODELS, "Adding current:%lf to tap %d\n", current, tap);
 }
 
-sanafe::PipelineResult sanafe::MultiTapModel1D::update(
-        const long int simulation_time, size_t neuron_address,
-        std::optional<double> current, std::optional<size_t> synapse_address)
+sanafe::PipelineResult sanafe::MultiTapModel1D::update(size_t neuron_address,
+        std::optional<double> current, std::optional<size_t> synapse_address,
+        const long int simulation_time)
 {
     while (timesteps_simulated < simulation_time)
     {
@@ -481,8 +479,8 @@ bool sanafe::LoihiLifModel::loihi_threshold_and_reset(LoihiCompartment &cx)
 }
 
 sanafe::PipelineResult sanafe::LoihiLifModel::update(
-        const long int simulation_time, const size_t neuron_address,
-        const std::optional<double> current_in)
+        const size_t neuron_address, const std::optional<double> current_in,
+        const long int simulation_time)
 {
     LoihiCompartment &cx = compartments[neuron_address];
     if (cx.timesteps_simulated == simulation_time)
@@ -607,16 +605,16 @@ int sanafe::LoihiLifModel::loihi_read_noise_stream()
 
 double sanafe::LoihiLifModel::loihi_generate_noise()
 {
-    int random_val = 0;
+    unsigned long int random_val = 0UL;
 
     if (noise_type == noise_file_stream)
     {
-        random_val = loihi_read_noise_stream();
+        random_val = static_cast<unsigned int>(loihi_read_noise_stream());
     }
     // else, don't generate any noise and return 0.0
 
     // Get the required noise bits (set by the noise exponent in Loihi)
-    const int sign_bit = random_val & sign_mask;
+    const long unsigned int sign_bit = random_val & sign_mask;
     random_val &= random_mask;
     if (sign_bit != 0)
     {
@@ -666,7 +664,7 @@ void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,
         n.bias = static_cast<double>(param);
     }
     else if (attribute_name == "force_update_every_timestep" ||
-        attribute_name == "force_update")
+            attribute_name == "force_update")
     {
         n.force_update = static_cast<bool>(param);
     }
@@ -762,8 +760,8 @@ bool sanafe::TrueNorthModel::truenorth_threshold_and_reset(TrueNorthNeuron &n)
 }
 
 sanafe::PipelineResult sanafe::TrueNorthModel::update(
-        const long int simulation_time, const size_t neuron_address,
-        const std::optional<double> current_in)
+        const size_t neuron_address, const std::optional<double> current_in,
+        const long int /*simulation_time*/)
 {
     sanafe::NeuronStatus state = sanafe::idle;
     TrueNorthNeuron &n = neurons[neuron_address];
@@ -825,9 +823,8 @@ void sanafe::TrueNorthModel::reset()
     }
 }
 
-sanafe::PipelineResult sanafe::InputModel::update(
-        const long int simulation_time, const size_t neuron_address,
-        std::optional<double> current_in)
+sanafe::PipelineResult sanafe::InputModel::update(const size_t neuron_address,
+        std::optional<double> current_in, const long int simulation_time)
 {
     // This models a dummy input node
     if (current_in.has_value() && (current_in.value() != 0.0))

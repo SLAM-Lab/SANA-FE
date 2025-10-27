@@ -1,5 +1,18 @@
+// Copyright (c) 2025 - The University of Texas at Austin
+//  This work was produced under contract #2317831 to National Technology and
+//  Engineering Solutions of Sandia, LLC which is under contract
+//  No. DE-NA0003525 with the U.S. Department of Energy.
+#include <ios>
+#include <map>
+#include <pybind11/gil.h>
+#include <pybind11/pytypes.h>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
+#include "message.hpp"
 #include "pytrace.hpp"
+#include "timestep.hpp"
 
 pybind11::dict message_to_dict(const sanafe::Message &m)
 {

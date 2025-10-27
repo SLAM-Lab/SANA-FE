@@ -202,17 +202,17 @@ private:
 };
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
-void schedule_messages(TimestepHandle &timestep_handle, Scheduler &scheduler, const BookSimConfig &booksim_config);
-void schedule_messages_simple(TimestepHandle &timestep_handle, Scheduler &scheduler);
-void schedule_messages_detailed(TimestepHandle &timestep_handle, Scheduler &scheduler);
-void schedule_messages_cycle_accurate(TimestepHandle &timestep_handle, const BookSimConfig &config, Scheduler &scheduler);
+void schedule_messages(TimestepHandle &ts, Scheduler &scheduler, const BookSimConfig &booksim_config);
+void schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler);
+void schedule_messages_detailed(TimestepHandle &ts, Scheduler &scheduler);
+void schedule_messages_cycle_accurate(TimestepHandle &ts, const BookSimConfig &config, Scheduler &scheduler);
 
 void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
 void schedule_messages_thread(Scheduler &scheduler, int thread_id);
 void schedule_stop_all_threads(Scheduler &scheduler);
 
 std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NocInfo &noc);
-double schedule_messages_timestep(TimestepHandle &timestep_handle, Scheduler &scheduler);
+double schedule_messages_timestep(TimestepHandle &ts, Scheduler &scheduler);
 void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);
