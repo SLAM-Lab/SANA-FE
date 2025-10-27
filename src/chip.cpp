@@ -983,7 +983,6 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
             //  time-step
             if (n.check_for_synapse_updates_every_timestep)
             {
-                INFO("checking for synapse updates every timestep\n");
                 for (MappedConnection &con : n.connections_out)
                 {
                     if (con.synapse_hw->update_every_timestep)
@@ -1001,7 +1000,6 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
             }
             if (n.dendrite_hw->update_every_timestep)
             {
-                INFO("checking for dendrite updates every timestep\n");
                 sanafe::PipelineResult result = n.dendrite_hw->update(
                         n.mapped_dendrite_hw_address, std::nullopt,
                         std::nullopt, ts.timestep);
