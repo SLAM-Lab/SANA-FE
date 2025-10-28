@@ -18,7 +18,7 @@ This will run the following scripts in ```tests/ci/```:
 
 ### To use CTest directly, configure and build with CMake:
 ```bash
-cmake -S . -B build -DENABLE_TESTING=ON
+cmake -S . -B build -DTESTING_ENABLED=ON
 cmake --build build
 ```
 Then, to run all CI-labeled tests:

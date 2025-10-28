@@ -12,7 +12,7 @@ mkdir  -p "$BUILD_DIR"
 cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
       -DCMAKE_BUILD_TYPE=Debug \
       -DCMAKE_CXX_FLAGS="--coverage -g -O0" \
-      -DENABLE_TESTING=ON \
+      -TESTING_ENABLED=ON \
       -DPYTHON_BUILD_ENABLED=OFF \
       -DSTANDALONE_BUILD_ENABLED=OFF \
       -DDEBUG_LEVEL_MODELS=1

@@ -20,24 +20,15 @@ if(POLICY CMP0148)
 endif()
 
 # Set which targets to make, between a standalone executable and a Python lib
-if (NOT STANDALONE_BUILD_ENABLED)
-    set(STANDALONE_BUILD_ENABLED ON)
-endif()
-
-if (NOT PYTHON_BUILD_ENABLED)
-    set(PYTHON_BUILD_ENABLED ON)
-endif()
-
-
-if (NOT ENABLE_TESTING)
-    set(ENABLE_TESTING OFF)
-endif()
+option(STANDALONE_BUILD_ENABLED "Build standalone executlbe" ON)
+option(PYTHON_BUILD_ENABLED "Build Python library" ON)
+option(TESTING_ENABLED "Build test library" OFF)
 
 # Ensure that at least one build target is enabled
-if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED AND NOT ENABLE_TESTING)
+if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED AND NOT TESTING_ENABLED)
     message(
         FATAL_ERROR
-        "No build target enabled: Either STANDALONE_BUILD_ENABLED or PYTHON_BUILD_ENABLED or ENABLE_TESTING must be ON."
+        "No build target enabled: Either STANDALONE_BUILD_ENABLED or PYTHON_BUILD_ENABLED or TESTING_ENABLED must be ON."
     )
 endif()
 
@@ -298,7 +289,7 @@ if(STANDALONE_BUILD_ENABLED)
     endif()
 endif()
 
-if(ENABLE_TESTING)
+if(TESTING_ENABLED)
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pytrace.cpp")
     add_library(sanafe SHARED ${SOURCE_FILES} ${HEADER_FILES})

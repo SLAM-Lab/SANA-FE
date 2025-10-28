@@ -16,7 +16,7 @@ puts "\n[#{label}] Running dynamic tests..."
 
 puts "[#{label}] Building the project with testing enabled..."
 
-cmake = system("cmake -DENABLE_TESTING=ON -DPYTHON_BUILD_ENABLED=OFF -DSTANDALONE_BUILD_ENABLED=OFF -DCMAKE_BUILD_TYPE=Debug -S . -B build > #{build_log_file} 2>&1")
+cmake = system("cmake -DTESTING_ENABLED=ON -DPYTHON_BUILD_ENABLED=OFF -DSTANDALONE_BUILD_ENABLED=OFF -DCMAKE_BUILD_TYPE=Debug -S . -B build > #{build_log_file} 2>&1")
 
 if !cmake
   puts "[#{label}] CMake configuration failed. See #{build_log_file} for details."
