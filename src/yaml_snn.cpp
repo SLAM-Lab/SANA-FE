@@ -902,6 +902,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
         SpikingNetwork &net)
 {
     std::string neuron_address;
+    // First parse the neuron group to map
     mapping_info >> ryml::key(neuron_address);
     const auto dot_pos = neuron_address.find_first_of('.');
     const bool neuron_defined = dot_pos != std::string::npos;
@@ -917,6 +918,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
     }
     NeuronGroup &group = net.groups.at(group_name); // No default constructor
 
+    // Now optionally parse a neuron or a range of neurons
     size_t start_id = 0;
     size_t end_id = 0;
     if (neuron_defined)
@@ -940,6 +942,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
         end_id = group.neurons.size() - 1UL;
     }
 
+    // For one or more neurons, map them to a specified tile and core
     TRACE2(DESCRIPTION, "Mapping neuron: %s.%zu..%zu\n", group_name.c_str(),
             start_id, end_id);
     for (size_t neuron_offset = start_id; neuron_offset <= end_id;
@@ -948,36 +951,14 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
         if (neuron_offset >= group.neurons.size())
         {
             std::string error = "Invalid neuron id: ";
-            error += group_name;
+            error += group.name;
             error += '.';
             error += std::to_string(neuron_offset);
             throw YamlDescriptionParsingError(error, parser, mapping_info);
         }
-
         // Get any mapping attributes or configuration
-        std::string core_address;
         Neuron &n = group.neurons[neuron_offset];
-        description_parse_mapping_info(parser, mapping_info, n, core_address);
-
-        // Get pointers to the h/w we're mapping to
-        const auto dot_pos = core_address.find('.');
-        const size_t tile_id = std::stoull(core_address.substr(0, dot_pos));
-        const size_t core_offset_within_tile =
-                std::stoull(core_address.substr(dot_pos + 1));
-
-        if (tile_id >= arch.tiles.size())
-        {
-            throw YamlDescriptionParsingError(
-                    "Tile ID >= tile count", parser, mapping_info);
-        }
-        TileConfiguration &tile = arch.tiles[tile_id];
-        if (core_offset_within_tile >= tile.cores.size())
-        {
-            throw YamlDescriptionParsingError(
-                    "Core ID >= core count", parser, mapping_info);
-        }
-        const CoreConfiguration &core = tile.cores[core_offset_within_tile];
-        n.map_to_core(core);
+        description_map_neuron(parser, n, mapping_info, arch);
     }
 }
 
@@ -1021,6 +1002,34 @@ void sanafe::description_parse_mapping_info(const ryml::Parser &parser,
             info["core"] >> core_name;
         }
     }
+}
+
+void sanafe::description_map_neuron(const ryml::Parser &parser, Neuron &n,
+        const ryml::ConstNodeRef mapping_info, Architecture &arch)
+{
+    // Get any mapping attributes or configuration
+    std::string core_address;
+    description_parse_mapping_info(parser, mapping_info, n, core_address);
+
+    // Get pointers to the h/w we're mapping to
+    const auto dot_pos = core_address.find('.');
+    const size_t tile_id = std::stoull(core_address.substr(0, dot_pos));
+    const size_t core_offset_within_tile =
+            std::stoull(core_address.substr(dot_pos + 1));
+
+    if (tile_id >= arch.tiles.size())
+    {
+        throw YamlDescriptionParsingError(
+                "Tile ID >= tile count", parser, mapping_info);
+    }
+    TileConfiguration &tile = arch.tiles[tile_id];
+    if (core_offset_within_tile >= tile.cores.size())
+    {
+        throw YamlDescriptionParsingError(
+                "Core ID >= core count", parser, mapping_info);
+    }
+    const CoreConfiguration &core = tile.cores[core_offset_within_tile];
+    n.map_to_core(core);
 }
 
 void sanafe::yaml_write_network(

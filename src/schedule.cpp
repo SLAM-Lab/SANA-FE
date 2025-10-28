@@ -274,15 +274,13 @@ double sanafe::schedule_messages_timestep(
             INFO("m:%e\n", curr.sent_timestamp);
         }
         INFO("***\n");
+        INFO("Priority size:%zu\n", priority.size());
 #endif
-
-        TRACE1(SCHEDULER, "Priority size:%zu\n", priority.size());
     }
     TRACE1(SCHEDULER, "Scheduler finished.\n");
 
-    ts_data.sim_time = last_timestamp;
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts_data.sim_time += scheduler.timestep_sync_delay;
+    ts_data.sim_time = last_timestamp + scheduler.timestep_sync_delay;
 
     // Update all messages with delays and timestamps set
     ts_data.messages = std::move(scheduled_messages_per_core);

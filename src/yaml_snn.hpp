@@ -38,6 +38,7 @@ void yaml_parse_neuron_section(const ryml::Parser &parser, ryml::ConstNodeRef ne
 void description_parse_mapping_section_yaml(const ryml::Parser &parser, ryml::ConstNodeRef mappings_node, Architecture &arch, SpikingNetwork &net);
 void description_parse_mapping(const ryml::Parser &parser, ryml::ConstNodeRef mapping_info, Architecture &arch, SpikingNetwork &net);
 void description_parse_mapping_info(const ryml::Parser &parser, ryml::ConstNodeRef info, Neuron &n, std::string &core_name);
+void description_map_neuron(const ryml::Parser &parser, Neuron &n, const ryml::ConstNodeRef mapping_info, Architecture &arch);
 void description_parse_neuron(const std::string &id, const ryml::Parser &parser, ryml::ConstNodeRef attributes, NeuronGroup &neuron_group);
 NeuronConfiguration yaml_parse_neuron_attributes(const ryml::Parser &parser,ryml::ConstNodeRef attributes, const NeuronConfiguration &default_template = NeuronConfiguration());
 void description_parse_edge(const std::string &description, const ryml::Parser &parser, ryml::ConstNodeRef attributes_node, SpikingNetwork &network);

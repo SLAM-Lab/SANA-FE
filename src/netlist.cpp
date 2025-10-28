@@ -767,8 +767,6 @@ std::string sanafe::netlist_attributes_to_netlist(
         const std::map<std::string, sanafe::ModelAttribute> &model_attributes,
         const std::map<std::string, sanafe::ModelAttribute> &default_attributes)
 {
-    std::string attribute_str{};
-
     TRACE1(DESCRIPTION, "Parsing attributes\n");
     bool nested_attributes = false;
     for (const auto &[key, attribute] : model_attributes)
@@ -782,38 +780,64 @@ std::string sanafe::netlist_attributes_to_netlist(
         }
     }
 
+    std::string attribute_str{};
     if (nested_attributes)
     {
-        TRACE2(DESCRIPTION, "Parsing nested attributes\n");
-        ryml::Tree tree; // NOLINT(misc-include-cleaner)
-        ryml::NodeRef root = tree.rootref(); // NOLINT(misc-include-cleaner)
-        root |= ryml::MAP; // NOLINT(misc-include-cleaner)
-        root |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
-
-        yaml_serialize_model_attributes(
-                default_attributes, root, model_attributes);
-        std::ostringstream ss;
-        ss << tree;
-        attribute_str = " " + ss.str();
+        attribute_str = netlist_nested_attributes_to_netlist(
+                model_attributes, default_attributes);
     }
     else
     {
-        TRACE2(DESCRIPTION, "Parsing attributes using normal format\n");
-        for (const auto &attribute : model_attributes)
+        attribute_str = netlist_scalar_attributes_to_netlist(
+                model_attributes, default_attributes);
+    }
+
+    return attribute_str;
+}
+
+std::string sanafe::netlist_nested_attributes_to_netlist(
+        const std::map<std::string, sanafe::ModelAttribute> &model_attributes,
+        const std::map<std::string, sanafe::ModelAttribute> &default_attributes)
+{
+    std::string attribute_str{};
+
+    TRACE2(DESCRIPTION, "Parsing nested attributes\n");
+    ryml::Tree tree; // NOLINT(misc-include-cleaner)
+    ryml::NodeRef root = tree.rootref(); // NOLINT(misc-include-cleaner)
+    root |= ryml::MAP; // NOLINT(misc-include-cleaner)
+    root |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
+
+    yaml_serialize_model_attributes(
+            default_attributes, root, model_attributes);
+    std::ostringstream ss;
+    ss << tree;
+    attribute_str = " " + ss.str();
+
+    return attribute_str;
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::string sanafe::netlist_scalar_attributes_to_netlist(
+        const std::map<std::string, sanafe::ModelAttribute> &model_attributes,
+        const std::map<std::string, sanafe::ModelAttribute> &default_attributes)
+{
+    std::string attribute_str{};
+
+    TRACE2(DESCRIPTION, "Parsing attributes using normal format\n");
+    for (const auto &attribute : model_attributes)
+    {
+        const std::string &attribute_name = attribute.first;
+        const sanafe::ModelAttribute &attribute_value = attribute.second;
+        const bool no_default_attribute =
+                (default_attributes.find(attribute_name) ==
+                        default_attributes.end());
+        if (no_default_attribute ||
+                (default_attributes.at(attribute_name) != attribute_value))
         {
-            const std::string &attribute_name = attribute.first;
-            const sanafe::ModelAttribute &attribute_value = attribute.second;
-            const bool no_default_attribute =
-                    (default_attributes.find(attribute_name) ==
-                            default_attributes.end());
-            if (no_default_attribute ||
-                    (default_attributes.at(attribute_name) != attribute_value))
-            {
-                attribute_str += " ";
-                attribute_str += attribute_name;
-                attribute_str += "=";
-                attribute_str += attribute_value.print();
-            }
+            attribute_str += " ";
+            attribute_str += attribute_name;
+            attribute_str += "=";
+            attribute_str += attribute_value.print();
         }
     }
 

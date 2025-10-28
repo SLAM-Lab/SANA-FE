@@ -193,7 +193,7 @@ std::vector<sanafe::ModelAttribute> sanafe::yaml_parse_attribute_map(
     return attribute_map;
 }
 
-// NOLINTBEGIN(readability-function-cognitive-complexity)
+// NOLINTBEGIN(readability-function-cognitive-complexity,readability-function-size)
 // False positive: Sequential type-checking pattern is simple despite multiple
 //  return points
 sanafe::AttributeVariant sanafe::yaml_parse_attribute_scalar(
@@ -201,7 +201,7 @@ sanafe::AttributeVariant sanafe::yaml_parse_attribute_scalar(
 {
     if (attribute_node.invalid())
     {
-        throw std::invalid_argument("Invalid node.\n");
+        throw std::invalid_argument("Invalid attribute YAML node.\n");
     }
     //  Parse YAML scalar by attempting type conversions in priority order.
     //   YAML scalars are ambiguous - the same text can often be parsed a
@@ -255,7 +255,7 @@ sanafe::AttributeVariant sanafe::yaml_parse_attribute_scalar(
     INFO("Error: %s.\n", error_msg.c_str());
     throw std::runtime_error(error_msg);
 }
-// NOLINTEND(readability-function-cognitive-complexity)
+// NOLINTEND(readability-function-cognitive-complexity,readability-function-size)
 
 std::pair<size_t, size_t> sanafe::yaml_parse_range(const std::string &range_str)
 {

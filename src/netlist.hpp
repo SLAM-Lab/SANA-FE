@@ -36,6 +36,9 @@ std::string netlist_neuron_to_netlist(const Neuron &neuron, const SpikingNetwork
 std::string netlist_mapping_to_netlist(const Neuron &neuron, const std::map<std::string, size_t> &group_name_to_id);
 std::string netlist_connection_to_netlist(const Connection &con, const std::map<std::string, size_t> &group_name_to_id);
 std::string netlist_attributes_to_netlist(const std::map<std::string, ModelAttribute> &model_attributes, const std::map<std::string, ModelAttribute> &default_attributes);
+std::string netlist_nested_attributes_to_netlist(const std::map<std::string, sanafe::ModelAttribute> &model_attributes, const std::map<std::string, sanafe::ModelAttribute> &default_attributes);
+std::string netlist_scalar_attributes_to_netlist(const std::map<std::string, sanafe::ModelAttribute> &model_attributes, const std::map<std::string, sanafe::ModelAttribute> &default_attributes);
+
 
 void netlist_read_group(const std::vector<std::string_view> &fields, SpikingNetwork &net, int line_number);
 void netlist_read_neuron(const std::vector<std::string_view> &fields, SpikingNetwork &net, int line_number);

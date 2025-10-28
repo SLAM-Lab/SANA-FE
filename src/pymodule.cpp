@@ -730,7 +730,7 @@ public:
 
     // Handles both integer and slice indexing, returning a NeuronRef or a list
     //  of NeuronRefs
-    [[nodiscard]] pybind11::object __getitem__(pybind11::object index) const // NOLINT(bugprone-reserved-identifier)
+    [[nodiscard]] pybind11::object __getitem__(pybind11::object index) const // NOLINT(bugprone-reserved-identifier,readability-identifier-naming)
     {
         const pybind11::gil_scoped_acquire acquire;
 
@@ -780,7 +780,7 @@ public:
     }
 
     // Support iteration directly on the view object
-    [[nodiscard]] PyNeuronRefIterator __iter__() const // NOLINT(bugprone-reserved-identifier)
+    [[nodiscard]] PyNeuronRefIterator __iter__() const // NOLINT(bugprone-reserved-identifier,readability-identifier-naming)
     {
         return {group_ref_, group_};
     }
