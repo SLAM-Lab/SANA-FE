@@ -816,7 +816,9 @@ std::string sanafe::netlist_nested_attributes_to_netlist(
     return attribute_str;
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+// TODO: maybe there is a better way to do this e.g. using a
+//  named struct like AttributesWithDefault
 std::string sanafe::netlist_scalar_attributes_to_netlist(
         const std::map<std::string, sanafe::ModelAttribute> &model_attributes,
         const std::map<std::string, sanafe::ModelAttribute> &default_attributes)
@@ -843,6 +845,7 @@ std::string sanafe::netlist_scalar_attributes_to_netlist(
 
     return attribute_str;
 }
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 size_t sanafe::field_to_int(const std::string_view &field)
 {
