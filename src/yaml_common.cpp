@@ -33,7 +33,7 @@ sanafe::YamlDescriptionParsingError::YamlDescriptionParsingError(
         const ryml::ConstNodeRef &node)
         : std::invalid_argument(error)
 {
-    const ryml::Location pos = parser.location(node);
+    const ryml::Location pos = node.location(parser);
     message = "Error: " + error + " (Line " + std::to_string(pos.line + 1) +
             ':' + std::to_string(pos.col + 1) + ").\n";
 }

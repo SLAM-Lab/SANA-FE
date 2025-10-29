@@ -167,7 +167,7 @@ endif()
 
 ############## rapid-yaml
 project(ryml-quickstart LANGUAGES CXX)
-set(RYML_VERSION "v0.9.0")
+set(RYML_VERSION "v0.10.0")
 message(STATUS "FetchContent for tag: ${RYML_VERSION}")
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 
