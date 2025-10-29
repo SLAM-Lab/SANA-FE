@@ -133,6 +133,16 @@ sanafe::SpikingNetwork sanafe::yaml_parse_network_section(
     INFO("Parsing network: %s\n", net_name.c_str());
 
     SpikingNetwork new_net(std::move(net_name));
+    if (net_node.find_child("groups").invalid())
+    {
+        throw YamlDescriptionParsingError(
+                "No neuron groups specified", parser, net_node);
+    }
+    if(net_node.find_child("edges").invalid())
+    {
+        throw YamlDescriptionParsingError(
+                "No edges section specified", parser, net_node);
+    }
     yaml_parse_neuron_group_section(parser, net_node["groups"], new_net);
     yaml_parse_edges_section_yaml(parser, net_node["edges"], new_net);
 
@@ -383,13 +393,15 @@ sanafe::NeuronConfiguration sanafe::yaml_parse_neuron_attributes(
 }
 
 std::tuple<sanafe::NeuronAddress, sanafe::NeuronAddress>
-sanafe::description_parse_edge_description(const std::string_view &description)
+sanafe::description_parse_edge_description(const std::string_view &description,
+        const ryml::Parser &parser, const ryml::ConstNodeRef node)
 {
     auto arrow_pos = description.find("->");
     if (arrow_pos == std::string::npos)
     {
-        throw std::runtime_error(
-                "Edge is not formatted correctly: " + std::string(description));
+        throw YamlDescriptionParsingError(
+                "Edge is not formatted correctly: " + std::string(description),
+                parser, node);
     }
 
     const std::string_view source_part =
@@ -404,13 +416,15 @@ sanafe::description_parse_edge_description(const std::string_view &description)
     const bool target_neuron_defined = (target_dot_pos != std::string::npos);
     if (source_neuron_defined && !target_neuron_defined)
     {
-        throw std::runtime_error(
-                "No target neuron defined in edge:" + std::string(description));
+        throw YamlDescriptionParsingError(
+                "No target neuron defined in edge:" + std::string(description),
+                parser, node);
     }
     if (target_neuron_defined && !source_neuron_defined)
     {
-        throw std::runtime_error(
-                "No target neuron defined in edge:" + std::string(description));
+        throw YamlDescriptionParsingError(
+                "No target neuron defined in edge:" + std::string(description),
+                parser, node);
     }
 
     NeuronAddress source;
@@ -438,7 +452,8 @@ void sanafe::description_parse_edge(const std::string &description,
 {
     // Description has format src_group.src_neuron -> tgt_group.tgt_neuron
     const auto [source_address, target_address] =
-            description_parse_edge_description(description);
+            description_parse_edge_description(
+                    description, parser, attributes_node);
 
     const bool is_hyper_edge = !source_address.neuron_offset.has_value();
     if (is_hyper_edge)
@@ -581,7 +596,8 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
 }
 
 bool sanafe::yaml_parse_conv2d_attribute(const std::string attribute_name,
-        const ModelAttribute &attribute, Conv2DParameters &convolution)
+        const ModelAttribute &attribute, Conv2DParameters &convolution,
+        const ryml::Parser &/*parser*/, const ryml::ConstNodeRef /*node*/)
 {
     bool parsed = true;
 
@@ -627,7 +643,8 @@ bool sanafe::yaml_parse_conv2d_attribute(const std::string attribute_name,
 
 bool sanafe::yaml_parse_sparse_attribute(const std::string attribute_name,
         const sanafe::ModelAttribute &attribute,
-        std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
+        std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs,
+        const ryml::Parser &parser, ryml::ConstNodeRef node)
 {
     if (attribute_name == "source_target_pairs")
     {
@@ -639,8 +656,10 @@ bool sanafe::yaml_parse_sparse_attribute(const std::string attribute_name,
             {
                 if (!src_tgt_pair.is_list())
                 {
-                    throw std::runtime_error("Invalid source/target type: "
-                                             "expected tuple [source, target]");
+                    throw YamlDescriptionParsingError(
+                            "Invalid source/target type: "
+                            "expected tuple [source, target]",
+                            parser, node);
                 }
                 std::vector<ModelAttribute> src_target_vec = src_tgt_pair;
 
@@ -654,15 +673,17 @@ bool sanafe::yaml_parse_sparse_attribute(const std::string attribute_name,
                 }
                 else
                 {
-                    throw std::runtime_error("Invalid source/target format: "
-                                             "expected [source, target]");
+                    throw YamlDescriptionParsingError(
+                            "Invalid source/target format: "
+                            "expected [source, target]",
+                            parser, node);
                 }
             }
         }
         else
         {
-            throw std::runtime_error(
-                    "Source/target pair must be a list of pairs");
+            throw YamlDescriptionParsingError(
+                    "Source/target pair must be a list of pairs", parser, node);
         }
         return true;
     }
@@ -712,7 +733,8 @@ void sanafe::yaml_parse_conv2d(NeuronGroup &source_group,
     std::map<std::string, std::vector<ModelAttribute>> attribute_lists{};
     for (const auto &[attribute_name, attribute] : attributes)
     {
-        if (yaml_parse_conv2d_attribute(attribute_name, attribute, convolution))
+        if (yaml_parse_conv2d_attribute(attribute_name, attribute, convolution,
+                    parser, hyperedge_node))
         {
             // Ignore the standard convolutional attributes which shouldn't be
             //  forwarded onto the hardware models
@@ -749,8 +771,8 @@ void sanafe::yaml_parse_sparse(NeuronGroup &source_group,
 
     for (const auto &[attribute_name, attribute] : attributes)
     {
-        if (yaml_parse_sparse_attribute(
-                    attribute_name, attribute, source_dest_id_pairs))
+        if (yaml_parse_sparse_attribute(attribute_name, attribute,
+                    source_dest_id_pairs, parser, hyperedge_node))
         {
             // Ignore the standard sparse attributes which shouldn't be
             //  forwarded onto the hardware models

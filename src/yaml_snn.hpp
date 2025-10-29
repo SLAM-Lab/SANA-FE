@@ -49,12 +49,12 @@ std::string description_parse_hyperedge_type(const ryml::Parser &parser, const r
 void yaml_parse_conv2d(NeuronGroup &source_group, const ryml::Parser &parser, ryml::ConstNodeRef hyperedge_node, NeuronGroup &target_group);
 void yaml_parse_sparse(NeuronGroup &source_group, const ryml::Parser &parser, ryml::ConstNodeRef hyperedge_node, NeuronGroup &target_group);
 void yaml_parse_dense(NeuronGroup &source_group, const ryml::Parser &parser, ryml::ConstNodeRef hyperedge_node, NeuronGroup &target_group);
-bool yaml_parse_conv2d_attribute(const std::string attribute_name, const sanafe::ModelAttribute &attribute, Conv2DParameters &convolution);
-bool yaml_parse_sparse_attribute(const std::string attribute_name, const sanafe::ModelAttribute &attribute, std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs);
+bool yaml_parse_conv2d_attribute(const std::string attribute_name, const sanafe::ModelAttribute &attribute, Conv2DParameters &convolution, const ryml::Parser &parser, ryml::ConstNodeRef node);
+bool yaml_parse_sparse_attribute(const std::string attribute_name, const sanafe::ModelAttribute &attribute, std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs, const ryml::Parser &parser, ryml::ConstNodeRef node);
 void yaml_parse_unit_specific_attributes(const ryml::Parser &parser, ryml::ConstNodeRef parent_node, std::map<std::string, std::vector<ModelAttribute>> &attribute_lists);
 
 void description_parse_edge_attributes(Connection &edge, const ryml::Parser &parser, ryml::ConstNodeRef attributes_node);
-std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description);
+std::tuple<NeuronAddress, NeuronAddress> description_parse_edge_description(const std::string_view &description, const ryml::Parser &parser, const ryml::ConstNodeRef node);
 
 // Functions for writing YAML
 void yaml_write_network(std::filesystem::path path, const sanafe::SpikingNetwork &network);

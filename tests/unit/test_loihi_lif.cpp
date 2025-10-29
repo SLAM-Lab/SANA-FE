@@ -190,10 +190,10 @@ TEST(LoihiLifModelTest, NoiseFileNotOpenThrows)
 TEST(LoihiLifModelTest, ThrowsWhenUpdatingTwiceSameTimeStep)
 {
     sanafe::LoihiLifModel neuron;
-    neuron.set_attribute_neuron(0, "threshold", make_attr_double(10.0));
+    neuron.set_attribute_neuron(0UL, "threshold", make_attr_double(10.0));
 
     neuron.reset();
-    neuron.update(1, 0, 5.0);
+    neuron.update(0UL, 5.0, 1L);
 
     EXPECT_THROW(
             neuron.update(0UL, 5.0, 1L), std::runtime_error);  // Same sim time
