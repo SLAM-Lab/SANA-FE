@@ -6,9 +6,6 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 
 Run DVS Gesture and extract some performance statistics
 """
-#import matplotlib
-#matplotlib.use('Agg')
-
 import csv
 import yaml
 from matplotlib import pyplot as plt
@@ -95,8 +92,8 @@ def parse_loihi_spiketrains(total_timesteps):
 if __name__ == "__main__":
     run_experiments = True
     plot_experiments = True
-    experiment = "time"
-    #experiment = "energy"
+    #experiment = "time"
+    experiment = "energy"
 
     neurons = []
     spiking_times = []
@@ -150,9 +147,7 @@ if __name__ == "__main__":
             is_first_frame = (frame == 0)
             chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",
                      write_trace_headers=is_first_frame, timing_model="detailed",
-                     #write_trace_headers=is_first_frame, timing_model="detailed",
                      processing_threads=8, scheduler_threads=8)
-                     #processing_threads=16, scheduler_threads=8)
             chip.reset()
 
         # Parse the detailed perf statistics
@@ -160,7 +155,7 @@ if __name__ == "__main__":
         stats = pd.read_csv(os.path.join(PROJECT_DIR, "perf.csv"))
         analysis = parse_stats(stats)
         times = np.append(times, analysis["times"])
-        energies = np.append(energies, analysis["total_energy"] / timesteps)
+        energies = stats["total_energy"]
         hops = np.append(hops, analysis["hops"])
 
         if experiment == "time":
@@ -293,33 +288,44 @@ if __name__ == "__main__":
                 if distances[min_dist_idx] < threshold:
                     print(f"Frame: {min_dist_idx}")
 
-        # Connect the click event to the figure
-        plt.gcf().canvas.mpl_connect('button_press_event', on_click)
+            # Connect the click event to the figure
+            plt.gcf().canvas.mpl_connect('button_press_event', on_click)
 
-        plt.figure(figsize=(3.0, 3.0))
-        scatter = plt.plot(predicted_latency[0:1000]*1.0e6, loihi_latency[0:1000]*1.0e6, "o", alpha=0.8)[0]
-        plt.plot(np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6),
-                    np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6), "k--")
-        plt.ylabel("Measured Latency ($\mu$s)")
-        plt.xlabel("Simulated Latency ($\mu$s)")
-        plt.tight_layout(pad=0.3)
-        plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.pdf")
-        plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.png", dpi=300)
+            plt.figure(figsize=(3.0, 3.0))
+            scatter = plt.plot(predicted_latency[0:1000]*1.0e6, loihi_latency[0:1000]*1.0e6, "o", alpha=0.8)[0]
+            plt.plot(np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6),
+                        np.linspace(min(loihi_latency)*1.0e6, max(loihi_latency)*1.0e6), "k--")
+            plt.ylabel("Measured Latency ($\mu$s)")
+            plt.xlabel("Simulated Latency ($\mu$s)")
+            plt.tight_layout(pad=0.3)
+            plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.pdf")
+            plt.savefig("runs/dvs/dvs_gesture_sim_correlation_ts.png", dpi=300)
 
-        print("Showing plots")
-        plt.show()
-        print("Time simulations finished")
+            print("Showing plots")
+            plt.show()
+            print("Time simulations finished")
 
         if experiment == "energy":
             plt.rcParams.update({'font.size': 6, 'lines.markersize': 2})
             loihi_data = pd.read_csv(LOIHI_ENERGY_DATA_PATH, delimiter=",")
             loihi_energies = np.array(loihi_data).flatten() * 1.0e6
+
             energies = np.loadtxt(SIM_ENERGY_DATA_PATH) * 1.0e6
+            energies = np.delete(energies,
+                    list(range(timesteps-1, timesteps*frames, timesteps)))
+
+            mean_energies = np.zeros(frames)
+            for i in range(0, frames):
+                mean_energies[i] = np.mean(energies[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
+
             plt.figure(figsize=(1.7, 1.7))
             plt.minorticks_on()
             plt.gca().set_box_aspect(1)
 
-            plt.plot(energies[0:frames], loihi_energies[0:frames], 'x')
+            print(loihi_energies)
+            print(energies)
+            print(frames)
+            plt.plot(mean_energies[0:frames], loihi_energies[0:frames], 'x')
             plt.plot(np.linspace(min(loihi_energies), max(loihi_energies)), np.linspace(min(loihi_energies), max(loihi_energies)), "k--")
             plt.ticklabel_format(style="sci", axis="y", scilimits=(0,0))
             plt.xlim((1, 4))
@@ -332,12 +338,12 @@ if __name__ == "__main__":
             plt.savefig("runs/dvs/dvs_gesture_sim_energy.png")
             plt.savefig("runs/dvs/dvs_gesture_sim_energy.pdf")
 
-            relative_error = abs(loihi_energies[0:frames] - energies[0:frames]) / loihi_energies[0:frames]
+            relative_error = abs(loihi_energies[0:frames] - mean_energies[0:frames]) / loihi_energies[0:frames]
             mean_error = sum(relative_error) / len(relative_error)
             print(relative_error)
             print(f"Energy Absolute Mean error: {mean_error} ({mean_error*100.0} %)")
 
-            total_error = (sum(loihi_energies[0:frames]) - sum(energies[0:frames])) / sum(loihi_energies[0:frames])
+            total_error = (sum(loihi_energies[0:frames]) - sum(mean_energies[0:frames])) / sum(loihi_energies[0:frames])
             print(f"Energy Total error: {total_error} ({total_error*100.0} %)")
 
         # These experiments not used for now

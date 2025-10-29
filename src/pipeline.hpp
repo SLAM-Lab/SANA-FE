@@ -420,7 +420,7 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
         synapse_address = con.value()->mapped_synapse_hw_address;
         read = true;
     }
-    PipelineResult output = update(ts.timestep, synapse_address, read);
+    PipelineResult output = update(synapse_address, read, ts.timestep);
     ++spikes_processed;
 
     return output;

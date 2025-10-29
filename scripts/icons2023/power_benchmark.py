@@ -203,7 +203,7 @@ def run_spiking_experiment(mapping, max_size=30, timing_model="simple"):
 mappings = ("fixed", "l2_split", "split_2", "luke", "split_4")
 #mappings = ("split_2_diff_tiles",)
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
 
     times = {0: [], 256: [], 512: [], 768: [], 1024: []}
