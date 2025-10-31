@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import sys
 import os
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
 sys.path.insert(0, PROJECT_DIR)
 import sanafe
 
@@ -32,21 +32,26 @@ def run_performance_experiments():
     """Run simulator performance experiments with varying thread counts."""
 
     # Configuration
-    ARCH_PATH = "arch/loihi.yaml"
-    NETWORK_PATH = "dvs_gesture_32x32_sep23.yaml"
+    ARCH_PATH = "arch/loihi_large.yaml"
+    #NETWORK_PATH = "dvs_gesture_32x32_sep23.yaml"
+    NETWORK_PATH = "snn/fly.net"
 
     # Experiment parameters
-    processing_threads_range = range(1, 17, 1)
-    scheduler_threads_range = range(0, 9, 1)   # Different scheduler thread counts
+    processing_threads_range = range(1, 49, 1)
+    #processing_threads_range = range(32, 49, 1)
+    scheduler_threads_range = [0, 1, 2] + list(range(4, 33, 4))   # Different scheduler thread counts
+    #scheduler_threads_range = [2,] # Different scheduler thread counts
     num_repeats = 5
-    timesteps = 10000
+#    num_repeats = 1
+    #timesteps = 10000
+    timesteps = 1000
 
     # Results storage
     results = []
 
     print("Loading architecture and network...")
     arch = sanafe.load_arch(ARCH_PATH)
-    net = sanafe.load_net(NETWORK_PATH, arch)
+    net = sanafe.load_net(NETWORK_PATH, arch, use_netlist_format=True)
 
     # Load input data (first frame only)
     print("Starting performance experiments...")
@@ -73,6 +78,7 @@ def run_performance_experiments():
                 end_time = time.perf_counter()
 
                 runtime = end_time - start_time
+                print(f"runtime: {runtime}")
 
                 # Store results
                 results.append({
@@ -99,6 +105,8 @@ def run_performance_experiments():
 def plot_results(df, show_plot=True, save_plot=True):
     """Create performance plots from the results DataFrame."""
 
+    df = df[df["scheduler_threads"] <= 20]
+
     # Calculate mean and std for each configuration
     summary = df.groupby(["processing_threads", "scheduler_threads"])["runtime_seconds"].agg(["mean", "std"]).reset_index()
 
@@ -119,14 +127,15 @@ def plot_results(df, show_plot=True, save_plot=True):
                     #linestyle=line_styles[i],
                     markersize=6)
 
-    plt.xlabel('Processing Threads', fontsize=10)
+    plt.xlabel('Processing Threads (U)', fontsize=10)
     plt.ylabel('Runtime (seconds)', fontsize=10)
     #plt.title('Simulator Performance vs Thread Configuration', fontsize=10)
-    plt.legend(("Schedule on main thread", "1 scheduler thread",
-                "2 scheduler threads", "3 scheduler threads",
-                "4 scheduler threads", "5 scheduler threads"), fontsize=8)
+    plt.legend(("Schedule on main thread",  "1 scheduler thread", "2 scheduler threads",
+                "4 scheduler threads", "8 scheduler threads",
+                "12 scheduler threads", "16 scheduler threads",
+                "20 scheduler threads"), fontsize=8)
     plt.grid(True, alpha=0.3)
-    plt.xticks(range(1, 17, 2))
+    plt.xticks(range(0, 49, 8))
 
     # Set y-axis to start from 0 for better comparison
     plt.ylim(bottom=0)
@@ -168,8 +177,8 @@ def plot_results(df, show_plot=True, save_plot=True):
     plt.xlabel("Processing Threads")
     plt.ylabel('Speedup')
     plt.grid(True, alpha=0.3)
-    plt.xticks(range(1, 17, 2))
-    plt.xlim(1, 16)
+    plt.xticks(range(0, 49, 4))
+    plt.xlim(0, 48)
     plt.ylim(bottom=0)
 
     plt.tight_layout()
@@ -183,7 +192,7 @@ def plot_results(df, show_plot=True, save_plot=True):
 
 if __name__ == "__main__":
     # Configuration flags
-    run_experiments = True
+    run_experiments = False
     plot_results_flag = True
 
     if run_experiments:
