@@ -61,11 +61,6 @@ PyBind11. You can install PyBind11 using:
 
 `pip install pybind11`
 
-Booksim 2 requires the `bison` and `flex` packages for config parsing.
-For example, in Ubuntu these can be installed using `apt`.
-
-`apt install bison flex`
-
 # To Run an Example
 
 `./sim arch/example.yaml snn/example.yaml 100`
