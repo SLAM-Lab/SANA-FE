@@ -408,14 +408,15 @@ def calculate_accuracy(analog_synapses=True):
 
     correct = 0
     for i in range(0, num_inputs):
-        print(f"Spike counts per class for inference of digit:{counts[:, i]} "
-            f"out:{np.argmax(counts[:, i])} actual:{labels[i]}")
+        # print(f"Spike counts per class for inference of digit:{counts[:, i]} "
+        #     f"out:{np.argmax(counts[:, i])} actual:{labels[i]}")
         if np.argmax(counts[:, i]) == labels[i]:
             correct += 1
 
-
     accuracy = (correct / num_inputs) * 100
     print(f"Accuracy: {accuracy}% ({correct}/{num_inputs})")
+    print(f"Min timesteps: {np.min(timesteps_per_input)}")
+    print(f"Max timesteps: {np.max(timesteps_per_input)}")
 
 
 def plot_spiking_digits():
@@ -423,11 +424,11 @@ def plot_spiking_digits():
     timesteps_per_input = list(np.loadtxt(
         os.path.join(RUN_PATH, "crossbar_shd.csv"),
         dtype=int, ndmin=1))
-    raster_num_inputs = min(len(timesteps_per_input), 10)
+    raster_num_inputs = min(len(timesteps_per_input), 7)
     raster_total_timesteps = sum(timesteps_per_input[0:raster_num_inputs])
 
     plt.rcParams.update({
-        "font.size": 6,
+        "font.size": 8,
         "font.family": "sans-serif",
         "font.sans-serif": "Arial",
         "pdf.fonttype": 42
@@ -458,8 +459,8 @@ def plot_spiking_digits():
             else:
                 print(f"Warning: Group {group_name} not recognized!")
 
-    fig = plt.figure(figsize=(7.2, 2.5))
-    gs = GridSpec(2, 1, height_ratios=[1.0, 1.0], hspace=0.1, left=0.07, right=0.93, top=0.99, bottom=0.12)
+    fig = plt.figure(figsize=(6.5, 2.5))
+    gs = GridSpec(2, 1, height_ratios=[1.0, 0.7], hspace=0.1, left=0.08, right=0.92, top=0.99, bottom=0.15)
 
     ax_spikes = fig.add_subplot(gs[0])
     ax_spikes.set_xlim((0, raster_total_timesteps))
@@ -468,19 +469,22 @@ def plot_spiking_digits():
     total_neurons = 0
     for neuron_id in range(0, in_neurons):
         ax_spikes.scatter(in_spikes[neuron_id],
-                          [total_neurons] * len(in_spikes[neuron_id]),
+                          [total_neurons] * len(in_spikes[neuron_id],),
+                          rasterized=True,
                           c='k', s=1, marker='.', linewidths=0.2)
         total_neurons += 1
 
     for neuron_id in range(0, hidden_neurons):
         ax_spikes.scatter(hidden_spikes[neuron_id],
                           [total_neurons] * len(hidden_spikes[neuron_id]),
+                          rasterized=True,
                           c='k', s=1, marker='.', linewidths=0.2)
         total_neurons += 1
 
     for neuron_id in range(0, out_neurons):
         ax_spikes.scatter(out_spikes[neuron_id],
                           [total_neurons] * len(out_spikes[neuron_id]),
+                          rasterized=True,
                           c='k', s=1, marker='.', linewidths=0.2)
         total_neurons += 1
 
@@ -501,7 +505,7 @@ def plot_spiking_digits():
     ax_spikes.add_patch(input_patch)
 
     ax_spikes.text(bracket_x + raster_total_timesteps*0.005, in_neurons/2, "Inputs",
-                va='center', fontsize=5)
+                va='center', fontsize=7)
 
     # Hidden neurons bracket - single path
     hidden_verts = [
@@ -516,7 +520,7 @@ def plot_spiking_digits():
     ax_spikes.add_patch(hidden_patch)
 
     ax_spikes.text(bracket_x + raster_total_timesteps*0.005, in_neurons + hidden_neurons/2, "Hidden\nNeurons",
-                va='center', fontsize=5)
+                va='center', fontsize=7)
 
     # Output neurons bracket - single path
     hidden_verts = [
@@ -532,7 +536,7 @@ def plot_spiking_digits():
 
     ax_spikes.text(bracket_x + raster_total_timesteps*0.005,
                    in_neurons + hidden_neurons + out_neurons/2, "Outputs",
-                va='center', fontsize=5)
+                va='center', fontsize=7)
 
     ax_spikes.set_xticks([])
 
@@ -546,30 +550,53 @@ def plot_spiking_digits():
     analog_perf_df["loihi_energy_uj"] = loihi_perf_df["total_energy"] * 1.0e6
 
     analog_perf_df.plot(x="timestep", y=["loihi_energy_uj", "total_energy_uj"],
-                        ax=ax_perf, color=[okabe_ito_colors[0], okabe_ito_colors[4]],
-                        style=["--", "-"])
+                        ax=ax_perf, color=[okabe_ito_colors[4], okabe_ito_colors[2]],
+                        style=["--", "-"], legend=False)
     ax_perf.set_xlim((0, raster_total_timesteps))
     ax_perf.set_xlabel("Time-step")
-    ax_perf.legend(("Loihi", "Loihi-IMAC"), fontsize=5, bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
+    #ax_perf.legend(("Loihi", "Loihi-IMAC"), fontsize=7, bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
     ax_perf.minorticks_on()
 
-    # Currently, I'm not planning to put this figure anywhere. Other data shows
-    #  that the vast majority of the energy consumption is due to everything
-    #  apart from the soma. The majority of energy savings by using the Indiveri
-    #  model is due to reduced spiking activity (likely due to the SNN being
-    #  trained slightly differently). The energy savings seen in this plot are
-    #  due to reduced synaptic energy usage...
-    plt.savefig(os.path.join(RUN_PATH, "shd_crossbar_raster.png"), dpi=300)
-    plt.savefig(os.path.join(RUN_PATH, "shd_crossbar_raster.pdf"))
+    # Add colored annotations on the right side for energy subplot
+    energy_label_x = raster_total_timesteps * 1.002
+    final_loihi_energy = analog_perf_df["loihi_energy_uj"].iloc[-1]
+    final_analog_energy = analog_perf_df["total_energy_uj"].iloc[-1]
 
-    # TODO: accumulate and print per inference stats like I do for indiveri
+    ax_perf.text(energy_label_x + raster_total_timesteps*0.005, final_loihi_energy, "Loihi",
+                va='center', fontsize=7, color=okabe_ito_colors[4])
+    ax_perf.text(energy_label_x + raster_total_timesteps*0.005, final_analog_energy, "Loihi-IMAC",
+                va='center', fontsize=7, color=okabe_ito_colors[2])
+
+    plt.savefig(os.path.join(RUN_PATH, "shd_crossbar_raster.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_PATH, "shd_crossbar_raster.pdf"), dpi=300)
+
+    analog_perf_df["total_energy_uj"] = analog_perf_df["total_energy"] * 1.0e6
+    analog_perf_df["soma_energy_uj"] = analog_perf_df["soma_energy"] * 1.0e6
+    print("***")
+    mean_energy = analog_perf_df['total_energy'].mean()
+    print(f"Mean Total Crossbar energy: {mean_energy} J (100 %)")
+    print(f"Mean Soma Crossbar energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / mean_energy} %)")
+    print(f"Mean Synapse Crossbar energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / mean_energy} %)")
+    print(f"Mean Network Crossbar energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / mean_energy} %)")
+    print(f"Mean Crossbar firing neurons: {analog_perf_df['fired'].mean()}")
+
+    print("***")
+    mean_energy = loihi_perf_df['total_energy'].mean()
+    print(f"Mean Total Loihi energy: {loihi_perf_df['total_energy'].mean()} J (100 %)")
+    print(f"Mean Soma Loihi energy: {loihi_perf_df['soma_energy'].mean()} J ({100.0 * loihi_perf_df['soma_energy'].mean() / mean_energy} %)")
+    print(f"Mean Synapse Loihi energy: {loihi_perf_df['synapse_energy'].mean()} J ({100.0 * loihi_perf_df['synapse_energy'].mean() / mean_energy} %)")
+    print(f"Mean Network Loihi energy: {loihi_perf_df['network_energy'].mean()} J ({100.0 * loihi_perf_df['network_energy'].mean() / mean_energy} %)")
+    print(f"Mean Loihi firing neurons: {loihi_perf_df['fired'].mean()}")
 
 
 if __name__ == "__main__":
     num_inputs = 2264  # Number of inferences
     #num_inputs = 10
-    run_spiking_digits(num_inputs=num_inputs, analog_synapses=False)
-    run_spiking_digits(num_inputs=num_inputs, analog_synapses=True)
+    run_experiments = False
+
+    if run_experiments:
+        run_spiking_digits(num_inputs=num_inputs, analog_synapses=True)
+        run_spiking_digits(num_inputs=num_inputs, analog_synapses=False)
 
     calculate_accuracy(analog_synapses=False)
     calculate_accuracy(analog_synapses=True)

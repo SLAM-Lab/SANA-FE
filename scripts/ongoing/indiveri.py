@@ -303,7 +303,8 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
         hw.sim(timesteps, spike_trace=os.path.join(RUN_PATH, spike_filename),
                potential_trace=os.path.join(RUN_PATH, potential_filename),
                perf_trace=os.path.join(RUN_PATH, perf_filename),
-               write_trace_headers=is_first_input, processing_threads=16)
+               write_trace_headers=is_first_input, processing_threads=8,
+               scheduler_threads=8)
         timesteps_per_input.append(timesteps)
         hw.reset()
 
@@ -451,6 +452,7 @@ def plot_experiments(dataset):
         dtype=int, ndmin=1))
 
     inputs, labels, weights = load_dataset(dataset, True)
+    # Not using the plots in the paper for now
     if dataset == "shd":
         plot_shd(timesteps_per_input, labels, weights)
     elif dataset == "mnist":
@@ -741,6 +743,7 @@ def plot_mnist(timesteps_per_input, inputs, weights):
     hidden_neurons = weights["fc1.weight"].shape[0]
     out_neurons = weights["fc2.weight"].shape[0]
 
+    """
     # Read in simulation results
     with open(os.path.join(RUN_PATH, spike_filename)) as spike_csv:
         spike_data = csv.DictReader(spike_csv)
@@ -762,7 +765,6 @@ def plot_mnist(timesteps_per_input, inputs, weights):
                 out_spikes[neuron_id].append(timestep)
             else:
                 print(f"Warning: Group {group_name} not recognized!")
-
 
     # 2) Create a raster plot of all spikes
     cumulative_counts = calculate_cumulative_spikes(
@@ -838,12 +840,13 @@ def plot_mnist(timesteps_per_input, inputs, weights):
     ax_potentials.set_ylabel("Spike Counts")
     ax_potentials.set_xticks([])
     ax_potentials.set_xlabel("")
-
     ax_perf = fig.add_subplot(gs[3])
     ax_perf.set_xlim((0, total_timesteps))
+    """
     perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
     perf_df["total_energy_uj"] = perf_df["total_energy"] * 1.0e6
     perf_df["soma_energy_uj"] = perf_df["soma_energy"] * 1.0e6
+    """
     perf_df.plot(x="timestep", y=["total_energy_uj", "soma_energy_uj"], ax=ax_perf)
     #perf_df.plot(x="timestep", y=["soma_energy_uj",], ax=ax_perf)
     for i in range(num_inputs + 1):
@@ -854,6 +857,7 @@ def plot_mnist(timesteps_per_input, inputs, weights):
     ax_perf.set_xlabel("Time-step")
     plt.savefig("runs/indiveri/mnist_raster.png", dpi=300)
     plt.savefig("runs/indiveri/mnist_raster.pdf")
+    """
 
     print("***")
     mean_energy = perf_df['total_energy'].mean()
@@ -875,7 +879,7 @@ def plot_mnist(timesteps_per_input, inputs, weights):
 
 
 # Rate-encoded MNIST as a toy demo
-dataset = "mnist"
+#dataset = "mnist"
 # Spiking Heidelberg Digits (SHD) is the second neuromorphic application.
 #  I have trained two SNNs for SHD for this script:
 #  The first SNN was trained using a modified LIF (Leaky) behavioral model (that
@@ -887,15 +891,15 @@ dataset = "mnist"
 #  The second SNN was trained using the LASANA model directly (by Jason). This
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
 #   accuracy, which is comparable to the SHD benchmark paper.
-#dataset = "shd"
+dataset = "shd"
 
 run_experiments = True
 create_plots = True
 
 if dataset == "mnist":
-    num_inputs = 10
+    #num_inputs = 10
     #num_inputs = 1
-    #num_inputs = 10000 # Entire test set
+    num_inputs = 10000 # Entire test set
 elif dataset == "shd":
     timesteps = None
     #num_inputs = 1

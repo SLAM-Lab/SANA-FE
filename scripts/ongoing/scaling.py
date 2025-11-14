@@ -101,47 +101,75 @@ def run_performance_experiments():
 
     return df
 
-
+from matplotlib import cm
 def plot_results(df, show_plot=True, save_plot=True):
     """Create performance plots from the results DataFrame."""
+    plt.rcParams.update({'font.size': 7, 'lines.markersize': 2, "font.family": "sans-serif", "font.sans-serif": "Arial", "pdf.fonttype": 42})
+
 
     df = df[df["scheduler_threads"] <= 20]
 
     # Calculate mean and std for each configuration
     summary = df.groupby(["processing_threads", "scheduler_threads"])["runtime_seconds"].agg(["mean", "std"]).reset_index()
 
-    plt.figure(figsize=(3, 3))
+    fig = plt.figure(figsize=(1.5, 1.5))
 
     #line_styles = (("-", "--", "-.", ":", "-", "-"))
     #markers = (("o", "x", "^", "s", "o", "o"))
 
     # Plot lines for each scheduler thread count
     scheduler_counts = sorted(summary['scheduler_threads'].unique())
-    for i, sched_threads in enumerate(scheduler_counts):
+    colors = ['black']  # S=0 gets black
+    n_lines = len(scheduler_counts)
+
+    if n_lines > 1:
+        hm = cm.get_cmap('Blues', n_lines - 1)
+        blues_colors = [hm(0.5 + 0.5 * (n_lines - 2 - i) / max(1, n_lines - 2)) for i in range(n_lines - 1)]
+    colors.extend(blues_colors)
+
+    label_y_values = [90, 81, 42, 22, 13, 4, 4, 4]
+
+    for i in reversed(range(len(scheduler_counts))):
+        sched_threads = scheduler_counts[i]
         data = summary[summary['scheduler_threads'] == sched_threads]
         plt.plot(data['processing_threads'], data['mean'],
                     #yerr=data['std'],
                     #marker=markers[i],
-                    color=okabe_ito_colors[i % len(okabe_ito_colors)],
+                    color=colors[i],
                     linewidth=2,
                     #linestyle=line_styles[i],
-                    markersize=6)
+                    markersize=6,
+                    alpha=0.8)
+                # Add label at the end of the line
 
-    plt.xlabel('Processing Threads (U)', fontsize=10)
-    plt.ylabel('Runtime (seconds)', fontsize=10)
+        ax = fig.axes[0]
+        if sched_threads <= 8:
+            last_x = data['processing_threads'].iloc[-1]
+            ax.text(last_x + 0.5, label_y_values[i], f'S={sched_threads}',
+               color=colors[i], fontsize=7, va='center')
+        if sched_threads == 20:
+            last_x = data['processing_threads'].iloc[-1]
+            ax.text(last_x + 0.5, label_y_values[i], f'S>8',
+               color=colors[i], fontsize=7, va='center')
+
+    plt.xlabel('H/W Update Threads (U)')
+    plt.ylabel('Simulator Run-time (s)')
     #plt.title('Simulator Performance vs Thread Configuration', fontsize=10)
-    plt.legend(("Schedule on main thread",  "1 scheduler thread", "2 scheduler threads",
-                "4 scheduler threads", "8 scheduler threads",
-                "12 scheduler threads", "16 scheduler threads",
-                "20 scheduler threads"), fontsize=8)
+    # plt.legend(("Schedule on main thread",  "1 scheduler thread", "2 scheduler threads",
+    #             "4 scheduler threads", "8 scheduler threads",
+    #             "12 scheduler threads", "16 scheduler threads",
+    #             "20 scheduler threads"), fontsize=8)
     plt.grid(True, alpha=0.3)
-    plt.xticks(range(0, 49, 8))
+    plt.xticks(range(0, 49, 16))
+    plt.yticks(range(0, 126, 25))
 
     # Set y-axis to start from 0 for better comparison
+    plt.xlim((0, 60))
     plt.ylim(bottom=0)
-    plt.tight_layout()
+    plt.tight_layout(pad=0.1)
 
     if save_plot:
+        plt.savefig('runs/scaling/simulator_performance.pdf')
         plt.savefig('runs/scaling/simulator_performance.png', dpi=300)
         print("Plot saved as simulator_performance.png")
 
@@ -155,12 +183,12 @@ def plot_results(df, show_plot=True, save_plot=True):
 
     # Calculate speedup
     summary['speedup'] = baseline / summary['runtime_seconds']
-
-    plt.figure(figsize=(3, 3))
+    fig = plt.figure(figsize=(1.5, 1.5))
 
     # Plot lines for each scheduler thread count
     scheduler_counts = sorted(summary['scheduler_threads'].unique())
 
+    label_y_values = [0.5, 1.8, 3.3, 6.4, 12.3, 17.2, 18.7, 20]
     for i, sched_threads in enumerate(scheduler_counts):
         data = summary[summary['scheduler_threads'] == sched_threads]
         plt.plot(data['processing_threads'], data['speedup'],
@@ -169,21 +197,28 @@ def plot_results(df, show_plot=True, save_plot=True):
                 markersize=6,
                 label=f'{sched_threads} scheduler threads',
                 #linestyle=line_styles[i],
-                color=okabe_ito_colors[i % len(okabe_ito_colors)])
+                color=colors[i],
+                alpha=0.8)
+        ax = fig.axes[0]
+        #print(data['speedup'].to_numpy()[-1])
+        last_x = data['processing_threads'].iloc[-1]
+        ax.text(last_x + 0.5, label_y_values[i], f'S={sched_threads}',
+            color=colors[i], fontsize=7, va='center')
 
     # Add ideal speedup reference line
     #plt.plot(range(1, 17), range(1, 17), '--', color='gray', alpha=0.5, label='Ideal speedup')
 
-    plt.xlabel("Processing Threads")
-    plt.ylabel('Speedup')
+    plt.xlabel("H/W Update Threads (U)")
+    plt.ylabel('Simulator Speedup')
     plt.grid(True, alpha=0.3)
-    plt.xticks(range(0, 49, 4))
-    plt.xlim(0, 48)
+    plt.xticks(range(0, 49, 16))
+    plt.xlim(0, 62)
     plt.ylim(bottom=0)
 
-    plt.tight_layout()
+    plt.tight_layout(pad=0.1)
     if save_plot:
         plt.savefig('runs/scaling/simulator_speedup.png', dpi=300)
+        plt.savefig('runs/scaling/simulator_speedup.pdf')
         print("Plot saved as simulator_speedup.png")
 
     if show_plot:
@@ -206,6 +241,6 @@ if __name__ == "__main__":
     # Generate plots
     if plot_results_flag:
         print("Generating plots...")
-        plot_results(results_df, show_plot=True, save_plot=True)
+        plot_results(results_df, show_plot=False, save_plot=True)
 
     print("Analysis complete!")

@@ -8,20 +8,27 @@ import yaml
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import matplotlib.pyplot as plt
+import time
 
-# Setup paths
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
-sys.path.insert(0, PROJECT_DIR)
-import sanafe
+# Setup paths
+try:
+    import sanafe
+except ImportError:
+    # Not installed, fall-back to local build
+    sys.path.insert(0, PROJECT_DIR)
+    import sanafe
 
 # Configuration
 ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net.tagged"
-DVS_RUN_DIR = os.path.join(PROJECT_DIR, "runs", "synapse")
+RUN_DIR = os.path.join(PROJECT_DIR, "runs", "synapse")
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
-GENERATED_NETWORK_PATH = os.path.join(DVS_RUN_DIR, NETWORK_FILENAME)
+GENERATED_NETWORK_PATH = os.path.join(RUN_DIR, NETWORK_FILENAME)
 
 # Simulation parameters
 TIMESTEPS = 128
@@ -39,7 +46,10 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses, run_dir
         for core in tile['core']:
             for synapse in core['synapse']:
                 if synapse['name'] == 'loihi_conv_synapse':
+                    synapse['attributes']['plugin'] = "/home/usr1/jboyle/neuro/sana-fe/plugins/libloihi_synapse.so"
+                    synapse['attributes']['model'] = "loihi"
                     synapse['attributes']['max_parallel_accesses'] = max_parallel_accesses
+                    del synapse["attributes"]["latency_process_spike"]
 
     # Create new filename
     new_arch_filename = f"loihi_parallel_{max_parallel_accesses}.yaml"
@@ -61,7 +71,7 @@ def run_single_experiment(max_parallel_accesses):
     try:
         # Create modified architecture file
         modified_arch_path = create_modified_arch_file(
-            ARCH_PATH, max_parallel_accesses, DVS_RUN_DIR
+            ARCH_PATH, max_parallel_accesses, RUN_DIR
         )
 
         # Load architecture and network
@@ -73,9 +83,10 @@ def run_single_experiment(max_parallel_accesses):
         # Setup performance tracking files
         perf_filename = f"perf_parallel_{max_parallel_accesses}.csv"
         messages_filename = f"messages_parallel_{max_parallel_accesses}.csv"
-        perf_path = os.path.join(DVS_RUN_DIR, perf_filename)
-        messages_path = os.path.join(DVS_RUN_DIR, messages_filename)
+        perf_path = os.path.join(RUN_DIR, perf_filename)
+        messages_path = os.path.join(RUN_DIR, messages_filename)
 
+        start_time = time.perf_counter()
         # Run simulation
         chip.sim(
             TIMESTEPS,
@@ -87,6 +98,7 @@ def run_single_experiment(max_parallel_accesses):
             scheduler_threads=1
         )
         chip.reset()
+        runtime = time.perf_counter() - start_time
 
         # Parse results
         stats = pd.read_csv(perf_path)
@@ -104,7 +116,8 @@ def run_single_experiment(max_parallel_accesses):
             'total_packets': total_packets,
             'total_fired': total_fired,
             'avg_time_per_timestep': total_time / TIMESTEPS,
-            'avg_energy_per_timestep': total_energy / TIMESTEPS
+            'avg_energy_per_timestep': total_energy / TIMESTEPS,
+            'runtime_seconds': runtime
         }
 
         print(f"Completed experiment with max_parallel_accesses={max_parallel_accesses}")
@@ -125,72 +138,83 @@ def main():
     """
     Main function to run parallel experiments
     """
+    run_experiments = False
     print("Starting DVS Gesture parallel architecture exploration")
     print(f"Running experiments with max_parallel_accesses values: {PARALLEL_ACCESS_VALUES}")
-    print(f"Using {len(PARALLEL_ACCESS_VALUES)} parallel threads")
+    results_path = os.path.join(RUN_DIR, "parallel_exploration_results.csv")
 
     # Ensure run directory exists
-    os.makedirs(DVS_RUN_DIR, exist_ok=True)
+    os.makedirs(RUN_DIR, exist_ok=True)
 
-    # Run experiments in parallel
-    results = []
-    for i, max_parallel_accesses in enumerate(PARALLEL_ACCESS_VALUES):
-        print(f"\nProgress: {i+1}/{len(PARALLEL_ACCESS_VALUES)}")
-        result = run_single_experiment(max_parallel_accesses)
-        results.append(result)
+    sweep_start = time.perf_counter()
+    if run_experiments:
+        # Run experiments in parallel
+        results = []
+        for i, max_parallel_accesses in enumerate(PARALLEL_ACCESS_VALUES):
+            print(f"\nProgress: {i+1}/{len(PARALLEL_ACCESS_VALUES)}")
+            result = run_single_experiment(max_parallel_accesses)
+            results.append(result)
 
-    # Sort results by max_parallel_accesses for easier analysis
-    results.sort(key=lambda x: x['max_parallel_accesses'])
+        # Sort results by max_parallel_accesses for easier analysis
+        results.sort(key=lambda x: x['max_parallel_accesses'])
 
-    # Save results to CSV
-    results_df = pd.DataFrame(results)
-    results_path = os.path.join(DVS_RUN_DIR, "parallel_exploration_results.csv")
-    results_df.to_csv(results_path, index=False)
+        # Print summary
+        print("\nSummary of results:")
+        print("Max Parallel | Total Time (s) | Total Energy (J) | Avg Time/Step (s)")
+        print("-" * 70)
+        for result in results:
+            if 'error' not in result:
+                print(f"{result['max_parallel_accesses']:11d} | "
+                    f"{result['total_time']:13.2e} | "
+                    f"{result['total_energy']:15.2e} | "
+                    f"{result['avg_time_per_timestep']:16.2e}")
+            else:
+                print(f"{result['max_parallel_accesses']:11d} | ERROR: {result['error']}")
 
-    print(f"\nAll experiments completed!")
-    print(f"Results saved to: {results_path}")
+        # Sort results by max_parallel_accesses for easier analysis
+        #results.sort(key=lambda x: x['max_parallel_accesses'])
 
-    # Print summary
-    print("\nSummary of results:")
-    print("Max Parallel | Total Time (s) | Total Energy (J) | Avg Time/Step (s)")
-    print("-" * 70)
-    for result in results:
-        if 'error' not in result:
-            print(f"{result['max_parallel_accesses']:11d} | "
-                  f"{result['total_time']:13.2e} | "
-                  f"{result['total_energy']:15.2e} | "
-                  f"{result['avg_time_per_timestep']:16.2e}")
-        else:
-            print(f"{result['max_parallel_accesses']:11d} | ERROR: {result['error']}")
+        # Save results to CSV
+        results_df = pd.DataFrame(results)
+        results_df.to_csv(results_path, index=False)
+
+        print(f"\nAll experiments completed!")
+        print(f"Results saved to: {results_path}")
+
+        sweep_end = time.perf_counter()
+        sweep_runtime = sweep_end - sweep_start
+        print(f"Total sweep runtime: {sweep_runtime} s")
 
 
-    import matplotlib.pyplot as plt
-    # Sort results by max_parallel_accesses for easier analysis
-    results.sort(key=lambda x: x['max_parallel_accesses'])
-
-    # Save results to CSV
-    results_df = pd.DataFrame(results)
-    results_path = os.path.join(DVS_RUN_DIR, "parallel_exploration_results.csv")
-    results_df.to_csv(results_path, index=False)
-
-    print(f"\nAll experiments completed!")
-    print(f"Results saved to: {results_path}")
-
+    # Plotting
+    results_df = pd.read_csv(results_path)
     # Analyze and plot latency results
     #concurrency, total_latency, avg_latency = analyze_and_plot_latency(results)
 
-    # plt.figure(figsize=(6, 4))
-    # plt.plot(concurrency, avg_latency * 1e6, 'o-', linewidth=2, markersize=8, color='blue')
-    # plt.xlabel('Max Parallel Accesses', fontsize=12)
-    # plt.ylabel('Average Timestep Latency (μs)', fontsize=12)
-    # plt.title('Hardware Latency vs Concurrency Level', fontsize=14)
-    # plt.grid(True, alpha=0.3)
-    # plt.xticks(range(1, max(concurrency)+1, 2))
-    # plt.tight_layout()
-    # plt.savefig(os.path.join(DVS_RUN_DIR, "latency_concurrency_clean.png"), dpi=300, bbox_inches='tight')
-    # plt.savefig(os.path.join(DVS_RUN_DIR, "latency_concurrency_clean.pdf"), bbox_inches='tight')
-    # plt.show()
+    plt.rcParams.update({
+        "font.size": 7,
+        "font.family": "sans-serif",
+        "font.sans-serif": "Arial",
+        "pdf.fonttype": 42
+    })
 
+    print(results_df)
+    baseline = results_df[results_df["max_parallel_accesses"] == 1]["total_time"].to_numpy()
+    results_df["speedup"] = baseline / results_df["total_time"]
+    fig = plt.figure(figsize=(1.5, 1.5))
+    plt.plot(results_df["max_parallel_accesses"], results_df["speedup"], 'o-',
+             linewidth=1, markersize=2, color='#56B4E9')
+    ax = fig.axes[0]
+    ax.ticklabel_format(style='plain', useOffset=False, axis='y')
+    plt.xlabel('Max. Parallel Reads')
+    plt.ylabel('Hardware Speed-up')
+    plt.grid(True, alpha=0.3)
+    plt.xticks(range(0, 17, 4))
+    plt.xlim((0, 17))
+    plt.tight_layout(pad=0.1)
+    plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.pdf"))
+    plt.show()
 
 
 if __name__ == "__main__":
