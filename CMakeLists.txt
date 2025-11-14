@@ -239,7 +239,7 @@ if(PYTHON_BUILD_ENABLED)
             OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
-        if(PYBIND11_IMPORT_RESULT EQUAL 0 AND PYBIND11_CMAKE_DIR)
+        if(PYBIND11_CMAKE_DIR)
             message(STATUS "Found pybind11 at: ${PYBIND11_CMAKE_DIR}")
             set(pybind11_DIR ${PYBIND11_CMAKE_DIR})
             find_package(pybind11 CONFIG REQUIRED)
@@ -281,6 +281,10 @@ if(PYTHON_BUILD_ENABLED)
             target_compile_definitions(sanafecpp PRIVATE ENABLE_SOURCE_INFO)
         endif()
     endif()
+    install(TARGETS sanafecpp
+        LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}"
+        RUNTIME DESTINATION "${CMAKE_SOURCE_DIR}")
+message(STATUS "Simulator files will be copied to project directory")
 endif()
 
 if(STANDALONE_BUILD_ENABLED)
@@ -304,6 +308,10 @@ if(STANDALONE_BUILD_ENABLED)
             target_compile_definitions(sim PRIVATE ENABLE_SOURCE_INFO)
         endif()
     endif()
+    install(TARGETS sim
+        LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}"
+        RUNTIME DESTINATION "${CMAKE_SOURCE_DIR}")
+message(STATUS "Simulator files will be copied to project directory")
 endif()
 
 if(TESTING_ENABLED)
@@ -330,8 +338,3 @@ if(TESTING_ENABLED)
     find_program(CTEST_MEMORYCHECK_COMMAND valgrind)
     set(CTEST_MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=10")
 endif()
-
-install(TARGETS sim sanafecpp
-        LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}"
-        RUNTIME DESTINATION "${CMAKE_SOURCE_DIR}")
-message(STATUS "Simulator files will be copied to project directory")
