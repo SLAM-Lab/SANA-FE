@@ -170,6 +170,7 @@ endif()
 project(ryml-quickstart LANGUAGES CXX)
 set(RYML_VERSION "v0.10.0")
 message(STATUS "FetchContent for tag: ${RYML_VERSION}")
+set(RYML_INSTALL OFF)
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
 
 include(FetchContent)
@@ -185,7 +186,8 @@ message(STATUS "got ryml")
 
 ############## booksim2
 project(booksim2-quickstart LANGUAGES CXX)
-set(BOOKSIM_VERSION "a6c6e4f172ab72c2ec3c9768566b1f28f0339fdf")
+set(BOOKSIM_VERSION "a8dd2c412c89fa83078528b2e82c5812489c071d")
+set(BOOKSIM_INSTALL OFF)
 FetchContent_Declare(booksim
     GIT_REPOSITORY https://github.com/SLAM-Lab/booksim2-sanafe.git
     GIT_TAG ${BOOKSIM_VERSION}
@@ -279,8 +281,6 @@ if(PYTHON_BUILD_ENABLED)
             target_compile_definitions(sanafecpp PRIVATE ENABLE_SOURCE_INFO)
         endif()
     endif()
-
-    install(TARGETS sanafecpp DESTINATION sanafe)
 endif()
 
 if(STANDALONE_BUILD_ENABLED)
@@ -330,3 +330,8 @@ if(TESTING_ENABLED)
     find_program(CTEST_MEMORYCHECK_COMMAND valgrind)
     set(CTEST_MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=10")
 endif()
+
+install(TARGETS sim sanafecpp
+        LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}"
+        RUNTIME DESTINATION "${CMAKE_SOURCE_DIR}")
+message(STATUS "Simulator files will be copied to project directory")

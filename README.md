@@ -45,8 +45,8 @@ compilation, first create a temporary build directory:
 Run the following command in this build directory:
 `cmake ..`
 
-Then compile SANA-FE by using the command:
-`make -j 12`
+Then compile SANA-FE and copy it to the project directory by running the command:
+`make -j 12 && make install && cd ..`
 
 The option `-j` indicates the number of parallel threads to use. This should
 be less than the threads supported by your system.
