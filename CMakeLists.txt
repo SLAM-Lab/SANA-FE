@@ -237,10 +237,26 @@ if(PYTHON_BUILD_ENABLED)
             OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
-        cmake_print_variables(PYBIND11_CMAKE_DIR)
-        set(pybind11_DIR ${PYBIND11_CMAKE_DIR})
-        find_package(pybind11 CONFIG REQUIRED)
+        if(PYBIND11_IMPORT_RESULT EQUAL 0 AND PYBIND11_CMAKE_DIR)
+            message(STATUS "Found pybind11 at: ${PYBIND11_CMAKE_DIR}")
+            set(pybind11_DIR ${PYBIND11_CMAKE_DIR})
+            find_package(pybind11 CONFIG REQUIRED)
+        else()  # pybind11 detection failed
+            message(FATAL_ERROR
+                "ERROR: Could not find pybind11\n"
+                "To fix this either:\n"
+                "  1. Make sure pybind11 is installed:\n"
+                "      $ ${PYTHON_EXECUTABLE} -m pip install pybind11\n"
+                "  2. If pybind11 is already installed in a different Python,\n"
+                "     the wrong Python environment may have been detected.\n"
+                "     set the PYTHON_EXECUTABLE environment variable:\n"
+                "      $ cmake -DPYTHON_EXECUTABLE=/path/to/correct/python ..\n"
+                "Current Python executable being detected:\n"
+                "      ${PYTHON_EXECUTABLE}\n"
+            )
+        endif()
     endif()
+
     pybind11_add_module(
         sanafecpp
         ${SOURCE_FILES}
