@@ -138,7 +138,7 @@ sanafe::SpikingNetwork sanafe::yaml_parse_network_section(
         throw YamlDescriptionParsingError(
                 "No neuron groups specified", parser, net_node);
     }
-    if(net_node.find_child("edges").invalid())
+    if (net_node.find_child("edges").invalid())
     {
         throw YamlDescriptionParsingError(
                 "No edges section specified", parser, net_node);
@@ -597,7 +597,7 @@ void sanafe::description_parse_hyperedge(const NeuronAddress &source_address,
 
 bool sanafe::yaml_parse_conv2d_attribute(const std::string attribute_name,
         const ModelAttribute &attribute, Conv2DParameters &convolution,
-        const ryml::Parser &/*parser*/, const ryml::ConstNodeRef /*node*/)
+        const ryml::Parser & /*parser*/, const ryml::ConstNodeRef /*node*/)
 {
     bool parsed = true;
 

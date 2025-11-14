@@ -988,7 +988,8 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
                     if (con.synapse_hw->update_every_timestep)
                     {
                         PipelineResult result = con.synapse_hw->update(
-                                con.mapped_synapse_hw_address, false, ts.timestep);
+                                con.mapped_synapse_hw_address, false,
+                                ts.timestep);
                         if (result.energy.has_value())
                         {
                             con.synapse_hw->energy += result.energy.value();
@@ -1000,9 +1001,9 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
             }
             if (n.dendrite_hw->update_every_timestep)
             {
-                sanafe::PipelineResult result = n.dendrite_hw->update(
-                        n.mapped_dendrite_hw_address, std::nullopt,
-                        std::nullopt, ts.timestep);
+                sanafe::PipelineResult result =
+                        n.dendrite_hw->update(n.mapped_dendrite_hw_address,
+                                std::nullopt, std::nullopt, ts.timestep);
                 if (result.energy.has_value())
                 {
                     n.dendrite_hw->energy += result.energy.value();

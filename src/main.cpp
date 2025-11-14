@@ -24,7 +24,6 @@
 #include "print.hpp"
 #include "yaml_common.hpp"
 
-
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,readability-function-size)
 int main(int argc, const char *argv[])
 {

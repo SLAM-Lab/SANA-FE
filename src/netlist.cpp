@@ -807,8 +807,7 @@ std::string sanafe::netlist_nested_attributes_to_netlist(
     root |= ryml::MAP; // NOLINT(misc-include-cleaner)
     root |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
 
-    yaml_serialize_model_attributes(
-            default_attributes, root, model_attributes);
+    yaml_serialize_model_attributes(default_attributes, root, model_attributes);
     std::ostringstream ss;
     ss << tree;
     attribute_str = " " + ss.str();
