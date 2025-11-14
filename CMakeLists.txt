@@ -47,7 +47,7 @@ endif()
 project(sana-fe)
 
 add_compile_options(
-    -Wall -pedantic -Werror -g -fopenmp -fPIC -pthread
+    -Wall -pedantic -Werror -g -fPIC -pthread
 )
 
 # Set default debug levels for tracing
@@ -157,6 +157,7 @@ find_package(Threads REQUIRED)
 # OpenMP i.e. multithreaded builds are optional, but on by default
 if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
     message(STATUS "OpenMP found: ${OpenMP_CXX_VERSION} and enabled")
+    add_compile_options(-fopenmp)
 else()
     if(NOT OpenMP_CXX_FOUND)
         message(STATUS "OpenMP not found - parallel code will be disabled")
