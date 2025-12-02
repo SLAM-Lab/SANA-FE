@@ -107,7 +107,7 @@ References
 James A. Boyle, Jason Ho, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Exploring Dendrites in Large-Scale Neuromorphic Architectures,"
 in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA, 2025,
-`doi: <https://doi.org/>`_.
+`doi:10.1109/ICONS69015.2025.00018 <https://doi.org/10.1109/ICONS69015.2025.00018>`_.
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems (TCAD), vol. 44, no. 8, pp. 3165–3178, 2025,

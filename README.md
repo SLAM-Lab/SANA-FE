@@ -365,7 +365,7 @@ C++ code has been written using the C++17 standard.
 James A. Boyle, Jason Ho, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Exploring Dendrites in Large-Scale Neuromorphic Architectures,"
 in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA, 2025,
-[doi:](https://doi.org/).
+[doi:10.1109/ICONS69015.2025.00018](https://doi.org/10.1109/ICONS69015.2025.00018).
 
 James A. Boyle, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration,"
