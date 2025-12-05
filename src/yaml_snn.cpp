@@ -1222,6 +1222,16 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_group(ryml::NodeRef parent,
         yaml_serialize_model_attributes(no_default_attributes, attr_node,
                 group.default_neuron_config.model_attributes);
     }
+    if (group.default_neuron_config.log_spikes.has_value())
+    {
+        attr_node["log_spikes"]
+                << group.default_neuron_config.log_spikes.value();
+    }
+    if (group.default_neuron_config.log_potential.has_value())
+    {
+        attr_node["log_potential"]
+                << group.default_neuron_config.log_potential.value();
+    }
 
     // Add neurons
     auto neurons_node = group_node["neurons"];
@@ -1277,6 +1287,14 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_run(ryml::NodeRef neurons_node,
     // Add model attributes if they exist and differ from group defaults
     neuron_node |= ryml::MAP; // NOLINT(misc-include-cleaner)
     neuron_node |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
+    if (neuron.log_spikes)
+    {
+        neuron_node["log_spikes"] << neuron.log_spikes;
+    }
+    if (neuron.log_potential)
+    {
+        neuron_node["log_potential"] << neuron.log_potential;
+    }
     if (!neuron.model_attributes.empty())
     {
         yaml_serialize_model_attributes(
