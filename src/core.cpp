@@ -83,10 +83,12 @@ sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
 
     if (!hw_found)
     {
-        INFO("Error: Could not find h/w with name:%s (that implements "
-             "synapse:%d, dendrite:%d, soma:%d)\n ",
-                hw_name.c_str(), is_synapse, is_dendrite, is_soma);
-        throw std::runtime_error("Error: Could not find dendrite h/w");
+        const std::string error("Could not find h/w (with name:" + hw_name +
+                ") that implements synapse:" + std::to_string(is_synapse) +
+                ", dendrite:" + std::to_string(is_dendrite) + ", soma:" +
+                std::to_string(is_soma));
+        INFO("Error: %s\n", error.c_str());
+        throw std::runtime_error(error);
     }
 
     return hw_unit;
