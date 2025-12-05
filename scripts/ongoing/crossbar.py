@@ -557,6 +557,30 @@ def plot_spiking_digits():
     #ax_perf.legend(("Loihi", "Loihi-IMAC"), fontsize=7, bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
     ax_perf.minorticks_on()
 
+    # Add vertical lines at digit boundaries
+    current_timestep = 0
+    for i in range(raster_num_inputs):
+        if i > 0:  # Don't draw line at the start
+            ax_perf.axvline(x=current_timestep, color='gray', linestyle=':',
+                        linewidth=0.5, alpha=0.5, zorder=1)
+        current_timestep += timesteps_per_input[i]
+
+    # Annotate with digit labels (English 0-9, German 10-19)
+    _, labels, _ = load_dataset()
+    current_timestep = 0
+    digit_labels_english = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+    digit_labels_german = ["null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"]
+    for i in range(raster_num_inputs):
+        mid_timestep = current_timestep + timesteps_per_input[i] / 2
+        digit = labels[i]
+        if digit < 10:
+            label = digit_labels_english[digit]
+        else:
+            label = digit_labels_german[digit - 10]
+        ax_perf.text(mid_timestep, 0.95, "‘" + label + "’",
+                    ha='center', va='bottom', fontsize=6, color='gray')
+        current_timestep += timesteps_per_input[i]
+
     # Add colored annotations on the right side for energy subplot
     energy_label_x = raster_total_timesteps * 1.002
     final_loihi_energy = analog_perf_df["loihi_energy_uj"].iloc[-1]
@@ -590,22 +614,24 @@ def plot_spiking_digits():
 
 
 if __name__ == "__main__":
-    num_inputs = 2264  # Number of inferences
+    num_inputs = 10000
+    #num_inputs = 2264  # Number of inferences
     #num_inputs = 10
-    run_experiments = False
+    run_experiments = True
 
     if run_experiments:
-        run_spiking_digits(num_inputs=num_inputs, analog_synapses=True)
-        run_spiking_digits(num_inputs=num_inputs, analog_synapses=False)
+        pass
+        #run_spiking_digits(num_inputs=num_inputs, analog_synapses=True)
+        #run_spiking_digits(num_inputs=num_inputs, analog_synapses=False)
 
-    calculate_accuracy(analog_synapses=False)
-    calculate_accuracy(analog_synapses=True)
+    #calculate_accuracy(analog_synapses=False)
+    #calculate_accuracy(analog_synapses=True)
 
-    plot_spiking_digits()
+    #plot_spiking_digits()
 
 # Legacy scripts that may be useful at some point to someone, but is not
 #  currently needed for any publication
-"""
+#"""
 
 # MNIST Data-set info (circuit-aware trained 23 Sep 2025 for 10 epochs)
 # Train set: Average loss: 0.1868, Accuracy: 56680/60000 (94.47%)
@@ -765,11 +791,23 @@ def run_mnist(analog_synapses=True, timesteps=30):
 
     print("Connecting neurons")
     print("Adding first layer connections")
+    total_hidden_1_crossbar_rows = (in_neurons + 31) // 32
+    total_hidden_r_crossbar_rows = (hidden_1_neurons + 31) // 32
+    total_out_crossbar_rows = (out_neurons + 31) // 32
+
+    print("Total crossbar rows:")
+    print(f"In->Hidden: {total_hidden_1_crossbar_rows}")
+    print(f"Hidden->Hidden: {total_hidden_r_crossbar_rows}")
+    print(f"Hidden->Out: {total_out_crossbar_rows}")
+
 
     for src in range(in_neurons):
         for dst in range(hidden_1_neurons):
             connection_parameters = {}
             if analog_synapses:
+                row = src // 32
+                col = src % 32
+                connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fc1"][dst, src])
                 connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             else:
@@ -782,6 +820,10 @@ def run_mnist(analog_synapses=True, timesteps=30):
         for dst in range(hidden_2_neurons):
             connection_parameters = {}
             if analog_synapses:
+                row = total_hidden_1_crossbar_rows + (src // 32)
+                col = src % 32
+                connection_parameters["crossbar_position"] = [row, col]
+
                 connection_parameters["weight"] = int(weights["fc2"][dst, src])
                 connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             else:
@@ -794,6 +836,10 @@ def run_mnist(analog_synapses=True, timesteps=30):
         for dst in range(out_neurons):
             connection_parameters = {}
             if analog_synapses:
+                row = src // 32
+                col = src % 32
+                connection_parameters["crossbar_position"] = [row, col]
+
                 connection_parameters["weight"] = int(weights["fc3"][dst, src])
                 connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             else:
@@ -828,7 +874,7 @@ def run_mnist(analog_synapses=True, timesteps=30):
                         spike_trace="spikes.csv",
                         perf_trace="perf.csv",
                         write_trace_headers=is_first_input,
-                        processing_threads=4,
+                        processing_threads=8,
                         scheduler_threads=8)
         timesteps_per_input.append(timesteps)
         # print(results)
@@ -879,4 +925,5 @@ def plot_mnist(num_inputs):
 
     accuracy = (correct / num_inputs) * 100
     print(f"Accuracy: {accuracy}%")
-"""
+#"""
+run_mnist(analog_synapses=True, timesteps=100)
