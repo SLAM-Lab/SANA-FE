@@ -422,14 +422,22 @@ void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
     {
         cx.refractory_delay = static_cast<int>(param);
     }
+    else if (attribute_name == "potential")
+    {
+        cx.potential = static_cast<double>(param);
+    }
 
     TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
 }
 
-void sanafe::LoihiLifModel::loihi_leak_and_quantize(LoihiCompartment &cx)
+void sanafe::LoihiLifModel::loihi_leak(LoihiCompartment &cx)
 {
     cx.input_current *= cx.input_decay;
     cx.potential *= cx.leak_decay;
+}
+
+void sanafe::LoihiLifModel::loihi_quantize(LoihiCompartment &cx)
+{
     // Loihi uses a simple fixed point representation where all weights and
     //  thresholds are shifted by 6 bits before being accumulated (i.e. the
     //  minimum weight is 1*2^6=64). Take into account this minimum resolution
@@ -508,7 +516,14 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
         state = sanafe::updated;
     }
 
-    loihi_leak_and_quantize(cx);
+    if (cx.timesteps_simulated > 0)
+    {
+        // Don't leak on the very first time-step, in case the user wants to
+        //  initialize neuron potentials with some non-zero value
+        loihi_leak(cx);
+    }
+    loihi_quantize(cx);
+
     // Add randomized noise to potential if enabled
     if (noise_type == noise_file_stream)
     {

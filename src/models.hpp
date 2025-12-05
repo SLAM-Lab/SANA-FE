@@ -89,7 +89,7 @@ private:
             "noise",
             "weight",
             "w",
-            "latency"
+            "latency",
     };
     std::vector<std::optional<double>> accumulated_charges;
     std::vector<long int> timesteps_simulated;
@@ -237,10 +237,22 @@ public:
     };
 
 private:
-    static inline const std::set<std::string> loihi_lif_attributes{"reset_mode",
-            "reverse_reset_mode", "reset", "reverse_reset", "bias", "threshold",
-            "reverse_threshold", "leak_decay", "noise", "noise_bits",
-            "refractory_delay", "force_update", "force_update_every_timestep"};
+    static inline const std::set<std::string> loihi_lif_attributes{
+            "reset_mode",
+            "reverse_reset_mode",
+            "reset",
+            "reverse_reset",
+            "bias",
+            "threshold",
+            "reverse_threshold",
+            "leak_decay",
+            "noise",
+            "noise_bits",
+            "refractory_delay",
+            "force_update",
+            "force_update_every_timestep",
+            "force_potential",
+    };
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{noise_none};
     std::ifstream noise_stream;
@@ -248,7 +260,8 @@ private:
     long unsigned int random_mask{0x7f};
     int noise_bits{7};
 
-    static void loihi_leak_and_quantize(LoihiCompartment &cx);
+    static void loihi_leak(LoihiCompartment &cx);
+    static void loihi_quantize(LoihiCompartment &cx);
     static bool loihi_threshold_and_reset(LoihiCompartment &cx);
 
     double loihi_generate_noise();
