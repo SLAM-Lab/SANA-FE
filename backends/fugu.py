@@ -1,117 +1,155 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+from fugu.backends import Backend
+from fugu.backends.backend import PortDataIterator
+from collections import defaultdict
+import sanafe
+import pandas as pd
 
-# TODO: adapt this backend for the updated version of SANA-FE
-
-"""
-isort:skip_file
-"""
-import os
-import sys
-
-# fmt: off
-from collections import deque
-from warnings import warn
-
-import fugu.simulators.SpikingNeuralNetwork as snn
-import fugu
-from fugu import Scaffold, Brick
-from fugu.bricks import Vector_Input
-from fugu.backends import snn_Backend
-
-from .backend import Backend
-from ..utils.export_utils import results_df_from_dict
-from ..utils.misc import CalculateSpikeTimes
-
-"""
-keep this file structure-
-Fugu
-├── backends
-│   ├── sanafe_backend.py
-│   │...
-│...
-SANAFE
-├── sim.py
-│...
-"""
-
-BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-FUGU_DIR = os.path.dirname(BACKEND_DIR)
-FUGU_PROJECT_DIR = os.path.dirname(FUGU_DIR)
-PROJECT_DIR = os.path.dirname(FUGU_PROJECT_DIR)
-sys.path.append(PROJECT_DIR)
-import utils as sanafe
-# Set some flags for the dynamic linking library
-# Important to do before importing the simcpp .so library!
-sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
-import sanafecpp
-
-ARCH_FILENAME = "arch/loihi.yaml"
+ARCH_FILENAME = "/home/usr1/jboyle/neuro/sana-fe/arch/loihi.yaml"
 
 class sanafe_Backend(Backend):
+    _net = None
+    _arch = None
 
-    def map_neurons(self):
-        return 0
+    def _map_to_cores(self):
+        """
+        Assigns neurons to cores based on capacity and hardware compatibility.
+        """
+        MAX_NEURONS_PER_CORE = 1024  # TODO: read from arch object?
+        cores = self.arch.cores()
+        total_cores = len(cores)
+        neurons_per_core = {i: 0 for i in range(total_cores)}
+
+        current_core_id = 0
+        # We assume self.node_map contains {fugu_id: sanafe_neuron_object}
+        for fugu_node_id, neuron in self.node_map.items():
+            if neurons_per_core[current_core_id] >= MAX_NEURONS_PER_CORE:
+                # There is space in the core
+                current_core_id += 1
+                assert(current_core_id < total_cores)
+            neurons_per_core[current_core_id] += 1
+
+            # Assign spike inputs to custom hardware
+            if fugu_node_id in self.input_map:
+                input_id = neurons_per_core[current_core_id] - 1
+                neuron.set_attributes(soma_hw_name=f"loihi_inputs[{input_id}]")
+
+            # Perform the actual mapping in SANA-FE
+            target_core = cores[current_core_id]
+            neuron.map_to_core(target_core)
+
+
+
+    def _convert_props(self, fugu_props):
+        """
+        Convert Fugu properties to equivalent SANA-FE attributes
+        """
+        param_map = {
+            "decay": "leak_decay",
+            "reset_voltage": "reset"
+        }
+        sanafe_props = {param_map.get(k, k): v for k, v in fugu_props.items()}
+        del sanafe_props["index"]
+        del sanafe_props["brick"]
+        del sanafe_props["neuron_number"]
+        del sanafe_props["p"]
+        if "potential" in sanafe_props:
+            del sanafe_props["potential"]
+
+        return sanafe_props
 
     def _build_network(self):
-        self.nn = snn.NeuralNetwork()
-        neuron_dict = {}
         """
-        Add Neurons
+        Build a Fugu SNN in SANA-FE
         """
-        # Add input neurons, as identified by circuit information.
-        record_all = (self.record == 'all')
-        for node, vals in self.fugu_circuit.nodes.data():
-            if vals.get('layer') != 'input': continue
-            for list in vals['output_lists']:
-                for neuron in list:
-                    n = snn.InputNeuron(neuron, record=record_all)
-                    neuron_dict[neuron] = n
-                    self.nn.add_neuron(n)
+        self.net = sanafe.Network()
+        self.node_map = {}
+        self.input_map = set()
 
-        # Add all other neurons.
-        for neuron, props in self.fugu_graph.nodes.data():
-            if neuron in neuron_dict: continue
-            voltage = props.get('voltage', 0.0)
-            threshold = props.get('threshold', 1.0)
-            reset_voltage = props.get('reset_voltage', 0.0)
-            leakage = 1.0 - props.get('decay', 0.0)
-            bias = props.get('bias', 0.0)
-            p = props.get('p', 1.0)
-            if 'potential' in props: Vinit   = props['potential']
-            if 'leakage_constant' in props: Vretain = props['leakage_constant']
-            n = snn.LIFNeuron(neuron, voltage=voltage, threshold=threshold,
-                              reset_voltage=reset_voltage,
-                              leakage_constant=leakage,
-                              bias=bias, p=p, record=record_all)
-            neuron_dict[neuron] = n
-            self.nn.add_neuron(n)
+        # --- STEP 1: Sort Neurons by Brick ---
+        # We create a dictionary where Key = Brick Tag, Value = List of Neuron IDs
+        brick_groups = defaultdict(list)
+        neurons_to_record = set()
+        input_neurons = set()
+        # --- STEP 2: Create Input Spike Trains and monitor Outputs ---
+        for brick_id, props in self.fugu_circuit.nodes.data():
+            if props.get("layer") == "input":
+                for timestep, neurons in enumerate(props['brick']):
+                    for n in neurons:
+                        node = self.fugu_graph.nodes[n]
+                        if "spikes" not in node:
+                            node["spikes"] = []
+                        spikes = node["spikes"]
+                        spikes.append(timestep + 1)
+                        input_neurons.add(n)
 
-        # Tag output neurons based on circuit information.
-        if not record_all:
-            for node, vals in self.fugu_circuit.nodes.data():
-                if vals.get("layer") != "output": continue
-                for list in vals["output_lists"]:
-                    for neuron in list:
-                        neuron_dict[neuron].record = True
+            elif props.get("layer") == "output":
+                if self.debug_mode:
+                    print(f"Found Output Brick: {props.get('name')}")
+                # Dig into the ports to find the specific data neurons
+                # 'ports' maps port_name -> PortData object
+                if 'ports' in props:
+                    for port in props['ports'].values():
+                        # 'channels' maps channel_name ('data', 'complete') -> ChannelData
+                        if 'data' in port.channels:
+                            # .neurons gives you the list of low-level Fugu IDs (e.g., 'AND_0')
+                            data_neurons = port.channels['data'].neurons
+                            neurons_to_record.update(data_neurons)
+
+        for n, props in self.fugu_graph.nodes.data():
+            # Get the unique tag (e.g., 'Brick-2', 'Input0-0')
+            # Default to 'Misc' if a neuron somehow has no brick parent
+            brick_tag = props.get('brick', 'Misc')
+            brick_groups[brick_tag].append(n)
+
+        # --- STEP 3: Create SANA-FE Groups ---
+        for brick_tag, neuron_list in brick_groups.items():
+            # Lookup the "Pretty Name" (e.g., 'AND') instead of 'Brick-2'
+            # The high-level info is stored in fugu_circuit using the tag as the key
+            group_name = brick_tag
+            if brick_tag in self.fugu_circuit.nodes:
+                # Get the human-readable name you gave it in the script
+                group_name = self.fugu_circuit.nodes[brick_tag].get('name', brick_tag)
+
+            # Create the neuron group in SANA-FE
+            if self.debug_mode:
+                print(f"Creating Group: {group_name} with {len(neuron_list)} neurons")
+            sanafe_group = self.net.create_neuron_group(group_name, len(neuron_list), {})
+
+            # --- STEP 4: Configure neurons & map IDs ---
+            for i, fugu_node_id in enumerate(neuron_list):
+                fugu_props = self.fugu_graph.nodes[fugu_node_id]
+                # Remap properties which have different names in Fugu vs SANA-FE
+                sanafe_props = self._convert_props(fugu_props)
+
+                if fugu_node_id in input_neurons:
+                    self.input_map.add(fugu_node_id)
+                sanafe_group[i].set_attributes(model_attributes=sanafe_props)
+
+                if fugu_node_id in neurons_to_record:
+                    # Enable logging for this neuron
+                    #if self.debug_mode:
+                    print(f"Enabling logging for neuron {fugu_node_id}")
+                    sanafe_group[i].set_attributes(log_spikes=True, log_potential=True)
+
+                # Map the Fugu node ID to the corresponding SANA-FE neuron
+                #  This ensures edges can find the correct destination next
+                self.node_map[fugu_node_id] = sanafe_group[i]
 
         for n1, n2, props in self.fugu_graph.edges.data():
-            delay  = int(props.get("delay",  1))
-            weight = float(props.get("weight", 1.0))
-            syn = snn.Synapse(neuron_dict[n1], neuron_dict[n2], delay=delay,
-                              weight=weight)
-            self.nn.add_synapse(syn)
+            if n1 in self.node_map and n2 in self.node_map:
+                src = self.node_map[n1]
+                dst = self.node_map[n2]
+                src.connect_to_neuron(dst, props)
 
-        del neuron_dict
-        '''
-        Set initial input values
-        '''
-        self.set_input_spikes()
-
-        if self.debug_mode:
-            self.nn.list_neurons()
 
     def compile(self, scaffold, compile_args={}):
+        """
+        Compile Fugu scaffold as SANA-FE network
+        Args:
+            scaffold: The Fugu scaffold containing one or more bricks
+            compile_args (Dict, optional): Arguments controlling compilation. Defaults to {}.
+        """
         # creates neuron populations and synapses
         self.scaffold = scaffold
         self.fugu_circuit = scaffold.circuit
@@ -135,69 +173,44 @@ class sanafe_Backend(Backend):
     def _find_node(name):
         return None
 
-    def run(self, n_steps=10, return_potential=False, debug_mode=False):
-        "Convert to SANA-FE network and save to file"
-        arch = sim.load_arch_yaml(ARCH_FILENAME)
-        network = sanafecpp.Network(arch)
+    def run(self, n_steps, return_potentials=False, debug_mode=False):
+        """
+        Convert to SANA-FE network and save to file
+        Args:
+            n_steps (int): Number of timesteps to simulate.
+            return_potentials (bool, optional): Log neuron potentials. Defaults to False.
+            debug_mode (bool, optional): Enable for verbose prints. Defaults to False.
+        """
 
-        id_dict = {} # Group name -> gid
-        nid_dict = [] # [Group index] Neuron name -> SANA-FE nid
-        nid_dict_idx = {} # Neuron Name -> gid
-        neurons = list(enumerate(sorted(self.scaffold.graph.nodes)))
+        self.return_potentials = return_potentials
+        if debug_mode:
+            self.scaffold.summary(verbose=1)
+        self.arch = sanafe.load_arch(ARCH_FILENAME)
+        self._map_to_cores()
 
-        # Add the neurons that belong to the current group
-        #TODO: optimize move out of this for loop
-        group = network.create_neuron_group(len(neurons))
-        for j, neuron in neurons:
-            neuron_properties = self.scaffold.graph.nodes[neuron]
-            threshold = neuron_properties["threshold"]
-            decay = neuron_properties["decay"]
-            reset = neuron_properties.get("reset", 0.0)
+        # Run simulation
+        chip = sanafe.SpikingChip(self.arch)
+        chip.load(self.net)
 
-            i = j
-            #TODO: threshold, reset, leak -> supposed to be neuron specific,
-            #  make new group for each setting type?
-            sanafe_neuron = group.define_neuron(j,
-                {"threshold": threshold, "reset": reset, "decay": decay})
-            index = sanafe_neuron.id
-            name = neuron
-            toadd = {name: index}
-            nid_dict_idx[name] = i
-            #neurons.remove((j, neuron))
+        self.net.save("foo")
 
-            # Map neuron
-            sim.map_neuron_to_compartment(arch, neuron)
-            nid_dict.append(toadd)
+        with open("spikes.csv", "w") as spike_trace, open("potentials.csv", "w") as potential_trace:
+            chip.sim(n_steps, spike_trace=spike_trace, potential_trace=potential_trace)
 
-        # Add synapses
-        for i, synapse in enumerate(self.scaffold.graph.edges):
-                #print(str(synapse) + " | " + str(self.scaffold.graph.edges[synapse]))
-                group_idx_src = nid_dict_idx[synapse[0]]
-                neuron_idx_src = nid_dict[group_idx_src][synapse[0]]
+        spikes_out = pd.read_csv("spikes.csv")
+        potentials_out = pd.read_csv("potentials.csv")
 
-                group_idx_dest = nid_dict_idx[synapse[1]]
-                neuron_idx_dest = nid_dict[group_idx_dest][synapse[1]]
+        if not self.return_potentials:
+            return spikes_out
 
-                weight = self.scaffold.graph.edges[synapse]['weight']
-                network.groups[group_idx_src].neurons[neuron_idx_src].add_connection(
-                    network.groups[group_idx_dest].neurons[neuron_idx_dest],
-                    {"weight": weight})
-
-        # print(id_dict)
-        # print(nid_dict)
-        # print(nid_dict_idx)
-        # self.scaffold.summary(verbose = 1)
-
-        #save
-        sim = sanafecpp.Simulation(arch, network)
-        sim.run(n_steps)
-        return
+        return spikes_out, potentials_out
 
     def cleanup(self):
         """
         Deletes/frees neurons and synapses
         """
-        pass
+        del self.net
+        del self.arch
 
     def reset(self):
         """
@@ -210,22 +223,20 @@ class sanafe_Backend(Backend):
         """
         Set properties for specific neurons and synapses
         Args:
-            properties: dictionary of parameter for bricks
-
-        Example:
-           for brick in properties:
-               neuron_props, synapse_props = self.circuit[brick].get_changes(properties[brick])
-               for neuron in neuron_props:
-                   set neuron properties
-               for synapse in synapse_props:
-                   set synapse properties
-
-        @NOTE: Currently, this function behaves differently for Input Bricks
-           * Instead of returning the changes, they change internally and reset the iterator
-           * This is because of how initial spike times are calculated using said bricks
-           * I have not yet found a way of incorporating my proposed method (above) into these bricks yet
+            properties (dict, optional): dictionary of properties for bricks. Defaults to {}.
         """
-        pass
+        for brick in properties:
+            if brick != 'compile_args':
+                brick_id = self.brick_to_number[brick]
+                self.fugu_circuit.nodes[brick_id]['brick'].set_properties(properties[brick])
+        # must call run() for changes to take effect
 
     def set_input_spikes(self):
-        pass
+        """
+        Reset input spike trains
+        """
+        # Clean out old spike structures.
+        for n, node in self.fugu_graph.nodes.data():
+            if 'spikes' in node:
+                del node['spikes']  # Allow list to be built from scratch.
+        # When run() is called, network will be rebuilt with new spike times.
