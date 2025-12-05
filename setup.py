@@ -76,7 +76,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="sanafe",
-    version="2.1.0",
+    version="2.1.1",
     author="James Boyle",
     author_email="james.boyle@utexas.edu",
     description="SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration",
