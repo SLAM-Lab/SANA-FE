@@ -38,33 +38,24 @@ sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
     core_finished_receiving = std::vector<double>(core_count);
 }
 
-void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
-        const BookSimConfig &booksim_config)
+sanafe::TimingModelFunc get_model_function(sanafe::TimingModel model)
 {
-    scheduler.booksim_config = booksim_config;
-    if (scheduler.timing_model == timing_model_simple)
+    switch (model)
     {
-        TRACE1(CHIP, "Running simple timing model\n");
-        schedule_messages_simple(ts, scheduler);
-    }
-    else if (scheduler.timing_model == timing_model_detailed)
-    {
-        TRACE1(CHIP, "Running detailed timing model\n");
-        schedule_messages_detailed(ts, scheduler);
-    }
-    else if (scheduler.timing_model == timing_model_cycle_accurate)
-    {
-        TRACE1(CHIP, "Running cycle-accurate timing model\n");
-        schedule_messages_cycle(ts, scheduler);
-    }
-    else
-    {
-        INFO("Error: Timing model:%d not recognized\n", scheduler.timing_model);
-        throw std::invalid_argument("Timing model not recognized");
+    case sanafe::TimingModel::timing_model_simple:
+        return &sanafe::schedule_messages_timestep_simple;
+        // Note: You might need to change simple's return type to double to match
+    case sanafe::TimingModel::timing_model_detailed:
+        return &sanafe::schedule_messages_timestep_detailed;
+    case sanafe::TimingModel::timing_model_cycle_accurate:
+        return &sanafe::schedule_messages_timestep_cycle;
+    default:
+        throw std::invalid_argument("Unknown timing model");
     }
 }
 
-void sanafe::schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler)
+double sanafe::schedule_messages_timestep_simple(
+        TimestepHandle &ts, Scheduler &scheduler)
 {
     // Simple analytical model, that takes the maximum of either neuron or
     //  message processing for each core, and takes the maximum latency of
@@ -102,6 +93,8 @@ void sanafe::schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler)
     // Account for fixed costs per timestep e.g., house-keeping or global sync
     ts_data.sim_time += scheduler.timestep_sync_delay;
     scheduler.timesteps_to_write.push(ts);
+
+    return ts_data.sim_time;
 }
 
 double sanafe::schedule_messages_timestep_cycle(
@@ -117,7 +110,6 @@ double sanafe::schedule_messages_timestep_cycle(
     //
     // The version of Booksim 2 used here has had substantial modifications,
     //  including a new static library interface (instead of being standalone)
-    // TODO: support running across multiple threads like the detailed model
     Timestep &ts_data = ts.get();
     for (auto &core_messages : ts_data.messages)
     {
@@ -177,52 +169,21 @@ void sanafe::schedule_create_threads(
     for (int thread_id = 0; thread_id < scheduler_thread_count; thread_id++)
     {
         TRACE1(CHIP, "Created scheduler thread:%d\n", thread_id);
-        if (scheduler.timing_model ==
-                sanafe::TimingModel::timing_model_detailed)
-        {
-            scheduler.scheduler_threads.emplace_back(
-                &schedule_messages_thread, std::ref(scheduler), thread_id);
-        }
-        else if (scheduler.timing_model ==
-                sanafe::TimingModel::timing_model_cycle_accurate)
-        {
-            scheduler.scheduler_threads.emplace_back(
-                    &schedule_messages_thread_cycle, std::ref(scheduler),
-                    thread_id);
-        }
-    }
-}
-
-void sanafe::schedule_messages_cycle(
-        TimestepHandle &ts, Scheduler &scheduler)
-{
-    if (scheduler.scheduler_threads.empty())
-    {
-        schedule_messages_timestep_cycle(ts, scheduler);
-    }
-    else
-    {
-        // Make sure the timestep queue stays within sensible size bounds
-        while (scheduler.timesteps_to_schedule.size() > max_buffered_timesteps)
-        {
-            TRACE1(SCHEDULER, "Warning: Timestep queue full (%zu>%zu)\n",
-                    scheduler.timesteps_to_schedule.size(),
-                    max_buffered_timesteps);
-        }
-        TRACE1(SCHEDULER, "Pushing timestep:%ld to be scheduled\n",
-                ts->timestep);
-        scheduler.timesteps_to_schedule.push(ts);
-        return;
+        scheduler.scheduler_threads.emplace_back(
+            &schedule_messages_thread, std::ref(scheduler), thread_id);
     }
 }
 
 // **** Detailed scheduler implementation ****
-void sanafe::schedule_messages_detailed(
-        TimestepHandle &ts, Scheduler &scheduler)
+void sanafe::schedule_messages(
+        TimestepHandle &ts, Scheduler &scheduler, const BookSimConfig &config)
 {
+    scheduler.booksim_config = config;
     if (scheduler.scheduler_threads.empty())
     {
-        schedule_messages_timestep(ts, scheduler);
+        const sanafe::TimingModelFunc timing_model =
+                get_model_function(scheduler.timing_model);
+        timing_model(ts, scheduler);
     }
     else
     {
@@ -240,7 +201,7 @@ void sanafe::schedule_messages_detailed(
     }
 }
 
-double sanafe::schedule_messages_timestep(
+double sanafe::schedule_messages_timestep_detailed(
         TimestepHandle &ts, Scheduler &scheduler)
 {
     // Schedule the global order of messages using a semi-analytical timing
@@ -654,10 +615,6 @@ std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
     return std::make_pair(x_increment, y_increment);
 }
 
-// **** Thread management ****
-// TODO: make the thread management agnostic to scheduling algorithm used, so it
-//  can be applied to the simple and cycle accurate models
-
 void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
 {
     while (!scheduler.should_stop)
@@ -673,31 +630,9 @@ void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
         {
             TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld sz:%zu\n", thread_id,
                     ts->timestep, scheduler.timesteps_to_schedule.size());
-            schedule_messages_timestep(ts, scheduler);
-        }
-    }
-
-    TRACE1(SCHEDULER, "Scheduler thread tid:%d terminating gracefully\n",
-            thread_id);
-}
-
-// TODO: refactor
-void sanafe::schedule_messages_thread_cycle(Scheduler &scheduler, const int thread_id)
-{
-    while (!scheduler.should_stop)
-    {
-        if (scheduler.should_stop)
-        {
-            break;
-        }
-
-        TimestepHandle ts;
-        const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
-        if (got_ts)
-        {
-            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld sz:%zu\n", thread_id,
-                    ts->timestep, scheduler.timesteps_to_schedule.size());
-            schedule_messages_timestep_cycle(ts, scheduler);
+            const TimingModelFunc timing_model =
+                    get_model_function(scheduler.timing_model);
+            timing_model(ts, scheduler);
         }
     }
 

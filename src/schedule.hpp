@@ -41,6 +41,7 @@ enum Direction : uint8_t
 
 using MessageFifo = std::list<Message>;
 using MessagePriorityQueue = std::priority_queue<Message, std::vector<Message>, CompareMessagesBySentTime>;
+using TimingModelFunc = std::function<double(TimestepHandle &, Scheduler &)>;
 constexpr size_t max_buffered_timesteps{256UL};
 
 template <typename T, typename Container = std::vector<T>,
@@ -204,17 +205,15 @@ private:
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
 void schedule_messages(TimestepHandle &ts, Scheduler &scheduler, const BookSimConfig &booksim_config);
-void schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler);
-void schedule_messages_detailed(TimestepHandle &ts, Scheduler &scheduler);
-void schedule_messages_cycle(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_simple(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_detailed(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_cycle(TimestepHandle &ts, Scheduler &scheduler);
 
 void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
 void schedule_messages_thread(Scheduler &scheduler, int thread_id);
 void schedule_stop_all_threads(Scheduler &scheduler);
 
 std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NocInfo &noc);
-double schedule_messages_timestep(TimestepHandle &ts, Scheduler &scheduler);
-double schedule_messages_timestep_cycle(TimestepHandle &ts, Scheduler &scheduler);
 
 void schedule_messages_thread(Scheduler &scheduler, const int thread_id);
 void schedule_messages_thread_cycle(Scheduler &scheduler, const int thread_id);
