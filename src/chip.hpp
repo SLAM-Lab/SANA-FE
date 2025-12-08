@@ -95,7 +95,7 @@ public:
     size_t noc_buffer_size{1UL};
 
 private:
-    std::unique_ptr<BookSimConfig> booksim_config;
+    std::shared_ptr<BookSimConfig> booksim_config;
     std::atomic<long int> total_messages_sent{0L};
     size_t total_neurons_mapped{0UL};
     long int total_neurons_updated{0L};

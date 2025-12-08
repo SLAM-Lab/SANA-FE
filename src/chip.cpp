@@ -99,7 +99,7 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
     // Use a unique_ptr for the config so that we don't need to include Booksim
     //  library in the header (meaning that plugins using chip.hpp don't need to
     //  also include this library)
-    booksim_config = std::make_unique<BookSimConfig>(new_config);
+    booksim_config = std::make_shared<BookSimConfig>(new_config);
     chip_count++;
 }
 
@@ -1070,7 +1070,7 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
 
     auto energy_calculation_end_tm = std::chrono::high_resolution_clock::now();
     auto scheduler_start_tm = energy_calculation_end_tm;
-    schedule_messages(ts, scheduler, *booksim_config);
+    schedule_messages(ts, scheduler, booksim_config);
     auto scheduler_end_tm = std::chrono::high_resolution_clock::now();
 
     // Calculate various simulator timings

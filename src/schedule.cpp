@@ -175,8 +175,8 @@ void sanafe::schedule_create_threads(
 }
 
 // **** Detailed scheduler implementation ****
-void sanafe::schedule_messages(
-        TimestepHandle &ts, Scheduler &scheduler, const BookSimConfig &config)
+void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
+        std::shared_ptr<BookSimConfig> config)
 {
     scheduler.booksim_config = config;
     if (scheduler.scheduler_threads.empty())
