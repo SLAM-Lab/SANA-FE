@@ -1070,10 +1070,6 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
 
     auto energy_calculation_end_tm = std::chrono::high_resolution_clock::now();
     auto scheduler_start_tm = energy_calculation_end_tm;
-    if (scheduler.timing_model == timing_model_cycle_accurate)
-    {
-        check_booksim_compatibility(scheduler, chip_count);
-    }
     schedule_messages(ts, scheduler, *booksim_config);
     auto scheduler_end_tm = std::chrono::high_resolution_clock::now();
 
@@ -1708,23 +1704,6 @@ std::vector<double> sanafe::SpikingChip::get_potentials() const
     }
 
     return potentials;
-}
-
-void sanafe::SpikingChip::check_booksim_compatibility(
-        const Scheduler &scheduler, const int /*sim_count*/)
-{
-    if ((scheduler.scheduler_threads.size() > 1) || (chip_count > 1))
-    {
-        INFO("Error: Cannot run multiple simultaneous cycle-accurate "
-             "simulations. The Booksim2 library does not support "
-             "concurrent runs as it has a lot of global state. For now "
-             "it's simplest to just not allow for concurrent runs. If you "
-             "need to simulate in parallel, launch separate SANA-FE "
-             "processes.");
-        throw std::runtime_error(
-                "Error: Cannot run multiple simultaneous cycle-accurate "
-                "simulations.");
-    }
 }
 
 sanafe::TimingModel sanafe::parse_timing_model(

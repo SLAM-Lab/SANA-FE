@@ -41,6 +41,7 @@ sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
 void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
         const BookSimConfig &booksim_config)
 {
+    scheduler.booksim_config = booksim_config;
     if (scheduler.timing_model == timing_model_simple)
     {
         TRACE1(CHIP, "Running simple timing model\n");
@@ -54,7 +55,7 @@ void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
     else if (scheduler.timing_model == timing_model_cycle_accurate)
     {
         TRACE1(CHIP, "Running cycle-accurate timing model\n");
-        schedule_messages_cycle_accurate(ts, booksim_config, scheduler);
+        schedule_messages_cycle(ts, scheduler);
     }
     else
     {
@@ -103,8 +104,8 @@ void sanafe::schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler)
     scheduler.timesteps_to_write.push(ts);
 }
 
-void sanafe::schedule_messages_cycle_accurate(
-        TimestepHandle &ts, const BookSimConfig &config, Scheduler &scheduler)
+double sanafe::schedule_messages_timestep_cycle(
+        TimestepHandle &ts, Scheduler &scheduler)
 {
     // Cycle-accurate (NoC)-based timing model for highly accurate network
     //  simulation, using external simulator Booksim 2. This is the most
@@ -159,12 +160,14 @@ void sanafe::schedule_messages_cycle_accurate(
     // Messages have been sent to the library, so now just execute the
     //  simulation and return simulated time
     TRACE1(SCHEDULER, "Running Booksim2 simulation\n");
-    const double booksim_time = booksim_run(config);
+    const double booksim_time = booksim_run(scheduler.booksim_config);
 
     ts_data.sim_time = booksim_time;
     // Account for fixed costs per timestep e.g., house-keeping or global sync
     ts_data.sim_time += scheduler.timestep_sync_delay;
     scheduler.timesteps_to_write.push(ts);
+
+    return ts_data.sim_time;
 }
 
 void sanafe::schedule_create_threads(
@@ -174,8 +177,42 @@ void sanafe::schedule_create_threads(
     for (int thread_id = 0; thread_id < scheduler_thread_count; thread_id++)
     {
         TRACE1(CHIP, "Created scheduler thread:%d\n", thread_id);
-        scheduler.scheduler_threads.emplace_back(
+        if (scheduler.timing_model ==
+                sanafe::TimingModel::timing_model_detailed)
+        {
+            scheduler.scheduler_threads.emplace_back(
                 &schedule_messages_thread, std::ref(scheduler), thread_id);
+        }
+        else if (scheduler.timing_model ==
+                sanafe::TimingModel::timing_model_cycle_accurate)
+        {
+            scheduler.scheduler_threads.emplace_back(
+                    &schedule_messages_thread_cycle, std::ref(scheduler),
+                    thread_id);
+        }
+    }
+}
+
+void sanafe::schedule_messages_cycle(
+        TimestepHandle &ts, Scheduler &scheduler)
+{
+    if (scheduler.scheduler_threads.empty())
+    {
+        schedule_messages_timestep_cycle(ts, scheduler);
+    }
+    else
+    {
+        // Make sure the timestep queue stays within sensible size bounds
+        while (scheduler.timesteps_to_schedule.size() > max_buffered_timesteps)
+        {
+            TRACE1(SCHEDULER, "Warning: Timestep queue full (%zu>%zu)\n",
+                    scheduler.timesteps_to_schedule.size(),
+                    max_buffered_timesteps);
+        }
+        TRACE1(SCHEDULER, "Pushing timestep:%ld to be scheduled\n",
+                ts->timestep);
+        scheduler.timesteps_to_schedule.push(ts);
+        return;
     }
 }
 
@@ -637,6 +674,30 @@ void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
             TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld sz:%zu\n", thread_id,
                     ts->timestep, scheduler.timesteps_to_schedule.size());
             schedule_messages_timestep(ts, scheduler);
+        }
+    }
+
+    TRACE1(SCHEDULER, "Scheduler thread tid:%d terminating gracefully\n",
+            thread_id);
+}
+
+// TODO: refactor
+void sanafe::schedule_messages_thread_cycle(Scheduler &scheduler, const int thread_id)
+{
+    while (!scheduler.should_stop)
+    {
+        if (scheduler.should_stop)
+        {
+            break;
+        }
+
+        TimestepHandle ts;
+        const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
+        if (got_ts)
+        {
+            TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld sz:%zu\n", thread_id,
+                    ts->timestep, scheduler.timesteps_to_schedule.size());
+            schedule_messages_timestep_cycle(ts, scheduler);
         }
     }
 
