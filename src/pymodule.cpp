@@ -613,7 +613,6 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             {
                 // Received an interrupt or error, so clean-up and kill the run
                 schedule_stop_all_threads(scheduler);
-                pyflush_timestep_data(self, rd, perf, scheduler, messages);
                 throw pybind11::error_already_set();
             }
             last_check = now;
@@ -631,10 +630,17 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         pyflush_timestep_data(self, rd, perf, scheduler, messages);
     }
 
-    const std::string last_message = "\rExecuted steps: [" +
-            std::to_string(timesteps) + "/" + std::to_string(timesteps) + "]";
-    const pybind11::gil_scoped_acquire acquire;
-    pybind11::print(last_message);
+    // Acquire the GIL and check for interrupts before printing to Python
+    {
+        const pybind11::gil_scoped_acquire acquire;
+        if (!PyErr_Occurred())
+        {
+            const std::string last_message = "\rExecuted steps: [" +
+                    std::to_string(timesteps) + "/" +
+                    std::to_string(timesteps) + "]";
+            pybind11::print(last_message);
+        }
+    }
 
     schedule_stop_all_threads(scheduler);
     pyflush_timestep_data(self, rd, perf, scheduler, messages);
