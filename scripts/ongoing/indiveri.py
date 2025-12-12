@@ -300,10 +300,12 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
 
         print(f"Simulating for {timesteps} timesteps")
         is_first_input = (input == 0)
-        hw.sim(timesteps, spike_trace=os.path.join(RUN_PATH, spike_filename),
+        hw.sim(timesteps,
+               spike_trace=os.path.join(RUN_PATH, spike_filename),
                potential_trace=os.path.join(RUN_PATH, potential_filename),
                perf_trace=os.path.join(RUN_PATH, perf_filename),
-               write_trace_headers=is_first_input, processing_threads=8,
+               write_trace_headers=is_first_input,
+               processing_threads=8,
                scheduler_threads=8)
         timesteps_per_input.append(timesteps)
         hw.reset()
@@ -312,8 +314,8 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
     snn.save(os.path.join(RUN_PATH, f"indiveri_{platform}_{dataset}.yaml"))
     # The inputs (and therefore timesteps per input) will be the same across
     #  Loihi/analog neuron runs. Only store this once.
-    np.savetxt(os.path.join(RUN_PATH, f"indiveri_{dataset}.csv"),
-               np.array(timesteps_per_input), fmt="%d")
+    # np.savetxt(os.path.join(RUN_PATH, f"indiveri_{dataset}.csv"),
+    #            np.array(timesteps_per_input), fmt="%d")
     return
 
 
@@ -612,11 +614,13 @@ def plot_shd(timesteps_per_input, labels, weights):
         indiveri_synapse = analog_perf_df.loc[analog_mask, 'synapse_energy'].sum()
         indiveri_soma = analog_perf_df.loc[analog_mask, 'soma_energy'].sum()
         indiveri_network = analog_perf_df.loc[analog_mask, 'network_energy'].sum()
+        indiveri_latency = analog_perf_df.loc[analog_mask, 'sim_time'].sum()
 
         loihi_total = loihi_perf_df.loc[loihi_mask, 'total_energy'].sum()
         loihi_synapse = loihi_perf_df.loc[loihi_mask, 'synapse_energy'].sum()
         loihi_soma = loihi_perf_df.loc[loihi_mask, 'soma_energy'].sum()
         loihi_network = loihi_perf_df.loc[loihi_mask, 'network_energy'].sum()
+        loihi_latency = loihi_perf_df.loc[loihi_mask, 'sim_time'].sum()
 
         # Count total spikes for this input
         indiveri_spikes = analog_perf_df.loc[analog_mask, 'fired'].sum()
@@ -630,11 +634,13 @@ def plot_shd(timesteps_per_input, labels, weights):
             'indiveri_soma_energy': indiveri_soma,
             'indiveri_network_energy': indiveri_network,
             'indiveri_spikes': indiveri_spikes,
+            'indiveri_latency': indiveri_latency,
             'loihi_total_energy': loihi_total,
             'loihi_synapse_energy': loihi_synapse,
             'loihi_soma_energy': loihi_soma,
             'loihi_network_energy': loihi_network,
             'loihi_spikes': loihi_spikes,
+            'loihi_latency': loihi_latency,
         })
         start_timestep = end_timestep
 
@@ -647,12 +653,14 @@ def plot_shd(timesteps_per_input, labels, weights):
     avg_indiveri_soma = sum(m['indiveri_soma_energy'] for m in per_input_metrics) / num_inputs
     avg_indiveri_network = sum(m['indiveri_network_energy'] for m in per_input_metrics) / num_inputs
     avg_indiveri_spikes = (sum(m['indiveri_spikes'] / spiking_neurons for m in per_input_metrics)) / num_inputs
+    avg_indiveri_latency = (sum(m['indiveri_latency'] for m in per_input_metrics)) / num_inputs
 
     print(f"Indiveri - Avg total energy per inference: {avg_indiveri_total:.6e} J (100.0 %)")
     print(f"Indiveri - Avg synapse energy per inference: {avg_indiveri_synapse:.6e} J ({100.0 * avg_indiveri_synapse / avg_indiveri_total:.1f} %)")
     print(f"Indiveri - Avg soma energy per inference: {avg_indiveri_soma:.6e} J ({100.0 * avg_indiveri_soma / avg_indiveri_total:.1f} %)")
     print(f"Indiveri - Avg network energy per inference: {avg_indiveri_network:.6e} J ({100.0 * avg_indiveri_network / avg_indiveri_total:.1f} %)")
     print(f"Indiveri - Avg spikes out per neuron per inference: {avg_indiveri_spikes:.1f}")
+    print(f"Indiveri - Avg inference latency: {avg_indiveri_latency:.6e}")
     print("***")
 
     avg_loihi_total = sum(m['loihi_total_energy'] for m in per_input_metrics) / num_inputs
@@ -660,12 +668,15 @@ def plot_shd(timesteps_per_input, labels, weights):
     avg_loihi_soma = sum(m['loihi_soma_energy'] for m in per_input_metrics) / num_inputs
     avg_loihi_network = sum(m['loihi_network_energy'] for m in per_input_metrics) / num_inputs
     avg_loihi_spikes = (sum(m['loihi_spikes'] / spiking_neurons for m in per_input_metrics)) / num_inputs
+    avg_loihi_latency = (sum(m['loihi_latency'] for m in per_input_metrics)) / num_inputs
+
 
     print(f"Loihi - Avg total energy per inference: {avg_loihi_total:.6e} J (100.0 %)")
     print(f"Loihi - Avg synapse energy per inference: {avg_loihi_synapse:.6e} J ({100.0 * avg_loihi_synapse / avg_loihi_total:.1f} %)")
     print(f"Loihi - Avg soma energy per inference: {avg_loihi_soma:.6e} J ({100.0 * avg_loihi_soma / avg_loihi_total:.1f} %)")
     print(f"Loihi - Avg network energy per inference: {avg_loihi_network:.6e} J ({100.0 * avg_loihi_network / avg_loihi_total:.1f} %)")
     print(f"Loihi - Avg spikes out per neuron per inference: {avg_loihi_spikes:.1f}")
+    print(f"Loihi - Avg inference latency: {avg_loihi_latency:.6e}")
     print("***")
 
     # Print per-timestep statistics. I will probably not include this in the paper
@@ -677,6 +688,8 @@ def plot_shd(timesteps_per_input, labels, weights):
     print(f"Indiveri - Mean per-timestep soma energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / total_indiveri_energy} %)")
     print(f"Indiveri - Mean per-timestep network energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / total_indiveri_energy} %)")
     print(f"Indiveri - Mean per-timestep fired: {analog_perf_df['fired'].mean()}")
+    print(f"Indiveri - total spikes: {analog_perf_df['spikes'].sum()}")
+    print(f"Indiveri - total timestep latency: {analog_perf_df['sim_time'].sum()}")
     print("***")
 
     total_loihi_energy = loihi_perf_df['total_energy'].mean()
@@ -685,6 +698,10 @@ def plot_shd(timesteps_per_input, labels, weights):
     print(f"Loihi - Mean per-timestep Loihi soma energy: {loihi_perf_df['soma_energy'].mean()} J ({100.0 * loihi_perf_df['soma_energy'].mean() / total_loihi_energy} %)")
     print(f"Loihi - Mean per-timestep Loihi network energy: {loihi_perf_df['network_energy'].mean()} J ({100.0 * loihi_perf_df['network_energy'].mean() / total_loihi_energy} %)")
     print(f"Loihi - Mean per-timestep Loihi fired: {loihi_perf_df['fired'].mean()}")
+    print(f"Loihi - total spikes: {loihi_perf_df['spikes'].sum()}")
+    print(f"Loihi - total timestep latency: {analog_perf_df['sim_time'].sum()}")
+
+
     print("***")
 
     # *** Other misc plots ***
@@ -859,14 +876,37 @@ def plot_mnist(timesteps_per_input, inputs, weights):
     plt.savefig("runs/indiveri/mnist_raster.pdf")
     """
 
+    print("******")
+    print("Per-inference")
+    mean_energy = perf_df['total_energy'].sum() / num_inputs
+    print(f"Per-inference Total Indiveri energy: {mean_energy} J (100 %)")
+    print(f"Per-inference Soma Indiveri energy: {perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * perf_df['soma_energy'].mean() / mean_energy} %)")
+    print(f"Per-inference Synapse Indiveri energy: {perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
+    print(f"Per-inference Network Indiveri energy: {perf_df['network_energy'].sum() / num_inputs} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
+    print(f"Per-inference Indiveri firing neurons: {perf_df['fired'].sum() / num_inputs}")
+    print(f"Per-inference Indiveri Time-step Latency: {perf_df['sim_time'].sum() / num_inputs}")
     print("***")
+    perf_filename = f"perf_loihi_mnist.csv"
+    perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
+    print(f"Per-inference Total Loihi energy: {perf_df['total_energy'].sum() / num_inputs} J (100 %)")
+    print(f"Per-inference Soma Loihi energy: {perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * perf_df['soma_energy'].mean() / mean_energy} %)")
+    print(f"Per-inference Synapse Loihi energy: {perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
+    print(f"Per-inference Network Loihi energy: {perf_df['network_energy'].sum() / num_inputs} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
+    print(f"Per-inference Loihi firing neurons: {perf_df['fired'].sum() / num_inputs}")
+    print(f"Per-inference Loihi time-step latency: {perf_df['sim_time'].sum() / num_inputs}")
+
+    print("******")
+    print("Per time-step")
+    perf_filename = f"perf_analog_mnist.csv"
+    perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
     mean_energy = perf_df['total_energy'].mean()
     print(f"Mean Total Indiveri energy: {mean_energy} J (100 %)")
     print(f"Mean Soma Indiveri energy: {perf_df['soma_energy'].mean()} J ({100.0 * perf_df['soma_energy'].mean() / mean_energy} %)")
     print(f"Mean Synapse Indiveri energy: {perf_df['synapse_energy'].mean()} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
     print(f"Mean Network Indiveri energy: {perf_df['network_energy'].mean()} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
     print(f"Mean Indiveri firing neurons: {perf_df['fired'].mean()}")
-
+    print(f"Mean Indiveri time-step latency: {perf_df['sim_time'].mean()}")
+    print(f"Mean Time-step Latency: {perf_df['spikes'].sum()}")
     print("***")
     perf_filename = f"perf_loihi_mnist.csv"
     perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
@@ -876,10 +916,12 @@ def plot_mnist(timesteps_per_input, inputs, weights):
     print(f"Mean Synapse Loihi energy: {perf_df['synapse_energy'].mean()} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
     print(f"Mean Network Loihi energy: {perf_df['network_energy'].mean()} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
     print(f"Mean Loihi firing neurons: {perf_df['fired'].mean()}")
+    print(f"Mean Loihi time-step latency: {perf_df['sim_time'].mean()}")
+    print(f"Total Loihi spikes: {perf_df['spikes'].sum()}")
 
 
 # Rate-encoded MNIST as a toy demo
-dataset = "mnist"
+#dataset = "mnist"
 # Spiking Heidelberg Digits (SHD) is the second neuromorphic application.
 #  I have trained two SNNs for SHD for this script:
 #  The first SNN was trained using a modified LIF (Leaky) behavioral model (that
@@ -891,15 +933,16 @@ dataset = "mnist"
 #  The second SNN was trained using the LASANA model directly (by Jason). This
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
 #   accuracy, which is comparable to the SHD benchmark paper.
-#dataset = "shd"
+dataset = "shd"
 
-run_experiments = True
-create_plots = False
+run_experiments = False
+create_plots = True
 
 if dataset == "mnist":
     #num_inputs = 10
     #num_inputs = 1
     num_inputs = 10000 # Entire test set
+    #num_inputs = 100
 elif dataset == "shd":
     timesteps = None
     #num_inputs = 1
@@ -909,7 +952,7 @@ elif dataset == "shd":
 
 if run_experiments:
     run_experiment(num_inputs, dataset, analog_neurons=True)
-    #run_experiment(num_inputs, dataset, analog_neurons=False)
+    run_experiment(num_inputs, dataset, analog_neurons=False)
 
 if create_plots:
     plot_experiments(dataset)

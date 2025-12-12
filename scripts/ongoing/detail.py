@@ -53,11 +53,9 @@ def parse_stats(stats):
     return analysis
 
 
-def run_dvs(inputs, detailed_network=False, detailed_synapse=False):
-    if detailed_synapse:
+def run_dvs(inputs, detail_level="detailed", detailed_sync=False):
+    if detailed_sync:
         arch_filename = "loihi_detailed.yaml"
-    elif detailed_network:
-        arch_filename = "loihi_net.yaml"
     else:
         arch_filename = "loihi_baseline.yaml"
 
@@ -76,7 +74,7 @@ def run_dvs(inputs, detailed_network=False, detailed_synapse=False):
         is_first_frame = (frame == 0)
         chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",
                     write_trace_headers=is_first_frame,
-                    timing_model="cycle" if detailed_network else "detailed",
+                    timing_model=detail_level,
                     processing_threads=16)
         chip.reset()
 
@@ -110,7 +108,19 @@ if __name__ == "__main__":
 
         # *************
         loihi_baseline = copy.deepcopy(loihi_yaml)
+        tile_section = loihi_baseline["architecture"]["tile"][0]
+        core_section = tile_section["core"][0]
+        synapse_section = None
+        for section in core_section["synapse"]:
+            if section["name"] == "loihi_conv_synapse":
+                synapse_section = section
+                break
         loihi_baseline["architecture"]["attributes"]["latency_sync"] = 0.0
+        synapse_section["attributes"]["model"] = "loihi"
+        synapse_section["attributes"]["plugin"] = "/home/usr1/jboyle/neuro/sana-fe/plugins/libloihi_synapse.so" # On detailed-loihi-model INRC branch
+        synapse_section["attributes"]["max_parallel_accesses"] = 4
+        del synapse_section["attributes"]["latency_process_spike"]
+        del synapse_section["attributes"]["energy_process_spike"]
         with open(os.path.join(RUN_DIR, "loihi_baseline.yaml"), "w") as baseline_yaml:
             yaml.dump(loihi_baseline, baseline_yaml)
 
@@ -131,6 +141,7 @@ if __name__ == "__main__":
         synapse_section["attributes"]["plugin"] = "/home/usr1/jboyle/neuro/sana-fe/plugins/libloihi_synapse.so" # On detailed-loihi-model INRC branch
         synapse_section["attributes"]["max_parallel_accesses"] = 4
         del synapse_section["attributes"]["latency_process_spike"]
+        del synapse_section["attributes"]["energy_process_spike"]
         with open(os.path.join(RUN_DIR, "loihi_detailed.yaml"), "w") as detailed_yaml:
             yaml.dump(loihi_detailed, detailed_yaml)
 
@@ -139,9 +150,9 @@ if __name__ == "__main__":
             inputs = np.loadtxt(input_csv, delimiter=",", skiprows=1)
 
         latencies = {}
-        latencies["full"] = run_dvs(inputs, detailed_network=True, detailed_synapse=True)
-        latencies["cycle_accurate"] = run_dvs(inputs, detailed_network=True, detailed_synapse=False)
-        latencies["baseline"] = run_dvs(inputs, detailed_network=False, detailed_synapse=False)
+        latencies["cycle"] = run_dvs(inputs, detail_level="cycle", detailed_sync=True)
+        latencies["detailed"] = run_dvs(inputs, detail_level="detailed", detailed_sync=False)
+        latencies["simple"] = run_dvs(inputs, detail_level="simple", detailed_sync=False)
 
         # Convert dict of arrays to DataFrame and save to CSV
         df = pd.DataFrame(latencies)
@@ -152,9 +163,9 @@ if __name__ == "__main__":
         # Plot the latency
         plt.rcParams.update({'font.size': 7, 'lines.markersize': 4})
         sim_data = pd.read_csv(SIM_TIME_DATA_PATH, delimiter=",")
-        sim_times_baseline = sim_data["baseline"].to_numpy()
-        sim_times_cycle = sim_data["cycle_accurate"].to_numpy()
-        sim_times_detailed = sim_data["full"].to_numpy()
+        sim_times_cycle = sim_data["cycle"].to_numpy()
+        sim_times_detailed = sim_data["detailed"].to_numpy()
+        sim_times_simple = sim_data["simple"].to_numpy()
 
         print("Reading Loihi data")
         loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
@@ -172,39 +183,65 @@ if __name__ == "__main__":
         print("Plotting latency")
         loihi_data = pd.read_csv(LOIHI_TIME_DATA_PATH)
         loihi_times = np.array(loihi_data.loc[:, :] / 1.0e6)
-        sim_times_baseline = np.delete(sim_times_baseline,
-                list(range(timesteps-1, timesteps*frames, timesteps)))
         sim_times_cycle = np.delete(sim_times_cycle,
                 list(range(timesteps-1, timesteps*frames, timesteps)))
         sim_times_detailed = np.delete(sim_times_detailed,
                 list(range(timesteps-1, timesteps*frames, timesteps)))
+        sim_times_simple = np.delete(sim_times_simple,
+                list(range(timesteps-1, timesteps*frames, timesteps)))
         loihi_times = loihi_times[0:timesteps-1,:]
 
-        total_sim_times_baseline = np.zeros(frames)
         total_sim_times_cycle = np.zeros(frames)
         total_sim_times_detailed = np.zeros(frames)
+        total_sim_times_simple = np.zeros(frames)
         total_hops = np.zeros(frames)
         loihi_total_times = np.zeros(frames)
         for i in range(0, frames):
-            total_sim_times_baseline[i] = np.sum(sim_times_baseline[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
             total_sim_times_cycle[i] = np.sum(sim_times_cycle[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
             total_sim_times_detailed[i] = np.sum(sim_times_detailed[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
+            total_sim_times_simple[i] = np.sum(sim_times_simple[i*(timesteps-1)+1:(i+1)*(timesteps-1)])
             loihi_total_times[i] = np.sum(loihi_times[0:timesteps-2, i])
 
-        plt.figure(figsize=(7.0, 1.6))
+        plt.figure(figsize=(3.5, 1.0))
         plt.rcParams.update({'font.size': 7, 'lines.markersize': 2, "font.family": "sans-serif", "font.sans-serif": "Arial", "pdf.fonttype": 42})
         start_frame = 0
-        plt.plot(np.arange(1, timesteps-1), sim_times_baseline[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "-", alpha=0.8, color="#0b3a55")
-        #plt.plot(np.arange(1, timesteps-1), sim_times_cycle[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "-.")#0b3a55
-        plt.plot(np.arange(1, timesteps-1), sim_times_detailed[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "-", alpha=0.8, color="#56B4E9")
-        plt.plot(np.arange(1, timesteps-1), loihi_times[0:timesteps-2, start_frame] * 1.0e6, "k--")
+        # plt.plot(np.arange(1, timesteps-1), sim_times_cycle[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "-.", linewidth=1.0, alpha=0.8, color="#002c59", zorder=5)
+        # plt.plot(np.arange(1, timesteps-1), sim_times_detailed[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "-", linewidth=1.0, alpha=0.8, color="#3983b8")
+        # plt.plot(np.arange(1, timesteps-1), sim_times_simple[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, ":", linewidth=1.0, alpha=0.8, color="gray", zorder=10) # "#56b4e9"
+        # plt.plot(np.arange(1, timesteps-1), loihi_times[0:timesteps-2, start_frame] * 1.0e6, "k--", linewidth=1.0)
 
-        plt.legend(("Less detail", "Most detail", "Measured on Loihi"), fontsize=6)
+        # plt.legend(("Cycle-accurate", "Semi-analytical", "Analytical"), fontsize=6)
+        # plt.ylabel("Time-step Latency (μs)")
+        # plt.xlabel("Time-step")
+        # plt.yticks(np.arange(0, 61, 20))
+        # #plt.minorticks_on()
+        # plt.tight_layout(pad=0.1)
+        # plt.savefig("runs/detail/dvs_gesture_time_series.pdf")
+        # plt.savefig("runs/detail/dvs_gesture_time_series.png", dpi=300)
+
+        plt.figure(figsize=(3.2, 1.2))  # Slightly increased height for legend
+        plt.rcParams.update({'font.size': 7, 'lines.markersize': 2, "font.family": "sans-serif", "font.sans-serif": "Arial", "pdf.fonttype": 42})
+        start_frame = 0
+        plt.plot(np.arange(1, timesteps-1), sim_times_cycle[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "-.", linewidth=1.0, alpha=0.8, color="#002c59", zorder=5)
+        plt.plot(np.arange(1, timesteps-1), sim_times_detailed[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, "-", linewidth=1.0, alpha=0.8, color="#3983b8")
+        plt.plot(np.arange(1, timesteps-1), sim_times_simple[start_frame*(timesteps-1)+1:(start_frame+1)*(timesteps-1)] * 1.0e6, ":", linewidth=1.0, alpha=0.8, color="gray", zorder=10)
+        plt.plot(np.arange(1, timesteps-1), loihi_times[0:timesteps-2, start_frame] * 1.0e6, "k--", linewidth=1.0)
+
+        plt.legend(("Cycle-accurate", "Semi-analytical", "Analytical", "Measured on Loihi"),
+                   fontsize=6,
+                   loc='upper center',
+                   bbox_to_anchor=(0.5, 1.25),
+                   ncol=4,
+                   frameon=False,
+                   handlelength=1.5,
+                   handletextpad=0.1,
+                   columnspacing=1.0)
         plt.ylabel("Time-step Latency (μs)")
         plt.xlabel("Time-step")
-        plt.yticks(np.arange(0, 61, 10))
-        plt.minorticks_on()
-        plt.tight_layout(pad=0.3)
+        plt.ylim(0, 70)  # Increased ylim to fit legend
+        plt.yticks(np.arange(0, 61, 20))
+        plt.tight_layout(pad=0.1)
+        plt.subplots_adjust(top=0.82)  # Make room for legend at top
         plt.savefig("runs/detail/dvs_gesture_time_series.pdf")
         plt.savefig("runs/detail/dvs_gesture_time_series.png", dpi=300)
 
@@ -214,51 +251,131 @@ if __name__ == "__main__":
         plt.gca().set_box_aspect(1)
 
         # TODO: plot the total test-case/inference latency, this will be less confusing next to the time-series! (Will be measured in ms)
-        average_sim_times_baseline = total_sim_times_baseline / 127
-        average_sim_times_cycle = total_sim_times_cycle / 127
-        average_sim_times_detailed = total_sim_times_detailed / 127
-        loihi_average_times = loihi_total_times / 127
-        plt.plot(average_sim_times_baseline[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "o", alpha=0.8, markeredgewidth=0, markerfacecolor="#0b3a55")[0]
-        #plt.plot(average_sim_times_cycle[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "o", alpha=0.7, markeredgewidth=0, markerfacecolor="#009E73")[0]
-        plt.plot(average_sim_times_detailed[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "o", alpha=0.8, markeredgewidth=0, markerfacecolor="#56B4E9")[0]
-        plt.plot(np.linspace(10, 30), np.linspace(10, 30), "k--", alpha=0.8)
+        average_sim_times_cycle = total_sim_times_cycle # / 127
+        average_sim_times_detailed = total_sim_times_detailed # / 127
+        average_sim_times_simple = total_sim_times_simple # / 127
+        loihi_average_times = loihi_total_times # / 127
+        # plt.plot(average_sim_times_detailed[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "o", alpha=0.8, markeredgewidth=0, markerfacecolor="#0b3a55")[0]
+        # plt.plot(average_sim_times_cycle[0:frames]*1.0e6, loihi_average_times[0:frames]*1.0e6, "o", alpha=0.8, markeredgewidth=0, markerfacecolor="#56B4E9")[0]
 
-        plt.legend(("Less detail", "Most detail"),
-           fontsize=6, markerscale=1.5, handlelength=0.6, handletextpad=0.05, loc="upper left")
-        plt.ylabel("Measured Latency (μs)")
-        plt.xlabel("Simulated Latency (μs)")
-        plt.xlim((10, 31))
-        plt.ylim((10, 31))
-        plt.xticks(np.arange(10, 31, 10))
-        plt.yticks(np.arange(10, 31, 10))
+        plt.plot(average_sim_times_simple[0:frames]*1.0e3, loihi_average_times[0:frames]*1.0e3, "^", alpha=0.95, zorder=10, markeredgewidth=0.3, markeredgecolor='black', markerfacecolor='none')[0] # 0e4767
+        plt.plot(average_sim_times_detailed[0:frames]*1.0e3, loihi_average_times[0:frames]*1.0e3, "o",  alpha=0.95, markeredgewidth=0, markerfacecolor="#56B4E9", zorder=0)[0]
+        plt.plot(average_sim_times_cycle[0:frames]*1.0e3, loihi_average_times[0:frames]*1.0e3, "x", alpha=0.8, markersize=2.5, markeredgewidth=0.6, markeredgecolor='#0e4767')[0]
+        plt.plot(np.linspace(1.5, 3.9), np.linspace(1.5, 3.9), "k--", alpha=0.7, linewidth=1.0)
+
+        plt.legend(("Analytical", "Semi-analytical", "Cycle-accurate"),
+           fontsize=5, markerscale=1.5, handlelength=0.6, handletextpad=0.05, loc="lower right")
+        plt.ylabel("Measured Latency (ms)")
+        plt.xlabel("Simulated Latency (ms)")
+        plt.xlim((1.5, 3.9))
+        plt.ylim((1.5, 3.9))
+        plt.xticks(np.arange(1.5, 3.9, 0.5))
+        plt.yticks(np.arange(1.5, 3.9, 0.5))
         plt.tight_layout(pad=0.1)
         plt.savefig("runs/detail/dvs_gesture_compare_plugin.pdf")
         plt.savefig("runs/detail/dvs_gesture_compare_plugin.png", dpi=300)
 
         # Calculate total error
         print("Calculating errors")
-        relative_error_baseline = np.abs(loihi_total_times - total_sim_times_baseline) / loihi_total_times
         relative_error_cycle = np.abs(loihi_total_times - total_sim_times_cycle) / loihi_total_times
         relative_error_detailed = np.abs(loihi_total_times - total_sim_times_detailed) / loihi_total_times
+        relative_error_simple = np.abs(loihi_total_times - total_sim_times_simple) / loihi_total_times
 
-
-        mean_error_baseline = np.sum(relative_error_baseline) / len(relative_error_baseline)
+        mean_error_simple = np.sum(relative_error_simple) / len(relative_error_simple)
         mean_error_cycle = np.sum(relative_error_cycle) / len(relative_error_cycle)
         mean_error_detailed = np.sum(relative_error_detailed) / len(relative_error_detailed)
-        print("Time Absolute Mean error (Baseline): {0} ({1} %)".format(mean_error_baseline, mean_error_baseline * 100))
+        print("Time Absolute Mean error (Simple): {0} ({1} %)".format(mean_error_simple, mean_error_simple * 100))
         print("Time Absolute Mean error (Cycle-accurate): {0} ({1} %)".format(mean_error_cycle, mean_error_cycle * 100))
-        print("Time Absolute Mean error (Cycle+Detailed synapse): {0} ({1} %)".format(mean_error_detailed, mean_error_detailed * 100))
+        print("Time Absolute Mean error (Detailed): {0} ({1} %)".format(mean_error_detailed, mean_error_detailed * 100))
 
-        total_error_baseline =  (np.sum(loihi_total_times) - np.sum(total_sim_times_baseline)) / np.sum(loihi_total_times)
-        print("Time Total error (Baseline): {0} ({1} %)".format(total_error_baseline, total_error_baseline * 100))
+        #total_error_baseline =  (np.sum(loihi_total_times) - np.sum(total_sim_times_baseline)) / np.sum(loihi_total_times)
+        #print("Time Total error (Baseline): {0} ({1} %)".format(total_error_baseline, total_error_baseline * 100))
 
         # Calculate correlation
-        frame_correlation_baseline = np.corrcoef(loihi_average_times[0:frames], average_sim_times_baseline[0:frames])[0,1]
+        frame_correlation_simple = np.corrcoef(loihi_average_times[0:frames], average_sim_times_simple[0:frames])[0,1]
         frame_correlation_cycle = np.corrcoef(loihi_average_times[0:frames], average_sim_times_cycle[0:frames])[0,1]
         frame_correlation_detailed = np.corrcoef(loihi_average_times[0:frames], average_sim_times_detailed[0:frames])[0,1]
-        print(f"Pearson correlation for baseline frame: {frame_correlation_baseline}")
+        #print(f"Pearson correlation for baseline frame: {frame_correlation_baseline}")
         print(f"Pearson correlation for cycle-accurate frame: {frame_correlation_cycle}")
         print(f"Pearson correlation for detailed synapse frame: {frame_correlation_detailed}")
+
+        import matplotlib
+        matplotlib.rcParams['hatch.linewidth'] = 0.8
+        # Create bar charts showing the simulator speed
+        # Data for first bar chart (Scheduler model)
+        scheduler_labels = ['Analytical', 'Semi-analytical', 'Cycle-accurate']
+        scheduler_values = [4.12e8, 7.55e6, 1.59e5]
+        scheduler_colors = ['#009E73', '#E69F00', '#56B4E9']  # Blue, Orange, Green
+        schedule_alphas = [0.7, 0.8, 0.8]
+        schedule_hatch = ['/////', None , 'xxxxxx']
+
+        # Data for second bar chart (Architecture)
+        arch_labels = ['Loihi', 'Loihi-Ind', 'Loihi-IMAC', 'Loihi-DD', 'Loihi-AD']
+        arch_values = [7.55e6, 1.44e6, 7.12e5, 5.12e6, 2.39e6]
+        arch_colors = ['#56B4E9', '#D55E00', '#009E73', '#CC79A7', '#E69F00']
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(1.5, 1.5))
+
+        # Adjust spacing
+        #plt.subplots_adjust(wspace=0.4, left=0.15, right=0.95, top=0.85, bottom=0.15)
+
+        # First bar chart - Scheduler model (LOGARITHMIC)
+        n1 = len(scheduler_labels)
+        bar_width = 1.0  # No space between bars in cluster
+        x1 = np.arange(n1) * bar_width  # Bars touching each other
+
+        bars1 = ax1.bar(x1, np.array(scheduler_values)/1e6, color=['white', '#56B4E9', 'white'], alpha=0.8, width=bar_width, edgecolor='black', linewidth=0.5)
+        # Overlay hatches with white edge (no fill)
+        ax1.bar(x1, np.array(scheduler_values)/1e6, color='none', alpha=0.8, hatch=schedule_hatch, width=bar_width, edgecolor='#56B4E9', linewidth=0)
+
+        # Add name labels on top of bars (vertical text, same color as bar)
+        for bar, label, color, alpha, hatch in zip(bars1, scheduler_labels, scheduler_colors, schedule_alphas, schedule_hatch):
+            if label == "Analytical":
+                height = 30
+            else:
+                height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height,
+                    label, ha='center', va='bottom', rotation=90,
+                    color='black', fontsize=6, alpha=1.0)
+
+        ax1.set_xlabel('Timing Model', fontsize=7)
+        ax1.set_ylabel('SANA-FE Throughput (Mspike/s)', fontsize=7, va='center')
+        ax1.set_xticks([])  # Remove x ticks since labels are on bars
+        ax1.tick_params(axis='both', labelsize=6)
+
+        # Logarithmic scale with no minor ticks
+        ax1.set_yscale('log')
+        #ax1.yaxis.set_minor_locator()
+
+        # Second bar chart - Architecture (LINEAR)
+        n2 = len(arch_labels)
+        x2 = np.arange(n2) * bar_width  # Bars touching each other
+
+        bars2 = ax2.bar(x2, np.array(arch_values)/1e6, color=arch_colors, width=bar_width, edgecolor='black', linewidth=0.5)
+
+        # Add name labels on top of bars (vertical text, same color as bar)
+        for bar, label, color in zip(bars2, arch_labels, arch_colors):
+            height = bar.get_height() + 0.1
+            ax2.text(bar.get_x() + bar.get_width()/2., height,
+                    label,
+                    ha='center', va='bottom', rotation=90,
+                    color=color, fontsize=6)
+
+        ax2.set_xlabel('Arch.', fontsize=7)
+        ax2.set_xticks([])  # Remove x ticks since labels are on bars
+        ax2.set_ylim([0, 10])
+        ax2.tick_params(axis='both', labelsize=6)
+
+        # Linear scale for architecture
+        # No set_yscale needed (linear is default)
+
+        # Remove top and right spines for cleaner look
+        for ax in [ax1, ax2]:
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+        plt.tight_layout(pad=0.1)
+        plt.savefig("runs/detail/compare_models.pdf")
+        plt.savefig("runs/detail/compare_models.png")
+
 
         #plt.show()
         print("Time simulations finished")

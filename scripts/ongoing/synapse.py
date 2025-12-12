@@ -50,6 +50,7 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses, run_dir
                     synapse['attributes']['model'] = "loihi"
                     synapse['attributes']['max_parallel_accesses'] = max_parallel_accesses
                     del synapse["attributes"]["latency_process_spike"]
+                    del synapse["attributes"]["energy_process_spike"]
 
     # Create new filename
     new_arch_filename = f"loihi_parallel_{max_parallel_accesses}.yaml"
@@ -94,6 +95,7 @@ def run_single_experiment(max_parallel_accesses):
             message_trace=messages_path,
             write_trace_headers=True,
             timing_model="cycle",
+            #timing_model="detailed",
             processing_threads=8,
             scheduler_threads=1
         )
@@ -107,6 +109,7 @@ def run_single_experiment(max_parallel_accesses):
         total_hops = stats.loc[:, "hops"].sum()
         total_packets = stats.loc[:, "packets"].sum()
         total_fired = stats.loc[:, "fired"].sum()
+        total_spikes = stats.loc[:, "spikes"].sum()
 
         result = {
             'max_parallel_accesses': max_parallel_accesses,
@@ -115,6 +118,7 @@ def run_single_experiment(max_parallel_accesses):
             'total_hops': total_hops,
             'total_packets': total_packets,
             'total_fired': total_fired,
+            'total_spikes': total_spikes,
             'avg_time_per_timestep': total_time / TIMESTEPS,
             'avg_energy_per_timestep': total_energy / TIMESTEPS,
             'runtime_seconds': runtime
@@ -199,22 +203,41 @@ def main():
     })
 
     print(results_df)
-    baseline = results_df[results_df["max_parallel_accesses"] == 1]["total_time"].to_numpy()
-    results_df["speedup"] = baseline / results_df["total_time"]
+    #baseline = results_df[results_df["max_parallel_accesses"] == 1]["total_time"].to_numpy()
+    results_df["speedup"] = 1.0 / results_df["total_time"]
     fig = plt.figure(figsize=(1.5, 1.5))
     plt.plot(results_df["max_parallel_accesses"], results_df["speedup"], 'o-',
              linewidth=1, markersize=2, color='#56B4E9')
     ax = fig.axes[0]
     ax.ticklabel_format(style='plain', useOffset=False, axis='y')
     plt.xlabel('Max. Parallel Reads')
-    plt.ylabel('Hardware Speed-up')
+    plt.ylabel('Simulated Frames/s')
     plt.grid(True, alpha=0.3)
     plt.xticks(range(0, 17, 4))
     plt.xlim((0, 17))
+    plt.ylim((100, 600))
     plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.png"), dpi=300)
     plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.pdf"))
+
+    #baseline = results_df[results_df["max_parallel_accesses"] == 1]["total_energy"].to_numpy()
+    fig = plt.figure(figsize=(1.5, 1.5))
+    plt.plot(results_df["max_parallel_accesses"], results_df["total_energy"] * 1.0e3, 'o-',
+             linewidth=1, markersize=2, color='#56B4E9')
+    ax = fig.axes[0]
+    ax.ticklabel_format(style='plain', useOffset=False, axis='y')
+    plt.xlabel('Max. Parallel Reads')
+    plt.ylabel('H/W Energy Usage (mJ)')
+    plt.grid(True, alpha=0.3)
+    plt.xticks(range(0, 17, 4))
+    plt.xlim((0, 17))
+    plt.ylim((0.25, 0.45))
+    plt.tight_layout(pad=0.1)
+    plt.savefig(os.path.join(RUN_DIR, "energy_concurrency.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_DIR, "energy_concurrency.pdf"))
+
     plt.show()
+    print(results_df)
 
 
 if __name__ == "__main__":
