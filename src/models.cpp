@@ -620,22 +620,25 @@ int sanafe::LoihiLifModel::loihi_read_noise_stream()
 
 double sanafe::LoihiLifModel::loihi_generate_noise()
 {
-    unsigned long int random_val = 0UL;
+    long int random_val = 0UL;
 
     if (noise_type == noise_file_stream)
     {
-        random_val = static_cast<unsigned int>(loihi_read_noise_stream());
+        random_val = loihi_read_noise_stream();
     }
     // else, don't generate any noise and return 0.0
 
     // Get the required noise bits (set by the noise exponent in Loihi)
-    const long unsigned int sign_bit = random_val & sign_mask;
+    const long int sign_bit = random_val & sign_mask;
     random_val &= random_mask;
     if (sign_bit != 0)
     {
         random_val |= ~random_mask; // Sign extend
     }
 
+    // Loihi noise generator has limited noise bits, perform sanity check
+    assert(random_val < 256);
+    assert(random_val > -256);
     return static_cast<double>(random_val);
 }
 
