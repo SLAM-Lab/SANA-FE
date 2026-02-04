@@ -7,6 +7,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_BUILD_TYPE Shared)
 
 add_compile_options(-Wall -pedantic -Werror -g)
+
 add_library(hodgkin_huxley SHARED "hodgkin_huxley.cpp")
 target_include_directories(hodgkin_huxley PRIVATE ../src)
 target_link_libraries(hodgkin_huxley PRIVATE ${CMAKE_DL_LIBS})
+
+add_library(neurofem SHARED "neurofem.cpp")
+target_include_directories(neurofem PRIVATE ../src)
+target_link_libraries(neurofem PRIVATE ${CMAKE_DL_LIBS})
