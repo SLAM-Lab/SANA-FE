@@ -496,10 +496,11 @@ void pyset_attributes(sanafe::Neuron *self,
     self->set_attributes(neuron_template);
 }
 
-void pyset_model_attributes(sanafe::MappedNeuron *self,
+void pyset_attributes_mapped(sanafe::MappedNeuron *self,
         pybind11::dict model_attributes,
         pybind11::dict dendrite_specific_attributes,
-        pybind11::dict soma_specific_attributes)
+        pybind11::dict soma_specific_attributes,
+        std::optional<bool> log_spikes)
 {
     std::map<std::string, sanafe::ModelAttribute> converted_attributes;
 
@@ -520,7 +521,7 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
         INFO("\tkey: %s\n", key.c_str());
     }
 #endif
-    self->set_model_attributes(converted_attributes);
+    self->set_attributes(converted_attributes, log_spikes);
 }
 
 // A similar implementation to SpikingChip::flush_timestep_data, but supporting
@@ -1122,10 +1123,11 @@ PYBIND11_MODULE(sanafecpp, m)
                             sanafe::default_max_neurons,
                     pybind11::arg("log_energy") = false);
     pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
-            .def("set_model_attributes", &pyset_model_attributes,
+            .def("set_attributes", &pyset_attributes_mapped,
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
-                    pybind11::arg("dendrite_attributes") = pybind11::dict());
+                    pybind11::arg("dendrite_attributes") = pybind11::dict(),
+                    pybind11::arg("log_spikes") = pybind11::none());
     pybind11::class_<sanafe::SpikingChip>(
             m, "SpikingChip", docstrings::spiking_chip_doc)
             .def_property(

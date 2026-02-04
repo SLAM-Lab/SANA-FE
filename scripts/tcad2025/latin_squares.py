@@ -28,12 +28,13 @@ ARCH_FILENAME = os.path.join("arch", "loihi_with_noise.yaml")
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
-LOIHI_COMPARTMENTS = 1024
+#LOIHI_COMPARTMENTS = 512
 #TIMESTEPS = 10
-TIMESTEPS = 1024
-#TIMESTEPS = 10240
+#TIMESTEPS = 1024
+TIMESTEPS = 10240
 
 MAX_COMPARTMENTS = 1024
+#MAX_COMPARTMENTS = 100
 TOTAL_CORES = 128
 
 
@@ -81,12 +82,11 @@ def latin_square(N, arch):
     #  possible digit choices
     wta_attributes = {
         "log_spikes": True,
-        "log_potential": False,
         "force_update": True,
         "threshold": 64,
         "reset": 0,
-        "leak": 1,
-        "reverse_threshold": -2**7 + 1,
+        "leak_decay": 1,
+        "reverse_threshold": -2**8 + 1,
         "reverse_reset_mode": "saturate",
         "soma_hw_name": "loihi_stochastic_lif",
         "synapse_hw_name": "loihi_sparse_synapse"
@@ -109,8 +109,7 @@ def latin_square(N, arch):
             core_id, add_dummy = map_group_to_core(N, free_compartments)
             if add_dummy:
                 dummy_group = network.create_neuron_group(
-                    f"group_{groups:0{zero_padding}d}", 1, wta_attributes)
-                groups += 1
+                    f"~dummy_core_{core_id}", 1, wta_attributes)
                 dummy_group.neurons[0].map_to_core(cores[core_id])
 
             wta = network.create_neuron_group(
@@ -182,11 +181,13 @@ def plot_results(N, network_path):
     # Now execute the network using SANA-FE and extract the spike timings
     arch_path = os.path.join(PROJECT_DIR, ARCH_FILENAME)
     arch = sanafe.load_arch(arch_path)
+    print(network_path)
     net = sanafe.load_net(network_path, arch, use_netlist_format=True)
-    chip = sanafe.SpikingChip(arch, record_spikes=True, record_potentials=True)
+    chip = sanafe.SpikingChip(arch)
     chip.load(net)
 
-    chip.sim(TIMESTEPS, perf_trace=True, spike_trace=True, potential_trace=True)
+    chip.sim(TIMESTEPS, perf_trace=True, spike_trace="spikes.csv",
+             scheduler_threads=8, processing_threads=16)
 
     # Use spiking data to create the grid solution produced by the Loihi run
     with open(os.path.join(PROJECT_DIR, "spikes.csv")) as spikes:
@@ -198,10 +199,13 @@ def plot_results(N, network_path):
             gid_str, nid_str = spike[0].split(".")
             gid, nid = int(gid_str), int(nid_str)
             timestep = int(spike[1])
-
+            if gid >= N*N and nid == 0:
+                # Assume is a dummy neuron
+                continue
             digit = nid
-            col = (gid-1) % N
-            row = (gid-1) // N
+            col = gid % N
+            row = gid // N
+
             assert(0 <= digit < N)
             assert(0 <= col < N)
             assert(0 <= row < N)
@@ -238,14 +242,18 @@ def run_experiment(N, network_filename, timing_model):
     net = sanafe.load_net(network_path, arch, use_netlist_format=True)
     chip = sanafe.SpikingChip(arch)
     chip.load(net)
-    results = chip.sim(TIMESTEPS, timing_model=timing_model)
+    results = chip.sim(TIMESTEPS, timing_model=timing_model, spike_trace=True,
+                       potential_trace=True)
 
     return results
 
+latin_square(N=20, arch=sanafe.load_arch("arch/loihi_with_noise.yaml"))
+plot_results(N=20, network_path="/home/usr1/jboyle/neuro/sana-fe/runs/latin/latin_square_N20.net")
 
+"""
 if __name__ == "__main__":
-    run_experiments = True
-    plot_experiment = True
+    run_experiments = False
+    plot_experiment = False
 
     if run_experiments:
         if (os.path.isfile(os.path.join(PROJECT_DIR, "runs", "latin",
@@ -346,3 +354,4 @@ if __name__ == "__main__":
         print(f"loihi times: {loihi_latency * TIMESTEPS * 1.0E-6}")
         print(f"total latency error: {total_latency_error * 100.0}%")
         print(f"total energy error: {total_energy_error * 100.0}%")
+"""

@@ -425,7 +425,6 @@ void sanafe::netlist_read_group(const std::vector<std::string_view> &fields,
     const auto attribute_fields =
             std::vector<std::string_view>(fields.begin() + 2, fields.end());
     auto attributes = netlist_parse_attributes(attribute_fields, line_number);
-    neuron_config.model_attributes = attributes;
     if (attributes.find("synapse_hw_name") != attributes.end())
     {
         neuron_config.default_synapse_hw_name =
@@ -449,6 +448,15 @@ void sanafe::netlist_read_group(const std::vector<std::string_view> &fields,
     {
         neuron_config.log_potential = static_cast<bool>(attributes["log_v"]);
     }
+
+    // Now that we parsed simulator specific attributes, remove these parsed
+    //  attributes and assign any remaining attributes to the model. These are
+    //  treated as reserved, so we know not to reuse them in the h/w models
+    for (const auto &key : reserved_neuron_attributes)
+    {
+        attributes.erase(key);
+    }
+    neuron_config.model_attributes = attributes;
 
     TRACE1(DESCRIPTION, "Creating neuron group:%s with count:%zu\n",
             neuron_group_id.c_str(), neuron_count);

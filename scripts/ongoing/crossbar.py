@@ -284,7 +284,7 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
         spiking_digit_input = inputs[input_idx].squeeze()
         for id, mapped_neuron in enumerate(mapped_inputs):
             spiketrain = list(spiking_digit_input[:, id])
-            mapped_neuron.set_model_attributes(
+            mapped_neuron.set_attributes(
                 model_attributes={"spikes": spiketrain})
         timesteps = len(spiketrain)
 
@@ -292,9 +292,13 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
         is_first_input = (input_idx == 0)
 
         hw.sim(timesteps,
-               spike_trace=os.path.join(RUN_PATH, spike_filename),
-               perf_trace=os.path.join(RUN_PATH, perf_filename),
-               potential_trace=os.path.join(RUN_PATH, potential_filename),
+            #    spike_trace=os.path.join(RUN_PATH, spike_filename),
+            #    perf_trace=os.path.join(RUN_PATH, perf_filename),
+            #    potential_trace=os.path.join(RUN_PATH, potential_filename),
+            #    write_trace_headers=is_first_input,
+               spike_trace=True,
+               perf_trace=True,
+               potential_trace=True,
                write_trace_headers=is_first_input,
                processing_threads=4,
                scheduler_threads=8)
@@ -640,9 +644,9 @@ if __name__ == "__main__":
     #num_inputs = 100
     #num_inputs = 10
     num_inputs = 2264  # Number of inferences
-    run_experiments = False
+    run_experiments = True
 
-    #"""
+    """
     if run_experiments:
         run_spiking_digits(num_inputs=num_inputs, analog_synapses=True)
         run_spiking_digits(num_inputs=num_inputs, analog_synapses=False)
@@ -651,7 +655,7 @@ if __name__ == "__main__":
     calculate_accuracy(analog_synapses=True)
 
     plot_spiking_digits()
-    #"""
+    """
 
 # Legacy scripts that may be useful at some point to someone, but is not
 #  currently needed for any publication
@@ -894,15 +898,19 @@ def run_mnist(analog_synapses=True, timesteps=100):
         mnist_input = inputs[input_idx].flatten()
         for id, mapped_neuron in enumerate(mapped_inputs):
             # print(list(inputs[:, id]))
-            mapped_neuron.set_model_attributes(#model_attributes={"spikes": list(inputs[:, id])})
+            mapped_neuron.set_attributes(#model_attributes={"spikes": list(inputs[:, id])})
                 model_attributes={"rate": mnist_input[id]})
 
         print(f"Simulating for {timesteps} timesteps")
         is_first_input = (input_idx == 0)
         results = hw.sim(timesteps,
-                        spike_trace=os.path.join(RUN_PATH, spike_filename),
-                        perf_trace=os.path.join(RUN_PATH, perf_filename),
-                        potential_trace=os.path.join(RUN_PATH, potential_filename),
+                        # spike_trace=os.path.join(RUN_PATH, spike_filename),
+                        # perf_trace=os.path.join(RUN_PATH, perf_filename),
+                        # potential_trace=os.path.join(RUN_PATH, potential_filename),
+                        # write_trace_headers=is_first_input,
+                        spike_trace=True,
+                        perf_trace=True,
+                        potential_trace=True,
                         write_trace_headers=is_first_input,
                         processing_threads=8,
                         scheduler_threads=8)
@@ -1004,8 +1012,8 @@ def plot_mnist(num_inputs):
     print(f"Per-inference Crossbar latency: {analog_perf_df['sim_time'].sum() / num_inputs}")
 
 #"""
-# num_inputs = 10000
-# if run_experiments:
-#     run_mnist(analog_synapses=True, timesteps=100)
-#     run_mnist(analog_synapses=False, timesteps=100)
+num_inputs = 10000
+if run_experiments:
+     run_mnist(analog_synapses=True, timesteps=100)
+     run_mnist(analog_synapses=False, timesteps=100)
 #plot_mnist(num_inputs)

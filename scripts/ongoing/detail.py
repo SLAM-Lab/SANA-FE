@@ -69,7 +69,7 @@ def run_dvs(inputs, detail_level="detailed", detailed_sync=False):
         dvs_inputs = inputs[frame, :]
         mapped_inputs = chip.mapped_neuron_groups["0"]
         for id, mapped_neuron in enumerate(mapped_inputs):
-            mapped_neuron.set_model_attributes(
+            mapped_neuron.set_attributes(
                 model_attributes={"bias": dvs_inputs[id]})
         is_first_frame = (frame == 0)
         chip.sim(timesteps, perf_trace="perf.csv", message_trace="messages.csv",

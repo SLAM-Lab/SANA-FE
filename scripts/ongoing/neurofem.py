@@ -456,7 +456,7 @@ def convert_model(params_file, model_folder):
 
     mapped_neurons = chip.mapped_neuron_groups["solver"]
     for i, n in enumerate(mapped_neurons):
-        n.set_model_attributes(model_attributes={"bias": bias_f1[i]})
+        n.set_attributes(model_attributes={"bias": bias_f1[i]})
     results = chip.sim(n_timesteps // 2, spike_trace=True, processing_threads=16, timing_model="simple")
                        #scheduler_threads=8)
     print("Simulation finished")
@@ -471,7 +471,7 @@ def convert_model(params_file, model_folder):
 
     print("Setting up next run")
     for i, n in enumerate(mapped_neurons):
-        n.set_model_attributes({"bias": bias_f2[i]})
+        n.set_attributes(model_attributes={"bias": bias_f2[i]})
     print("Running")
 
     results = chip.sim((n_timesteps+1) // 2, spike_trace=True, processing_threads=16, timing_model="simple")

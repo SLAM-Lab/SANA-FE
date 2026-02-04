@@ -286,13 +286,13 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
             timesteps = 100
             mnist_input = inputs[input, :]
             for id, mapped_neuron in enumerate(mapped_inputs):
-                mapped_neuron.set_model_attributes(
+                mapped_neuron.set_attributes(
                     model_attributes={"poisson": mnist_input[id]})
         elif dataset == "shd":
             spiking_digit_input = inputs[input].squeeze()
             for id, mapped_neuron in enumerate(mapped_inputs):
                 spiketrain = list(spiking_digit_input[:, id])
-                mapped_neuron.set_model_attributes(
+                mapped_neuron.set_attributes(
                     model_attributes={"spikes": spiketrain})
             timesteps = len(spiketrain)
         else:

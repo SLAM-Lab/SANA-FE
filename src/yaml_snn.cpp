@@ -357,8 +357,8 @@ sanafe::NeuronConfiguration sanafe::yaml_parse_neuron_attributes(
 
     // Parse and add shared attributes, which are in the same section. We assume
     //  that all attributes not listed above are model specific
-    auto model_attributes =
-            description_parse_model_attributes_yaml(parser, attributes);
+    auto model_attributes = description_parse_model_attributes_yaml(
+            parser, attributes);
     for (auto &[key, attribute] : model_attributes)
     {
         attribute.forward_to_dendrite = true;

@@ -56,7 +56,7 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
     }
 }
 
-void sanafe::MappedConnection::set_model_attributes(
+void sanafe::MappedConnection::set_attributes(
         const std::map<std::string, sanafe::ModelAttribute> &model_attributes)
         const
 {
@@ -93,7 +93,6 @@ sanafe::MappedNeuron::MappedNeuron(const size_t nid,
         , mapping_order(neuron_to_map.mapping_order)
         , log_spikes(neuron_to_map.log_spikes)
         , log_potential(neuron_to_map.log_potential)
-
 {
     // The neuron processing pipeline is a sequence of hardware to update the
     //  neuron, the message processing pipeline is built later when mapping
@@ -101,12 +100,33 @@ sanafe::MappedNeuron::MappedNeuron(const size_t nid,
     build_neuron_processing_pipeline();
 }
 
-void sanafe::MappedNeuron::set_model_attributes(
-        const std::map<std::string, sanafe::ModelAttribute> &model_attributes)
-        const
+void sanafe::MappedNeuron::set_attributes(
+        const std::map<std::string, sanafe::ModelAttribute> &model_attributes,
+        std::optional<bool> set_log_spikes)
 {
+    // Note that neuron attributes related to h/w mapping (i.e.,
+    //  default_synapse_hw_name, dendrite_hw_name) are not arguments here.
+    //  At this point the neuron has been mapped, and so h/w cannot be changed
+
+    if (set_log_spikes.has_value())
+    {
+        log_spikes = set_log_spikes.value();
+    }
+    // Note that setting potential traces (log_potential) is also not supported
+    //  in mapped neurons; if and once a simulation has started, changing which
+    //  neurons record their potentials would mess up the trace file, which is
+    //  represented as a (CSV) table of recorded values
+
     for (const auto &[key, attribute] : model_attributes)
     {
+        if (is_reserved_neuron_attribute(key))
+        {
+            std::string error = ("Reserved neuron attribute '" + key +
+                    "' cannot be used as a model attribute. " +
+                    "Pass it as a direct argument instead (if supported).");
+            throw std::invalid_argument(error);
+        }
+
         TRACE2(CHIP, "Forwarding attribute: %s (dendrite:%d soma:%d)\n",
                 key.c_str(), attribute.forward_to_dendrite,
                 attribute.forward_to_soma);

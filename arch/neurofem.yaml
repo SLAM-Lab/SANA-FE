@@ -28,7 +28,7 @@ architecture:
       core:
         - name: loihi_core[0..3]
           attributes:
-            buffer_position: dendrite
+            buffer_position: soma
             buffer_inside_unit: true
             max_neurons_supported: 1024
           axon_in:

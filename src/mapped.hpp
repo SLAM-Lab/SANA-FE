@@ -17,7 +17,6 @@
 
 namespace sanafe
 {
-
 enum NeuronStatus : uint8_t
 {
     invalid_neuron_state = 0U,
@@ -38,7 +37,7 @@ public:
     size_t mapped_synapse_hw_address{0UL};
 
     explicit MappedConnection(std::reference_wrapper<MappedNeuron> pre_neuron, std::reference_wrapper<MappedNeuron> post_neuron);
-    void set_model_attributes(const std::map<std::string, sanafe::ModelAttribute> &model_attributes) const;
+    void set_attributes(const std::map<std::string, sanafe::ModelAttribute> &attributes) const;
     void build_message_processing_pipeline();
 };
 
@@ -80,7 +79,7 @@ public:
     MappedNeuron(MappedNeuron&& other) = default;
 
     MappedNeuron& operator=(MappedNeuron&& other) = default;
-    void set_model_attributes(const std::map<std::string, ModelAttribute> &model_attributes) const;
+    void set_attributes(const std::map<std::string, ModelAttribute> &attributes, std::optional<bool> set_log_spikes=std::nullopt);
 
 private:
     void build_neuron_processing_pipeline();

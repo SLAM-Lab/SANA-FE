@@ -11,6 +11,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -18,6 +19,22 @@
 
 namespace sanafe
 {
+// There are a small set of reserved SNN attributes for the simulator kernel,
+//  which cannot be implemented by neuron H/W models - do not reuse any of these
+const std::unordered_set<std::string> reserved_neuron_attributes = {
+    "soma_hw_name",
+    "default_synapse_hw_name",
+    "dendrite_hw_name",
+    "log_spikes",
+    "log_potential",
+    "log_v"
+};
+
+inline bool is_reserved_neuron_attribute(const std::string &name)
+{
+    return (reserved_neuron_attributes.count(name) > 0);
+}
+
 // An attribute can contain a scalar value, or either a list or named set of
 //  attributes i.e., attributes can be recursively defined. However,
 //  in C++, variants cannot be defined recursively, so create this new class.

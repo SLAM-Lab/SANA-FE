@@ -116,6 +116,13 @@ void sanafe::Neuron::set_attributes(const NeuronConfiguration &config)
 
     for (const auto &[key, attribute] : config.model_attributes)
     {
+        if (is_reserved_neuron_attribute(key))
+        {
+            std::string error = ("Reserved neuron attribute '" + key +
+                    "' cannot be used as a model attribute. " +
+                    "Pass it as a direct argument instead.");
+            throw std::invalid_argument(error);
+        }
         model_attributes.insert_or_assign(key, attribute);
     }
 }

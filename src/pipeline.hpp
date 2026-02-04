@@ -172,8 +172,6 @@ public:
 
 protected:
     std::set<std::string> supported_attribute_names{
-            "log_spikes",
-            "log_potential",
             "force_update",
             "synapse_hw_name",
             "dendrite_hw_name",
@@ -195,7 +193,6 @@ protected:
             "energy_message_out",
             "latency_message_out",
             // Legacy attributes (v1)
-            "log_v",
             "connections_out",
     };
     InputInterfaceFunc process_input_fn;

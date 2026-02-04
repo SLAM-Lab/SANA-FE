@@ -162,7 +162,7 @@ void sanafe::Core::map_neuron(
                 mapped_neuron.mapped_dendrite_hw_address;
     }
 
-    mapped_neuron.set_model_attributes(neuron_to_map.model_attributes);
+    mapped_neuron.set_attributes(neuron_to_map.model_attributes);
 }
 
 void sanafe::Core::map_connection(const Connection &con,
@@ -176,7 +176,7 @@ void sanafe::Core::map_connection(const Connection &con,
     mapped_con.synapse_hw->add_connection(mapped_con);
 
     mapped_con.build_message_processing_pipeline();
-    mapped_con.set_model_attributes(con.synapse_attributes);
+    mapped_con.set_attributes(con.synapse_attributes);
     TRACE2(CHIP, "Mapped connection to hw: %s\n",
             mapped_con.synapse_hw->name.c_str());
 }
