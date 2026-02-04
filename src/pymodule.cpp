@@ -1122,12 +1122,13 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
                     pybind11::arg("log_energy") = false);
-    pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
+    pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron", docstrings::mapped_neuron_doc)
             .def("set_attributes", &pyset_attributes_mapped,
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict(),
-                    pybind11::arg("log_spikes") = pybind11::none());
+                    pybind11::arg("log_spikes") = pybind11::none(),
+                    docstrings::mapped_neuron_set_attributes_doc);
     pybind11::class_<sanafe::SpikingChip>(
             m, "SpikingChip", docstrings::spiking_chip_doc)
             .def_property(

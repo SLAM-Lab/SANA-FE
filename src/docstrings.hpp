@@ -131,14 +131,14 @@ Example:
 
 // Neuron class
 constexpr const char *neuron_doc = R"pbdoc(
-Individual spiking neuron with configurable hardware mapping and parameters.
+Individual spiking neuron with configurable hardware mapping and attributes.
 
 Neurons maintain their own state, connections, and hardware assignments.
 Access via NeuronGroup indexing or iteration.
 )pbdoc";
 
 constexpr const char *neuron_set_attributes_doc = R"pbdoc(
-Configure neuron-specific parameters and hardware assignments.
+Configure neuron-specific attributes and mapping to hardware.
 
 Args:
     soma_hw_name (str, optional): Soma processing unit name. Default is None.
@@ -147,8 +147,8 @@ Args:
     log_spikes (bool, optional): Enable spike logging for this neuron. Default is False.
     log_potential (bool, optional): Enable potential logging for this neuron. Default is False.
     model_attributes (dict, optional): General model parameters. Default is None.
-    soma_attributes (dict, optional): Soma-specific parameters. Default is None.
-    dendrite_attributes (dict, optional): Dendrite-specific parameters. Default is None.
+    soma_attributes (dict, optional): Soma-specific model parameters. Default is None.
+    dendrite_attributes (dict, optional): Dendrite-specific model parameters. Default is None.
 
 )pbdoc";
 
@@ -168,6 +168,29 @@ Args:
 
 Returns:
     int: Connection index for later reference
+
+)pbdoc";
+
+// Mapped Neuron class
+constexpr const char *mapped_neuron_doc = R"pbdoc(
+A spiking neuron that has been mapped to neuromorphic hardware.
+
+Once a Neuron object is mapped to hardware, it becomes a MappedNeuron. This means
+it has been mapped to a specific core within a network tile, and is assigned to
+specific hardware units. MappedNeuron objects can be used to access the state of
+a neuron during simulation or passing additional attributes, e.g., to change an
+attribute mid-simulation.
+
+)pbdoc";
+
+constexpr const char *mapped_neuron_set_attributes_doc = R"pbdoc(
+Configure neuron-specific attributes after mapping to hardware.
+
+Args:
+    log_spikes (bool, optional): Enable spike logging for this neuron. Default is False.
+    model_attributes (dict, optional): General model parameters. Default is None.
+    soma_attributes (dict, optional): Soma-specific model parameters. Default is None.
+    dendrite_attributes (dict, optional): Dendrite-specific model parameters. Default is None.
 
 )pbdoc";
 
