@@ -33,7 +33,8 @@ public:
             "threshold", "reset", "dt", "compartment"};
 
     NeuroFEMModel()
-            : PipelineUnit(false, true, true) // implements dendrite+soma
+            : PipelineUnit(sanafe::HardwareBitfield::implements_dendrite |
+                      sanafe::HardwareBitfield::implements_soma)
     {
         register_attributes(supported_attributes);
     }

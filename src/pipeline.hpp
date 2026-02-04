@@ -21,6 +21,26 @@
 
 namespace sanafe
 {
+enum HardwareBitfield : uint8_t
+{
+    implements_invalid = 0U,
+    implements_synapse = 1U << 0,
+    implements_dendrite = 1U << 1,
+    implements_soma = 1U << 2
+};
+
+inline HardwareBitfield operator|(HardwareBitfield a, HardwareBitfield b)
+{
+    return static_cast<HardwareBitfield>(
+        static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+
+inline HardwareBitfield operator&(HardwareBitfield a, HardwareBitfield b)
+{
+    return static_cast<HardwareBitfield>(
+        static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+}
+
 struct SomaEnergyMetrics
 {
     double energy_update_neuron{0.0};
@@ -48,7 +68,7 @@ struct PipelineResult
 class PipelineUnit
 {
 public:
-    PipelineUnit(bool implements_synapse, bool implements_dendrite, bool implements_soma);
+    PipelineUnit(const HardwareBitfield implemented);
     PipelineUnit(const PipelineUnit &copy) = default;
     PipelineUnit(PipelineUnit &&other) = default;
     virtual ~PipelineUnit() = default;
@@ -209,7 +229,7 @@ private:
 class SynapseUnit : public PipelineUnit
 {
 public:
-    SynapseUnit() : PipelineUnit(true, false, false) {}
+    SynapseUnit() : PipelineUnit(HardwareBitfield::implements_synapse) {}
     PipelineResult update(size_t synapse_address,
             bool read, long int /*timestep*/) override = 0;
     PipelineResult update(size_t /*neuron_address*/,
@@ -232,7 +252,7 @@ class DendriteUnit : public PipelineUnit
 {
 public:
     DendriteUnit()
-            : PipelineUnit(false, true, false)
+            : PipelineUnit(HardwareBitfield::implements_dendrite)
     {
     }
     PipelineResult update(size_t neuron_address,
@@ -255,7 +275,7 @@ public:
 class SomaUnit : public PipelineUnit
 {
 public:
-    SomaUnit() : PipelineUnit(false, false, true) {}
+    SomaUnit() : PipelineUnit(HardwareBitfield::implements_soma) {}
     PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int timestep) override = 0;
     PipelineResult update(size_t /*synapse_address*/, bool /*read*/, long int /*timestep*/) final
     {
@@ -279,11 +299,12 @@ BufferPosition pipeline_parse_buffer_pos_str(
 //  to avoid linkage issues with plug-ins. Generally, header-only approaches
 //  are useful in this situation. In this case, I've inlined only public and
 //  protected members. Private members can be defined externally.
-inline sanafe::PipelineUnit::PipelineUnit(const bool implements_synapse,
-            const bool implements_dendrite, const bool implements_soma)
-            : implements_synapse(implements_synapse)
-            , implements_dendrite(implements_dendrite)
-            , implements_soma(implements_soma)
+inline sanafe::PipelineUnit::PipelineUnit(const HardwareBitfield hw_implemented)
+        : implements_synapse(
+                  hw_implemented & HardwareBitfield::implements_synapse)
+        , implements_dendrite(
+                  hw_implemented & HardwareBitfield::implements_dendrite)
+        , implements_soma(hw_implemented & HardwareBitfield::implements_soma)
 {
     // When constructing the pipeline h/w unit, setup input/output interfaces.
     //  A hardware unit may implement synaptic, dendritic
