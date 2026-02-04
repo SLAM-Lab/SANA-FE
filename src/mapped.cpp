@@ -127,17 +127,22 @@ void sanafe::MappedNeuron::set_model_attributes(
 
 void sanafe::MappedNeuron::build_neuron_processing_pipeline()
 {
+    bool dendrite_hw_added = false;
     if (core->pipeline_config.buffer_position < buffer_before_dendrite_unit)
     {
         throw std::runtime_error("Error: Buffer must be after synaptic h/w");
     }
-    if (core->pipeline_config.buffer_position == buffer_inside_dendrite_unit)
+    if (core->pipeline_config.buffer_position <= buffer_inside_dendrite_unit)
     {
         neuron_processing_pipeline.push_back(dendrite_hw);
+        dendrite_hw_added = true;
     }
-    if ((core->pipeline_config.buffer_position <= buffer_inside_soma_unit) &&
-            (soma_hw != dendrite_hw))
+    if (core->pipeline_config.buffer_position <= buffer_inside_soma_unit)
     {
-        neuron_processing_pipeline.push_back(soma_hw);
+        // Avoid pushing the same h/w unit twice
+        if ((soma_hw != dendrite_hw) || !dendrite_hw_added)
+        {
+            neuron_processing_pipeline.push_back(soma_hw);
+        }
     }
 }
