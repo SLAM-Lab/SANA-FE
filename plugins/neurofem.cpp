@@ -197,7 +197,7 @@ sanafe::PipelineResult NeuroFEMModel::update(size_t neuron_address,
         const long int simulation_time)
 {
     NeuroFEMNeuron &n = neurons[neuron_address];
-    sanafe::NeuronStatus state{sanafe::invalid_neuron_state};
+    sanafe::NeuronStatus state{sanafe::neuron_state_unset};
 
     // Update time-step double buffered dendritic accumulators
     if (n.timesteps_simulated < (simulation_time - 1))

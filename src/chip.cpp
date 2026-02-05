@@ -554,14 +554,6 @@ void sanafe::SpikingChip::step(Scheduler &scheduler)
     sim_update_total_energy_and_counts(timestep_handle.get());
     // The total_messages_sent is incremented during the simulation since it's
     //  used to calculate the message id, so nothing needs to be done here
-    if (spike_trace.is_open())
-    {
-        sim_trace_record_spikes(spike_trace, total_timesteps);
-    }
-    if (potential_trace.is_open())
-    {
-        sim_trace_record_potentials(potential_trace, total_timesteps);
-    }
 }
 
 void sanafe::SpikingChip::sim_timestep_sync(Scheduler &scheduler) const
@@ -601,7 +593,7 @@ void sanafe::SpikingChip::reset()
     {
         for (MappedNeuron &neuron : neurons)
         {
-            neuron.status = invalid_neuron_state;
+            neuron.status = neuron_state_unset;
         }
     }
 }
@@ -784,7 +776,7 @@ sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
         output = unit->process(ts, n, con, output);
         total_energy += output.energy.value_or(0.0);
         total_latency += output.latency.value_or(0.0);
-        if (output.status != invalid_neuron_state)
+        if (output.status != NeuronStatus::neuron_state_unset)
         {
             n.status = output.status;
         }
@@ -1057,6 +1049,17 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
     process_neurons(ts_data);
     auto neuron_processing_end_tm = std::chrono::high_resolution_clock::now();
 
+    // Record spiking and neuron potentials after processing them
+    if (spike_trace.is_open())
+    {
+        sim_trace_record_spikes(spike_trace, total_timesteps);
+    }
+    // Record all neuron
+    if (potential_trace.is_open())
+    {
+        sim_trace_record_potentials(potential_trace, total_timesteps);
+    }
+
     auto message_processing_start_tm = neuron_processing_end_tm;
     process_messages(ts_data);
     forced_updates(ts_data);
@@ -1067,8 +1070,8 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
     auto energy_calculation_start_tm = message_processing_end_tm;
     sim_calculate_ts_energy(ts_data);
     sim_update_ts_counters(ts_data);
-
     auto energy_calculation_end_tm = std::chrono::high_resolution_clock::now();
+
     auto scheduler_start_tm = energy_calculation_end_tm;
     if (scheduler.timing_model == timing_model_cycle_accurate)
     {

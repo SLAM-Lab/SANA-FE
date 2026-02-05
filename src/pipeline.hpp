@@ -59,7 +59,7 @@ struct PipelineResult
 {
     // Hardware outputs
     std::optional<double> current{std::nullopt};
-    NeuronStatus status{invalid_neuron_state};
+    NeuronStatus status{neuron_state_unset};
     // Optionally simulate energy and/or latency
     std::optional<double> energy{std::nullopt};
     std::optional<double> latency{std::nullopt};

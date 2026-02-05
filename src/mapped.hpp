@@ -19,7 +19,7 @@ namespace sanafe
 {
 enum NeuronStatus : uint8_t
 {
-    invalid_neuron_state = 0U,
+    neuron_state_unset = 0U,
     idle = 1U,
     updated = 2U,
     fired = 3U
@@ -65,7 +65,7 @@ public:
     int spike_count{0};
     int maps_in_count{0};
     int maps_out_count{0};
-    NeuronStatus status{invalid_neuron_state};
+    NeuronStatus status{neuron_state_unset};
 
     // Flags and traces
     bool log_spikes{false};

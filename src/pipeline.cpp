@@ -108,7 +108,7 @@ void sanafe::PipelineUnit::check_outputs(
         const MappedNeuron & /*n*/, const PipelineResult &result) const
 {
     // Check the hw returns a valid value for the next unit to process
-    if (implements_soma && result.status == invalid_neuron_state)
+    if (implements_soma && result.status == neuron_state_unset)
     {
         throw std::runtime_error("Soma output; should return valid "
                                  "neuron state.");
