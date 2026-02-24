@@ -109,6 +109,11 @@ public:
     {
         return 0.0;
     }
+    virtual std::map<std::string, double> get_neuron_traces(size_t /*neuron_address*/)
+    {
+        // Default is to have no neuron traces in addition to potentials
+        return {};
+    }
 
     // Normal member functions and function pointers
     void set_attributes_hw(std::string unit_name, const ModelInfo &model);

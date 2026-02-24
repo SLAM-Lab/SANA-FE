@@ -404,6 +404,10 @@ void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
     {
         cx.leak_decay = static_cast<double>(param);
     }
+    else if (attribute_name == "log_u")
+    {
+        cx.log_current = static_cast<bool>(param);
+    }
     else if (attribute_name == "input_decay")
     {
         cx.input_decay = static_cast<double>(param);
@@ -640,6 +644,19 @@ double sanafe::LoihiLifModel::loihi_generate_noise()
     assert(random_val < 256);
     assert(random_val > -256);
     return static_cast<double>(random_val);
+}
+
+std::map<std::string, double> sanafe::LoihiLifModel::get_neuron_traces(
+        size_t neuron_address)
+{
+    if (compartments[neuron_address].log_current)
+    {
+        return {{"u", compartments[neuron_address].input_current}};
+    }
+    else
+    {
+        return {};
+    }
 }
 
 void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,

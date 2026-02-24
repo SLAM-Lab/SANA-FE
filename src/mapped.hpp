@@ -11,6 +11,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 #include "attribute.hpp"
 #include "fwd.hpp"
@@ -68,6 +69,7 @@ public:
     NeuronStatus status{neuron_state_unset};
 
     // Flags and traces
+    std::unordered_set<std::string> trace_names{};
     bool log_spikes{false};
     bool log_potential{false};
     bool check_for_synapse_updates_every_timestep{false};
