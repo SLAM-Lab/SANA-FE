@@ -14,9 +14,10 @@ net = sanafe.load_net("snn/example.yaml", arch)
 net.save("out")
 chip.load(net)
 
-result = chip.sim(10, spike_trace=True)
+result = chip.sim(10, spike_trace=True, potential_trace=True)
 
 print(result)
 #import yaml
 #print(yaml.dump(result))
 print(result["spike_trace"])
+print(result["potential_trace"])

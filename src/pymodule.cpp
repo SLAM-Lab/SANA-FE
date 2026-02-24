@@ -563,7 +563,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
 
     const bool overwrite_if_trace_exists = write_trace_headers;
     PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
-    PyPotentialTrace potentials(
+    PyNeuronTrace neuron_traces(
             self, potential_trace, overwrite_if_trace_exists);
     PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
     PyPerfTrace perf(self, perf_trace, overwrite_if_trace_exists);
@@ -571,7 +571,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     if (write_trace_headers)
     {
         spikes.write_header();
-        potentials.write_header();
+        neuron_traces.write_header();
         messages.write_header();
         perf.write_header();
     }
@@ -601,7 +601,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         self->step(scheduler);
         const long int total_timesteps = self->get_total_timesteps();
         spikes.record_net_activity(total_timesteps);
-        potentials.record_net_activity(total_timesteps);
+        neuron_traces.record_net_activity(total_timesteps);
 
         const auto now = std::chrono::steady_clock::now();
         constexpr std::chrono::milliseconds check_interval{100};
@@ -647,13 +647,13 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     pyflush_timestep_data(self, rd, perf, scheduler, messages);
 
     const auto spike_data = spikes.get_python_object();
-    const auto potential_data = potentials.get_python_object();
+    const auto neuron_data = neuron_traces.get_python_object();
     const auto perf_data = perf.get_python_object();
     const auto message_data = messages.get_python_object();
 
     pybind11::dict result = run_data_to_dict(rd);
     result["spike_trace"] = spike_data;
-    result["potential_trace"] = potential_data;
+    result["neuron_trace"] = neuron_data;
     result["perf_trace"] = perf_data;
     result["message_trace"] = message_data;
 

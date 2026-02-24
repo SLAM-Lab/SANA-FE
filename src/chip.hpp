@@ -68,18 +68,18 @@ public:
     void set_heartbeat(long int timesteps) { heartbeat = timesteps; }
     double get_power() const noexcept;
     std::vector<NeuronAddress> get_spikes() const;
-    std::vector<double> get_potentials() const;
+    std::map<std::string, std::vector<double>> get_all_traces() const;
     long int get_total_timesteps() const noexcept { return total_timesteps; }
     static void update_run_data(RunData &rd, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
 
     static void sim_trace_write_spike_header(std::ostream &spike_trace_file);
-    void sim_trace_write_potential_header(std::ostream &potential_trace_file);
+    void sim_trace_write_neuron_trace_header(std::ostream &potential_trace_file);
     void sim_trace_write_perf_header(std::ostream &perf_trace_file);
     static void sim_trace_write_message_header(std::ostream &message_trace_file);
 
     void sim_trace_record_spikes(std::ostream &spike_trace_file, long int timesteps);
-    void sim_trace_record_potentials(std::ostream &potential_trace_file, long int timestep);
+    void sim_trace_record_neuron_traces(std::ostream &potential_trace_file, long int timestep);
     void sim_trace_record_perf(std::ostream &perf_trace_file, const Timestep &ts);
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
 

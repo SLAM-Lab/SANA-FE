@@ -214,7 +214,8 @@ hard-coded names using either csv or yaml extensions.
 
 `spikes.csv`: The spikes for each time-step on probed neurons
 
-`potential.csv`: The potentials for each time-step on probed neurons
+`potential.csv`: The potentials (and other neuron state) for each time-step on
+probed neurons
 
 `perf.csv`: Detailed statistics for each timestep and each hardware unit
 

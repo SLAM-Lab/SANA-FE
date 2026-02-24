@@ -923,7 +923,7 @@ std::ofstream sanafe::SpikingChip::sim_trace_open_potential_trace(
         throw std::runtime_error(
                 "Error: Couldn't open trace file for writing.");
     }
-    sim_trace_write_potential_header(potential_file);
+    sim_trace_write_neuron_trace_header(potential_file);
     return potential_file;
 }
 
@@ -1057,7 +1057,7 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
     // Record all neuron
     if (potential_trace.is_open())
     {
-        sim_trace_record_potentials(potential_trace, total_timesteps);
+        sim_trace_record_neuron_traces(potential_trace, total_timesteps);
     }
 
     auto message_processing_start_tm = neuron_processing_end_tm;
@@ -1444,7 +1444,7 @@ void sanafe::SpikingChip::sim_trace_write_spike_header(
     spike_trace_file << "neuron,timestep" << '\n';
 }
 
-void sanafe::SpikingChip::sim_trace_write_potential_header(
+void sanafe::SpikingChip::sim_trace_write_neuron_trace_header(
         std::ostream &potential_trace_file)
 {
     // Write csv header for probe outputs - record which neurons have been
@@ -1455,22 +1455,31 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
     {
         for (MappedNeuron &neuron : group_neurons)
         {
+            // Neuron potential trace support is required for any h/w models
+            //  This trace is handled by the SANA-FE kernel
             if (neuron.log_potential)
             {
                 potential_trace_file << "neuron " << group_name;
                 potential_trace_file << "." << neuron.offset << ",";
             }
 
+            // The user can specify any number of additional state trace
+            //  variables. The user tracks them by setting neuron attributes
+            //  which are handled in the respective h/w models
             auto neuron_traces = neuron.dendrite_hw->get_neuron_traces(
                     neuron.mapped_dendrite_hw_address);
             // Merge dendrite and soma traces, overwriting one another if needed
-            // TODO: Note that in the future we may want more fine-grained
-            //  traces. This also is not capable of storing synaptic traces
-            //  which would have to be stored on a per connection basis
             neuron_traces.merge(neuron.soma_hw->get_neuron_traces(
                     neuron.mapped_soma_hw_address));
             for (const auto &[trace_name, placeholder_value] : neuron_traces)
             {
+                if (trace_name == "v")
+                {
+                    std::string error = "Trace name of 'v' is reserved for "
+                                        "neuron membrane potentials.";
+                    INFO("Error: %s\n", error.c_str());
+                    throw std::invalid_argument(error);
+                }
                 if (trace_name.find(',') != std::string::npos)
                 {
                     std::string error = "Trace '" + trace_name +
@@ -1479,8 +1488,9 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
                     INFO("Error: %s\n", error.c_str());
                     throw std::invalid_argument(error);
                 }
+                // Custom user traces are stored with similar format to neuron
+                //  potentials, but must include a unique trace specifier
                 neuron.trace_names.insert(trace_name);
-                // Store optional traces in the same file as potentials
                 potential_trace_file << "neuron " << group_name;
                 potential_trace_file << "." << neuron.offset << "/";
                 potential_trace_file << trace_name << ",";
@@ -1603,7 +1613,7 @@ void sanafe::SpikingChip::sim_trace_record_spikes(
     }
 }
 
-void sanafe::SpikingChip::sim_trace_record_potentials(
+void sanafe::SpikingChip::sim_trace_record_neuron_traces(
         std::ostream &potential_trace_file, const long int timestep)
 {
     // Each line of this csv file is the potential of all probed neurons for
@@ -1733,9 +1743,11 @@ std::vector<sanafe::NeuronAddress> sanafe::SpikingChip::get_spikes() const
     return spikes;
 }
 
-std::vector<double> sanafe::SpikingChip::get_potentials() const
+std::map<std::string, std::vector<double>>
+sanafe::SpikingChip::get_all_traces() const
 {
-    std::vector<double> potentials;
+    // Return current traces for all mapped neurons, for the current timestep
+    std::map<std::string, std::vector<double>> timestep_traces;
 
     for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
@@ -1743,15 +1755,25 @@ std::vector<double> sanafe::SpikingChip::get_potentials() const
         {
             const NeuronAddress address{
                     neuron.parent_group_name, neuron.offset};
+            auto neuron_traces = neuron.dendrite_hw->get_neuron_traces(
+                    neuron.mapped_dendrite_hw_address);
+            neuron_traces.merge(neuron.soma_hw->get_neuron_traces(
+                    neuron.mapped_soma_hw_address));
+            for (const auto &[trace_name, trace_value] : neuron_traces)
+            {
+                timestep_traces[trace_name].emplace_back(trace_value);
+            }
+
+            // For now, neuron membrane potential is a special required case
             if (neuron.log_potential)
             {
-                potentials.emplace_back(neuron.soma_hw->get_potential(
+                timestep_traces["v"].emplace_back(neuron.soma_hw->get_potential(
                         neuron.mapped_soma_hw_address));
             }
         }
     }
 
-    return potentials;
+    return timestep_traces;
 }
 
 void sanafe::SpikingChip::check_booksim_compatibility(

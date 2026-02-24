@@ -143,28 +143,32 @@ private:
     std::vector<std::vector<sanafe::NeuronAddress>> data;
 };
 
-class PyPotentialTrace : public PyNetworkTrace
+class PyNeuronTrace : public PyNetworkTrace
 {
 public:
-    PyPotentialTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
+    PyNeuronTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
             const bool overwrite_trace)
             : PyNetworkTrace(chip, trace_obj, overwrite_trace)
     {
     }
-    ~PyPotentialTrace() override = default;
+    ~PyNeuronTrace() override = default;
     void get_header_string(std::ostringstream &ss) override
     {
-        parent_chip->sim_trace_write_potential_header(ss);
+        parent_chip->sim_trace_write_neuron_trace_header(ss);
     }
     void write_net_trace_to_stream(
             std::ostringstream &ss, const long int timestep) override
     {
-        parent_chip->sim_trace_record_potentials(ss, timestep);
+        parent_chip->sim_trace_record_neuron_traces(ss, timestep);
     }
     void append_net_activity_to_memory() override
     {
-        auto potentials = parent_chip->get_potentials();
-        data.emplace_back(std::move(potentials));
+        const auto traces = parent_chip->get_all_traces();
+
+        for (auto &[trace_name, trace_values] : traces)
+        {
+            data[trace_name].emplace_back(std::move(trace_values));
+        }
     }
     pybind11::object get_python_object() const override
     {
@@ -179,7 +183,7 @@ public:
     }
 
 private:
-    std::vector<std::vector<double>> data;
+    std::map<std::string, std::vector<std::vector<double>>> data;
 };
 
 class PyPerfTrace : public PyHardwareTrace
