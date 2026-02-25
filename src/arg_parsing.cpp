@@ -25,15 +25,15 @@ std::string_view get_next_arg(
     {
         throw std::runtime_error("Flag requires an argument but none provided");
     }
-    return args[current_idx + 1];
+    return args.at(current_idx + 1);
 }
 
 // NOLINTNEXTLINE(readability-function-size)
 int parse_flag(const std::vector<std::string> args, const size_t current_idx,
         OptionalProgramFlags &flags)
 {
-    const std::string_view arg = args[current_idx];
-    if (arg.empty() || arg[0] != '-')
+    const std::string_view arg = args.at(current_idx);
+    if (arg.empty() || arg.at(0) != '-')
     {
         INFO("Invalid flag, should start with '-'");
         return 0;
@@ -47,7 +47,7 @@ int parse_flag(const std::vector<std::string> args, const size_t current_idx,
     int args_consumed = 1;
     // Ignore the first character (arg[0]), which we know is a dash. Parse the
     //  character and fields immediately after
-    switch (arg[1])
+    switch (arg.at(1))
     {
     case 'o': {
         args_consumed = 2;
@@ -129,9 +129,9 @@ OptionalProgramFlags parse_command_line_flags(
     // Should always be three arguments from the end
     size_t current_idx = 0;
     while (current_idx < args.size() &&
-            (args.size() - current_idx) > (RequiredProgramArgs::program_nargs))
+            (args.size() - current_idx) > RequiredProgramArgs::program_nargs)
     {
-        if (args[current_idx].empty() || args[current_idx][0] != '-')
+        if (args.at(current_idx).empty() || args.at(current_idx).at(0) != '-')
         {
             break;
         }
@@ -167,14 +167,14 @@ RequiredProgramArgs parse_required_args(
     }
 
     required_args.arch_filename =
-            args[optional_flags + RequiredProgramArgs::arch_filename_idx];
+            args.at(optional_flags + RequiredProgramArgs::arch_filename_idx);
     required_args.network_filename =
-            args[optional_flags + RequiredProgramArgs::network_filename_idx];
+            args.at(optional_flags + RequiredProgramArgs::network_filename_idx);
 
     try // Catch exceptions when converting from string to long
     {
-        const auto timestep_arg = std::string(args[optional_flags +
-                RequiredProgramArgs::timesteps_to_execute_idx]);
+        const auto timestep_arg = std::string(args.at(optional_flags +
+                RequiredProgramArgs::timesteps_to_execute_idx));
         required_args.timesteps_to_execute = std::stol(timestep_arg);
     }
     catch (const std::exception &e)

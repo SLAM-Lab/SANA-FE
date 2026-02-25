@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <functional>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -121,7 +122,7 @@ void sanafe::MappedNeuron::set_attributes(
     {
         if (is_reserved_neuron_attribute(key))
         {
-            std::string error = ("Reserved neuron attribute '" + key +
+            const std::string error = ("Reserved neuron attribute '" + key +
                     "' cannot be used as a model attribute. " +
                     "Pass it as a direct argument instead (if supported).");
             throw std::invalid_argument(error);

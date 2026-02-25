@@ -7,6 +7,7 @@
 #include <functional> // For std::reference_wrapper
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "arch.hpp"
@@ -84,9 +85,10 @@ sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
     if (!hw_found)
     {
         const std::string error("Could not find h/w (with name:" + hw_name +
-                ") that implements synapse:" + std::to_string(is_synapse) +
-                ", dendrite:" + std::to_string(is_dendrite) +
-                ", soma:" + std::to_string(is_soma));
+                ") that implements synapse:" +
+                std::to_string(static_cast<int>(is_synapse)) +
+                ", dendrite:" + std::to_string(static_cast<int>(is_dendrite)) +
+                ", soma:" + std::to_string(static_cast<int>(is_soma)));
         INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }

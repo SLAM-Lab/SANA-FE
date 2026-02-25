@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <ios>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -32,7 +33,7 @@ sanafe::PipelineResult sanafe::CurrentBasedSynapseModel::update(
     if (read)
     {
         TRACE1(MODELS, "w:%lf\n", weights[synapse_address]);
-        output.current = weights[synapse_address];
+        output.current = weights.at(synapse_address);
     }
     else
     {
@@ -55,7 +56,7 @@ void sanafe::CurrentBasedSynapseModel::set_attribute_edge(
     {
         TRACE1(MODELS, "Setting weight at address:%zu = %lf\n", synapse_address,
                 static_cast<double>(param));
-        weights[synapse_address] = static_cast<double>(param);
+        weights.at(synapse_address) = static_cast<double>(param);
     }
 
     min_synaptic_resolution = (1.0 / weight_bits);
@@ -73,20 +74,20 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
 {
     PipelineResult output;
 
-    if (timesteps_simulated[neuron_address] < simulation_time)
+    if (timesteps_simulated.at(neuron_address) < simulation_time)
     {
-        accumulated_charges[neuron_address] = 0.0;
-        timesteps_simulated[neuron_address] = simulation_time;
+        accumulated_charges.at(neuron_address) = 0.0;
+        timesteps_simulated.at(neuron_address) = simulation_time;
     }
     if (current.has_value())
     {
         // Integrate input charges
-        accumulated_charges[neuron_address] =
-                accumulated_charges[neuron_address].value_or(0.0) +
+        accumulated_charges.at(neuron_address) =
+                accumulated_charges.at(neuron_address).value_or(0.0) +
                 current.value();
     }
 
-    output.current = accumulated_charges[neuron_address];
+    output.current = accumulated_charges.at(neuron_address);
 
     return output;
 }
@@ -102,7 +103,8 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
         // Apply leak for 1 or more timesteps
         ++(timesteps_simulated[neuron_address]);
 
-        accumulated_charges[neuron_address] =
+        // TODO: suppress bounds checking here for speed
+	accumulated_charges[neuron_address] =
                 next_accumulated_charges[0UL][neuron_address];
         for (size_t i = 0; i < next_accumulated_charges.size() - 1UL; i++)
         {
@@ -364,14 +366,16 @@ void sanafe::LoihiLifModel::set_attribute_hw(
     else if (attribute_name == "noise_bits")
     {
         noise_bits = static_cast<int>(param);
-        random_mask = (1ULL << noise_bits) - 1;
+        random_mask = (1L << noise_bits) - 1L;
     }
 }
 
+
+// NOLINTNEXTLINE(readability-function-size)
 void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &attribute_name, const ModelAttribute &param)
 {
-    LoihiCompartment &cx = compartments[neuron_address];
+    LoihiCompartment &cx = compartments.at(neuron_address);
 
     if (attribute_name == "threshold")
     {
@@ -649,20 +653,18 @@ double sanafe::LoihiLifModel::loihi_generate_noise()
 std::map<std::string, double> sanafe::LoihiLifModel::get_neuron_traces(
         size_t neuron_address)
 {
-    if (compartments[neuron_address].log_current)
+    if (compartments.at(neuron_address).log_current)
     {
-        return {{"u", compartments[neuron_address].input_current}};
+        return {{"u", compartments.at(neuron_address).input_current}};
     }
-    else
-    {
-        return {};
-    }
+
+    return {};
 }
 
 void sanafe::TrueNorthModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &attribute_name, const ModelAttribute &param)
 {
-    TrueNorthNeuron &n = neurons[neuron_address];
+    TrueNorthNeuron &n = neurons.at(neuron_address);
     if (attribute_name == "threshold")
     {
         n.threshold = static_cast<double>(param);

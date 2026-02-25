@@ -219,7 +219,7 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         TRACE1(CHIP, "Mapping neuron %s.%zu to core:%zu\n",
                 neuron.parent_group_name.c_str(), neuron.offset,
                 neuron.core_address.value().id);
-        Core &mapped_core = list_of_cores[neuron.core_address.value().id];
+        Core &mapped_core = list_of_cores.at(neuron.core_address.value().id);
         mapped_core.map_neuron(neuron, total_neurons_mapped);
 
         // Keep a global count of mapped neurons so we can assign unique ids
@@ -270,11 +270,11 @@ void sanafe::SpikingChip::track_mapped_neurons()
         // Validate that offset == index
         for (size_t i = 0; i < neuron_refs.size(); ++i)
         {
-            if (neuron_refs[i].get().offset != i)
+            if (neuron_refs.at(i).get().offset != i)
             {
                 throw std::logic_error("Offset incorrect in group '" +
                         group_name + "' at index " + std::to_string(i) + "(" +
-                        std::to_string(neuron_refs[i].get().offset) + ")");
+                        std::to_string(neuron_refs.at(i).get().offset) + ")");
             }
         }
     }
@@ -315,7 +315,7 @@ std::string sanafe::SpikingChip::get_synapse_hw_name(
     }
     const NeuronGroup &post_group = net.groups.at(address.group_name);
     const Neuron &post_neuron =
-            post_group.neurons[address.neuron_offset.value()];
+            post_group.neurons.at(address.neuron_offset.value());
 
     const bool use_per_connection_mapping = (!con.synapse_hw_name.empty());
     std::string hw_name;
@@ -364,9 +364,9 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
                 auto &post_group =
                         mapped_neuron_groups.at(con.post_neuron.group_name);
                 MappedNeuron &pre_neuron =
-                        pre_group[con.pre_neuron.neuron_offset.value()];
+                        pre_group.at(con.pre_neuron.neuron_offset.value());
                 MappedNeuron &post_neuron =
-                        post_group[con.post_neuron.neuron_offset.value()];
+                        post_group.at(con.post_neuron.neuron_offset.value());
 
                 Core &post_core = *(post_neuron.core);
                 std::string hw_name = get_synapse_hw_name(net, con);
@@ -501,6 +501,10 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         if (record_potentials)
         {
             potential_trace = sim_trace_open_potential_trace(output_dir);
+        }
+        if (record_neuron_state)
+        {
+            neuron_trace = sim_trace_open_neuron_trace(output_dir);
         }
         if (record_perf)
         {
@@ -647,7 +651,7 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
             placeholder.generation_delay = core.next_message_generation_delay;
             // Create a dummy placeholder message
             auto &message_queue = ts.messages;
-            message_queue[core.id].push_back(std::move(placeholder));
+            message_queue.at(core.id).push_back(std::move(placeholder));
         }
     }
 }
@@ -695,14 +699,14 @@ void sanafe::SpikingChip::receive_message(Message &m)
     assert(static_cast<size_t>(m.src_tile_id) < tiles.size());
     assert(static_cast<size_t>(m.dest_tile_id) < tiles.size());
 
-    const Tile &src_tile = tiles[m.src_tile_id];
-    Tile &dest_tile = tiles[m.dest_tile_id];
+    const Tile &src_tile = tiles.at(m.src_tile_id);
+    Tile &dest_tile = tiles.at(m.dest_tile_id);
 
     m.min_hop_delay = sim_estimate_network_costs(src_tile, dest_tile);
     m.hops = abs_diff(src_tile.x, dest_tile.x) +
             abs_diff(src_tile.y, dest_tile.y);
 
-    Core &core = dest_tile.cores[m.dest_core_offset];
+    Core &core = dest_tile.cores.at(m.dest_core_offset);
     core.messages_in.emplace_back(m);
 }
 
@@ -717,8 +721,8 @@ void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
     if (simulate_buffer)
     {
         // Read then clear the pipeline buffer entry
-        input = c.timestep_buffer[n.mapped_offset_within_core];
-        c.timestep_buffer[n.mapped_offset_within_core] = PipelineResult{};
+        input = c.timestep_buffer.at(n.mapped_offset_within_core);
+        c.timestep_buffer.at(n.mapped_offset_within_core) = PipelineResult{};
     }
     const std::optional<MappedConnection *> no_con{std::nullopt};
     const PipelineResult pipeline_output = execute_pipeline(
@@ -740,13 +744,13 @@ double sanafe::SpikingChip::process_message(
     double message_processing_latency = pipeline_process_axon_in(core, m);
 
     assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
-    const AxonInModel &axon_in = core.axons_in[m.dest_axon_id];
+    const AxonInModel &axon_in = core.axons_in.at(m.dest_axon_id);
     const PipelineResult
             empty_input{}; // Empty/default struct used as dummy input
 
     for (const size_t synapse_address : axon_in.synapse_addresses)
     {
-        MappedConnection &con = *(core.connections_in[synapse_address]);
+        MappedConnection &con = *(core.connections_in.at(synapse_address));
         // In certain pipeline configurations, every synaptic lookup requires
         //  updates to the dendrite and/or soma units as well. Keep propagating
         //  outputs/inputs until we hit the time-step buffer, where outputs
@@ -755,7 +759,7 @@ double sanafe::SpikingChip::process_message(
 
         const PipelineResult pipeline_output = execute_pipeline(
                 con.message_processing_pipeline, ts, n, &con, empty_input);
-        core.timestep_buffer[n.mapped_offset_within_core] = pipeline_output;
+        core.timestep_buffer.at(n.mapped_offset_within_core) = pipeline_output;
         message_processing_latency += pipeline_output.latency.value_or(0.0);
     }
 
@@ -792,7 +796,7 @@ double sanafe::SpikingChip::pipeline_process_axon_in(
 {
     assert(m.dest_axon_hw >= 0);
     assert(static_cast<size_t>(m.dest_axon_hw) < core.axon_in_hw.size());
-    AxonInUnit &axon_unit = core.axon_in_hw[m.dest_axon_hw];
+    AxonInUnit &axon_unit = core.axon_in_hw.at(m.dest_axon_hw);
     axon_unit.spike_messages_in++;
 
     return axon_unit.latency_spike_message;
@@ -822,7 +826,7 @@ sanafe::PipelineResult sanafe::SpikingChip::pipeline_process_axon_out(
         n.core->next_message_generation_delay = 0.0;
 
         auto &message_queue = ts.messages;
-        message_queue[n.core->id].push_back(std::move(m));
+        message_queue.at(n.core->id).push_back(std::move(m));
         ++axon_out_hw.packets_out;
 
         axon_result.energy.value() += axon_out_hw.energy_access;
@@ -1278,7 +1282,7 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     const auto cores_out = sim_get_post_synaptic_cores(pre_neuron);
     TRACE1(CHIP, "Creating connections for neuron nid:%zu to %zu core(s)\n",
             pre_neuron.id, cores_out.size());
-    for (Core *dest_core : cores_out)
+    for (Core *const dest_core : cores_out)
     {
         // Create the axon, and add it to both the destination and source cores
         sim_allocate_axon(pre_neuron, *dest_core);
@@ -1312,7 +1316,7 @@ std::set<sanafe::Core *> sanafe::SpikingChip::sim_get_post_synaptic_cores(
     for (const MappedConnection &curr_connection : neuron.connections_out)
     {
         const MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
-        Core *dest_core = post_neuron.core;
+        Core *const dest_core = post_neuron.core;
         cores_out.insert(dest_core);
         TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
     }
@@ -1472,7 +1476,7 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
     potential_trace_file << "timestep,";
     for (auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
-        for (MappedNeuron &neuron : group_neurons)
+        for (const MappedNeuron &neuron : group_neurons)
         {
             // Neuron potential trace support is required for any h/w models
             //  This trace is handled by the SANA-FE kernel
@@ -1488,12 +1492,12 @@ void sanafe::SpikingChip::sim_trace_write_potential_header(
 }
 
 void sanafe::SpikingChip::sim_trace_write_neuron_trace_header(
-        std::ostream &potential_trace_file)
+        std::ostream &neuron_trace_file)
 {
     // Write csv header for probe outputs - record which neurons have been
     //  probed
-    assert(potential_trace_file.good());
-    potential_trace_file << "timestep,";
+    assert(neuron_trace_file.good());
+    neuron_trace_file << "timestep,";
     for (auto &[group_name, group_neurons] : mapped_neuron_groups)
     {
         for (MappedNeuron &neuron : group_neurons)
@@ -1508,16 +1512,9 @@ void sanafe::SpikingChip::sim_trace_write_neuron_trace_header(
                     neuron.mapped_soma_hw_address));
             for (const auto &[trace_name, placeholder_value] : neuron_traces)
             {
-                if (trace_name == "v")
-                {
-                    std::string error = "Trace name of 'v' is reserved for "
-                                        "neuron membrane potentials.";
-                    INFO("Error: %s\n", error.c_str());
-                    throw std::invalid_argument(error);
-                }
                 if (trace_name.find(',') != std::string::npos)
                 {
-                    std::string error = "Trace '" + trace_name +
+                    const std::string error = "Trace '" + trace_name +
                             "' cannot contain , (comma). This delimiter is "
                             "required for the CSV trace.";
                     INFO("Error: %s\n", error.c_str());
@@ -1526,14 +1523,14 @@ void sanafe::SpikingChip::sim_trace_write_neuron_trace_header(
                 // Custom user traces are stored with similar format to neuron
                 //  potentials, but must include a unique trace specifier
                 neuron.trace_names.insert(trace_name);
-                potential_trace_file << "neuron " << group_name;
-                potential_trace_file << "." << neuron.offset << "/";
-                potential_trace_file << trace_name << ",";
+                neuron_trace_file << "neuron " << group_name;
+                neuron_trace_file << "." << neuron.offset << "/";
+                neuron_trace_file << trace_name << ",";
             }
         }
     }
-    potential_trace_file << "\n";
-    potential_trace_file.flush();
+    neuron_trace_file << "\n";
+    neuron_trace_file.flush();
 }
 
 std::map<std::string, double>
