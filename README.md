@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/SLAM-Lab/SANA-FE/main/sana_fe_logo.svg" alt="SANA-FE" width="400" style="max-width: 100%; height: auto;">
 </p>
 
-Copyright (c) 2025 - The University of Texas at Austin
+Copyright (c) 2026 - The University of Texas at Austin
 
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract

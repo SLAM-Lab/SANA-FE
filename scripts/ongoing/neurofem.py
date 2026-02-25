@@ -450,7 +450,6 @@ def convert_model(params_file, model_folder):
     chip.load(snn)
     snn.save("runs/neurofem/neurofem.yaml")
 
-
     del arch
     del snn
 
@@ -471,7 +470,7 @@ def convert_model(params_file, model_folder):
 
     print("Setting up next run")
     for i, n in enumerate(mapped_neurons):
-        n.set_attributes(model_attributes={"bias": bias_f2[i]})
+        n.set_attributes(model_attributes={"bias": bias_f2[i], "log_spikes": True})
     print("Running")
 
     results = chip.sim((n_timesteps+1) // 2, spike_trace=True, processing_threads=16, timing_model="simple")
