@@ -149,7 +149,6 @@ Args:
     model_attributes (dict, optional): General model parameters. Default is None.
     soma_attributes (dict, optional): Soma-specific model parameters. Default is None.
     dendrite_attributes (dict, optional): Dendrite-specific model parameters. Default is None.
-
 )pbdoc";
 
 constexpr const char *neuron_map_to_core_doc = R"pbdoc(
@@ -192,6 +191,9 @@ Args:
     soma_attributes (dict, optional): Soma-specific model parameters. Default is None.
     dendrite_attributes (dict, optional): Dendrite-specific model parameters. Default is None.
 
+Raises:
+    HardwareMappingError: If the model attribute is incompatible with the specified
+        hardware.
 )pbdoc";
 
 // Architecture class
@@ -263,8 +265,17 @@ Example:
 constexpr const char *spiking_chip_load_doc = R"pbdoc(
 Map a neural network onto this chip's hardware architecture.
 
-network (Network): Spiking network to map onto hardware
-overwrite (bool, optional): Overwrite programmed spiking network. Default is True.
+Args:
+    network (Network): Spiking network to map onto hardware
+    overwrite (bool, optional): Overwrite programmed spiking network. Default is True.
+
+Raises:
+    HardwareMappingError: If the network cannot be mapped to the architecture.
+        This may occur if a neuron was never assigned to a core, if a required
+        hardware unit (soma, synapse, or dendrite) is not supported by the target
+        architecture, or if a model attribute is incompatible with the specified
+        hardware. The exception message describes which mapping constraint was
+        violated.
 )pbdoc";
 
 constexpr const char *spiking_chip_sim_doc = R"pbdoc(

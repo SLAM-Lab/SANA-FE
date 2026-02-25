@@ -121,18 +121,20 @@ void sanafe::PipelineUnit::check_outputs(
     }
 }
 
-void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
+bool sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
 {
     if (supported_attribute_names.find(attribute_name) ==
                     supported_attribute_names.end() &&
-            (attribute_warnings <= max_attribute_warnings))
+            (attribute_warnings < max_attribute_warnings))
     {
         INFO("Warning: Attribute (%s) not supported by model: %s, will be "
              "ignored.\nEither remove this attribute from the SNN/Architecture "
              "description file, be more specific which hardware requires it "
-             "(using synapse/dendrite/soma sections) or register the attribute "
-             "in the constructor to suppress this warning.\n",
+             "(using synapse/dendrite/soma sections), or register the "
+             "attribute in the constructor to suppress this warning. To "
+             "disable these warnings, set max_attribute_warnings to 0\n",
                 attribute_name.c_str(), name.c_str());
+        attribute_warnings++;
         if (attribute_warnings == max_attribute_warnings)
         {
             INFO("Warning: Reached max attribute warnings (%ld) for this h/w "
@@ -140,8 +142,10 @@ void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
                  "rebuild and increase PipelineUnit::max_attribute_warnings\n",
                     max_attribute_warnings);
         }
-        attribute_warnings++;
+        return false;
     }
+
+    return true;
 }
 
 void sanafe::PipelineUnit::set_attributes_hw(
@@ -161,6 +165,8 @@ void sanafe::PipelineUnit::set_attributes_hw(
     // Finally, forward all attributes from the architecture description to the
     //  model. This might be useful if you want to define any additional
     //  model-specific attributes here, e.g., fault-rate or maximum memory size.
+    //  Note that it isn't required for the model to handle any h/w attributes,
+    //  like it is with SNN/neuron attributes.
     for (auto &[key, attribute] : model_attributes)
     {
         check_attribute(key);

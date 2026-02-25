@@ -90,7 +90,7 @@ sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
                 ", dendrite:" + std::to_string(static_cast<int>(is_dendrite)) +
                 ", soma:" + std::to_string(static_cast<int>(is_soma)));
         INFO("Error: %s\n", error.c_str());
-        throw std::runtime_error(error);
+        throw HardwareMappingError(error);
     }
 
     return hw_unit;
@@ -123,7 +123,7 @@ void sanafe::Core::map_neuron(
     {
         INFO("Error: Exceeded maximum neurons per core (%zu)",
                 pipeline_config.max_neurons_supported);
-        throw std::runtime_error("Error: Exceeded maximum neurons per core.");
+        throw HardwareMappingError("Error: Exceeded maximum neurons per core.");
     }
 
     // Map neuron model to dendrite and soma h/w units in this core.

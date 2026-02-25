@@ -214,7 +214,7 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
             const std::string error = "Neuron: " + neuron.parent_group_name +
                     "." + std::to_string(neuron.offset) + " not mapped.";
             INFO("%s", error.c_str());
-            throw std::runtime_error(error);
+            throw HardwareMappingError(error);
         }
         TRACE1(CHIP, "Mapping neuron %s.%zu to core:%zu\n",
                 neuron.parent_group_name.c_str(), neuron.offset,

@@ -564,7 +564,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
 
     const bool overwrite_if_trace_exists = write_trace_headers;
     PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
-    PyPotentialTrace potential_traces(
+    PyPotentialTrace potentials(
             self, potential_trace, overwrite_if_trace_exists);
     PyNeuronTrace neuron_traces(self, neuron_trace, overwrite_if_trace_exists);
     PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
@@ -574,6 +574,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     {
         spikes.write_header();
         neuron_traces.write_header();
+        potentials.write_header();
         messages.write_header();
         perf.write_header();
     }
@@ -597,59 +598,59 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             "Executed steps: [0/" + std::to_string(timesteps) + "]";
     pybind11::print(first_message, pybind11::arg("end") = "");
 
-    const pybind11::gil_scoped_release release;
-    for (long int timestep = 1; timestep <= timesteps; timestep++)
     {
-        self->step(scheduler);
-        const long int total_timesteps = self->get_total_timesteps();
-        spikes.record_net_activity(total_timesteps);
-        neuron_traces.record_net_activity(total_timesteps);
+        const pybind11::gil_scoped_release release;
+        for (long int timestep = 1; timestep <= timesteps; timestep++)
+        {
+            self->step(scheduler);
+            const long int total_timesteps = self->get_total_timesteps();
+            spikes.record_net_activity(total_timesteps);
+            potentials.record_net_activity(total_timesteps);
+            neuron_traces.record_net_activity(total_timesteps);
 
-        const auto now = std::chrono::steady_clock::now();
-        constexpr std::chrono::milliseconds check_interval{100};
-        constexpr std::chrono::seconds print_interval{1};
-        if ((now - last_check) >= check_interval)
-        {
-            // Periodically check for user interrupts or errors from Python
-            const pybind11::gil_scoped_acquire acquire;
-            if (PyErr_CheckSignals() != 0)
+            const auto now = std::chrono::steady_clock::now();
+            constexpr std::chrono::milliseconds check_interval{100};
+            constexpr std::chrono::seconds print_interval{1};
+            if ((now - last_check) >= check_interval)
             {
-                // Received an interrupt or error, so clean-up and kill the run
-                schedule_stop_all_threads(scheduler);
-                throw pybind11::error_already_set();
+                // Periodically check for user interrupts or errors from Python
+                const pybind11::gil_scoped_acquire acquire;
+                if (PyErr_CheckSignals() != 0)
+                {
+                    // Received an interrupt or error, so clean-up and kill the run
+                    schedule_stop_all_threads(scheduler);
+                    throw pybind11::error_already_set();
+                }
+                last_check = now;
             }
-            last_check = now;
+            if ((now - last_print) >= print_interval)
+            {
+                const std::string message = "\rExecuted steps: [" +
+                        std::to_string(timestep) + "/" +
+                        std::to_string(timesteps) + "]";
+                const pybind11::gil_scoped_acquire acquire;
+                pybind11::print(message, pybind11::arg("end") = "");
+                last_print = now;
+            }
+            //  avoids the message write queue growing too large
+            pyflush_timestep_data(self, rd, perf, scheduler, messages);
         }
-        if ((now - last_print) >= print_interval)
-        {
-            const std::string message = "\rExecuted steps: [" +
-                    std::to_string(timestep) + "/" + std::to_string(timesteps) +
-                    "]";
-            const pybind11::gil_scoped_acquire acquire;
-            pybind11::print(message, pybind11::arg("end") = "");
-            last_print = now;
-        }
-        //  avoids the message write queue growing too large
-        pyflush_timestep_data(self, rd, perf, scheduler, messages);
     }
 
-    // Acquire the GIL and check for interrupts before printing to Python
+    // Re-acquire the GIL and check for interrupts before printing to Python
+    if (!PyErr_Occurred())
     {
-        const pybind11::gil_scoped_acquire acquire;
-        if (!PyErr_Occurred())
-        {
             const std::string last_message = "\rExecuted steps: [" +
                     std::to_string(timesteps) + "/" +
                     std::to_string(timesteps) + "]";
             pybind11::print(last_message);
-        }
     }
 
     schedule_stop_all_threads(scheduler);
     pyflush_timestep_data(self, rd, perf, scheduler, messages);
 
     const auto spike_data = spikes.get_python_object();
-    const auto potential_data = potential_traces.get_python_object();
+    const auto potential_data = potentials.get_python_object();
     const auto neuron_data = neuron_traces.get_python_object();
     const auto perf_data = perf.get_python_object();
     const auto message_data = messages.get_python_object();
@@ -823,6 +824,10 @@ PYBIND11_MODULE(sanafecpp, m)
                     sanafe::buffer_before_axon_out_unit)
             .value("buffer_positions", sanafe::buffer_positions);
 
+    pybind11::register_exception<sanafe::HardwareMappingError>(
+        m, "HardwareMappingError"
+    );
+
     pybind11::class_<sanafe::SpikingNetwork>(
             m, "Network", docstrings::network_doc)
             .def(pybind11::init<>())
@@ -867,8 +872,6 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("__getitem__", &PyNeuronRefView::__getitem__)
             .def("__iter__", &PyNeuronRefView::__iter__)
             .def("__repr__", &PyNeuronRefView::info);
-
-    // Now change the NeuronGroup binding...
 
     pybind11::class_<sanafe::NeuronGroup>(
             m, "NeuronGroup", docstrings::neuron_group_doc)

@@ -7,7 +7,7 @@ network:
     #  true integrator due to an off-by-one error. As such, the best we can do
     #  is 4095/4096, slightly less than 1
     attributes: {soma_hw_name: loihi_lif, synapse_hw_name: loihi_conv_synapse, threshold: 255, log_u: true,
-      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false, force_soma_update: false}
+      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false}
     neurons:
     - {0: {bias: 0}}
     - {1: {bias: 0}}
@@ -1035,27 +1035,27 @@ network:
     - {1023: {bias: 0}}
   - name: 1
     attributes: {soma_hw_name: loihi_lif, synapse_hw_name: loihi_conv_synapse, threshold: 420,
-      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: true, force_soma_update: false}
+      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: true}
     neurons:
       - 0..3599: {}
   - name: 2
     attributes: {soma_hw_name: loihi_lif, synapse_hw_name: loihi_conv_synapse, threshold: 351,
-      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false, force_soma_update: false}
+      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false}
     neurons:
       - 0..5407: {}
   - name: 3
     attributes: {soma_hw_name: loihi_lif, synapse_hw_name: loihi_conv_synapse, threshold: 276,
-      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false, force_soma_update: false}
+      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false}
     neurons:
       - 0..7743: {}
   - name: 4
     attributes: {soma_hw_name: loihi_lif, synapse_hw_name: loihi_conv_synapse, threshold: 371,
-      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false, force_soma_update: false}
+      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false}
     neurons:
       - 0..890: {}
   - name: 5
     attributes: {soma_hw_name: loihi_lif, synapse_hw_name: loihi_dense_synapse, threshold: 341,
-      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false, force_soma_update: false}
+      reset: 0, leak_decay: 0.99975585937, log_spikes: true, log_potential: false}
     neurons:
       - 0..9: {}
       - 10: {log_potential: true}

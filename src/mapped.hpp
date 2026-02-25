@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -24,6 +25,16 @@ enum NeuronStatus : uint8_t
     idle = 1U,
     updated = 2U,
     fired = 3U
+};
+
+class HardwareMappingError : public std::runtime_error
+{
+public:
+    // Pass the specific message to the base class constructor
+    explicit HardwareMappingError(const std::string &message)
+            : std::runtime_error(message)
+    {
+    }
 };
 
 class MappedConnection

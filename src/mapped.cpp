@@ -63,18 +63,27 @@ void sanafe::MappedConnection::set_attributes(
 {
     for (const auto &[key, value] : model_attributes)
     {
+        bool attribute_supported = false;
         if (value.forward_to_synapse)
         {
-            synapse_hw->check_attribute(key);
+            attribute_supported |= synapse_hw->check_attribute(key);
             synapse_hw->set_attribute_edge(
                     mapped_synapse_hw_address, key, value);
         }
         if (value.forward_to_dendrite)
         {
             MappedNeuron &n = post_neuron_ref;
-            n.dendrite_hw->check_attribute(key);
+            attribute_supported |= n.dendrite_hw->check_attribute(key);
             n.dendrite_hw->set_attribute_edge(
                     mapped_synapse_hw_address, key, value);
+        }
+        if (!attribute_supported)
+        {
+            const std::string error("Attribute '" + key +
+                    "' not supported by any message processing h/w unit. "
+                    "Mapping to h/w failed.");
+            INFO("Error: %s\n", error.c_str());
+            throw HardwareMappingError(error);
         }
     }
 }
@@ -131,17 +140,27 @@ void sanafe::MappedNeuron::set_attributes(
         TRACE2(CHIP, "Forwarding attribute: %s (dendrite:%d soma:%d)\n",
                 key.c_str(), attribute.forward_to_dendrite,
                 attribute.forward_to_soma);
+
+        bool attribute_supported = false;
         if (attribute.forward_to_dendrite && (dendrite_hw != nullptr))
         {
-            dendrite_hw->check_attribute(key);
+            attribute_supported |= dendrite_hw->check_attribute(key);
             dendrite_hw->set_attribute_neuron(
                     mapped_dendrite_hw_address, key, attribute);
         }
         if (attribute.forward_to_soma && (soma_hw != nullptr))
         {
-            soma_hw->check_attribute(key);
+            attribute_supported |= soma_hw->check_attribute(key);
             soma_hw->set_attribute_neuron(
                     mapped_soma_hw_address, key, attribute);
+        }
+        if (!attribute_supported)
+        {
+            const std::string error("Attribute '" + key +
+                    "' not supported by any neuron processing h/w unit. "
+                    "Mapping to h/w failed.");
+            INFO("Error: %s\n", error.c_str());
+            throw HardwareMappingError(error);
         }
     }
 }
