@@ -277,6 +277,7 @@ Args:
     scheduler_threads (int, optional): Number of scheduler threads. Default is 0 (run in main thread).
     spike_trace (object, optional): Spike trace output (file, string, True, or None). Default is None.
     potential_trace (object, optional): Potential trace output (file, string, True, or None). Default is None.
+    neuron_trace (object, optional): Neuron state trace output (file, string, True, or None). Default is None.
     perf_trace (object, optional): Performance metrics trace output (file, string, True, or None). Default is None.
     message_trace (object, optional): Message trace output (file, string, True, or None). Default is None.
     write_trace_headers (bool, optional): Write CSV headers to trace files. Default is True.
@@ -289,6 +290,7 @@ Returns:
         - spikes: Total spike count
         - spike_trace: Spike data (if enabled)
         - potential_trace: Potential data (if enabled)
+        - neuron_trace: Neuron trace data (if enabled)
         - perf_trace: Performance metrics (if enabled)
         - message_trace: Network message data (if enabled)
 

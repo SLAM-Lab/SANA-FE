@@ -14,7 +14,7 @@ net = sanafe.load_net("snn/example.yaml", arch)
 net.save("out")
 chip.load(net)
 
-result = chip.sim(10, spike_trace=True, potential_trace=True)
+result = chip.sim(10, spike_trace=True, neuron_trace=True)
 
 print(result)
 #import yaml

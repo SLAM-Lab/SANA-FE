@@ -476,8 +476,8 @@ void sanafe::SpikingChip::update_run_data(
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const TimingModel timing_model, const int scheduler_thread_count,
         const bool record_spikes, const bool record_potentials,
-        const bool record_perf, const bool record_messages,
-        std::string output_dir)
+        const bool record_neuron_state, const bool record_perf,
+        const bool record_messages, std::string output_dir)
 {
     RunData rd(total_timesteps + 1);
     rd.timesteps_executed += timesteps;
@@ -912,6 +912,21 @@ std::ofstream sanafe::SpikingChip::sim_trace_open_spike_trace(
     return spike_file;
 }
 
+std::ofstream sanafe::SpikingChip::sim_trace_open_neuron_trace(
+        const std::filesystem::path &out_dir)
+{
+    const std::filesystem::path neuron_path = out_dir / "neurons.csv";
+    std::ofstream neuron_trace_file(neuron_path);
+
+    if (!neuron_trace_file.is_open())
+    {
+        throw std::runtime_error(
+                "Error: Couldn't open trace file for writing.");
+    }
+    sim_trace_write_neuron_trace_header(neuron_trace_file);
+    return neuron_trace_file;
+}
+
 std::ofstream sanafe::SpikingChip::sim_trace_open_potential_trace(
         const std::filesystem::path &out_dir)
 {
@@ -923,7 +938,7 @@ std::ofstream sanafe::SpikingChip::sim_trace_open_potential_trace(
         throw std::runtime_error(
                 "Error: Couldn't open trace file for writing.");
     }
-    sim_trace_write_neuron_trace_header(potential_file);
+    sim_trace_write_potential_header(potential_file);
     return potential_file;
 }
 
@@ -1057,7 +1072,11 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
     // Record all neuron
     if (potential_trace.is_open())
     {
-        sim_trace_record_neuron_traces(potential_trace, total_timesteps);
+        sim_trace_record_potentials(potential_trace, total_timesteps);
+    }
+    if (neuron_trace.is_open())
+    {
+        sim_trace_record_neuron_traces(neuron_trace, total_timesteps);
     }
 
     auto message_processing_start_tm = neuron_processing_end_tm;
@@ -1444,7 +1463,7 @@ void sanafe::SpikingChip::sim_trace_write_spike_header(
     spike_trace_file << "neuron,timestep" << '\n';
 }
 
-void sanafe::SpikingChip::sim_trace_write_neuron_trace_header(
+void sanafe::SpikingChip::sim_trace_write_potential_header(
         std::ostream &potential_trace_file)
 {
     // Write csv header for probe outputs - record which neurons have been
@@ -1462,7 +1481,23 @@ void sanafe::SpikingChip::sim_trace_write_neuron_trace_header(
                 potential_trace_file << "neuron " << group_name;
                 potential_trace_file << "." << neuron.offset << ",";
             }
+        }
+    }
+    potential_trace_file << "\n";
+    potential_trace_file.flush();
+}
 
+void sanafe::SpikingChip::sim_trace_write_neuron_trace_header(
+        std::ostream &potential_trace_file)
+{
+    // Write csv header for probe outputs - record which neurons have been
+    //  probed
+    assert(potential_trace_file.good());
+    potential_trace_file << "timestep,";
+    for (auto &[group_name, group_neurons] : mapped_neuron_groups)
+    {
+        for (MappedNeuron &neuron : group_neurons)
+        {
             // The user can specify any number of additional state trace
             //  variables. The user tracks them by setting neuron attributes
             //  which are handled in the respective h/w models
@@ -1613,13 +1648,13 @@ void sanafe::SpikingChip::sim_trace_record_spikes(
     }
 }
 
-void sanafe::SpikingChip::sim_trace_record_neuron_traces(
+void sanafe::SpikingChip::sim_trace_record_potentials(
         std::ostream &potential_trace_file, const long int timestep)
 {
     // Each line of this csv file is the potential of all probed neurons for
     //  one time-step
     assert(potential_trace_file.good());
-    TRACE1(CHIP, "Recording potential/traces for timestep: %ld\n", timestep);
+    TRACE1(CHIP, "Recording potential for timestep: %ld\n", timestep);
     potential_trace_file << timestep << ",";
 
     long int potential_probe_count = 0;
@@ -1634,8 +1669,32 @@ void sanafe::SpikingChip::sim_trace_record_neuron_traces(
                 potential_trace_file << ',';
                 potential_probe_count++;
             }
+        }
+    }
 
-            // Store optional traces in the same file as potentials.
+    // Each timestep takes up a line in the respective csv file
+    if (potential_probe_count > 0)
+    {
+        potential_trace_file << "\n";
+        potential_trace_file.flush();
+    }
+}
+
+void sanafe::SpikingChip::sim_trace_record_neuron_traces(
+        std::ostream &neuron_trace_file, const long int timestep)
+{
+    // Each line of this csv file is the traces for all probed neurons for
+    //  one time-step
+    assert(neuron_trace_file.good());
+    TRACE1(CHIP, "Recording user neuron traces for timestep: %ld\n", timestep);
+    neuron_trace_file << timestep << ",";
+
+    long int neuron_probe_count = 0;
+    for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
+    {
+        for (const MappedNeuron &neuron : group_neurons)
+        {
+            // Store model-defined traces in the same file as potentials.
             //  We only iterate over traces discovered when creating the
             //  trace file header. Any new ones returned are ignored.
             //  If the user fails to provide any, an out-of-range exception
@@ -1647,17 +1706,17 @@ void sanafe::SpikingChip::sim_trace_record_neuron_traces(
             for (const std::string trace_name : neuron.trace_names)
             {
                 const double trace_value = neuron_traces.at(trace_name);
-                potential_trace_file << trace_value << ',';
-                potential_probe_count++;
+                neuron_trace_file << trace_value << ',';
+                neuron_probe_count++;
             }
         }
     }
 
     // Each timestep takes up a line in the respective csv file
-    if (potential_probe_count > 0)
+    if (neuron_probe_count > 0)
     {
-        potential_trace_file << "\n";
-        potential_trace_file.flush();
+        neuron_trace_file << "\n";
+        neuron_trace_file.flush();
     }
 }
 
@@ -1743,8 +1802,29 @@ std::vector<sanafe::NeuronAddress> sanafe::SpikingChip::get_spikes() const
     return spikes;
 }
 
+std::vector<double> sanafe::SpikingChip::get_potentials() const
+{
+    // Return current traces for all mapped neurons, for the current timestep
+    std::vector<double> potentials;
+
+    for (const auto &[group_name, group_neurons] : mapped_neuron_groups)
+    {
+        for (const MappedNeuron &neuron : group_neurons)
+        {
+            // For now, neuron membrane potential is a special required case
+            if (neuron.log_potential)
+            {
+                potentials.emplace_back(neuron.soma_hw->get_potential(
+                        neuron.mapped_soma_hw_address));
+            }
+        }
+    }
+
+    return potentials;
+}
+
 std::map<std::string, std::vector<double>>
-sanafe::SpikingChip::get_all_traces() const
+sanafe::SpikingChip::get_traces() const
 {
     // Return current traces for all mapped neurons, for the current timestep
     std::map<std::string, std::vector<double>> timestep_traces;
@@ -1762,13 +1842,6 @@ sanafe::SpikingChip::get_all_traces() const
             for (const auto &[trace_name, trace_value] : neuron_traces)
             {
                 timestep_traces[trace_name].emplace_back(trace_value);
-            }
-
-            // For now, neuron membrane potential is a special required case
-            if (neuron.log_potential)
-            {
-                timestep_traces["v"].emplace_back(neuron.soma_hw->get_potential(
-                        neuron.mapped_soma_hw_address));
             }
         }
     }

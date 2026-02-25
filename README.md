@@ -96,6 +96,7 @@ Flags:
 * `-s`: Enable spike traces to `spikes.csv`
 * `-t [simple/detailed/cycle]`: Specify the timing model  (default=`detailed`)
 * `-v`: Enable potential (voltage) traces to `potential.csv`
+* `-x`: Enable extra user neuron traces to `neurons.csv`
 * `-N`: Number of neuron/message processing threads (default=1)
 * `-S`: Number of scheduling threads (default=0, use main thread)
 
@@ -214,8 +215,9 @@ hard-coded names using either csv or yaml extensions.
 
 `spikes.csv`: The spikes for each time-step on probed neurons
 
-`potential.csv`: The potentials (and other neuron state) for each time-step on
-probed neurons
+`potential.csv`: The potentials for each time-step on probed neurons
+
+`neurons.csv`: Any extra neuron state traces for each time-step (if supported).
 
 `perf.csv`: Detailed statistics for each timestep and each hardware unit
 

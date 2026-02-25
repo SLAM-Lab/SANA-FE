@@ -547,8 +547,9 @@ void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         std::string timing_model_str, const int processing_threads,
         const int scheduler_threads, pybind11::object spike_trace,
-        pybind11::object potential_trace, pybind11::object perf_trace,
-        pybind11::object message_trace, const bool write_trace_headers)
+        pybind11::object potential_trace, pybind11::object neuron_trace,
+        pybind11::object perf_trace, pybind11::object message_trace,
+        const bool write_trace_headers)
 {
     sanafe::TimingModel timing_model{sanafe::timing_model_detailed};
     timing_model = sanafe::parse_timing_model(timing_model_str);
@@ -563,8 +564,10 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
 
     const bool overwrite_if_trace_exists = write_trace_headers;
     PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
-    PyNeuronTrace neuron_traces(
+    PyPotentialTrace potential_traces(
             self, potential_trace, overwrite_if_trace_exists);
+    PyNeuronTrace neuron_traces(
+            self, neuron_trace, overwrite_if_trace_exists);
     PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
     PyPerfTrace perf(self, perf_trace, overwrite_if_trace_exists);
 
@@ -647,12 +650,14 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     pyflush_timestep_data(self, rd, perf, scheduler, messages);
 
     const auto spike_data = spikes.get_python_object();
+    const auto potential_data = potential_traces.get_python_object();
     const auto neuron_data = neuron_traces.get_python_object();
     const auto perf_data = perf.get_python_object();
     const auto message_data = messages.get_python_object();
 
     pybind11::dict result = run_data_to_dict(rd);
     result["spike_trace"] = spike_data;
+    result["potential_trace"] = potential_data;
     result["neuron_trace"] = neuron_data;
     result["perf_trace"] = perf_data;
     result["message_trace"] = message_data;
@@ -1152,6 +1157,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("scheduler_threads") = 0,
                     pybind11::arg("spike_trace") = pybind11::none(),
                     pybind11::arg("potential_trace") = pybind11::none(),
+                    pybind11::arg("neuron_trace") = pybind11::none(),
                     pybind11::arg("perf_trace") = pybind11::none(),
                     pybind11::arg("message_trace") = pybind11::none(),
                     pybind11::arg("write_trace_headers") = true)

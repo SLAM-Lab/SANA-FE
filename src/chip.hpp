@@ -58,7 +58,7 @@ public:
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false, std::string output_dir = "");
+    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, bool record_spikes = false, bool record_potentials = false, bool record_neuron_state = false, bool record_perf = false, bool record_messages = false, std::string output_dir = "");
     void step(Scheduler &scheduler);
     void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
@@ -68,18 +68,21 @@ public:
     void set_heartbeat(long int timesteps) { heartbeat = timesteps; }
     double get_power() const noexcept;
     std::vector<NeuronAddress> get_spikes() const;
-    std::map<std::string, std::vector<double>> get_all_traces() const;
+    std::vector<double> get_potentials() const;
+    std::map<std::string, std::vector<double>> get_traces() const;
     long int get_total_timesteps() const noexcept { return total_timesteps; }
     static void update_run_data(RunData &rd, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
 
     static void sim_trace_write_spike_header(std::ostream &spike_trace_file);
-    void sim_trace_write_neuron_trace_header(std::ostream &potential_trace_file);
+    void sim_trace_write_potential_header(std::ostream &potential_trace_file);
+    void sim_trace_write_neuron_trace_header(std::ostream &neuron_trace_file);
     void sim_trace_write_perf_header(std::ostream &perf_trace_file);
     static void sim_trace_write_message_header(std::ostream &message_trace_file);
 
     void sim_trace_record_spikes(std::ostream &spike_trace_file, long int timesteps);
-    void sim_trace_record_neuron_traces(std::ostream &potential_trace_file, long int timestep);
+    void sim_trace_record_potentials(std::ostream &potential_trace_file, long int timestep);
+    void sim_trace_record_neuron_traces(std::ostream &neuron_trace_file, long int timestep);
     void sim_trace_record_perf(std::ostream &perf_trace_file, const Timestep &ts);
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
 
@@ -121,6 +124,7 @@ private:
     // Filestreams
     std::ofstream spike_trace;
     std::ofstream potential_trace;
+    std::ofstream neuron_trace;
     std::ofstream message_trace;
     std::ofstream perf_trace;
 
@@ -173,6 +177,7 @@ private:
     std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
     std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir);
+    std::ofstream sim_trace_open_neuron_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
 
     // Booksim 2

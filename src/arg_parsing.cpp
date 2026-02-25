@@ -76,6 +76,9 @@ int parse_flag(const std::vector<std::string> args, const size_t current_idx,
     case 'v':
         flags.record_potentials = true;
         break;
+    case 'x':
+        flags.record_neuron_state = true;
+        break;
     case 'N':
         args_consumed = 2;
 #ifndef HAVE_OPENMP
