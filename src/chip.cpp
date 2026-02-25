@@ -1703,7 +1703,7 @@ void sanafe::SpikingChip::sim_trace_record_neuron_traces(
                     neuron.mapped_dendrite_hw_address);
             neuron_traces.merge(neuron.soma_hw->get_neuron_traces(
                     neuron.mapped_soma_hw_address));
-            for (const std::string trace_name : neuron.trace_names)
+            for (const std::string &trace_name : neuron.trace_names)
             {
                 const double trace_value = neuron_traces.at(trace_name);
                 neuron_trace_file << trace_value << ',';
