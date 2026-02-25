@@ -38,8 +38,8 @@ public:
     {
         register_attributes(supported_attributes);
     }
-    NeuroFEMModel(const NeuroFEMModel &copy) = default;
-    NeuroFEMModel(NeuroFEMModel &&other) = default;
+    NeuroFEMModel(const NeuroFEMModel &copy) = delete;
+    NeuroFEMModel(NeuroFEMModel &&other) = delete;
     ~NeuroFEMModel() override = default;
     NeuroFEMModel &operator=(const NeuroFEMModel &other) = delete;
     NeuroFEMModel &operator=(NeuroFEMModel &&other) = delete;

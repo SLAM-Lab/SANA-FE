@@ -207,7 +207,7 @@ public:
     {
         return compartments[neuron_address].potential;
     }
-    std::map<std::string, double> get_neuron_traces(size_t neuron_address);
+    std::map<std::string, double> get_neuron_traces(size_t neuron_address) override;
     std::uniform_real_distribution<double> uniform_distribution{0.0, 1.0}; // TODO: hack
     std::mt19937 gen{1}; // TODO: hack
 
