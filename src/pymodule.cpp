@@ -499,8 +499,7 @@ void pyset_attributes(sanafe::Neuron *self,
 void pyset_attributes_mapped(sanafe::MappedNeuron *self,
         pybind11::dict model_attributes,
         pybind11::dict dendrite_specific_attributes,
-        pybind11::dict soma_specific_attributes,
-        std::optional<bool> log_spikes)
+        pybind11::dict soma_specific_attributes, std::optional<bool> log_spikes)
 {
     std::map<std::string, sanafe::ModelAttribute> converted_attributes;
 
@@ -566,8 +565,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
     PyPotentialTrace potential_traces(
             self, potential_trace, overwrite_if_trace_exists);
-    PyNeuronTrace neuron_traces(
-            self, neuron_trace, overwrite_if_trace_exists);
+    PyNeuronTrace neuron_traces(self, neuron_trace, overwrite_if_trace_exists);
     PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
     PyPerfTrace perf(self, perf_trace, overwrite_if_trace_exists);
 
@@ -1127,7 +1125,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
                     pybind11::arg("log_energy") = false);
-    pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron", docstrings::mapped_neuron_doc)
+    pybind11::class_<sanafe::MappedNeuron>(
+            m, "MappedNeuron", docstrings::mapped_neuron_doc)
             .def("set_attributes", &pyset_attributes_mapped,
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),

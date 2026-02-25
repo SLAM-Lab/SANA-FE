@@ -9,8 +9,8 @@
 //  and which ones are supported, stick with a dummy hardcoded model for now.
 
 #include <cassert>
-#include <stack>
 #include <random>
+#include <stack>
 #include <variant>
 
 #include "arch.hpp"
@@ -54,8 +54,7 @@ public:
             const sanafe::ModelAttribute &param) override;
     sanafe::PipelineResult update(size_t neuron_address,
             std::optional<double> current_in,
-            std::optional<size_t> synaptic_address,
-            long int timestep) override;
+            std::optional<size_t> synaptic_address, long int timestep) override;
     void reset() override;
     double get_potential(const size_t neuron_address) override
     {
@@ -163,8 +162,7 @@ void NeuroFEMModel::set_attribute_neuron(const size_t neuron_address,
     else if (param_name == "bias")
     {
         n.bias = static_cast<double>(param);
-        TRACE2(PLUGINS, "Setting bias of %zu=%lf\n", neuron_address,
-                n.bias);
+        TRACE2(PLUGINS, "Setting bias of %zu=%lf\n", neuron_address, n.bias);
     }
     else if (param_name == "dt")
     {
@@ -193,8 +191,7 @@ void NeuroFEMModel::set_attribute_neuron(const size_t neuron_address,
 
 sanafe::PipelineResult NeuroFEMModel::update(size_t neuron_address,
         std::optional<double> current_in,
-        std::optional<size_t> synaptic_address,
-        const long int simulation_time)
+        std::optional<size_t> synaptic_address, const long int simulation_time)
 {
     NeuroFEMNeuron &n = neurons[neuron_address];
     sanafe::NeuronStatus state{sanafe::neuron_state_unset};
@@ -252,7 +249,6 @@ sanafe::PipelineResult NeuroFEMModel::update(size_t neuron_address,
 
     return {std::nullopt, state, std::nullopt, std::nullopt};
 }
-
 
 //  ######################
 //         # compute update to u1

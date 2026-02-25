@@ -14,8 +14,8 @@
 #include <string>
 #include <string_view>
 #include <typeinfo>
-#include <utility>
 #include <unordered_set>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -28,18 +28,12 @@
 #include "yaml_common.hpp"
 
 static const std::unordered_set<std::string> skip_keys = {
-    // Reserved neuron specific attributes for the simulator kernel
-    //  (see attributes.hpp)
-    "soma_hw_name",
-    "default_synapse_hw_name",
-    "dendrite_hw_name",
-    "log_spikes",
-    "log_potential",
-    // Unit-specific keys (parsed elsewhere)
-    "synapse",
-    "dendrite",
-    "soma"
-};
+        // Reserved neuron specific attributes for the simulator kernel
+        //  (see attributes.hpp)
+        "soma_hw_name", "default_synapse_hw_name", "dendrite_hw_name",
+        "log_spikes", "log_potential",
+        // Unit-specific keys (parsed elsewhere)
+        "synapse", "dendrite", "soma"};
 
 // NOLINTBEGIN(misc-include-cleaner)
 sanafe::YamlDescriptionParsingError::YamlDescriptionParsingError(
