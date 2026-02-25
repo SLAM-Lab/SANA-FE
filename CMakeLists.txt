@@ -322,10 +322,6 @@ if(ENABLE_TESTING)
     target_link_libraries(sanafe PUBLIC ryml::ryml)
     target_link_libraries(sanafe PUBLIC booksim)
     target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
-    if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
-        target_link_libraries(sanafe PRIVATE OpenMP::OpenMP_CXX)
-        target_compile_definitions(sanafe PRIVATE HAVE_OPENMP)
-    endif()
     target_link_libraries(sanafe PRIVATE Threads::Threads)
     target_include_directories(sanafe PUBLIC
         ${CMAKE_SOURCE_DIR}/src
