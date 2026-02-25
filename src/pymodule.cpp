@@ -167,9 +167,10 @@ sanafe::ModelAttribute pyobject_to_model_attribute(
         std::vector<sanafe::ModelAttribute> model_attributes;
         for (auto item : pybind11::cast<pybind11::dict>(value))
         {
-            sanafe::ModelAttribute attribute = pyobject_to_model_attribute(
+            sanafe::ModelAttribute element = pyobject_to_model_attribute(
                     pybind11::cast<pybind11::object>(item.second));
-            attribute.name = pybind11::cast<std::string>(item.first);
+            element.name = pybind11::cast<std::string>(item.first);
+            model_attributes.emplace_back(element);
         }
         attribute.value = model_attributes;
     }
