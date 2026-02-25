@@ -120,6 +120,7 @@ public:
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     void register_attributes(const std::set<std::string> &attribute_names);
     bool check_attribute(std::string attribute_name);
+    std::vector<std::string> get_attributes() { return std::vector<std::string>(supported_attribute_names.begin(), supported_attribute_names.end()); }
     void check_implemented(bool check_implements_synapse, bool check_implements_dendrite, bool check_implements_soma) const;
     size_t add_neuron();
     size_t add_connection(MappedConnection &con);
