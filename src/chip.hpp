@@ -44,6 +44,15 @@ enum TimingModel : uint8_t
     timing_model_cycle_accurate, // Booksim2 simulator
 };
 
+struct TraceFlags
+{
+    bool record_spikes{false};
+    bool record_potentials{false};
+    bool record_neuron_state{false};
+    bool record_perf{false};
+    bool record_messages{false};
+};
+
 class SpikingChip
 {
 public:
@@ -58,7 +67,7 @@ public:
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, bool record_spikes = false, bool record_potentials = false, bool record_neuron_state = false, bool record_perf = false, bool record_messages = false, std::string output_dir = "");
+    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), std::string output_dir = "");
     void step(Scheduler &scheduler);
     void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
@@ -98,6 +107,21 @@ public:
     size_t noc_buffer_size{1UL};
 
 private:
+    using TimePoint = std::chrono::steady_clock::time_point;
+    struct SimTimings
+    {
+        TimePoint setup_start_tm{TimePoint::min()};
+        TimePoint setup_end_tm{TimePoint::min()};
+        TimePoint neuron_processing_start_tm{TimePoint::min()};
+        TimePoint neuron_processing_end_tm{TimePoint::min()};
+        TimePoint message_processing_start_tm{TimePoint::min()};
+        TimePoint message_processing_end_tm{TimePoint::min()};
+        TimePoint energy_calculation_start_tm{TimePoint::min()};
+        TimePoint energy_calculation_end_tm{TimePoint::min()};
+        TimePoint scheduler_start_tm{TimePoint::min()};
+        TimePoint scheduler_end_tm{TimePoint::min()};
+    };
+
     std::unique_ptr<BookSimConfig> booksim_config;
     std::atomic<long int> total_messages_sent{0L};
     size_t total_neurons_mapped{0UL};
@@ -150,6 +174,7 @@ private:
     static double sim_calculate_tile_energy(Timestep &ts, Tile &tile);
     static double sim_calculate_core_energy(Timestep &ts, Core &core);
     void sim_update_total_energy_and_counts(const Timestep &ts);
+    void update_simulator_timings(const SimTimings &timings);
 
     // Misc outputting and formatting
     void sim_format_run_summary(std::ostream &out, const RunData &run_data) const;

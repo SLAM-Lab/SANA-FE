@@ -49,8 +49,7 @@
 //  named arguments - removing the risk of accidentally swapping args and
 //  making it easier to specify a large number of args
 //  PyBind11 also relies on a super long function macro, so suppress this too
-// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-size)
-
+// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-size,readability-identifier-naming,bugprone-reserved-identifier)
 // Forward declarations
 namespace // anonymous
 {
@@ -638,7 +637,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     }
 
     // Re-acquire the GIL and check for interrupts before printing to Python
-    if (!PyErr_Occurred())
+    if (PyErr_Occurred() == nullptr)
     {
             const std::string last_message = "\rExecuted steps: [" +
                     std::to_string(timesteps) + "/" +
@@ -1170,4 +1169,4 @@ PYBIND11_MODULE(sanafecpp, m)
                     docstrings::spiking_chip_reset_doc);
 }
 // NOLINTEND(readability-function-cognitive-complexity)
-// NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size)
+// NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size,readability-identifier-naming,bugprone-reserved-identifier)

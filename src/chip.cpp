@@ -475,9 +475,7 @@ void sanafe::SpikingChip::update_run_data(
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const TimingModel timing_model, const int scheduler_thread_count,
-        const bool record_spikes, const bool record_potentials,
-        const bool record_neuron_state, const bool record_perf,
-        const bool record_messages, std::string output_dir)
+        const TraceFlags trace_flags, std::string output_dir)
 {
     RunData rd(total_timesteps + 1);
     rd.timesteps_executed += timesteps;
@@ -494,23 +492,23 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     if (total_timesteps <= 0)
     {
         // If no timesteps have been simulated, open the trace files
-        if (record_spikes)
+        if (trace_flags.record_spikes)
         {
             spike_trace = sim_trace_open_spike_trace(output_dir);
         }
-        if (record_potentials)
+        if (trace_flags.record_potentials)
         {
             potential_trace = sim_trace_open_potential_trace(output_dir);
         }
-        if (record_neuron_state)
+        if (trace_flags.record_neuron_state)
         {
             neuron_trace = sim_trace_open_neuron_trace(output_dir);
         }
-        if (record_perf)
+        if (trace_flags.record_perf)
         {
             perf_trace = sim_trace_open_perf_trace(output_dir);
         }
-        if (record_messages)
+        if (trace_flags.record_messages)
         {
             message_trace = sim_trace_open_message_trace(output_dir);
         }
@@ -1056,24 +1054,25 @@ void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
 sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
         const long int timestep, Scheduler &scheduler)
 {
+    SimTimings sim_timings;
+
     // Start the next time-step, clear all buffers
-    auto setup_start_tm = std::chrono::high_resolution_clock::now();
+    sim_timings.setup_start_tm = std::chrono::steady_clock::now();
     auto ts = TimestepHandle(timestep);
     Timestep &ts_data = ts.get(); // Get reference to timestep data
     ts_data.set_cores(core_count);
     sim_reset_measurements();
-    auto setup_end_tm = std::chrono::high_resolution_clock::now();
+    auto setup_end_tm = std::chrono::steady_clock::now();
 
-    auto neuron_processing_start_tm = setup_end_tm;
+    sim_timings.neuron_processing_start_tm = setup_end_tm;
     process_neurons(ts_data);
-    auto neuron_processing_end_tm = std::chrono::high_resolution_clock::now();
+    sim_timings.neuron_processing_end_tm = std::chrono::steady_clock::now();
 
     // Record spiking and neuron potentials after processing them
     if (spike_trace.is_open())
     {
         sim_trace_record_spikes(spike_trace, total_timesteps);
     }
-    // Record all neuron
     if (potential_trace.is_open())
     {
         sim_trace_record_potentials(potential_trace, total_timesteps);
@@ -1083,61 +1082,49 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
         sim_trace_record_neuron_traces(neuron_trace, total_timesteps);
     }
 
-    auto message_processing_start_tm = neuron_processing_end_tm;
+    sim_timings.message_processing_start_tm = sim_timings.neuron_processing_end_tm;
     process_messages(ts_data);
     forced_updates(ts_data);
     // The timestep ends once cores are synchronized
     sim_timestep_sync(scheduler);
-    auto message_processing_end_tm = std::chrono::high_resolution_clock::now();
+    sim_timings.message_processing_end_tm = std::chrono::steady_clock::now();
 
-    auto energy_calculation_start_tm = message_processing_end_tm;
+    sim_timings.energy_calculation_start_tm = sim_timings.message_processing_end_tm;
     sim_calculate_ts_energy(ts_data);
     sim_update_ts_counters(ts_data);
-    auto energy_calculation_end_tm = std::chrono::high_resolution_clock::now();
+    sim_timings.energy_calculation_end_tm = std::chrono::steady_clock::now();
 
-    auto scheduler_start_tm = energy_calculation_end_tm;
+    sim_timings.scheduler_start_tm = sim_timings.energy_calculation_end_tm;
     if (scheduler.timing_model == timing_model_cycle_accurate)
     {
         check_booksim_compatibility(scheduler, chip_count);
     }
     schedule_messages(ts, scheduler, *booksim_config);
-    auto scheduler_end_tm = std::chrono::high_resolution_clock::now();
+    sim_timings.scheduler_end_tm = std::chrono::steady_clock::now();
 
-    // Calculate various simulator timings
-    constexpr double ns_to_second = 1.0e-9;
-    const long int setup_cycles =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    setup_end_tm - setup_start_tm)
-                    .count();
-    setup_wall += static_cast<double>(setup_cycles) * ns_to_second;
-    const long int neuron_processing_cycles =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    neuron_processing_end_tm - neuron_processing_start_tm)
-                    .count();
-    neuron_processing_wall +=
-            static_cast<double>(neuron_processing_cycles) * ns_to_second;
-    const long int message_processing_cycles =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    message_processing_end_tm - message_processing_start_tm)
-                    .count();
-    message_processing_wall +=
-            static_cast<double>(message_processing_cycles) * ns_to_second;
-    const long int scheduler_cycles =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    scheduler_end_tm - scheduler_start_tm)
-                    .count();
-    scheduler_wall += static_cast<double>(scheduler_cycles) * ns_to_second;
-    const long int energy_stats_cycles =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    energy_calculation_end_tm - energy_calculation_start_tm)
-                    .count();
-    energy_stats_wall +=
-            static_cast<double>(energy_stats_cycles) * ns_to_second;
+    update_simulator_timings(sim_timings);
     TRACE1(CHIP, "neuron:%e message:%e scheduler:%e energy:%e\n",
             neuron_processing_wall, message_processing_wall, scheduler_wall,
             energy_stats_wall);
 
     return ts;
+}
+
+void sanafe::SpikingChip::update_simulator_timings(const SimTimings &timings)
+{
+    const auto get_elapsed = [](TimePoint start, TimePoint end) {
+        return std::chrono::duration<double>(end - start).count(); // seconds
+    };
+
+    setup_wall += get_elapsed(timings.setup_start_tm, timings.setup_end_tm);
+    neuron_processing_wall += get_elapsed(timings.neuron_processing_start_tm,
+            timings.neuron_processing_end_tm);
+    message_processing_wall += get_elapsed(timings.message_processing_start_tm,
+            timings.message_processing_end_tm);
+    scheduler_wall +=
+            get_elapsed(timings.scheduler_start_tm, timings.scheduler_end_tm);
+    energy_stats_wall += get_elapsed(timings.energy_calculation_start_tm,
+            timings.energy_calculation_end_tm);
 }
 
 double sanafe::SpikingChip::sim_estimate_network_costs(
