@@ -370,13 +370,16 @@ void sanafe::LoihiLifModel::set_attribute_hw(
     }
 }
 
-
 // NOLINTNEXTLINE(readability-function-size)
 void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &attribute_name, const ModelAttribute &param)
 {
     LoihiCompartment &cx = compartments.at(neuron_address);
 
+    // TODO: HACK for some of these attributes, ensure they are not 0 < x < 1 as they will be
+    //  quantized away to 0 unintentionally (perhaps any fractional value should
+    //  error out..) Specifically, thresholds, resets, biases. The decays are
+    //  scaling factors. Should I just force these to be integers?
     if (attribute_name == "threshold")
     {
         cx.threshold = static_cast<double>(param);
