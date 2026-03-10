@@ -38,8 +38,7 @@ class sanafe_Backend(Backend):
 
         # TODO: ideally generate this mapping file from the Fugu network and
         #  then just read from the generated file
-        mapping_filename = "/home/usr1/jboyle/neuro/Fugu/fugu/nscale/core_mappings.json"
-        with open(mapping_filename, "r") as mapping_file:
+        with open(self.mappings_name, "r") as mapping_file:
             mapping_info = json.load(mapping_file)
         neuron_info = mapping_info["neuron_dict"]
 
@@ -249,6 +248,8 @@ class sanafe_Backend(Backend):
             self.debug_mode = False
         if "arch" in compile_args:
             self.arch_name = compile_args["arch"]
+        if "mappings" in compile_args:
+            self.mappings_name = compile_args["mappings"]
 
         self._build_network()
 
