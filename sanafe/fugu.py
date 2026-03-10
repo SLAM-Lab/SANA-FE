@@ -17,7 +17,6 @@ from fugu.backends import Backend
 from collections import defaultdict
 import math
 import pandas as pd
-import os
 import json
 
 import sanafe
@@ -278,7 +277,9 @@ class sanafe_Backend(Backend):
         self.net.save("snn.yaml")
 
         with open("spikes.csv", "w") as spike_trace, open("potentials.csv", "w") as potential_trace:
-            chip.sim(n_steps, spike_trace=spike_trace, potential_trace=potential_trace)
+            results = chip.sim(n_steps, spike_trace=spike_trace, potential_trace=potential_trace)
+        with open("run_summary.json", "w") as summary_file:
+            json.dump(results, summary_file, sort_keys=True)
 
         # Parse output data
         spikes_out_df = pd.read_csv("spikes.csv")
