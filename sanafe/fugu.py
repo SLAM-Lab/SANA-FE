@@ -34,7 +34,7 @@ class sanafe_Backend(Backend):
         """
         # TODO: reach this from the arch description?
         X_TILES = 8
-        CORES_PER_TILE = 4
+        CORES_PER_TILE = 2 * 2
 
         # TODO: ideally generate this mapping file from the Fugu network and
         #  then just read from the generated file
@@ -78,10 +78,11 @@ class sanafe_Backend(Backend):
         # Scale and quantize here?
         # TODO: do we need a way to determine the quantization to apply that is
         #  automated
-        if "bias" in fugu_props:
-            sanafe_props["bias"] = int(sanafe_props["bias"] * 65536)
-        if "threshold" in fugu_props:
-            sanafe_props["threshold"] = int(sanafe_props["threshold"] * 65536)
+        # TODO: requited for LCA but not for the simplest initial application
+        #if "bias" in fugu_props:
+        #    sanafe_props["bias"] = int(sanafe_props["bias"] * 65536)
+        #if "threshold" in fugu_props:
+        #    sanafe_props["threshold"] = int(sanafe_props["threshold"] * 65536)
 
         del sanafe_props["index"]
         del sanafe_props["brick"]
@@ -214,7 +215,8 @@ class sanafe_Backend(Backend):
         for n1, n2, props in self.fugu_graph.edges.data():
             if n1 in self.node_map and n2 in self.node_map:
                 if "weight" in props:
-                    props["weight"] = int(props["weight"] * 65536)  # TODO: cleanup somehow, need to auto-quantize
+                    props["weight"] = int(props["weight"])
+                    #props["weight"] = int(props["weight"] * 65536)  # TODO: cleanup somehow, need to auto-quantize
                 src = self.node_map[n1]
                 dst = self.node_map[n2]
                 src.connect_to_neuron(dst, props)
