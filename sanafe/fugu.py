@@ -12,12 +12,17 @@ basic spike and voltage probes.
 
 # TODO: support recordInGraph
 # TODO: read from arch object in the future
+import fugu
 from fugu.backends import Backend
 from collections import defaultdict
 import math
 import pandas as pd
+import os
+import json
 
 import sanafe
+
+FUGU_DIR = fugu.__file__
 
 class sanafe_Backend(Backend):
     _net = None
@@ -27,24 +32,25 @@ class sanafe_Backend(Backend):
         """
         Assigns neurons to cores based on capacity and hardware compatibility.
         """
-        MAX_NEURONS_PER_CORE = 1024
+        # TODO: reach this from the arch description?
+        X_TILES = 8
+        CORES_PER_TILE = 4
+
+        # TODO: ideally generate this mapping file from the Fugu network and
+        #  then just read from the generated file
+        mapping_filename = "/home/usr1/jboyle/neuro/Fugu/fugu/nscale/core_mappings.json"
+        with open(mapping_filename, "r") as mapping_file:
+            mapping_info = json.load(mapping_file)
+        neuron_info = mapping_info["neuron_dict"]
+
         cores = self.arch.cores()
-        total_cores = len(cores)
-        neurons_per_core = {i: 0 for i in range(total_cores)}
+        for fugu_node_name, neuron in self.node_map.items():
+            neuron_id = fugu_node_name.split('_')[-1]
+            neuron_mapping = neuron_info[neuron_id]
+            nscale_core_id = neuron_mapping["core"]
 
-        current_core_id = 0
-        # We assume self.node_map contains {fugu_id: sanafe_neuron_object}
-        for fugu_node_id, neuron in self.node_map.items():
-            if neurons_per_core[current_core_id] >= MAX_NEURONS_PER_CORE:
-                # There is space in the core
-                current_core_id += 1
-                assert(current_core_id < total_cores)
-            neurons_per_core[current_core_id] += 1
-
-            # Assign spike inputs to custom hardware
-            if fugu_node_id in self.input_map:
-                input_id = neurons_per_core[current_core_id] - 1
-                neuron.set_attributes(soma_hw_name=f"loihi_inputs[{input_id}]")
+            current_tile_id = nscale_core_id[0] * X_TILES + nscale_core_id[1]
+            current_core_id = current_tile_id * CORES_PER_TILE + nscale_core_id[2]
 
             # Perform the actual mapping in SANA-FE
             target_core = cores[current_core_id]
@@ -259,6 +265,7 @@ class sanafe_Backend(Backend):
         self.return_potentials = return_potentials
         if debug_mode:
             self.scaffold.summary(verbose=1)
+        print(self.arch_name)
         self.arch = sanafe.load_arch(self.arch_name)
         self._map_to_cores()
 

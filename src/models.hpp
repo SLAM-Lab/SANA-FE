@@ -26,6 +26,7 @@ namespace sanafe
 {
 constexpr int default_weight_bits = 8; // Based on real-world H/W e.g., Loihi
 constexpr int loihi_max_compartments{1024};
+constexpr int neuroscale_max_compartments{1024}; // ? what is this?
 
 class CurrentBasedSynapseModel : public SynapseUnit
 {
@@ -327,6 +328,61 @@ private:
 
     static void truenorth_leak(TrueNorthNeuron &n);
     static bool truenorth_threshold_and_reset(TrueNorthNeuron &n);
+};
+
+class NeuroScaleModel : public SomaUnit
+{
+public:
+    NeuroScaleModel() { register_attributes(neuroscale_attributes); }
+    NeuroScaleModel(const NeuroScaleModel &copy) = delete;
+    NeuroScaleModel(NeuroScaleModel &&other) = delete;
+    ~NeuroScaleModel() override = default;
+    NeuroScaleModel &operator=(const NeuroScaleModel &other) = delete;
+    NeuroScaleModel &operator=(NeuroScaleModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
+    void reset() override;
+    double get_potential(const size_t neuron_address) override
+    {
+        return compartments[neuron_address].potential;
+    }
+    std::map<std::string, double> get_neuron_traces(size_t neuron_address) override;
+
+    struct NeuroScaleCompartment
+    {
+        double bias{0.0};
+        std::vector<double> biases;
+        bool force_update_every_timestep{false};
+        double input_current{0.0};
+        double input_decay{0.0};
+        double leak_decay{1.0};
+        bool log_current{false};
+        double potential{0.0};
+        int refractory_delay{0};
+        int refractory_count{0};
+        double reset{0.0};
+        double reverse_reset{0.0};
+        double reverse_threshold{0.0};
+        double threshold{0.0};
+        long int timesteps_simulated{0L};
+    };
+
+private:
+    static inline const std::set<std::string> neuroscale_attributes{
+            "bias",
+            "leak_decay",
+            "log_u",
+            "refractory_delay",
+            "reset",
+            "threshold",
+    };
+    std::vector<NeuroScaleCompartment> compartments{neuroscale_max_compartments};
+
+    static void neuroscale_leak(NeuroScaleCompartment &cx);
+    static void neuroscale_quantize(NeuroScaleCompartment &cx);
+    static bool neuroscale_threshold_and_reset(NeuroScaleCompartment &cx);
 };
 
 class InputModel : public SomaUnit
