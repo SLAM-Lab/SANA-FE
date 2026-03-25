@@ -31,9 +31,9 @@ _ENERGY_COLUMNS = [
 
 _LATENCY_COLUMNS = [
     "generation_delay",
-    "processing_delay",
+    "receive_delay",
     "network_delay",
-    "blocking_delay",
+    "blocked_delay",
 ]
 
 
