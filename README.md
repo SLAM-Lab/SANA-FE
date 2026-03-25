@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/SLAM-Lab/SANA-FE/main/sana_fe_logo.svg" alt="SANA-FE" width="400" style="max-width: 100%; height: auto;">
 </p>
 
-Copyright (c) 2025 - The University of Texas at Austin
+Copyright (c) 2026 - The University of Texas at Austin
 
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
@@ -96,6 +96,7 @@ Flags:
 * `-s`: Enable spike traces to `spikes.csv`
 * `-t [simple/detailed/cycle]`: Specify the timing model  (default=`detailed`)
 * `-v`: Enable potential (voltage) traces to `potential.csv`
+* `-x`: Enable extra user neuron traces to `neurons.csv`
 * `-N`: Number of neuron/message processing threads (default=1)
 * `-S`: Number of scheduling threads (default=0, use main thread)
 
@@ -215,6 +216,8 @@ hard-coded names using either csv or yaml extensions.
 `spikes.csv`: The spikes for each time-step on probed neurons
 
 `potential.csv`: The potentials for each time-step on probed neurons
+
+`neurons.csv`: Any extra neuron state traces for each time-step (if supported).
 
 `perf.csv`: Detailed statistics for each timestep and each hardware unit
 

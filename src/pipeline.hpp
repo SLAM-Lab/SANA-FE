@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -21,6 +21,26 @@
 
 namespace sanafe
 {
+enum HardwareBitfield : uint8_t
+{
+    implements_invalid = 0U,
+    implements_synapse = 1U << 0,
+    implements_dendrite = 1U << 1,
+    implements_soma = 1U << 2
+};
+
+inline HardwareBitfield operator|(HardwareBitfield a, HardwareBitfield b)
+{
+    return static_cast<HardwareBitfield>(
+        static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+
+inline HardwareBitfield operator&(HardwareBitfield a, HardwareBitfield b)
+{
+    return static_cast<HardwareBitfield>(
+        static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+}
+
 struct SomaEnergyMetrics
 {
     double energy_update_neuron{0.0};
@@ -39,7 +59,7 @@ struct PipelineResult
 {
     // Hardware outputs
     std::optional<double> current{std::nullopt};
-    NeuronStatus status{invalid_neuron_state};
+    NeuronStatus status{neuron_state_unset};
     // Optionally simulate energy and/or latency
     std::optional<double> energy{std::nullopt};
     std::optional<double> latency{std::nullopt};
@@ -48,7 +68,7 @@ struct PipelineResult
 class PipelineUnit
 {
 public:
-    PipelineUnit(bool implements_synapse, bool implements_dendrite, bool implements_soma);
+    PipelineUnit(const HardwareBitfield implemented);
     PipelineUnit(const PipelineUnit &copy) = default;
     PipelineUnit(PipelineUnit &&other) = default;
     virtual ~PipelineUnit() = default;
@@ -89,12 +109,18 @@ public:
     {
         return 0.0;
     }
+    virtual std::map<std::string, double> get_neuron_traces(size_t /*neuron_address*/)
+    {
+        // Default is to have no neuron traces in addition to potentials
+        return {};
+    }
 
     // Normal member functions and function pointers
     void set_attributes_hw(std::string unit_name, const ModelInfo &model);
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     void register_attributes(const std::set<std::string> &attribute_names);
-    void check_attribute(std::string attribute_name);
+    bool check_attribute(std::string attribute_name);
+    std::vector<std::string> get_attributes() { return std::vector<std::string>(supported_attribute_names.begin(), supported_attribute_names.end()); }
     void check_implemented(bool check_implements_synapse, bool check_implements_dendrite, bool check_implements_soma) const;
     size_t add_neuron();
     size_t add_connection(MappedConnection &con);
@@ -129,7 +155,7 @@ public:
 
     // Warning counter (in case we get attributes we don't recognize)
     long int attribute_warnings{0L};
-    static constexpr long int max_attribute_warnings{10L}; // Stops spam
+    static constexpr long int max_attribute_warnings{0L}; // Disabled by default
 
     // Implementation flags, set whichever operations your derived unit supports
     //  to 'true'. Note that a hardware unit must support one or more of these
@@ -152,8 +178,6 @@ public:
 
 protected:
     std::set<std::string> supported_attribute_names{
-            "log_spikes",
-            "log_potential",
             "force_update",
             "synapse_hw_name",
             "dendrite_hw_name",
@@ -175,7 +199,6 @@ protected:
             "energy_message_out",
             "latency_message_out",
             // Legacy attributes (v1)
-            "log_v",
             "connections_out",
     };
     InputInterfaceFunc process_input_fn;
@@ -209,7 +232,7 @@ private:
 class SynapseUnit : public PipelineUnit
 {
 public:
-    SynapseUnit() : PipelineUnit(true, false, false) {}
+    SynapseUnit() : PipelineUnit(HardwareBitfield::implements_synapse) {}
     PipelineResult update(size_t synapse_address,
             bool read, long int /*timestep*/) override = 0;
     PipelineResult update(size_t /*neuron_address*/,
@@ -232,7 +255,7 @@ class DendriteUnit : public PipelineUnit
 {
 public:
     DendriteUnit()
-            : PipelineUnit(false, true, false)
+            : PipelineUnit(HardwareBitfield::implements_dendrite)
     {
     }
     PipelineResult update(size_t neuron_address,
@@ -255,7 +278,7 @@ public:
 class SomaUnit : public PipelineUnit
 {
 public:
-    SomaUnit() : PipelineUnit(false, false, true) {}
+    SomaUnit() : PipelineUnit(HardwareBitfield::implements_soma) {}
     PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int timestep) override = 0;
     PipelineResult update(size_t /*synapse_address*/, bool /*read*/, long int /*timestep*/) final
     {
@@ -279,11 +302,12 @@ BufferPosition pipeline_parse_buffer_pos_str(
 //  to avoid linkage issues with plug-ins. Generally, header-only approaches
 //  are useful in this situation. In this case, I've inlined only public and
 //  protected members. Private members can be defined externally.
-inline sanafe::PipelineUnit::PipelineUnit(const bool implements_synapse,
-            const bool implements_dendrite, const bool implements_soma)
-            : implements_synapse(implements_synapse)
-            , implements_dendrite(implements_dendrite)
-            , implements_soma(implements_soma)
+inline sanafe::PipelineUnit::PipelineUnit(const HardwareBitfield hw_implemented)
+        : implements_synapse(
+                  hw_implemented & HardwareBitfield::implements_synapse)
+        , implements_dendrite(
+                  hw_implemented & HardwareBitfield::implements_dendrite)
+        , implements_soma(hw_implemented & HardwareBitfield::implements_soma)
 {
     // When constructing the pipeline h/w unit, setup input/output interfaces.
     //  A hardware unit may implement synaptic, dendritic

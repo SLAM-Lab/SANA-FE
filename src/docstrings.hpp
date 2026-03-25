@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -131,14 +131,14 @@ Example:
 
 // Neuron class
 constexpr const char *neuron_doc = R"pbdoc(
-Individual spiking neuron with configurable hardware mapping and parameters.
+Individual spiking neuron with configurable hardware mapping and attributes.
 
 Neurons maintain their own state, connections, and hardware assignments.
 Access via NeuronGroup indexing or iteration.
 )pbdoc";
 
 constexpr const char *neuron_set_attributes_doc = R"pbdoc(
-Configure neuron-specific parameters and hardware assignments.
+Configure neuron-specific attributes and mapping to hardware.
 
 Args:
     soma_hw_name (str, optional): Soma processing unit name. Default is None.
@@ -147,9 +147,8 @@ Args:
     log_spikes (bool, optional): Enable spike logging for this neuron. Default is False.
     log_potential (bool, optional): Enable potential logging for this neuron. Default is False.
     model_attributes (dict, optional): General model parameters. Default is None.
-    soma_attributes (dict, optional): Soma-specific parameters. Default is None.
-    dendrite_attributes (dict, optional): Dendrite-specific parameters. Default is None.
-
+    soma_attributes (dict, optional): Soma-specific model parameters. Default is None.
+    dendrite_attributes (dict, optional): Dendrite-specific model parameters. Default is None.
 )pbdoc";
 
 constexpr const char *neuron_map_to_core_doc = R"pbdoc(
@@ -169,6 +168,32 @@ Args:
 Returns:
     int: Connection index for later reference
 
+)pbdoc";
+
+// Mapped Neuron class
+constexpr const char *mapped_neuron_doc = R"pbdoc(
+A spiking neuron that has been mapped to neuromorphic hardware.
+
+Once a Neuron object is mapped to hardware, it becomes a MappedNeuron. This means
+it has been mapped to a specific core within a network tile, and is assigned to
+specific hardware units. MappedNeuron objects can be used to access the state of
+a neuron during simulation or passing additional attributes, e.g., to change an
+attribute mid-simulation.
+
+)pbdoc";
+
+constexpr const char *mapped_neuron_set_attributes_doc = R"pbdoc(
+Configure neuron-specific attributes after mapping to hardware.
+
+Args:
+    log_spikes (bool, optional): Enable spike logging for this neuron. Default is False.
+    model_attributes (dict, optional): General model parameters. Default is None.
+    soma_attributes (dict, optional): Soma-specific model parameters. Default is None.
+    dendrite_attributes (dict, optional): Dendrite-specific model parameters. Default is None.
+
+Raises:
+    HardwareMappingError: If the model attribute is incompatible with the specified
+        hardware.
 )pbdoc";
 
 // Architecture class
@@ -240,8 +265,17 @@ Example:
 constexpr const char *spiking_chip_load_doc = R"pbdoc(
 Map a neural network onto this chip's hardware architecture.
 
-network (Network): Spiking network to map onto hardware
-overwrite (bool, optional): Overwrite programmed spiking network. Default is True.
+Args:
+    network (Network): Spiking network to map onto hardware
+    overwrite (bool, optional): Overwrite programmed spiking network. Default is True.
+
+Raises:
+    HardwareMappingError: If the network cannot be mapped to the architecture.
+        This may occur if a neuron was never assigned to a core, if a required
+        hardware unit (soma, synapse, or dendrite) is not supported by the target
+        architecture, or if a model attribute is incompatible with the specified
+        hardware. The exception message describes which mapping constraint was
+        violated.
 )pbdoc";
 
 constexpr const char *spiking_chip_sim_doc = R"pbdoc(
@@ -254,6 +288,7 @@ Args:
     scheduler_threads (int, optional): Number of scheduler threads. Default is 0 (run in main thread).
     spike_trace (object, optional): Spike trace output (file, string, True, or None). Default is None.
     potential_trace (object, optional): Potential trace output (file, string, True, or None). Default is None.
+    neuron_trace (object, optional): Neuron state trace output (file, string, True, or None). Default is None.
     perf_trace (object, optional): Performance metrics trace output (file, string, True, or None). Default is None.
     message_trace (object, optional): Message trace output (file, string, True, or None). Default is None.
     write_trace_headers (bool, optional): Write CSV headers to trace files. Default is True.
@@ -266,6 +301,7 @@ Returns:
         - spikes: Total spike count
         - spike_trace: Spike data (if enabled)
         - potential_trace: Potential data (if enabled)
+        - neuron_trace: Neuron trace data (if enabled)
         - perf_trace: Performance metrics (if enabled)
         - message_trace: Network message data (if enabled)
 

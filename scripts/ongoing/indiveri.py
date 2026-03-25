@@ -1,5 +1,5 @@
 """
-Copyright (c) 2025 - The University of Texas at Austin
+Copyright (c) 2026 - The University of Texas at Austin
 This work was produced under contract #2317831 to National Technology and
 Engineering Solutions of Sandia, LLC which is under contract
 No. DE-NA0003525 with the U.S. Department of Energy.
@@ -286,13 +286,13 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
             timesteps = 100
             mnist_input = inputs[input, :]
             for id, mapped_neuron in enumerate(mapped_inputs):
-                mapped_neuron.set_model_attributes(
+                mapped_neuron.set_attributes(
                     model_attributes={"poisson": mnist_input[id]})
         elif dataset == "shd":
             spiking_digit_input = inputs[input].squeeze()
             for id, mapped_neuron in enumerate(mapped_inputs):
                 spiketrain = list(spiking_digit_input[:, id])
-                mapped_neuron.set_model_attributes(
+                mapped_neuron.set_attributes(
                     model_attributes={"spikes": spiketrain})
             timesteps = len(spiketrain)
         else:

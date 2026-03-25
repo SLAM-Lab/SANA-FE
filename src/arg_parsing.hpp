@@ -12,6 +12,7 @@ struct OptionalProgramFlags
     std::filesystem::path output_dir{std::filesystem::current_path()};
     bool record_spikes{false};
     bool record_potentials{false};
+    bool record_neuron_state{false};
     bool record_perf{false};
     bool record_messages{false};
     bool use_netlist_format{false};

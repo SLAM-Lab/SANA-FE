@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -44,6 +44,15 @@ enum TimingModel : uint8_t
     timing_model_cycle_accurate, // Booksim2 simulator
 };
 
+struct TraceFlags
+{
+    bool record_spikes{false};
+    bool record_potentials{false};
+    bool record_neuron_state{false};
+    bool record_perf{false};
+    bool record_messages{false};
+};
+
 class SpikingChip
 {
 public:
@@ -58,7 +67,7 @@ public:
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, bool record_spikes = false, bool record_potentials = false, bool record_perf = false, bool record_messages = false, std::string output_dir = "");
+    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), std::string output_dir = "");
     void step(Scheduler &scheduler);
     void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
@@ -69,17 +78,20 @@ public:
     double get_power() const noexcept;
     std::vector<NeuronAddress> get_spikes() const;
     std::vector<double> get_potentials() const;
+    std::map<std::string, std::vector<double>> get_traces() const;
     long int get_total_timesteps() const noexcept { return total_timesteps; }
     static void update_run_data(RunData &rd, const Timestep &ts);
     std::map<std::string, double> sim_trace_get_optional_traces();
 
     static void sim_trace_write_spike_header(std::ostream &spike_trace_file);
     void sim_trace_write_potential_header(std::ostream &potential_trace_file);
+    void sim_trace_write_neuron_trace_header(std::ostream &neuron_trace_file);
     void sim_trace_write_perf_header(std::ostream &perf_trace_file);
     static void sim_trace_write_message_header(std::ostream &message_trace_file);
 
     void sim_trace_record_spikes(std::ostream &spike_trace_file, long int timesteps);
     void sim_trace_record_potentials(std::ostream &potential_trace_file, long int timestep);
+    void sim_trace_record_neuron_traces(std::ostream &neuron_trace_file, long int timestep);
     void sim_trace_record_perf(std::ostream &perf_trace_file, const Timestep &ts);
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
 
@@ -95,6 +107,21 @@ public:
     size_t noc_buffer_size{1UL};
 
 private:
+    using TimePoint = std::chrono::steady_clock::time_point;
+    struct SimTimings
+    {
+        TimePoint setup_start_tm{TimePoint::min()};
+        TimePoint setup_end_tm{TimePoint::min()};
+        TimePoint neuron_processing_start_tm{TimePoint::min()};
+        TimePoint neuron_processing_end_tm{TimePoint::min()};
+        TimePoint message_processing_start_tm{TimePoint::min()};
+        TimePoint message_processing_end_tm{TimePoint::min()};
+        TimePoint energy_calculation_start_tm{TimePoint::min()};
+        TimePoint energy_calculation_end_tm{TimePoint::min()};
+        TimePoint scheduler_start_tm{TimePoint::min()};
+        TimePoint scheduler_end_tm{TimePoint::min()};
+    };
+
     std::unique_ptr<BookSimConfig> booksim_config;
     std::atomic<long int> total_messages_sent{0L};
     size_t total_neurons_mapped{0UL};
@@ -121,6 +148,7 @@ private:
     // Filestreams
     std::ofstream spike_trace;
     std::ofstream potential_trace;
+    std::ofstream neuron_trace;
     std::ofstream message_trace;
     std::ofstream perf_trace;
 
@@ -146,6 +174,7 @@ private:
     static double sim_calculate_tile_energy(Timestep &ts, Tile &tile);
     static double sim_calculate_core_energy(Timestep &ts, Core &core);
     void sim_update_total_energy_and_counts(const Timestep &ts);
+    void update_simulator_timings(const SimTimings &timings);
 
     // Misc outputting and formatting
     void sim_format_run_summary(std::ostream &out, const RunData &run_data) const;
@@ -173,6 +202,7 @@ private:
     std::ofstream sim_trace_open_perf_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_spike_trace(const std::filesystem::path &out_dir);
     std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir);
+    std::ofstream sim_trace_open_neuron_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
 
     // Booksim 2

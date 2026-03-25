@@ -57,7 +57,7 @@ failed_files = []
 File.open(log_file, "w") do |log|
   cpp_files.each do |file|
     log.puts "----- #{file} -----"
-    result = `clang-tidy -p #{build_dir} #{file} -- -I./src 2>&1`
+    result = `clang-tidy -p #{build_dir} #{file} 2>&1`
     log.puts result
 
     if result.include?("warning:") || result.include?("error:")

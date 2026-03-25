@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -9,21 +9,32 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 #include "attribute.hpp"
 #include "fwd.hpp"
 
 namespace sanafe
 {
-
 enum NeuronStatus : uint8_t
 {
-    invalid_neuron_state = 0U,
+    neuron_state_unset = 0U,
     idle = 1U,
     updated = 2U,
     fired = 3U
+};
+
+class HardwareMappingError : public std::runtime_error
+{
+public:
+    // Pass the specific message to the base class constructor
+    explicit HardwareMappingError(const std::string &message)
+            : std::runtime_error(message)
+    {
+    }
 };
 
 class MappedConnection
@@ -38,7 +49,7 @@ public:
     size_t mapped_synapse_hw_address{0UL};
 
     explicit MappedConnection(std::reference_wrapper<MappedNeuron> pre_neuron, std::reference_wrapper<MappedNeuron> post_neuron);
-    void set_model_attributes(const std::map<std::string, sanafe::ModelAttribute> &model_attributes) const;
+    void set_attributes(const std::map<std::string, sanafe::ModelAttribute> &attributes) const;
     void build_message_processing_pipeline();
 };
 
@@ -66,9 +77,10 @@ public:
     int spike_count{0};
     int maps_in_count{0};
     int maps_out_count{0};
-    NeuronStatus status{invalid_neuron_state};
+    NeuronStatus status{neuron_state_unset};
 
     // Flags and traces
+    std::unordered_set<std::string> trace_names{};
     bool log_spikes{false};
     bool log_potential{false};
     bool check_for_synapse_updates_every_timestep{false};
@@ -80,7 +92,7 @@ public:
     MappedNeuron(MappedNeuron&& other) = default;
 
     MappedNeuron& operator=(MappedNeuron&& other) = default;
-    void set_model_attributes(const std::map<std::string, ModelAttribute> &model_attributes) const;
+    void set_attributes(const std::map<std::string, ModelAttribute> &attributes, std::optional<bool> set_log_spikes=std::nullopt);
 
 private:
     void build_neuron_processing_pipeline();

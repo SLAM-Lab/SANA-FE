@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -61,11 +61,17 @@ int main(int argc, const char *argv[])
         hw.load(net);
 
         INFO("Running simulation.\n");
+        sanafe::TraceFlags trace_flags;
+        trace_flags.record_spikes = optional_flags.record_spikes;
+        trace_flags.record_potentials = optional_flags.record_spikes;
+        trace_flags.record_neuron_state = optional_flags.record_spikes;
+        trace_flags.record_perf = optional_flags.record_spikes;
+        trace_flags.record_messages = optional_flags.record_spikes;
+
         const sanafe::RunData run_summary = hw.sim(
                 required_args.timesteps_to_execute, optional_flags.timing_model,
-                optional_flags.scheduler_threads, optional_flags.record_spikes,
-                optional_flags.record_potentials, optional_flags.record_perf,
-                optional_flags.record_messages, optional_flags.output_dir);
+                optional_flags.scheduler_threads, trace_flags,
+                optional_flags.output_dir);
 
         INFO("Closing Booksim2 library\n");
         booksim_close();

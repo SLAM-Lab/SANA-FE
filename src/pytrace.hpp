@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -180,6 +180,49 @@ public:
 
 private:
     std::vector<std::vector<double>> data;
+};
+
+
+class PyNeuronTrace : public PyNetworkTrace
+{
+public:
+    PyNeuronTrace(sanafe::SpikingChip *chip, pybind11::object trace_obj,
+            const bool overwrite_trace)
+            : PyNetworkTrace(chip, trace_obj, overwrite_trace)
+    {
+    }
+    ~PyNeuronTrace() override = default;
+    void get_header_string(std::ostringstream &ss) override
+    {
+        parent_chip->sim_trace_write_neuron_trace_header(ss);
+    }
+    void write_net_trace_to_stream(
+            std::ostringstream &ss, const long int timestep) override
+    {
+        parent_chip->sim_trace_record_neuron_traces(ss, timestep);
+    }
+    void append_net_activity_to_memory() override
+    {
+        const auto traces = parent_chip->get_traces();
+        for (auto &[trace_name, trace_values] : traces)
+        {
+            data[trace_name].emplace_back(std::move(trace_values));
+        }
+    }
+    pybind11::object get_python_object() const override
+    {
+        // Acquire GIL to be safe, even though simulations should have finished
+        //  at this point and the GIL should be reacquired already
+        const pybind11::gil_scoped_acquire acquire;
+        if (mode == TraceMode::trace_memory)
+        {
+            return pybind11::cast(data);
+        }
+        return pybind11::none();
+    }
+
+private:
+    std::map<std::string, std::vector<std::vector<double>>> data;
 };
 
 class PyPerfTrace : public PyHardwareTrace

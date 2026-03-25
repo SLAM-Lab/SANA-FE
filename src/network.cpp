@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -116,6 +116,13 @@ void sanafe::Neuron::set_attributes(const NeuronConfiguration &config)
 
     for (const auto &[key, attribute] : config.model_attributes)
     {
+        if (is_reserved_neuron_attribute(key))
+        {
+            const std::string error = ("Reserved neuron attribute '" + key +
+                    "' cannot be used as a model attribute. " +
+                    "Pass it as a direct argument instead.");
+            throw std::invalid_argument(error);
+        }
         model_attributes.insert_or_assign(key, attribute);
     }
 }

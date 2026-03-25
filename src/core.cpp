@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -7,6 +7,7 @@
 #include <functional> // For std::reference_wrapper
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "arch.hpp"
@@ -84,11 +85,12 @@ sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
     if (!hw_found)
     {
         const std::string error("Could not find h/w (with name:" + hw_name +
-                ") that implements synapse:" + std::to_string(is_synapse) +
-                ", dendrite:" + std::to_string(is_dendrite) +
-                ", soma:" + std::to_string(is_soma));
+                ") that implements synapse:" +
+                std::to_string(static_cast<int>(is_synapse)) +
+                ", dendrite:" + std::to_string(static_cast<int>(is_dendrite)) +
+                ", soma:" + std::to_string(static_cast<int>(is_soma)));
         INFO("Error: %s\n", error.c_str());
-        throw std::runtime_error(error);
+        throw HardwareMappingError(error);
     }
 
     return hw_unit;
@@ -121,7 +123,7 @@ void sanafe::Core::map_neuron(
     {
         INFO("Error: Exceeded maximum neurons per core (%zu)",
                 pipeline_config.max_neurons_supported);
-        throw std::runtime_error("Error: Exceeded maximum neurons per core.");
+        throw HardwareMappingError("Error: Exceeded maximum neurons per core.");
     }
 
     // Map neuron model to dendrite and soma h/w units in this core.
@@ -162,7 +164,7 @@ void sanafe::Core::map_neuron(
                 mapped_neuron.mapped_dendrite_hw_address;
     }
 
-    mapped_neuron.set_model_attributes(neuron_to_map.model_attributes);
+    mapped_neuron.set_attributes(neuron_to_map.model_attributes);
 }
 
 void sanafe::Core::map_connection(const Connection &con,
@@ -176,7 +178,7 @@ void sanafe::Core::map_connection(const Connection &con,
     mapped_con.synapse_hw->add_connection(mapped_con);
 
     mapped_con.build_message_processing_pipeline();
-    mapped_con.set_model_attributes(con.synapse_attributes);
+    mapped_con.set_attributes(con.synapse_attributes);
     TRACE2(CHIP, "Mapped connection to hw: %s\n",
             mapped_con.synapse_hw->name.c_str());
 }

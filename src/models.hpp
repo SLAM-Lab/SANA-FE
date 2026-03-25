@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -207,27 +207,29 @@ public:
     {
         return compartments[neuron_address].potential;
     }
+    std::map<std::string, double> get_neuron_traces(size_t neuron_address) override;
     std::uniform_real_distribution<double> uniform_distribution{0.0, 1.0}; // TODO: hack
     std::mt19937 gen{1}; // TODO: hack
 
     struct LoihiCompartment
     {
+        double bias{0.0};
         std::vector<double> biases;
         bool force_update_every_timestep{false};
-        long int timesteps_simulated{0L};
-        int reset_mode{neuron_reset_hard};
-        int reverse_reset_mode{neuron_no_reset};
         double input_current{0.0};
-        double potential{0.0};
-        double leak_decay{1.0};
         double input_decay{0.0};
-        double bias{0.0};
-        double threshold{0.0};
-        double reverse_threshold{0.0};
-        double reset{0.0};
-        double reverse_reset{0.0};
+        double leak_decay{1.0};
+        bool log_current{false};
+        double potential{0.0};
         int refractory_delay{0};
         int refractory_count{0};
+        double reset{0.0};
+        int reset_mode{neuron_reset_hard};
+        double reverse_reset{0.0};
+        int reverse_reset_mode{neuron_no_reset};
+        double reverse_threshold{0.0};
+        double threshold{0.0};
+        long int timesteps_simulated{0L};
     };
 
     enum NoiseType : uint8_t
@@ -238,20 +240,21 @@ public:
 
 private:
     static inline const std::set<std::string> loihi_lif_attributes{
+            "bias",
+            "force_update",
+            "force_update_every_timestep",
+            "force_potential",
+            "leak_decay",
+            "log_u",
+            "noise",
+            "noise_bits",
+            "refractory_delay",
             "reset_mode",
             "reverse_reset_mode",
             "reset",
             "reverse_reset",
-            "bias",
-            "threshold",
             "reverse_threshold",
-            "leak_decay",
-            "noise",
-            "noise_bits",
-            "refractory_delay",
-            "force_update",
-            "force_update_every_timestep",
-            "force_potential",
+            "threshold",
     };
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{noise_none};

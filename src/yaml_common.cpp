@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -10,11 +10,11 @@
 #include <limits>
 #include <map>
 #include <optional>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <typeinfo>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -26,6 +26,14 @@
 #include "attribute.hpp"
 #include "print.hpp"
 #include "yaml_common.hpp"
+
+static const std::unordered_set<std::string> skip_keys = {
+        // Reserved neuron specific attributes for the simulator kernel
+        //  (see attributes.hpp)
+        "soma_hw_name", "default_synapse_hw_name", "dendrite_hw_name",
+        "log_spikes", "log_potential",
+        // Unit-specific keys (parsed elsewhere)
+        "synapse", "dendrite", "soma"};
 
 // NOLINTBEGIN(misc-include-cleaner)
 sanafe::YamlDescriptionParsingError::YamlDescriptionParsingError(
@@ -113,9 +121,7 @@ sanafe::description_parse_model_attributes_yaml( // NOLINT(misc-no-recursion)
         {
             std::string key_str;
             node >> ryml::key(key_str); // NOLINT(misc-include-cleaner)
-            std::set<std::string> unit_specific_keys = {
-                    "synapse", "dendrite", "soma"};
-            if (unit_specific_keys.find(key_str) == unit_specific_keys.end())
+            if (skip_keys.count(key_str) == 0)
             {
                 //INFO("Parsing attribute: %s\n", key.c_str());
                 model_attributes[key_str] = yaml_parse_attribute(parser, node);

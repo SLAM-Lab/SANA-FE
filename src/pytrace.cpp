@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -18,6 +18,9 @@ pybind11::dict message_to_dict(const sanafe::Message &m)
 {
     pybind11::dict message_dict;
 
+    // clang-tidy doesn't know how to deal with PyBind dict accesses yet. These
+    //  are safe
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     message_dict["generation_delay"] = m.generation_delay;
     message_dict["network_delay"] = m.network_delay;
     message_dict["receive_delay"] = m.receive_delay;
@@ -44,6 +47,7 @@ pybind11::dict message_to_dict(const sanafe::Message &m)
     message_dict["dest_axon_hw"] = m.dest_axon_hw;
     message_dict["dest_axon_id"] = m.dest_axon_id;
     message_dict["placeholder"] = m.placeholder;
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     return message_dict;
 }

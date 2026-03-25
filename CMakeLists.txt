@@ -22,13 +22,13 @@ endif()
 # Set which targets to make, between a standalone executable and a Python lib
 option(STANDALONE_BUILD_ENABLED "Build standalone executlbe" ON)
 option(PYTHON_BUILD_ENABLED "Build Python library" ON)
-option(TESTING_ENABLED "Build test library" OFF)
+option(ENABLE_TESTING "Build test library" OFF)
 
 # Ensure that at least one build target is enabled
-if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED AND NOT TESTING_ENABLED)
+if(NOT STANDALONE_BUILD_ENABLED AND NOT PYTHON_BUILD_ENABLED AND NOT ENABLE_TESTING)
     message(
         FATAL_ERROR
-        "No build target enabled: Either STANDALONE_BUILD_ENABLED or PYTHON_BUILD_ENABLED or TESTING_ENABLED must be ON."
+        "No build target enabled: Either STANDALONE_BUILD_ENABLED or PYTHON_BUILD_ENABLED or ENABLE_TESTING must be ON."
     )
 endif()
 
@@ -315,17 +315,13 @@ if(STANDALONE_BUILD_ENABLED)
 message(STATUS "Simulator files will be copied to project directory")
 endif()
 
-if(TESTING_ENABLED)
+if(ENABLE_TESTING)
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pytrace.cpp")
     add_library(sanafe SHARED ${SOURCE_FILES} ${HEADER_FILES})
     target_link_libraries(sanafe PUBLIC ryml::ryml)
     target_link_libraries(sanafe PUBLIC booksim)
     target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
-    if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
-        target_link_libraries(sanafe PRIVATE OpenMP::OpenMP_CXX)
-        target_compile_definitions(sanafe PRIVATE HAVE_OPENMP)
-    endif()
     target_link_libraries(sanafe PRIVATE Threads::Threads)
     target_include_directories(sanafe PUBLIC
         ${CMAKE_SOURCE_DIR}/src

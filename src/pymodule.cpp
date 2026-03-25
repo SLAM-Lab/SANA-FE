@@ -1,4 +1,4 @@
-// Copyright (c) 2025 - The University of Texas at Austin
+// Copyright (c) 2026 - The University of Texas at Austin
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
@@ -49,8 +49,7 @@
 //  named arguments - removing the risk of accidentally swapping args and
 //  making it easier to specify a large number of args
 //  PyBind11 also relies on a super long function macro, so suppress this too
-// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-size)
-
+// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-size,readability-identifier-naming,bugprone-reserved-identifier)
 // Forward declarations
 namespace // anonymous
 {
@@ -167,9 +166,10 @@ sanafe::ModelAttribute pyobject_to_model_attribute(
         std::vector<sanafe::ModelAttribute> model_attributes;
         for (auto item : pybind11::cast<pybind11::dict>(value))
         {
-            sanafe::ModelAttribute attribute = pyobject_to_model_attribute(
+            sanafe::ModelAttribute element = pyobject_to_model_attribute(
                     pybind11::cast<pybind11::object>(item.second));
-            attribute.name = pybind11::cast<std::string>(item.first);
+            element.name = pybind11::cast<std::string>(item.first);
+            model_attributes.emplace_back(element);
         }
         attribute.value = model_attributes;
     }
@@ -496,10 +496,10 @@ void pyset_attributes(sanafe::Neuron *self,
     self->set_attributes(neuron_template);
 }
 
-void pyset_model_attributes(sanafe::MappedNeuron *self,
+void pyset_attributes_mapped(sanafe::MappedNeuron *self,
         pybind11::dict model_attributes,
         pybind11::dict dendrite_specific_attributes,
-        pybind11::dict soma_specific_attributes)
+        pybind11::dict soma_specific_attributes, std::optional<bool> log_spikes)
 {
     std::map<std::string, sanafe::ModelAttribute> converted_attributes;
 
@@ -520,7 +520,7 @@ void pyset_model_attributes(sanafe::MappedNeuron *self,
         INFO("\tkey: %s\n", key.c_str());
     }
 #endif
-    self->set_model_attributes(converted_attributes);
+    self->set_attributes(converted_attributes, log_spikes);
 }
 
 // A similar implementation to SpikingChip::flush_timestep_data, but supporting
@@ -546,8 +546,9 @@ void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         std::string timing_model_str, const int processing_threads,
         const int scheduler_threads, pybind11::object spike_trace,
-        pybind11::object potential_trace, pybind11::object perf_trace,
-        pybind11::object message_trace, const bool write_trace_headers)
+        pybind11::object potential_trace, pybind11::object neuron_trace,
+        pybind11::object perf_trace, pybind11::object message_trace,
+        const bool write_trace_headers)
 {
     sanafe::TimingModel timing_model{sanafe::timing_model_detailed};
     timing_model = sanafe::parse_timing_model(timing_model_str);
@@ -564,12 +565,14 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     PySpikeTrace spikes(self, spike_trace, overwrite_if_trace_exists);
     PyPotentialTrace potentials(
             self, potential_trace, overwrite_if_trace_exists);
+    PyNeuronTrace neuron_traces(self, neuron_trace, overwrite_if_trace_exists);
     PyMessageTrace messages(self, message_trace, overwrite_if_trace_exists);
     PyPerfTrace perf(self, perf_trace, overwrite_if_trace_exists);
 
     if (write_trace_headers)
     {
         spikes.write_header();
+        neuron_traces.write_header();
         potentials.write_header();
         messages.write_header();
         perf.write_header();
@@ -594,52 +597,52 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             "Executed steps: [0/" + std::to_string(timesteps) + "]";
     pybind11::print(first_message, pybind11::arg("end") = "");
 
-    const pybind11::gil_scoped_release release;
-    for (long int timestep = 1; timestep <= timesteps; timestep++)
     {
-        self->step(scheduler);
-        const long int total_timesteps = self->get_total_timesteps();
-        spikes.record_net_activity(total_timesteps);
-        potentials.record_net_activity(total_timesteps);
+        const pybind11::gil_scoped_release release;
+        for (long int timestep = 1; timestep <= timesteps; timestep++)
+        {
+            self->step(scheduler);
+            const long int total_timesteps = self->get_total_timesteps();
+            spikes.record_net_activity(total_timesteps);
+            potentials.record_net_activity(total_timesteps);
+            neuron_traces.record_net_activity(total_timesteps);
 
-        const auto now = std::chrono::steady_clock::now();
-        constexpr std::chrono::milliseconds check_interval{100};
-        constexpr std::chrono::seconds print_interval{1};
-        if ((now - last_check) >= check_interval)
-        {
-            // Periodically check for user interrupts or errors from Python
-            const pybind11::gil_scoped_acquire acquire;
-            if (PyErr_CheckSignals() != 0)
+            const auto now = std::chrono::steady_clock::now();
+            constexpr std::chrono::milliseconds check_interval{100};
+            constexpr std::chrono::seconds print_interval{1};
+            if ((now - last_check) >= check_interval)
             {
-                // Received an interrupt or error, so clean-up and kill the run
-                schedule_stop_all_threads(scheduler);
-                throw pybind11::error_already_set();
+                // Periodically check for user interrupts or errors from Python
+                const pybind11::gil_scoped_acquire acquire;
+                if (PyErr_CheckSignals() != 0)
+                {
+                    // Received an interrupt or error, so clean-up and kill the run
+                    schedule_stop_all_threads(scheduler);
+                    throw pybind11::error_already_set();
+                }
+                last_check = now;
             }
-            last_check = now;
+            if ((now - last_print) >= print_interval)
+            {
+                const std::string message = "\rExecuted steps: [" +
+                        std::to_string(timestep) + "/" +
+                        std::to_string(timesteps) + "]";
+                const pybind11::gil_scoped_acquire acquire;
+                pybind11::print(message, pybind11::arg("end") = "");
+                last_print = now;
+            }
+            //  avoids the message write queue growing too large
+            pyflush_timestep_data(self, rd, perf, scheduler, messages);
         }
-        if ((now - last_print) >= print_interval)
-        {
-            const std::string message = "\rExecuted steps: [" +
-                    std::to_string(timestep) + "/" + std::to_string(timesteps) +
-                    "]";
-            const pybind11::gil_scoped_acquire acquire;
-            pybind11::print(message, pybind11::arg("end") = "");
-            last_print = now;
-        }
-        //  avoids the message write queue growing too large
-        pyflush_timestep_data(self, rd, perf, scheduler, messages);
     }
 
-    // Acquire the GIL and check for interrupts before printing to Python
+    // Re-acquire the GIL and check for interrupts before printing to Python
+    if (PyErr_Occurred() == nullptr)
     {
-        const pybind11::gil_scoped_acquire acquire;
-        if (!PyErr_Occurred())
-        {
             const std::string last_message = "\rExecuted steps: [" +
                     std::to_string(timesteps) + "/" +
                     std::to_string(timesteps) + "]";
             pybind11::print(last_message);
-        }
     }
 
     schedule_stop_all_threads(scheduler);
@@ -647,12 +650,14 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
 
     const auto spike_data = spikes.get_python_object();
     const auto potential_data = potentials.get_python_object();
+    const auto neuron_data = neuron_traces.get_python_object();
     const auto perf_data = perf.get_python_object();
     const auto message_data = messages.get_python_object();
 
     pybind11::dict result = run_data_to_dict(rd);
     result["spike_trace"] = spike_data;
     result["potential_trace"] = potential_data;
+    result["neuron_trace"] = neuron_data;
     result["perf_trace"] = perf_data;
     result["message_trace"] = message_data;
 
@@ -818,6 +823,10 @@ PYBIND11_MODULE(sanafecpp, m)
                     sanafe::buffer_before_axon_out_unit)
             .value("buffer_positions", sanafe::buffer_positions);
 
+    pybind11::register_exception<sanafe::HardwareMappingError>(
+        m, "HardwareMappingError"
+    );
+
     pybind11::class_<sanafe::SpikingNetwork>(
             m, "Network", docstrings::network_doc)
             .def(pybind11::init<>())
@@ -862,8 +871,6 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("__getitem__", &PyNeuronRefView::__getitem__)
             .def("__iter__", &PyNeuronRefView::__iter__)
             .def("__repr__", &PyNeuronRefView::info);
-
-    // Now change the NeuronGroup binding...
 
     pybind11::class_<sanafe::NeuronGroup>(
             m, "NeuronGroup", docstrings::neuron_group_doc)
@@ -1121,11 +1128,14 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
                     pybind11::arg("log_energy") = false);
-    pybind11::class_<sanafe::MappedNeuron>(m, "MappedNeuron")
-            .def("set_model_attributes", &pyset_model_attributes,
+    pybind11::class_<sanafe::MappedNeuron>(
+            m, "MappedNeuron", docstrings::mapped_neuron_doc)
+            .def("set_attributes", &pyset_attributes_mapped,
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
-                    pybind11::arg("dendrite_attributes") = pybind11::dict());
+                    pybind11::arg("dendrite_attributes") = pybind11::dict(),
+                    pybind11::arg("log_spikes") = pybind11::none(),
+                    docstrings::mapped_neuron_set_attributes_doc);
     pybind11::class_<sanafe::SpikingChip>(
             m, "SpikingChip", docstrings::spiking_chip_doc)
             .def_property(
@@ -1149,6 +1159,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("scheduler_threads") = 0,
                     pybind11::arg("spike_trace") = pybind11::none(),
                     pybind11::arg("potential_trace") = pybind11::none(),
+                    pybind11::arg("neuron_trace") = pybind11::none(),
                     pybind11::arg("perf_trace") = pybind11::none(),
                     pybind11::arg("message_trace") = pybind11::none(),
                     pybind11::arg("write_trace_headers") = true)
@@ -1158,4 +1169,4 @@ PYBIND11_MODULE(sanafecpp, m)
                     docstrings::spiking_chip_reset_doc);
 }
 // NOLINTEND(readability-function-cognitive-complexity)
-// NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size)
+// NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size,readability-identifier-naming,bugprone-reserved-identifier)
