@@ -1,8 +1,17 @@
 """
-Provides utilities for loading, converting, and analyzing SANA-FE trace data.
-Supports conversion to pandas DataFrames and numpy arrays for analysis.
+Convert SANA-FE trace outputs (in-memory or CSV) to pandas DataFrames.
 """
 
-from sanafe.data.traces import TraceData
+from sanafe.data.traces import (
+    spikes_to_dataframe,
+    potentials_to_dataframe,
+    performance_to_dataframe,
+    messages_to_dataframe,
+)
 
-__all__ = ["TraceData"]
+__all__ = [
+    "spikes_to_dataframe",
+    "potentials_to_dataframe",
+    "performance_to_dataframe",
+    "messages_to_dataframe",
+]
