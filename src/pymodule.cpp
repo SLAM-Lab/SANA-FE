@@ -595,7 +595,8 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
 
     const std::string first_message =
             "Executed steps: [0/" + std::to_string(timesteps) + "]";
-    pybind11::print(first_message, pybind11::arg("end") = "");
+    pybind11::print(first_message, pybind11::arg("end") = "",
+            pybind11::arg("flush") = true);
 
     {
         const pybind11::gil_scoped_release release;
@@ -624,11 +625,12 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             }
             if ((now - last_print) >= print_interval)
             {
-                const std::string message = "\rExecuted steps: [" +
+                const std::string message = "\033[2K\rExecuted steps: [" +
                         std::to_string(timestep) + "/" +
                         std::to_string(timesteps) + "]";
                 const pybind11::gil_scoped_acquire acquire;
-                pybind11::print(message, pybind11::arg("end") = "");
+                pybind11::print(message, pybind11::arg("end") = "",
+                        pybind11::arg("flush") = true);
                 last_print = now;
             }
             //  avoids the message write queue growing too large
@@ -639,10 +641,10 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     // Re-acquire the GIL and check for interrupts before printing to Python
     if (PyErr_Occurred() == nullptr)
     {
-            const std::string last_message = "\rExecuted steps: [" +
+            const std::string last_message = "\033[2K\rExecuted steps: [" +
                     std::to_string(timesteps) + "/" +
                     std::to_string(timesteps) + "]";
-            pybind11::print(last_message);
+            pybind11::print(last_message, pybind11::arg("flush") = true);
     }
 
     schedule_stop_all_threads(scheduler);
