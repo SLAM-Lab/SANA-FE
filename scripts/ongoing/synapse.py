@@ -33,8 +33,10 @@ GENERATED_NETWORK_PATH = os.path.join(RUN_DIR, NETWORK_FILENAME)
 # Simulation parameters
 TIMESTEPS = 128
 PARALLEL_ACCESS_VALUES = list(range(1, 17))  # [1, 2, 3, ..., 16]
+SENSITIVITY_MODIFIERS = (80, 100, 120)  # %
 
-def create_modified_arch_file(original_arch_path, max_parallel_accesses, run_dir):
+def create_modified_arch_file(original_arch_path, max_parallel_accesses,
+                              run_dir, calibration_modifier):
     """
     Create a modified architecture YAML file with specified max_parallel_accesses
     """
@@ -46,14 +48,16 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses, run_dir
         for core in tile['core']:
             for synapse in core['synapse']:
                 if synapse['name'] == 'loihi_conv_synapse':
-                    synapse['attributes']['plugin'] = "/home/usr1/jboyle/neuro/sana-fe/plugins/libloihi_synapse.so"
+                    synapse['attributes']['plugin'] = os.path.join(
+                        PROJECT_DIR, "plugins", "libloihi_synapse.so")
                     synapse['attributes']['model'] = "loihi"
                     synapse['attributes']['max_parallel_accesses'] = max_parallel_accesses
+                    synapse['attributes']['calibration_modifier'] = float(calibration_modifier) / 100.0
                     del synapse["attributes"]["latency_process_spike"]
                     del synapse["attributes"]["energy_process_spike"]
 
     # Create new filename
-    new_arch_filename = f"loihi_parallel_{max_parallel_accesses}.yaml"
+    new_arch_filename = f"loihi_parallel_{max_parallel_accesses}_{calibration_modifier}.yaml"
     new_arch_path = os.path.join(run_dir, new_arch_filename)
 
     # Save modified architecture file
@@ -63,7 +67,7 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses, run_dir
     return new_arch_path
 
 
-def run_single_experiment(max_parallel_accesses):
+def run_single_experiment(max_parallel_accesses, calibration_modifier):
     """
     Run a single experiment with specified max_parallel_accesses value
     """
@@ -72,7 +76,7 @@ def run_single_experiment(max_parallel_accesses):
     try:
         # Create modified architecture file
         modified_arch_path = create_modified_arch_file(
-            ARCH_PATH, max_parallel_accesses, RUN_DIR
+            ARCH_PATH, max_parallel_accesses, RUN_DIR, calibration_modifier
         )
 
         # Load architecture and network
@@ -82,8 +86,8 @@ def run_single_experiment(max_parallel_accesses):
         chip.load(net)
 
         # Setup performance tracking files
-        perf_filename = f"perf_parallel_{max_parallel_accesses}.csv"
-        messages_filename = f"messages_parallel_{max_parallel_accesses}.csv"
+        perf_filename = f"perf_parallel_{max_parallel_accesses}_{calibration_modifier}.csv"
+        messages_filename = f"messages_parallel_{max_parallel_accesses}_{calibration_modifier}.csv"
         perf_path = os.path.join(RUN_DIR, perf_filename)
         messages_path = os.path.join(RUN_DIR, messages_filename)
 
@@ -94,8 +98,8 @@ def run_single_experiment(max_parallel_accesses):
             perf_trace=perf_path,
             message_trace=messages_path,
             write_trace_headers=True,
-            timing_model="cycle",
-            #timing_model="detailed",
+            # timing_model="cycle",
+            timing_model="detailed",
             processing_threads=8,
             scheduler_threads=1
         )
@@ -113,6 +117,7 @@ def run_single_experiment(max_parallel_accesses):
 
         result = {
             'max_parallel_accesses': max_parallel_accesses,
+            'calibration_modifier': calibration_modifier,
             'total_time': total_time,
             'total_energy': total_energy,
             'total_hops': total_hops,
@@ -145,6 +150,7 @@ def main():
     run_experiments = False
     print("Starting DVS Gesture parallel architecture exploration")
     print(f"Running experiments with max_parallel_accesses values: {PARALLEL_ACCESS_VALUES}")
+    print(f"Running experiments with {SENSITIVITY_MODIFIERS}% for synaptic latency and energy")
     results_path = os.path.join(RUN_DIR, "parallel_exploration_results.csv")
 
     # Ensure run directory exists
@@ -154,10 +160,11 @@ def main():
     if run_experiments:
         # Run experiments in parallel
         results = []
-        for i, max_parallel_accesses in enumerate(PARALLEL_ACCESS_VALUES):
-            print(f"\nProgress: {i+1}/{len(PARALLEL_ACCESS_VALUES)}")
-            result = run_single_experiment(max_parallel_accesses)
-            results.append(result)
+        for calibration_modifier in SENSITIVITY_MODIFIERS:  # % of synaptic energy/latency
+            for i, max_parallel_accesses in enumerate(PARALLEL_ACCESS_VALUES):
+                print(f"\nProgress: {i+1}/{len(PARALLEL_ACCESS_VALUES)}")
+                result = run_single_experiment(max_parallel_accesses, calibration_modifier)
+                results.append(result)
 
         # Sort results by max_parallel_accesses for easier analysis
         results.sort(key=lambda x: x['max_parallel_accesses'])
@@ -202,12 +209,26 @@ def main():
         "pdf.fonttype": 42
     })
 
-    print(results_df)
-    #baseline = results_df[results_df["max_parallel_accesses"] == 1]["total_time"].to_numpy()
-    results_df["speedup"] = 1.0 / results_df["total_time"]
+    # Split by calibration modifier
+    df_80 = results_df[results_df["calibration_modifier"] == 80].sort_values("max_parallel_accesses")
+    df_100 = results_df[results_df["calibration_modifier"] == 100].sort_values("max_parallel_accesses")
+    df_120 = results_df[results_df["calibration_modifier"] == 120].sort_values("max_parallel_accesses")
+    x = df_100["max_parallel_accesses"]
+
+    # --- Latency (Frames/s) plot ---
     fig = plt.figure(figsize=(1.5, 1.5))
-    plt.plot(results_df["max_parallel_accesses"], results_df["speedup"], 'o-',
-             linewidth=1, markersize=2, color='#56B4E9')
+    y_100 = 1.0 / df_100["total_time"].values
+    y_80 = 1.0 / df_80["total_time"].values
+    y_120 = 1.0 / df_120["total_time"].values
+
+    plt.fill_between(x, y_120, y_80, alpha=0.25, color='#56B4E9', linewidth=0)
+    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color='#56B4E9')
+
+    x_val = 4
+    y_val = y_100[x.values == x_val][0]
+    plt.plot([0, x_val], [y_val, y_val], ':', color='gray', linewidth=1.5)
+    plt.plot([x_val, x_val], [plt.ylim()[0], y_val], ':', color='gray', linewidth=1.5)
+
     ax = fig.axes[0]
     ax.ticklabel_format(style='plain', useOffset=False, axis='y')
     plt.xlabel('Max. Parallel Reads')
@@ -215,15 +236,24 @@ def main():
     plt.grid(True, alpha=0.3)
     plt.xticks(range(0, 17, 4))
     plt.xlim((0, 17))
-    plt.ylim((100, 600))
+    plt.ylim((100, 650))
     plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.png"), dpi=300)
     plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.pdf"))
 
-    #baseline = results_df[results_df["max_parallel_accesses"] == 1]["total_energy"].to_numpy()
+    # --- Energy plot ---
     fig = plt.figure(figsize=(1.5, 1.5))
-    plt.plot(results_df["max_parallel_accesses"], results_df["total_energy"] * 1.0e3, 'o-',
-             linewidth=1, markersize=2, color='#56B4E9')
+    e_100 = df_100["total_energy"].values * 1.0e3
+    e_80 = df_80["total_energy"].values * 1.0e3
+    e_120 = df_120["total_energy"].values * 1.0e3
+
+    plt.fill_between(x, np.minimum(e_80, e_120), np.maximum(e_80, e_120),
+                    alpha=0.25, color='#56B4E9', linewidth=0)
+    plt.plot(x, e_100, 'o-', linewidth=1, markersize=2, color='#56B4E9')
+    e_val = e_100[x.values == x_val][0]
+    plt.plot([0, x_val], [e_val, e_val], ':', color='gray', linewidth=1.5)
+    plt.plot([x_val, x_val], [plt.ylim()[0], e_val], ':', color='gray', linewidth=1.5)
+
     ax = fig.axes[0]
     ax.ticklabel_format(style='plain', useOffset=False, axis='y')
     plt.xlabel('Max. Parallel Reads')
@@ -231,7 +261,7 @@ def main():
     plt.grid(True, alpha=0.3)
     plt.xticks(range(0, 17, 4))
     plt.xlim((0, 17))
-    plt.ylim((0.25, 0.45))
+    plt.ylim((0.25, 0.5))
     plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(RUN_DIR, "energy_concurrency.png"), dpi=300)
     plt.savefig(os.path.join(RUN_DIR, "energy_concurrency.pdf"))
