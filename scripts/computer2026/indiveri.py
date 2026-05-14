@@ -14,6 +14,7 @@ import sys
 import dill
 import numpy as np
 import pandas as pd
+import argparse
 # PyTorch and Benchmark data
 import torchvision
 from torchvision import datasets
@@ -25,18 +26,27 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.path import Path
 import matplotlib.patches as patches
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
+
+parser = argparse.ArgumentParser(
+        prog="Loihi-Indiveri",
+        description="Explore mixed-signal architecture with analog neurons.")
+parser.add_argument("run_path", nargs="?",
+                    default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "indiveri"))))
+parser.add_argument("lasana_dir", nargs="?",
+                    default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana")))
+args = parser.parse_args()
+
+RUN_PATH = args.run_path
+LASANA_DIR = args.lasana_dir
+
 # Try importing the installed sanafe library. If not installed, require a
 #  fall-back to a local build of the sanafe Python library
 try:
     import sanafe
 except ImportError:
     # Not installed, fall-back to local build
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
-
-    LASANA_DIR = os.path.abspath(os.path.join(
-        "/", "home", "usr1", "jboyle", "neuro", "lasana"))
-    RUN_PATH =  os.path.abspath((os.path.join(PROJECT_DIR, "runs", "indiveri")))
     print(f"Project dir: {PROJECT_DIR}")
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
@@ -64,8 +74,10 @@ def load_dataset(dataset, analog_neurons):
             torchvision.transforms.Grayscale(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0,), (1,))])
-        test_dataset = datasets.MNIST(root="./runs/indiveri/data", train=False,
-                                      download=True, transform=transform)
+        test_dataset = datasets.MNIST(root=os.path.join(RUN_PATH, "data"),
+                                      train=False,
+                                      download=True,
+                                      transform=transform)
         labels = test_dataset.targets
 
         dataloader = torch.utils.data.DataLoader(
@@ -524,7 +536,8 @@ def plot_shd(timesteps_per_input, labels, weights):
                 print(f"Warning: Group {group_name} not recognized!")
 
     fig = plt.figure(figsize=(7.2, 2.5))
-    gs = GridSpec(2, 1, height_ratios=[1.0, 1.0], hspace=0.1, left=0.06, right=0.94, top=0.99, bottom=0.12)
+    gs = GridSpec(2, 1, height_ratios=[1.0, 1.0], hspace=0.1, left=0.06,
+                  right=0.94, top=0.99, bottom=0.12)
 
     ax_spikes = fig.add_subplot(gs[0])
     ax_spikes.set_xlim((0, raster_total_timesteps))
@@ -556,7 +569,8 @@ def plot_shd(timesteps_per_input, labels, weights):
     ]
     input_codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO]
     input_path = Path(input_verts, input_codes)
-    input_patch = patches.PathPatch(input_path, facecolor='none', edgecolor='k', linewidth=1.0, clip_on=False)
+    input_patch = patches.PathPatch(input_path, facecolor='none', edgecolor='k',
+                                    linewidth=1.0, clip_on=False)
     ax_spikes.add_patch(input_patch)
 
     ax_spikes.text(bracket_x + raster_total_timesteps*0.005, in_neurons/2, 'Input',
@@ -571,7 +585,9 @@ def plot_shd(timesteps_per_input, labels, weights):
     ]
     hidden_codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO]
     hidden_path = Path(hidden_verts, hidden_codes)
-    hidden_patch = patches.PathPatch(hidden_path, facecolor='none', edgecolor='k', linewidth=1.0, clip_on=False)
+    hidden_patch = patches.PathPatch(hidden_path, facecolor='none',
+                                     edgecolor='k', linewidth=1.0,
+                                     clip_on=False)
     ax_spikes.add_patch(hidden_patch)
 
     ax_spikes.text(bracket_x + raster_total_timesteps*0.005, in_neurons + hidden_neurons/2, 'Hidden',
@@ -586,7 +602,8 @@ def plot_shd(timesteps_per_input, labels, weights):
                         style=["--", "-"])
     ax_perf.set_xlim((0, raster_total_timesteps))
     ax_perf.set_xlabel("Time-step")
-    ax_perf.legend(("Loihi", "Loihi-Ind"), fontsize=5, bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
+    ax_perf.legend(("Loihi", "Loihi-Ind"), fontsize=5,
+                   bbox_to_anchor=(0.5, 1.0), handlelength=1.9)
     ax_perf.minorticks_on()
 
     # Currently, I'm not planning to put this figure anywhere. Other data shows
@@ -919,9 +936,7 @@ def plot_mnist(timesteps_per_input, inputs, weights):
     print(f"Mean Loihi time-step latency: {perf_df['sim_time'].mean()}")
     print(f"Total Loihi spikes: {perf_df['spikes'].sum()}")
 
-
-# Rate-encoded MNIST as a toy demo
-#dataset = "mnist"
+# MNIST is the first application
 # Spiking Heidelberg Digits (SHD) is the second neuromorphic application.
 #  I have trained two SNNs for SHD for this script:
 #  The first SNN was trained using a modified LIF (Leaky) behavioral model (that
@@ -933,29 +948,23 @@ def plot_mnist(timesteps_per_input, inputs, weights):
 #  The second SNN was trained using the LASANA model directly (by Jason). This
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
 #   accuracy, which is comparable to the SHD benchmark paper.
-dataset = "shd"
-
 run_experiments = False
 create_plots = True
 
-if dataset == "mnist":
-    #num_inputs = 10
-    #num_inputs = 1
-    num_inputs = 10000 # Entire test set
-    #num_inputs = 100
-elif dataset == "shd":
-    timesteps = None
-    #num_inputs = 1
-    #num_inputs = 10
-    #num_inputs = 100
-    num_inputs = 2264  # Entire test set
+num_mnist_inputs = 10000 # Entire test set
+num_shd_inputs = 2264  # Entire test set
+
 
 if run_experiments:
-    run_experiment(num_inputs, dataset, analog_neurons=True)
-    run_experiment(num_inputs, dataset, analog_neurons=False)
+    run_experiment(num_mnist_inputs, "mnist", analog_neurons=True)
+    run_experiment(num_mnist_inputs, "mnist", analog_neurons=False)
+
+    run_experiment(num_shd_inputs, "shd", analog_neurons=True)
+    run_experiment(num_shd_inputs, "shd", analog_neurons=False)
 
 if create_plots:
-    plot_experiments(dataset)
+    plot_experiments("mnist")
+    plot_experiments("shd")
 
 print("Finished.")
 #plt.show()  # Enable if running on the host and we want to display

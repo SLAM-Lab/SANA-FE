@@ -1,5 +1,10 @@
 """
-DVS Gesture Parallel Runner - Streamlined version for parallel architecture exploration
+Copyright (c) 2026 - The University of Texas at Austin
+This work was produced under contract #2317831 to National Technology and
+Engineering Solutions of Sandia, LLC which is under contract
+No. DE-NA0003525 with the U.S. Department of Energy.
+
+Explore synaptic concurrency within a Loihi-based architecture
 """
 
 import os
@@ -10,7 +15,7 @@ import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 import time
-
+import matplotlib
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
@@ -33,10 +38,11 @@ GENERATED_NETWORK_PATH = os.path.join(RUN_DIR, NETWORK_FILENAME)
 # Simulation parameters
 TIMESTEPS = 128
 PARALLEL_ACCESS_VALUES = list(range(1, 17))  # [1, 2, 3, ..., 16]
-SENSITIVITY_MODIFIERS = (80, 100, 120)  # %
+# PARALLEL_ACCESS_VALUES = list(range(1, 17, 3))  # [1, 2, 3, ..., 16]
+PARALLELIZATION_MODIFIERS = (0, 30, 60, 100)  # %
 
 def create_modified_arch_file(original_arch_path, max_parallel_accesses,
-                              run_dir, calibration_modifier):
+                              run_dir, parallelization_modifier):
     """
     Create a modified architecture YAML file with specified max_parallel_accesses
     """
@@ -52,12 +58,13 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses,
                         PROJECT_DIR, "plugins", "libloihi_synapse.so")
                     synapse['attributes']['model'] = "loihi"
                     synapse['attributes']['max_parallel_accesses'] = max_parallel_accesses
-                    synapse['attributes']['calibration_modifier'] = float(calibration_modifier) / 100.0
+                    synapse['attributes']['parallelizable_ratio'] = float(parallelization_modifier) / 100
+                    synapse['attributes']['duplication_ratio'] = float(parallelization_modifier) / 100
                     del synapse["attributes"]["latency_process_spike"]
                     del synapse["attributes"]["energy_process_spike"]
 
     # Create new filename
-    new_arch_filename = f"loihi_parallel_{max_parallel_accesses}_{calibration_modifier}.yaml"
+    new_arch_filename = f"loihi_parallel_{max_parallel_accesses}_{parallelization_modifier}.yaml"
     new_arch_path = os.path.join(run_dir, new_arch_filename)
 
     # Save modified architecture file
@@ -67,7 +74,7 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses,
     return new_arch_path
 
 
-def run_single_experiment(max_parallel_accesses, calibration_modifier):
+def run_single_experiment(max_parallel_accesses, parallelization_modifier):
     """
     Run a single experiment with specified max_parallel_accesses value
     """
@@ -76,7 +83,7 @@ def run_single_experiment(max_parallel_accesses, calibration_modifier):
     try:
         # Create modified architecture file
         modified_arch_path = create_modified_arch_file(
-            ARCH_PATH, max_parallel_accesses, RUN_DIR, calibration_modifier
+            ARCH_PATH, max_parallel_accesses, RUN_DIR, parallelization_modifier
         )
 
         # Load architecture and network
@@ -86,8 +93,8 @@ def run_single_experiment(max_parallel_accesses, calibration_modifier):
         chip.load(net)
 
         # Setup performance tracking files
-        perf_filename = f"perf_parallel_{max_parallel_accesses}_{calibration_modifier}.csv"
-        messages_filename = f"messages_parallel_{max_parallel_accesses}_{calibration_modifier}.csv"
+        perf_filename = f"perf_parallel_{max_parallel_accesses}_{parallelization_modifier}.csv"
+        messages_filename = f"messages_parallel_{max_parallel_accesses}_{parallelization_modifier}.csv"
         perf_path = os.path.join(RUN_DIR, perf_filename)
         messages_path = os.path.join(RUN_DIR, messages_filename)
 
@@ -98,7 +105,6 @@ def run_single_experiment(max_parallel_accesses, calibration_modifier):
             perf_trace=perf_path,
             message_trace=messages_path,
             write_trace_headers=True,
-            # timing_model="cycle",
             timing_model="detailed",
             processing_threads=8,
             scheduler_threads=1
@@ -117,7 +123,7 @@ def run_single_experiment(max_parallel_accesses, calibration_modifier):
 
         result = {
             'max_parallel_accesses': max_parallel_accesses,
-            'calibration_modifier': calibration_modifier,
+            'parallelization_modifier': parallelization_modifier,
             'total_time': total_time,
             'total_energy': total_energy,
             'total_hops': total_hops,
@@ -150,7 +156,7 @@ def main():
     run_experiments = False
     print("Starting DVS Gesture parallel architecture exploration")
     print(f"Running experiments with max_parallel_accesses values: {PARALLEL_ACCESS_VALUES}")
-    print(f"Running experiments with {SENSITIVITY_MODIFIERS}% for synaptic latency and energy")
+    print(f"Running experiments with {PARALLELIZATION_MODIFIERS}% parallelization")
     results_path = os.path.join(RUN_DIR, "parallel_exploration_results.csv")
 
     # Ensure run directory exists
@@ -160,10 +166,10 @@ def main():
     if run_experiments:
         # Run experiments in parallel
         results = []
-        for calibration_modifier in SENSITIVITY_MODIFIERS:  # % of synaptic energy/latency
+        for p in PARALLELIZATION_MODIFIERS:  # % of synaptic energy/latency
             for i, max_parallel_accesses in enumerate(PARALLEL_ACCESS_VALUES):
                 print(f"\nProgress: {i+1}/{len(PARALLEL_ACCESS_VALUES)}")
-                result = run_single_experiment(max_parallel_accesses, calibration_modifier)
+                result = run_single_experiment(max_parallel_accesses, p)
                 results.append(result)
 
         # Sort results by max_parallel_accesses for easier analysis
@@ -210,19 +216,31 @@ def main():
     })
 
     # Split by calibration modifier
-    df_80 = results_df[results_df["calibration_modifier"] == 80].sort_values("max_parallel_accesses")
-    df_100 = results_df[results_df["calibration_modifier"] == 100].sort_values("max_parallel_accesses")
-    df_120 = results_df[results_df["calibration_modifier"] == 120].sort_values("max_parallel_accesses")
+    df_0 = results_df[results_df["parallelization_modifier"] == 0].sort_values("parallelization_modifier")
+    df_30 = results_df[results_df["parallelization_modifier"] == 30].sort_values("parallelization_modifier")
+    df_60 = results_df[results_df["parallelization_modifier"] == 60].sort_values("parallelization_modifier")
+    df_100 = results_df[results_df["parallelization_modifier"] == 100].sort_values("parallelization_modifier")
     x = df_100["max_parallel_accesses"]
 
     # --- Latency (Frames/s) plot ---
     fig = plt.figure(figsize=(1.5, 1.5))
+    y_0 = 1.0 / df_0["total_time"].values
+    y_30 = 1.0 / df_30["total_time"].values
+    y_60 = 1.0 / df_60["total_time"].values
     y_100 = 1.0 / df_100["total_time"].values
-    y_80 = 1.0 / df_80["total_time"].values
-    y_120 = 1.0 / df_120["total_time"].values
 
-    plt.fill_between(x, y_120, y_80, alpha=0.25, color='#56B4E9', linewidth=0)
-    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color='#56B4E9')
+    colors = ['black']  # S=0 gets black
+    n_lines = len(PARALLELIZATION_MODIFIERS)
+    if n_lines > 1:
+        hm = matplotlib.colormaps.get_cmap('Blues').resampled(n_lines - 1)
+        blues_colors = [hm(0.5 + 0.5 * (n_lines - 2 - i) / max(1, n_lines - 2)) for i in range(n_lines - 1)]
+    colors.extend(blues_colors)
+
+    plt.fill_between(x, y_30, y_100, alpha=0.25, color='#56B4E9', linewidth=0)
+    #plt.plot(x, y_0, 'o-', linewidth=1, markersize=2, color=colors[0])
+    plt.plot(x, y_30, 'o-', linewidth=1, markersize=2, color=colors[0])
+    plt.plot(x, y_60, 'o-', linewidth=1, markersize=2, color=colors[2])
+    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color=colors[3])
 
     x_val = 4
     y_val = y_100[x.values == x_val][0]
@@ -231,42 +249,59 @@ def main():
 
     ax = fig.axes[0]
     ax.ticklabel_format(style='plain', useOffset=False, axis='y')
+    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     plt.xlabel('Max. Parallel Reads')
     plt.ylabel('Simulated Frames/s')
     plt.grid(True, alpha=0.3)
     plt.xticks(range(0, 17, 4))
     plt.xlim((0, 17))
-    plt.ylim((100, 650))
+    plt.ylim((50, 650))
+
+    # Annotate each line at the right end with colored text
+    plt.text(13, y_30[-1]+25, '$p=0.3$', color=colors[0], fontsize=5, va='center')
+    plt.text(13, y_60[-1]+25, '$p=0.6$', color=colors[2], fontsize=5, va='center')
+    plt.text(13, y_100[-1]+25, '$p=1.0$', color=colors[3], fontsize=5, va='center')
+
     plt.tight_layout(pad=0.1)
-    plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.png"), dpi=300)
-    plt.savefig(os.path.join(RUN_DIR, "latency_concurrency.pdf"))
+    plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.pdf"))
 
     # --- Energy plot ---
     fig = plt.figure(figsize=(1.5, 1.5))
+    e_0 = df_0["total_energy"].values * 1.0e3
+    e_30 = df_30["total_energy"].values * 1.0e3
+    e_60 = df_60["total_energy"].values * 1.0e3
     e_100 = df_100["total_energy"].values * 1.0e3
-    e_80 = df_80["total_energy"].values * 1.0e3
-    e_120 = df_120["total_energy"].values * 1.0e3
 
-    plt.fill_between(x, np.minimum(e_80, e_120), np.maximum(e_80, e_120),
+    plt.fill_between(x, np.minimum(e_30, e_100), np.maximum(e_30, e_100),
                     alpha=0.25, color='#56B4E9', linewidth=0)
-    plt.plot(x, e_100, 'o-', linewidth=1, markersize=2, color='#56B4E9')
-    e_val = e_100[x.values == x_val][0]
+    # plt.plot(x, e_0, 'o-', linewidth=1, markersize=2, color="gray")
+    plt.plot(x, e_30, 'o-', linewidth=1, markersize=2, color=colors[3])
+    plt.plot(x, e_60, 'o-', linewidth=1, markersize=2, color=colors[2])
+    plt.plot(x, e_100, 'o-', linewidth=1, markersize=2, color=colors[0])
+    e_val = e_30[x.values == x_val][0]
     plt.plot([0, x_val], [e_val, e_val], ':', color='gray', linewidth=1.5)
     plt.plot([x_val, x_val], [plt.ylim()[0], e_val], ':', color='gray', linewidth=1.5)
 
     ax = fig.axes[0]
     ax.ticklabel_format(style='plain', useOffset=False, axis='y')
+    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     plt.xlabel('Max. Parallel Reads')
     plt.ylabel('H/W Energy Usage (mJ)')
     plt.grid(True, alpha=0.3)
     plt.xticks(range(0, 17, 4))
     plt.xlim((0, 17))
-    plt.ylim((0.25, 0.5))
-    plt.tight_layout(pad=0.1)
-    plt.savefig(os.path.join(RUN_DIR, "energy_concurrency.png"), dpi=300)
-    plt.savefig(os.path.join(RUN_DIR, "energy_concurrency.pdf"))
+    plt.ylim((0.2, 0.75))
 
-    plt.show()
+    plt.text(6.5, e_100[-1]+0.03, '$s=E_{\\mathrm{static}}/E_{\\mathrm{total}}=1.0$', color=colors[0], fontsize=5, va='center')
+    plt.text(13.3, e_60[-1]+0.03, '$s=0.6$', color=colors[2], fontsize=5, va='center')
+    plt.text(13.3, e_30[-1]+0.03, '$s=0.3$', color=colors[3], fontsize=5, va='center')
+
+    plt.tight_layout(pad=0.1)
+    plt.savefig(os.path.join(RUN_DIR, "fig_5b_concurrency_loihi_energy.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_DIR, "fig_5b_concurrency_loihi_energy.pdf"))
+
+    # plt.show()
     print(results_df)
 
 
