@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("run_path", nargs="?",
                     default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "crossbar"))))
 parser.add_argument("lasana_dir", nargs="?",
-                    default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana")))
+                    default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana", "build")))
 args = parser.parse_args()
 
 RUN_PATH = args.run_path
@@ -1032,7 +1032,7 @@ def plot_mnist(num_inputs):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
 
     num_shd_inputs = 2264  # Number of inferences

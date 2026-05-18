@@ -39,7 +39,7 @@ GENERATED_NETWORK_PATH = os.path.join(RUN_DIR, NETWORK_FILENAME)
 TIMESTEPS = 128
 PARALLEL_ACCESS_VALUES = list(range(1, 17))  # [1, 2, 3, ..., 16]
 # PARALLEL_ACCESS_VALUES = list(range(1, 17, 3))  # [1, 2, 3, ..., 16]
-PARALLELIZATION_MODIFIERS = (0, 30, 60, 100)  # %
+PARALLELIZATION_MODIFIERS = (0, 25, 30, 50, 60, 75, 90, 100)  # %
 
 def create_modified_arch_file(original_arch_path, max_parallel_accesses,
                               run_dir, parallelization_modifier):
@@ -217,30 +217,34 @@ def main():
 
     # Split by calibration modifier
     df_0 = results_df[results_df["parallelization_modifier"] == 0].sort_values("parallelization_modifier")
+    df_25 = results_df[results_df["parallelization_modifier"] == 25].sort_values("parallelization_modifier")
     df_30 = results_df[results_df["parallelization_modifier"] == 30].sort_values("parallelization_modifier")
+    df_50 = results_df[results_df["parallelization_modifier"] == 50].sort_values("parallelization_modifier")
     df_60 = results_df[results_df["parallelization_modifier"] == 60].sort_values("parallelization_modifier")
+    df_75 = results_df[results_df["parallelization_modifier"] == 75].sort_values("parallelization_modifier")
+    df_90 = results_df[results_df["parallelization_modifier"] == 90].sort_values("parallelization_modifier")
     df_100 = results_df[results_df["parallelization_modifier"] == 100].sort_values("parallelization_modifier")
     x = df_100["max_parallel_accesses"]
 
     # --- Latency (Frames/s) plot ---
     fig = plt.figure(figsize=(1.5, 1.5))
     y_0 = 1.0 / df_0["total_time"].values
-    y_30 = 1.0 / df_30["total_time"].values
-    y_60 = 1.0 / df_60["total_time"].values
+    y_25 = 1.0 / df_25["total_time"].values
+    y_50 = 1.0 / df_50["total_time"].values
+    y_75 = 1.0 / df_75["total_time"].values
     y_100 = 1.0 / df_100["total_time"].values
 
-    colors = ['black']  # S=0 gets black
-    n_lines = len(PARALLELIZATION_MODIFIERS)
-    if n_lines > 1:
-        hm = matplotlib.colormaps.get_cmap('Blues').resampled(n_lines - 1)
-        blues_colors = [hm(0.5 + 0.5 * (n_lines - 2 - i) / max(1, n_lines - 2)) for i in range(n_lines - 1)]
-    colors.extend(blues_colors)
+    n_blues = 3
+    blues_colors = [matplotlib.colormaps['Blues'](v) for v in np.linspace(0.6, 0.9, n_blues)]
+    colors = blues_colors
+    colors.extend(['black',])
 
-    plt.fill_between(x, y_30, y_100, alpha=0.25, color='#56B4E9', linewidth=0)
+    plt.fill_between(x, y_25, y_100, alpha=0.25, color='#56B4E9', linewidth=0)
     #plt.plot(x, y_0, 'o-', linewidth=1, markersize=2, color=colors[0])
-    plt.plot(x, y_30, 'o-', linewidth=1, markersize=2, color=colors[0])
-    plt.plot(x, y_60, 'o-', linewidth=1, markersize=2, color=colors[2])
-    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color=colors[3])
+    plt.plot(x, y_25, 'o-', linewidth=1, markersize=2, color=colors[3])
+    plt.plot(x, y_50, 'o-', linewidth=1, markersize=2, color=colors[2])
+    plt.plot(x, y_75, 'o-', linewidth=1, markersize=2, color=colors[1])
+    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color=colors[0])
 
     x_val = 4
     y_val = y_100[x.values == x_val][0]
@@ -258,27 +262,34 @@ def main():
     plt.ylim((50, 650))
 
     # Annotate each line at the right end with colored text
-    plt.text(13, y_30[-1]+25, '$p=0.3$', color=colors[0], fontsize=5, va='center')
-    plt.text(13, y_60[-1]+25, '$p=0.6$', color=colors[2], fontsize=5, va='center')
-    plt.text(13, y_100[-1]+25, '$p=1.0$', color=colors[3], fontsize=5, va='center')
+    plt.text(17, y_25[-1]-35, '$p=0.25$', color=colors[3], fontsize=6, va='center', ha='right')
+    plt.text(17, y_50[-1]+16, '$p=0.50$', color=colors[2], fontsize=6, va='center', ha='right')
+    plt.text(17, y_75[-1]+25, '$p=0.75$', color=colors[1], fontsize=6, va='center', ha='right')
+    plt.text(17, y_100[-1]+25, '$p=1.00$', color=colors[0], fontsize=6, va='center', ha='right')
 
     plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.png"), dpi=300)
     plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.pdf"))
 
     # --- Energy plot ---
+    n_blues = 2
+    blues_colors = [matplotlib.colormaps['Blues'](v) for v in np.linspace(0.6, 0.9, n_blues)]
+    colors = blues_colors
+    colors.extend(['black',])  # S=0 gets black
+
+
     fig = plt.figure(figsize=(1.5, 1.5))
     e_0 = df_0["total_energy"].values * 1.0e3
     e_30 = df_30["total_energy"].values * 1.0e3
     e_60 = df_60["total_energy"].values * 1.0e3
-    e_100 = df_100["total_energy"].values * 1.0e3
+    e_90 = df_90["total_energy"].values * 1.0e3
 
-    plt.fill_between(x, np.minimum(e_30, e_100), np.maximum(e_30, e_100),
+    plt.fill_between(x, np.minimum(e_30, e_90), np.maximum(e_30, e_90),
                     alpha=0.25, color='#56B4E9', linewidth=0)
     # plt.plot(x, e_0, 'o-', linewidth=1, markersize=2, color="gray")
-    plt.plot(x, e_30, 'o-', linewidth=1, markersize=2, color=colors[3])
-    plt.plot(x, e_60, 'o-', linewidth=1, markersize=2, color=colors[2])
-    plt.plot(x, e_100, 'o-', linewidth=1, markersize=2, color=colors[0])
+    plt.plot(x, e_90, 'o-', linewidth=1, markersize=2, color=colors[2])
+    plt.plot(x, e_60, 'o-', linewidth=1, markersize=2, color=colors[1])
+    plt.plot(x, e_30, 'o-', linewidth=1, markersize=2, color=colors[0])
     e_val = e_30[x.values == x_val][0]
     plt.plot([0, x_val], [e_val, e_val], ':', color='gray', linewidth=1.5)
     plt.plot([x_val, x_val], [plt.ylim()[0], e_val], ':', color='gray', linewidth=1.5)
@@ -290,12 +301,12 @@ def main():
     plt.ylabel('H/W Energy Usage (mJ)')
     plt.grid(True, alpha=0.3)
     plt.xticks(range(0, 17, 4))
-    plt.xlim((0, 17))
+    plt.xlim((0, 18))
     plt.ylim((0.2, 0.75))
 
-    plt.text(6.5, e_100[-1]+0.03, '$s=E_{\\mathrm{static}}/E_{\\mathrm{total}}=1.0$', color=colors[0], fontsize=5, va='center')
-    plt.text(13.3, e_60[-1]+0.03, '$s=0.6$', color=colors[2], fontsize=5, va='center')
-    plt.text(13.3, e_30[-1]+0.03, '$s=0.3$', color=colors[3], fontsize=5, va='center')
+    plt.text(18, e_90[-1]+0.022, '$s=E_{\\mathrm{static}}/E_{\\mathrm{total}}=0.9$', color=colors[2], fontsize=6, va='center', ha='right')
+    plt.text(18, e_60[-1]+0.022, '$s=0.6$', color=colors[1], fontsize=6, va='center', ha='right')
+    plt.text(18, e_30[-1]+0.022, '$s=0.3$', color=colors[0], fontsize=6, va='center', ha='right')
 
     plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(RUN_DIR, "fig_5b_concurrency_loihi_energy.png"), dpi=300)

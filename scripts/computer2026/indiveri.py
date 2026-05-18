@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("run_path", nargs="?",
                     default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "indiveri"))))
 parser.add_argument("lasana_dir", nargs="?",
-                    default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana")))
+                    default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana", "build")))
 args = parser.parse_args()
 
 RUN_PATH = args.run_path
