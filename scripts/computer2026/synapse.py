@@ -45,11 +45,12 @@ args = parser.parse_args()
 # Configuration
 ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net.tagged"
+DATA_PATH = args.data_path
 RUN_DIR = args.run_path
 RUN_EXPERIMENTS = args.run
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
-GENERATED_NETWORK_PATH = os.path.join(RUN_DIR, NETWORK_FILENAME)
+GENERATED_NETWORK_PATH = os.path.join(DATA_PATH, NETWORK_FILENAME)
 
 # Simulation parameters
 TIMESTEPS = 128
