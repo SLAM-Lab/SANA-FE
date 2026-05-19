@@ -1032,7 +1032,7 @@ def plot_mnist(num_inputs):
 
 
 if __name__ == "__main__":
-    run_experiments = True
+    run_experiments = False
     plot_experiments = True
 
     num_shd_inputs = 2264  # Number of inferences

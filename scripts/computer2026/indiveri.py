@@ -52,7 +52,7 @@ except ImportError:
     import sanafe
 
 
-def load_dataset(dataset, analog_neurons):
+def load_dataset(num_inputs, dataset, analog_neurons):
     if dataset == "mnist":
         weights = {}
         # Load the MNIST torch network, which is the same for both Loihi and
@@ -271,7 +271,7 @@ def create_net(arch, dataset, weights, analog_neurons):
 def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
     print(f"Loading models for {dataset}")
 
-    inputs, labels, weights = load_dataset(dataset, analog_neurons)
+    inputs, labels, weights = load_dataset(num_inputs, dataset, analog_neurons)
     # Load the LASAGNA architecture with analog neurons
     arch = sanafe.load_arch(
         os.path.abspath(os.path.join(LASANA_DIR, "indiveri", "lasana.yaml")))
@@ -364,11 +364,11 @@ def calculate_cumulative_spikes(out_spikes, out_neurons, total_timesteps,
 
 # We can store the spike and perf data somewhere in the run directory, and plot from this
 
-def calculate_accuracy(dataset, analog_neurons, timesteps_per_input):
+def calculate_accuracy(num_inputs, dataset, analog_neurons, timesteps_per_input):
     arch = "analog" if analog_neurons else "loihi"
     print(f"Calculating accuracy for {arch} architecture")
 
-    _, labels, weights = load_dataset(dataset, analog_neurons)
+    _, labels, weights = load_dataset(num_inputs, dataset, analog_neurons)
     in_neurons = weights["fc1.weight"].shape[1]
     hidden_neurons = weights["fc1.weight"].shape[0]
     out_neurons = weights["fc2.weight"].shape[0]
@@ -455,7 +455,7 @@ okabe_ito_colors = [
 ]
 
 
-def plot_experiments(dataset):
+def plot_experiments(num_inputs, dataset):
     # Plot both sets of experiments:
     #  Raster plot of a small number of inputs e.g. 10 inputs
     #  Time series plot of a small number of inputs
@@ -465,19 +465,19 @@ def plot_experiments(dataset):
         os.path.join(RUN_PATH, f"indiveri_{dataset}.csv"),
         dtype=int, ndmin=1))
 
-    inputs, labels, weights = load_dataset(dataset, True)
+    inputs, labels, weights = load_dataset(num_inputs, dataset, True)
     # Not using the plots in the paper for now
     if dataset == "shd":
-        plot_shd(timesteps_per_input, labels, weights)
+        plot_shd(num_inputs, timesteps_per_input, labels, weights)
     elif dataset == "mnist":
-        plot_mnist(timesteps_per_input[0], inputs, weights)
+        plot_mnist(num_inputs, timesteps_per_input[0], inputs, weights)
 
     # Calculate accuracy for both sets of runs
-    calculate_accuracy(dataset, True, timesteps_per_input)
-    calculate_accuracy(dataset, False, timesteps_per_input)
+    calculate_accuracy(num_inputs, dataset, True, timesteps_per_input)
+    calculate_accuracy(num_inputs, dataset, False, timesteps_per_input)
 
 
-def plot_shd(timesteps_per_input, labels, weights):
+def plot_shd(num_inputs, timesteps_per_input, labels, weights):
     analog_spike_filename = f"spikes_analog_shd.csv"
     analog_perf_filename = f"perf_analog_shd.csv"
     analog_potential_filename = f"potential_analog_shd.csv"
@@ -769,7 +769,7 @@ def plot_shd(timesteps_per_input, labels, weights):
     plt.savefig(os.path.join(RUN_PATH, "shd.png"), dpi=300)
 
 
-def plot_mnist(timesteps_per_input, inputs, weights):
+def plot_mnist(num_inputs, timesteps_per_input, inputs, weights):
     spike_filename = f"spikes_analog_mnist.csv"
     perf_filename = f"perf_analog_mnist.csv"
 
@@ -963,8 +963,8 @@ if run_experiments:
     run_experiment(num_shd_inputs, "shd", analog_neurons=False)
 
 if create_plots:
-    plot_experiments("mnist")
-    plot_experiments("shd")
+    plot_experiments(num_mnist_inputs, "mnist")
+    plot_experiments(num_shd_inputs, "shd")
 
 print("Finished.")
 #plt.show()  # Enable if running on the host and we want to display
