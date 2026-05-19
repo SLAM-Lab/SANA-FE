@@ -16,6 +16,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import time
 import matplotlib
+import argparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
@@ -27,10 +28,22 @@ except ImportError:
     sys.path.insert(0, PROJECT_DIR)
     import sanafe
 
+parser = argparse.ArgumentParser(
+        prog="Synaptic-concurrency",
+        description="Explore impact of synaptic concurrency on Loihi.")
+parser.add_argument("data_path", nargs="?",
+                    default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "synapse"))))
+parser.add_argument("run_path", nargs="?",
+                    default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "synapse"))))
+parser.add_argument("--run", action="store_true")
+
+args = parser.parse_args()
+
 # Configuration
 ARCH_FILENAME = "loihi.yaml"
 NETWORK_FILENAME = "dvs_gesture_32x32.net.tagged"
-RUN_DIR = os.path.join(PROJECT_DIR, "runs", "synapse")
+RUN_DIR = args.run_path
+RUN_EXPERIMENTS = args.run
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
 GENERATED_NETWORK_PATH = os.path.join(RUN_DIR, NETWORK_FILENAME)
@@ -38,7 +51,6 @@ GENERATED_NETWORK_PATH = os.path.join(RUN_DIR, NETWORK_FILENAME)
 # Simulation parameters
 TIMESTEPS = 128
 PARALLEL_ACCESS_VALUES = list(range(1, 17))  # [1, 2, 3, ..., 16]
-# PARALLEL_ACCESS_VALUES = list(range(1, 17, 3))  # [1, 2, 3, ..., 16]
 PARALLELIZATION_MODIFIERS = (0, 25, 30, 50, 60, 75, 90, 100)  # %
 
 def create_modified_arch_file(original_arch_path, max_parallel_accesses,
@@ -153,7 +165,6 @@ def main():
     """
     Main function to run parallel experiments
     """
-    run_experiments = False
     print("Starting DVS Gesture parallel architecture exploration")
     print(f"Running experiments with max_parallel_accesses values: {PARALLEL_ACCESS_VALUES}")
     print(f"Running experiments with {PARALLELIZATION_MODIFIERS}% parallelization")
@@ -163,7 +174,7 @@ def main():
     os.makedirs(RUN_DIR, exist_ok=True)
 
     sweep_start = time.perf_counter()
-    if run_experiments:
+    if RUN_EXPERIMENTS:
         # Run experiments in parallel
         results = []
         for p in PARALLELIZATION_MODIFIERS:  # % of synaptic energy/latency
