@@ -45,7 +45,6 @@ args = parser.parse_args()
 
 DATA_PATH = args.data_path
 RUN_PATH = args.run_path
-RUN_PATH = "tmp"
 LASANA_DIR = args.lasana_dir
 QUICK_RUN = args.quick
 RUN_EXPERIMENTS = args.run
