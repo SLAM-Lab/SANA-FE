@@ -722,8 +722,7 @@ def run_mnist(num_inputs, analog_synapses=True, timesteps=100):
         #  (normal digital) synapses
         snn = torch.load(
                 os.path.join(DATA_PATH, "app_models", "mnist_400_128_84_10.pt"),
-                pickle_module=dill,
-                map_location=torch.device("cpu")).state_dict()
+                weights_only=True)
 
     weights = {}
     if analog_synapses:
