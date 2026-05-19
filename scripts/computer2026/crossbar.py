@@ -23,14 +23,23 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
 parser = argparse.ArgumentParser(
         prog="Loihi-Indiveri",
         description="Explore mixed-signal architecture with analog crossbar synapses.")
+parser.add_argument("data_path", nargs="?",
+                    default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "combined"))))
 parser.add_argument("run_path", nargs="?",
                     default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "crossbar"))))
 parser.add_argument("lasana_dir", nargs="?",
                     default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana", "build")))
+parser.add_argument("--quick", action="store_true")
+parser.add_argument("--run", action="store_true")
+parser.add_argument("--plot", action="store_true")
 args = parser.parse_args()
 
+DATA_PATH = args.data_path
 RUN_PATH = args.run_path
 LASANA_DIR = args.lasana_dir
+QUICK_RUN = args.quick
+RUN_EXPERIMENTS = args.run
+PLOT_EXPERIMENTS = args.plot
 
 # Try importing the installed sanafe library. If not installed, require a
 #  fall-back to a local build of the sanafe Python library
@@ -91,13 +100,13 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
             break
 
     if analog_synapses:
-        snn_path = os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_aware.pt")
+        snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_aware.pt")
         snn = torch.load(snn_path, pickle_module=dill,
                          map_location=torch.device("cpu")).state_dict()
     else:
         # Load a normally trained rate-coded SHD model to deploy on Loihi's
         #  (digital, full-precision) synapses
-        snn_path = os.path.join(RUN_PATH, "app_models", "shd_70_256R_20.pt")
+        snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20.pt")
         snn = torch.load(snn_path, pickle_module=dill,
                          map_location=torch.device("cpu")).state_dict()
 
@@ -331,14 +340,14 @@ def load_dataset(num_inputs, analog_neurons=True):
         # Use a SNN trained using circuit-aware methods i.e. was
         #  trained specifically on an IMAC-sim crossbar model.
         spiking_digits_model = torch.load(
-                os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_aware.pt"),
+                os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_aware.pt"),
                 map_location=torch.device("cpu")).state_dict()
 
         for attribute_name, param in spiking_digits_model.items():
             weights[attribute_name] = param.detach().numpy()
     else: # Use digital LIF neuron models
         # Use an SNN trained on a normal (linear) synapses
-        spiking_digits_model = torch.load(os.path.join(RUN_PATH, "app_models", "shd_70_256R_20.pt"))
+        spiking_digits_model = torch.load(os.path.join(DATA_PATH, "app_models", "shd_70_256R_20.pt"))
 
         #for attribute_name, param in spiking_digits.named_parameters():
         #    weights[attribute_name] = param.detach().numpy()
@@ -1003,25 +1012,25 @@ def plot_mnist(num_inputs):
     print(f"Mean Crossbar firing neurons: {analog_perf_df['fired'].mean()}")
     print(f"Total Crossbar spikes: {analog_perf_df['spikes'].sum()}")
 
-    print("***")
-    mean_energy = loihi_perf_df['total_energy'].mean()
-    print(f"Mean Total Loihi energy: {loihi_perf_df['total_energy'].mean()} J (100 %)")
-    print(f"Mean Soma Loihi energy: {loihi_perf_df['soma_energy'].mean()} J ({100.0 * loihi_perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Mean Synapse Loihi energy: {loihi_perf_df['synapse_energy'].mean()} J ({100.0 * loihi_perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Mean Network Loihi energy: {loihi_perf_df['network_energy'].mean()} J ({100.0 * loihi_perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Mean Loihi firing neurons: {loihi_perf_df['fired'].mean()}")
-    print(f"Total Loihi spikes: {loihi_perf_df['fired'].sum()}")
+    # print("***")
+    # mean_energy = loihi_perf_df['total_energy'].mean()
+    # print(f"Mean Total Loihi energy: {loihi_perf_df['total_energy'].mean()} J (100 %)")
+    # print(f"Mean Soma Loihi energy: {loihi_perf_df['soma_energy'].mean()} J ({100.0 * loihi_perf_df['soma_energy'].mean() / mean_energy} %)")
+    # print(f"Mean Synapse Loihi energy: {loihi_perf_df['synapse_energy'].mean()} J ({100.0 * loihi_perf_df['synapse_energy'].mean() / mean_energy} %)")
+    # print(f"Mean Network Loihi energy: {loihi_perf_df['network_energy'].mean()} J ({100.0 * loihi_perf_df['network_energy'].mean() / mean_energy} %)")
+    # print(f"Mean Loihi firing neurons: {loihi_perf_df['fired'].mean()}")
+    # print(f"Total Loihi spikes: {loihi_perf_df['fired'].sum()}")
 
     print("***********")
     print("Per-inference results")
-    mean_energy = loihi_perf_df['total_energy'].sum() / num_inputs
-    print(f"Per-inference Total Loihi energy: {loihi_perf_df['total_energy'].sum() / num_inputs} J (100 %)")
-    print(f"Per-inference Soma Loihi energy: {loihi_perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * loihi_perf_df['soma_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Synapse Loihi energy: {loihi_perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * loihi_perf_df['synapse_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Network Loihi energy: {loihi_perf_df['network_energy'].sum() / num_inputs} J ({100.0 * loihi_perf_df['network_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Loihi firing neurons: {loihi_perf_df['fired'].sum()}")
-    print(f"Per-inference Crossbar latency: {loihi_perf_df['sim_time'].sum() / num_inputs}")
-    print("***")
+    # mean_energy = loihi_perf_df['total_energy'].sum() / num_inputs
+    # print(f"Per-inference Total Loihi energy: {loihi_perf_df['total_energy'].sum() / num_inputs} J (100 %)")
+    # print(f"Per-inference Soma Loihi energy: {loihi_perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * loihi_perf_df['soma_energy'].sum() / (num_inputs * mean_energy)} %)")
+    # print(f"Per-inference Synapse Loihi energy: {loihi_perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * loihi_perf_df['synapse_energy'].sum() / (num_inputs * mean_energy)} %)")
+    # print(f"Per-inference Network Loihi energy: {loihi_perf_df['network_energy'].sum() / num_inputs} J ({100.0 * loihi_perf_df['network_energy'].sum() / (num_inputs * mean_energy)} %)")
+    # print(f"Per-inference Loihi firing neurons: {loihi_perf_df['fired'].sum()}")
+    # print(f"Per-inference Crossbar latency: {loihi_perf_df['sim_time'].sum() / num_inputs}")
+    # print("***")
     mean_energy = analog_perf_df['total_energy'].sum() / num_inputs
     print(f"Per-inference Total Crossbar energy: {mean_energy} J (100 %)")
     print(f"Per-inference Soma Crossbar energy: {analog_perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['soma_energy'].sum() / (num_inputs * mean_energy)} %)")
@@ -1032,20 +1041,22 @@ def plot_mnist(num_inputs):
 
 
 if __name__ == "__main__":
-    run_experiments = False
-    plot_experiments = True
+    print(f"Launching Loihi-IMAC, run:{RUN_EXPERIMENTS} plot:{PLOT_EXPERIMENTS}")
+    if QUICK_RUN:
+        num_shd_inputs = 100
+        num_mnist_inputs = 100
+    else:
+        num_shd_inputs = 2264  # Number of inferences
+        num_mnist_inputs = 10000
 
-    num_shd_inputs = 2264  # Number of inferences
-    num_mnist_inputs = 10000
-
-    if run_experiments:
+    if RUN_EXPERIMENTS:
         run_spiking_digits(num_inputs=num_shd_inputs, analog_synapses=True)
         run_spiking_digits(num_inputs=num_shd_inputs, analog_synapses=False)
 
         run_mnist(num_inputs=num_mnist_inputs, analog_synapses=False, timesteps=100)
         run_mnist(num_inputs=num_mnist_inputs, analog_synapses=True, timesteps=100)
 
-    if plot_experiments:
+    if PLOT_EXPERIMENTS:
         calculate_shd_accuracy(num_inputs=num_shd_inputs, analog_synapses=True)
         calculate_shd_accuracy(num_inputs=num_shd_inputs, analog_synapses=False)
 

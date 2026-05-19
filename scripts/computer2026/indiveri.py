@@ -36,10 +36,16 @@ parser.add_argument("run_path", nargs="?",
                     default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "indiveri"))))
 parser.add_argument("lasana_dir", nargs="?",
                     default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana", "build")))
+parser.add_argument("--quick", action="store_true")
+parser.add_argument("--run", action="store_true")
+parser.add_argument("--plot", action="store_true")
 args = parser.parse_args()
 
 RUN_PATH = args.run_path
 LASANA_DIR = args.lasana_dir
+QUICK_RUN = args.quick
+RUN_EXPERIMENTS = args.run
+PLOT_EXPERIMENTS = args.plot
 
 # Try importing the installed sanafe library. If not installed, require a
 #  fall-back to a local build of the sanafe Python library
@@ -672,12 +678,12 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
     avg_indiveri_spikes = (sum(m['indiveri_spikes'] / spiking_neurons for m in per_input_metrics)) / num_inputs
     avg_indiveri_latency = (sum(m['indiveri_latency'] for m in per_input_metrics)) / num_inputs
 
-    print(f"Indiveri - Avg total energy per inference: {avg_indiveri_total:.6e} J (100.0 %)")
-    print(f"Indiveri - Avg synapse energy per inference: {avg_indiveri_synapse:.6e} J ({100.0 * avg_indiveri_synapse / avg_indiveri_total:.1f} %)")
-    print(f"Indiveri - Avg soma energy per inference: {avg_indiveri_soma:.6e} J ({100.0 * avg_indiveri_soma / avg_indiveri_total:.1f} %)")
-    print(f"Indiveri - Avg network energy per inference: {avg_indiveri_network:.6e} J ({100.0 * avg_indiveri_network / avg_indiveri_total:.1f} %)")
-    print(f"Indiveri - Avg spikes out per neuron per inference: {avg_indiveri_spikes:.1f}")
-    print(f"Indiveri - Avg inference latency: {avg_indiveri_latency:.6e}")
+    print(f"Loihi-Indiveri - Avg total energy per inference: {avg_indiveri_total:.6e} J (100.0 %)")
+    print(f"Loihi-Indiveri - Avg synapse energy per inference: {avg_indiveri_synapse:.6e} J ({100.0 * avg_indiveri_synapse / avg_indiveri_total:.1f} %)")
+    print(f"Loihi-Indiveri - Avg soma energy per inference: {avg_indiveri_soma:.6e} J ({100.0 * avg_indiveri_soma / avg_indiveri_total:.1f} %)")
+    print(f"Loihi-Indiveri - Avg network energy per inference: {avg_indiveri_network:.6e} J ({100.0 * avg_indiveri_network / avg_indiveri_total:.1f} %)")
+    print(f"Loihi-Indiveri - Avg spikes out per neuron per inference: {avg_indiveri_spikes:.1f}")
+    print(f"Loihi-Indiveri - Avg inference latency: {avg_indiveri_latency:.6e}")
     print("***")
 
     avg_loihi_total = sum(m['loihi_total_energy'] for m in per_input_metrics) / num_inputs
@@ -700,13 +706,13 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
     #  either but its otherwise interesting/useful to me
     total_indiveri_energy = analog_perf_df['total_energy'].mean()
     print("Per-timestep Averages")
-    print(f"Indiveri - Mean per-timestep total energy: {total_indiveri_energy} J (100 %)")
-    print(f"Indiveri - Mean per-timestep synapse energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / total_indiveri_energy} %)")
-    print(f"Indiveri - Mean per-timestep soma energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / total_indiveri_energy} %)")
-    print(f"Indiveri - Mean per-timestep network energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / total_indiveri_energy} %)")
-    print(f"Indiveri - Mean per-timestep fired: {analog_perf_df['fired'].mean()}")
-    print(f"Indiveri - total spikes: {analog_perf_df['spikes'].sum()}")
-    print(f"Indiveri - total timestep latency: {analog_perf_df['sim_time'].sum()}")
+    print(f"Loihi-Indiveri - Mean per-timestep total energy: {total_indiveri_energy} J (100 %)")
+    print(f"Loihi-Indiveri - Mean per-timestep synapse energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / total_indiveri_energy} %)")
+    print(f"Loihi-Indiveri - Mean per-timestep soma energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / total_indiveri_energy} %)")
+    print(f"Loihi-Indiveri - Mean per-timestep network energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / total_indiveri_energy} %)")
+    print(f"Loihi-Indiveri - Mean per-timestep fired: {analog_perf_df['fired'].mean()}")
+    print(f"Loihi-Indiveri - total spikes: {analog_perf_df['spikes'].sum()}")
+    print(f"Loihi-Indiveri - total timestep latency: {analog_perf_df['sim_time'].sum()}")
     print("***")
 
     total_loihi_energy = loihi_perf_df['total_energy'].mean()
@@ -948,23 +954,28 @@ def plot_mnist(num_inputs, timesteps_per_input, inputs, weights):
 #  The second SNN was trained using the LASANA model directly (by Jason). This
 #   circuit-aware training has no accuracy degredation and so achieves ~70%
 #   accuracy, which is comparable to the SHD benchmark paper.
-run_experiments = False
-create_plots = True
 
-num_mnist_inputs = 10000 # Entire test set
-num_shd_inputs = 2264  # Entire test set
+if __name__ == "__main__":
+    print(f"Launching Loihi-Indiveri, run:{RUN_EXPERIMENTS} plot:{PLOT_EXPERIMENTS}")
+    if QUICK_RUN:
+        num_shd_inputs = 100
+        num_mnist_inputs = 100
+    else:
+        num_shd_inputs = 2264  # Number of inferences
+        num_mnist_inputs = 10000
+    num_mnist_inputs = 10000 # Entire test set
+    num_shd_inputs = 2264  # Entire test set
 
+    if RUN_EXPERIMENTS:
+        run_experiment(num_mnist_inputs, "mnist", analog_neurons=True)
+        run_experiment(num_mnist_inputs, "mnist", analog_neurons=False)
 
-if run_experiments:
-    run_experiment(num_mnist_inputs, "mnist", analog_neurons=True)
-    run_experiment(num_mnist_inputs, "mnist", analog_neurons=False)
+        run_experiment(num_shd_inputs, "shd", analog_neurons=True)
+        run_experiment(num_shd_inputs, "shd", analog_neurons=False)
 
-    run_experiment(num_shd_inputs, "shd", analog_neurons=True)
-    run_experiment(num_shd_inputs, "shd", analog_neurons=False)
+    if PLOT_EXPERIMENTS:
+        plot_experiments(num_mnist_inputs, "mnist")
+        plot_experiments(num_shd_inputs, "shd")
 
-if create_plots:
-    plot_experiments(num_mnist_inputs, "mnist")
-    plot_experiments(num_shd_inputs, "shd")
-
-print("Finished.")
-#plt.show()  # Enable if running on the host and we want to display
+    print("Finished.")
+    #plt.show()  # Enable if running on the host and we want to display

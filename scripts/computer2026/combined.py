@@ -25,14 +25,24 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
 parser = argparse.ArgumentParser(
         prog="Loihi-Crossbar-Indiveri",
         description="Explore mixed-signal architecture with analog crossbar synapses and Indiveri neurons.")
+parser.add_argument("data_path", nargs="?",
+                    default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "combined"))))
 parser.add_argument("run_path", nargs="?",
                     default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "combined"))))
 parser.add_argument("lasana_dir", nargs="?",
                     default=os.path.abspath(os.path.join("/", "home", "usr1", "jboyle", "neuro", "lasana", "build")))
+parser.add_argument("--quick", action="store_true")
+parser.add_argument("--run", action="store_true")
+parser.add_argument("--plot", action="store_true")
 args = parser.parse_args()
 
+DATA_PATH = args.data_path
 RUN_PATH = args.run_path
 LASANA_DIR = args.lasana_dir
+QUICK_RUN = args.quick
+RUN_EXPERIMENTS = args.run
+PLOT_EXPERIMENTS = args.plot
+
 
 # Try importing the installed sanafe library. If not installed, require a
 #  fall-back to a local build of the sanafe Python library
@@ -95,7 +105,7 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
     # snn_path = os.path.join(RUN_PATH, "app_models", "spiking_digits_indiveri_crossbar_latest.pt")
     # snn_path = os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60.pt.state")
     # snn_path = os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_55.pt.state")
-    snn_path = os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60_attempt2.pt.state")
+    snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60_attempt2.pt.state")
 
     # After loading
     # snn = torch.load(snn_path,
@@ -320,7 +330,7 @@ def load_dataset(num_inputs):
     # Use a SNN trained using circuit-aware methods i.e. was
     #  trained specifically on an IMAC-sim crossbar model.
     spiking_digits_model = torch.load(
-            os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60_attempt2.pt.state"),
+            os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60_attempt2.pt.state"),
             map_location=torch.device("cpu"), weights_only=True)
 
     for attribute_name, param in spiking_digits_model.items():
@@ -490,7 +500,7 @@ def run_mnist(num_inputs, timesteps=100):
         if count >= num_inputs:
             break
 
-    snn_path = os.path.join(RUN_PATH, "app_models", "mnist_10_128_84_10.pth")
+    snn_path = os.path.join(DATA_PATH, "app_models", "mnist_10_128_84_10.pth")
     snn = torch.load(snn_path, map_location=torch.device("cpu"))
 
     weights = {}
@@ -760,39 +770,43 @@ def plot_mnist(num_inputs):
     analog_perf_df["soma_energy_uj"] = analog_perf_df["soma_energy"] * 1.0e6
     print("***")
     mean_energy = analog_perf_df['total_energy'].mean()
-    print(f"Mean Total Crossbar energy: {mean_energy} J (100 %)")
-    print(f"Mean Soma Crossbar energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Mean Synapse Crossbar energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Mean Network Crossbar energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Mean Crossbar firing neurons: {analog_perf_df['fired'].mean()}")
-    print(f"Total Crossbar spikes: {analog_perf_df['spikes'].sum()}")
+    print(f"Mean Total Loihi-IMAC-Indiveri energy: {mean_energy} J (100 %)")
+    print(f"Mean Soma Loihi-IMAC-Indiveri energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / mean_energy} %)")
+    print(f"Mean Synapse Loihi-IMAC-Indiveri energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / mean_energy} %)")
+    print(f"Mean Network Loihi-IMAC-Indiveri energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / mean_energy} %)")
+    print(f"Mean Loihi-IMAC-Indiveri firing neurons: {analog_perf_df['fired'].mean()}")
+    print(f"Total Loihi-IMAC-Indiveri spikes: {analog_perf_df['spikes'].sum()}")
 
 
     print("***********")
     print("Per-inference results")
     mean_energy = analog_perf_df['total_energy'].sum() / num_inputs
-    print(f"Per-inference Total Crossbar energy: {mean_energy} J (100 %)")
-    print(f"Per-inference Soma Crossbar energy: {analog_perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['soma_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Synapse Crossbar energy: {analog_perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['synapse_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Network Crossbar energy: {analog_perf_df['network_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['network_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Crossbar firing neurons: {analog_perf_df['fired'].sum() / num_inputs}")
-    print(f"Per-inference Crossbar latency: {analog_perf_df['sim_time'].sum() / num_inputs}")
+    print(f"Per-inference Total Loihi-IMAC-Indiveri energy: {mean_energy} J (100 %)")
+    print(f"Per-inference Soma Loihi-IMAC-Indiveri energy: {analog_perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['soma_energy'].sum() / (num_inputs * mean_energy)} %)")
+    print(f"Per-inference Synapse Loihi-IMAC-Indiveri energy: {analog_perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['synapse_energy'].sum() / (num_inputs * mean_energy)} %)")
+    print(f"Per-inference Network Loihi-IMAC-Indiveri energy: {analog_perf_df['network_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['network_energy'].sum() / (num_inputs * mean_energy)} %)")
+    print(f"Per-inference Loihi-IMAC-Indiveri firing neurons: {analog_perf_df['fired'].sum() / num_inputs}")
+    print(f"Per-inference Loihi-IMAC-Indiveri latency: {analog_perf_df['sim_time'].sum() / num_inputs}")
 
 
 if __name__ == "__main__":
-    run_experiments = True
-    plot_experiments = True
+    print(f"Launching Loihi-IMAC-Indiveri, run:{RUN_EXPERIMENTS} plot:{PLOT_EXPERIMENTS}")
+    if QUICK_RUN:
+        num_shd_inputs = 100
+        num_mnist_inputs = 100
+    else:
+        num_shd_inputs = 2264  # Number of inferences
+        num_mnist_inputs = 10000
 
-    num_shd_inputs = 2264  # Number of inferences
-    num_mnist_inputs = 10000
-
-    if run_experiments:
+    if RUN_EXPERIMENTS:
         run_spiking_digits(num_inputs=num_shd_inputs)
         run_mnist(num_inputs=num_mnist_inputs, timesteps=100)
 
-    if plot_experiments:
+    if PLOT_EXPERIMENTS:
         calculate_shd_accuracy(num_inputs=num_shd_inputs)
         calculate_mnist_accuracy(num_inputs=num_mnist_inputs)
 
         plot_spiking_digits(num_inputs=num_shd_inputs)
         plot_mnist(num_inputs=num_mnist_inputs)
+
+    print("Loihi-IMAC-Indiveri finished!")
