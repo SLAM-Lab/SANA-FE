@@ -425,6 +425,7 @@ def calculate_shd_accuracy(num_inputs):
     print(f"Accuracy ({platform}): {accuracy}% ({correct}/{num_inputs})")
     print(f"Min timesteps: {np.min(timesteps_per_input)}")
     print(f"Max timesteps: {np.max(timesteps_per_input)}")
+    return accuracy
 
 
 def plot_spiking_digits(num_inputs):
@@ -432,38 +433,74 @@ def plot_spiking_digits(num_inputs):
     timesteps_per_input = list(np.loadtxt(
         os.path.join(RUN_PATH, "crossbar_indiveri_shd.csv"),
         dtype=int, ndmin=1))
-    raster_num_inputs = min(len(timesteps_per_input), 7)
-    raster_total_timesteps = sum(timesteps_per_input[0:raster_num_inputs])
 
-    plt.rcParams.update({
-        "font.size": 8,
-        "font.family": "sans-serif",
-        "font.sans-serif": "Arial",
-        "pdf.fonttype": 42
-    })
-
+    imac_indiveri_accuracy = calculate_shd_accuracy(num_inputs=num_shd_inputs)
     analog_perf_df = pd.read_csv(os.path.join(RUN_PATH, "perf_crossbar_indiveri_shd.csv"))
     analog_perf_df["total_energy_uj"] = analog_perf_df["total_energy"] * 1.0e6
-    analog_perf_df["total_energy_uj"] = analog_perf_df["total_energy"] * 1.0e6
-    analog_perf_df["soma_energy_uj"] = analog_perf_df["soma_energy"] * 1.0e6
-    print("***")
-    mean_energy = analog_perf_df['total_energy'].mean()
-    print(f"Mean Total Crossbar energy: {mean_energy} J (100 %)")
-    print(f"Mean Soma Crossbar energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Mean Synapse Crossbar energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Mean Network Crossbar energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Mean Crossbar firing neurons: {analog_perf_df['fired'].mean()}")
-    print(f"Mean Crossbar latency: {analog_perf_df['sim_time'].mean()}")
-    print("******")
 
-    mean_energy = analog_perf_df['total_energy'].sum() / num_inputs
-    print(f"Per-inference Total Crossbar energy: {mean_energy} J (100 %)")
-    print(f"Per-inference Soma Crossbar energy: {analog_perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['soma_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Synapse Crossbar energy: {analog_perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['synapse_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Network Crossbar energy: {analog_perf_df['network_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['network_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Crossbar firing neurons: {analog_perf_df['fired'].sum() / num_inputs}")
-    print(f"Per-inference Crossbar latency: {analog_perf_df['sim_time'].sum() / num_inputs}")
-    print(f"Per-inference Crossbar latency: {analog_perf_df['sim_time'].sum() / num_inputs}")
+    # Per time-step
+    imac_mean_energy = analog_perf_df['total_energy'].mean()
+    def per_timestep_row(df, label, mean_energy):
+        return {
+            "Platform": label,
+            "Total Energy (uJ)":  df['total_energy'].mean()   * 1e6,
+            "Total Energy (%)": 100.0,
+            "Soma Energy (uJ)": df['soma_energy'].mean()    * 1e6,
+            "Soma Energy (%)": 100.0 * df['soma_energy'].mean()    / mean_energy,
+            "Synapse Energy (uJ)": df['synapse_energy'].mean() * 1e6,
+            "Synapse Energy (%)": 100.0 * df['synapse_energy'].mean() / mean_energy,
+            "Network Energy (uJ)": df['network_energy'].mean() * 1e6,
+            "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
+            "Mean Fired": df['fired'].mean(),
+            "Mean Latency (ms)": df['sim_time'].mean() * 1e3,
+        }
+
+    per_timestep_results = pd.DataFrame([
+        per_timestep_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy),
+    ]).set_index("Platform")
+
+    # print("=" * 80)
+    # print("Per Time-step Results")
+    # print("=" * 80)
+    # print(per_timestep_results.to_string())
+    # print()
+
+    # Per-inference
+    imac_mean_energy = analog_perf_df['total_energy'].sum() / num_inputs
+
+    def per_inference_row(df, label, mean_energy, accuracy):
+        return {
+            "Platform":            label,
+            "Total Energy (uJ)":   df['total_energy'].sum()   / num_inputs * 1e6,
+            "Total Energy (%)":    100.0,
+            "Soma Energy (uJ)":    df['soma_energy'].sum()    / num_inputs * 1e6,
+            "Soma Energy (%)":     100.0 * df['soma_energy'].sum()    / (num_inputs * mean_energy),
+            "Synapse Energy (uJ)": df['synapse_energy'].sum() / num_inputs * 1e6,
+            "Synapse Energy (%)":  100.0 * df['synapse_energy'].sum() / (num_inputs * mean_energy),
+            "Network Energy (uJ)": df['network_energy'].sum() / num_inputs * 1e6,
+            "Network Energy (%)":  100.0 * df['network_energy'].sum() / (num_inputs * mean_energy),
+            "Firing Neurons":      df['fired'].sum()   / num_inputs,
+            "Latency (ms)":             df['sim_time'].sum() / num_inputs * 1e3,
+            "Accuracy (%)": accuracy
+        }
+
+    per_inference_results = pd.DataFrame([
+        per_inference_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy, imac_indiveri_accuracy),
+    ]).set_index("Platform")
+
+    print("=" * 80)
+    print("Per-Inference Results")
+    print("=" * 80)
+    print(per_inference_results.to_string())
+    print()
+
+    # Save to CSV
+    combined = pd.concat(
+        [per_inference_results, per_timestep_results],
+        keys=["Per-Inference", "Per-Timestep"]
+    )
+    combined.to_csv(os.path.join(RUN_PATH, "imac_shd_results.csv"))
+    print("Results saved to imac_shd_results.csv")
 
 #"""
 
@@ -761,32 +798,81 @@ def calculate_mnist_accuracy(num_inputs, analog_synapses=True):
 
     accuracy = (correct / num_inputs) * 100
     print(f"Loihi-IMAC-Indiveri Accuracy: {accuracy}%")
+    return accuracy
 
 
 def plot_mnist(num_inputs):
     print("Outputting MNIST experiment results")
-    analog_perf_df = pd.read_csv(os.path.join(RUN_PATH, "perf_crossbar_indiveri_mnist.csv"))
-    analog_perf_df["total_energy_uj"] = analog_perf_df["total_energy"] * 1.0e6
-    analog_perf_df["soma_energy_uj"] = analog_perf_df["soma_energy"] * 1.0e6
-    print("***")
-    mean_energy = analog_perf_df['total_energy'].mean()
-    print(f"Mean Total Loihi-IMAC-Indiveri energy: {mean_energy} J (100 %)")
-    print(f"Mean Soma Loihi-IMAC-Indiveri energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Mean Synapse Loihi-IMAC-Indiveri energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Mean Network Loihi-IMAC-Indiveri energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Mean Loihi-IMAC-Indiveri firing neurons: {analog_perf_df['fired'].mean()}")
-    print(f"Total Loihi-IMAC-Indiveri spikes: {analog_perf_df['spikes'].sum()}")
+    analog_perf_df = pd.read_csv(
+        os.path.join(RUN_PATH, "perf_crossbar_indiveri_mnist.csv"))
 
+    imac_indiveri_accuracy = calculate_mnist_accuracy(
+        num_inputs=num_mnist_inputs, analog_synapses=True)
 
-    print("***********")
-    print("Per-inference results")
-    mean_energy = analog_perf_df['total_energy'].sum() / num_inputs
-    print(f"Per-inference Total Loihi-IMAC-Indiveri energy: {mean_energy} J (100 %)")
-    print(f"Per-inference Soma Loihi-IMAC-Indiveri energy: {analog_perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['soma_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Synapse Loihi-IMAC-Indiveri energy: {analog_perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['synapse_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Network Loihi-IMAC-Indiveri energy: {analog_perf_df['network_energy'].sum() / num_inputs} J ({100.0 * analog_perf_df['network_energy'].sum() / (num_inputs * mean_energy)} %)")
-    print(f"Per-inference Loihi-IMAC-Indiveri firing neurons: {analog_perf_df['fired'].sum() / num_inputs}")
-    print(f"Per-inference Loihi-IMAC-Indiveri latency: {analog_perf_df['sim_time'].sum() / num_inputs}")
+    # Per time-step
+    imac_mean_energy = analog_perf_df['total_energy'].mean()
+
+    def per_timestep_row(df, label, mean_energy):
+        return {
+            "Platform": label,
+            "Total Energy (uJ)": df['total_energy'].mean() * 1e6,
+            "Total Energy (%)": 100.0,
+            "Soma Energy (uJ)": df['soma_energy'].mean() * 1e6,
+            "Soma Energy (%)": 100.0 * df['soma_energy'].mean() / mean_energy,
+            "Synapse Energy (uJ)": df['synapse_energy'].mean() * 1e6,
+            "Synapse Energy (%)": 100.0 * df['synapse_energy'].mean() / mean_energy,
+            "Network Energy (uJ)": df['network_energy'].mean() * 1e6,
+            "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
+            "Mean Fired": df['fired'].mean(),
+            "Total Spikes": df['spikes'].sum(),
+        }
+
+    per_timestep_results = pd.DataFrame([
+        per_timestep_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy),
+    ]).set_index("Platform")
+
+    # print("=" * 80)
+    # print("Per Time-step Results")
+    # print("=" * 80)
+    # print(per_timestep_results.to_string())
+    # print()
+
+    # Per-inference
+    imac_mean_energy  = analog_perf_df['total_energy'].sum() / num_inputs
+
+    def per_inference_row(df, label, mean_energy, accuracy):
+        return {
+            "Platform": label,
+            "Total Energy (uJ)": df['total_energy'].sum() / num_inputs * 1e6,
+            "Total Energy (%)": 100.0,
+            "Soma Energy (uJ)": df['soma_energy'].sum() / num_inputs * 1e6,
+            "Soma Energy (%)": 100.0 * df['soma_energy'].sum() / (num_inputs * mean_energy),
+            "Synapse Energy (uJ)": df['synapse_energy'].sum() / num_inputs * 1e6,
+            "Synapse Energy (%)":  100.0 * df['synapse_energy'].sum() / (num_inputs * mean_energy),
+            "Network Energy (uJ)": df['network_energy'].sum() / num_inputs * 1e6,
+            "Network Energy (%)": 100.0 * df['network_energy'].sum() / (num_inputs * mean_energy),
+            "Firing Neurons": df['fired'].sum()  / num_inputs,
+            "Latency (ms)": df['sim_time'].sum() / num_inputs * 1e3,
+            "Accuracy (%)": accuracy
+        }
+
+    per_inference_results = pd.DataFrame([
+        per_inference_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy, imac_indiveri_accuracy),
+    ]).set_index("Platform")
+
+    print("=" * 80)
+    print("Per-Inference Results")
+    print("=" * 80)
+    print(per_inference_results.to_string())
+    print()
+
+    # Save to CSV
+    combined = pd.concat(
+        [per_inference_results, per_timestep_results],
+        keys=["Per-Inference", "Per-Timestep"]
+    )
+    combined.to_csv(os.path.join(RUN_PATH, "imac_mnist_results.csv"))
+    print("Results saved to imac_mnist_results.csv")
 
 
 if __name__ == "__main__":
@@ -803,9 +889,6 @@ if __name__ == "__main__":
         run_mnist(num_inputs=num_mnist_inputs, timesteps=100)
 
     if PLOT_EXPERIMENTS:
-        calculate_shd_accuracy(num_inputs=num_shd_inputs)
-        calculate_mnist_accuracy(num_inputs=num_mnist_inputs)
-
         plot_spiking_digits(num_inputs=num_shd_inputs)
         plot_mnist(num_inputs=num_mnist_inputs)
 

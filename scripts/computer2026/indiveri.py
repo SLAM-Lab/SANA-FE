@@ -710,7 +710,7 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
                 "Network Energy (uJ)": df['network_energy'].sum()/ num_inputs * 1e6,
                 "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
                 "Firing Neurons":  df['fired'].sum() / num_inputs,
-                "Time-step Latency": df['sim_time'].sum() / num_inputs,
+                "Time-step Latency (ms)": df['sim_time'].sum() / num_inputs * 1e3,
                 "Accuracy (%)": accuracy
             }
 
@@ -750,7 +750,7 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
             "Network Energy (uJ)": df['network_energy'].mean() * 1e6,
             "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
             "Firing Neurons": df['fired'].mean(),
-            "Time-step Latency": df['sim_time'].mean(),
+            "Time-step Latency (ms)": df['sim_time'].mean() * 1e3,
             "Total Spikes": df['spikes'].sum(),
         }
 
