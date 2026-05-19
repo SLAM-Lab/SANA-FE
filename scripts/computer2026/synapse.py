@@ -36,6 +36,9 @@ parser.add_argument("data_path", nargs="?",
 parser.add_argument("run_path", nargs="?",
                     default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "synapse"))))
 parser.add_argument("--run", action="store_true")
+# TODO: Both of these are ignored for now, to keep interfaces consistent
+parser.add_argument("--quick", action="store_true")
+parser.add_argument("--plot", action="store_true")
 
 args = parser.parse_args()
 
