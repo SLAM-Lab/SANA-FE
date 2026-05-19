@@ -32,6 +32,8 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir, os.pardir)))
 parser = argparse.ArgumentParser(
         prog="Loihi-Indiveri",
         description="Explore mixed-signal architecture with analog neurons.")
+parser.add_argument("data_path", nargs="?",
+                    default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "indiveri"))))
 parser.add_argument("run_path", nargs="?",
                     default=os.path.abspath((os.path.join(PROJECT_DIR, "runs", "indiveri"))))
 parser.add_argument("lasana_dir", nargs="?",
@@ -41,7 +43,9 @@ parser.add_argument("--run", action="store_true")
 parser.add_argument("--plot", action="store_true")
 args = parser.parse_args()
 
+DATA_PATH = args.data_path
 RUN_PATH = args.run_path
+RUN_PATH = "tmp"
 LASANA_DIR = args.lasana_dir
 QUICK_RUN = args.quick
 RUN_EXPERIMENTS = args.run
@@ -69,7 +73,7 @@ def load_dataset(num_inputs, dataset, analog_neurons):
         #  that MNIST is generally not super sensitive to small circuit
         #  variations (unlike spiking digits)
         mnist_model = torch.load(
-                os.path.join(RUN_PATH, "app_models", "mnist_784_128_10.pt"),
+                os.path.join(DATA_PATH, "app_models", "mnist_784_128_10.pt"),
                 pickle_module=dill,
                 map_location=torch.device("cpu"))
         for attribute_name, param in mnist_model.named_parameters():
@@ -108,7 +112,7 @@ def load_dataset(num_inputs, dataset, analog_neurons):
             #  Jason Ho and uses LASANA surrogate model layers in between
             #  regular Linear synapses.
             spiking_digits_model = torch.load(
-                    os.path.join(RUN_PATH, "app_models", "shd_70_200_20_circuit_aware.pt"),
+                    os.path.join(DATA_PATH, "app_models", "shd_70_200_20_indiveri_aware.pt"),
                     weights_only=True,
                     map_location=torch.device("cpu"))
 
@@ -119,7 +123,7 @@ def load_dataset(num_inputs, dataset, analog_neurons):
             #  to mimic the Indiveri behavior as close as is possible with an LIF
             #  (Leaky in SNNTorch) neuron
             spiking_digits = torch.load(
-                    os.path.join(RUN_PATH, "app_models", "shd_70_200_20.pt"),
+                    os.path.join(DATA_PATH, "app_models", "shd_70_200_20.pt"),
                     pickle_module=dill,
                     map_location=torch.device("cpu"))
 
@@ -332,8 +336,8 @@ def run_experiment(num_inputs, dataset="shd", analog_neurons=True):
     snn.save(os.path.join(RUN_PATH, f"indiveri_{platform}_{dataset}.yaml"))
     # The inputs (and therefore timesteps per input) will be the same across
     #  Loihi/analog neuron runs. Only store this once.
-    # np.savetxt(os.path.join(RUN_PATH, f"indiveri_{dataset}.csv"),
-    #            np.array(timesteps_per_input), fmt="%d")
+    np.savetxt(os.path.join(RUN_PATH, f"indiveri_{dataset}.csv"),
+               np.array(timesteps_per_input), fmt="%d")
     return
 
 
@@ -720,7 +724,7 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
     ]).set_index("Platform")
 
     print("=" * 80)
-    print("Per-Inference Results")
+    print("Per-Inference Results for SHD")
     print("=" * 80)
     print(per_inference_results.to_string())
     print()
@@ -865,7 +869,7 @@ def plot_mnist(num_inputs, timesteps_per_input):
     ]).set_index("Platform")
 
     print("=" * 80)
-    print("Per-Inference Results")
+    print("Per-Inference Results for MNIST")
     print("=" * 80)
     print(per_inference_results.to_string())
     print()
@@ -937,8 +941,6 @@ if __name__ == "__main__":
     else:
         num_shd_inputs = 2264  # Number of inferences
         num_mnist_inputs = 10000
-    num_mnist_inputs = 10000 # Entire test set
-    num_shd_inputs = 2264  # Entire test set
 
     if RUN_EXPERIMENTS:
         run_experiment(num_mnist_inputs, "mnist", analog_neurons=True)

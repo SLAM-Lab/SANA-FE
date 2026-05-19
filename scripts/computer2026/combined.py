@@ -105,7 +105,7 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
     # snn_path = os.path.join(RUN_PATH, "app_models", "spiking_digits_indiveri_crossbar_latest.pt")
     # snn_path = os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60.pt.state")
     # snn_path = os.path.join(RUN_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_55.pt.state")
-    snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60_attempt2.pt.state")
+    snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_indiveri_aware.pt")
 
     # After loading
     # snn = torch.load(snn_path,
@@ -489,7 +489,7 @@ def plot_spiking_digits(num_inputs):
     ]).set_index("Platform")
 
     print("=" * 80)
-    print("Per-Inference Results")
+    print("SHD Per-Inference Results")
     print("=" * 80)
     print(per_inference_results.to_string())
     print()
@@ -537,7 +537,7 @@ def run_mnist(num_inputs, timesteps=100):
         if count >= num_inputs:
             break
 
-    snn_path = os.path.join(DATA_PATH, "app_models", "mnist_10_128_84_10.pth")
+    snn_path = os.path.join(DATA_PATH, "app_models", "mnist_10_128_84_10_crossbar_indiveri_aware.pt")
     snn = torch.load(snn_path, map_location=torch.device("cpu"))
 
     weights = {}
@@ -838,7 +838,7 @@ def plot_mnist(num_inputs):
     # print()
 
     # Per-inference
-    imac_mean_energy  = analog_perf_df['total_energy'].sum() / num_inputs
+    imac_mean_energy = analog_perf_df['total_energy'].sum() / num_inputs
 
     def per_inference_row(df, label, mean_energy, accuracy):
         return {
@@ -861,7 +861,7 @@ def plot_mnist(num_inputs):
     ]).set_index("Platform")
 
     print("=" * 80)
-    print("Per-Inference Results")
+    print("MNIST Per-Inference Results")
     print("=" * 80)
     print(per_inference_results.to_string())
     print()

@@ -100,7 +100,7 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
             break
 
     if analog_synapses:
-        snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_aware.pt")
+        snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_aware.pt")
         snn = torch.load(snn_path, pickle_module=dill,
                          map_location=torch.device("cpu")).state_dict()
     else:
@@ -340,7 +340,7 @@ def load_dataset(num_inputs, analog_neurons=True):
         # Use a SNN trained using circuit-aware methods i.e. was
         #  trained specifically on an IMAC-sim crossbar model.
         spiking_digits_model = torch.load(
-                os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_aware.pt"),
+                os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_aware.pt"),
                 map_location=torch.device("cpu")).state_dict()
 
         for attribute_name, param in spiking_digits_model.items():
@@ -671,7 +671,7 @@ def plot_spiking_digits(num_inputs):
     ]).set_index("Platform")
 
     print("=" * 80)
-    print("Per-Inference Results")
+    print("SHD Per-Inference Results")
     print("=" * 80)
     print(per_inference_results.to_string())
     print()
@@ -719,14 +719,13 @@ def run_mnist(num_inputs, analog_synapses=True, timesteps=100):
             break
 
     if analog_synapses:
-        # TODO: move this into common model path
-        snn_path = "/home/usr1/jboyle/neuro/binary_mnist/binarized_mnist_model.pth"
+        snn_path = os.path.join(DATA_PATH, "app_models", "mnist_400_128_64_10_crossbar_aware.pt")
         snn = torch.load(snn_path, weights_only=True)
     else:
         # Load a normally trained rate-coded MNIST model to deploy on Loihi
         #  (normal digital) synapses
         snn = torch.load(
-                os.path.join(PROJECT_DIR, "etc", "mnist_400_128_84_10.pt"),
+                os.path.join(DATA_PATH, "app_models", "mnist_400_128_84_10.pt"),
                 pickle_module=dill,
                 map_location=torch.device("cpu")).state_dict()
 
@@ -1089,7 +1088,7 @@ def plot_mnist(num_inputs):
     ]).set_index("Platform")
 
     print("=" * 80)
-    print("Per-Inference Results")
+    print("MNIST Per-Inference Results")
     print("=" * 80)
     print(per_inference_results.to_string())
     print()
