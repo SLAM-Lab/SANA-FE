@@ -36,6 +36,7 @@ args = parser.parse_args()
 
 DATA_PATH = args.data_path
 RUN_PATH = args.run_path
+RUN_PATH = "tmp"
 LASANA_DIR = args.lasana_dir
 QUICK_RUN = args.quick
 RUN_EXPERIMENTS = args.run
@@ -101,12 +102,12 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
 
     if analog_synapses:
         snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_aware.pt")
-        snn = torch.load(snn_path, map_location=torch.device("cpu"))
+        snn = torch.load(snn_path, weights_only=True)
     else:
         # Load a normally trained rate-coded SHD model to deploy on Loihi's
         #  (digital, full-precision) synapses
         snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20.pt")
-        snn = torch.load(snn_path, map_location=torch.device("cpu"))
+        snn = torch.load(snn_path, weights_only=True)
 
     weights = {}
     if analog_synapses:
