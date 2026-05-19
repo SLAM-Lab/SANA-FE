@@ -409,14 +409,14 @@ def calculate_accuracy(num_inputs, dataset, analog_neurons, timesteps_per_input)
         counts = np.zeros((out_neurons, num_inputs), dtype=int)
         for digit, spikes in enumerate(out_spikes):
             for spike_timestep in spikes:
-                input_idx = (spike_timestep - 1) // timesteps_per_input[0]
+                input_idx = (spike_timestep - 1) // timesteps_per_input
                 assert(input_idx < num_inputs)
                 counts[digit, input_idx] += 1
 
         correct = 0
         for i in range(0, num_inputs):
-            print(f"Spike counts per class for inference of digit:{counts[:, i]} "
-                f"out:{np.argmax(counts[:, i])} actual:{labels[i]}")
+            # print(f"Spike counts per class for inference of digit:{counts[:, i]} "
+            #     f"out:{np.argmax(counts[:, i])} actual:{labels[i]}")
             if np.argmax(counts[:, i]) == labels[i]:
                 correct += 1
 
@@ -445,7 +445,8 @@ def calculate_accuracy(num_inputs, dataset, analog_neurons, timesteps_per_input)
             start_timestep += timesteps
 
     accuracy = (correct / num_inputs) * 100
-    print(f"Accuracy: {accuracy}% ({correct}/{num_inputs})")
+    # print(f"Accuracy: {accuracy}% ({correct}/{num_inputs})")
+    return accuracy
 
 
 # Okabe-Ito color palette (colorblind-friendly)
@@ -476,11 +477,7 @@ def plot_experiments(num_inputs, dataset):
     if dataset == "shd":
         plot_shd(num_inputs, timesteps_per_input, labels, weights)
     elif dataset == "mnist":
-        plot_mnist(num_inputs, timesteps_per_input[0], inputs, weights)
-
-    # Calculate accuracy for both sets of runs
-    calculate_accuracy(num_inputs, dataset, True, timesteps_per_input)
-    calculate_accuracy(num_inputs, dataset, False, timesteps_per_input)
+        plot_mnist(num_inputs, timesteps_per_input[0])
 
 
 def plot_shd(num_inputs, timesteps_per_input, labels, weights):
@@ -625,7 +622,7 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
     per_input_metrics = []
     start_timestep = 0
     for input_idx in range(num_inputs):
-        print(".", end="")
+        # print(".", end="")
         end_timestep = start_timestep + timesteps_per_input[input_idx]
 
         # Filter data for this input's timestep range
@@ -645,9 +642,12 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
         loihi_network = loihi_perf_df.loc[loihi_mask, 'network_energy'].sum()
         loihi_latency = loihi_perf_df.loc[loihi_mask, 'sim_time'].sum()
 
+        indiveri_fired = analog_perf_df.loc[analog_mask, 'fired'].sum()
+        loihi_fired = loihi_perf_df.loc[loihi_mask, 'fired'].sum()
+
         # Count total spikes for this input
-        indiveri_spikes = analog_perf_df.loc[analog_mask, 'fired'].sum()
-        loihi_spikes = loihi_perf_df.loc[loihi_mask, 'fired'].sum()
+        indiveri_spikes = analog_perf_df.loc[analog_mask, 'spikes'].sum()
+        loihi_spikes = loihi_perf_df.loc[loihi_mask, 'spikes'].sum()
 
         per_input_metrics.append({
             'input_idx': input_idx,
@@ -658,74 +658,120 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
             'indiveri_network_energy': indiveri_network,
             'indiveri_spikes': indiveri_spikes,
             'indiveri_latency': indiveri_latency,
+            'indiveri_fired': indiveri_fired,
             'loihi_total_energy': loihi_total,
             'loihi_synapse_energy': loihi_synapse,
             'loihi_soma_energy': loihi_soma,
             'loihi_network_energy': loihi_network,
             'loihi_spikes': loihi_spikes,
             'loihi_latency': loihi_latency,
+            'loihi_fired': loihi_fired
         })
         start_timestep = end_timestep
 
     # Print per-inference statistics summaries
+    # Per-inference
     spiking_neurons = 70 + hidden_neurons
-    print("")
-    print(f"Per-Inference Averages (across {num_inputs} inputs):")
-    avg_indiveri_total = sum(m['indiveri_total_energy'] for m in per_input_metrics) / num_inputs
-    avg_indiveri_synapse = sum(m['indiveri_synapse_energy'] for m in per_input_metrics) / num_inputs
-    avg_indiveri_soma = sum(m['indiveri_soma_energy'] for m in per_input_metrics) / num_inputs
-    avg_indiveri_network = sum(m['indiveri_network_energy'] for m in per_input_metrics) / num_inputs
-    avg_indiveri_spikes = (sum(m['indiveri_spikes'] / spiking_neurons for m in per_input_metrics)) / num_inputs
-    avg_indiveri_latency = (sum(m['indiveri_latency'] for m in per_input_metrics)) / num_inputs
 
-    print(f"Loihi-Indiveri - Avg total energy per inference: {avg_indiveri_total:.6e} J (100.0 %)")
-    print(f"Loihi-Indiveri - Avg synapse energy per inference: {avg_indiveri_synapse:.6e} J ({100.0 * avg_indiveri_synapse / avg_indiveri_total:.1f} %)")
-    print(f"Loihi-Indiveri - Avg soma energy per inference: {avg_indiveri_soma:.6e} J ({100.0 * avg_indiveri_soma / avg_indiveri_total:.1f} %)")
-    print(f"Loihi-Indiveri - Avg network energy per inference: {avg_indiveri_network:.6e} J ({100.0 * avg_indiveri_network / avg_indiveri_total:.1f} %)")
-    print(f"Loihi-Indiveri - Avg spikes out per neuron per inference: {avg_indiveri_spikes:.1f}")
-    print(f"Loihi-Indiveri - Avg inference latency: {avg_indiveri_latency:.6e}")
-    print("***")
+    indiveri_mean_energy = sum(m['indiveri_total_energy'] for m in per_input_metrics) / num_inputs
+    loihi_mean_energy = sum(m['loihi_total_energy']    for m in per_input_metrics) / num_inputs
 
-    avg_loihi_total = sum(m['loihi_total_energy'] for m in per_input_metrics) / num_inputs
-    avg_loihi_synapse = sum(m['loihi_synapse_energy'] for m in per_input_metrics) / num_inputs
-    avg_loihi_soma = sum(m['loihi_soma_energy'] for m in per_input_metrics) / num_inputs
-    avg_loihi_network = sum(m['loihi_network_energy'] for m in per_input_metrics) / num_inputs
-    avg_loihi_spikes = (sum(m['loihi_spikes'] / spiking_neurons for m in per_input_metrics)) / num_inputs
-    avg_loihi_latency = (sum(m['loihi_latency'] for m in per_input_metrics)) / num_inputs
+    indiveri_df = pd.DataFrame([{
+        'total_energy': m['indiveri_total_energy'],
+        'soma_energy': m['indiveri_soma_energy'],
+        'synapse_energy': m['indiveri_synapse_energy'],
+        'network_energy': m['indiveri_network_energy'],
+        'fired': m['indiveri_fired'],
+        'sim_time': m['indiveri_latency'],
+        'spikes': m['indiveri_spikes']
+    } for m in per_input_metrics])
 
+    loihi_df = pd.DataFrame([{
+        'total_energy': m['loihi_total_energy'],
+        'soma_energy': m['loihi_soma_energy'],
+        'synapse_energy': m['loihi_synapse_energy'],
+        'network_energy': m['loihi_network_energy'],
+        'fired': m['loihi_fired'],
+        'sim_time': m['loihi_latency'],
+        'spikes': m['loihi_spikes'],
+    } for m in per_input_metrics])
+    indiveri_accuracy = calculate_accuracy(num_inputs, "shd", True, timesteps_per_input)
+    loihi_accuracy = calculate_accuracy(num_inputs, "shd", False, timesteps_per_input)
 
-    print(f"Loihi - Avg total energy per inference: {avg_loihi_total:.6e} J (100.0 %)")
-    print(f"Loihi - Avg synapse energy per inference: {avg_loihi_synapse:.6e} J ({100.0 * avg_loihi_synapse / avg_loihi_total:.1f} %)")
-    print(f"Loihi - Avg soma energy per inference: {avg_loihi_soma:.6e} J ({100.0 * avg_loihi_soma / avg_loihi_total:.1f} %)")
-    print(f"Loihi - Avg network energy per inference: {avg_loihi_network:.6e} J ({100.0 * avg_loihi_network / avg_loihi_total:.1f} %)")
-    print(f"Loihi - Avg spikes out per neuron per inference: {avg_loihi_spikes:.1f}")
-    print(f"Loihi - Avg inference latency: {avg_loihi_latency:.6e}")
-    print("***")
+    def per_inference_row(df, label, mean_energy, accuracy):
+            return {
+                "Platform": label,
+                "Total Energy (uJ)": df['total_energy'].sum() / num_inputs * 1e6,
+                "Total Energy (%)": 100.0,
+                "Soma Energy (uJ)": df['soma_energy'].sum() / num_inputs * 1e6,
+                "Soma Energy (%)": 100.0 * df['soma_energy'].mean()    / mean_energy,
+                "Synapse Energy (uJ)": df['synapse_energy'].sum()/ num_inputs * 1e6,
+                "Synapse Energy (%)": 100.0 * df['synapse_energy'].mean() / mean_energy,
+                "Network Energy (uJ)": df['network_energy'].sum()/ num_inputs * 1e6,
+                "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
+                "Firing Neurons":  df['fired'].sum() / num_inputs,
+                "Time-step Latency": df['sim_time'].sum() / num_inputs,
+                "Accuracy (%)": accuracy
+            }
 
-    # Print per-timestep statistics. I will probably not include this in the paper
-    #  either but its otherwise interesting/useful to me
-    total_indiveri_energy = analog_perf_df['total_energy'].mean()
-    print("Per-timestep Averages")
-    print(f"Loihi-Indiveri - Mean per-timestep total energy: {total_indiveri_energy} J (100 %)")
-    print(f"Loihi-Indiveri - Mean per-timestep synapse energy: {analog_perf_df['synapse_energy'].mean()} J ({100.0 * analog_perf_df['synapse_energy'].mean() / total_indiveri_energy} %)")
-    print(f"Loihi-Indiveri - Mean per-timestep soma energy: {analog_perf_df['soma_energy'].mean()} J ({100.0 * analog_perf_df['soma_energy'].mean() / total_indiveri_energy} %)")
-    print(f"Loihi-Indiveri - Mean per-timestep network energy: {analog_perf_df['network_energy'].mean()} J ({100.0 * analog_perf_df['network_energy'].mean() / total_indiveri_energy} %)")
-    print(f"Loihi-Indiveri - Mean per-timestep fired: {analog_perf_df['fired'].mean()}")
-    print(f"Loihi-Indiveri - total spikes: {analog_perf_df['spikes'].sum()}")
-    print(f"Loihi-Indiveri - total timestep latency: {analog_perf_df['sim_time'].sum()}")
-    print("***")
+    per_inference_results = pd.DataFrame([
+        per_inference_row(indiveri_df, "Indiveri", indiveri_mean_energy, indiveri_accuracy),
+        per_inference_row(loihi_df, "Loihi", loihi_mean_energy, loihi_accuracy),
+    ]).set_index("Platform")
 
-    total_loihi_energy = loihi_perf_df['total_energy'].mean()
-    print(f"Loihi - Mean per-timestep Loihi total energy: {total_loihi_energy} J (100 %)")
-    print(f"Loihi - Mean per-timestep Loihi synapse energy: {loihi_perf_df['synapse_energy'].mean()} J ({100.0 * loihi_perf_df['synapse_energy'].mean() / total_loihi_energy} %)")
-    print(f"Loihi - Mean per-timestep Loihi soma energy: {loihi_perf_df['soma_energy'].mean()} J ({100.0 * loihi_perf_df['soma_energy'].mean() / total_loihi_energy} %)")
-    print(f"Loihi - Mean per-timestep Loihi network energy: {loihi_perf_df['network_energy'].mean()} J ({100.0 * loihi_perf_df['network_energy'].mean() / total_loihi_energy} %)")
-    print(f"Loihi - Mean per-timestep Loihi fired: {loihi_perf_df['fired'].mean()}")
-    print(f"Loihi - total spikes: {loihi_perf_df['spikes'].sum()}")
-    print(f"Loihi - total timestep latency: {analog_perf_df['sim_time'].sum()}")
+    print("=" * 80)
+    print("Per-Inference Results")
+    print("=" * 80)
+    print(per_inference_results.to_string())
+    print()
 
+    # Per time-step
+    indiveri_mean_energy = analog_perf_df['total_energy'].mean()
+    loihi_mean_energy = loihi_perf_df['total_energy'].mean()
 
-    print("***")
+     # Per time-step
+    perf_filename = "perf_analog_mnist.csv"
+    indiveri_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
+    indiveri_mean_energy = indiveri_df['total_energy'].mean()
+
+    perf_filename = "perf_loihi_mnist.csv"
+    loihi_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
+    loihi_mean_energy = loihi_df['total_energy'].mean()
+
+    def per_timestep_row(df, label, mean_energy):
+        return {
+            "Platform": label,
+            "Total Energy (uJ)": df['total_energy'].mean() * 1e6,
+            "Total Energy (%)": 100.0,
+            "Soma Energy (uJ)": df['soma_energy'].mean() * 1e6,
+            "Soma Energy (%)": 100.0 * df['soma_energy'].mean() / mean_energy,
+            "Synapse Energy (uJ)": df['synapse_energy'].mean() * 1e6,
+            "Synapse Energy (%)": 100.0 * df['synapse_energy'].mean() / mean_energy,
+            "Network Energy (uJ)": df['network_energy'].mean() * 1e6,
+            "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
+            "Firing Neurons": df['fired'].mean(),
+            "Time-step Latency": df['sim_time'].mean(),
+            "Total Spikes": df['spikes'].sum(),
+        }
+
+    per_timestep_results = pd.DataFrame([
+        per_timestep_row(indiveri_df, "Loihi-Indiveri", indiveri_mean_energy),
+        per_timestep_row(loihi_df, "Loihi",    loihi_mean_energy),
+    ]).set_index("Platform")
+
+    # print("=" * 80)
+    # print("Per Time-step Results")
+    # print("=" * 80)
+    # print(per_timestep_results.to_string())
+    # print()
+
+    # Save to CSV
+    combined = pd.concat(
+        [per_inference_results, per_timestep_results],
+        keys=["Per-Inference", "Per-Timestep"]
+    )
+    combined.to_csv(os.path.join(RUN_PATH, "indiveri_shd_results.csv"))
+    print("Results saved to indiveri_shd_results.csv")
 
     # *** Other misc plots ***
     fig = plt.figure(figsize=(12.0, 8.0))
@@ -774,173 +820,101 @@ def plot_shd(num_inputs, timesteps_per_input, labels, weights):
     #  intended for publication or presentation.
     plt.savefig(os.path.join(RUN_PATH, "shd.png"), dpi=300)
 
+    return loihi_df, indiveri_df
 
-def plot_mnist(num_inputs, timesteps_per_input, inputs, weights):
-    spike_filename = f"spikes_analog_mnist.csv"
+
+def plot_mnist(num_inputs, timesteps_per_input):
+    print("Plotting MNIST results")
     perf_filename = f"perf_analog_mnist.csv"
-
-    in_neurons = weights["fc1.weight"].shape[1]
-    hidden_neurons = weights["fc1.weight"].shape[0]
-    out_neurons = weights["fc2.weight"].shape[0]
-
-    """
-    # Read in simulation results
-    with open(os.path.join(RUN_PATH, spike_filename)) as spike_csv:
-        spike_data = csv.DictReader(spike_csv)
-
-        in_spikes = [[] for _ in range(0, in_neurons)]
-        hidden_spikes = [[] for _ in range(0, hidden_neurons)]
-        out_spikes = [[] for _ in range(0, out_neurons)]
-        for spike in spike_data:
-            # Spike entry has the format <group_name.neuron_id,timestep>
-            timestep, neuron = int(spike["timestep"]), spike["neuron"]
-            group_name, neuron_id = neuron.split(".")
-            neuron_id = int(neuron_id)
-            # Track spikes for all three layers
-            if group_name == "in":
-                in_spikes[neuron_id].append(timestep)
-            elif group_name == "hidden":
-                hidden_spikes[neuron_id].append(timestep)
-            elif group_name == "out":
-                out_spikes[neuron_id].append(timestep)
-            else:
-                print(f"Warning: Group {group_name} not recognized!")
-
-    # 2) Create a raster plot of all spikes
-    cumulative_counts = calculate_cumulative_spikes(
-        out_spikes, out_neurons, timesteps_per_input * num_inputs,
-        timesteps_per_input)
-
-    fig = plt.figure(figsize=(12.0, 8.0))
-    gs = GridSpec(4, 1, height_ratios=[2, 4, 4, 4], hspace=0.1)
-
-    # Top subplot for MNIST digits
-    ax_digits = fig.add_subplot(gs[0])
-    ax_digits.set_xticks([])
-    ax_digits.set_yticks([])
-
-    # Calculate positions for each digit
-    digit_width = 28  # MNIST digits are 28x28
-    time_per_digit = timesteps_per_input
-
-    # Create a blank canvas for all digits
-    total_timesteps = timesteps_per_input * num_inputs
-    display_height = 20  # Adjust this factor to change digit height
-
-    # Place each digit at its corresponding time position
-    for i, digit in enumerate(inputs[0:num_inputs, :]):
-        start_time = i * time_per_digit
-        # Calculate extent for each digit: [left, right, bottom, top]
-        # Width of each digit display is set to match the time window
-        digit_extent = [start_time, start_time + time_per_digit, 0, display_height]
-        ax_digits.imshow(digit.reshape(digit_width, digit_width),
-                        cmap='gray', aspect='auto', extent=digit_extent)
-
-    # Display the digits
-    ax_digits.set_xlim(0, total_timesteps)
-    ax_digits.set_ylim(0, display_height)
-    ax_digits.set_title('Mixed-Signal Architecture Classifying MNIST')
-
-    ax_spikes = fig.add_subplot(gs[1])
-    ax_spikes.set_xlim((0, total_timesteps))
-    ax_spikes.set_ylim((0, in_neurons + hidden_neurons + out_neurons))
-
-    total_neurons = 0
-    for neuron_id in range(0, in_neurons):
-        ax_spikes.scatter(in_spikes[neuron_id],
-                    [total_neurons]*len(in_spikes[neuron_id]), c='r', s=2,
-                    marker='.', linewidths=0.5)
-        total_neurons += 1
-
-    for neuron_id in range(0, hidden_neurons):
-        ax_spikes.scatter(hidden_spikes[neuron_id],
-                    [total_neurons]*len(hidden_spikes[neuron_id]), c='b', s=2,
-                    marker='.', linewidths=0.5)
-        total_neurons += 1
-
-    for neuron_id in range(0, out_neurons):
-        ax_spikes.scatter(out_spikes[neuron_id],
-                    [total_neurons]*len(out_spikes[neuron_id]), c='k', s=2,
-                    marker='.', linewidths=0.5)
-        total_neurons += 1
-
-    # Add vertical lines to show digit presentation boundaries
-    for i in range(num_inputs + 1):
-        ax_spikes.axvline(x=i * time_per_digit, color='gray', linestyle='--', alpha=0.3)
-    ax_spikes.set_ylabel("Neuron")
-    ax_spikes.set_xticks([])
-
-    # Plot the output neuron spike counts
-    ax_potentials = fig.add_subplot(gs[2])
-    ax_potentials.set_xlim((0, total_timesteps))
-    ax_potentials.plot(cumulative_counts.transpose())
-    # Add vertical lines to show digit presentation boundaries
-    for i in range(num_inputs + 1):
-        ax_potentials.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
-    ax_potentials.set_ylabel("Spike Counts")
-    ax_potentials.set_xticks([])
-    ax_potentials.set_xlabel("")
-    ax_perf = fig.add_subplot(gs[3])
-    ax_perf.set_xlim((0, total_timesteps))
-    """
     perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
     perf_df["total_energy_uj"] = perf_df["total_energy"] * 1.0e6
     perf_df["soma_energy_uj"] = perf_df["soma_energy"] * 1.0e6
-    """
-    perf_df.plot(x="timestep", y=["total_energy_uj", "soma_energy_uj"], ax=ax_perf)
-    #perf_df.plot(x="timestep", y=["soma_energy_uj",], ax=ax_perf)
-    for i in range(num_inputs + 1):
-        ax_perf.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
-    ax_perf.set_ylabel("Simulated Energy (uJ)")
-    ax_perf.get_legend().remove()
 
-    ax_perf.set_xlabel("Time-step")
-    plt.savefig("runs/indiveri/mnist_raster.png", dpi=300)
-    plt.savefig("runs/indiveri/mnist_raster.pdf")
-    """
+    # Per-inference
+    perf_filename = "perf_analog_mnist.csv"
+    indiveri_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
+    indiveri_mean_energy = indiveri_df['total_energy'].sum() / num_inputs
 
-    print("******")
-    print("Per-inference")
-    mean_energy = perf_df['total_energy'].sum() / num_inputs
-    print(f"Per-inference Total Indiveri energy: {mean_energy} J (100 %)")
-    print(f"Per-inference Soma Indiveri energy: {perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Per-inference Synapse Indiveri energy: {perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Per-inference Network Indiveri energy: {perf_df['network_energy'].sum() / num_inputs} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Per-inference Indiveri firing neurons: {perf_df['fired'].sum() / num_inputs}")
-    print(f"Per-inference Indiveri Time-step Latency: {perf_df['sim_time'].sum() / num_inputs}")
-    print("***")
-    perf_filename = f"perf_loihi_mnist.csv"
-    perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
-    print(f"Per-inference Total Loihi energy: {perf_df['total_energy'].sum() / num_inputs} J (100 %)")
-    print(f"Per-inference Soma Loihi energy: {perf_df['soma_energy'].sum() / num_inputs} J ({100.0 * perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Per-inference Synapse Loihi energy: {perf_df['synapse_energy'].sum() / num_inputs} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Per-inference Network Loihi energy: {perf_df['network_energy'].sum() / num_inputs} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Per-inference Loihi firing neurons: {perf_df['fired'].sum() / num_inputs}")
-    print(f"Per-inference Loihi time-step latency: {perf_df['sim_time'].sum() / num_inputs}")
+    perf_filename = "perf_loihi_mnist.csv"
+    loihi_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
+    loihi_mean_energy = loihi_df['total_energy'].sum() / num_inputs
 
-    print("******")
-    print("Per time-step")
-    perf_filename = f"perf_analog_mnist.csv"
-    perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
-    mean_energy = perf_df['total_energy'].mean()
-    print(f"Mean Total Indiveri energy: {mean_energy} J (100 %)")
-    print(f"Mean Soma Indiveri energy: {perf_df['soma_energy'].mean()} J ({100.0 * perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Mean Synapse Indiveri energy: {perf_df['synapse_energy'].mean()} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Mean Network Indiveri energy: {perf_df['network_energy'].mean()} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Mean Indiveri firing neurons: {perf_df['fired'].mean()}")
-    print(f"Mean Indiveri time-step latency: {perf_df['sim_time'].mean()}")
-    print(f"Mean Time-step Latency: {perf_df['spikes'].sum()}")
-    print("***")
-    perf_filename = f"perf_loihi_mnist.csv"
-    perf_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
-    mean_energy = perf_df['total_energy'].mean()
-    print(f"Mean Total Loihi energy: {perf_df['total_energy'].mean()} J (100 %)")
-    print(f"Mean Soma Loihi energy: {perf_df['soma_energy'].mean()} J ({100.0 * perf_df['soma_energy'].mean() / mean_energy} %)")
-    print(f"Mean Synapse Loihi energy: {perf_df['synapse_energy'].mean()} J ({100.0 * perf_df['synapse_energy'].mean() / mean_energy} %)")
-    print(f"Mean Network Loihi energy: {perf_df['network_energy'].mean()} J ({100.0 * perf_df['network_energy'].mean() / mean_energy} %)")
-    print(f"Mean Loihi firing neurons: {perf_df['fired'].mean()}")
-    print(f"Mean Loihi time-step latency: {perf_df['sim_time'].mean()}")
-    print(f"Total Loihi spikes: {perf_df['spikes'].sum()}")
+    # Calculate accuracy for both sets of runs
+    indiveri_accuracy = calculate_accuracy(num_inputs, "mnist", True, timesteps_per_input)
+    loihi_accuracy = calculate_accuracy(num_inputs, "mnist", False, timesteps_per_input)
+
+    def per_inference_row(df, label, mean_energy, accuracy):
+        return {
+            "Platform": label,
+            "Total Energy (uJ)": df['total_energy'].sum() / num_inputs * 1e6,
+            "Total Energy (%)": 100.0,
+            "Soma Energy (uJ)": df['soma_energy'].sum() / num_inputs * 1e6,
+            "Soma Energy (%)": 100.0 * df['soma_energy'].mean()    / mean_energy,
+            "Synapse Energy (uJ)": df['synapse_energy'].sum()/ num_inputs * 1e6,
+            "Synapse Energy (%)": 100.0 * df['synapse_energy'].mean() / mean_energy,
+            "Network Energy (uJ)": df['network_energy'].sum()/ num_inputs * 1e6,
+            "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
+            "Firing Neurons":  df['fired'].sum() / num_inputs,
+            "Time-step Latency (ms)": df['sim_time'].sum() / num_inputs * 1e3,
+            "Accuracy (%)": accuracy
+        }
+
+    per_inference_results = pd.DataFrame([
+        per_inference_row(indiveri_df, "Indiveri", indiveri_mean_energy, indiveri_accuracy),
+        per_inference_row(loihi_df, "Loihi",    loihi_mean_energy, loihi_accuracy),
+    ]).set_index("Platform")
+
+    print("=" * 80)
+    print("Per-Inference Results")
+    print("=" * 80)
+    print(per_inference_results.to_string())
+    print()
+
+    # Per time-step
+    perf_filename = "perf_analog_mnist.csv"
+    indiveri_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
+    indiveri_mean_energy = indiveri_df['total_energy'].mean()
+
+    perf_filename = "perf_loihi_mnist.csv"
+    loihi_df = pd.read_csv(os.path.join(RUN_PATH, perf_filename))
+    loihi_mean_energy = loihi_df['total_energy'].mean()
+
+    def per_timestep_row(df, label, mean_energy):
+        return {
+            "Platform": label,
+            "Total Energy (uJ)": df['total_energy'].mean() * 1e6,
+            "Total Energy (%)": 100.0,
+            "Soma Energy (uJ)": df['soma_energy'].mean() * 1e6,
+            "Soma Energy (%)": 100.0 * df['soma_energy'].mean() / mean_energy,
+            "Synapse Energy (uJ)": df['synapse_energy'].mean() * 1e6,
+            "Synapse Energy (%)": 100.0 * df['synapse_energy'].mean() / mean_energy,
+            "Network Energy (uJ)": df['network_energy'].mean() * 1e6,
+            "Network Energy (%)": 100.0 * df['network_energy'].mean() / mean_energy,
+            "Firing Neurons": df['fired'].mean(),
+            "Time-step Latency (ms)": df['sim_time'].mean() * 1e3,
+            "Total Spikes": df['spikes'].sum(),
+        }
+
+    per_timestep_results = pd.DataFrame([
+        per_timestep_row(indiveri_df, "Loihi-Indiveri", indiveri_mean_energy),
+        per_timestep_row(loihi_df, "Loihi",    loihi_mean_energy),
+    ]).set_index("Platform")
+
+    # print("=" * 80)
+    # print("Per Time-step Results")
+    # print("=" * 80)
+    # print(per_timestep_results.to_string())
+    # print()
+
+    # Save to CSV
+    combined = pd.concat(
+        [per_inference_results, per_timestep_results],
+        keys=["Per-Inference", "Per-Timestep"]
+    )
+    combined.to_csv(os.path.join(RUN_PATH, "indiveri_mnist_results.csv"))
+    print("Results saved to indiveri_mnist_results.csv")
+
+    return loihi_df, indiveri_df
 
 # MNIST is the first application
 # Spiking Heidelberg Digits (SHD) is the second neuromorphic application.
@@ -979,3 +953,119 @@ if __name__ == "__main__":
 
     print("Finished.")
     #plt.show()  # Enable if running on the host and we want to display
+
+
+# Archived code from plot_mnist()
+"""
+# Read in simulation results
+with open(os.path.join(RUN_PATH, spike_filename)) as spike_csv:
+    spike_data = csv.DictReader(spike_csv)
+
+    in_spikes = [[] for _ in range(0, in_neurons)]
+    hidden_spikes = [[] for _ in range(0, hidden_neurons)]
+    out_spikes = [[] for _ in range(0, out_neurons)]
+    for spike in spike_data:
+        # Spike entry has the format <group_name.neuron_id,timestep>
+        timestep, neuron = int(spike["timestep"]), spike["neuron"]
+        group_name, neuron_id = neuron.split(".")
+        neuron_id = int(neuron_id)
+        # Track spikes for all three layers
+        if group_name == "in":
+            in_spikes[neuron_id].append(timestep)
+        elif group_name == "hidden":
+            hidden_spikes[neuron_id].append(timestep)
+        elif group_name == "out":
+            out_spikes[neuron_id].append(timestep)
+        else:
+            print(f"Warning: Group {group_name} not recognized!")
+
+# 2) Create a raster plot of all spikes
+cumulative_counts = calculate_cumulative_spikes(
+    out_spikes, out_neurons, timesteps_per_input * num_inputs,
+    timesteps_per_input)
+
+fig = plt.figure(figsize=(12.0, 8.0))
+gs = GridSpec(4, 1, height_ratios=[2, 4, 4, 4], hspace=0.1)
+
+# Top subplot for MNIST digits
+ax_digits = fig.add_subplot(gs[0])
+ax_digits.set_xticks([])
+ax_digits.set_yticks([])
+
+# Calculate positions for each digit
+digit_width = 28  # MNIST digits are 28x28
+time_per_digit = timesteps_per_input
+
+# Create a blank canvas for all digits
+total_timesteps = timesteps_per_input * num_inputs
+display_height = 20  # Adjust this factor to change digit height
+
+# Place each digit at its corresponding time position
+for i, digit in enumerate(inputs[0:num_inputs, :]):
+    start_time = i * time_per_digit
+    # Calculate extent for each digit: [left, right, bottom, top]
+    # Width of each digit display is set to match the time window
+    digit_extent = [start_time, start_time + time_per_digit, 0, display_height]
+    ax_digits.imshow(digit.reshape(digit_width, digit_width),
+                    cmap='gray', aspect='auto', extent=digit_extent)
+
+# Display the digits
+ax_digits.set_xlim(0, total_timesteps)
+ax_digits.set_ylim(0, display_height)
+ax_digits.set_title('Mixed-Signal Architecture Classifying MNIST')
+
+ax_spikes = fig.add_subplot(gs[1])
+ax_spikes.set_xlim((0, total_timesteps))
+ax_spikes.set_ylim((0, in_neurons + hidden_neurons + out_neurons))
+
+total_neurons = 0
+for neuron_id in range(0, in_neurons):
+    ax_spikes.scatter(in_spikes[neuron_id],
+                [total_neurons]*len(in_spikes[neuron_id]), c='r', s=2,
+                marker='.', linewidths=0.5)
+    total_neurons += 1
+
+for neuron_id in range(0, hidden_neurons):
+    ax_spikes.scatter(hidden_spikes[neuron_id],
+                [total_neurons]*len(hidden_spikes[neuron_id]), c='b', s=2,
+                marker='.', linewidths=0.5)
+    total_neurons += 1
+
+for neuron_id in range(0, out_neurons):
+    ax_spikes.scatter(out_spikes[neuron_id],
+                [total_neurons]*len(out_spikes[neuron_id]), c='k', s=2,
+                marker='.', linewidths=0.5)
+    total_neurons += 1
+
+# Add vertical lines to show digit presentation boundaries
+for i in range(num_inputs + 1):
+    ax_spikes.axvline(x=i * time_per_digit, color='gray', linestyle='--', alpha=0.3)
+ax_spikes.set_ylabel("Neuron")
+ax_spikes.set_xticks([])
+
+# Plot the output neuron spike counts
+ax_potentials = fig.add_subplot(gs[2])
+ax_potentials.set_xlim((0, total_timesteps))
+ax_potentials.plot(cumulative_counts.transpose())
+# Add vertical lines to show digit presentation boundaries
+for i in range(num_inputs + 1):
+    ax_potentials.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
+ax_potentials.set_ylabel("Spike Counts")
+ax_potentials.set_xticks([])
+ax_potentials.set_xlabel("")
+ax_perf = fig.add_subplot(gs[3])
+ax_perf.set_xlim((0, total_timesteps))
+"""
+
+"""
+perf_df.plot(x="timestep", y=["total_energy_uj", "soma_energy_uj"], ax=ax_perf)
+#perf_df.plot(x="timestep", y=["soma_energy_uj",], ax=ax_perf)
+for i in range(num_inputs + 1):
+    ax_perf.axvline(x=i*time_per_digit + 1, color='gray', linestyle='--', alpha=0.3)
+ax_perf.set_ylabel("Simulated Energy (uJ)")
+ax_perf.get_legend().remove()
+
+ax_perf.set_xlabel("Time-step")
+plt.savefig("runs/indiveri/mnist_raster.png", dpi=300)
+plt.savefig("runs/indiveri/mnist_raster.pdf")
+"""
