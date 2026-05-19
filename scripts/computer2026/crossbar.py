@@ -101,14 +101,12 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
 
     if analog_synapses:
         snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_aware.pt")
-        snn = torch.load(snn_path, pickle_module=dill,
-                         map_location=torch.device("cpu")).state_dict()
+        snn = torch.load(snn_path, map_location=torch.device("cpu"))
     else:
         # Load a normally trained rate-coded SHD model to deploy on Loihi's
         #  (digital, full-precision) synapses
         snn_path = os.path.join(DATA_PATH, "app_models", "shd_70_256R_20.pt")
-        snn = torch.load(snn_path, pickle_module=dill,
-                         map_location=torch.device("cpu")).state_dict()
+        snn = torch.load(snn_path, map_location=torch.device("cpu"))
 
     weights = {}
     if analog_synapses:
@@ -340,9 +338,7 @@ def load_dataset(num_inputs, analog_neurons=True):
         # Use a SNN trained using circuit-aware methods i.e. was
         #  trained specifically on an IMAC-sim crossbar model.
         spiking_digits_model = torch.load(
-                os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_aware.pt"),
-                map_location=torch.device("cpu")).state_dict()
-
+                os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_aware.pt"))
         for attribute_name, param in spiking_digits_model.items():
             weights[attribute_name] = param.detach().numpy()
     else: # Use digital LIF neuron models
