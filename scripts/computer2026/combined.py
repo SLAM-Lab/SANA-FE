@@ -456,7 +456,7 @@ def plot_spiking_digits(num_inputs):
         }
 
     per_timestep_results = pd.DataFrame([
-        per_timestep_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy),
+        per_timestep_row(analog_perf_df, "Loihi-IMAC-Indiveri", imac_mean_energy),
     ]).set_index("Platform")
 
     # print("=" * 80)
@@ -485,7 +485,7 @@ def plot_spiking_digits(num_inputs):
         }
 
     per_inference_results = pd.DataFrame([
-        per_inference_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy, imac_indiveri_accuracy),
+        per_inference_row(analog_perf_df, "Loihi-IMAC-Indiveri", imac_mean_energy, imac_indiveri_accuracy),
     ]).set_index("Platform")
 
     print("=" * 80)
@@ -828,7 +828,7 @@ def plot_mnist(num_inputs):
         }
 
     per_timestep_results = pd.DataFrame([
-        per_timestep_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy),
+        per_timestep_row(analog_perf_df, "Loihi-IMAC-Indiveri", imac_mean_energy),
     ]).set_index("Platform")
 
     # print("=" * 80)
@@ -857,7 +857,7 @@ def plot_mnist(num_inputs):
         }
 
     per_inference_results = pd.DataFrame([
-        per_inference_row(analog_perf_df, "Loihi-IMAC", imac_mean_energy, imac_indiveri_accuracy),
+        per_inference_row(analog_perf_df, "Loihi-IMAC-Indiveri", imac_mean_energy, imac_indiveri_accuracy),
     ]).set_index("Platform")
 
     print("=" * 80)
@@ -871,8 +871,8 @@ def plot_mnist(num_inputs):
         [per_inference_results, per_timestep_results],
         keys=["Per-Inference", "Per-Timestep"]
     )
-    combined.to_csv(os.path.join(RUN_PATH, "imac_mnist_results.csv"))
-    print("Results saved to imac_mnist_results.csv")
+    combined.to_csv(os.path.join(RUN_PATH, "imac_indiveri_mnist_results.csv"))
+    print("Results saved to imac_indiveri_mnist_results.csv")
 
 
 if __name__ == "__main__":
