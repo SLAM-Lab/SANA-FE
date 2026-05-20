@@ -127,7 +127,7 @@ void sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
                     supported_attribute_names.end() &&
             (attribute_warnings <= max_attribute_warnings))
     {
-        INFO("Warning: Attribute (%s) not supported by model: %s, will be "
+        INFO("Warning: Attribute (%s) not supported by model: %s, may be "
              "ignored.\nEither remove this attribute from the SNN/Architecture "
              "description file, be more specific which hardware requires it "
              "(using synapse/dendrite/soma sections) or register the attribute "
