@@ -48,13 +48,18 @@ NETWORK_FILENAME = "dvs_gesture_32x32.net.tagged"
 DATA_PATH = args.data_path
 RUN_DIR = args.run_path
 RUN_EXPERIMENTS = args.run
+QUICK_RUN = args.quick
 
 ARCH_PATH = os.path.join(PROJECT_DIR, "arch", ARCH_FILENAME)
 GENERATED_NETWORK_PATH = os.path.join(DATA_PATH, NETWORK_FILENAME)
 
 # Simulation parameters
 TIMESTEPS = 128
-PARALLEL_ACCESS_VALUES = list(range(1, 17))  # [1, 2, 3, ..., 16]
+
+if QUICK_RUN:
+    PARALLEL_ACCESS_VALUES = list(range(1, 17, 3))  # [1, 4, 7, 10, 13, 16]
+else:
+    PARALLEL_ACCESS_VALUES = list(range(1, 17))  # [1, 2, 3, ..., 16]
 PARALLELIZATION_MODIFIERS = (0, 25, 30, 50, 60, 75, 90, 100)  # %
 
 def create_modified_arch_file(original_arch_path, max_parallel_accesses,
