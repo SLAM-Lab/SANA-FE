@@ -11,7 +11,6 @@ import csv
 import torch
 import os
 import sys
-import dill
 import numpy as np
 import pandas as pd
 import argparse
@@ -73,9 +72,8 @@ def load_dataset(num_inputs, dataset, analog_neurons):
         #  variations (unlike spiking digits)
         mnist_model = torch.load(
                 os.path.join(DATA_PATH, "app_models", "mnist_784_128_10.pt"),
-                pickle_module=dill,
                 map_location=torch.device("cpu"))
-        for attribute_name, param in mnist_model.named_parameters():
+        for attribute_name, param in mnist_model.items():
             weights[attribute_name] = param.detach().numpy()
 
         transform = torchvision.transforms.Compose([
@@ -123,10 +121,10 @@ def load_dataset(num_inputs, dataset, analog_neurons):
             #  (Leaky in SNNTorch) neuron
             spiking_digits = torch.load(
                     os.path.join(DATA_PATH, "app_models", "shd_70_200_20.pt"),
-                    pickle_module=dill,
+                    weights_only=True,
                     map_location=torch.device("cpu"))
 
-            for attribute_name, param in spiking_digits.named_parameters():
+            for attribute_name, param in spiking_digits.items():
                 weights[attribute_name] = param.detach().numpy()
 
         # Load the spiking digits test inputs from the raw dataset, applying the
