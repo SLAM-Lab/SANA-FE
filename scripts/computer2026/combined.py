@@ -330,7 +330,7 @@ def load_dataset(num_inputs):
     # Use a SNN trained using circuit-aware methods i.e. was
     #  trained specifically on an IMAC-sim crossbar model.
     spiking_digits_model = torch.load(
-            os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_bin_crossbar_indiveri_aware_60_attempt2.pt.state"),
+            os.path.join(DATA_PATH, "app_models", "shd_70_256R_20_crossbar_indiveri_aware.pt"),
             map_location=torch.device("cpu"), weights_only=True)
 
     for attribute_name, param in spiking_digits_model.items():
