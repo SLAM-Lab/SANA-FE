@@ -82,7 +82,7 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
         tonic.transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
     ])
     testset = tonic.datasets.SHD(
-        save_to=os.path.join(RUN_PATH, "data"),
+        save_to=os.path.join(DATA_PATH, "datasets"),
         transform=transform, train=False
     )
     dataloader = torch.utils.data.DataLoader(testset, batch_size=1)
@@ -355,7 +355,7 @@ def load_dataset(num_inputs, analog_neurons=True):
         tonic.transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
     ])
     testset = tonic.datasets.SHD(
-        save_to=os.path.join(RUN_PATH, "data"),
+        save_to=os.path.join(DATA_PATH, "datasets"),
         transform=frame_transform, train=False
     )
     dataloader = torch.utils.data.DataLoader(testset, batch_size=1)
@@ -698,8 +698,10 @@ def run_mnist(num_inputs, analog_synapses=True, timesteps=100):
         transforms.Resize((20, 20)),
         transforms.Normalize((0,), (1,))  # MNIST normalization
     ])
-    test_dataset = datasets.MNIST(os.path.join(RUN_PATH, "data"), train=False,
-                                transform=transform, download=True)
+    test_dataset = datasets.MNIST(os.path.join(DATA_PATH, "datasets"),
+                                  train=False,
+                                  transform=transform,
+                                  download=True)
     dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     inputs = []
@@ -950,8 +952,8 @@ def calculate_mnist_accuracy(num_inputs, analog_synapses=True):
         transforms.Resize((20, 20)),
         transforms.Normalize((0,), (1,))  # MNIST normalization
     ])
-    test_dataset = datasets.MNIST(os.path.join(RUN_PATH, "data"), train=False,
-                                transform=transform, download=True)
+    test_dataset = datasets.MNIST(os.path.join(DATA_PATH, "datasets"),
+                                  train=False, transform=transform, download=True)
     dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     inputs = []

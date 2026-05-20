@@ -81,7 +81,7 @@ def load_dataset(num_inputs, dataset, analog_neurons):
             torchvision.transforms.Grayscale(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0,), (1,))])
-        test_dataset = datasets.MNIST(root=os.path.join(RUN_PATH, "data"),
+        test_dataset = datasets.MNIST(root=os.path.join(DATA_PATH, "datasets"),
                                       train=False,
                                       download=True,
                                       transform=transform)
@@ -134,7 +134,7 @@ def load_dataset(num_inputs, dataset, analog_neurons):
             transforms.ToFrame(sensor_size=(70, 1, 1), time_window=1000)
         ])
         testset = tonic.datasets.SHD(
-            save_to="./runs/indiveri/data",
+            save_to=os.path.join(DATA_PATH, "datasets"),
             transform=frame_transform, train=False
         )
         dataloader = torch.utils.data.DataLoader(testset, batch_size=1)
