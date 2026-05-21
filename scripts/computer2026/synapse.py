@@ -60,10 +60,10 @@ if QUICK_RUN:
     PARALLEL_ACCESS_VALUES = list(range(1, 17, 3))  # [1, 4, 7, 10, 13, 16]
 else:
     PARALLEL_ACCESS_VALUES = list(range(1, 17))  # [1, 2, 3, ..., 16]
-PARALLELIZATION_MODIFIERS = (0, 25, 30, 50, 60, 75, 90, 100)  # %
+STATIC_RATIO = (30, 60, 90, 100)  # %
 
 def create_modified_arch_file(original_arch_path, max_parallel_accesses,
-                              run_dir, parallelization_modifier):
+                              run_dir, static_ratio):
     """
     Create a modified architecture YAML file with specified max_parallel_accesses
     """
@@ -79,13 +79,12 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses,
                         PROJECT_DIR, "plugins", "libloihi_synapse.so")
                     synapse['attributes']['model'] = "loihi"
                     synapse['attributes']['max_parallel_accesses'] = max_parallel_accesses
-                    synapse['attributes']['parallelizable_ratio'] = float(parallelization_modifier) / 100
-                    synapse['attributes']['duplication_ratio'] = float(parallelization_modifier) / 100
+                    synapse['attributes']['duplication_ratio'] = float(static_ratio) / 100
                     del synapse["attributes"]["latency_process_spike"]
                     del synapse["attributes"]["energy_process_spike"]
 
     # Create new filename
-    new_arch_filename = f"loihi_parallel_{max_parallel_accesses}_{parallelization_modifier}.yaml"
+    new_arch_filename = f"loihi_parallel_{max_parallel_accesses}_{static_ratio}.yaml"
     new_arch_path = os.path.join(run_dir, new_arch_filename)
 
     # Save modified architecture file
@@ -95,7 +94,7 @@ def create_modified_arch_file(original_arch_path, max_parallel_accesses,
     return new_arch_path
 
 
-def run_single_experiment(max_parallel_accesses, parallelization_modifier):
+def run_single_experiment(max_parallel_accesses, static_ratio):
     """
     Run a single experiment with specified max_parallel_accesses value
     """
@@ -104,7 +103,7 @@ def run_single_experiment(max_parallel_accesses, parallelization_modifier):
     try:
         # Create modified architecture file
         modified_arch_path = create_modified_arch_file(
-            ARCH_PATH, max_parallel_accesses, RUN_DIR, parallelization_modifier
+            ARCH_PATH, max_parallel_accesses, RUN_DIR, static_ratio
         )
 
         # Load architecture and network
@@ -114,8 +113,8 @@ def run_single_experiment(max_parallel_accesses, parallelization_modifier):
         chip.load(net)
 
         # Setup performance tracking files
-        perf_filename = f"perf_parallel_{max_parallel_accesses}_{parallelization_modifier}.csv"
-        messages_filename = f"messages_parallel_{max_parallel_accesses}_{parallelization_modifier}.csv"
+        perf_filename = f"perf_parallel_{max_parallel_accesses}_{static_ratio}.csv"
+        messages_filename = f"messages_parallel_{max_parallel_accesses}_{static_ratio}.csv"
         perf_path = os.path.join(RUN_DIR, perf_filename)
         messages_path = os.path.join(RUN_DIR, messages_filename)
 
@@ -144,7 +143,7 @@ def run_single_experiment(max_parallel_accesses, parallelization_modifier):
 
         result = {
             'max_parallel_accesses': max_parallel_accesses,
-            'parallelization_modifier': parallelization_modifier,
+            'static_ratio': static_ratio,
             'total_time': total_time,
             'total_energy': total_energy,
             'total_hops': total_hops,
@@ -176,7 +175,7 @@ def main():
     """
     print("Starting DVS Gesture parallel architecture exploration")
     print(f"Running experiments with max_parallel_accesses values: {PARALLEL_ACCESS_VALUES}")
-    print(f"Running experiments with {PARALLELIZATION_MODIFIERS}% parallelization")
+    print(f"Running experiments with {STATIC_RATIO}% static ratios")
     results_path = os.path.join(RUN_DIR, "parallel_exploration_results.csv")
 
     # Ensure run directory exists
@@ -186,10 +185,10 @@ def main():
     if RUN_EXPERIMENTS:
         # Run experiments in parallel
         results = []
-        for p in PARALLELIZATION_MODIFIERS:  # % of synaptic energy/latency
+        for s in STATIC_RATIO:  # % of synaptic energy/latency
             for i, max_parallel_accesses in enumerate(PARALLEL_ACCESS_VALUES):
                 print(f"\nProgress: {i+1}/{len(PARALLEL_ACCESS_VALUES)}")
-                result = run_single_experiment(max_parallel_accesses, p)
+                result = run_single_experiment(max_parallel_accesses, s)
                 results.append(result)
 
         # Sort results by max_parallel_accesses for easier analysis
@@ -236,35 +235,18 @@ def main():
     })
 
     # Split by calibration modifier
-    df_0 = results_df[results_df["parallelization_modifier"] == 0].sort_values("parallelization_modifier")
-    df_25 = results_df[results_df["parallelization_modifier"] == 25].sort_values("parallelization_modifier")
-    df_30 = results_df[results_df["parallelization_modifier"] == 30].sort_values("parallelization_modifier")
-    df_50 = results_df[results_df["parallelization_modifier"] == 50].sort_values("parallelization_modifier")
-    df_60 = results_df[results_df["parallelization_modifier"] == 60].sort_values("parallelization_modifier")
-    df_75 = results_df[results_df["parallelization_modifier"] == 75].sort_values("parallelization_modifier")
-    df_90 = results_df[results_df["parallelization_modifier"] == 90].sort_values("parallelization_modifier")
-    df_100 = results_df[results_df["parallelization_modifier"] == 100].sort_values("parallelization_modifier")
+    df_0 = results_df[results_df["static_ratio"] == 0].sort_values("static_ratio")
+    df_30 = results_df[results_df["static_ratio"] == 30].sort_values("static_ratio")
+    df_60 = results_df[results_df["static_ratio"] == 60].sort_values("static_ratio")
+    df_90 = results_df[results_df["static_ratio"] == 90].sort_values("static_ratio")
+    df_100 = results_df[results_df["static_ratio"] == 100].sort_values("static_ratio")
     x = df_100["max_parallel_accesses"]
 
     # --- Latency (Frames/s) plot ---
     fig = plt.figure(figsize=(1.5, 1.5))
-    y_0 = 1.0 / df_0["total_time"].values
-    y_25 = 1.0 / df_25["total_time"].values
-    y_50 = 1.0 / df_50["total_time"].values
-    y_75 = 1.0 / df_75["total_time"].values
     y_100 = 1.0 / df_100["total_time"].values
 
-    n_blues = 3
-    blues_colors = [matplotlib.colormaps['Blues'](v) for v in np.linspace(0.6, 0.9, n_blues)]
-    colors = blues_colors
-    colors.extend(['black',])
-
-    plt.fill_between(x, y_25, y_100, alpha=0.25, color='#56B4E9', linewidth=0)
-    #plt.plot(x, y_0, 'o-', linewidth=1, markersize=2, color=colors[0])
-    plt.plot(x, y_25, 'o-', linewidth=1, markersize=2, color=colors[3])
-    plt.plot(x, y_50, 'o-', linewidth=1, markersize=2, color=colors[2])
-    plt.plot(x, y_75, 'o-', linewidth=1, markersize=2, color=colors[1])
-    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color=colors[0])
+    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color='#56B4E9')
 
     x_val = 4
     y_val = y_100[x.values == x_val][0]
@@ -279,13 +261,7 @@ def main():
     plt.grid(True, alpha=0.3)
     plt.xticks(range(0, 17, 4))
     plt.xlim((0, 17))
-    plt.ylim((50, 650))
-
-    # Annotate each line at the right end with colored text
-    plt.text(17, y_25[-1]-35, '$p=0.25$', color=colors[3], fontsize=6, va='center', ha='right')
-    plt.text(17, y_50[-1]+16, '$p=0.50$', color=colors[2], fontsize=6, va='center', ha='right')
-    plt.text(17, y_75[-1]+25, '$p=0.75$', color=colors[1], fontsize=6, va='center', ha='right')
-    plt.text(17, y_100[-1]+25, '$p=1.00$', color=colors[0], fontsize=6, va='center', ha='right')
+    plt.ylim((100, 600))
 
     plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.png"), dpi=300)
