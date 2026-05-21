@@ -39,7 +39,7 @@ def spikes_to_dataframe(source: Any) -> pd.DataFrame:
         return source
 
     if _is_path(source):
-        df = pd.read_csv(source)
+        df = pd.read_csv(source, dtype={"neuron": str})
         split = df["neuron"].str.rsplit(".", n=1, expand=True)
         df["group"] = split[0]
         df["neuron_offset"] = split[1].astype(int)
