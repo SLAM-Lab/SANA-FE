@@ -33,7 +33,7 @@ int main(int argc, const char *argv[])
     argc -= optional_flags.total_args_parsed;
     if (argc < RequiredProgramArgs::program_nargs)
     {
-        INFO("Usage: ./sim [-psvmo] <arch description> <network description> "
+        INFO("Usage: ./sim [-mnopstvNS] <arch description> <network description> "
              "<timesteps>\n");
         return 0;
     }
