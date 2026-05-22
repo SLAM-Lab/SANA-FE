@@ -45,8 +45,6 @@ int main(int argc, const char *argv[])
 #define GIT_COMMIT "git-hash-unknown"
 #endif
         INFO("Running SANA-FE simulation (build:%s)\n", GIT_COMMIT);
-        booksim_init();
-
         const RequiredProgramArgs required_args =
                 parse_required_args(arg_vec, optional_flags.total_args_parsed);
         sanafe::Architecture arch =

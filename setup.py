@@ -87,5 +87,6 @@ setup(
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
     python_requires=">=3.8",
+    install_requires=["pybind11>=2.6.0",],
     packages=find_packages()
 )

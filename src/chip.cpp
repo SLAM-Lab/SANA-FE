@@ -99,7 +99,7 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
     // Use a unique_ptr for the config so that we don't need to include Booksim
     //  library in the header (meaning that plugins using chip.hpp don't need to
     //  also include this library)
-    booksim_config = std::make_unique<BookSimConfig>(new_config);
+    booksim_config = std::make_shared<BookSimConfig>(new_config);
     chip_count++;
 }
 
@@ -1095,11 +1095,7 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
     sim_timings.energy_calculation_end_tm = std::chrono::steady_clock::now();
 
     sim_timings.scheduler_start_tm = sim_timings.energy_calculation_end_tm;
-    if (scheduler.timing_model == timing_model_cycle_accurate)
-    {
-        check_booksim_compatibility(scheduler, chip_count);
-    }
-    schedule_messages(ts, scheduler, *booksim_config);
+    schedule_messages(ts, scheduler, booksim_config);
     sim_timings.scheduler_end_tm = std::chrono::steady_clock::now();
 
     update_simulator_timings(sim_timings);
@@ -1831,23 +1827,6 @@ sanafe::SpikingChip::get_traces() const
     }
 
     return timestep_traces;
-}
-
-void sanafe::SpikingChip::check_booksim_compatibility(
-        const Scheduler &scheduler, const int /*sim_count*/)
-{
-    if ((scheduler.scheduler_threads.size() > 1) || (chip_count > 1))
-    {
-        INFO("Error: Cannot run multiple simultaneous cycle-accurate "
-             "simulations. The Booksim2 library does not support "
-             "concurrent runs as it has a lot of global state. For now "
-             "it's simplest to just not allow for concurrent runs. If you "
-             "need to simulate in parallel, launch separate SANA-FE "
-             "processes.");
-        throw std::runtime_error(
-                "Error: Cannot run multiple simultaneous cycle-accurate "
-                "simulations.");
-    }
 }
 
 sanafe::TimingModel sanafe::parse_timing_model(
