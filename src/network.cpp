@@ -635,15 +635,15 @@ void sanafe::SpikingNetwork::save_mappings_to_netlist(std::ofstream &out,
     }
 
     // Sort by mapping_order
-    std::sort(all_neurons.begin(), all_neurons.end(),
-            [](const Neuron &a, const Neuron &b) {
-                return a.mapping_order < b.mapping_order;
-            });
+    std::sort(all_neurons.begin(), all_neurons.end(), [](auto a, auto b) {
+        return a.get().mapping_order < b.get().mapping_order;
+    });
 
     // Save sorted mappings
-    for (const Neuron &neuron : all_neurons)
+    for (const auto &neuron_ref : all_neurons)
     {
-        out << netlist_mapping_to_netlist(neuron, group_name_to_id) << "\n";
+        out << netlist_mapping_to_netlist(neuron_ref.get(), group_name_to_id);
+        out << "\n";
     }
 }
 
