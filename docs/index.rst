@@ -74,6 +74,14 @@ These tutorials can be run locally or using Google Colab.
    api
    layers
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Models
+   :glob:
+
+   models/framework
+   models/*
+
 Indices and tables
 ==================
 

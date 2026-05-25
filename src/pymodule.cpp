@@ -703,22 +703,6 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     return result;
 }
 
-pybind11::dict pyget_model_attributes(const std::string &model_name)
-{
-    const auto model_attributes = sanafe::get_model_attributes(model_name);
-    if (model_attributes.size() == 0UL)
-    {
-        throw pybind11::key_error("Unknown model: " + model_name);
-    }
-
-    pybind11::dict result;
-    for (const auto &[name, description] : model_attributes)
-    {
-        result[pybind11::str(name)] = description;
-    }
-    return result;
-}
-
 } // end of anonymous namespace
 
 // Custom Python wrapper class for the Neuron class
@@ -869,9 +853,9 @@ PYBIND11_MODULE(sanafecpp, m)
     m.def("load_net", &sanafe::load_net, docstrings::load_net_doc,
             pybind11::arg("path"), pybind11::arg("arch"),
             pybind11::arg("use_netlist_format") = false);
-    m.def("get_model_attributes", &pyget_model_attributes, pybind11::arg("model_name"),
-            "Return the supported attributes for a given model, separated into "
-            "framework attributes (shared by all models) and model-specific attributes.");
+
+    m.attr("framework_attributes") = sanafe::PipelineUnit::framework_attributes;
+    m.attr("model_attributes") = sanafe::get_builtin_models();
 
     pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
             .value("buffer_before_dendrite_unit",

@@ -370,7 +370,6 @@ void sanafe::LoihiLifModel::set_attribute_hw(
     }
 }
 
-
 // NOLINTNEXTLINE(readability-function-size)
 void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
         const std::string &attribute_name, const ModelAttribute &param)
@@ -966,23 +965,22 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     throw std::invalid_argument(error);
 }
 
-const std::unordered_map<std::string, std::string> sanafe::get_model_attributes(
-        const std::string model_name)
+const sanafe::ModelMap &sanafe::get_builtin_models()
 {
-    using AttributeMap = std::unordered_map<std::string, std::string>;
-    static const std::unordered_map<std::string, const AttributeMap *> registry = {
-            {"current_based",
-                    &CurrentBasedSynapseModel::current_based_synapse_attributes},
-            {"leaky_integrate_fire", &LoihiLifModel::loihi_lif_attributes}};
+    // Use this wrapper function to construct a static map of all built-in
+    //  models and their attributes (with helpful descriptions)
+    static const std::map<std::string,
+            const std::unordered_map<std::string, std::string> *>
+            builtin_models = {{"current_based",
+                                      &CurrentBasedSynapseModel::
+                                              current_based_synapse_attributes},
+                    {"accumulator", nullptr},
+                    {"accumulator_with_delay", nullptr},
+                    {"taps", &MultiTapModel1D::multitap_attributes},
+                    {"input", &InputModel::input_attributes},
+                    {"leaky_integrate_and_fire",
+                            &LoihiLifModel::loihi_lif_attributes},
+                    {"truenorth", &TrueNorthModel::truenorth_attributes}};
 
-    const auto it = registry.find(model_name);
-    if (it != registry.end())
-    {
-        return *(it->second);
-    }
-    else
-    {
-        // Return empty mapping
-        return std::unordered_map<std::string, std::string>{};
-    }
+    return builtin_models;
 }

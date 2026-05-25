@@ -79,8 +79,6 @@ public:
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override {};
-
-private:
     // Technically soma attributes, but due to common usage, suppress warnings
     //  for these in the dendrite H/W too
     static inline const std::set<std::string> accumulator_attributes{
@@ -97,6 +95,8 @@ private:
             "w",
             "latency",
     };
+
+private:
     std::vector<std::optional<double>> accumulated_charges;
     std::vector<long int> timesteps_simulated;
 };
@@ -179,10 +179,13 @@ public:
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void reset() override;
+    static inline const std::unordered_map<std::string, std::string> multitap_attributes{
+            {"taps", "(int) Number of N dendritic 'taps' or compartments."},
+            {"time_constants", "(list[float]) List of RC line time constants, one per tap."},
+            {"space_constants", "(list[float]) List of RC line space constants, N-1 in total."}
+    };
 
 private:
-    static inline const std::set<std::string> multitap_attributes{
-            "taps", "time_constants", "space_constants"};
     // Modeling a 1D dendrite with taps
     std::vector<double> tap_voltages{std::vector<double>(1, 0.0)};
     std::vector<double> next_voltages{std::vector<double>(1, 0.0)};
@@ -259,8 +262,8 @@ public:
             {"reverse_reset_mode", "(str) The type of reset to apply on negative/reverse spikes [none/soft/hard/saturate]. Default=None"},
             {"reset", "(float) The potential to reset to after a spike. Default=0.0"},
             {"reverse_reset", "(float) The potential to reset to after a reverse spike."},
-            {"reverse_threshold", "(float) The potential at which a reverse spike is triggered."},
-            {"threshold", "(float) The potential at which a spike is triggered."},
+            {"reverse_threshold", "(float) Fires when V < reverse_threshold, then V <- f(reverse_reset_mode, reverse_reset)."},
+            {"threshold", "(float) Fires when V > threshold, then V <- f(reset_mode, reset)."},
     };
 
 private:
@@ -320,15 +323,17 @@ public:
         double reverse_reset{0.0};
     };
 
-    static inline const std::set<std::string> truenorth_attributes{
-            "reset_mode",
-            "reverse_reset_mode",
-            "reset",
-            "reverse_reset",
-            "bias",
-            "threshold",
-            "reverse_threshold",
-            "leak",
+    static inline const std::unordered_map<std::string, std::string> truenorth_attributes{
+        {"reset", "(float) The potential to reset to after a spike. Default=0.0"},
+        {"reverse_reset", "(float) The potential to reset to after a reverse spike."},
+        {"reset_mode", "(str) The type of reset to apply on spikes [none/soft/hard/saturate]. Default=hard"},
+        {"reverse_reset_mode", "(str) The type of reset to apply on negative/reverse spikes [none/soft/hard/saturate]. Default=None"},
+        {"bias", "Additive bias current applied every step."},
+        {"threshold", "(float) The potential at which a spike is triggered."},
+        {"reverse_threshold", "(float) The potential at which a reverse spike is triggered."},
+        {"leak", "(float) Subtractive leak term applied every step"},
+        {"leak_towards_zero", "(bool) Leak towards zero if true, leak away otherwise."},
+        {"random_mask", "(int) Positive mask to apply to randomly generated noise."},
     };
 
 private:
@@ -353,13 +358,13 @@ public:
     PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
     void reset() override { send_spike = false;
     }
-
-private:
     static inline const std::unordered_map<std::string, std::string> input_attributes{
         {"rate", "(float) Rate-based input encoding."},
         {"poisson", "(float) Randomized Poisson input encoding, i.e., random > poisson: spike, else no spike."},
         {"spikes", "(list[bool]) A per-time-step spike-train."},
     };
+
+private:
     static inline unsigned int instance_counter = 0;
     std::vector<bool> spikes;
     std::vector<bool>::const_iterator curr_spike{spikes.begin()};
@@ -376,7 +381,10 @@ private:
 
 std::shared_ptr<PipelineUnit> model_get_pipeline_unit(const std::string &model_name);
 NeuronResetModes model_parse_reset_mode(const std::string &str);
-const std::unordered_map<std::string, std::string> get_model_attributes(const std::string name);
+
+using ModelMap = std::map<std::string, const std::unordered_map<std::string, std::string>*>;
+const ModelMap &get_builtin_models();
 }
+
 
 #endif
