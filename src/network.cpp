@@ -217,7 +217,6 @@ sanafe::SpikingNetwork sanafe::load_net(const std::filesystem::path &path,
         INFO("Loading network from YAML file: %s\n", path.c_str());
         net = yaml_parse_network_file(network_fp, arch);
     }
-    network_fp.close();
 
     return net;
 }
