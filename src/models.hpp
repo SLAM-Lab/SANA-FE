@@ -15,6 +15,7 @@
 #include <random>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -41,9 +42,14 @@ public:
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void reset() override;
+    static inline const std::unordered_map<std::string, std::string> current_based_synapse_attributes{
+        {"weight", "(float) Synaptic weight associated with connection."},
+        {"w", "(float) Synaptic weight associated with connection."},
+        {"delay", "(float) Time-steps that a spike is delayed."},
+        {"d", "(float) Time-steps that a spike is delayed."},
+    };
 
 private:
-    static inline const std::set<std::string> current_based_synapse_attributes{"weight", "w", "delay", "d"};
     std::vector<double> weights;
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};
@@ -131,10 +137,6 @@ public:
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void track_connection(size_t synapse_address, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) override;
 
-private:
-    // Technically soma attributes, but due to common usage, suppress warnings
-    //  for these in the dendrite H/W too
-    const size_t max_delay{5UL};
     static inline const std::set<std::string> accumulator_attributes{
             "reset_mode",
             "reverse_reset_mode",
@@ -151,6 +153,11 @@ private:
             "delay",
             "d",
     };
+
+private:
+    // Technically soma attributes, but due to common usage, suppress warnings
+    //  for these in the dendrite H/W too
+    const size_t max_delay{5UL};
     std::vector<std::optional<double>> accumulated_charges;
     std::vector<std::vector<std::optional<double>>> next_accumulated_charges;
     std::vector<long int> timesteps_simulated;
@@ -238,24 +245,25 @@ public:
         noise_file_stream = 1U,
     };
 
-private:
-    static inline const std::set<std::string> loihi_lif_attributes{
-            "bias",
-            "force_update",
-            "force_update_every_timestep",
-            "force_potential",
-            "leak_decay",
-            "log_u",
-            "noise",
-            "noise_bits",
-            "refractory_delay",
-            "reset_mode",
-            "reverse_reset_mode",
-            "reset",
-            "reverse_reset",
-            "reverse_threshold",
-            "threshold",
+    static inline const std::unordered_map<std::string, std::string> loihi_lif_attributes{
+            {"bias", "Bias current applied every step: v[t+1] = bias + v[t]*leak_decay + u[t]"},
+            {"force_update", "(bool) Force soma to update every step, regardless of inputs."},
+            {"force_update_every_timestep", "(bool) Force soma to update every step, regardless of inputs."},
+            {"force_potential", ""},
+            {"leak_decay", "(float) Decay term applied every step: v[t+1] = bias + v[t]*leak_decay + u[t]"},
+            {"log_u", "(bool) Record input current (u) for Loihi soma."},
+            {"noise", "(str) Noise source. Only file-based noise stream supported"},
+            {"noise_bits", "(int) The number of noise bits simulated."},
+            {"refractory_delay", "(int) The number of refractory steps after a spike, default=0."},
+            {"reset_mode", "(str) The type of reset to apply on spikes [none/soft/hard/saturate]. Default=hard"},
+            {"reverse_reset_mode", "(str) The type of reset to apply on negative/reverse spikes [none/soft/hard/saturate]. Default=None"},
+            {"reset", "(float) The potential to reset to after a spike. Default=0.0"},
+            {"reverse_reset", "(float) The potential to reset to after a reverse spike."},
+            {"reverse_threshold", "(float) The potential at which a reverse spike is triggered."},
+            {"threshold", "(float) The potential at which a spike is triggered."},
     };
+
+private:
     std::vector<LoihiCompartment> compartments{loihi_max_compartments};
     NoiseType noise_type{noise_none};
     std::ifstream noise_stream;
@@ -312,7 +320,6 @@ public:
         double reverse_reset{0.0};
     };
 
-private:
     static inline const std::set<std::string> truenorth_attributes{
             "reset_mode",
             "reverse_reset_mode",
@@ -323,6 +330,8 @@ private:
             "reverse_threshold",
             "leak",
     };
+
+private:
     std::vector<TrueNorthNeuron> neurons{truenorth_max_neurons};
 
     static void truenorth_leak(TrueNorthNeuron &n);
@@ -346,7 +355,11 @@ public:
     }
 
 private:
-    static inline const std::set<std::string> input_attributes{"rate", "poisson", "spikes"};
+    static inline const std::unordered_map<std::string, std::string> input_attributes{
+        {"rate", "(float) Rate-based input encoding."},
+        {"poisson", "(float) Randomized Poisson input encoding, i.e., random > poisson: spike, else no spike."},
+        {"spikes", "(list[bool]) A per-time-step spike-train."},
+    };
     static inline unsigned int instance_counter = 0;
     std::vector<bool> spikes;
     std::vector<bool>::const_iterator curr_spike{spikes.begin()};
@@ -363,6 +376,7 @@ private:
 
 std::shared_ptr<PipelineUnit> model_get_pipeline_unit(const std::string &model_name);
 NeuronResetModes model_parse_reset_mode(const std::string &str);
+const std::unordered_map<std::string, std::string> get_model_attributes(const std::string name);
 }
 
 #endif

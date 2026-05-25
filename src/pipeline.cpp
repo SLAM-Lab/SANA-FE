@@ -123,8 +123,8 @@ void sanafe::PipelineUnit::check_outputs(
 
 bool sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
 {
-    if (supported_attribute_names.find(attribute_name) ==
-                    supported_attribute_names.end() &&
+    if (supported_attributes.find(attribute_name) ==
+                    supported_attributes.end() &&
             (attribute_warnings < max_attribute_warnings))
     {
         INFO("Warning: Attribute (%s) not supported by model: %s, may be "

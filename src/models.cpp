@@ -965,3 +965,24 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
             "Pipeline model not supported (" + model_name + ")\n";
     throw std::invalid_argument(error);
 }
+
+const std::unordered_map<std::string, std::string> sanafe::get_model_attributes(
+        const std::string model_name)
+{
+    using AttributeMap = std::unordered_map<std::string, std::string>;
+    static const std::unordered_map<std::string, const AttributeMap *> registry = {
+            {"current_based",
+                    &CurrentBasedSynapseModel::current_based_synapse_attributes},
+            {"leaky_integrate_fire", &LoihiLifModel::loihi_lif_attributes}};
+
+    const auto it = registry.find(model_name);
+    if (it != registry.end())
+    {
+        return *(it->second);
+    }
+    else
+    {
+        // Return empty mapping
+        return std::unordered_map<std::string, std::string>{};
+    }
+}
