@@ -224,6 +224,7 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
                 &attribute_lists,
         const std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
 {
+    size_t edge_idx = 0UL;
     for (auto [source_id, dest_id] : source_dest_id_pairs)
     {
         TRACE2(NET, "Connecting neurons, neurons.size=%lu\n", neurons.size());
@@ -258,11 +259,12 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
                         "Error: Length of attribute list != "
                         "number of defined edges.");
             }
-            attributes[key] = value_list[source_id];
+            attributes[key] = value_list.at(edge_idx);
         }
 
         con.synapse_attributes = attributes;
         con.dendrite_attributes = attributes;
+        ++edge_idx;
     }
 }
 
