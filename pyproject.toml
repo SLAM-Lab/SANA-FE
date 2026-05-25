@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sanafe"
-version = "2.1.1"
+version = "2.2.0"
 description = "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,4 +27,4 @@ Repository = "https://github.com/SLAM-Lab/SANA-FE"
 packages = { find = {} }
 
 [tool.setuptools.package-data]
-sanafe = ["examples/*.yaml"]
+sanafe = ["examples/*.yaml", "examples/dvs_challenge.npz"]
