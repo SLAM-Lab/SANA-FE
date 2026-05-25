@@ -1,0 +1,29 @@
+# Simulating Advanced Neuromorphic Architectures for Fast Exploration (SANA-FE)
+
+> SANA-FE is a framework for modeling the energy usage and performance of different neuromorphic hardware.
+
+SANA-FE is a performance simulator for many-core neuromorphic chips, designed
+for rapid design-space exploration and hardware/software co-design. Both the
+chip architecture and the spiking neural network application mapped to it can
+be specified using YAML description files or built programmatically via a
+Python API.
+
+## Documentation
+
+- [Python API reference](https://sana-fe.readthedocs.io/en/latest/): Full API docs
+- [SNN file format](https://github.com/SLAM-Lab/SANA-FE/blob/main/snn/README.md): YAML format for spiking networks
+- [Architecture file format](https://github.com/SLAM-Lab/SANA-FE/blob/main/arch/README.md): YAML format for hardware descriptions
+- [Plugin guide](https://github.com/SLAM-Lab/SANA-FE/blob/main/plugins/README.md): Writing custom hardware models
+
+## Examples
+
+- [Tutorial notebooks](https://github.com/SLAM-Lab/SANA-FE/tree/main/tutorial): End-to-end walkthroughs
+- [Example architectures](https://github.com/SLAM-Lab/SANA-FE/tree/main/arch): Loihi, etc.
+- [Example SNNs](https://github.com/SLAM-Lab/SANA-FE/tree/main/snn): Sample networks
+- [Installation and quickstart](https://github.com/SLAM-Lab/SANA-FE#quickstart): Install via pip and run your first simulation
+- [Tutorial notebooks](https://github.com/SLAM-Lab/SANA-FE/tree/main/tutorial): End-to-end walkthroughs
+
+## Optional
+
+- [Paper (TCAD 2025)](https://doi.org/10.1109/TCAD.2025.3537971): Foundational reference
+- [GitHub repository](https://github.com/SLAM-Lab/SANA-FE): Source code

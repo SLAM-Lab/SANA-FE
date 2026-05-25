@@ -1,15 +1,30 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel",
-    "cmake>=3.13",
-    "pybind11>=2.6.0"
-]
+requires = ["setuptools>=61", "wheel", "pybind11>=2.6.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.cibuildwheel.linux]
-before-all = "yum install -y flex"
+[project]
+name = "sanafe"
+version = "2.1.1"
+description = "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "James Boyle", email = "james.boyle@utexas.edu" },
+]
+license = { text = "GPL-3.0" }
+dependencies = [
+    "pybind11>=2.6.0",
+]
 
-[[tool.cibuildwheel.overrides]]
-select = "*-musllinux*"
-before-all = "apk add flex"
+[project.urls]
+Homepage = "https://github.com/SLAM-Lab/SANA-FE"
+Documentation = "https://sana-fe.readthedocs.io"
+Repository = "https://github.com/SLAM-Lab/SANA-FE"
+
+[tool.setuptools]
+# Tell setuptools to find packages automatically. find-packages with no args
+# is equivalent to find_packages() in setup.py.
+packages = { find = {} }
+
+[tool.setuptools.package-data]
+sanafe = ["examples/*.yaml"]

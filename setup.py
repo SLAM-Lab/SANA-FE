@@ -75,18 +75,6 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
 
 setup(
-    name="sanafe",
-    version="2.1.1",
-    author="James Boyle",
-    author_email="james.boyle@utexas.edu",
-    description="SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    url="https://github.com/SLAM-Lab/SANA-FE",
     ext_modules=[CMakeExtension("sanafe")],
     cmdclass=dict(build_ext=CMakeBuild),
-    zip_safe=False,
-    python_requires=">=3.8",
-    install_requires=["pybind11>=2.6.0",],
-    packages=find_packages()
 )
