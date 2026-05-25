@@ -140,6 +140,14 @@ sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
         const std::string name, const size_t neuron_count,
         const NeuronConfiguration &default_config)
 {
+    const bool group_exists_already = groups.find(name) != groups.end();
+    if (group_exists_already)
+    {
+        std::string error = "Group: " + name + " already exists in SNN.";
+        INFO("Error: %s", error.c_str());
+        throw std::invalid_argument(error);
+    }
+
     groups.emplace(
             name, NeuronGroup(name, *this, neuron_count, default_config));
     TRACE1(NET, "Created neuron group gid:%s with %zu neurons\n", name.c_str(),
