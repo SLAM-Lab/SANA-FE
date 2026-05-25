@@ -593,11 +593,35 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     auto last_check = std::chrono::steady_clock::now();
     auto last_print = std::chrono::steady_clock::now();
 
-    const std::string first_message =
-            "Executed steps: [0/" + std::to_string(timesteps) + "]";
-    pybind11::print(first_message, pybind11::arg("end") = "",
-            pybind11::arg("flush") = true);
+    // Avoid multiple heartbeat prints if the output isn't TTY (a terminal),
+    //  since those outputs will get mangled. The first part to that is figuring
+    //  out if Python is outputting to a terminal or not.
+    bool stdout_is_tty = false;
+    {
+        const pybind11::gil_scoped_acquire acquire;
+        pybind11::object sys_stdout =
+                pybind11::module_::import("sys").attr("stdout");
+        if (pybind11::hasattr(sys_stdout, "isatty"))
+        {
+            try
+            {
+                stdout_is_tty = sys_stdout.attr("isatty")().cast<bool>();
+            }
+            catch (const pybind11::error_already_set &)
+            {
+                stdout_is_tty =
+                        false; // some stream objects raise; treat as non-TTY
+            }
+        }
+    }
 
+    if (stdout_is_tty)
+    {
+        const std::string first_message =
+                "Executed steps: [0/" + std::to_string(timesteps) + "]";
+        pybind11::print(first_message, pybind11::arg("end") = "",
+                pybind11::arg("flush") = true);
+    }
     {
         const pybind11::gil_scoped_release release;
         for (long int timestep = 1; timestep <= timesteps; timestep++)
@@ -623,7 +647,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
                 }
                 last_check = now;
             }
-            if ((now - last_print) >= print_interval)
+            if (stdout_is_tty && (now - last_print) >= print_interval)
             {
                 const std::string message = "\033[2K\rExecuted steps: [" +
                         std::to_string(timestep) + "/" +
@@ -641,10 +665,22 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     // Re-acquire the GIL and check for interrupts before printing to Python
     if (PyErr_Occurred() == nullptr)
     {
-            const std::string last_message = "\033[2K\rExecuted steps: [" +
+        std::string last_message;
+        if (stdout_is_tty)
+        {
+            // Terminal: overwrite the in-progress line with the final state,
+            // then newline. Same as before.
+            last_message = "\033[2K\rExecuted steps: [" +
                     std::to_string(timesteps) + "/" +
                     std::to_string(timesteps) + "]";
-            pybind11::print(last_message, pybind11::arg("flush") = true);
+        }
+        else
+        {
+            // Non-TTY: plain line, no escapes, no carriage return.
+            last_message = "Executed steps: [" + std::to_string(timesteps) +
+                    "/" + std::to_string(timesteps) + "]";
+        }
+        pybind11::print(last_message, pybind11::arg("flush") = true);
     }
 
     schedule_stop_all_threads(scheduler);

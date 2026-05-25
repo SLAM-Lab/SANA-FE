@@ -24,7 +24,7 @@ standalone command-line simulator.
 ```python
 import sanafe;
 
-arch, net = sanafe.example()
+arch, net = sanafe.load_example()
 chip = sanafe.SpikingChip(arch)
 chip.load(sanafe.load_net('snn/example_snn.yaml', arch))
 results = chip.sim(100)
