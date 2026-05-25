@@ -1080,7 +1080,7 @@ void sanafe::yaml_write_network(
         {
             tree = ryml::parse_in_arena(existing_content.c_str());
         }
-        catch (const std::runtime_error &e)
+        catch (const c4::yml::ExceptionParse &e)
         {
             // Check for invalid YAML in the existing file (it may not even be
             //  a YAML file at all). In this case, we should warn the user and

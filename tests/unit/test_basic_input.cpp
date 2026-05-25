@@ -60,8 +60,8 @@ TEST(BasicInputTest, ValidFile)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     // std::cout << "Current path: " << path.string() << std::endl;
-    std::vector<std::string> args = {path.string() + "/arch/example.yaml",
-            path.string() + "/snn/example.yaml", "100"};
+    std::vector<std::string> args = {path.string() + "/arch/example_chip.yaml",
+            path.string() + "/snn/example_snn.yaml", "100"};
     RequiredProgramArgs parsed_args = parse_required_args(args, 0);
     EXPECT_NO_THROW(sanafe::load_arch(parsed_args.arch_filename));
 }
