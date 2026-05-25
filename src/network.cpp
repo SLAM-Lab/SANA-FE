@@ -390,9 +390,9 @@ sanafe::Conv2DOutputDimensions sanafe::NeuronGroup::conv2d_calculate_dimensions(
     auto require_positive = [](int value, const char *name) {
         if (value <= 0)
         {
-            throw std::invalid_argument(
-                    "Error: Conv2D parameter '" + std::string(name) +
-                    "' must be > 0 (got " + std::to_string(value) + ").");
+            throw std::invalid_argument("Error: Conv2D parameter '" +
+                    std::string(name) + "' must be > 0 (got " +
+                    std::to_string(value) + ").");
         }
     };
 
@@ -411,8 +411,7 @@ sanafe::Conv2DOutputDimensions sanafe::NeuronGroup::conv2d_calculate_dimensions(
     if (convolution.kernel_width > convolution.input_width ||
             convolution.kernel_height > convolution.input_height)
     {
-        throw std::invalid_argument(
-                "Error: Conv2D kernel (" +
+        throw std::invalid_argument("Error: Conv2D kernel (" +
                 std::to_string(convolution.kernel_width) + "x" +
                 std::to_string(convolution.kernel_height) +
                 ") larger than input (" +
