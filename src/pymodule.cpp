@@ -866,8 +866,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .value("buffer_positions", sanafe::buffer_positions);
 
     pybind11::register_exception<sanafe::HardwareMappingError>(
-        m, "HardwareMappingError"
-    );
+            m, "HardwareMappingError");
 
     pybind11::class_<sanafe::SpikingNetwork>(
             m, "Network", docstrings::network_doc)

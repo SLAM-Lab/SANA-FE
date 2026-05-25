@@ -1082,14 +1082,16 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
         sim_trace_record_neuron_traces(neuron_trace, total_timesteps);
     }
 
-    sim_timings.message_processing_start_tm = sim_timings.neuron_processing_end_tm;
+    sim_timings.message_processing_start_tm =
+            sim_timings.neuron_processing_end_tm;
     process_messages(ts_data);
     forced_updates(ts_data);
     // The timestep ends once cores are synchronized
     sim_timestep_sync(scheduler);
     sim_timings.message_processing_end_tm = std::chrono::steady_clock::now();
 
-    sim_timings.energy_calculation_start_tm = sim_timings.message_processing_end_tm;
+    sim_timings.energy_calculation_start_tm =
+            sim_timings.message_processing_end_tm;
     sim_calculate_ts_energy(ts_data);
     sim_update_ts_counters(ts_data);
     sim_timings.energy_calculation_end_tm = std::chrono::steady_clock::now();

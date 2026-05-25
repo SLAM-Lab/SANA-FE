@@ -26,6 +26,7 @@
 #include <variant>
 #include <vector>
 
+#include <c4/yml/error.hpp>
 #include <c4/yml/event_handler_tree.hpp>
 #include <c4/yml/fwd.hpp>
 #include <c4/yml/node.hpp>

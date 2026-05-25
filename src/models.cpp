@@ -104,7 +104,7 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
         ++(timesteps_simulated[neuron_address]);
 
         // TODO: suppress bounds checking here for speed
-	accumulated_charges[neuron_address] =
+        accumulated_charges[neuron_address] =
                 next_accumulated_charges[0UL][neuron_address];
         for (size_t i = 0; i < next_accumulated_charges.size() - 1UL; i++)
         {

@@ -170,7 +170,7 @@ void sanafe::schedule_create_threads(
     {
         TRACE1(CHIP, "Created scheduler thread:%d\n", thread_id);
         scheduler.scheduler_threads.emplace_back(
-            &schedule_messages_thread, std::ref(scheduler), thread_id);
+                &schedule_messages_thread, std::ref(scheduler), thread_id);
     }
 }
 
