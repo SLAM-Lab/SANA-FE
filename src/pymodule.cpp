@@ -366,9 +366,10 @@ void pyconnect_neurons_dense(sanafe::NeuronGroup *self,
 
 sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
         const std::string &group_name, const int neuron_count,
-        pybind11::dict &model_dict, std::string default_synapse_hw_name,
-        std::string dendrite_hw_name, bool log_potential, bool log_spikes,
-        std::string soma_hw_name)
+        const pybind11::dict &model_dict,
+        const std::string &default_synapse_hw_name,
+        const std::string &dendrite_hw_name, bool log_potential,
+        bool log_spikes, std::string soma_hw_name)
 {
     sanafe::NeuronConfiguration default_neuron_config;
     default_neuron_config.default_synapse_hw_name = default_synapse_hw_name;
@@ -428,7 +429,7 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
 
 std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
         size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
-        std::string buffer_position, bool buffer_inside_unit,
+        const std::string &buffer_position, bool buffer_inside_unit,
         size_t max_neurons_supported, bool log_energy)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
@@ -448,8 +449,9 @@ std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
 }
 
 sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
-        std::string name, size_t parent_tile_id, std::string buffer_position,
-        bool buffer_inside_unit, size_t max_neurons_supported, bool log_energy)
+        std::string name, size_t parent_tile_id,
+        const std::string &buffer_position, bool buffer_inside_unit,
+        size_t max_neurons_supported, bool log_energy)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
@@ -545,7 +547,7 @@ void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
 }
 
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-        std::string timing_model_str, const int processing_threads,
+        const std::string &timing_model_str, const int processing_threads,
         const int scheduler_threads, pybind11::object spike_trace,
         pybind11::object potential_trace, pybind11::object neuron_trace,
         pybind11::object perf_trace, pybind11::object message_trace,
@@ -600,7 +602,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     bool stdout_is_tty = false;
     {
         const pybind11::gil_scoped_acquire acquire;
-        pybind11::object sys_stdout =
+        const pybind11::object sys_stdout =
                 pybind11::module_::import("sys").attr("stdout");
         if (pybind11::hasattr(sys_stdout, "isatty"))
         {

@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <map>
+#include <numeric>
 #include <variant>
 
 #include <pybind11/pybind11.h>
@@ -36,7 +37,7 @@ enum TraceMode : uint8_t
 class PyTrace
 {
 public:
-    PyTrace(sanafe::SpikingChip *chip, pybind11::object &trace_obj,
+    PyTrace(sanafe::SpikingChip *chip, const pybind11::object &trace_obj,
             const bool overwrite_trace)
             : parent_chip(chip)
     {
@@ -293,10 +294,18 @@ public:
             std::ostringstream &ss, const sanafe::Timestep &ts) override
     {
         std::vector<std::reference_wrapper<const sanafe::Message>> all_messages;
+
+        // Count the total messages and reserve to avoid constant reallocation
+        const size_t total = std::accumulate(ts.messages.begin(),
+                ts.messages.end(), size_t{0},
+                [](size_t acc, const auto &q) { return acc + q.size(); });
+        all_messages.reserve(total);
+
         for (const sanafe::MessageFifo &q : ts.messages)
         {
             for (const sanafe::Message &m : q)
             {
+                // cppcheck-suppress useStlAlgorithm
                 all_messages.emplace_back(m);
             }
         }
@@ -319,6 +328,7 @@ public:
         {
             for (const sanafe::Message &m : q)
             {
+                // cppcheck-suppress useStlAlgorithm
                 timestep_messages.emplace_back(m);
             }
         }

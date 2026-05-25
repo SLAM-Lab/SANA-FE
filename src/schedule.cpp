@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <functional> // For std::reference_wrapper
 #include <list>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -28,16 +29,8 @@
 #include "schedule.hpp"
 #include "timestep.hpp"
 
-sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
-        : noc_width_in_tiles(scheduler.noc_width_in_tiles)
-        , noc_height_in_tiles(scheduler.noc_height_in_tiles)
-        , core_count(scheduler.core_count)
-        , max_cores_per_tile(scheduler.max_cores_per_tile)
+namespace
 {
-    messages_received = std::vector<sanafe::MessageFifo>(core_count);
-    core_finished_receiving = std::vector<double>(core_count);
-}
-
 sanafe::TimingModelFunc get_model_function(sanafe::TimingModel model)
 {
     switch (model)
@@ -52,6 +45,17 @@ sanafe::TimingModelFunc get_model_function(sanafe::TimingModel model)
     default:
         throw std::invalid_argument("Unknown timing model");
     }
+}
+}
+
+sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
+        : noc_width_in_tiles(scheduler.noc_width_in_tiles)
+        , noc_height_in_tiles(scheduler.noc_height_in_tiles)
+        , core_count(scheduler.core_count)
+        , max_cores_per_tile(scheduler.max_cores_per_tile)
+{
+    messages_received = std::vector<sanafe::MessageFifo>(core_count);
+    core_finished_receiving = std::vector<double>(core_count);
 }
 
 double sanafe::schedule_messages_timestep_simple(
@@ -300,7 +304,7 @@ std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
 }
 
 void sanafe::schedule_handle_message(
-        Message &m, Scheduler &scheduler, NocInfo &noc)
+        Message &m, const Scheduler &scheduler, NocInfo &noc)
 {
     TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
             m.src_neuron_group_id.c_str(), m.src_neuron_offset);
@@ -387,7 +391,7 @@ void sanafe::noc_update_all_tracked_messages(const double t, NocInfo &noc)
             {
                 m.in_noc = false;
                 noc_update_message_tracking(m, noc, false);
-                TRACE1(SCHEDULER, "Removing message mid:%zu\n", m.mid);
+                TRACE1(SCHEDULER, "Removing message mid:%ld\n", m.mid);
                 return true; // Remove this message
             }
             return false; // Keep this message
@@ -619,11 +623,6 @@ void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
 {
     while (!scheduler.should_stop)
     {
-        if (scheduler.should_stop)
-        {
-            break;
-        }
-
         TimestepHandle ts;
         const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
         if (got_ts)

@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "arch.hpp"
@@ -872,7 +873,7 @@ sanafe::PipelineResult sanafe::InputModel::update(const size_t neuron_address,
         throw std::runtime_error(error);
     }
 
-    bool send_spike = false;
+    send_spike = false;
     if (curr_spike != spikes.end())
     {
         send_spike = *curr_spike;

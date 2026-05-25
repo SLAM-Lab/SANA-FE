@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -26,7 +27,6 @@
 #include <variant>
 #include <vector>
 
-#include <c4/yml/error.hpp>
 #include <c4/yml/event_handler_tree.hpp>
 #include <c4/yml/fwd.hpp>
 #include <c4/yml/node.hpp>
@@ -1081,7 +1081,7 @@ void sanafe::yaml_write_network(
         {
             tree = ryml::parse_in_arena(existing_content.c_str());
         }
-        catch (const c4::yml::ExceptionParse &e)
+        catch (const std::exception &e)
         {
             // Check for invalid YAML in the existing file (it may not even be
             //  a YAML file at all). In this case, we should warn the user and

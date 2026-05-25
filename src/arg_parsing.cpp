@@ -29,7 +29,7 @@ std::string_view get_next_arg(
 }
 
 // NOLINTNEXTLINE(readability-function-size)
-int parse_flag(const std::vector<std::string> args, const size_t current_idx,
+int parse_flag(const std::vector<std::string> &args, const size_t current_idx,
         OptionalProgramFlags &flags)
 {
     const std::string_view arg = args.at(current_idx);

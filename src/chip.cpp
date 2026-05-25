@@ -166,10 +166,8 @@ void sanafe::SpikingChip::clear_hw()
             mapped_cores = 0UL;
 
             // Clear any core pipeline buffers
-            for (auto &val : core.timestep_buffer)
-            {
-                val = PipelineResult();
-            }
+            std::fill(core.timestep_buffer.begin(), core.timestep_buffer.end(),
+                    PipelineResult{});
 
             for (auto &hw : core.pipeline_hw)
             {
@@ -195,6 +193,7 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         mapped_neuron_groups[name].reserve(group.neurons.size());
         for (const Neuron &neuron : group.neurons)
         {
+            // cppcheck-suppress useStlAlgorithm
             neurons_in_mapped_order.emplace_back(neuron);
         }
     }
@@ -249,6 +248,7 @@ void sanafe::SpikingChip::track_mapped_neurons()
     //  previous references would be invalidated. Also, as we use
     //  reference_wrappers instead of pointers, we can't simply resize() the
     //  vector at the beginning and fill them as we go
+    // cppcheck-suppress useStlAlgorithm
     for (Core &core : list_of_cores)
     {
         for (MappedNeuron &mapped_neuron : core.neurons)
@@ -335,9 +335,9 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
 {
     for (const auto &[name, group] : net.groups)
     {
-        for (const Neuron &pre_neuron : group.neurons)
+        for (const Neuron &src_neuron : group.neurons)
         {
-            for (const Connection &con : pre_neuron.edges_out)
+            for (const Connection &con : src_neuron.edges_out)
             {
                 TRACE2(CHIP, "Mapping %s.%zu->%s.%zu\n",
                         con.pre_neuron.group_name.c_str(),
@@ -446,6 +446,7 @@ void sanafe::SpikingChip::sim_sort_and_record_messages(const Timestep &ts)
     {
         for (const Message &m : q)
         {
+            // cppcheck-suppress useStlAlgorithm
             all_messages.emplace_back(m);
         }
     }
@@ -475,7 +476,7 @@ void sanafe::SpikingChip::update_run_data(
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const TimingModel timing_model, const int scheduler_thread_count,
-        const TraceFlags trace_flags, std::string output_dir)
+        const TraceFlags trace_flags, const std::string &output_dir)
 {
     RunData rd(total_timesteps + 1);
     rd.timesteps_executed += timesteps;
@@ -578,11 +579,9 @@ void sanafe::SpikingChip::reset()
     {
         for (Core &core : tile.cores)
         {
-            // Clear any core pipeline buffer entries
-            for (auto &val : core.timestep_buffer)
-            {
-                val = PipelineResult();
-            }
+            // Clear any core pipeline buffers
+            std::fill(core.timestep_buffer.begin(), core.timestep_buffer.end(),
+                    PipelineResult{});
 
             for (auto &hw : core.pipeline_hw)
             {
@@ -1028,10 +1027,10 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
 
 void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
 {
-    for (auto &tile : tiles)
+    for (const auto &tile : tiles)
     {
         ts.total_hops += tile.hops;
-        for (auto &core : tile.cores)
+        for (const auto &core : tile.cores)
         {
             for (const auto &hw_ref : core.pipeline_hw_in_use)
             {
@@ -1164,7 +1163,7 @@ double sanafe::SpikingChip::sim_estimate_network_costs(
 
     dest.hops += (x_hops + y_hops);
     dest.messages_received++;
-    TRACE1(CHIP, "xhops:%ld yhops%ld total hops:%ld latency:%e\n", x_hops,
+    TRACE1(CHIP, "xhops:%zu yhops%zu total hops:%zu latency:%e\n", x_hops,
             y_hops, x_hops + y_hops, network_latency);
     return network_latency;
 }
@@ -1199,7 +1198,7 @@ double sanafe::SpikingChip::sim_calculate_tile_energy(Timestep &ts, Tile &tile)
             (static_cast<double>(tile.north_hops) * tile.energy_north_hop);
     tile.energy = total_hop_energy;
     ts.network_energy += total_hop_energy;
-    TRACE1(CHIP, "east:%ld west:%ld north:%ld south:%ld\n", tile.east_hops,
+    TRACE1(CHIP, "east:%zu west:%zu north:%zu south:%zu\n", tile.east_hops,
             tile.west_hops, tile.north_hops, tile.south_hops);
 
     for (auto &core : tile.cores)

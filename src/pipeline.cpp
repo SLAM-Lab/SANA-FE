@@ -121,7 +121,7 @@ void sanafe::PipelineUnit::check_outputs(
     }
 }
 
-bool sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
+bool sanafe::PipelineUnit::check_attribute(const std::string &attribute_name)
 {
     if (supported_attributes.find(attribute_name) ==
                     supported_attributes.end() &&
@@ -220,6 +220,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         for (const auto &metric : energy_metric_names)
         {
             if (!key_exists(metric))
+            // cppcheck-suppress useStlAlgorithm
             {
                 const std::string error = "Metric not defined: " + metric;
                 INFO("Error: %s\n", error.c_str());
@@ -246,6 +247,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         for (const auto &metric : latency_metric_names)
         {
             if (!key_exists(metric))
+            // cppcheck-suppress useStlAlgorithm
             {
                 const std::string error = "Missing metric: " + metric;
                 INFO("Error: %s\n", error.c_str());

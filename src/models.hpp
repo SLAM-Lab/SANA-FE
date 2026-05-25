@@ -108,8 +108,6 @@ public:
             : accumulated_charges(loihi_max_compartments, std::nullopt)
             , timesteps_simulated(loihi_max_compartments, 0UL)
     {
-        timesteps_simulated = std::vector<long int>(loihi_max_compartments, 0UL);
-        accumulated_charges = std::vector<std::optional<double>>(loihi_max_compartments, std::nullopt);
         next_accumulated_charges.resize(max_delay + 1UL);
         for (auto &accumulator : next_accumulated_charges)
         {

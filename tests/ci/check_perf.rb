@@ -8,8 +8,8 @@ FileUtils.mkdir_p(log_dir)
 
 #test parameters
 sim_path = "./sim"
-arch_file = "arch/example.yaml"
-snn_file = "snn/example.yaml"
+arch_file = "arch/example_chip.yaml"
+snn_file = "snn/example_snn.yaml"
 steps = 100000
 
 perf_output = `(/usr/bin/time -f "%e" #{sim_path} #{arch_file} #{snn_file} #{steps} > /dev/null) 2>&1`
@@ -18,7 +18,7 @@ runtime = perf_output.to_f
 baseline_file = "tests/ci/perf_baseline.txt"
 commit_perf_file = "#{log_dir}/perf_runtime.txt"
 
-#first time 
+#first time
 if !File.exist?(baseline_file)
   File.write(baseline_file, "#{runtime.round(3)}\n")
   File.write(log_file, <<~LOG)

@@ -186,7 +186,7 @@ public:
     double mean_in_flight_receive_delay{0.0};
     long int messages_in_noc{0L};
 
-    NocInfo(const Scheduler &scheduler);
+    explicit NocInfo(const Scheduler &scheduler);
     [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
     {
         const size_t links_per_router = max_cores_per_tile + ndirections;
@@ -217,7 +217,7 @@ std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NocInf
 
 void schedule_messages_thread(Scheduler &scheduler, const int thread_id);
 void schedule_messages_thread_cycle(Scheduler &scheduler, const int thread_id);
-void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
+void schedule_handle_message(Message &m, const Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);
 void noc_update_all_tracked_messages(double t, NocInfo &noc);

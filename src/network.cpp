@@ -143,7 +143,7 @@ sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
     const bool group_exists_already = groups.find(name) != groups.end();
     if (group_exists_already)
     {
-        std::string error = "Group: " + name + " already exists in SNN.";
+        const std::string error = "Group: " + name + " already exists in SNN.";
         INFO("Error: %s", error.c_str());
         throw std::invalid_argument(error);
     }
@@ -531,7 +531,7 @@ void sanafe::NeuronGroup::conv2d_create_and_configure_connection(Neuron &source,
         Neuron &dest,
         const std::map<std::string, std::vector<ModelAttribute>>
                 &attribute_lists,
-        int filter_idx)
+        size_t filter_idx)
 {
     // Create the connection
     const size_t con_idx = source.connect_to_neuron(dest);
@@ -540,7 +540,7 @@ void sanafe::NeuronGroup::conv2d_create_and_configure_connection(Neuron &source,
     // Set the attributes for this connection
     for (const auto &[key, attribute_list] : attribute_lists)
     {
-        if (attribute_list.size() <= static_cast<size_t>(filter_idx))
+        if (attribute_list.size() <= filter_idx)
         {
             INFO("Error: Not enough entries defined for attribute (%zu): %s\n",
                     attribute_list.size(), key.c_str());
