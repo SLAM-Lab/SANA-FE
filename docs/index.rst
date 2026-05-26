@@ -36,7 +36,6 @@ To install SANA-FE from PyPI, run the following
 
 .. code-block:: bash
 
-   python
    pip install sanafe
 
 If you would rather install the latest SANA-FE from source, run
@@ -47,7 +46,7 @@ If you would rather install the latest SANA-FE from source, run
    cd sana-fe
    pip install .
 
-You can test your SANA-FE installation by running the following command
+You can test your SANA-FE installation by running the following Python code:
 
 .. code-block:: python
 
@@ -79,10 +78,8 @@ These tutorials can be run locally or using Google Colab.
 .. toctree::
    :maxdepth: 1
    :caption: Models
-   :glob:
 
-   models/framework
-   models/*
+   models
 
 Indices and tables
 ==================

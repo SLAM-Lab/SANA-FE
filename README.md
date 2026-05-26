@@ -85,7 +85,7 @@ The option `-j` indicates the number of parallel build threads.
 Building this project requires `cmake`, `make`, and a compiler that supports the
 C++17 standard (e.g., GCC >= 8, Clang >= 5). This project uses RapidYAML for all
 YAML file parsing, and Booksim 2 for optional cycle-accurate NoC modeling. To
-build the Python interfaces, you must also have Python >= 3.8 installed with
+build the Python interfaces, you must also have Python >= 3.10 installed with
 PyBind11. You can install PyBind11 using:
 
 `pip install pybind11`
