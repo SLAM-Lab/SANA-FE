@@ -74,5 +74,7 @@ Utility Functions
 .. autofunction:: load_example
 
 .. autodata:: sanafe.framework_attributes
+   :annotation:
 
 .. autodata:: sanafe.model_attributes
+   :annotation:
