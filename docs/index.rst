@@ -49,11 +49,13 @@ If you would rather install the latest SANA-FE from source, run
 
 You can test your SANA-FE installation by running the following command
 
-.. code-block:: bash
+.. code-block:: python
 
-   python -c "import sanafe; \
-   arch=sanafe.load_arch('arch/example.yaml'); c=sanafe.SpikingChip(arch); \
-   c.load(sanafe.load_net('snn/example.yaml',arch)); c.sim(100)"
+   import sanafe
+   arch, snn = sanafe.load_example()
+   chip = sanafe.SpikingChip(arch)
+   chip.load(snn)
+   chip.sim(100)
 
 If this ran successfully, you should see the following print on the console
 
