@@ -49,7 +49,7 @@ void sanafe::plugin_init_hw(
 
     // Load the soma library
     INFO("Loading plugin:%s\n", plugin_path.c_str());
-    void *hw = dlopen(plugin_path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+    void *hw = dlopen(plugin_path.c_str(), RTLD_LAZY | RTLD_LOCAL);
     plugin_handles[model_name] = DlHandlePtr(hw);
     if (hw == nullptr)
     {

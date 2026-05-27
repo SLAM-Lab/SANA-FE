@@ -70,3 +70,11 @@ Utility Functions
 .. autofunction:: load_arch
 
 .. autofunction:: load_net
+
+.. autofunction:: load_example
+
+.. autodata:: sanafe.framework_attributes
+   :annotation:
+
+.. autodata:: sanafe.model_attributes
+   :annotation:

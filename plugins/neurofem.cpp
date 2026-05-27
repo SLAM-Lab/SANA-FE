@@ -28,15 +28,15 @@ public:
     std::mt19937 gen{rd()};
     std::normal_distribution<double> d{};
 
-    static inline const std::set<std::string> supported_attributes{"weight",
-            "w", "lambda_v", "lambda_d", "sigma_v", "ki", "kp", "bias",
-            "threshold", "reset", "dt", "compartment"};
+    static inline const std::set<std::string> neurofem_attributes{"weight", "w",
+            "lambda_v", "lambda_d", "sigma_v", "ki", "kp", "bias", "threshold",
+            "reset", "dt", "compartment"};
 
     NeuroFEMModel()
             : PipelineUnit(sanafe::HardwareBitfield::implements_dendrite |
                       sanafe::HardwareBitfield::implements_soma)
     {
-        register_attributes(supported_attributes);
+        register_attributes(neurofem_attributes);
     }
     NeuroFEMModel(const NeuroFEMModel &copy) = delete;
     NeuroFEMModel(NeuroFEMModel &&other) = delete;

@@ -8,14 +8,45 @@ tutorial.py - Tutorial helper scripts, mostly for checking answers
 """
 import yaml
 import re
+import shutil
+
+from importlib.resources import files
+from . import load_arch, load_net
 
 green_text = "\033[92m"
 red_text = "\033[31m"
 default_text = "\033[0m"
 
 
-def check_arch(arch_filename):
-    with open("arch.yaml", "r") as arch_file:
+def copy_arch():
+    """Copy the tutorial architecture into the working dir"""
+    resource_path = files("sanafe.examples").joinpath("tutorial_arch.yaml")
+    with resource_path.open('rb') as src, open("tutorial_arch.yaml", 'wb') as dst:
+        shutil.copyfileobj(src, dst)
+
+
+def copy_snn():
+    """Copy the tutorial SNN application into the working dir"""
+    resource_path = files("sanafe.examples").joinpath("tutorial_snn.yaml")
+    with resource_path.open('rb') as src, open("tutorial_snn.yaml", 'wb') as dst:
+        shutil.copyfileobj(src, dst)
+
+
+def load():
+    """Load the tutorial architecture and SNN"""
+    base = files("sanafe.examples")
+    arch = load_arch(base / "tutorial_arch.yaml")
+    net  = load_net(base / "tutorial_snn.yaml", arch)
+    return arch, net
+
+
+def get_dvs_data():
+    """Get raw (binary) weight data for the DVS gesture challenge."""
+    return files("sanafe.examples").joinpath("dvs_challenge.npz").open("rb")
+
+
+def check_arch():
+    with open("tutorial_arch.yaml", "r") as arch_file:
         arch_details = yaml.safe_load(arch_file)
     check_arch_exercise_1(arch_details)
     check_arch_exercise_2(arch_details)
@@ -95,8 +126,8 @@ def check_arch_exercise_3(arch_details):
                   f"and/or latency ({synapse_latency}s) not set correctly{default_text}")
 
 
-def check_snn(snn_filename):
-    with open(snn_filename, "r") as snn_file:
+def check_snn():
+    with open("tutorial_snn.yaml", "r") as snn_file:
         snn = yaml.safe_load(snn_file)
     check_exercise_snns_1(snn)
     check_exercise_snns_2(snn)

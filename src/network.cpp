@@ -140,6 +140,14 @@ sanafe::NeuronGroup &sanafe::SpikingNetwork::create_neuron_group(
         const std::string name, const size_t neuron_count,
         const NeuronConfiguration &default_config)
 {
+    const bool group_exists_already = groups.find(name) != groups.end();
+    if (group_exists_already)
+    {
+        const std::string error = "Group: " + name + " already exists in SNN.";
+        INFO("Error: %s", error.c_str());
+        throw std::invalid_argument(error);
+    }
+
     groups.emplace(
             name, NeuronGroup(name, *this, neuron_count, default_config));
     TRACE1(NET, "Created neuron group gid:%s with %zu neurons\n", name.c_str(),
@@ -209,7 +217,6 @@ sanafe::SpikingNetwork sanafe::load_net(const std::filesystem::path &path,
         INFO("Loading network from YAML file: %s\n", path.c_str());
         net = yaml_parse_network_file(network_fp, arch);
     }
-    network_fp.close();
 
     return net;
 }
@@ -224,6 +231,7 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
                 &attribute_lists,
         const std::vector<std::pair<size_t, size_t>> &source_dest_id_pairs)
 {
+    size_t edge_idx = 0UL;
     for (auto [source_id, dest_id] : source_dest_id_pairs)
     {
         TRACE2(NET, "Connecting neurons, neurons.size=%lu\n", neurons.size());
@@ -258,17 +266,16 @@ void sanafe::NeuronGroup::connect_neurons_sparse(NeuronGroup &dest_group,
                         "Error: Length of attribute list != "
                         "number of defined edges.");
             }
-            attributes[key] = value_list[source_id];
+            attributes[key] = value_list.at(edge_idx);
         }
 
         con.synapse_attributes = attributes;
         con.dendrite_attributes = attributes;
+        ++edge_idx;
     }
 }
 
 // 2D Convolution Neural Network Connection Algorithm
-//
-
 void sanafe::NeuronGroup::connect_neurons_conv2d(NeuronGroup &dest_group,
         const std::map<std::string, std::vector<ModelAttribute>>
                 &attribute_lists,
@@ -321,11 +328,9 @@ void sanafe::NeuronGroup::conv2d_create_output_neuron_connections(
         const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims,
         const Conv2DCoordinate &output_coordinate)
 {
-    int dest_idx =
-            output_coordinate.channel * dims.output_width * dims.output_height;
-    dest_idx += output_coordinate.y * dims.output_width;
-    dest_idx += output_coordinate.x;
-    Neuron &dest = dest_group.neurons[dest_idx];
+    const size_t dest_idx =
+            conv2d_calculate_dest_index(dims, output_coordinate);
+    Neuron &dest = dest_group.neurons.at(dest_idx);
 
     // Connect to source/input neurons through kernel
     for (int c_in = 0; c_in < convolution.input_channels; ++c_in)
@@ -362,7 +367,7 @@ void sanafe::NeuronGroup::conv2d_create_kernel_connections(Neuron &dest,
             const auto indices =
                     conv2d_calculate_indices(convolution, dims, position);
 
-            Neuron &source = neurons[indices.source_idx];
+            Neuron &source = neurons.at(indices.source_idx);
             conv2d_create_and_configure_connection(
                     source, dest, attribute_lists, indices.filter_idx);
         }
@@ -381,8 +386,39 @@ sanafe::Conv2DOutputDimensions sanafe::NeuronGroup::conv2d_calculate_dimensions(
     //  mapping layer inputs/outputs to the layer of neurons. We should support
     //  filter_channels_last and input_channels_last and output_channels_last
     //  separately, to be as flexible as possible. For now hard-code.
+    // Validate inputs before doing any arithmetic.
+    auto require_positive = [](int value, const char *name) {
+        if (value <= 0)
+        {
+            throw std::invalid_argument("Error: Conv2D parameter '" +
+                    std::string(name) + "' must be > 0 (got " +
+                    std::to_string(value) + ").");
+        }
+    };
+
+    require_positive(convolution.input_width, "input_width");
+    require_positive(convolution.input_height, "input_height");
+    require_positive(convolution.input_channels, "input_channels");
+    require_positive(convolution.kernel_width, "kernel_width");
+    require_positive(convolution.kernel_height, "kernel_height");
+    require_positive(convolution.kernel_count, "kernel_count");
+    require_positive(convolution.stride_width, "stride_width");
+    require_positive(convolution.stride_height, "stride_height");
+
     const int pad_width = 0;
     const int pad_height = 0;
+
+    if (convolution.kernel_width > convolution.input_width ||
+            convolution.kernel_height > convolution.input_height)
+    {
+        throw std::invalid_argument("Error: Conv2D kernel (" +
+                std::to_string(convolution.kernel_width) + "x" +
+                std::to_string(convolution.kernel_height) +
+                ") larger than input (" +
+                std::to_string(convolution.input_width) + "x" +
+                std::to_string(convolution.input_height) +
+                ") with zero padding.");
+    }
 
     Conv2DOutputDimensions dims{};
     // Standard convolution output size formula: (W - K + 2P) / S + 1"
@@ -433,6 +469,19 @@ void sanafe::NeuronGroup::conv2d_validate_neuron_counts(
     }
 }
 
+size_t sanafe::NeuronGroup::conv2d_calculate_dest_index(
+        const Conv2DOutputDimensions &dims,
+        const Conv2DCoordinate &output_coordinate) noexcept
+{
+    size_t dest_idx = static_cast<size_t>(output_coordinate.channel) *
+            static_cast<size_t>(dims.output_width) *
+            static_cast<size_t>(dims.output_height);
+    dest_idx += static_cast<size_t>(output_coordinate.y) *
+            static_cast<size_t>(dims.output_width);
+    dest_idx += static_cast<size_t>(output_coordinate.x);
+    return dest_idx;
+}
+
 sanafe::Conv2DIndices sanafe::NeuronGroup::conv2d_calculate_indices(
         const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims,
         const Conv2DPosition &pos)
@@ -440,29 +489,33 @@ sanafe::Conv2DIndices sanafe::NeuronGroup::conv2d_calculate_indices(
     // Calculate indices for the neurons within the neuron groups, and for the
     //  correct index into the flattened filter array
     Conv2DIndices indices{};
-    indices.dest_idx = pos.output_coordinate.channel * dims.output_width *
-            dims.output_height;
-    indices.dest_idx += pos.output_coordinate.y * dims.output_width;
-    indices.dest_idx += pos.output_coordinate.x;
+    indices.dest_idx = conv2d_calculate_dest_index(dims, pos.output_coordinate);
 
     // Calculate source index
-    indices.source_idx =
-            pos.c_in * convolution.input_width * convolution.input_height;
+    indices.source_idx = static_cast<size_t>(pos.c_in) *
+            static_cast<size_t>(convolution.input_width) *
+            static_cast<size_t>(convolution.input_height);
     indices.source_idx +=
-            ((pos.output_coordinate.y * convolution.stride_height) +
-                    pos.y_filter) *
-            convolution.input_width;
+            ((static_cast<size_t>(pos.output_coordinate.y) *
+                     static_cast<size_t>(convolution.stride_height)) +
+                    static_cast<size_t>(pos.y_filter)) *
+            static_cast<size_t>(convolution.input_width);
     indices.source_idx +=
-            ((pos.output_coordinate.x * convolution.stride_width) +
-                    pos.x_filter);
+            ((static_cast<size_t>(pos.output_coordinate.x) *
+                     static_cast<size_t>(convolution.stride_width)) +
+                    static_cast<size_t>(pos.x_filter));
 
     // Calculate filter index
-    indices.filter_idx = pos.y_filter * convolution.kernel_width *
-            convolution.input_channels * convolution.kernel_count;
-    indices.filter_idx += pos.x_filter * convolution.input_channels *
-            convolution.kernel_count;
-    indices.filter_idx += pos.c_in * convolution.kernel_count;
-    indices.filter_idx += pos.output_coordinate.channel;
+    indices.filter_idx = static_cast<size_t>(pos.y_filter) *
+            static_cast<size_t>(convolution.kernel_width) *
+            static_cast<size_t>(convolution.input_channels) *
+            static_cast<size_t>(convolution.kernel_count);
+    indices.filter_idx += static_cast<size_t>(pos.x_filter) *
+            static_cast<size_t>(convolution.input_channels) *
+            static_cast<size_t>(convolution.kernel_count);
+    indices.filter_idx += static_cast<size_t>(pos.c_in) *
+            static_cast<size_t>(convolution.kernel_count);
+    indices.filter_idx += static_cast<size_t>(pos.output_coordinate.channel);
     // Filter laid out as [y][x][input_channel][output_channel]
 
     return indices;
@@ -478,7 +531,7 @@ void sanafe::NeuronGroup::conv2d_create_and_configure_connection(Neuron &source,
         Neuron &dest,
         const std::map<std::string, std::vector<ModelAttribute>>
                 &attribute_lists,
-        int filter_idx)
+        size_t filter_idx)
 {
     // Create the connection
     const size_t con_idx = source.connect_to_neuron(dest);
@@ -487,7 +540,7 @@ void sanafe::NeuronGroup::conv2d_create_and_configure_connection(Neuron &source,
     // Set the attributes for this connection
     for (const auto &[key, attribute_list] : attribute_lists)
     {
-        if (attribute_list.size() <= static_cast<size_t>(filter_idx))
+        if (attribute_list.size() <= filter_idx)
         {
             INFO("Error: Not enough entries defined for attribute (%zu): %s\n",
                     attribute_list.size(), key.c_str());
@@ -495,7 +548,7 @@ void sanafe::NeuronGroup::conv2d_create_and_configure_connection(Neuron &source,
                     "Not enough entries defined for attribute");
         }
 
-        const ModelAttribute &attribute = attribute_list[filter_idx];
+        const ModelAttribute &attribute = attribute_list.at(filter_idx);
         if (attribute.forward_to_dendrite)
         {
             con.dendrite_attributes[key] = attribute;
@@ -633,15 +686,15 @@ void sanafe::SpikingNetwork::save_mappings_to_netlist(std::ofstream &out,
     }
 
     // Sort by mapping_order
-    std::sort(all_neurons.begin(), all_neurons.end(),
-            [](const Neuron &a, const Neuron &b) {
-                return a.mapping_order < b.mapping_order;
-            });
+    std::sort(all_neurons.begin(), all_neurons.end(), [](auto a, auto b) {
+        return a.get().mapping_order < b.get().mapping_order;
+    });
 
     // Save sorted mappings
-    for (const Neuron &neuron : all_neurons)
+    for (const auto &neuron_ref : all_neurons)
     {
-        out << netlist_mapping_to_netlist(neuron, group_name_to_id) << "\n";
+        out << netlist_mapping_to_netlist(neuron_ref.get(), group_name_to_id);
+        out << "\n";
     }
 }
 

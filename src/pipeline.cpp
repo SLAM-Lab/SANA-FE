@@ -121,13 +121,13 @@ void sanafe::PipelineUnit::check_outputs(
     }
 }
 
-bool sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
+bool sanafe::PipelineUnit::check_attribute(const std::string &attribute_name)
 {
-    if (supported_attribute_names.find(attribute_name) ==
-                    supported_attribute_names.end() &&
+    if (supported_attributes.find(attribute_name) ==
+                    supported_attributes.end() &&
             (attribute_warnings < max_attribute_warnings))
     {
-        INFO("Warning: Attribute (%s) not supported by model: %s, will be "
+        INFO("Warning: Attribute (%s) not supported by model: %s, may be "
              "ignored.\nEither remove this attribute from the SNN/Architecture "
              "description file, be more specific which hardware requires it "
              "(using synapse/dendrite/soma sections), or register the "
@@ -220,6 +220,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         for (const auto &metric : energy_metric_names)
         {
             if (!key_exists(metric))
+            // cppcheck-suppress useStlAlgorithm
             {
                 const std::string error = "Metric not defined: " + metric;
                 INFO("Error: %s\n", error.c_str());
@@ -246,6 +247,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         for (const auto &metric : latency_metric_names)
         {
             if (!key_exists(metric))
+            // cppcheck-suppress useStlAlgorithm
             {
                 const std::string error = "Missing metric: " + metric;
                 INFO("Error: %s\n", error.c_str());

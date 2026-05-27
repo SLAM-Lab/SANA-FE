@@ -36,7 +36,6 @@ To install SANA-FE from PyPI, run the following
 
 .. code-block:: bash
 
-   python
    pip install sanafe
 
 If you would rather install the latest SANA-FE from source, run
@@ -47,13 +46,15 @@ If you would rather install the latest SANA-FE from source, run
    cd sana-fe
    pip install .
 
-You can test your SANA-FE installation by running the following command
+You can test your SANA-FE installation by running the following Python code:
 
-.. code-block:: bash
+.. code-block:: python
 
-   python -c "import sanafe; \
-   arch=sanafe.load_arch('arch/example.yaml'); c=sanafe.SpikingChip(arch); \
-   c.load(sanafe.load_net('snn/example.yaml',arch)); c.sim(100)"
+   import sanafe
+   arch, snn = sanafe.load_example()
+   chip = sanafe.SpikingChip(arch)
+   chip.load(snn)
+   chip.sim(100)
 
 If this ran successfully, you should see the following print on the console
 
@@ -73,6 +74,12 @@ These tutorials can be run locally or using Google Colab.
 
    api
    layers
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Models
+
+   models
 
 Indices and tables
 ==================

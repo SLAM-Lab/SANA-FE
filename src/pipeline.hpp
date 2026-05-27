@@ -13,6 +13,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 #include "attribute.hpp"
 #include "fwd.hpp"
@@ -119,8 +120,10 @@ public:
     void set_attributes_hw(std::string unit_name, const ModelInfo &model);
     PipelineResult process(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     void register_attributes(const std::set<std::string> &attribute_names);
-    bool check_attribute(std::string attribute_name);
-    std::vector<std::string> get_attributes() { return std::vector<std::string>(supported_attribute_names.begin(), supported_attribute_names.end()); }
+    void register_attributes(const std::unordered_map<std::string, std::string> &attributes_with_descriptions);
+    bool check_attribute(const std::string &attribute_name);
+    std::vector<std::string> get_attributes() const;
+
     void check_implemented(bool check_implements_synapse, bool check_implements_dendrite, bool check_implements_soma) const;
     size_t add_neuron();
     size_t add_connection(MappedConnection &con);
@@ -176,46 +179,49 @@ public:
     //  that has a small leakage.
     bool update_every_timestep{false};
 
-protected:
-    std::set<std::string> supported_attribute_names{
-            "force_update",
-            "synapse_hw_name",
-            "dendrite_hw_name",
-            "soma_hw_name",
-            "model",
-            "plugin",
-            "energy_message_in",
-            "latency_message_in",
-            "energy_access_neuron",
-            "latency_access_neuron",
-            "energy_update_neuron",
-            "latency_update_neuron",
-            "energy_spike_out",
-            "latency_spike_out",
-            "energy_process_spike",
-            "latency_process_spike",
-            "energy_update",
-            "latency_update",
-            "energy_message_out",
-            "latency_message_out",
+    static inline const std::unordered_map<std::string, std::string> framework_attributes{
+            {"force_update", "(bool) Force updates every time-step."},
+            {"synapse_hw_name", "(str) Unique name of the synapse H/W unit."},
+            {"dendrite_hw_name", "(str) Unique name of the dendrite H/W unit."},
+            {"soma_hw_name", "(str) Unique name of the soma H/W unit."},
+            {"model", "(str) Unique model name, either built-in or plugin."},
+            {"plugin", "(str) Plug-in library path." },
+            {"energy_message_in", "(float) Energy cost of receiving a spike message (J)."},
+            {"latency_message_in", "(float) Latency cost of receiving a spike message (s)."},
+            {"energy_access_neuron", "(float) Energy cost for a soma to access a neuron (J)."},
+            {"latency_access_neuron", "(float) Latency cost for a soma to access a neuron (s)."},
+            {"energy_update_neuron", "(float) Energy cost for a soma to update (J)."},
+            {"latency_update_neuron", "(float) Energy cost for a soma to update (s)."},
+            {"energy_spike_out", "(float) Energy cost for a soma to spike (J)."},
+            {"latency_spike_out", "(float) Latency cost for a soma to spike (s)."},
+            {"energy_process_spike", "(float) Energy cost for one synapse look-up/access (J)."},
+            {"latency_process_spike", "(float) Latency cost for one synapse look-up/access (s)."},
+            {"energy_update", "(float) Energy cost of updating a dendrite (s)"},
+            {"latency_update", "(float) Latency cost of updating a dendrite (s)"},
+            {"energy_message_out", "(float) Energy cost of sending a spike message (J)"},
+            {"latency_message_out", "(float) Latency cost of sending a spike message (s)"},
             // Legacy attributes (v1)
-            "connections_out",
+            {"connections_out", "(int) Connections outgoing from a neuron (deprecated)"},
     };
+
+protected:
+    std::unordered_map<std::string, std::string> supported_attributes{framework_attributes};
+
     InputInterfaceFunc process_input_fn;
     OutputInterfaceFunc process_output_fn;
 
-    PipelineResult process_synapse_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
-    PipelineResult process_dendrite_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
-    PipelineResult process_soma_input(Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    PipelineResult process_synapse_input(const Timestep &ts, const MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    PipelineResult process_dendrite_input(const Timestep &ts, const MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    PipelineResult process_soma_input(const Timestep &ts, const MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
 
-    static void process_synapse_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
-    static void process_dendrite_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
+    static void process_synapse_output(const MappedNeuron &/*n*/, std::optional<MappedConnection *> con, PipelineResult &output);
+    static void process_dendrite_output(const MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
     static void process_soma_output(MappedNeuron &n, std::optional<MappedConnection *> con, PipelineResult &output);
 
 private:
-    static void calculate_synapse_default_energy_latency(MappedConnection &con, PipelineResult &simulation_result);
-    static void calculate_dendrite_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
-    static void calculate_soma_default_energy_latency(MappedNeuron &n, PipelineResult &simulation_result);
+    static void calculate_synapse_default_energy_latency(const MappedConnection &con, PipelineResult &simulation_result);
+    static void calculate_dendrite_default_energy_latency(const MappedNeuron &n, PipelineResult &simulation_result);
+    static void calculate_soma_default_energy_latency(const MappedNeuron &n, PipelineResult &simulation_result);
     static void update_soma_activity(MappedNeuron &n, const PipelineResult &simulation_result);
     void check_outputs(const MappedNeuron &n, const PipelineResult &result) const;
 
@@ -346,7 +352,7 @@ inline sanafe::PipelineUnit::PipelineUnit(const HardwareBitfield hw_implemented)
     // Set input interface
     if (implements_synapse)
     {
-        process_input_fn = [this](Timestep &ts, MappedNeuron &n,
+        process_input_fn = [this](const Timestep &ts, const MappedNeuron &n,
                                    std::optional<MappedConnection *> con,
                                    const PipelineResult &input) {
             return this->process_synapse_input(ts, n, con, input);
@@ -354,7 +360,7 @@ inline sanafe::PipelineUnit::PipelineUnit(const HardwareBitfield hw_implemented)
     }
     else if (implements_dendrite)
     {
-        process_input_fn = [this](Timestep &ts, MappedNeuron &n,
+        process_input_fn = [this](const Timestep &ts, const MappedNeuron &n,
                                    std::optional<MappedConnection *> con,
                                    const PipelineResult &input) {
             return this->process_dendrite_input(ts, n, con, input);
@@ -362,7 +368,7 @@ inline sanafe::PipelineUnit::PipelineUnit(const HardwareBitfield hw_implemented)
     }
     else if (implements_soma)
     {
-        process_input_fn = [this](Timestep &ts, MappedNeuron &n,
+        process_input_fn = [this](const Timestep &ts, const MappedNeuron &n,
                                    std::optional<MappedConnection *> con,
                                    const PipelineResult &input) {
             return this->process_soma_input(ts, n, con, input);
@@ -398,22 +404,47 @@ inline sanafe::PipelineUnit::PipelineUnit(const HardwareBitfield hw_implemented)
     //  already been handled above
 }
 
+inline std::vector<std::string> sanafe::PipelineUnit::get_attributes() const
+{
+    std::vector<std::string> keys;
+    keys.reserve(supported_attributes.size());
+
+    for (const auto &[attribute_name, description] : supported_attributes)
+    {
+        keys.push_back(attribute_name);
+    }
+    return keys;
+}
+
+inline void sanafe::PipelineUnit::register_attributes(
+        const std::unordered_map<std::string, std::string> &attributes_with_descriptions)
+{
+    for (const auto &[attr, description] : attributes_with_descriptions)
+    {
+        supported_attributes[attr] = description;
+    }
+}
+
 inline void sanafe::PipelineUnit::register_attributes(
         const std::set<std::string> &attribute_names)
 {
     for (const auto &attr : attribute_names)
     {
-        supported_attribute_names.insert(attr);
+        // Add supported attribute without any helpful description. If possible,
+        //  users should always add a helpful description that lets API users
+        //  introspect the model features
+        supported_attributes[attr] = "";
     }
 }
 
-inline void sanafe::PipelineUnit::process_synapse_output(MappedNeuron & /*n*/,
-        std::optional<MappedConnection *> con, PipelineResult &output)
+inline void sanafe::PipelineUnit::process_synapse_output(
+        const MappedNeuron & /*n*/, std::optional<MappedConnection *> con,
+        PipelineResult &output)
 {
     calculate_synapse_default_energy_latency(*(con.value_or(nullptr)), output);
 }
 
-inline void sanafe::PipelineUnit::process_dendrite_output(MappedNeuron &n,
+inline void sanafe::PipelineUnit::process_dendrite_output(const MappedNeuron &n,
         std::optional<MappedConnection *> /*con*/, PipelineResult &output)
 {
     calculate_dendrite_default_energy_latency(n, output);
@@ -427,7 +458,7 @@ inline void sanafe::PipelineUnit::process_soma_output(MappedNeuron &n,
 }
 
 inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
-        Timestep &ts, MappedNeuron & /*n*/,
+        const Timestep &ts, const MappedNeuron & /*n*/,
         std::optional<MappedConnection *> con, const PipelineResult & /*input*/)
 {
     bool read = false;
@@ -451,7 +482,7 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
 }
 
 inline sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_input(
-        Timestep &ts, MappedNeuron &n,
+        const Timestep &ts, const MappedNeuron &n,
         std::optional<MappedConnection *> con, const PipelineResult &input)
 {
     PipelineResult output{};
@@ -468,7 +499,7 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_dendrite_input(
 }
 
 inline sanafe::PipelineResult sanafe::PipelineUnit::process_soma_input(
-        Timestep &ts, MappedNeuron &n,
+        const Timestep &ts, const MappedNeuron &n,
         std::optional<MappedConnection *> /*con*/, const PipelineResult &input)
 {
     PipelineResult output =
@@ -478,7 +509,7 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_soma_input(
 
 
 inline void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
-        MappedConnection &con, PipelineResult &simulation_result)
+        const MappedConnection &con, PipelineResult &simulation_result)
 {
     const bool energy_simulated = simulation_result.energy.has_value();
     const bool latency_simulated = simulation_result.latency.has_value();
@@ -541,7 +572,7 @@ inline void sanafe::PipelineUnit::calculate_synapse_default_energy_latency(
 }
 
 inline void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
-        MappedNeuron &n, PipelineResult &simulation_result)
+        const MappedNeuron &n, PipelineResult &simulation_result)
 {
     const bool energy_simulated = simulation_result.energy.has_value();
     const bool latency_simulated = simulation_result.latency.has_value();
@@ -598,7 +629,7 @@ inline void sanafe::PipelineUnit::calculate_dendrite_default_energy_latency(
 }
 
 inline void sanafe::PipelineUnit::calculate_soma_default_energy_latency(
-        MappedNeuron &n, PipelineResult &simulation_result)
+        const MappedNeuron &n, PipelineResult &simulation_result)
 {
     const bool energy_simulated = simulation_result.energy.has_value();
     const bool latency_simulated = simulation_result.latency.has_value();

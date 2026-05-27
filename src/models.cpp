@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "arch.hpp"
@@ -104,7 +105,7 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
         ++(timesteps_simulated[neuron_address]);
 
         // TODO: suppress bounds checking here for speed
-	accumulated_charges[neuron_address] =
+        accumulated_charges[neuron_address] =
                 next_accumulated_charges[0UL][neuron_address];
         for (size_t i = 0; i < next_accumulated_charges.size() - 1UL; i++)
         {
@@ -369,7 +370,6 @@ void sanafe::LoihiLifModel::set_attribute_hw(
         random_mask = (1L << noise_bits) - 1L;
     }
 }
-
 
 // NOLINTNEXTLINE(readability-function-size)
 void sanafe::LoihiLifModel::set_attribute_neuron(const size_t neuron_address,
@@ -873,7 +873,7 @@ sanafe::PipelineResult sanafe::InputModel::update(const size_t neuron_address,
         throw std::runtime_error(error);
     }
 
-    bool send_spike = false;
+    send_spike = false;
     if (curr_spike != spikes.end())
     {
         send_spike = *curr_spike;
@@ -964,4 +964,24 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     const std::string error =
             "Pipeline model not supported (" + model_name + ")\n";
     throw std::invalid_argument(error);
+}
+
+const sanafe::ModelMap &sanafe::get_builtin_models()
+{
+    // Use this wrapper function to construct a static map of all built-in
+    //  models and their attributes (with helpful descriptions)
+    static const std::map<std::string,
+            const std::unordered_map<std::string, std::string> *>
+            builtin_models = {{"current_based",
+                                      &CurrentBasedSynapseModel::
+                                              current_based_synapse_attributes},
+                    {"accumulator", nullptr},
+                    {"accumulator_with_delay", nullptr},
+                    {"taps", &MultiTapModel1D::multitap_attributes},
+                    {"input", &InputModel::input_attributes},
+                    {"leaky_integrate_and_fire",
+                            &LoihiLifModel::loihi_lif_attributes},
+                    {"truenorth", &TrueNorthModel::truenorth_attributes}};
+
+    return builtin_models;
 }

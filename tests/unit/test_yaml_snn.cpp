@@ -295,11 +295,11 @@ TEST(YamlSnnTest, WriteEdgeFormat)
 TEST(YamlSnnTest, SerializeNetworkToYaml)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
-    // FAIL() << "Current path: " << path.string() + "/arch/example.yaml";
+    // FAIL() << "Current path: " << path.string() + "/arch/example_snn.yaml";
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
     sanafe::SpikingNetwork net =
-            sanafe::load_net(path.string() + "/snn/example.yaml", arch);
+            sanafe::load_net(path.string() + "/snn/example_snn.yaml", arch);
     // FAIL() << "loaded network\n";
     std::filesystem::path output_path = path / "tests/output.yaml";
     // FAIL() << "opening output path: " << output_path.string();
@@ -672,7 +672,7 @@ TEST(YamlSnnTest, ParseMappingSection_InvalidNeuronGroup)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     const std::string yaml = R"(
 network:
@@ -699,7 +699,7 @@ TEST(YamlSnnTest, ParseMappingSection_OutOfBoundsTile)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     const std::string yaml = R"(
 network:
@@ -726,7 +726,7 @@ TEST(YamlSnnTest, ParseMappingSection_NeuronRange)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     const std::string yaml = R"(
 network:
@@ -906,7 +906,7 @@ TEST(YamlSnnTest, ParseNetworkFile_FileNotOpen)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     std::ifstream bad_stream; // Not opened
     EXPECT_THROW(sanafe::yaml_parse_network_file(bad_stream, arch),
@@ -929,7 +929,7 @@ mappings: []
 
     std::ifstream fp(test_file);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     EXPECT_THROW(sanafe::yaml_parse_network_file(fp, arch),
             sanafe::YamlDescriptionParsingError);
@@ -959,7 +959,7 @@ network:
 
     std::ifstream fp(test_file);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     EXPECT_THROW(sanafe::yaml_parse_network_file(fp, arch),
             sanafe::YamlDescriptionParsingError);
@@ -980,7 +980,7 @@ TEST(YamlSnnTest, ParseNetworkFile_InvalidTopLevelFormat)
 
     std::ifstream fp(test_file);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     EXPECT_THROW(sanafe::yaml_parse_network_file(fp, arch),
             sanafe::YamlDescriptionParsingError);
@@ -993,7 +993,7 @@ TEST(YamlSnnTest, WriteMappings_NeuronNotMapped)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     sanafe::SpikingNetwork net("test");
     net.create_neuron_group("TestGroup", 1, {});
@@ -1045,7 +1045,7 @@ TEST(YamlSnnTest, ParseMappingInfo_AllHardwareUnits)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     const std::string yaml = R"(
 network:
@@ -1082,7 +1082,7 @@ TEST(YamlSnnTest, ParseMappingSection_NotSequenceThrows)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     const std::string yaml = R"(
 network:
@@ -1111,7 +1111,7 @@ TEST(YamlSnnTest, ParseMapping_MultipleEntriesThrows)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     const std::string yaml = R"(
 network:
@@ -1198,7 +1198,7 @@ TEST(YamlSnnTest, WriteNetwork_EmptyNetworkName)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     sanafe::SpikingNetwork net("");
     auto &group = net.create_neuron_group("TestGroup", 1, {});
@@ -1245,7 +1245,7 @@ TEST(YamlSnnTest, SerializeNeuronRuns_MultipleRuns)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     sanafe::SpikingNetwork net("test");
     auto &group = net.create_neuron_group("TestGrp", 5, {});
@@ -1307,7 +1307,7 @@ network:
     out.close();
 
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     sanafe::SpikingNetwork net("new");
     auto &group = net.create_neuron_group("TestGroup", 1, {});
@@ -1353,7 +1353,7 @@ mappings:
     out.close();
 
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
     sanafe::SpikingNetwork net = sanafe::load_net(output_path, arch);
 
     // Save just mappings (which calls yaml_write_mappings_file)
@@ -1375,7 +1375,7 @@ TEST(YamlSnnTest, ParseMapping_AllNeuronsInGroup)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     const std::string yaml = R"(
 network:

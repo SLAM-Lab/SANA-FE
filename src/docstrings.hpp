@@ -294,16 +294,16 @@ Args:
     write_trace_headers (bool, optional): Write CSV headers to trace files. Default is True.
 
 Returns:
-    dict: Simulation results including energy, timing, and trace data
-        - timesteps_executed: Number of timesteps simulated
-        - energy: Energy breakdown by component
-        - sim_time: Simulated hardware time (seconds)
-        - spikes: Total spike count
-        - spike_trace: Spike data (if enabled)
-        - potential_trace: Potential data (if enabled)
-        - neuron_trace: Neuron trace data (if enabled)
-        - perf_trace: Performance metrics (if enabled)
-        - message_trace: Network message data (if enabled)
+    dict: Simulation results including energy, timing, and trace data.
+        - timesteps_executed (int): Number of timesteps simulated.
+        - energy (float): Energy breakdown by component.
+        - sim_time (float): Simulated hardware time (seconds).
+        - spikes (int): Total spike count.
+        - spike_trace (list[list[MappedNeuron]]): A list of length <timesteps_executed> where each element is a list of the spiking MappedNeuron objects (if enabled).
+        - potential_trace (list[list[float]]): A 2D array of probed neuron potentials (if enabled).
+        - neuron_trace (dict[str, list[list]]): A dictionary of neuron traces, where each entry is a 2D array, i.e., a list of length <timesteps_executed> which elements are a list of per-neuron values (if enabled).
+        - perf_trace (dict[str, list]): A dict of H/W performance metrics indexed by statistic name and containing lists of length <timesteps_executed> (if enabled).
+        - message_trace (list[list[dict]]): A list of length <timesteps_executed>, where each time-step has a list of dictionaries, one per message (if enabled).
 
 Example:
     >>> results = chip.sim(timesteps=1000, spike_trace=True, perf_trace=True)

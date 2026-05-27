@@ -82,9 +82,9 @@ struct Conv2DPosition
 
 struct Conv2DIndices
 {
-    int dest_idx;
-    int source_idx;
-    int filter_idx;
+    size_t dest_idx;
+    size_t source_idx;
+    size_t filter_idx;
 };
 
 class Neuron
@@ -120,7 +120,7 @@ public:
     NeuronConfiguration default_neuron_config;
     std::string name;
 
-    [[nodiscard]] std::string get_name() const { return name; }
+    [[nodiscard]] const std::string &get_name() const { return name; }
     explicit NeuronGroup(std::string group_name, SpikingNetwork &net, size_t neuron_count, const NeuronConfiguration &default_config);
 
     void connect_neurons_dense(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists);
@@ -131,11 +131,12 @@ public:
 private:
     static Conv2DOutputDimensions conv2d_calculate_dimensions(const Conv2DParameters &convolution);
     void conv2d_validate_neuron_counts(const NeuronGroup &dest_group, const Conv2DOutputDimensions &dims) const;
+    static size_t conv2d_calculate_dest_index(const Conv2DOutputDimensions &dims, const Conv2DCoordinate &output_coordinate) noexcept;
     static Conv2DIndices conv2d_calculate_indices(const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims, const Conv2DPosition &position);
     static bool conv2d_is_position_valid(int position, int max_size) noexcept;
     void conv2d_create_output_neuron_connections(NeuronGroup &dest_group, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims, const Conv2DCoordinate &out);
     void conv2d_create_kernel_connections(Neuron &dest, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, const Conv2DParameters &convolution, const Conv2DOutputDimensions &dims, const Conv2DCoordinate &out, int c_in);
-    static void conv2d_create_and_configure_connection(Neuron &source, Neuron &dest, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, int filter_idx);
+    static void conv2d_create_and_configure_connection(Neuron &source, Neuron &dest, const std::map<std::string, std::vector<ModelAttribute>> &attribute_lists, size_t filter_idx);
 };
 
 class SpikingNetwork
@@ -187,7 +188,7 @@ struct Connection
     NeuronAddress post_neuron{};
     size_t id;
 
-    Connection(size_t id) : id(id) {}
+    explicit Connection(size_t id) : id(id) {}
     [[nodiscard]] std::string info() const;
 };
 

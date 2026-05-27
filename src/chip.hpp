@@ -60,14 +60,14 @@ public:
     // Keep a reference to the different neuron groups mapped to the H/W
     std::map<std::string, std::vector<std::reference_wrapper<MappedNeuron>>> mapped_neuron_groups;
 
-    SpikingChip(const Architecture &arch);
+    explicit SpikingChip(const Architecture &arch);
     ~SpikingChip();
     // Do not allow copying
     SpikingChip(const SpikingChip &copy) = delete;
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), std::string output_dir = "");
+    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), const std::string &output_dir = "");
     void step(Scheduler &scheduler);
     void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
@@ -122,7 +122,7 @@ private:
         TimePoint scheduler_end_tm{TimePoint::min()};
     };
 
-    std::unique_ptr<BookSimConfig> booksim_config;
+    std::shared_ptr<BookSimConfig> booksim_config;
     std::atomic<long int> total_messages_sent{0L};
     size_t total_neurons_mapped{0UL};
     long int total_neurons_updated{0L};
@@ -229,7 +229,7 @@ struct RunData
     double network_energy{0.0};
     double sim_time{0.0};
 
-    RunData(long int start);
+    explicit RunData(long int start);
 };
 }
 

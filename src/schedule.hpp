@@ -41,6 +41,7 @@ enum Direction : uint8_t
 
 using MessageFifo = std::list<Message>;
 using MessagePriorityQueue = std::priority_queue<Message, std::vector<Message>, CompareMessagesBySentTime>;
+using TimingModelFunc = std::function<double(TimestepHandle &, Scheduler &)>;
 constexpr size_t max_buffered_timesteps{256UL};
 
 template <typename T, typename Container = std::vector<T>,
@@ -154,6 +155,7 @@ struct Scheduler
     ThreadSafePriorityQueue<TimestepHandle, std::vector<TimestepHandle>,
             CompareTimesteps>
             timesteps_to_write;
+    std::shared_ptr<BookSimConfig> booksim_config;
 
     TimingModel timing_model{timing_model_detailed};
     size_t noc_width_in_tiles;
@@ -184,7 +186,7 @@ public:
     double mean_in_flight_receive_delay{0.0};
     long int messages_in_noc{0L};
 
-    NocInfo(const Scheduler &scheduler);
+    explicit NocInfo(const Scheduler &scheduler);
     [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
     {
         const size_t links_per_router = max_cores_per_tile + ndirections;
@@ -202,18 +204,20 @@ private:
 };
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
-void schedule_messages(TimestepHandle &ts, Scheduler &scheduler, const BookSimConfig &booksim_config);
-void schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler);
-void schedule_messages_detailed(TimestepHandle &ts, Scheduler &scheduler);
-void schedule_messages_cycle_accurate(TimestepHandle &ts, const BookSimConfig &config, Scheduler &scheduler);
+void schedule_messages(TimestepHandle &ts, Scheduler &scheduler, std::shared_ptr<BookSimConfig> config);
+double schedule_messages_timestep_simple(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_detailed(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_cycle(TimestepHandle &ts, Scheduler &scheduler);
 
 void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
 void schedule_messages_thread(Scheduler &scheduler, int thread_id);
 void schedule_stop_all_threads(Scheduler &scheduler);
 
 std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NocInfo &noc);
-double schedule_messages_timestep(TimestepHandle &ts, Scheduler &scheduler);
-void schedule_handle_message(Message &m, Scheduler &scheduler, NocInfo &noc);
+
+void schedule_messages_thread(Scheduler &scheduler, const int thread_id);
+void schedule_messages_thread_cycle(Scheduler &scheduler, const int thread_id);
+void schedule_handle_message(Message &m, const Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);
 void noc_update_all_tracked_messages(double t, NocInfo &noc);
