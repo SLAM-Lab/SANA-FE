@@ -1,2 +1,5 @@
 sphinx_rtd_theme
 pybind11
+numpy
+pandas
+matplotlib
