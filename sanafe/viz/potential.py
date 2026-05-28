@@ -11,7 +11,7 @@ from typing import Any, Optional, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sanafe.data.traces import potentials_to_dataframe
+from sanafe.data import potentials_to_dataframe
 from sanafe.viz.styles import (
     SANAFEStyle,
     DEFAULT_COLORS,

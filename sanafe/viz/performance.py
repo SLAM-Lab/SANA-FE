@@ -10,7 +10,7 @@ from typing import Any, Optional, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sanafe.data.traces import (
+from sanafe.data import (
     performance_to_dataframe,
     messages_to_dataframe,
 )
@@ -252,7 +252,7 @@ def plot_throughput(
     return fig, ax
 
 
-def plot_latency(
+def plot_message_latency(
     source: Any,
     metrics: Optional[Sequence[str]] = None,
     filter_placeholder: bool = True,

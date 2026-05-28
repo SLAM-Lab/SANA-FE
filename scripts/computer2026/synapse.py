@@ -225,7 +225,7 @@ def main():
     # Plotting
     results_df = pd.read_csv(results_path)
     # Analyze and plot latency results
-    #concurrency, total_latency, avg_latency = analyze_and_plot_latency(results)
+    #concurrency, total_latency, avg_latency = analyze_and_plot_message_latency(results)
 
     plt.rcParams.update({
         "font.size": 7,

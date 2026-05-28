@@ -4,7 +4,7 @@ Plotting utilities for SANA-FE simulation outputs.
 
 from sanafe.viz.raster import plot_raster
 from sanafe.viz.potential import plot_potential, plot_potential_lines
-from sanafe.viz.performance import plot_energy, plot_throughput, plot_latency
+from sanafe.viz.performance import plot_energy, plot_throughput, plot_message_latency
 from sanafe.viz.styles import (
     SANAFEStyle,
     get_group_colors,
@@ -21,7 +21,7 @@ __all__ = [
     "plot_potential_lines",
     "plot_energy",
     "plot_throughput",
-    "plot_latency",
+    "plot_message_latency",
     "SANAFEStyle",
     "get_group_colors",
     "apply_style",

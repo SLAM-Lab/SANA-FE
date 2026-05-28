@@ -58,7 +58,7 @@ NEUROMORPHIC_CMAP_COLORS = [
 class SANAFEStyle:
     """
     Style configuration for plots
-    
+
         colors: List of colors for different groups/series
         figure_size: Default (width, height) in inches
         dpi: Resolution for saved figures
@@ -88,23 +88,23 @@ class SANAFEStyle:
     grid: bool = False
     grid_alpha: float = 0.3
     tight_layout: bool = True
-    
+
     # Raster plot specific
     raster_marker: str = "|"
     raster_marker_size: float = 100.0
     raster_line_width: float = 1.5
-    
+
     # Potential plot specific
     potential_line_width: float = 1.5
     potential_marker: Optional[str] = None
     potential_marker_size: float = 4.0
-    
+
     # Performance plot specific
     perf_line_width: float = 1.5
     perf_marker: Optional[str] = "o"
     perf_marker_size: float = 3.0
     perf_fill_alpha: float = 0.3
-    
+
     # Energy breakdown specific
     energy_colors: List[str] = field(default_factory=lambda: [
         "#1f77b4",  # Synapse - Blue
@@ -115,13 +115,13 @@ class SANAFEStyle:
     energy_component_names: List[str] = field(default_factory=lambda: [
         "Synapse", "Dendrite", "Soma", "Network",
     ])
-    
+
     # Histogram specific
     hist_bins: int = 30
     hist_alpha: float = 0.7
     hist_edgecolor: str = "white"
     hist_edgewidth: float = 0.5
-    
+
     def to_rc_params(self) -> Dict[str, Any]:
         """Convert style to matplotlib rcParams dictionary."""
         return {
@@ -205,7 +205,7 @@ def apply_style(style: Optional[SANAFEStyle] = None) -> None:
     """
     if style is None:
         style = _default_style
-    
+
     for key, value in style.to_rc_params().items():
         mpl.rcParams[key] = value
 
@@ -214,7 +214,7 @@ def get_group_colors(
     groups: Sequence[str],
     style: Optional[SANAFEStyle] = None,
 ) -> Dict[str, str]:
-    """    
+    """
     Assigns colors from the style's color palette to each group name.
     Colors cycle if there are more groups than colors.
 
@@ -223,9 +223,9 @@ def get_group_colors(
     """
     if style is None:
         style = _default_style
-    
+
     colors = style.colors if len(style.colors) >= len(groups) else EXTENDED_COLORS
-    
+
     return {
         group: colors[i % len(colors)]
         for i, group in enumerate(groups)
@@ -238,7 +238,7 @@ def get_colormap(
 ) -> LinearSegmentedColormap:
     """
     Get a colormap for SANA-FE visualizations.
-    
+
     Args:
         name: Colormap name. Options:
             - "neuromorphic": Purple-to-yellow gradient (default)
@@ -246,7 +246,7 @@ def get_colormap(
             - "energy": Green-to-red for energy consumption
             - Any matplotlib colormap name
         n_colors: Number of discrete colors in the colormap
-        
+
     Returns: Matplotlib colormap object.
     """
     if name == "neuromorphic":
@@ -283,20 +283,20 @@ def create_figure(
     """
     if style is None:
         style = _default_style
-    
+
     if figsize is None:
         figsize = style.figure_size
-    
+
     fig, ax = plt.subplots(figsize=figsize, **kwargs)
-    
+
     # Apply spine styling
     for spine in ax.spines.values():
         spine.set_linewidth(style.spine_width)
-    
+
     # Apply grid if enabled
     if style.grid:
         ax.grid(True, alpha=style.grid_alpha)
-    
+
     return fig, ax
 
 
@@ -311,15 +311,15 @@ def style_axis(
 ) -> plt.Axes:
     if style is None:
         style = _default_style
-    
+
     # Apply spine styling
     for spine in ax.spines.values():
         spine.set_linewidth(style.spine_width)
-    
+
     # Apply grid if enabled
     if style.grid:
         ax.grid(True, alpha=style.grid_alpha)
-    
+
     # Set labels and title
     if xlabel is not None:
         ax.set_xlabel(xlabel, fontsize=style.label_size)
@@ -327,14 +327,14 @@ def style_axis(
         ax.set_ylabel(ylabel, fontsize=style.label_size)
     if title is not None:
         ax.set_title(title, fontsize=style.title_size)
-    
+
     # Set limits
     if xlim is not None:
         ax.set_xlim(xlim)
     if ylim is not None:
         ax.set_ylim(ylim)
-    
+
     # Set tick label sizes
     ax.tick_params(axis="both", labelsize=style.tick_size)
-    
+
     return ax

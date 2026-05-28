@@ -34,6 +34,91 @@ def _looks_like_perf_dict(source: Any) -> bool:
         source.get("timestep"), (list, tuple, np.ndarray))
 
 
+def spikes_to_raster(
+    source: Any,
+    groups: Optional[Sequence[str]] = None,
+    time_range: Optional[Tuple[int, int]] = None,
+    n_timesteps: Optional[int] = None,
+) -> Tuple[np.ndarray, list[str], np.ndarray]:
+    """Convert a spike trace into a dense 2D raster matrix.
+
+    Args:
+        source: The spike trace data. May be a :class:`pandas.DataFrame`, a
+            path to a CSV file, the dict returned by ``chip.sim()``, or the raw
+            ``spike_trace`` values i.e., a per-timestep list, where each element
+            is a list of spiking neurons for that timestep.
+        groups: Optional subset of neuron groups to include. Row order in the
+            returned matrix follows the order given here; when omitted, all
+            groups are included in sorted order.
+        time_range (tuple(int, int), optional): Optional ``(start, stop)``
+            half-open interval of timesteps to include. When omitted, spans from
+            the minimum to maximum timestep present in the data.
+        n_timesteps (int, optional): Optional explicit number of columns in the
+            matrix. Useful when the trace ends before the simulation does (e.g.,
+            no spikes in the final timesteps) and you want the matrix to span
+            the full run. Ignored when ``time_range`` is given.
+
+    Returns:
+        tuple: A 3-tuple ``(matrix, neuron_ids, timesteps)`` where
+
+        * ``matrix`` is a 2D boolean :class:`numpy.ndarray` of shape
+          ``(n_neurons, n_timesteps)`` with ``True`` where a spike occurred.
+        * ``neuron_ids`` is a list of ``"group.offset"`` strings labelling
+          each row of the matrix.
+        * ``timesteps`` is a 1D :class:`numpy.ndarray` giving the timestep
+          index for each column.
+
+    Raises:
+        ValueError: If no spike trace data can be found in ``source``, or if
+            ``groups`` contains unknown group names.
+    """
+    from sanafe.data import spikes_to_dataframe  # avoid circular import in snippet
+
+    df = spikes_to_dataframe(source)
+
+    all_groups = sorted(df["group"].unique())
+    if groups is None:
+        groups = all_groups
+    else:
+        unknown = set(groups) - set(all_groups)
+        if unknown:
+            raise ValueError(
+                f"Unknown groups: {unknown}. Available: {all_groups}")
+        df = df[df["group"].isin(groups)]
+
+    # Determine time axis
+    if time_range is not None:
+        t_start, t_stop = time_range
+        df = df[(df["timestep"] >= t_start) & (df["timestep"] < t_stop)]
+    else:
+        t_start = int(df["timestep"].min()) if len(df) else 0
+        if n_timesteps is not None:
+            t_stop = t_start + n_timesteps
+        else:
+            t_stop = int(df["timestep"].max()) + 1 if len(df) else t_start + 1
+
+    timesteps = np.arange(t_start, t_stop)
+
+    # Determine row order: stable per-group ordering by neuron_offset
+    neuron_ids: list[str] = []
+    row_of: dict[str, int] = {}
+    for g in groups:
+        offsets = sorted(df.loc[df["group"] == g, "neuron_offset"].unique())
+        for off in offsets:
+            nid = f"{g}.{int(off)}"
+            row_of[nid] = len(neuron_ids)
+            neuron_ids.append(nid)
+
+    matrix = np.zeros((len(neuron_ids), len(timesteps)), dtype=bool)
+    if len(df) and len(neuron_ids) and len(timesteps):
+        rows = df["neuron_id"].map(row_of).to_numpy()
+        cols = df["timestep"].to_numpy() - t_start
+        valid = (rows >= 0) & (cols >= 0) & (cols < len(timesteps))
+        matrix[rows[valid], cols[valid]] = True
+
+    return matrix, neuron_ids, timesteps
+
+
 def spikes_to_dataframe(source: Any) -> pd.DataFrame:
     """Convert a spike trace into a pandas DataFrame.
 

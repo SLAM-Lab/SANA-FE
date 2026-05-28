@@ -38,12 +38,14 @@ each trace into a DataFrame:
                            perf_trace=True, message_trace=True,
                            neuron_trace=True)
 
+   sanafe.data.spikes_to_raster(results_dict, n_timesteps=5)
    sanafe.data.spikes_to_dataframe(results_dict)
    sanafe.data.potentials_to_dataframe(results_dict)
    sanafe.data.performance_to_dataframe(results_dict)
    sanafe.data.messages_to_dataframe(results_dict)
    sanafe.data.neuron_traces_to_dataframe(results_dict)
 
+.. autofunction:: spikes_to_raster
 
 .. autofunction:: spikes_to_dataframe
 

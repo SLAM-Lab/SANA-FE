@@ -10,7 +10,7 @@ from typing import Any, Optional, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sanafe.data.traces import spikes_to_dataframe
+from sanafe.data import spikes_to_dataframe
 from sanafe.viz.styles import (
     SANAFEStyle,
     create_figure,

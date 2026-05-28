@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sanafe"
-version = "2.2.0"
+version = "2.2.1"
 description = "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,9 +12,12 @@ authors = [
     { name = "James Boyle", email = "james.boyle@utexas.edu" },
 ]
 license = { text = "GPL-3.0" }
-dependencies = [
-    "pybind11>=2.6.0",
-]
+dependencies = []
+
+[project.optional-dependencies]
+data = ["pandas"]
+viz = ["pandas", "matplotlib", "numpy"]
+all = ["pandas", "matplotlib", "numpy"]
 
 [project.urls]
 Homepage = "https://github.com/SLAM-Lab/SANA-FE"
