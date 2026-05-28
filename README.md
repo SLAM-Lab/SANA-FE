@@ -22,11 +22,11 @@ standalone command-line simulator.
 ## Python
 
 ```python
-import sanafe;
+import sanafe
 
 arch, net = sanafe.load_example()
 chip = sanafe.SpikingChip(arch)
-chip.load(sanafe.load_net('snn/example_snn.yaml', arch))
+chip.load(net)
 results = chip.sim(100)
 print(results)
 ```
@@ -132,8 +132,8 @@ hard-coded names using either csv or yaml extensions.
 
 `run_summary.yaml`: High-level statistics for the simulation e.g. runtime
 
-This project has been written in C++ and Python C++ code has been written using
-the C++17 standard.
+This project has been written in C++ and Python.
+C++ code has been written using the C++17 standard.
 
 For more details, see:
 
