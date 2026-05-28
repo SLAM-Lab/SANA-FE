@@ -299,7 +299,7 @@ Returns:
         - energy (float): Energy breakdown by component.
         - sim_time (float): Simulated hardware time (seconds).
         - spikes (int): Total spike count.
-        - spike_trace (list[list[MappedNeuron]]): A list of length <timesteps_executed> where each element is a list of the spiking MappedNeuron objects (if enabled).
+        - spike_trace (list[list[NeuronAddress]]): A list of length <timesteps_executed> where each element is a list of the spiking MappedNeuron objects (if enabled).
         - potential_trace (list[list[float]]): A 2D array of probed neuron potentials (if enabled).
         - neuron_trace (dict[str, list[list]]): A dictionary of neuron traces, where each entry is a 2D array, i.e., a list of length <timesteps_executed> which elements are a list of per-neuron values (if enabled).
         - perf_trace (dict[str, list]): A dict of H/W performance metrics indexed by statistic name and containing lists of length <timesteps_executed> (if enabled).
