@@ -38,7 +38,7 @@ def spikes_to_dataframe(source: Any) -> pd.DataFrame:
     """Convert a spike trace into a pandas DataFrame.
 
     Args:
-        source (pandas.DataFrame or Path or str or Dict or List[List[NeuronAddress]]):
+        source (pandas.DataFrame or Path or str or dict or list[list[NeuronAddress]]):
            The spike trace data. May be a :class:`pandas.DataFrame`, a path to a
            CSV file, the dict returned by ``chip.sim()``, or the raw
            ``spike_trace`` value. In memory, spike traces are a per-timestep
@@ -89,9 +89,11 @@ def potentials_to_dataframe(source: Any,
     """Convert a membrane-potential trace into a pandas DataFrame indexed by timestep.
 
     Args:
-        source (pandas.DataFrame or str or Path or Dict or List[Dict]): The potential trace data. May be a :class:`pandas.DataFrame`, a
-            path to a CSV file, the dict returned by ``chip.sim()``, or the raw
-            ``potential_trace`` value.
+        source (pandas.DataFrame or str or Path or dict or list[list[float]]):
+            The potential trace data. May be a :class:`pandas.DataFrame`, a
+            path to a CSV file, the dict returned by ``chip.sim()``, or a 2D
+            array of ``potential_trace`` values (i.e., a per-timestep list,
+            containing per-neuron lists of potentials).
         neuron_ids (List[str]): Optional column labels for the neurons. When
             omitted, columns are named ``Neuron 0``, ``Neuron 1``, and so on.
             Only used when ``source`` is in-memory trace data.
@@ -134,14 +136,116 @@ def potentials_to_dataframe(source: Any,
     return df
 
 
+def neuron_traces_to_dataframe(source: Any,
+                              neuron_ids: Sequence[str] | None = None) -> pd.DataFrame:
+    """Convert additional neuron traces into a pandas DataFrame indexed by timestep.
+
+    Args:
+        source (pandas.DataFrame or str or Path or dict or dict[str, list[list]]):
+            The neuron trace data. May be a :class:`pandas.DataFrame`, a
+            path to a CSV file, the dict returned by ``chip.sim()``, or a 2D
+            array of neuron_traces (i.e., a per-timestep list, containing
+            per-neuron lists of values).
+        neuron_ids (List[str]): Optional column labels for the neurons. When
+            omitted, columns are named ``Neuron 0``, ``Neuron 1``, and so on.
+            Only used when ``source`` is in-memory trace data.
+
+    Returns:
+        pandas.DataFrame: A DataFrame whose index is named ``timestep`` and
+        whose columns correspond to individual neurons.
+
+    Raises:
+        ValueError: If no potential trace data is found, or if ``neuron_ids``
+            length does not match the number of trace columns.
+    """
+    if isinstance(source, pd.DataFrame):
+        df = source.copy()
+        index_cols = [c for c in ("timestep", "neuron_id") if c in df.columns]
+        if index_cols:
+            df = df.set_index(index_cols)
+        return df
+
+    if _is_path(source):
+        # Drop pandas' phantom column from the trailing-comma rows.
+        raw = pd.read_csv(source)
+
+
+        if "timestep" not in raw.columns:
+            raise ValueError(
+                f"Neuron trace CSV {source!r} is missing a 'timestep' column")
+
+        long_rows: list[dict] = []
+        for col in raw.columns:
+            if col == "timestep" or col.startswith("Unnamed"):
+                continue
+            # Parse "neuron <group>.<offset>/<variable>"
+            stripped = col[len("neuron "):] if col.startswith("neuron ") else col
+            if "/" not in stripped:
+                raise ValueError(
+                    f"Unrecognised neuron trace column {col!r}; "
+                    "expected 'neuron <group>.<offset>/<variable>'")
+            neuron_id, var = stripped.rsplit("/", 1)
+            for t, v in zip(raw["timestep"], raw[col]):
+                long_rows.append(
+                    {"timestep": t, "neuron_id": neuron_id, "var": var, "value": v})
+
+        df = pd.DataFrame(long_rows)
+        # Pivot to (timestep, neuron_id) index, one column per variable.
+        return df.pivot_table(
+            index=["timestep", "neuron_id"], columns="var", values="value")
+
+    traces = _maybe_unwrap(source, "neuron_trace")
+    if traces is None or (isinstance(traces, dict) and not traces):
+        raise ValueError("No neuron trace data in source")
+    if not isinstance(traces, dict):
+        raise ValueError(
+            f"Expected neuron_trace to be a dict[str, list[list]], got {type(traces).__name__}")
+
+    # Stack each variable into a (T, N) array and check shapes agree.
+    arrays: dict[str, np.ndarray] = {}
+    n_timesteps: int | None = None
+    n_neurons: int | None = None
+    for var, values in traces.items():
+        arr = np.asarray(values, dtype=float)
+        if arr.ndim != 2:
+            raise ValueError(
+                f"neuron_trace[{var!r}] is not 2D (got shape {arr.shape})")
+        if n_timesteps is None:
+            n_timesteps, n_neurons = arr.shape
+        elif arr.shape != (n_timesteps, n_neurons):
+            raise ValueError(
+                f"neuron_trace[{var!r}] has shape {arr.shape}, "
+                f"expected ({n_timesteps}, {n_neurons})")
+        arrays[var] = arr
+
+    if n_neurons == 0:
+        raise ValueError("Neuron traces contain no neurons")
+
+    if neuron_ids is None:
+        neuron_ids = [f"Neuron {i}" for i in range(n_neurons)]
+    elif len(neuron_ids) != n_neurons:
+        raise ValueError(
+            f"neuron_ids has {len(neuron_ids)} entries but trace has {n_neurons} columns")
+
+    index = pd.MultiIndex.from_product(
+        [range(n_timesteps), list(neuron_ids)],
+        names=["timestep", "neuron_id"],
+    )
+    return pd.DataFrame(
+        {var: arr.reshape(-1) for var, arr in arrays.items()},
+        index=index,
+    )
+
+
 def performance_to_dataframe(source: Any) -> pd.DataFrame:
     """Convert a performance trace into a DataFrame.
 
     Args:
-        source (pandas.DataFrame): The performance trace data. May be a :class:`pandas.DataFrame`,
-            a path to a CSV file, a performance dict (one containing
-            ``total_energy`` and a sequence-valued ``timestep``), or the raw
-            ``perf_trace`` value.
+        source (pandas.DataFrame or Path or str or dict:
+            The performance trace data. May be a :class:`pandas.DataFrame`,
+            a path to a CSV file, the dict from chip.sim() or a dict containing
+            performance data (dict[str, list], i.e. lists of per-timestep values
+            for each metric).
 
     Returns:
         pandas.DataFrame: A DataFrame of per-timestep performance metrics.
@@ -165,25 +269,8 @@ def performance_to_dataframe(source: Any) -> pd.DataFrame:
     return pd.DataFrame(perf)
 
 
-_MESSAGE_RENAME = {
-    "receive_delay": "processing_delay",
-    "blocked_delay": "blocking_delay",
-    "sent_timestamp": "send_timestamp",
-}
-
-
 def messages_to_dataframe(source: Any) -> pd.DataFrame:
     """Convert a message trace into a flat pandas DataFrame, one row per message.
-
-    The following columns are renamed for consistency:
-
-    ===================  ==================
-    Original             Renamed
-    ===================  ==================
-    ``receive_delay``    ``processing_delay``
-    ``blocked_delay``    ``blocking_delay``
-    ``sent_timestamp``   ``send_timestamp``
-    ===================  ==================
 
     In addition, convenience identifier columns are derived when their
     components are present:
@@ -193,9 +280,10 @@ def messages_to_dataframe(source: Any) -> pd.DataFrame:
     * ``dest_hw`` from ``dest_tile_id`` and ``dest_core_offset``
 
     Args:
-        source (pandas.DataFrame): The message trace data. May be a :class:`pandas.DataFrame`, a
-            path to a CSV file, the dict returned by ``chip.sim()``, or the raw
-            ``message_trace`` value.
+        source (pandas.DataFrame or Path or str or dict or list[list[dict]]):
+            The message trace data. May be a :class:`pandas.DataFrame`, a path
+            to a CSV file, the dict returned by ``chip.sim()``, or the raw
+            ``message_trace`` values.
 
     Returns:
         pandas.DataFrame: A DataFrame with one row per message.
@@ -217,9 +305,6 @@ def messages_to_dataframe(source: Any) -> pd.DataFrame:
     for ts_msgs in messages:
         for m in ts_msgs:
             row = dict(m)
-            for old, new in _MESSAGE_RENAME.items():
-                if old in row:
-                    row[new] = row.pop(old)
             if "src_neuron_group_id" in row and "src_neuron_offset" in row:
                 row.setdefault("src_neuron",
                                f"{row['src_neuron_group_id']}.{row['src_neuron_offset']}")
@@ -231,37 +316,3 @@ def messages_to_dataframe(source: Any) -> pd.DataFrame:
                                f"{row['dest_tile_id']}.{row['dest_core_offset']}")
             rows.append(row)
     return pd.DataFrame(rows)
-
-
-# Code for testing, TODO: make into quickstart and possibly unit test
-# if __name__ == "__main__":
-#     import sanafe
-
-#     arch, _ = sanafe.load_tutorial()
-#     snn = sanafe.Network()
-#     g = snn.create_neuron_group(
-#         "in", 2, {"bias": 0.5, "threshold": 1.0, "reset": 0.0},
-#         log_spikes=True, log_potential=True)
-#     for n in g:
-#         n.map_to_core(arch.tiles[0].cores[0])
-#     chip = sanafe.SpikingChip(arch)
-#     chip.load(snn)
-#     r = chip.sim(5, spike_trace=True, potential_trace=True,
-#                  perf_trace=True, message_trace=True)
-
-#     spikes = spikes_to_dataframe(r)
-#     pots = potentials_to_dataframe(r)
-#     perf = performance_to_dataframe(r)
-#     msgs = messages_to_dataframe(r)
-
-#     print(spikes)
-#     print(pots)
-#     print(perf)
-#     print(msgs)
-
-#     assert list(spikes.columns) == ["timestep", "group", "neuron_offset", "neuron_id"]
-#     assert pots.index.name == "timestep"
-#     assert "total_energy" in perf.columns
-#     assert "processing_delay" in msgs.columns
-#     assert "receive_delay" not in msgs.columns
-#     print("OK", len(spikes), len(pots), len(perf), len(msgs))
