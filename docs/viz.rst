@@ -41,9 +41,9 @@ Run a simulation and generate the standard set of plots:
 Spike Plots
 -----------
 
-.. autofunction:: plot_raster
+.. autofunction:: sanafe.viz.plot_raster
 
-.. autofunction:: raster_plot_matrix
+.. autofunction:: sanafe.viz.raster_plot_matrix
 
 
 Membrane Potential Plots
@@ -54,9 +54,9 @@ for spikes. ``plot_potential_lines`` is available for traditional per-neuron
 line plots, which is more useful when only a handful of neurons are being
 inspected.
 
-.. autofunction:: plot_potential
+.. autofunction:: sanafe.viz.plot_potential
 
-.. autofunction:: plot_potential_lines
+.. autofunction:: sanafe.viz.plot_potential_lines
 
 
 Performance Plots
@@ -66,11 +66,11 @@ Hardware performance plots cover energy breakdowns, throughput, and message
 latency distributions. Energy and time values are automatically rescaled to
 sensible units (e.g., pJ, nJ, µs, ms) based on the magnitude of the data.
 
-.. autofunction:: plot_energy
+.. autofunction:: sanafe.viz.plot_energy
 
-.. autofunction:: plot_throughput
+.. autofunction:: sanafe.viz.plot_throughput
 
-.. autofunction:: plot_message_latency
+.. autofunction:: sanafe.viz.plot_message_latency
 
 
 .. _styling:
@@ -102,16 +102,16 @@ Apply a preset globally with :func:`set_default_style`, or pass a
 .. autoclass:: SANAFEStyle
    :members:
 
-.. autofunction:: get_default_style
+.. autofunction:: sanafe.viz.get_default_style
 
-.. autofunction:: set_default_style
+.. autofunction:: sanafe.viz.set_default_style
 
-.. autofunction:: apply_style
+.. autofunction:: sanafe.viz.apply_style
 
-.. autofunction:: get_group_colors
+.. autofunction:: sanafe.viz.get_group_colors
 
-.. autofunction:: get_colormap
+.. autofunction:: sanafe.viz.get_colormap
 
-.. autofunction:: create_figure
+.. autofunction:: sanafe.viz.create_figure
 
-.. autofunction:: style_axis
+.. autofunction:: sanafe.viz.style_axis

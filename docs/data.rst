@@ -45,12 +45,12 @@ each trace into a DataFrame:
    sanafe.data.messages_to_dataframe(results_dict)
    sanafe.data.neuron_traces_to_dataframe(results_dict)
 
-.. autofunction:: spikes_to_raster
+.. autofunction:: sanafe.data.spikes_to_raster
 
-.. autofunction:: spikes_to_dataframe
+.. autofunction:: sanafe.data.spikes_to_dataframe
 
-.. autofunction:: potentials_to_dataframe
+.. autofunction:: sanafe.data.potentials_to_dataframe
 
-.. autofunction:: performance_to_dataframe
+.. autofunction:: sanafe.data.performance_to_dataframe
 
-.. autofunction:: messages_to_dataframe
+.. autofunction:: sanafe.data.messages_to_dataframe
