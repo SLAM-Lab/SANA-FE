@@ -1,6 +1,6 @@
-===========================================
-SANA-FE Trace Data Conversion (sanafe.data)
-===========================================
+===================================
+Trace Data Conversion (sanafe.data)
+===================================
 
 The ``sanafe.data`` module converts SANA-FE trace outputs into other useful
 formats, e.g., Pandas.

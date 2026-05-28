@@ -1,7 +1,8 @@
-API Reference
-=============
+==================
+Core API Reference
+==================
 
-This page contains the API documentation for SANA-FE.
+This page contains the core API documentation for SANA-FE.
 
 .. currentmodule:: sanafe
 

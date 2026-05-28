@@ -1,6 +1,6 @@
-=====================================
-SANA-FE Layers Module (sanafe.layers)
-=====================================
+==========================
+SNN Layers (sanafe.layers)
+==========================
 
 The ``sanafe.layers`` module provides higher-level machine learning abstractions
 that simplify the construction of deep spiking neural network applications in

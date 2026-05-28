@@ -1,5 +1,6 @@
-Models
-======
+======================
+Models (sanafe.models)
+======================
 
 This page documents every pipeline model available in SANA-FE. It begins with
 the framework attributes shared by all models, followed by a section for each
