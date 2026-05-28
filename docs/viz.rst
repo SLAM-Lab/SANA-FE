@@ -41,9 +41,9 @@ Run a simulation and generate the standard set of plots:
 Spike Plots
 -----------
 
-.. autofunction:: sanafe.viz.plot_raster
+.. autofunction:: sanafe.viz.raster.plot_raster
 
-.. autofunction:: sanafe.viz.raster_plot_matrix
+.. autofunction:: sanafe.viz.raster.raster_plot_matrix
 
 
 Membrane Potential Plots
@@ -54,9 +54,9 @@ for spikes. ``plot_potential_lines`` is available for traditional per-neuron
 line plots, which is more useful when only a handful of neurons are being
 inspected.
 
-.. autofunction:: sanafe.viz.plot_potential
+.. autofunction:: sanafe.viz.potential.plot_potential
 
-.. autofunction:: sanafe.viz.plot_potential_lines
+.. autofunction:: sanafe.viz.potential.plot_potential_lines
 
 
 Performance Plots
@@ -66,11 +66,11 @@ Hardware performance plots cover energy breakdowns, throughput, and message
 latency distributions. Energy and time values are automatically rescaled to
 sensible units (e.g., pJ, nJ, µs, ms) based on the magnitude of the data.
 
-.. autofunction:: sanafe.viz.plot_energy
+.. autofunction:: sanafe.viz.performance.plot_energy
 
-.. autofunction:: sanafe.viz.plot_throughput
+.. autofunction:: sanafe.viz.performance.plot_throughput
 
-.. autofunction:: sanafe.viz.plot_message_latency
+.. autofunction:: sanafe.viz.performance.plot_message_latency
 
 
 .. _styling:
@@ -99,19 +99,17 @@ Apply a preset globally with :func:`set_default_style`, or pass a
 
    sanafe.viz.plot_raster(results_dict)
 
-.. autoclass:: SANAFEStyle
+.. autoclass:: sanafe.viz.styles.SANAFEStyle
    :members:
 
-.. autofunction:: sanafe.viz.get_default_style
+.. autofunction:: sanafe.viz.styles.get_default_style
 
-.. autofunction:: sanafe.viz.set_default_style
+.. autofunction:: sanafe.viz.styles.apply_style
 
-.. autofunction:: sanafe.viz.apply_style
+.. autofunction:: sanafe.viz.styles.get_group_colors
 
-.. autofunction:: sanafe.viz.get_group_colors
+.. autofunction:: sanafe.viz.styles.get_colormap
 
-.. autofunction:: sanafe.viz.get_colormap
+.. autofunction:: sanafe.viz.styles.create_figure
 
-.. autofunction:: sanafe.viz.create_figure
-
-.. autofunction:: sanafe.viz.style_axis
+.. autofunction:: sanafe.viz.styles.style_axis
