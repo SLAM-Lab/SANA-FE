@@ -79,9 +79,9 @@ double sanafe::schedule_messages_timestep_simple(
         for (Message &m : q)
         {
             neuron_processing_latencies[sending_core] += m.generation_delay;
-            message_processing_latencies[m.dest_core_id] += m.receive_delay;
+            message_processing_latencies[m.dest_core_id] += m.processing_delay;
             // Update message delays using very simple timing model
-            m.blocked_delay = 0.0; // No blocking modeled
+            m.blocking_delay = 0.0; // No blocking modeled
             m.network_delay = m.min_hop_delay;
         }
     }
@@ -148,7 +148,7 @@ double sanafe::schedule_messages_timestep_cycle(
                 booksim_create_spike_event(static_cast<int>(message.timestep),
                         std::move(src_neuron), std::move(src_hw),
                         std::move(dest_hw), message.generation_delay,
-                        message.receive_delay);
+                        message.processing_delay);
             }
         }
     }
@@ -309,7 +309,7 @@ void sanafe::schedule_handle_message(
     TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
             m.src_neuron_group_id.c_str(), m.src_neuron_offset);
     TRACE1(SCHEDULER, "Send delay:%e\n", m.generation_delay);
-    TRACE1(SCHEDULER, "Receive delay:%e\n", m.receive_delay);
+    TRACE1(SCHEDULER, "Receive delay:%e\n", m.processing_delay);
     const size_t dest_core = m.dest_core_id;
     // Figure out if we are able to send a message into the
     //  network i.e., is the route to the dest core
@@ -323,13 +323,13 @@ void sanafe::schedule_handle_message(
     {
         // Use heuristic for estimating delay based on route congestion,
         //  path capacity in messages and the mean delay per message
-        m.blocked_delay = (m.messages_along_route - path_capacity) *
+        m.blocking_delay = (m.messages_along_route - path_capacity) *
                 noc.mean_in_flight_receive_delay;
-        m.sent_timestamp += m.blocked_delay;
+        m.sent_timestamp += m.blocking_delay;
     }
     else
     {
-        m.blocked_delay = 0.0; // Path isn't at capacity; no blocking
+        m.blocking_delay = 0.0; // Path isn't at capacity; no blocking
     }
 
     const double congestion_delay = m.messages_along_route *
@@ -346,8 +346,8 @@ void sanafe::schedule_handle_message(
             noc.core_finished_receiving[dest_core], earliest_received_time);
 
     noc.core_finished_receiving[dest_core] =
-            std::max((noc.core_finished_receiving[dest_core] + m.receive_delay),
-                    (earliest_received_time + m.receive_delay));
+            std::max((noc.core_finished_receiving[dest_core] + m.processing_delay),
+                    (earliest_received_time + m.processing_delay));
     m.processed_timestamp = noc.core_finished_receiving[dest_core];
 
     // Now, push the message into the right receiving queue. Calculate the
@@ -453,7 +453,7 @@ void sanafe::NocInfo::update_rolling_averages(
     {
         // Message entering NoC
         mean_in_flight_receive_delay +=
-                (message.receive_delay - mean_in_flight_receive_delay) /
+                (message.processing_delay - mean_in_flight_receive_delay) /
                 (static_cast<double>(messages_in_noc) + 1.0);
         messages_in_noc++;
     }
@@ -463,7 +463,7 @@ void sanafe::NocInfo::update_rolling_averages(
         if (messages_in_noc > 1)
         {
             mean_in_flight_receive_delay +=
-                    (mean_in_flight_receive_delay - message.receive_delay) /
+                    (mean_in_flight_receive_delay - message.processing_delay) /
                     (static_cast<double>(messages_in_noc) - 1.0);
         }
         else

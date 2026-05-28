@@ -9,7 +9,7 @@ network:
     - name: out
       attributes: []
       neurons:
-        - 0..1: [soma: {threshold: 2}, log_u: true, log_potential: true]
+        - 0..1: [soma: {threshold: 2}, log_spikes: true, log_potential: true]
   edges:
     - out.1 -> out.1: [weight: -4]
     - in -> out: [type: dense, weight: [-1, 2, 1, 3]]

@@ -686,7 +686,7 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
         for (auto &m_ref : core.messages_in)
         {
             Message &m = m_ref;
-            m.receive_delay += process_message(ts, core, m);
+            m.processing_delay += process_message(ts, core, m);
         }
     }
 }
@@ -1754,9 +1754,9 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.received_timestamp << ",";
     message_trace_file << m.processed_timestamp << ",";
     message_trace_file << m.generation_delay << ",";
-    message_trace_file << m.receive_delay << ",";
+    message_trace_file << m.processing_delay << ",";
     message_trace_file << m.network_delay << ",";
-    message_trace_file << m.blocked_delay << ",";
+    message_trace_file << m.blocking_delay << ",";
     message_trace_file << m.min_hop_delay << ",";
     message_trace_file << m.messages_along_route;
     message_trace_file << "\n";
