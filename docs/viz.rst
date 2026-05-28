@@ -1,6 +1,6 @@
-========================================
-SANA-FE Visualization (sanafe.viz)
-========================================
+==========================
+Visualization (sanafe.viz)
+==========================
 
 The ``sanafe.viz`` module provides plotting helpers for SANA-FE trace outputs,
 built on top of matplotlib. Each plotting function accepts the same input
