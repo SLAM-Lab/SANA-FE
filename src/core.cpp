@@ -58,11 +58,61 @@ void sanafe::Core::update_hw_in_use()
     pipeline_hw_in_use = hw_list;
 }
 
+std::string sanafe::Core::print_hw_not_found(const std::string &hw_name,
+        const std::vector<std::string> &hw_candidates, const bool is_synapse,
+        const bool is_dendrite, const bool is_soma)
+{
+    // Was the requested name the un-indexed form of a replicated unit?
+    // e.g. asked for "demo_input" when the unit is named "demo_input[3]".
+    // Detect with a simple prefix check: candidate begins with name + "[".
+    const std::string indexed_prefix = hw_name + "[";
+    std::string ranged_match;
+    std::string available;
+    for (const auto &name : hw_candidates)
+    {
+        if (ranged_match.empty() && name.rfind(indexed_prefix, 0) == 0)
+        {
+            // Starts with prefix
+            ranged_match = name;
+        }
+        available += " " + name;
+    }
+    if (available.empty())
+    {
+        available = "(none)";
+    }
+
+    std::string error;
+    if (!ranged_match.empty())
+    {
+        error = "H/w unit '" + hw_name + "' is a replicated unit; " +
+                "you must provide an index, e.g. '" + hw_name +
+                "[0]'. Matching unit: '" + ranged_match +
+                "'. Available units:" + available;
+    }
+    else
+    {
+        error = "Could not find h/w with name '" + hw_name +
+                "' that implements synapse:" +
+                std::to_string(static_cast<int>(is_synapse)) +
+                ", dendrite:" + std::to_string(static_cast<int>(is_dendrite)) +
+                ", soma:" + std::to_string(static_cast<int>(is_soma)) +
+                ". Available units:" + available;
+    }
+
+    return error;
+}
+
 sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
         const bool is_synapse, const bool is_dendrite, const bool is_soma)
 {
     PipelineUnit *hw_unit{nullptr};
     const bool choose_first_available_by_default = (hw_name.empty());
+
+    // Collect the names of all units that implement the requested pipieline
+    //  unit type(s) [synapse/dendrite/soma], so we can give a useful error if
+    //  the lookup fails
+    std::vector<std::string> hw_candidates;
 
     bool hw_found{false};
     for (auto &hw : pipeline_hw)
@@ -74,6 +124,7 @@ sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
             // H/w does not support the required operations, skip
             continue;
         }
+        hw_candidates.push_back(hw->name);
         if (choose_first_available_by_default || (hw_name == hw->name))
         {
             hw_unit = hw.get();
@@ -84,11 +135,8 @@ sanafe::PipelineUnit *sanafe::Core::get_hw(const std::string &hw_name,
 
     if (!hw_found)
     {
-        const std::string error("Could not find h/w (with name:" + hw_name +
-                ") that implements synapse:" +
-                std::to_string(static_cast<int>(is_synapse)) +
-                ", dendrite:" + std::to_string(static_cast<int>(is_dendrite)) +
-                ", soma:" + std::to_string(static_cast<int>(is_soma)));
+        const std::string error = print_hw_not_found(
+                hw_name, hw_candidates, is_synapse, is_dendrite, is_soma);
         INFO("Error: %s\n", error.c_str());
         throw HardwareMappingError(error);
     }

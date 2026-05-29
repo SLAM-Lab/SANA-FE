@@ -42,8 +42,10 @@ Args:
     group_name (str): Unique identifier for this neuron group
     neuron_count (int): Number of neurons to create in this group
     model_attributes (dict, optional): Model parameters (e.g., threshold, leak). Default is None.
-    default_synapse_hw_name (str, optional): Default synapse hardware type. Default is None.
-    default_dendrite_hw_name (str, optional): Default dendrite hardware type. Default is None.
+    default_synapse_hw_name (str, optional): Default synapse hardware unit name for neurons within the group.
+        Hardware unit names much match exactly with their corresponding pipeline unit in the architecture
+        description/object. Default is None (which means defaulting to the first defined pipeline unit).
+    default_dendrite_hw_name (str, optional): Default dendrite hardware unit name. Default is None.
     log_potential (bool, optional): Enable membrane potential logging. Default is False.
     log_spikes (bool, optional): Enable spike event logging. Default is False.
     soma_hw_name (str, optional): Soma hardware implementation name. Default is None.
@@ -143,7 +145,10 @@ Configure neuron-specific attributes and mapping to hardware.
 Args:
     soma_hw_name (str, optional): Soma processing unit name. Default is None.
     default_synapse_hw_name (str, optional): Default synapse type. Default is None.
-    dendrite_hw_name (str, optional): Dendrite processing unit name. Default is None.
+    dendrite_hw_name (str, optional): Dendrite processing unit name.
+        Hardware unit names much match exactly with their corresponding pipeline
+        unit in the architecture description/object. Default is None (which
+        means defaulting to the first defined pipeline unit).
     log_spikes (bool, optional): Enable spike logging for this neuron. Default is False.
     log_potential (bool, optional): Enable potential logging for this neuron. Default is False.
     model_attributes (dict, optional): General model parameters. Default is None.
@@ -284,7 +289,7 @@ Execute neuromorphic simulation for specified timesteps.
 Args:
     timesteps (int, optional): Number of simulation timesteps
     timing_model (str, optional): Timing model ("simple", "detailed", "cycle"). Default is "detailed".
-    processing_threads (int, optional): Number of processing threads. Default is 1.
+    processing_threads (int, optional): Number of processing threads. Default is 0 (automatically detect threads).
     scheduler_threads (int, optional): Number of scheduler threads. Default is 0 (run in main thread).
     spike_trace (object, optional): Spike trace output (file, string, True, or None). Default is None.
     potential_trace (object, optional): Potential trace output (file, string, True, or None). Default is None.
