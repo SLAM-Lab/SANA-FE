@@ -123,6 +123,7 @@ public:
     void register_attributes(const std::unordered_map<std::string, std::string> &attributes_with_descriptions);
     bool check_attribute(const std::string &attribute_name);
     std::vector<std::string> get_attributes() const;
+    std::string get_attribute_help(const std::string &attribute_name) const;
 
     void check_implemented(bool check_implements_synapse, bool check_implements_dendrite, bool check_implements_soma) const;
     size_t add_neuron();

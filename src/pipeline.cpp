@@ -148,6 +148,22 @@ bool sanafe::PipelineUnit::check_attribute(const std::string &attribute_name)
     return true;
 }
 
+std::string sanafe::PipelineUnit::get_attribute_help(
+        const std::string &attribute_name) const
+{
+    std::string help;
+    if (supported_attributes.find(attribute_name) == supported_attributes.end())
+    {
+        help = "Attribute (" + attribute_name + ") is not supported.\n";
+    }
+    else
+    {
+        help = supported_attributes.at(attribute_name);
+    }
+
+    return help;
+}
+
 void sanafe::PipelineUnit::set_attributes_hw(
         std::string unit_name, const ModelInfo &model)
 {

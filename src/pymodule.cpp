@@ -606,6 +606,93 @@ std::string pypipeline_unit_config_repr(
     return repr;
 }
 
+static pybind11::dict pyenumerate_pipeline_unit(sanafe::PipelineUnit &hw)
+{
+    pybind11::dict d;
+    d["name"]  = hw.name;
+    d["model"] = hw.model;
+
+    d["implements_synapse"]  = hw.implements_synapse;
+    d["implements_dendrite"] = hw.implements_dendrite;
+    d["implements_soma"]     = hw.implements_soma;
+
+    d["log_energy"]            = hw.log_energy;
+    d["log_latency"]           = hw.log_latency;
+    d["update_every_timestep"] = hw.update_every_timestep;
+
+    if (hw.plugin_lib.has_value())
+    {
+        d["plugin"] = hw.plugin_lib.value().string();
+    }
+
+    // Enumerate every supported attribute name, then fetch its help text.
+    pybind11::dict attrs;
+    for (const auto &attr_name : hw.get_attributes())
+    {
+        attrs[pybind11::str(attr_name)] = hw.get_attribute_help(attr_name);
+    }
+    d["supported_attributes"] = attrs;
+
+    return d;
+}
+
+static pybind11::dict pyenumerate_core(const sanafe::Core &core)
+{
+    pybind11::dict d;
+    d["name"] = core.name;
+    d["id"]   = core.id;
+
+    pybind11::list units;
+    for (const auto &hw : core.pipeline_hw)   // owning handle -> deref
+    {
+        units.append(pyenumerate_pipeline_unit(*hw));
+    }
+    d["pipeline_units"] = units;
+
+    pybind11::list axons_in;
+    for (const auto &a : core.axon_in_hw)  { axons_in.append(a.name); }
+    d["axon_in"] = axons_in;
+
+    pybind11::list axons_out;
+    for (const auto &a : core.axon_out_hw) { axons_out.append(a.name); }
+    d["axon_out"] = axons_out;
+
+    return d;
+}
+
+static pybind11::dict pyenumerate_tile(const sanafe::Tile &tile)
+{
+    pybind11::dict d;
+    d["name"] = tile.name;
+    d["id"]   = tile.id;
+
+    pybind11::list cores;
+    for (const auto &core : tile.cores)
+    {
+        cores.append(pyenumerate_core(core));
+    }
+    d["cores"] = cores;
+
+    return d;
+}
+
+static pybind11::dict pyenumerate_chip(sanafe::SpikingChip &chip)
+{
+    pybind11::dict d;
+    d["core_count"]         = chip.core_count;
+    d["noc_width_in_tiles"]  = chip.noc_width_in_tiles;
+    d["noc_height_in_tiles"] = chip.noc_height_in_tiles;
+
+    pybind11::list tiles;
+    for (const auto &tile : chip.tiles)
+    {
+        tiles.append(pyenumerate_tile(tile));
+    }
+    d["tiles"] = tiles;
+
+    return d;
+}
+
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         const std::string &timing_model_str, const int processing_threads,
         const int scheduler_threads, pybind11::object spike_trace,
@@ -1326,7 +1413,10 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("get_power", &sanafe::SpikingChip::get_power,
                     docstrings::spiking_chip_get_power_doc)
             .def("reset", &sanafe::SpikingChip::reset,
-                    docstrings::spiking_chip_reset_doc);
+                    docstrings::spiking_chip_reset_doc)
+            .def("enumerate_chip", &pyenumerate_chip,
+                    "Enumerate the full chip structure -- every tile, core, pipeline unit, "
+                    "and the attributes each unit supports -- as a nested dictionary. ");
 }
 // NOLINTEND(readability-function-cognitive-complexity)
 // NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size,readability-identifier-naming,bugprone-reserved-identifier)
