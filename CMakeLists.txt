@@ -178,6 +178,7 @@ FetchContent_Declare(ryml
     GIT_REPOSITORY https://github.com/biojppm/rapidyaml.git
     GIT_TAG ${RYML_VERSION}
     GIT_SHALLOW FALSE  # ensure submodules are checked out
+    EXCLUDE_FROM_ALL  # stop it trying to install outside of SANA-FE
 )
 FetchContent_MakeAvailable(ryml)
 ##### END OF rapid-yaml
