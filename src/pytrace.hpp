@@ -6,6 +6,7 @@
 #ifndef PYTRACE_HEADER_INCLUDED_
 #define PYTRACE_HEADER_INCLUDED_
 
+#include <algorithm>
 #include <fstream>
 #include <map>
 #include <numeric>
