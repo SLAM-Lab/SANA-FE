@@ -418,24 +418,36 @@ def convert_model(params_file, model_folder):
             "kp": kp,
             "dt": dt,
             "sigma_v": sigma_v,
-            "reset": v_reset[0],
-            "threshold": threshs[0],
+            "reset": np.round(v_reset[0] * (2**28)),
+            "threshold": np.round(threshs[0] * (2**28)),
         }
+        # model_attributes={
+        #     "lambda_d": lambda_d,
+        #     "lambda_v": lambda_v,
+        #     "ki": ki,
+        #     "kp": kp,
+        #     "dt": dt,
+        #     "sigma_v": sigma_v,
+        #     "reset": v_reset[0],
+        #     "threshold": threshs[0],
+        # }
     )  # All neurons in single group for now
 
     print(f"Connecting {n_neurons} neurons")
 
     gtAg_coo = gtAg.tocoo()
+
+    # Normalize omega_f into its power-of-two interval
     for j, i, weight_u1 in zip(gtAg_coo.row, gtAg_coo.col, gtAg_coo.data):
         weight_u2 = omega_f[j, i]
         if weight_u1 != 0:
             neuron_group.neurons[int(i)].connect_to_neuron(
                 neuron_group.neurons[int(j)],
-                {"weight": weight_u1, "compartment": 0})
+                {"weight": np.round(weight_u1 * (2**6)), "compartment": 0})
         if weight_u2 != 0:
             neuron_group.neurons[int(i)].connect_to_neuron(
                 neuron_group.neurons[int(j)],
-                {"weight": weight_u2, "compartment": 1})
+                {"weight": np.round(weight_u2 * (2**19)), "compartment": 1})
 
     print("neurons connected")
     # TODO: hardware mapping to cores? figure out actual mapping algorithm
@@ -455,7 +467,8 @@ def convert_model(params_file, model_folder):
 
     mapped_neurons = chip.mapped_neuron_groups["solver"]
     for i, n in enumerate(mapped_neurons):
-        n.set_attributes(model_attributes={"bias": bias_f1[i]})
+        # This differs from the paper table: scaling should be 2^9 not 2^17
+        n.set_attributes(model_attributes={"bias": np.round(bias_f1[i] * (2**9))})
     results = chip.sim(n_timesteps // 2, spike_trace=True, processing_threads=16, timing_model="simple")
                        #scheduler_threads=8)
     print("Simulation finished")
@@ -470,7 +483,7 @@ def convert_model(params_file, model_folder):
 
     print("Setting up next run")
     for i, n in enumerate(mapped_neurons):
-        n.set_attributes(model_attributes={"bias": bias_f2[i], "log_spikes": True})
+        n.set_attributes(log_spikes=True, model_attributes={"bias": np.round(bias_f2[i] * (2**9))})
     print("Running")
 
     results = chip.sim((n_timesteps+1) // 2, spike_trace=True, processing_threads=16, timing_model="simple")

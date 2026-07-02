@@ -9,6 +9,7 @@
 //  and which ones are supported, stick with a dummy hardcoded model for now.
 
 #include <cassert>
+#include <iostream>
 #include <random>
 #include <stack>
 #include <variant>
@@ -23,6 +24,7 @@ class NeuroFEMModel : public sanafe::PipelineUnit
 public:
     std::random_device rd;
     //std::mt19937 gen{42};
+
     std::mt19937 gen{rd()};
     std::normal_distribution<double> d{};
 
@@ -277,36 +279,49 @@ sanafe::PipelineResult NeuroFEMModel::update(size_t neuron_address,
 //         V += dv
 //         ##########
 
-#include <iostream>
-
 sanafe::NeuronStatus NeuroFEMModel::process_fem(NeuroFEMNeuron &n)
 {
     //n.potential = static_cast<int>(n.potential * 64.0) / 64.0; // TODO: quantization
     TRACE1(PLUGINS, "Adding bias:%lf\n", n.bias);
-    //cx.potential += cx.bias;
 
-    n.u1 -= n.lambda_d * n.dt * n.u1;
-    n.u2 -= n.lambda_d * n.dt * n.u2;
+    // Floating point version
+    // n.u1 -= n.lambda_d * n.dt * n.u1;
+    // n.u2 -= n.lambda_d * n.dt * n.u2;
 
-    n.u1 += n.u1_dendritic_accumulator.value_or(0.0);
-    n.u2 += n.lambda_d * n.u2_dendritic_accumulator.value_or(0.0);
+    // n.u1 += n.u1_dendritic_accumulator.value_or(0.0);
+    // n.u2 += n.lambda_d * n.u2_dendritic_accumulator.value_or(0.0);
 
-    n.u_error = n.u1 + n.bias;
-    n.u_integrated += n.dt * n.u_error;
+    // n.u_error = n.u1 + n.bias;
+    // n.u_integrated += n.dt * n.u_error;
 
-    double noise = d(gen);
+    // double noise = d(gen);
 
-    n.potential = n.potential - (n.lambda_v * n.dt * n.potential);
-    n.potential = n.potential + (n.dt * n.kp * n.u_error) +
-            (n.dt * n.ki * n.u_integrated) + (n.dt * n.u2) +
-            (n.sigma_v * noise) - n.u2_dendritic_accumulator.value_or(0.0);
+    // n.potential = n.potential - (n.lambda_v * n.dt * n.potential);
+    // n.potential = n.potential + (n.dt * n.kp * n.u_error) +
+    //         (n.dt * n.ki * n.u_integrated) + (n.dt * n.u2) +
+    //         (n.sigma_v * noise) - n.u2_dendritic_accumulator.value_or(0.0);
+
+    // Fixed point version
+    n.u1 = (static_cast<int>(511 * n.u1) >> 9) + (static_cast<int>(n.u1_dendritic_accumulator.value_or(0)) << 10);
+    n.u2 = (static_cast<int>(511 * n.u2) >> 9) + (static_cast<int>(n.u2_dendritic_accumulator.value_or(0)) >> 5);
+
+    n.u_error = n.u1 + (static_cast<int>(n.bias) << 7);
+    n.u_integrated += static_cast<int>(n.u_error);
+
+    const long int noise = std::llround(d(gen) * (n.sigma_v * 268435456.0)); // 24-bit noise generator
+
+    n.potential = ((255 * static_cast<int>(n.potential)) >> 8) +
+            (static_cast<int>(n.u_error) << 2) +
+            n.u_integrated +
+            (static_cast<int>(n.u2) >> 4) +
+            (static_cast<int>(noise) >> 3) -
+            (static_cast<int>(n.u2_dendritic_accumulator.value_or(0)) << 9);
 
     sanafe::NeuronStatus state{sanafe::updated};
 
     // Check against threshold potential (for spiking)
     if (n.potential > n.threshold)
     {
-        //n.potential -= n.threshold;
         n.potential = n.reset;
         state = sanafe::fired;
         TRACE1(PLUGINS, "Compartment fired.\n");
