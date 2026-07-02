@@ -22,7 +22,8 @@ target_compile_definitions(unit PRIVATE
     SANAFE_ROOT_PATH="${SANAFE_ROOT}"
 )
 
+set_property(DIRECTORY PROPERTY LABELS "dev;ci;unit")
 include(GoogleTest)
 gtest_discover_tests(unit
-  PROPERTIES LABELS "dev;ci;unit"
+  DISCOVERY_MODE PRE_TEST
 )

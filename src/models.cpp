@@ -8,13 +8,13 @@
 #include <cstddef>
 #include <cstdlib>
 #include <ios>
-#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "arch.hpp"
@@ -92,6 +92,7 @@ sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
     return output;
 }
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
         size_t neuron_address, std::optional<double> current,
         std::optional<size_t> synapse_address, const long int simulation_time)
@@ -104,7 +105,7 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
         ++(timesteps_simulated[neuron_address]);
 
         // TODO: suppress bounds checking here for speed
-	accumulated_charges[neuron_address] =
+        accumulated_charges[neuron_address] =
                 next_accumulated_charges[0UL][neuron_address];
         for (size_t i = 0; i < next_accumulated_charges.size() - 1UL; i++)
         {
@@ -128,6 +129,7 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
 
     return output;
 }
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
 void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
         size_t synapse_address, const std::string &attribute_name,
@@ -136,7 +138,7 @@ void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
     if (delays.size() <= synapse_address)
     {
         TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
-        delays.resize(synapse_address + 1, 0UL);
+        delays.resize(synapse_address + 1UL, 0UL);
     }
 
     if ((attribute_name == "delay") || (attribute_name == "d"))
@@ -146,7 +148,7 @@ void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
         {
             throw std::runtime_error("Error: delay > max delay\n");
         }
-        delays[synapse_address] = static_cast<size_t>(delay);
+        delays.at(synapse_address) = static_cast<size_t>(delay);
     }
 }
 
@@ -159,15 +161,16 @@ void sanafe::AccumulatorWithDelayModel::track_connection(
     if (delays.size() <= synapse_address)
     {
         TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
-        delays.resize(synapse_address, 0UL);
+        delays.resize(synapse_address + 1UL, 0UL);
     }
 }
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 void sanafe::MultiTapModel1D::calculate_next_state()
 {
     const size_t taps = tap_voltages.size();
 
-    for (size_t i = 0; i < tap_voltages.size(); i++)
+    for (size_t i = 0UL; i < tap_voltages.size(); i++)
     {
         TRACE1(MODELS, "\tv[%zu]: %lf\n", i, tap_voltages[i]);
     }
@@ -230,9 +233,9 @@ void sanafe::MultiTapModel1D::input_current(
     TRACE2(MODELS, "Adding current:%lf to tap %d\n", current, tap);
 }
 
-sanafe::PipelineResult sanafe::MultiTapModel1D::update(size_t neuron_address,
-        std::optional<double> current, std::optional<size_t> synapse_address,
-        const long int simulation_time)
+sanafe::PipelineResult sanafe::MultiTapModel1D::update(
+        [[maybe_unused]] size_t neuron_address, std::optional<double> current,
+        std::optional<size_t> synapse_address, const long int simulation_time)
 {
     while (timesteps_simulated < simulation_time)
     {
@@ -256,7 +259,9 @@ sanafe::PipelineResult sanafe::MultiTapModel1D::update(size_t neuron_address,
     output.current = tap_voltages[0];
     return output;
 }
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
+// NOLINTNEXTLINE(readability-function-size)
 void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
         const std::string &attribute_name, const ModelAttribute &param)
 {
@@ -281,6 +286,10 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
     {
         const size_t n_taps = tap_voltages.size();
         time_constants = static_cast<std::vector<double>>(param);
+        if (n_taps == 0)
+        {
+            throw std::invalid_argument("Number of taps must be > 0\n");
+        }
         if (time_constants.size() < n_taps)
         {
             const std::string error = "Expected " + std::to_string(n_taps) +
@@ -300,11 +309,15 @@ void sanafe::MultiTapModel1D::set_attribute_neuron(const size_t /*address*/,
     {
         const size_t n_taps = tap_voltages.size();
         space_constants = static_cast<std::vector<double>>(param);
+        if (n_taps == 0)
+        {
+            throw std::invalid_argument("Number of taps must be > 0\n");
+        }
         if (space_constants.size() < (n_taps - 1))
         {
             const std::string error = "Expected " + std::to_string(n_taps - 1) +
                     " but received " + std::to_string(time_constants.size()) +
-                    "time constants.";
+                    "space constants.";
             throw std::invalid_argument(error);
         }
         if (space_constants.size() > (n_taps - 1))
@@ -332,18 +345,14 @@ void sanafe::MultiTapModel1D::set_attribute_edge(const size_t address,
         {
             synapse_to_tap.resize(address + 1, 0);
         }
-        synapse_to_tap[address] = static_cast<int>(param);
+        synapse_to_tap.at(address) = static_cast<int>(param);
     }
 }
 
 void sanafe::MultiTapModel1D::reset()
 {
-    const size_t n_taps = tap_voltages.size();
-    for (size_t tap = 0; tap < n_taps; ++tap)
-    {
-        tap_voltages[tap] = 0.0;
-        next_voltages[tap] = 0.0;
-    }
+    tap_voltages.assign(tap_voltages.size(), 0.0);
+    next_voltages.assign(next_voltages.size(), 0.0);
 }
 
 // **** Soma hardware unit models ****
@@ -501,7 +510,7 @@ sanafe::PipelineResult sanafe::LoihiLifModel::update(
         const size_t neuron_address, const std::optional<double> current_in,
         const long int simulation_time)
 {
-    LoihiCompartment &cx = compartments[neuron_address];
+    LoihiCompartment &cx = compartments.at(neuron_address);
     if (cx.timesteps_simulated == simulation_time)
     {
         throw std::runtime_error(
@@ -756,7 +765,7 @@ bool sanafe::TrueNorthModel::truenorth_threshold_and_reset(TrueNorthNeuron &n)
         //  which are often implemented in H/W to generate psuedorandom numbers.
         //  Checkers will complain this function is not very 'random'
         //  but here we care about emulating hardware behavior over randomness.
-        // NOLINTNEXTLINE(cert-msc30-c, cert-msc50-cpp)
+        // NOLINTNEXTLINE(cert-msc30-c, cert-msc50-cpp, misc-predictable-rand)
         const unsigned int r = std::rand() & n.random_range_mask;
         v += static_cast<double>(r);
     }
@@ -804,7 +813,7 @@ sanafe::PipelineResult sanafe::TrueNorthModel::update(
         const long int /*simulation_time*/)
 {
     sanafe::NeuronStatus state = sanafe::idle;
-    TrueNorthNeuron &n = neurons[neuron_address];
+    TrueNorthNeuron &n = neurons.at(neuron_address);
 
     if ((std::fabs(n.potential) > 0.0) || current_in.has_value() ||
             (std::fabs(n.bias) > 0.0) || n.force_update)
@@ -1019,7 +1028,7 @@ void sanafe::InputModel::set_attribute_neuron(const size_t /*neuron_address*/,
     {
         spikes = static_cast<std::vector<bool>>(param);
         TRACE1(MODELS, "Setting input spike train (len:%zu)\n", spikes.size());
-        curr_spike = spikes.begin();
+        curr_spike = 0UL;
     }
     else if (attribute_name == "poisson")
     {
@@ -1042,7 +1051,8 @@ void sanafe::TrueNorthModel::reset()
     }
 }
 
-sanafe::PipelineResult sanafe::InputModel::update(const size_t neuron_address,
+sanafe::PipelineResult sanafe::InputModel::update(
+        [[maybe_unused]] const size_t neuron_address,
         std::optional<double> current_in, const long int simulation_time)
 {
     // This models a dummy input node
@@ -1055,11 +1065,11 @@ sanafe::PipelineResult sanafe::InputModel::update(const size_t neuron_address,
         throw std::runtime_error(error);
     }
 
-    bool send_spike = false;
-    if (curr_spike != spikes.end())
+    send_spike = false;
+    if (curr_spike < spikes.size())
     {
-        send_spike = *curr_spike;
-        curr_spike = std::next(curr_spike);
+        send_spike = spikes.at(curr_spike);
+        ++curr_spike;
     }
 
     if (poisson_probability > uniform_distribution(gen))
@@ -1070,12 +1080,20 @@ sanafe::PipelineResult sanafe::InputModel::update(const size_t neuron_address,
     }
 
     TRACE1(MODELS, "Simulation time:%ld\n", simulation_time);
-    if ((rate > 0.0) &&
-            ((simulation_time % static_cast<long int>(1.0 / rate)) == 0))
+    if (rate < 0.0 || rate > 1.0)
     {
-        send_spike = true;
-        TRACE2(MODELS, "n:%zu randomly generating spikes (rate).\n",
-                neuron_address);
+        throw std::invalid_argument(
+                "Invalid input rate: " + std::to_string(rate));
+    }
+    if (rate > 0.0)
+    {
+        const auto interval = static_cast<long int>(1.0 / rate);
+        if ((simulation_time % interval) == 0)
+        {
+            send_spike = true;
+            TRACE2(MODELS, "n:%zu randomly generating spikes (rate).\n",
+                    neuron_address);
+        }
     }
 
     const NeuronStatus status = send_spike ? fired : idle;
@@ -1150,4 +1168,24 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     const std::string error =
             "Pipeline model not supported (" + model_name + ")\n";
     throw std::invalid_argument(error);
+}
+
+const sanafe::ModelMap &sanafe::get_builtin_models()
+{
+    // Use this wrapper function to construct a static map of all built-in
+    //  models and their attributes (with helpful descriptions)
+    static const std::map<std::string,
+            const std::unordered_map<std::string, std::string> *>
+            builtin_models = {{"current_based",
+                                      &CurrentBasedSynapseModel::
+                                              current_based_synapse_attributes},
+                    {"accumulator", nullptr},
+                    {"accumulator_with_delay", nullptr},
+                    {"taps", &MultiTapModel1D::multitap_attributes},
+                    {"input", &InputModel::input_attributes},
+                    {"leaky_integrate_fire",
+                            &LoihiLifModel::loihi_lif_attributes},
+                    {"truenorth", &TrueNorthModel::truenorth_attributes}};
+
+    return builtin_models;
 }

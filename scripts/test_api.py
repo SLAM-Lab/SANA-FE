@@ -5,11 +5,11 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 import sanafe
 
-arch = sanafe.load_arch("arch/example.yaml")
+arch = sanafe.load_arch("arch/example_chip.yaml")
 chip = sanafe.SpikingChip(arch)
 
 #net = sanafe.load_net("snn/example.net", arch, use_netlist_format=True)
-net = sanafe.load_net("snn/example.yaml", arch)
+net = sanafe.load_net("snn/example_snn.yaml", arch)
 #net.save("out", use_netlist_format=True)
 net.save("out")
 chip.load(net)

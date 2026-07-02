@@ -28,7 +28,7 @@ sanafe::Message::Message(const long int id, const SpikingChip &hw,
     //  default, messages without destinations act as a placeholder for neuron
     //  processing
     const Core &src_core = *(n.core);
-    const Tile &src_tile = hw.tiles[src_core.parent_tile_id];
+    const Tile &src_tile = hw.tiles.at(src_core.parent_tile_id);
     src_x = src_tile.x;
     src_y = src_tile.y;
     src_tile_id = src_tile.id;
@@ -42,10 +42,10 @@ sanafe::Message::Message(const long int id, const SpikingChip &hw,
         : Message(id, hw, n, timestep)
 {
     const Core &src_core = *(n.core);
-    const AxonOutModel &src_axon = src_core.axons_out[axon_address];
-    const Tile &dest_tile = hw.tiles[src_axon.dest_tile_id];
-    const Core &dest_core = dest_tile.cores[src_axon.dest_core_offset];
-    const AxonInModel &dest_axon = dest_core.axons_in[src_axon.dest_axon_id];
+    const AxonOutModel &src_axon = src_core.axons_out.at(axon_address);
+    const Tile &dest_tile = hw.tiles.at(src_axon.dest_tile_id);
+    const Core &dest_core = dest_tile.cores.at(src_axon.dest_core_offset);
+    const AxonInModel &dest_axon = dest_core.axons_in.at(src_axon.dest_axon_id);
 
     placeholder = false;
     spikes = dest_axon.synapse_addresses.size();

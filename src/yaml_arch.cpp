@@ -1,4 +1,3 @@
-
 #include <cstddef>
 #include <fstream>
 #include <ios>
@@ -26,6 +25,10 @@
 #include "yaml_common.hpp"
 
 constexpr std::string_view range_delimiter = "..";
+
+// Don't lint unchecked [] accesses, since this gets confused by the RapidYAML
+//  accesses (these accesses are checked and throw if the entry doesn't exist)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
 void sanafe::yaml_parse_axon_in(const ryml::Parser &parser,
         const ryml::ConstNodeRef axon_in_node, CoreConfiguration &parent_core,
@@ -168,7 +171,9 @@ void sanafe::yaml_merge_or_create_hardware_unit(CoreConfiguration &parent_core,
                                 model_details.plugin_library_path)
                 {
                     INFO("Warning: overwriting plugin path:%s\n",
-                            model_details.plugin_library_path.value().c_str());
+                            model_details.plugin_library_path.value()
+                                    .string()
+                                    .c_str());
                 }
                 hw.model_info.plugin_library_path =
                         model_details.plugin_library_path;
@@ -191,7 +196,7 @@ void sanafe::yaml_parse_pipeline_entry(const ryml::Parser &parser,
         const std::string_view &type, ParseFunc parsing_function)
 {
     auto name = yaml_required_field<std::string>(parser, unit_node, "name");
-    std::pair<int, int> range = {0, 0};
+    std::pair<size_t, size_t> range = {0UL, 0UL};
 
     // Check if name contains range notation (e.g., "foo[0..3]")
     if (name.find(range_delimiter) != std::string::npos)
@@ -202,7 +207,7 @@ void sanafe::yaml_parse_pipeline_entry(const ryml::Parser &parser,
     // Parse the same entry for each unit in the range
     // Note: We re-parse the YAML node for each iteration rather than
     // copying objects for simplicity, as the iteration count is typically small
-    for (int i = range.first; i <= range.second; ++i)
+    for (size_t i = range.first; i <= range.second; ++i)
     {
         // Generate unique name for each unit in the range
         std::string unit_name(name);
@@ -298,14 +303,14 @@ void sanafe::description_parse_core_section_yaml(const ryml::Parser &parser,
 {
     auto core_name =
             yaml_required_field<std::string>(parser, core_node, "name");
-    std::pair<int, int> core_range = {0, 0};
+    std::pair<size_t, size_t> core_range = {0UL, 0UL};
 
     if (core_name.find(range_delimiter) != std::string::npos)
     {
         core_range = yaml_parse_range(core_name);
     }
 
-    for (int c = core_range.first; c <= core_range.second; c++)
+    for (size_t c = core_range.first; c <= core_range.second; c++)
     {
         const std::string name = core_name.substr(0, core_name.find('[')) +
                 '[' + std::to_string(c) + ']';
@@ -382,14 +387,14 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
 {
     std::string tile_name;
     tile_node["name"] >> tile_name;
-    std::pair<int, int> range = {0, 0};
+    std::pair<size_t, size_t> range = {0UL, 0UL};
 
     if (tile_name.find(range_delimiter) != std::string::npos)
     {
         range = yaml_parse_range(tile_name);
     }
 
-    for (int t = range.first; t <= range.second; t++)
+    for (size_t t = range.first; t <= range.second; t++)
     {
         std::string name = tile_name.substr(0, tile_name.find('[')) + "[" +
                 std::to_string(t) + "]";
@@ -592,3 +597,5 @@ sanafe::Architecture sanafe::description_parse_arch_file_yaml(std::ifstream &fp)
     return description_parse_arch_section_yaml(
             parser, top_level_yaml["architecture"]);
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)

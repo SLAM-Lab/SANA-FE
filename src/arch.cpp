@@ -75,7 +75,7 @@ sanafe::CoreConfiguration::CoreConfiguration(std::string name,
 {
 }
 
-std::pair<int, int> sanafe::Architecture::calculate_tile_coordinates(
+std::pair<size_t, size_t> sanafe::Architecture::calculate_tile_coordinates(
         const size_t tile_id) const
 {
     // Map linear tile IDs to 2D coordinates for physical layout representation.
@@ -88,7 +88,7 @@ std::pair<int, int> sanafe::Architecture::calculate_tile_coordinates(
 }
 
 sanafe::TileConfiguration &sanafe::Architecture::create_tile(
-        std::string name, const TilePowerMetrics &power_metrics)
+        std::string tile_name, const TilePowerMetrics &power_metrics)
 {
     // Tiles are assigned sequential IDs based on creation order to ensure
     //  deterministic addressing in the network-on-chip topology
@@ -96,8 +96,8 @@ sanafe::TileConfiguration &sanafe::Architecture::create_tile(
 
     // Tile IDs serve as both array indices and as network addresses in the NoC
     //  topology, enabling O(1) tile lookups and efficient message routing
-    tiles.emplace_back(std::move(name), new_tile_id, power_metrics);
-    TileConfiguration &new_tile = tiles[new_tile_id];
+    tiles.emplace_back(std::move(tile_name), new_tile_id, power_metrics);
+    TileConfiguration &new_tile = tiles.at(new_tile_id);
     std::tie(new_tile.x, new_tile.y) = calculate_tile_coordinates(new_tile.id);
 
     return new_tile;
@@ -112,12 +112,12 @@ sanafe::Architecture sanafe::load_arch(const std::filesystem::path &path)
         throw std::system_error(std::make_error_code(std::errc::io_error),
                 "Failed to open architecture file: " + path.string());
     }
-    INFO("Loading architecture from file: %s\n", path.c_str());
+    INFO("Loading architecture from file: %s\n", path.string().c_str());
     return description_parse_arch_file_yaml(arch_fp_stream);
 }
 
-sanafe::CoreConfiguration &sanafe::Architecture::create_core(std::string name,
-        const size_t parent_tile_id,
+sanafe::CoreConfiguration &sanafe::Architecture::create_core(
+        std::string core_name, const size_t parent_tile_id,
         const CorePipelineConfiguration &pipeline_config)
 {
     if (parent_tile_id >= tiles.size())
@@ -136,7 +136,7 @@ sanafe::CoreConfiguration &sanafe::Architecture::create_core(std::string name,
     //  globally within the architecture to support both local and cross-tile
     //  routing
     parent_tile.cores.emplace_back(
-            std::move(name), new_core_address, pipeline_config);
+            std::move(core_name), new_core_address, pipeline_config);
 
     // The architecture tracks the maximum cores in *any* of its tiles.
     //  This information is needed later by the scheduler, when creating
@@ -144,15 +144,15 @@ sanafe::CoreConfiguration &sanafe::Architecture::create_core(std::string name,
     max_cores_per_tile =
             std::max<size_t>(max_cores_per_tile, offset_within_tile + 1);
     TRACE1(ARCH, "Core created id:%zu.%zu.\n", parent_tile_id, new_core_id);
-    CoreConfiguration &new_core = parent_tile.cores[offset_within_tile];
+    CoreConfiguration &new_core = parent_tile.cores.at(offset_within_tile);
 
     return new_core;
 }
 
 sanafe::AxonInConfiguration &sanafe::CoreConfiguration::create_axon_in(
-        std::string name, const AxonInPowerMetrics &power_metrics)
+        std::string axon_name, const AxonInPowerMetrics &power_metrics)
 {
-    axon_in.emplace_back(power_metrics, name);
+    axon_in.emplace_back(power_metrics, axon_name);
     AxonInConfiguration &new_axon = axon_in.back();
 
     // Return a reference to the newly created component to allow caller to
@@ -162,18 +162,18 @@ sanafe::AxonInConfiguration &sanafe::CoreConfiguration::create_axon_in(
 
 sanafe::PipelineUnitConfiguration &
 sanafe::CoreConfiguration::create_hardware_unit(
-        std::string name, const ModelInfo &model_details)
+        std::string unit_name, const ModelInfo &model_details)
 {
-    pipeline_hw.emplace_back(model_details, name);
+    pipeline_hw.emplace_back(model_details, unit_name);
     PipelineUnitConfiguration &new_hw = pipeline_hw.back();
 
     return new_hw;
 }
 
 sanafe::AxonOutConfiguration &sanafe::CoreConfiguration::create_axon_out(
-        std::string name, const AxonOutPowerMetrics &power_metrics)
+        std::string axon_name, const AxonOutPowerMetrics &power_metrics)
 {
-    axon_out.emplace_back(power_metrics, name);
+    axon_out.emplace_back(power_metrics, axon_name);
     AxonOutConfiguration &new_axon_out = axon_out.back();
 
     return new_axon_out;

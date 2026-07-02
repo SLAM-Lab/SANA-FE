@@ -1,0 +1,45 @@
+Checks: >
+  modernize-*,
+  readability-*,
+  cppcoreguidelines-*,
+  bugprone-*,
+  performance-*,
+  clang-analyzer-*,
+  misc-*,
+  deadcode-*,
+  misc-redundant-expression,
+  clang-analyzer-core.uninitialized.Branch,
+  clang-analyzer-deadcode.DeadStores,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
+  -readability-identifier-length,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -performance-unnecessary-value-param,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  -google-build-namespaces,
+  -cert-dcl59-cpp,
+  -readability-identifier-naming,
+  -readability-named-parameter,
+  -cppcoreguidelines-owning-memory,
+  -cert-err58-cpp,
+  -misc-use-internal-linkage
+
+HeaderFilterRegex: '^sana-fe/tests/unit/.*\.(h|hpp)$'
+
+CheckOptions:
+  readability-function-size.LineThreshold: 150
+  readability-function-size.StatementThreshold: 80
+  readability-function-size.BranchThreshold: 30
+  readability-function-size.ParameterThreshold: 8
+  readability-function-cognitive-complexity.Threshold: 50
+  performance-for-range-copy.WarnOnAllAutoCopies: true
+  modernize-use-auto.MinTypeNameLength: 5
+  modernize-loop-convert.MinConfidence: reasonable
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions: true
+
+FormatStyle: file
+InheritParentConfig: true

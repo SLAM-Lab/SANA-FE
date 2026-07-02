@@ -1,13 +1,13 @@
+"""Build script for sanafe's Python kernel."""
+# pylint: disable=missing-class-docstring, missing-module-docstring
 import os
-import re
 import sys
 import sysconfig
 import platform
 import subprocess
 
-from setuptools import setup, Extension, find_packages
+from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
-from distutils.version import LooseVersion
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=""):
@@ -17,10 +17,12 @@ class CMakeExtension(Extension):
 class CMakeBuild(build_ext):
     def run(self):
         try:
-            out = subprocess.check_output(["cmake", "--version"])
-        except OSError:
-            raise RuntimeError("CMake must be installed to build the following extensions: " +
-                               ", ".join(e.name for e in self.extensions))
+            subprocess.check_output(["cmake", "--version"])
+        except OSError as exc:
+            raise RuntimeError(
+                "CMake must be installed to build the following extensions: " +
+                ", ".join(e.name for e in self.extensions)
+            ) from exc
 
         for ext in self.extensions:
             self.build_extension(ext)
@@ -31,7 +33,7 @@ class CMakeBuild(build_ext):
         print("Source directory:", ext.sourcedir)
         print("External directory:", extdir)
 
-        jobs = os.getenv('CMAKE_BUILD_PARALLEL_LEVEL', '1')  # Default to single-threaded build
+        jobs = os.getenv('CMAKE_BUILD_PARALLEL_LEVEL', str(os.cpu_count() or 1))
         # Check for -j option
         if '-j' in sys.argv:
             # Find the index of '-j' and get the following number
@@ -42,7 +44,8 @@ class CMakeBuild(build_ext):
                 sys.argv.pop(jobs_index)
                 sys.argv.pop(jobs_index - 1)
             except (IndexError, ValueError):
-                print("Warning: -j option requires a positive integer argument, using default number of threads.")
+                print("Warning: -j option requires a positive integer "
+                      "argument, using default number of threads.")
 
         cmake_args = ["-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
                       "-DPYTHON_EXECUTABLE=" + sys.executable,
@@ -53,19 +56,30 @@ class CMakeBuild(build_ext):
                       "-DBUILD_WHEEL=ON"]
         print(f"CMake Arguments: {cmake_args}")
         cfg = "Debug" if self.debug else "Release"
-        build_args = ["--config", cfg, "-j 10"]
+        build_args = ["--config", cfg, "-j", jobs]
 
         if platform.system() == "Windows":
             cmake_args += [f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"]
-            if sys.maxsize > 2**32:
-                cmake_args += ["-A", "x64"]
+            cmake_args += [f"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}"]
+            plat_name = self.plat_name
+            if plat_name:
+                plat_to_cmake = {
+                    "win32": "Win32",
+                    "win-amd64": "x64",
+                    "win-arm64": "ARM64",
+                }
+                cmake_arch = plat_to_cmake.get(plat_name)
+                if cmake_arch:
+                    cmake_args += ["-A", cmake_arch]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
 
         env = os.environ.copy()
-        env["CXXFLAGS"] = "{} -DVERSION_INFO=\\'{}\\'".format(env.get("CXXFLAGS", ""),
-                                                              self.distribution.get_version())
-        env["CMAKE_BUILD_PARALLEL_LEVEL"] = jobs
+        env["CXXFLAGS"] = (
+            f"{env.get('CXXFLAGS', '')} "
+            f"-DVERSION_INFO=\\'{self.distribution.get_version()}\\'"
+        )
+        env["CMAKE_BUILD_PARALLEL_LEVEL"] = str(jobs)
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         env["PYTHON_EXECUTABLE"] = sys.executable
@@ -75,17 +89,6 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
 
 setup(
-    name="sanafe",
-    version="2.1.1",
-    author="James Boyle",
-    author_email="james.boyle@utexas.edu",
-    description="SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    url="https://github.com/SLAM-Lab/SANA-FE",
     ext_modules=[CMakeExtension("sanafe")],
-    cmdclass=dict(build_ext=CMakeBuild),
-    zip_safe=False,
-    python_requires=">=3.8",
-    packages=find_packages()
+    cmdclass={"build_ext": CMakeBuild}
 )

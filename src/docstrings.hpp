@@ -41,9 +41,9 @@ Create a new group of neurons with shared properties.
 Args:
     group_name (str): Unique identifier for this neuron group
     neuron_count (int): Number of neurons to create in this group
-    model_attributes (dict, optional): Model parameters (e.g., threshold, leak). Default is None.
-    default_synapse_hw_name (str, optional): Default synapse hardware type. Default is None.
-    default_dendrite_hw_name (str, optional): Default dendrite hardware type. Default is None.
+    model_attributes (dict, optional): Model parameters (e.g., threshold, bias). Default is None.
+    default_synapse_hw_name (str, optional): Default synapse hardware unit name for neurons within the group. Hardware unit names much match exactly with their corresponding pipeline unit in the architecture description/object. Default is None (which means defaulting to the first defined pipeline unit).
+    default_dendrite_hw_name (str, optional): Default dendrite hardware unit name. Default is None.
     log_potential (bool, optional): Enable membrane potential logging. Default is False.
     log_spikes (bool, optional): Enable spike event logging. Default is False.
     soma_hw_name (str, optional): Soma hardware implementation name. Default is None.
@@ -53,7 +53,7 @@ Returns:
 
 Example:
     >>> group = net.create_neuron_group("layer1", 256,
-    ...     model_attributes={"threshold": 1.0, "leak": 0.9})
+    ...     model_attributes={"threshold": 1.0, "bias": 0.5})
 )pbdoc";
 
 constexpr const char *network_save_doc = R"pbdoc(
@@ -129,6 +129,13 @@ Example:
     ...     28, 28, 1, 3, 3, 32, 1, 1)
 )pbdoc";
 
+constexpr const char *group_map_to_core_doc = R"pbdoc(
+Assign all neurons in this neuron group to a specific hardware core.
+
+:param core_configuration: Target core for neuron placement
+:type core_configuration: Core
+)pbdoc";
+
 // Neuron class
 constexpr const char *neuron_doc = R"pbdoc(
 Individual spiking neuron with configurable hardware mapping and attributes.
@@ -143,7 +150,7 @@ Configure neuron-specific attributes and mapping to hardware.
 Args:
     soma_hw_name (str, optional): Soma processing unit name. Default is None.
     default_synapse_hw_name (str, optional): Default synapse type. Default is None.
-    dendrite_hw_name (str, optional): Dendrite processing unit name. Default is None.
+    dendrite_hw_name (str, optional): Dendrite processing unit name. Hardware unit names much match exactly with their corresponding pipeline unit in the architecture description/object. Default is None (which means defaulting to the first defined pipeline unit).
     log_spikes (bool, optional): Enable spike logging for this neuron. Default is False.
     log_potential (bool, optional): Enable potential logging for this neuron. Default is False.
     model_attributes (dict, optional): General model parameters. Default is None.
@@ -232,11 +239,10 @@ Returns:
 constexpr const char *architecture_create_core_doc = R"pbdoc(
 Add a processing core to an existing tile.
 
-
 Args:
     name (str): Unique core identifier within tile
     parent_tile_id (int): ID of containing tile
-    buffer_position (BufferPosition, optional): Pipeline buffer location. Default is before soma.
+    buffer_position (str, optional): Pipeline buffer location. Default is "soma".
     buffer_inside_unit (bool, optional): Whether buffer is inside processing unit. Default is False.
     max_neurons_supported (int, optional): Maximum neurons per core. Default is None.
     log_energy (bool, optional): Enable core energy logging. Default is False.
@@ -284,7 +290,7 @@ Execute neuromorphic simulation for specified timesteps.
 Args:
     timesteps (int, optional): Number of simulation timesteps
     timing_model (str, optional): Timing model ("simple", "detailed", "cycle"). Default is "detailed".
-    processing_threads (int, optional): Number of processing threads. Default is 1.
+    processing_threads (int, optional): Number of processing threads. Default is 0 (automatically detect threads).
     scheduler_threads (int, optional): Number of scheduler threads. Default is 0 (run in main thread).
     spike_trace (object, optional): Spike trace output (file, string, True, or None). Default is None.
     potential_trace (object, optional): Potential trace output (file, string, True, or None). Default is None.
@@ -294,16 +300,16 @@ Args:
     write_trace_headers (bool, optional): Write CSV headers to trace files. Default is True.
 
 Returns:
-    dict: Simulation results including energy, timing, and trace data
-        - timesteps_executed: Number of timesteps simulated
-        - energy: Energy breakdown by component
-        - sim_time: Simulated hardware time (seconds)
-        - spikes: Total spike count
-        - spike_trace: Spike data (if enabled)
-        - potential_trace: Potential data (if enabled)
-        - neuron_trace: Neuron trace data (if enabled)
-        - perf_trace: Performance metrics (if enabled)
-        - message_trace: Network message data (if enabled)
+    dict: Simulation results including energy, timing, and trace data.
+        - timesteps_executed (int): Number of timesteps simulated.
+        - energy (float): Energy breakdown by component.
+        - sim_time (float): Simulated hardware time (seconds).
+        - spikes (int): Total spike count.
+        - spike_trace (list[list[NeuronAddress]]): A list of length <timesteps_executed> where each element is a list of the spiking MappedNeuron objects (if enabled).
+        - potential_trace (list[list[float]]): A 2D array of probed neuron potentials (if enabled).
+        - neuron_trace (dict[str, list[list]]): A dictionary of neuron traces, where each entry is a 2D array, i.e., a list of length <timesteps_executed> which elements are a list of per-neuron values (if enabled).
+        - perf_trace (dict[str, list]): A dict of H/W performance metrics indexed by statistic name and containing lists of length <timesteps_executed> (if enabled).
+        - message_trace (list[list[dict]]): A list of length <timesteps_executed>, where each time-step has a list of dictionaries, one per message (if enabled).
 
 Example:
     >>> results = chip.sim(timesteps=1000, spike_trace=True, perf_trace=True)

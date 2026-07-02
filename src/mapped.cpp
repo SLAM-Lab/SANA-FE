@@ -1,6 +1,5 @@
 
 #include <cstddef>
-#include <functional>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -16,17 +15,16 @@
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 sanafe::MappedConnection::MappedConnection(
-        std::reference_wrapper<MappedNeuron> pre_neuron,
-        std::reference_wrapper<MappedNeuron> post_neuron)
-        : pre_neuron_ref(pre_neuron)
-        , post_neuron_ref(post_neuron)
+        MappedNeuron &pre_neuron, MappedNeuron &post_neuron)
+        : pre_neuron(&pre_neuron)
+        , post_neuron(&post_neuron)
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {
 }
 
 void sanafe::MappedConnection::build_message_processing_pipeline()
 {
-    MappedNeuron &n = post_neuron_ref;
+    MappedNeuron &n = *post_neuron;
     const Core &mapped_core = *(n.core);
 
     // Cache whether *any* of the post-synaptic neuron's connections requires
@@ -72,7 +70,7 @@ void sanafe::MappedConnection::set_attributes(
         }
         if (value.forward_to_dendrite)
         {
-            MappedNeuron &n = post_neuron_ref;
+            MappedNeuron &n = *post_neuron;
             attribute_supported |= n.dendrite_hw->check_attribute(key);
             n.dendrite_hw->set_attribute_edge(
                     mapped_synapse_hw_address, key, value);

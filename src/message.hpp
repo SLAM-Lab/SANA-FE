@@ -19,11 +19,11 @@ constexpr long int placeholder_mid = -1L; // An invalid message id for placehold
 struct Message
 {
     double generation_delay{0.0};
-    double receive_delay{0.0};
+    double processing_delay{0.0};
     double network_delay{0.0};
     // Specific hardware delays
     double min_hop_delay{0.0};
-    double blocked_delay{0.0};
+    double blocking_delay{0.0};
     double sent_timestamp{-std::numeric_limits<double>::infinity()};
     double received_timestamp{-std::numeric_limits<double>::infinity()};
     double processed_timestamp{-std::numeric_limits<double>::infinity()};

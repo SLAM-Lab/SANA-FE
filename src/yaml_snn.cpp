@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -42,6 +43,8 @@
 #include "yaml_common.hpp"
 #include "yaml_snn.hpp"
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+
 namespace // anonymous
 {
 std::string_view description_trim_whitespace(const std::string_view input)
@@ -62,13 +65,21 @@ sanafe::SpikingNetwork sanafe::yaml_parse_network_file(
 {
     if (!fp.is_open())
     {
-        throw std::runtime_error("Error opening file\n");
+        const std::string error = "Error opening file";
+        INFO("Error:%s\n", error.c_str());
+        throw std::runtime_error(error);
     }
 
     // Get file size
     fp.seekg(0, std::ios::end);
     const std::streampos file_size = fp.tellg();
     fp.seekg(0, std::ios::beg);
+    if (file_size < 0)
+    {
+        const std::string error = "Error reading filesize";
+        INFO("Error:%s\n", error.c_str());
+        throw std::runtime_error(error);
+    }
 
     // Allocate memory
     std::string file_content;
@@ -80,14 +91,13 @@ sanafe::SpikingNetwork sanafe::yaml_parse_network_file(
     fp.close();
     ryml::EventHandlerTree event_handler = {};
     ryml::Parser parser(&event_handler, ryml::ParserOptions().locations(true));
+    INFO("Loading network YAML information from file.\n");
     const ryml::Tree top_level_yaml =
             ryml::parse_in_place(&parser, file_content.data());
-    INFO("Loading network YAML information from file.\n");
     // NOLINTNEXT(misc-include-cleaner)
-    ryml::Tree tree = ryml::parse_in_place(file_content.data());
     INFO("Network YAML information loaded from file.\n");
 
-    const ryml::ConstNodeRef yaml_node = tree.rootref();
+    const ryml::ConstNodeRef yaml_node = top_level_yaml.rootref();
     if (yaml_node.is_map())
     {
         if (yaml_node.find_child("network").invalid())
@@ -423,7 +433,7 @@ sanafe::description_parse_edge_description(const std::string_view &description,
     if (target_neuron_defined && !source_neuron_defined)
     {
         throw YamlDescriptionParsingError(
-                "No target neuron defined in edge:" + std::string(description),
+                "No source neuron defined in edge:" + std::string(description),
                 parser, node);
     }
 
@@ -485,7 +495,7 @@ void sanafe::description_parse_neuron_connection(
         const std::string error("No source neuron id set");
         throw YamlDescriptionParsingError(error, parser, attributes_node);
     }
-    if (source_address.neuron_offset >= source_group.neurons.size())
+    if (source_address.neuron_offset.value() >= source_group.neurons.size())
     {
         std::string error =
                 "Invalid source neuron id: " + source_address.group_name;
@@ -496,7 +506,7 @@ void sanafe::description_parse_neuron_connection(
         throw YamlDescriptionParsingError(error, parser, attributes_node);
     }
     Neuron &source_neuron =
-            source_group.neurons[source_address.neuron_offset.value()];
+            source_group.neurons.at(source_address.neuron_offset.value());
 
     if (net.groups.find(target_address.group_name) == net.groups.end())
     {
@@ -510,7 +520,7 @@ void sanafe::description_parse_neuron_connection(
         const std::string error("No target neuron id set");
         throw YamlDescriptionParsingError(error, parser, attributes_node);
     }
-    if (target_address.neuron_offset >= target_group.neurons.size())
+    if (target_address.neuron_offset.value() >= target_group.neurons.size())
     {
         const std::string error =
                 "Invalid target neuron id: " + target_address.group_name + "." +
@@ -521,7 +531,7 @@ void sanafe::description_parse_neuron_connection(
             target_group.neurons.at(target_address.neuron_offset.value());
 
     const size_t edge_idx = source_neuron.connect_to_neuron(target_neuron);
-    Connection &edge = source_neuron.edges_out[edge_idx];
+    Connection &edge = source_neuron.edges_out.at(edge_idx);
     description_parse_edge_attributes(edge, parser, attributes_node);
 }
 
@@ -666,9 +676,9 @@ bool sanafe::yaml_parse_sparse_attribute(const std::string attribute_name,
                 if (src_target_vec.size() == 2)
                 {
                     const size_t source_id =
-                            static_cast<int>(src_target_vec[0]);
+                            static_cast<int>(src_target_vec.at(0));
                     const size_t target_id =
-                            static_cast<int>(src_target_vec[1]);
+                            static_cast<int>(src_target_vec.at(1));
                     source_dest_id_pairs.emplace_back(source_id, target_id);
                 }
                 else
@@ -979,7 +989,7 @@ void sanafe::description_parse_mapping(const ryml::Parser &parser,
             throw YamlDescriptionParsingError(error, parser, mapping_info);
         }
         // Get any mapping attributes or configuration
-        Neuron &n = group.neurons[neuron_offset];
+        Neuron &n = group.neurons.at(neuron_offset);
         description_map_neuron(parser, n, mapping_info, arch);
     }
 }
@@ -1011,13 +1021,13 @@ void sanafe::description_parse_mapping_info(const ryml::Parser &parser,
         {
             info["dendrite"] >> n.dendrite_hw_name;
             TRACE3(DESCRIPTION, "Parsed dendrite unit name: %s",
-                    n.default_synapse_hw_name.c_str());
+                    n.dendrite_hw_name.c_str());
         }
         if (!info.find_child("soma").invalid())
         {
             info["soma"] >> n.soma_hw_name;
             TRACE3(DESCRIPTION, "Parsed soma unit name: %s",
-                    n.default_synapse_hw_name.c_str());
+                    n.soma_hw_name.c_str());
         }
         if (!info.find_child("core").invalid())
         {
@@ -1054,8 +1064,8 @@ void sanafe::description_map_neuron(const ryml::Parser &parser, Neuron &n,
     n.map_to_core(core);
 }
 
-void sanafe::yaml_write_network(
-        const std::filesystem::path path, const sanafe::SpikingNetwork &network)
+void sanafe::yaml_write_network(const std::filesystem::path &path,
+        const sanafe::SpikingNetwork &network)
 {
     std::ifstream previous_content(path);
 
@@ -1080,7 +1090,7 @@ void sanafe::yaml_write_network(
         {
             tree = ryml::parse_in_arena(existing_content.c_str());
         }
-        catch (const std::runtime_error &e)
+        catch (const std::exception &)
         {
             // Check for invalid YAML in the existing file (it may not even be
             //  a YAML file at all). In this case, we should warn the user and
@@ -1244,7 +1254,9 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_group(ryml::NodeRef parent,
     for (auto neuron_it = group.neurons.begin();
             neuron_it != group.neurons.end(); ++neuron_it)
     {
-        if (neuron_it->model_attributes != prev_neuron->model_attributes)
+        if ((neuron_it->model_attributes != prev_neuron->model_attributes) ||
+                (neuron_it->log_spikes != prev_neuron->log_spikes) ||
+                (neuron_it->log_potential != prev_neuron->log_potential))
         {
             neuron_runs.emplace_back(run_start, prev_neuron->offset);
             TRACE1(DESCRIPTION, "Adding new run %zu..%zu\n", run_start,
@@ -1267,7 +1279,7 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_group(ryml::NodeRef parent,
 }
 
 ryml::NodeRef sanafe::yaml_serialize_neuron_run(ryml::NodeRef neurons_node,
-        const std::tuple<int, int> &neuron_run, const NeuronGroup &group,
+        const std::tuple<size_t, size_t> &neuron_run, const NeuronGroup &group,
         std::list<std::string> &strings)
 {
     auto [start_offset, end_offset] = neuron_run;
@@ -1275,7 +1287,7 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_run(ryml::NodeRef neurons_node,
     auto neuron_map = neurons_node.append_child();
     neuron_map |= ryml::MAP; // NOLINT(misc-include-cleaner)
 
-    const Neuron &neuron = group.neurons[start_offset];
+    const Neuron &neuron = group.neurons.at(start_offset);
     std::string neuron_description = std::to_string(start_offset);
     if (end_offset != start_offset)
     {
@@ -1287,11 +1299,15 @@ ryml::NodeRef sanafe::yaml_serialize_neuron_run(ryml::NodeRef neurons_node,
     // Add model attributes if they exist and differ from group defaults
     neuron_node |= ryml::MAP; // NOLINT(misc-include-cleaner)
     neuron_node |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
-    if (neuron.log_spikes)
+    const bool default_log_spikes =
+            group.default_neuron_config.log_spikes.value_or(false);
+    if (neuron.log_spikes != default_log_spikes)
     {
         neuron_node["log_spikes"] << neuron.log_spikes;
     }
-    if (neuron.log_potential)
+    const bool default_log_potential =
+            group.default_neuron_config.log_potential.value_or(false);
+    if (neuron.log_potential != default_log_potential)
     {
         neuron_node["log_potential"] << neuron.log_potential;
     }
@@ -1318,7 +1334,7 @@ ryml::NodeRef sanafe::yaml_serialize_model_attributes(
         const bool default_value_exists = default_values.find(key) !=
                 default_values.end();
         const bool same_as_default = default_value_exists &&
-                (default_values.at(key) != attribute);
+                (default_values.at(key) == attribute);
         if (same_as_default)
         {
             continue;
@@ -1414,8 +1430,8 @@ ryml::NodeRef sanafe::description_serialize_variant_value_to_yaml(
     return node;
 }
 
-void sanafe::yaml_write_mappings_file(
-        const std::filesystem::path path, const sanafe::SpikingNetwork &network)
+void sanafe::yaml_write_mappings_file(const std::filesystem::path &path,
+        const sanafe::SpikingNetwork &network)
 {
     std::ifstream previous_content(path);
 
@@ -1426,7 +1442,7 @@ void sanafe::yaml_write_mappings_file(
     // Try to read existing content if file exists and is not empty
     const bool file_empty =
             (previous_content.peek() == std::ifstream::traits_type::eof());
-    if (!previous_content.is_open() || !file_empty)
+    if (previous_content.is_open() && !file_empty)
     {
         // Read existing YAML content
         const std::string existing_content(
@@ -1439,11 +1455,12 @@ void sanafe::yaml_write_mappings_file(
         {
             tree = ryml::parse_in_arena(existing_content.c_str());
         }
-        catch (const std::runtime_error &e)
+        catch (const std::runtime_error &)
         {
             // Check for invalid YAML in the existing file (it may not even be
             //  a YAML file at all). In this case, we should warn the user and
             //  go no further
+            previous_content.close();
             throw std::runtime_error(
                     "Attempted to read existing file: " + path.string() +
                     " but it is not a valid YAML document. "
@@ -1545,3 +1562,5 @@ void sanafe::yaml_create_mappings(ryml::NodeRef &node,
         }
     }
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)

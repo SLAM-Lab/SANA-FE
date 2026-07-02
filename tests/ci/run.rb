@@ -2,10 +2,10 @@
 
 require 'fileutils'
 
-timestamp = Time.now.strftime("%Y%m%d-%H%M%S")            
-commit_hash = `git rev-parse --short HEAD`.strip          
-unique_id = "#{timestamp}-#{commit_hash}"                 
-log_dir = "logs/commit-#{unique_id}"   
+timestamp = Time.now.strftime("%Y%m%d-%H%M%S")
+commit_hash = `git rev-parse --short HEAD`.strip
+unique_id = "#{timestamp}-#{commit_hash}"
+log_dir = "logs/commit-#{unique_id}"
 FileUtils.mkdir_p(log_dir)
 
 ENV["SANAFE_CI_LOG_DIR"] = log_dir
@@ -15,9 +15,11 @@ puts "Running SANA-FE CI for commit #{commit_hash}"
 puts "Logs will be saved to #{log_dir}/"
 puts "-------------------------------"
 
-build_status = system("ruby tests/ci/check_build.rb")    
-format_status = system("ruby tests/ci/check_format.rb")   
-tidy_status = system("ruby tests/ci/check_tidy.rb")       
+build_status = system("ruby tests/ci/check_build.rb")
+windows_status = system("ruby tests/ci/check_windows.rb")
+format_status = system("ruby tests/ci/check_format.rb")
+tidy_status = system("ruby tests/ci/check_tidy.rb")
 cppcheck_status = system("ruby tests/ci/check_cppcheck.rb")
 dynamic_status = system("ruby tests/ci/check_dynamic.rb")
+pytest_status = system("ruby tests/ci/check_python.rb")
 perf_status = system("ruby tests/ci/check_perf.rb")

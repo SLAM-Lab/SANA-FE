@@ -1,3 +1,7 @@
+# Copyright (c) 2026 - The University of Texas at Austin
+#  This work was produced under contract #2317831 to National Technology and
+#  Engineering Solutions of Sandia, LLC which is under contract
+#  No. DE-NA0003525 with the U.S. Department of Energy.
 """
 SANA-FE Neural Network Layers Module
 
@@ -19,6 +23,8 @@ Example:
     >>> conv1 = layers.Conv2D(net, input_layer, conv_weights, stride_width=1)
     >>> dense1 = layers.Dense(net, conv1, 128, dense_weights)
 """
+from typing import Any
+# pylint: disable=unsubscriptable-object
 
 class Layer:
     """
@@ -45,10 +51,9 @@ class Layer:
 
     def __init__(self):
         """Initialize base layer with empty neuron group."""
-        self.group = None
-        return
+        self.group: Any = None
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str):
         """
         Access neuron(s) by index or slice.
 
@@ -80,7 +85,6 @@ class Layer:
         while i < len(self.group):
             yield self.group[i]
             i += 1
-        return
 
 
 class Input2D(Layer):
@@ -111,7 +115,8 @@ class Input2D(Layer):
 
     _count = 0
 
-    def __init__(self, snn, width, height, channels=1, **kwargs):
+    def __init__(self, snn, width: int, height: int, channels:int = 1,
+                 **kwargs):
         """
         Create 2D input layer with specified dimensions.
 
@@ -173,8 +178,9 @@ class Conv2D(Layer):
 
     _count = 0
 
-    def __init__(self, snn, prev_layer, weights, stride_width=1,
-                 stride_height=1, pad_width=0, pad_height=0, **kwargs):
+    def __init__(self, snn, prev_layer, weights, stride_width:int = 1,
+                 stride_height: int = 1, pad_width: int = 0,
+                 pad_height: int = 0, **kwargs):
         """
         Create 2D convolutional layer.
 
@@ -283,7 +289,7 @@ class Dense(Layer):
 
     _count = 0
 
-    def __init__(self, snn, prev_layer, neuron_count, weights, **kwargs):
+    def __init__(self, snn, prev_layer, neuron_count: int, weights, **kwargs):
         """
         Create fully-connected layer.
 

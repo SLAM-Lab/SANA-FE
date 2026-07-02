@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 
 #include "utils.hpp"
 
@@ -11,7 +12,7 @@ double sanafe::calculate_elapsed_time(
 {
     // Calculate elapsed wall-clock time between ts_start and ts_end
     const auto chrono_elapsed = ts_end - ts_start;
-    const long int cycles_elapsed =
+    const int64_t cycles_elapsed =
             std::chrono::duration_cast<std::chrono::nanoseconds>(chrono_elapsed)
                     .count();
     constexpr double seconds_in_nanoseconds = 1.0e-9;

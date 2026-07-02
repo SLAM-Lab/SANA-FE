@@ -569,7 +569,7 @@ TEST(YamlArchTest, LoadArchFromFile_ValidFile)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
     EXPECT_EQ(arch.name, "demo");
     EXPECT_EQ(arch.tiles.size(), 2);
@@ -581,9 +581,9 @@ TEST(YamlArchTest, LoadArchFromFile_VerifiesNestedStructure)
 {
     std::filesystem::path path(SANAFE_ROOT_PATH);
     sanafe::Architecture arch =
-            sanafe::load_arch(path.string() + "/arch/example.yaml");
+            sanafe::load_arch(path.string() + "/arch/example_chip.yaml");
 
-    // Tiles and cores expanded correctly + attributes 
+    // Tiles and cores expanded correctly + attributes
     EXPECT_EQ(arch.tiles.size(), 2);
     EXPECT_EQ(arch.core_count, 8);
 

@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <functional> // For std::reference_wrapper
 #include <list>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -28,6 +29,29 @@
 #include "schedule.hpp"
 #include "timestep.hpp"
 
+// Performance critical code, so don't add a ton of extra bounds checking. There
+//  may be a better/safer way to do this, for now, disable this linter noise
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+
+namespace
+{
+sanafe::TimingModelFunc get_model_function(sanafe::TimingModel model)
+{
+    switch (model)
+    {
+    case sanafe::TimingModel::timing_model_simple:
+        return &sanafe::schedule_messages_timestep_simple;
+        // Note: You might need to change simple's return type to double to match
+    case sanafe::TimingModel::timing_model_detailed:
+        return &sanafe::schedule_messages_timestep_detailed;
+    case sanafe::TimingModel::timing_model_cycle_accurate:
+        return &sanafe::schedule_messages_timestep_cycle;
+    default:
+        throw std::invalid_argument("Unknown timing model");
+    }
+}
+}
+
 sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
         : noc_width_in_tiles(scheduler.noc_width_in_tiles)
         , noc_height_in_tiles(scheduler.noc_height_in_tiles)
@@ -38,32 +62,8 @@ sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
     core_finished_receiving = std::vector<double>(core_count);
 }
 
-void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
-        const BookSimConfig &booksim_config)
-{
-    if (scheduler.timing_model == timing_model_simple)
-    {
-        TRACE1(CHIP, "Running simple timing model\n");
-        schedule_messages_simple(ts, scheduler);
-    }
-    else if (scheduler.timing_model == timing_model_detailed)
-    {
-        TRACE1(CHIP, "Running detailed timing model\n");
-        schedule_messages_detailed(ts, scheduler);
-    }
-    else if (scheduler.timing_model == timing_model_cycle_accurate)
-    {
-        TRACE1(CHIP, "Running cycle-accurate timing model\n");
-        schedule_messages_cycle_accurate(ts, booksim_config, scheduler);
-    }
-    else
-    {
-        INFO("Error: Timing model:%d not recognized\n", scheduler.timing_model);
-        throw std::invalid_argument("Timing model not recognized");
-    }
-}
-
-void sanafe::schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler)
+double sanafe::schedule_messages_timestep_simple(
+        TimestepHandle &ts, Scheduler &scheduler)
 {
     // Simple analytical model, that takes the maximum of either neuron or
     //  message processing for each core, and takes the maximum latency of
@@ -83,9 +83,9 @@ void sanafe::schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler)
         for (Message &m : q)
         {
             neuron_processing_latencies[sending_core] += m.generation_delay;
-            message_processing_latencies[m.dest_core_id] += m.receive_delay;
+            message_processing_latencies[m.dest_core_id] += m.processing_delay;
             // Update message delays using very simple timing model
-            m.blocked_delay = 0.0; // No blocking modeled
+            m.blocking_delay = 0.0; // No blocking modeled
             m.network_delay = m.min_hop_delay;
         }
     }
@@ -101,10 +101,12 @@ void sanafe::schedule_messages_simple(TimestepHandle &ts, Scheduler &scheduler)
     // Account for fixed costs per timestep e.g., house-keeping or global sync
     ts_data.sim_time += scheduler.timestep_sync_delay;
     scheduler.timesteps_to_write.push(ts);
+
+    return ts_data.sim_time;
 }
 
-void sanafe::schedule_messages_cycle_accurate(
-        TimestepHandle &ts, const BookSimConfig &config, Scheduler &scheduler)
+double sanafe::schedule_messages_timestep_cycle(
+        TimestepHandle &ts, Scheduler &scheduler)
 {
     // Cycle-accurate (NoC)-based timing model for highly accurate network
     //  simulation, using external simulator Booksim 2. This is the most
@@ -116,7 +118,6 @@ void sanafe::schedule_messages_cycle_accurate(
     //
     // The version of Booksim 2 used here has had substantial modifications,
     //  including a new static library interface (instead of being standalone)
-    // TODO: support running across multiple threads like the detailed model
     Timestep &ts_data = ts.get();
     for (auto &core_messages : ts_data.messages)
     {
@@ -151,7 +152,7 @@ void sanafe::schedule_messages_cycle_accurate(
                 booksim_create_spike_event(static_cast<int>(message.timestep),
                         std::move(src_neuron), std::move(src_hw),
                         std::move(dest_hw), message.generation_delay,
-                        message.receive_delay);
+                        message.processing_delay);
             }
         }
     }
@@ -159,12 +160,14 @@ void sanafe::schedule_messages_cycle_accurate(
     // Messages have been sent to the library, so now just execute the
     //  simulation and return simulated time
     TRACE1(SCHEDULER, "Running Booksim2 simulation\n");
-    const double booksim_time = booksim_run(config);
+    const double booksim_time = booksim_run(scheduler.booksim_config);
 
     ts_data.sim_time = booksim_time;
     // Account for fixed costs per timestep e.g., house-keeping or global sync
     ts_data.sim_time += scheduler.timestep_sync_delay;
     scheduler.timesteps_to_write.push(ts);
+
+    return ts_data.sim_time;
 }
 
 void sanafe::schedule_create_threads(
@@ -180,12 +183,15 @@ void sanafe::schedule_create_threads(
 }
 
 // **** Detailed scheduler implementation ****
-void sanafe::schedule_messages_detailed(
-        TimestepHandle &ts, Scheduler &scheduler)
+void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
+        std::shared_ptr<BookSimConfig> config)
 {
+    scheduler.booksim_config = config;
     if (scheduler.scheduler_threads.empty())
     {
-        schedule_messages_timestep(ts, scheduler);
+        const sanafe::TimingModelFunc timing_model =
+                get_model_function(scheduler.timing_model);
+        timing_model(ts, scheduler);
     }
     else
     {
@@ -203,7 +209,7 @@ void sanafe::schedule_messages_detailed(
     }
 }
 
-double sanafe::schedule_messages_timestep(
+double sanafe::schedule_messages_timestep_detailed(
         TimestepHandle &ts, Scheduler &scheduler)
 {
     // Schedule the global order of messages using a semi-analytical timing
@@ -302,12 +308,12 @@ std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
 }
 
 void sanafe::schedule_handle_message(
-        Message &m, Scheduler &scheduler, NocInfo &noc)
+        Message &m, const Scheduler &scheduler, NocInfo &noc)
 {
     TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
             m.src_neuron_group_id.c_str(), m.src_neuron_offset);
     TRACE1(SCHEDULER, "Send delay:%e\n", m.generation_delay);
-    TRACE1(SCHEDULER, "Receive delay:%e\n", m.receive_delay);
+    TRACE1(SCHEDULER, "Receive delay:%e\n", m.processing_delay);
     const size_t dest_core = m.dest_core_id;
     // Figure out if we are able to send a message into the
     //  network i.e., is the route to the dest core
@@ -321,13 +327,13 @@ void sanafe::schedule_handle_message(
     {
         // Use heuristic for estimating delay based on route congestion,
         //  path capacity in messages and the mean delay per message
-        m.blocked_delay = (m.messages_along_route - path_capacity) *
+        m.blocking_delay = (m.messages_along_route - path_capacity) *
                 noc.mean_in_flight_receive_delay;
-        m.sent_timestamp += m.blocked_delay;
+        m.sent_timestamp += m.blocking_delay;
     }
     else
     {
-        m.blocked_delay = 0.0; // Path isn't at capacity; no blocking
+        m.blocking_delay = 0.0; // Path isn't at capacity; no blocking
     }
 
     const double congestion_delay = m.messages_along_route *
@@ -343,9 +349,9 @@ void sanafe::schedule_handle_message(
     m.received_timestamp = std::max(
             noc.core_finished_receiving[dest_core], earliest_received_time);
 
-    noc.core_finished_receiving[dest_core] =
-            std::max((noc.core_finished_receiving[dest_core] + m.receive_delay),
-                    (earliest_received_time + m.receive_delay));
+    noc.core_finished_receiving[dest_core] = std::max(
+            (noc.core_finished_receiving[dest_core] + m.processing_delay),
+            (earliest_received_time + m.processing_delay));
     m.processed_timestamp = noc.core_finished_receiving[dest_core];
 
     // Now, push the message into the right receiving queue. Calculate the
@@ -389,7 +395,7 @@ void sanafe::noc_update_all_tracked_messages(const double t, NocInfo &noc)
             {
                 m.in_noc = false;
                 noc_update_message_tracking(m, noc, false);
-                TRACE1(SCHEDULER, "Removing message mid:%zu\n", m.mid);
+                TRACE1(SCHEDULER, "Removing message mid:%ld\n", m.mid);
                 return true; // Remove this message
             }
             return false; // Keep this message
@@ -451,7 +457,7 @@ void sanafe::NocInfo::update_rolling_averages(
     {
         // Message entering NoC
         mean_in_flight_receive_delay +=
-                (message.receive_delay - mean_in_flight_receive_delay) /
+                (message.processing_delay - mean_in_flight_receive_delay) /
                 (static_cast<double>(messages_in_noc) + 1.0);
         messages_in_noc++;
     }
@@ -461,7 +467,7 @@ void sanafe::NocInfo::update_rolling_averages(
         if (messages_in_noc > 1)
         {
             mean_in_flight_receive_delay +=
-                    (mean_in_flight_receive_delay - message.receive_delay) /
+                    (mean_in_flight_receive_delay - message.processing_delay) /
                     (static_cast<double>(messages_in_noc) - 1.0);
         }
         else
@@ -617,26 +623,20 @@ std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
     return std::make_pair(x_increment, y_increment);
 }
 
-// **** Thread management ****
-// TODO: make the thread management agnostic to scheduling algorithm used, so it
-//  can be applied to the simple and cycle accurate models
-
-void sanafe::schedule_messages_thread(Scheduler &scheduler, const int thread_id)
+void sanafe::schedule_messages_thread(
+        Scheduler &scheduler, [[maybe_unused]] const int thread_id)
 {
     while (!scheduler.should_stop)
     {
-        if (scheduler.should_stop)
-        {
-            break;
-        }
-
         TimestepHandle ts;
         const bool got_ts = scheduler.timesteps_to_schedule.pop(ts);
         if (got_ts)
         {
             TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld sz:%zu\n", thread_id,
                     ts->timestep, scheduler.timesteps_to_schedule.size());
-            schedule_messages_timestep(ts, scheduler);
+            const TimingModelFunc timing_model =
+                    get_model_function(scheduler.timing_model);
+            timing_model(ts, scheduler);
         }
     }
 
@@ -664,3 +664,5 @@ void sanafe::schedule_stop_all_threads(Scheduler &scheduler)
 
     TRACE1(SCHEDULER, "All threads stopped successfully.\n");
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)

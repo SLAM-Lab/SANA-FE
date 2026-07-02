@@ -19,8 +19,6 @@
 #include "plugins.hpp"
 #include "print.hpp"
 
-//#include <iostream>
-
 class NeuroFEMModel : public sanafe::PipelineUnit
 {
 public:
@@ -30,15 +28,15 @@ public:
     std::mt19937 gen{rd()};
     std::normal_distribution<double> d{};
 
-    static inline const std::set<std::string> supported_attributes{"weight",
-            "w", "lambda_v", "lambda_d", "sigma_v", "ki", "kp", "bias",
-            "threshold", "reset", "dt", "compartment"};
+    static inline const std::set<std::string> neurofem_attributes{"weight", "w",
+            "lambda_v", "lambda_d", "sigma_v", "ki", "kp", "bias", "threshold",
+            "reset", "dt", "compartment"};
 
     NeuroFEMModel()
             : PipelineUnit(sanafe::HardwareBitfield::implements_dendrite |
                       sanafe::HardwareBitfield::implements_soma)
     {
-        register_attributes(supported_attributes);
+        register_attributes(neurofem_attributes);
     }
     NeuroFEMModel(const NeuroFEMModel &copy) = delete;
     NeuroFEMModel(NeuroFEMModel &&other) = delete;
@@ -46,8 +44,8 @@ public:
     NeuroFEMModel &operator=(const NeuroFEMModel &other) = delete;
     NeuroFEMModel &operator=(NeuroFEMModel &&other) = delete;
 
-    void set_attribute_hw(const std::string &param_name,
-            const sanafe::ModelAttribute &param) override {};
+    void set_attribute_hw(const std::string & /*param_name*/,
+            const sanafe::ModelAttribute & /*param*/) override {};
     void set_attribute_neuron(size_t neuron_address,
             const std::string &param_name,
             const sanafe::ModelAttribute &param) override;
@@ -93,7 +91,7 @@ public:
 
 private:
     std::vector<NeuroFEMNeuron> neurons{};
-    std::map<int, int> synapse_to_compartment{};
+    std::map<size_t, size_t> synapse_to_compartment{};
 
     sanafe::NeuronStatus process_fem(NeuroFEMNeuron &n);
     void check_compartments();
@@ -120,7 +118,8 @@ void NeuroFEMModel::set_attribute_edge(const size_t synapse_address,
     {
         // Attributes for mapped connections/synapses
         int compartment = static_cast<int>(param);
-        synapse_to_compartment[synapse_address] = compartment;
+        synapse_to_compartment[synapse_address] =
+                static_cast<size_t>(compartment);
         TRACE1(PLUGINS, "mapping synapse:%zu to compartment:%d\n",
                 synapse_address, compartment);
         if ((compartment < 0) || (compartment > 1))
@@ -229,13 +228,13 @@ sanafe::PipelineResult NeuroFEMModel::update(size_t neuron_address,
     if (current_in.has_value())
     {
         TRACE1(PLUGINS, "Received synaptic current:%e\n", current_in.value());
-        int cx = 0;
+        size_t cx = 0UL;
         if (synaptic_address.has_value())
         {
             // Note if not stored explicitly, the default compartment is 0
             cx = synapse_to_compartment[synaptic_address.value()];
         }
-        if (cx == 0)
+        if (cx == 0UL)
         {
             n.next_u1_dendritic_accumulator =
                     n.next_u1_dendritic_accumulator.value_or(0.0) +

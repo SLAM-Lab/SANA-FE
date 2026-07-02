@@ -29,7 +29,7 @@ std::string_view get_next_arg(
 }
 
 // NOLINTNEXTLINE(readability-function-size)
-int parse_flag(const std::vector<std::string> args, const size_t current_idx,
+int parse_flag(const std::vector<std::string> &args, const size_t current_idx,
         OptionalProgramFlags &flags)
 {
     const std::string_view arg = args.at(current_idx);
@@ -53,7 +53,7 @@ int parse_flag(const std::vector<std::string> args, const size_t current_idx,
         args_consumed = 2;
         flags.output_dir =
                 std::filesystem::path(get_next_arg(args, current_idx));
-        INFO("Writing output to %s\n", flags.output_dir.c_str());
+        INFO("Writing output to %s\n", flags.output_dir.string().c_str());
         break;
     }
     case 'm':
@@ -145,7 +145,7 @@ OptionalProgramFlags parse_command_line_flags(
             current_idx += args_consumed;
             flags.total_args_parsed += args_consumed;
         }
-        catch (const std::exception &exc)
+        catch ([[maybe_unused]] const std::exception &exc)
         {
             INFO("Error parsing flag: %s\n", exc.what());
             break;
@@ -177,7 +177,7 @@ RequiredProgramArgs parse_required_args(
                 RequiredProgramArgs::timesteps_to_execute_idx));
         required_args.timesteps_to_execute = std::stol(timestep_arg);
     }
-    catch (const std::exception &e)
+    catch (const std::exception &)
     {
         throw std::invalid_argument("Error: Invalid time-step arg:");
     }

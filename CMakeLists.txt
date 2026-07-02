@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT MSVC AND NOT APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
 endif()
 
@@ -46,9 +46,8 @@ endif()
 
 project(sana-fe)
 
-add_compile_options(
-    -Wall -pedantic -Werror -g -fPIC -pthread
-)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+find_package(Threads REQUIRED)
 
 # Set default debug levels for tracing
 if(NOT DEFINED DEBUG_LEVEL_ARCH)
@@ -92,28 +91,6 @@ foreach(category ARCH CHIP DESCRIPTION MODELS NET PLUGINS PYMODULE SCHEDULER)
     add_compile_definitions(DEBUG_LEVEL_${category}=${DEBUG_LEVEL_${category}})
 endforeach()
 
-# Set conditional defaults based on build type
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    # Release build defaults
-    set(DEFAULT_STANDALONE_DEBUG ON)
-    set(DEFAULT_STANDALONE_SOURCE OFF)  # No source info in release
-    set(DEFAULT_PYTHON_DEBUG OFF)
-    set(DEFAULT_PYTHON_SOURCE OFF)
-else()
-    # Debug/other build defaults
-    set(DEFAULT_STANDALONE_DEBUG ON)
-    set(DEFAULT_STANDALONE_SOURCE ON)
-    set(DEFAULT_PYTHON_DEBUG ON)
-    set(DEFAULT_PYTHON_SOURCE ON)
-endif()
-
-# Define options with conditional defaults
-option(ENABLE_STANDALONE_DEBUG "Enable debug prints for standalone build" ${DEFAULT_STANDALONE_DEBUG})
-option(ENABLE_SOURCE_INFO_STANDALONE "Include source info in standalone debug prints" ${DEFAULT_STANDALONE_SOURCE})
-option(ENABLE_PYTHON_DEBUG "Enable debug prints for Python build" ${DEFAULT_PYTHON_DEBUG})
-option(ENABLE_SOURCE_INFO_PYTHON "Include source info in standalone debug prints" ${DEFAULT_PYTHON_SOURCE})
-cmake_print_variables(ENABLE_STANDALONE_DEBUG ENABLE_SOURCE_INFO_STANDALONE ENABLE_PYTHON_DEBUG ENABLE_SOURCE_INFO_PYTHON)
-
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/plugins")
 cmake_print_variables(SRC_DIR)
@@ -141,11 +118,13 @@ if(PYTHON_BUILD_ENABLED)
         if(NOT DEFINED PYTHON_EXECUTABLE OR NOT DEFINED PYTHON_INCLUDE_DIRS)
             message(FATAL_ERROR "PYTHON_EXECUTABLE and PYTHON_INCLUDE_DIRS must be provided when PYTHON_FROM_SETUP=ON")
         endif()
+        set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
+        find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
     else()
         if(PYTHON_VERSION)
-            find_package(Python ${PYTHON_VERSION} EXACT COMPONENTS Interpreter Development REQUIRED)
+            find_package(Python ${PYTHON_VERSION} EXACT COMPONENTS Interpreter Development.Module REQUIRED)
         else()
-            find_package(Python COMPONENTS Interpreter Development REQUIRED)
+            find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
         endif()
     endif()
 endif()
@@ -157,7 +136,6 @@ find_package(Threads REQUIRED)
 # OpenMP i.e. multithreaded builds are optional, but on by default
 if (OpenMP_CXX_FOUND AND ENABLE_OPENMP)
     message(STATUS "OpenMP found: ${OpenMP_CXX_VERSION} and enabled")
-    add_compile_options(-fopenmp)
 else()
     if(NOT OpenMP_CXX_FOUND)
         message(STATUS "OpenMP not found - parallel code will be disabled")
@@ -167,17 +145,18 @@ else()
 endif()
 
 ############## rapid-yaml
-project(ryml-quickstart LANGUAGES CXX)
-set(RYML_VERSION "v0.10.0")
+#project(ryml-quickstart LANGUAGES CXX)
+set(RYML_VERSION "v0.13.0")
 message(STATUS "FetchContent for tag: ${RYML_VERSION}")
 set(RYML_INSTALL OFF)
-set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON)
+set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "Make ryml throw on errors" FORCE)
 
 include(FetchContent)
 FetchContent_Declare(ryml
     GIT_REPOSITORY https://github.com/biojppm/rapidyaml.git
     GIT_TAG ${RYML_VERSION}
     GIT_SHALLOW FALSE  # ensure submodules are checked out
+    EXCLUDE_FROM_ALL  # stop it trying to install outside of SANA-FE
 )
 FetchContent_MakeAvailable(ryml)
 ##### END OF rapid-yaml
@@ -185,8 +164,8 @@ FetchContent_MakeAvailable(ryml)
 message(STATUS "got ryml")
 
 ############## booksim2
-project(booksim2-quickstart LANGUAGES CXX)
-set(BOOKSIM_VERSION "bd249160e8059ac1ead52fa3d41daae9c17951bd")
+# project(booksim2-quickstart LANGUAGES CXX)
+set(BOOKSIM_VERSION "a495f7ec69a4865a6b960513fc5920bfad29dfad")
 set(BOOKSIM_INSTALL OFF)
 set(BOOKSIM_GENERATE_PARSER OFF)
 FetchContent_Declare(booksim
@@ -214,7 +193,7 @@ if(NOT BOOKSIM_INCLUDE_DIRS)
 endif()
 #### END of booksim2
 
-include_directories(${PYTHON_INCLUDE_DIRS})
+# include_directories(${PYTHON_INCLUDE_DIRS})
 
 cmake_print_variables(PyBind11_DIR)
 
@@ -222,8 +201,6 @@ cmake_print_variables(PyBind11_DIR)
 if(PYTHON_BUILD_ENABLED)
     if(PYTHON_FROM_SETUP)
         # Force pybind11 to use the Python from setup.py
-        set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
-        set(Python_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
         set(PYBIND11_PYTHON_VERSION "") # Don't let pybind11 override
         message(STATUS "Forcing pybind11 to use Python: ${PYTHON_EXECUTABLE}")
     endif()
@@ -260,13 +237,16 @@ if(PYTHON_BUILD_ENABLED)
         endif()
     endif()
 
+    cmake_print_variables(PYTHON_LIBRARIES Python_LIBRARIES Python_LIBRARY_DIRS)
     pybind11_add_module(
         sanafecpp
         ${SOURCE_FILES}
     )
-
-    target_link_libraries(sanafecpp PRIVATE ${PYTHON_LIBRARIES})
-    target_link_libraries(sanafecpp PRIVATE pybind11::pybind11)
+    if(MSVC)
+        target_compile_options(sanafecpp PRIVATE /W4 /WX /wd4127)
+    else()
+        target_compile_options(sanafecpp PRIVATE -Wall -pedantic -Werror)
+    endif()
     target_link_libraries(sanafecpp PUBLIC ryml::ryml)
     target_link_libraries(sanafecpp PUBLIC booksim)
     target_link_libraries(sanafecpp PRIVATE ${CMAKE_DL_LIBS})
@@ -276,12 +256,12 @@ if(PYTHON_BUILD_ENABLED)
     endif()
     target_link_libraries(sanafecpp PRIVATE Threads::Threads)
 
-    if(ENABLE_PYTHON_DEBUG)
-        target_compile_definitions(sanafecpp PRIVATE ENABLE_DEBUG_PRINTS)
-        if(ENABLE_SOURCE_INFO_PYTHON)
-            target_compile_definitions(sanafecpp PRIVATE ENABLE_SOURCE_INFO)
-        endif()
-    endif()
+    # ENABLE_PYTHON_DEBUG: OFF in Release, ON otherwise
+    # ENABLE_SOURCE_INFO_PYTHON: OFF in Release, ON otherwise
+    target_compile_definitions(sanafecpp PRIVATE
+        $<$<NOT:$<CONFIG:Release>>:ENABLE_DEBUG_PRINTS>
+        $<$<NOT:$<CONFIG:Release>>:ENABLE_SOURCE_INFO>
+    )
     install(TARGETS sanafecpp
         LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}"
         RUNTIME DESTINATION "${CMAKE_SOURCE_DIR}")
@@ -289,11 +269,17 @@ message(STATUS "Simulator files will be copied to project directory")
 endif()
 
 if(STANDALONE_BUILD_ENABLED)
+
     add_executable(sim "${SRC_DIR}/main.cpp")
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pytrace.cpp")
     target_sources(sim PRIVATE ${SOURCE_FILES})
 
+    if(MSVC)
+        target_compile_options(sim PRIVATE /W4 /WX /wd4127)
+    else()
+        target_compile_options(sim PRIVATE -Wall -pedantic -Werror)
+    endif()
     target_link_libraries(sim PUBLIC ryml::ryml)
     target_link_libraries(sim PUBLIC booksim)
     target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})
@@ -303,12 +289,12 @@ if(STANDALONE_BUILD_ENABLED)
     endif()
     target_link_libraries(sim PRIVATE Threads::Threads)
 
-    if(ENABLE_STANDALONE_DEBUG)
-        target_compile_definitions(sim PRIVATE ENABLE_DEBUG_PRINTS)
-        if(ENABLE_SOURCE_INFO_STANDALONE)
-            target_compile_definitions(sim PRIVATE ENABLE_SOURCE_INFO)
-        endif()
-    endif()
+    # ENABLE_STANDALONE_DEBUG: ON in all configs
+    # ENABLE_SOURCE_INFO_STANDALONE: OFF in Release, ON otherwise
+    target_compile_definitions(sim PRIVATE
+        ENABLE_DEBUG_PRINTS
+        $<$<NOT:$<CONFIG:Release>>:ENABLE_SOURCE_INFO>
+    )
     install(TARGETS sim
         LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}"
         RUNTIME DESTINATION "${CMAKE_SOURCE_DIR}")
@@ -318,7 +304,13 @@ endif()
 if(ENABLE_TESTING)
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pymodule.cpp")
     list(FILTER SOURCE_FILES EXCLUDE REGEX "pytrace.cpp")
-    add_library(sanafe SHARED ${SOURCE_FILES} ${HEADER_FILES})
+    add_library(sanafe STATIC ${SOURCE_FILES} ${HEADER_FILES})
+
+    if(MSVC)
+        target_compile_options(sanafe PRIVATE /W4 /WX /wd4127)
+    else()
+        target_compile_options(sanafe PRIVATE -Wall -pedantic -Werror)
+    endif()
     target_link_libraries(sanafe PUBLIC ryml::ryml)
     target_link_libraries(sanafe PUBLIC booksim)
     target_link_libraries(sanafe PRIVATE ${CMAKE_DL_LIBS})
@@ -326,9 +318,12 @@ if(ENABLE_TESTING)
     target_include_directories(sanafe PUBLIC
         ${CMAKE_SOURCE_DIR}/src
     )
-    target_compile_definitions(sanafe PRIVATE ENABLE_DEBUG_PRINTS)
+    target_compile_definitions(sanafe PRIVATE
+        $<$<NOT:$<CONFIG:Release>>:ENABLE_DEBUG_PRINTS>
+    )
 
     message(STATUS "Testing enabled")
+    enable_testing()
     include(CTest)
     add_subdirectory(tests)
 

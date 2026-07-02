@@ -83,12 +83,12 @@ public:
 
     Architecture(std::string name, const NetworkOnChipConfiguration &noc);
     [[nodiscard]] std::vector<std::reference_wrapper<CoreConfiguration>> cores();
-    TileConfiguration &create_tile(std::string name, const TilePowerMetrics &power_metrics);
-    CoreConfiguration &create_core(std::string name, size_t parent_tile_id, const CorePipelineConfiguration &pipeline_config);
+    TileConfiguration &create_tile(std::string tile_name, const TilePowerMetrics &power_metrics);
+    CoreConfiguration &create_core(std::string core_name, size_t parent_tile_id, const CorePipelineConfiguration &pipeline_config);
     [[nodiscard]] std::string info() const noexcept;
 
 private:
-    [[nodiscard]] std::pair<int, int> calculate_tile_coordinates(size_t tile_id) const;
+    [[nodiscard]] std::pair<size_t, size_t> calculate_tile_coordinates(size_t tile_id) const;
 };
 
 Architecture load_arch(const std::filesystem::path &path);
@@ -125,7 +125,7 @@ struct TileConfiguration
     size_t x{};
     size_t y{};
 
-    TileConfiguration(std::string name, size_t id,
+    TileConfiguration(std::string tile_name, size_t id,
             const TilePowerMetrics &metrics);
 };
 
@@ -154,9 +154,9 @@ struct CoreConfiguration
     std::vector<PipelineUnitConfiguration> pipeline_hw;
     std::vector<AxonOutConfiguration> axon_out;
 
-    AxonInConfiguration &create_axon_in(std::string name, const AxonInPowerMetrics &power_metrics);
-    PipelineUnitConfiguration &create_hardware_unit(std::string name, const ModelInfo &model_details);
-    AxonOutConfiguration &create_axon_out(std::string name, const AxonOutPowerMetrics &power_metrics);
+    AxonInConfiguration &create_axon_in(std::string axon_name, const AxonInPowerMetrics &power_metrics);
+    PipelineUnitConfiguration &create_hardware_unit(std::string unit_name, const ModelInfo &model_details);
+    AxonOutConfiguration &create_axon_out(std::string axon_name, const AxonOutPowerMetrics &power_metrics);
 
     CoreConfiguration(std::string name, const CoreAddress &address, const CorePipelineConfiguration &pipeline);
 };

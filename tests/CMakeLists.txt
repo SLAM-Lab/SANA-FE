@@ -12,7 +12,7 @@ FetchContent_MakeAvailable(googletest)
 # you can follow the template in tests/unit/CMakeLists.txt
 add_subdirectory(unit)
 
-find_program(RUBY_EXE ruby REQUIRED)
+find_program(RUBY_EXE ruby)
 
 # Same unique id + logs dir
 execute_process(COMMAND git rev-parse --short HEAD
@@ -39,18 +39,20 @@ set_tests_properties(${NAME} PROPERTIES
 )
 endfunction()
 
-add_ruby_checker(build    tests/ci/check_build.rb     "ci")
-add_ruby_checker(format   tests/ci/check_format.rb    "dev;ci;lint")
-add_ruby_checker(tidy     tests/ci/check_tidy.rb      "ci;static")
-add_ruby_checker(cppcheck tests/ci/check_cppcheck.rb  "ci;static")
-add_ruby_checker(dynamic  tests/ci/check_dynamic.rb   "ci;dynamic")
-add_ruby_checker(perf     tests/ci/check_perf.rb      "ci;perf")
-
-set_tests_properties(format   PROPERTIES DEPENDS build)
-set_tests_properties(tidy     PROPERTIES DEPENDS format)
-set_tests_properties(cppcheck PROPERTIES DEPENDS tidy)
-set_tests_properties(dynamic  PROPERTIES DEPENDS cppcheck)
-set_tests_properties(perf     PROPERTIES DEPENDS dynamic)
+if(RUBY_EXE)
+    add_ruby_checker(build    tests/ci/check_build.rb     "ci")
+    add_ruby_checker(format   tests/ci/check_format.rb    "dev;ci;lint")
+    add_ruby_checker(tidy     tests/ci/check_tidy.rb      "ci;static")
+    add_ruby_checker(cppcheck tests/ci/check_cppcheck.rb  "ci;static")
+    add_ruby_checker(dynamic  tests/ci/check_dynamic.rb   "ci;dynamic")
+    add_ruby_checker(perf     tests/ci/check_perf.rb      "ci;perf")
+    
+    set_tests_properties(format   PROPERTIES DEPENDS build)
+    set_tests_properties(tidy     PROPERTIES DEPENDS format)
+    set_tests_properties(cppcheck PROPERTIES DEPENDS tidy)
+    set_tests_properties(dynamic  PROPERTIES DEPENDS cppcheck)
+    set_tests_properties(perf     PROPERTIES DEPENDS dynamic)
+endif()
 
 # Scenario targets: dev vs full
 include(ProcessorCount)

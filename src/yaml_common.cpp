@@ -2,6 +2,8 @@
 //  This work was produced under contract #2317831 to National Technology and
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -14,7 +16,6 @@
 #include <string>
 #include <string_view>
 #include <typeinfo>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -27,13 +28,13 @@
 #include "print.hpp"
 #include "yaml_common.hpp"
 
-static const std::unordered_set<std::string> skip_keys = {
+static constexpr std::array<std::string_view, 8> skip_keys = {
         // Reserved neuron specific attributes for the simulator kernel
         //  (see attributes.hpp)
-        "soma_hw_name", "default_synapse_hw_name", "dendrite_hw_name",
-        "log_spikes", "log_potential",
+        "default_synapse_hw_name", "dendrite_hw_name", "log_potential",
+        "log_spikes", "soma_hw_name",
         // Unit-specific keys (parsed elsewhere)
-        "synapse", "dendrite", "soma"};
+        "dendrite", "soma", "synapse"};
 
 // NOLINTBEGIN(misc-include-cleaner)
 sanafe::YamlDescriptionParsingError::YamlDescriptionParsingError(
@@ -121,7 +122,8 @@ sanafe::description_parse_model_attributes_yaml( // NOLINT(misc-no-recursion)
         {
             std::string key_str;
             node >> ryml::key(key_str); // NOLINT(misc-include-cleaner)
-            if (skip_keys.count(key_str) == 0)
+            if (std::find(skip_keys.begin(), skip_keys.end(), key_str) ==
+                    skip_keys.end())
             {
                 //INFO("Parsing attribute: %s\n", key.c_str());
                 model_attributes[key_str] = yaml_parse_attribute(parser, node);
@@ -305,7 +307,7 @@ std::pair<size_t, size_t> sanafe::yaml_parse_range(const std::string &range_str)
         range_first = std::stoull(first_str);
         range_last = std::stoull(last_str);
     }
-    catch (const std::exception &e)
+    catch (const std::exception &)
     {
         throw std::runtime_error("Invalid range string, failed to convert");
     }

@@ -68,7 +68,7 @@ std::string print_format_attributes(const std::map<std::string, std::any> &attr)
 #ifdef ENABLE_SOURCE_INFO
     #define SOURCE_INFO() fprintf(stdout, "[%s:%d:%s()] ", __FILE__, __LINE__, __func__)
 #else
-    #define SOURCE_INFO() do {} while (0)
+    #define SOURCE_INFO() ((void)0)
 #endif
 // NOLINTEND
 
@@ -101,10 +101,10 @@ std::string print_format_attributes(const std::map<std::string, std::any> &attr)
     } while (0)
 #else
     // No-op versions for stripped builds
-    #define INFO(...) do {} while (0)
-    #define TRACE1(category, ...) do {} while (0)
-    #define TRACE2(category, ...) do {} while (0)
-    #define TRACE3(category, ...) do {} while (0)
+    #define INFO(...) ((void)0)
+    #define TRACE1(category, ...) ((void)0)
+    #define TRACE2(category, ...) ((void)0)
+    #define TRACE3(category, ...) ((void)0)
 #endif
 // NOLINTEND
 

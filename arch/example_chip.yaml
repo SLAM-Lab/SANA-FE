@@ -57,7 +57,7 @@ architecture:
                 latency_update_neuron: 10.0e-9
                 energy_spike_out: 30.0e-12
                 latency_spike_out: 3.0e-9
-            - name: demo_input
+            - name: demo_input[0..15]
               attributes:
                 model: input
                 energy_access_neuron: 0.0

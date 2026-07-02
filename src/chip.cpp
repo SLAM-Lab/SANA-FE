@@ -99,7 +99,7 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
     // Use a unique_ptr for the config so that we don't need to include Booksim
     //  library in the header (meaning that plugins using chip.hpp don't need to
     //  also include this library)
-    booksim_config = std::make_unique<BookSimConfig>(new_config);
+    booksim_config = std::make_shared<BookSimConfig>(new_config);
     chip_count++;
 }
 
@@ -166,10 +166,8 @@ void sanafe::SpikingChip::clear_hw()
             mapped_cores = 0UL;
 
             // Clear any core pipeline buffers
-            for (auto &val : core.timestep_buffer)
-            {
-                val = PipelineResult();
-            }
+            std::fill(core.timestep_buffer.begin(), core.timestep_buffer.end(),
+                    PipelineResult{});
 
             for (auto &hw : core.pipeline_hw)
             {
@@ -195,6 +193,7 @@ void sanafe::SpikingChip::map_neurons(const SpikingNetwork &net)
         mapped_neuron_groups[name].reserve(group.neurons.size());
         for (const Neuron &neuron : group.neurons)
         {
+            // cppcheck-suppress useStlAlgorithm
             neurons_in_mapped_order.emplace_back(neuron);
         }
     }
@@ -249,6 +248,7 @@ void sanafe::SpikingChip::track_mapped_neurons()
     //  previous references would be invalidated. Also, as we use
     //  reference_wrappers instead of pointers, we can't simply resize() the
     //  vector at the beginning and fill them as we go
+    // cppcheck-suppress useStlAlgorithm
     for (Core &core : list_of_cores)
     {
         for (MappedNeuron &mapped_neuron : core.neurons)
@@ -335,9 +335,9 @@ void sanafe::SpikingChip::map_connections(const SpikingNetwork &net)
 {
     for (const auto &[name, group] : net.groups)
     {
-        for (const Neuron &pre_neuron : group.neurons)
+        for (const Neuron &src_neuron : group.neurons)
         {
-            for (const Connection &con : pre_neuron.edges_out)
+            for (const Connection &con : src_neuron.edges_out)
             {
                 TRACE2(CHIP, "Mapping %s.%zu->%s.%zu\n",
                         con.pre_neuron.group_name.c_str(),
@@ -446,6 +446,7 @@ void sanafe::SpikingChip::sim_sort_and_record_messages(const Timestep &ts)
     {
         for (const Message &m : q)
         {
+            // cppcheck-suppress useStlAlgorithm
             all_messages.emplace_back(m);
         }
     }
@@ -475,7 +476,7 @@ void sanafe::SpikingChip::update_run_data(
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const TimingModel timing_model, const int scheduler_thread_count,
-        const TraceFlags trace_flags, std::string output_dir)
+        const TraceFlags trace_flags, const std::string &output_dir)
 {
     RunData rd(total_timesteps + 1);
     rd.timesteps_executed += timesteps;
@@ -578,11 +579,9 @@ void sanafe::SpikingChip::reset()
     {
         for (Core &core : tile.cores)
         {
-            // Clear any core pipeline buffer entries
-            for (auto &val : core.timestep_buffer)
-            {
-                val = PipelineResult();
-            }
+            // Clear any core pipeline buffers
+            std::fill(core.timestep_buffer.begin(), core.timestep_buffer.end(),
+                    PipelineResult{});
 
             for (auto &hw : core.pipeline_hw)
             {
@@ -630,14 +629,15 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (auto idx : core_list)
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (int idx = 0; idx < static_cast<int>(core_list.size()); idx++)
     {
-        for (MappedNeuron &n : idx.get().neurons)
+        Core &core = core_list.at(idx);
+        for (MappedNeuron &n : core.neurons)
         {
             process_neuron(ts, n);
         }
 
-        Core &core = idx;
         // Account for any remaining neuron processing
         const bool placeholder_event =
                 (core.next_message_generation_delay != 0.0);
@@ -676,18 +676,19 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (auto idx : core_list)
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (int idx = 0; idx < static_cast<int>(core_list.size()); idx++)
     {
+        Core &core = core_list.at(idx);
 #ifdef HAVE_OPENMP
         TRACE3(CHIP, "omp thread:%d\n", omp_get_thread_num());
 #endif
-        Core &core = idx;
         TRACE1(CHIP, "Processing %zu message(s) for cid:%zu\n",
                 core.messages_in.size(), core.id);
         for (auto &m_ref : core.messages_in)
         {
             Message &m = m_ref;
-            m.receive_delay += process_message(ts, core, m);
+            m.processing_delay += process_message(ts, core, m);
         }
     }
 }
@@ -753,7 +754,7 @@ double sanafe::SpikingChip::process_message(
         //  updates to the dendrite and/or soma units as well. Keep propagating
         //  outputs/inputs until we hit the time-step buffer, where outputs
         //  are stored as inputs ready for the next time-step
-        MappedNeuron &n = con.post_neuron_ref;
+        MappedNeuron &n = *(con.post_neuron);
 
         const PipelineResult pipeline_output = execute_pipeline(
                 con.message_processing_pipeline, ts, n, &con, empty_input);
@@ -863,7 +864,7 @@ void sanafe::SpikingChip::sim_output_run_summary(
     }
     else
     {
-        INFO("Summary file %s couldn't open.\n", summary_path.c_str());
+        INFO("Summary file %s couldn't open.\n", summary_path.string().c_str());
     }
 }
 
@@ -979,12 +980,13 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
     //  every time-step, regardless of whether it received inputs or not.
     //  Note that energy is accounted for, but latency is not considered here.
     auto core_list = cores();
-#ifdef ENABLE_OPENMP
+#ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (auto idx : core_list)
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (int idx = 0; idx < static_cast<int>(core_list.size()); idx++)
     {
-        Core &core = idx;
+        Core &core = core_list.at(idx);
         for (MappedNeuron &n : core.neurons)
         {
             // We cache whether to update one or more synapse units for each
@@ -1028,10 +1030,10 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
 
 void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
 {
-    for (auto &tile : tiles)
+    for (const auto &tile : tiles)
     {
         ts.total_hops += tile.hops;
-        for (auto &core : tile.cores)
+        for (const auto &core : tile.cores)
         {
             for (const auto &hw_ref : core.pipeline_hw_in_use)
             {
@@ -1082,24 +1084,22 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
         sim_trace_record_neuron_traces(neuron_trace, total_timesteps);
     }
 
-    sim_timings.message_processing_start_tm = sim_timings.neuron_processing_end_tm;
+    sim_timings.message_processing_start_tm =
+            sim_timings.neuron_processing_end_tm;
     process_messages(ts_data);
     forced_updates(ts_data);
     // The timestep ends once cores are synchronized
     sim_timestep_sync(scheduler);
     sim_timings.message_processing_end_tm = std::chrono::steady_clock::now();
 
-    sim_timings.energy_calculation_start_tm = sim_timings.message_processing_end_tm;
+    sim_timings.energy_calculation_start_tm =
+            sim_timings.message_processing_end_tm;
     sim_calculate_ts_energy(ts_data);
     sim_update_ts_counters(ts_data);
     sim_timings.energy_calculation_end_tm = std::chrono::steady_clock::now();
 
     sim_timings.scheduler_start_tm = sim_timings.energy_calculation_end_tm;
-    if (scheduler.timing_model == timing_model_cycle_accurate)
-    {
-        check_booksim_compatibility(scheduler, chip_count);
-    }
-    schedule_messages(ts, scheduler, *booksim_config);
+    schedule_messages(ts, scheduler, booksim_config);
     sim_timings.scheduler_end_tm = std::chrono::steady_clock::now();
 
     update_simulator_timings(sim_timings);
@@ -1166,7 +1166,7 @@ double sanafe::SpikingChip::sim_estimate_network_costs(
 
     dest.hops += (x_hops + y_hops);
     dest.messages_received++;
-    TRACE1(CHIP, "xhops:%ld yhops%ld total hops:%ld latency:%e\n", x_hops,
+    TRACE1(CHIP, "xhops:%zu yhops%zu total hops:%zu latency:%e\n", x_hops,
             y_hops, x_hops + y_hops, network_latency);
     return network_latency;
 }
@@ -1201,7 +1201,7 @@ double sanafe::SpikingChip::sim_calculate_tile_energy(Timestep &ts, Tile &tile)
             (static_cast<double>(tile.north_hops) * tile.energy_north_hop);
     tile.energy = total_hop_energy;
     ts.network_energy += total_hop_energy;
-    TRACE1(CHIP, "east:%ld west:%ld north:%ld south:%ld\n", tile.east_hops,
+    TRACE1(CHIP, "east:%zu west:%zu north:%zu south:%zu\n", tile.east_hops,
             tile.west_hops, tile.north_hops, tile.south_hops);
 
     for (auto &core : tile.cores)
@@ -1281,13 +1281,13 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     {
         // Add every connection to the axon. Also link to the map in the
         //  post synaptic core / neuron
-        const MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
+        const MappedNeuron &post_neuron = *(curr_connection.post_neuron);
         Core &post_core = *(post_neuron.core);
         TRACE3(CHIP, "\tAdding connection:%s.%zu->%s.%zu\n",
-                curr_connection.pre_neuron_ref.get().parent_group_name.c_str(),
-                curr_connection.pre_neuron_ref.get().offset,
-                curr_connection.post_neuron_ref.get().parent_group_name.c_str(),
-                curr_connection.post_neuron_ref.get().offset);
+                curr_connection.pre_neuron->parent_group_name.c_str(),
+                curr_connection.pre_neuron->offset,
+                curr_connection.post_neuron->parent_group_name.c_str(),
+                curr_connection.post_neuron->offset);
         sim_add_connection_to_axon(curr_connection, post_core);
     }
     TRACE1(CHIP, "Finished mapping connections to hardware for nid:%s.%zu.\n",
@@ -1302,10 +1302,9 @@ std::set<sanafe::Core *> sanafe::SpikingChip::sim_get_post_synaptic_cores(
     std::set<Core *> cores_out;
     for (const MappedConnection &curr_connection : neuron.connections_out)
     {
-        const MappedNeuron &post_neuron = curr_connection.post_neuron_ref;
-        Core *const dest_core = post_neuron.core;
-        cores_out.insert(dest_core);
-        TRACE1(CHIP, "Connected to dest core: %zu\n", dest_core->id);
+        const MappedNeuron &post_neuron = *(curr_connection.post_neuron);
+        cores_out.insert(post_neuron.core);
+        TRACE1(CHIP, "Connected to dest core: %zu\n", post_neuron.core->id);
     }
 
     return cores_out;
@@ -1397,10 +1396,6 @@ void sanafe::SpikingChip::sim_reset_measurements()
 {
     // Reset any energy, time latency or other measurements of network hardware
     //  This is called every timestep
-
-#ifdef HAVE_OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
     for (auto &t : tiles)
     {
         // Reset tile
@@ -1757,9 +1752,9 @@ void sanafe::sim_trace_record_message(
     message_trace_file << m.received_timestamp << ",";
     message_trace_file << m.processed_timestamp << ",";
     message_trace_file << m.generation_delay << ",";
-    message_trace_file << m.receive_delay << ",";
+    message_trace_file << m.processing_delay << ",";
     message_trace_file << m.network_delay << ",";
-    message_trace_file << m.blocked_delay << ",";
+    message_trace_file << m.blocking_delay << ",";
     message_trace_file << m.min_hop_delay << ",";
     message_trace_file << m.messages_along_route;
     message_trace_file << "\n";
@@ -1831,23 +1826,6 @@ sanafe::SpikingChip::get_traces() const
     }
 
     return timestep_traces;
-}
-
-void sanafe::SpikingChip::check_booksim_compatibility(
-        const Scheduler &scheduler, const int /*sim_count*/)
-{
-    if ((scheduler.scheduler_threads.size() > 1) || (chip_count > 1))
-    {
-        INFO("Error: Cannot run multiple simultaneous cycle-accurate "
-             "simulations. The Booksim2 library does not support "
-             "concurrent runs as it has a lot of global state. For now "
-             "it's simplest to just not allow for concurrent runs. If you "
-             "need to simulate in parallel, launch separate SANA-FE "
-             "processes.");
-        throw std::runtime_error(
-                "Error: Cannot run multiple simultaneous cycle-accurate "
-                "simulations.");
-    }
 }
 
 sanafe::TimingModel sanafe::parse_timing_model(

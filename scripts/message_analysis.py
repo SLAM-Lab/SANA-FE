@@ -1258,12 +1258,12 @@ def schedule_messages_detailed(messages):
 
 class Message:
     """Spike message timing information"""
-    def __init__(self, src_neuron, generation_delay=None, receive_delay=None,
+    def __init__(self, src_neuron, generation_delay=None, processing_delay=None,
                  src_hw=None, dest_hw=None, hops=None, id=None):
         self.id = id
         self.src_neuron = src_neuron
         self.generation_delay = float(generation_delay)
-        self.receive_delay = float(receive_delay)
+        self.processing_delay = float(processing_delay)
         self.src_tile, self.src_core = hw_str_to_core(src_hw)
         self.dest_tile, self.dest_core = hw_str_to_core(dest_hw)
         self.network_delay = None

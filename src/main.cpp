@@ -33,7 +33,7 @@ int main(int argc, const char *argv[])
     argc -= optional_flags.total_args_parsed;
     if (argc < RequiredProgramArgs::program_nargs)
     {
-        INFO("Usage: ./sim [-psvmo] <arch description> <network description> "
+        INFO("Usage: ./sim [-mnopstvNS] <arch description> <network description> "
              "<timesteps>\n");
         return 0;
     }
@@ -45,8 +45,6 @@ int main(int argc, const char *argv[])
 #define GIT_COMMIT "git-hash-unknown"
 #endif
         INFO("Running SANA-FE simulation (build:%s)\n", GIT_COMMIT);
-        booksim_init();
-
         const RequiredProgramArgs required_args =
                 parse_required_args(arg_vec, optional_flags.total_args_parsed);
         sanafe::Architecture arch =
@@ -64,14 +62,14 @@ int main(int argc, const char *argv[])
         sanafe::TraceFlags trace_flags;
         trace_flags.record_spikes = optional_flags.record_spikes;
         trace_flags.record_potentials = optional_flags.record_spikes;
-        trace_flags.record_neuron_state = optional_flags.record_spikes;
+        trace_flags.record_neuron_state = optional_flags.record_neuron_state;
         trace_flags.record_perf = optional_flags.record_spikes;
         trace_flags.record_messages = optional_flags.record_spikes;
 
         const sanafe::RunData run_summary = hw.sim(
                 required_args.timesteps_to_execute, optional_flags.timing_model,
                 optional_flags.scheduler_threads, trace_flags,
-                optional_flags.output_dir);
+                optional_flags.output_dir.string());
 
         INFO("Closing Booksim2 library\n");
         booksim_close();
@@ -84,17 +82,17 @@ int main(int argc, const char *argv[])
 
         return 0;
     }
-    catch (const sanafe::YamlDescriptionParsingError &exc)
+    catch ([[maybe_unused]] const sanafe::YamlDescriptionParsingError &exc)
     {
         INFO("%s", exc.what());
         return 1;
     }
-    catch (const std::runtime_error &exc)
+    catch ([[maybe_unused]] const std::runtime_error &exc)
     {
         INFO("Error: runtime exception thrown: %s\n", exc.what());
         return 1;
     }
-    catch (const std::invalid_argument &exc)
+    catch ([[maybe_unused]] const std::invalid_argument &exc)
     {
         INFO("Error: invalid argument thrown: %s\n", exc.what());
         return 1;

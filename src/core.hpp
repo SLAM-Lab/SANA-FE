@@ -114,6 +114,7 @@ private:
     PipelineUnit *get_synapse_hw(const std::string &synapse_hw_name);
     PipelineUnit *get_dendrite_hw(const std::string &dendrite_hw_name);
     PipelineUnit *get_soma_hw(const std::string &soma_hw_name);
+    static std::string print_hw_not_found(const std::string &hw_name, const std::vector<std::string> &hw_candidates, const bool is_synapse, const bool is_dendrite, const bool is_soma);
 };
 
 }

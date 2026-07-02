@@ -3,6 +3,7 @@
 //  Engineering Solutions of Sandia, LLC which is under contract
 //  No. DE-NA0003525 with the U.S. Department of Energy.
 // pymodule.cpp
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstddef>
@@ -34,13 +35,16 @@
 #include "arch.hpp"
 #include "attribute.hpp"
 #include "chip.hpp"
+#include "core.hpp"
 #include "docstrings.hpp"
 #include "mapped.hpp"
+#include "models.hpp"
 #include "network.hpp"
 #include "pipeline.hpp"
 #include "print.hpp"
 #include "pytrace.hpp"
 #include "schedule.hpp"
+#include "tile.hpp"
 #include "timestep.hpp"
 
 #define PYBIND11_DETAILED_ERROR_MESSAGES
@@ -49,6 +53,7 @@
 //  named arguments - removing the risk of accidentally swapping args and
 //  making it easier to specify a large number of args
 //  PyBind11 also relies on a super long function macro, so suppress this too
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-size,readability-identifier-naming,bugprone-reserved-identifier)
 // Forward declarations
 namespace // anonymous
@@ -365,9 +370,10 @@ void pyconnect_neurons_dense(sanafe::NeuronGroup *self,
 
 sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
         const std::string &group_name, const int neuron_count,
-        pybind11::dict &model_dict, std::string default_synapse_hw_name,
-        std::string dendrite_hw_name, bool log_potential, bool log_spikes,
-        std::string soma_hw_name)
+        const pybind11::dict &model_dict,
+        const std::string &default_synapse_hw_name,
+        const std::string &dendrite_hw_name, bool log_potential,
+        bool log_spikes, std::string soma_hw_name)
 {
     sanafe::NeuronConfiguration default_neuron_config;
     default_neuron_config.default_synapse_hw_name = default_synapse_hw_name;
@@ -382,26 +388,6 @@ sanafe::NeuronGroup &pycreate_neuron_group(sanafe::SpikingNetwork *self,
 
     return self->create_neuron_group(
             group_name, neuron_count, default_neuron_config);
-}
-
-sanafe::TileConfiguration &pycreate_tile(sanafe::Architecture *self,
-        std::string name, double energy_north_hop, double latency_north_hop,
-        double energy_east_hop, double latency_east_hop,
-        double energy_south_hop, double latency_south_hop,
-        double energy_west_hop, double latency_west_hop, bool log_energy)
-{
-    sanafe::TilePowerMetrics tile_power_metrics{};
-    tile_power_metrics.energy_north_hop = energy_north_hop;
-    tile_power_metrics.latency_north_hop = latency_north_hop;
-    tile_power_metrics.energy_east_hop = energy_east_hop;
-    tile_power_metrics.latency_east_hop = latency_east_hop;
-    tile_power_metrics.energy_south_hop = energy_south_hop;
-    tile_power_metrics.latency_south_hop = latency_south_hop;
-    tile_power_metrics.energy_west_hop = energy_west_hop;
-    tile_power_metrics.latency_west_hop = latency_west_hop;
-    tile_power_metrics.log_energy = log_energy;
-
-    return self->create_tile(std::move(name), tile_power_metrics);
 }
 
 std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
@@ -427,7 +413,7 @@ std::unique_ptr<sanafe::TileConfiguration> pyconstruct_tile(std::string name,
 
 std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
         size_t parent_tile_id, size_t offset_within_tile, size_t core_id,
-        std::string buffer_position, bool buffer_inside_unit,
+        const std::string &buffer_position, bool buffer_inside_unit,
         size_t max_neurons_supported, bool log_energy)
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
@@ -444,20 +430,6 @@ std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
 
     return std::make_unique<sanafe::CoreConfiguration>(
             name, core_address, pipeline_config);
-}
-
-sanafe::CoreConfiguration &pycreate_core(sanafe::Architecture *self,
-        std::string name, size_t parent_tile_id, std::string buffer_position,
-        bool buffer_inside_unit, size_t max_neurons_supported, bool log_energy)
-{
-    sanafe::CorePipelineConfiguration pipeline_config{};
-
-    pipeline_config.buffer_position = sanafe::pipeline_parse_buffer_pos_str(
-            buffer_position, buffer_inside_unit);
-    pipeline_config.max_neurons_supported = max_neurons_supported;
-    pipeline_config.log_energy = log_energy;
-
-    return self->create_core(std::move(name), parent_tile_id, pipeline_config);
 }
 
 void pyset_attributes(sanafe::Neuron *self,
@@ -543,8 +515,161 @@ void pyflush_timestep_data(sanafe::SpikingChip *self, sanafe::RunData &rd,
     }
 }
 
+std::string pycore_config_repr(const sanafe::CoreConfiguration &self)
+{
+    constexpr size_t max_units_shown = 3;
+    std::string units;
+    const size_t count = self.pipeline_hw.size();
+    const size_t shown = std::min(count, max_units_shown);
+    for (size_t i = 0; i < shown; ++i)
+    {
+        if (i > 0)
+        {
+            units += ", ";
+        }
+        units += self.pipeline_hw[i].name;
+    }
+    if (count > max_units_shown)
+    {
+        units += ", ... (count=" + std::to_string(count) + ")";
+    }
+    return "<Core '" + self.name + "' id=" + std::to_string(self.address.id) +
+            " pipeline_hw=[" + units + "]>";
+}
+
+std::string pypipeline_unit_config_repr(
+        const sanafe::PipelineUnitConfiguration &self)
+{
+    std::string repr = "<PipelineUnit '" + self.name + "' model='" +
+            self.model_info.name + "'";
+
+    if (self.model_info.plugin_library_path.has_value())
+    {
+        repr += " plugin='" +
+                self.model_info.plugin_library_path.value().string() + "'";
+    }
+
+    std::string implements;
+    if (self.implements_synapse)
+    {
+        implements += "synapse";
+    }
+    if (self.implements_dendrite)
+    {
+        if (!implements.empty())
+        {
+            implements += ",";
+        }
+        implements += "dendrite";
+    }
+    if (self.implements_soma)
+    {
+        if (!implements.empty())
+        {
+            implements += ",";
+        }
+        implements += "soma";
+    }
+    repr += " implements=[" + implements + "]>";
+
+    return repr;
+}
+
+pybind11::dict pydescribe_pipeline_unit(sanafe::PipelineUnit &hw)
+{
+    pybind11::dict d;
+    d["name"] = hw.name;
+    d["model"] = hw.model;
+
+    d["implements_synapse"] = hw.implements_synapse;
+    d["implements_dendrite"] = hw.implements_dendrite;
+    d["implements_soma"] = hw.implements_soma;
+
+    d["log_energy"] = hw.log_energy;
+    d["log_latency"] = hw.log_latency;
+    d["update_every_timestep"] = hw.update_every_timestep;
+
+    if (hw.plugin_lib.has_value())
+    {
+        d["plugin"] = hw.plugin_lib.value().string();
+    }
+
+    // Enumerate every supported attribute name, then fetch its help text.
+    pybind11::dict attrs;
+    for (const auto &attr_name : hw.get_attributes())
+    {
+        attrs[pybind11::str(attr_name)] = hw.get_attribute_help(attr_name);
+    }
+    d["supported_attributes"] = attrs;
+
+    return d;
+}
+
+pybind11::dict pydescribe_core(const sanafe::Core &core)
+{
+    pybind11::dict d;
+    d["name"] = core.name;
+    d["id"] = core.id;
+
+    pybind11::list units;
+    for (const auto &hw : core.pipeline_hw) // owning handle -> deref
+    {
+        units.append(pydescribe_pipeline_unit(*hw));
+    }
+    d["pipeline_units"] = units;
+
+    pybind11::list axons_in;
+    for (const auto &a : core.axon_in_hw)
+    {
+        axons_in.append(a.name);
+    }
+    d["axon_in"] = axons_in;
+
+    pybind11::list axons_out;
+    for (const auto &a : core.axon_out_hw)
+    {
+        axons_out.append(a.name);
+    }
+    d["axon_out"] = axons_out;
+
+    return d;
+}
+
+pybind11::dict pydescribe_tile(const sanafe::Tile &tile)
+{
+    pybind11::dict d;
+    d["name"] = tile.name;
+    d["id"] = tile.id;
+
+    pybind11::list cores;
+    for (const auto &core : tile.cores)
+    {
+        cores.append(pydescribe_core(core));
+    }
+    d["cores"] = cores;
+
+    return d;
+}
+
+pybind11::dict pydescribe(const sanafe::SpikingChip &chip)
+{
+    pybind11::dict d;
+    d["core_count"] = chip.core_count;
+    d["noc_width_in_tiles"] = chip.noc_width_in_tiles;
+    d["noc_height_in_tiles"] = chip.noc_height_in_tiles;
+
+    pybind11::list tiles;
+    for (const auto &tile : chip.tiles)
+    {
+        tiles.append(pydescribe_tile(tile));
+    }
+    d["tiles"] = tiles;
+
+    return d;
+}
+
 pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
-        std::string timing_model_str, const int processing_threads,
+        const std::string &timing_model_str, const int processing_threads,
         const int scheduler_threads, pybind11::object spike_trace,
         pybind11::object potential_trace, pybind11::object neuron_trace,
         pybind11::object perf_trace, pybind11::object message_trace,
@@ -593,10 +718,35 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     auto last_check = std::chrono::steady_clock::now();
     auto last_print = std::chrono::steady_clock::now();
 
-    const std::string first_message =
-            "Executed steps: [0/" + std::to_string(timesteps) + "]";
-    pybind11::print(first_message, pybind11::arg("end") = "");
+    // Avoid multiple heartbeat prints if the output isn't TTY (a terminal),
+    //  since those outputs will get mangled. The first part to that is figuring
+    //  out if Python is outputting to a terminal or not.
+    bool stdout_is_tty = false;
+    {
+        const pybind11::gil_scoped_acquire acquire;
+        const pybind11::object sys_stdout =
+                pybind11::module_::import("sys").attr("stdout");
+        if (pybind11::hasattr(sys_stdout, "isatty"))
+        {
+            try
+            {
+                stdout_is_tty = sys_stdout.attr("isatty")().cast<bool>();
+            }
+            catch (const pybind11::error_already_set &)
+            {
+                stdout_is_tty =
+                        false; // some stream objects raise; treat as non-TTY
+            }
+        }
+    }
 
+    if (stdout_is_tty)
+    {
+        const std::string first_message =
+                "Executed steps: [0/" + std::to_string(timesteps) + "]";
+        pybind11::print(first_message, pybind11::arg("end") = "",
+                pybind11::arg("flush") = true);
+    }
     {
         const pybind11::gil_scoped_release release;
         for (long int timestep = 1; timestep <= timesteps; timestep++)
@@ -622,13 +772,14 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
                 }
                 last_check = now;
             }
-            if ((now - last_print) >= print_interval)
+            if (stdout_is_tty && (now - last_print) >= print_interval)
             {
-                const std::string message = "\rExecuted steps: [" +
+                const std::string message = "\033[2K\rExecuted steps: [" +
                         std::to_string(timestep) + "/" +
                         std::to_string(timesteps) + "]";
                 const pybind11::gil_scoped_acquire acquire;
-                pybind11::print(message, pybind11::arg("end") = "");
+                pybind11::print(message, pybind11::arg("end") = "",
+                        pybind11::arg("flush") = true);
                 last_print = now;
             }
             //  avoids the message write queue growing too large
@@ -639,10 +790,22 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     // Re-acquire the GIL and check for interrupts before printing to Python
     if (PyErr_Occurred() == nullptr)
     {
-            const std::string last_message = "\rExecuted steps: [" +
+        std::string last_message;
+        if (stdout_is_tty)
+        {
+            // Terminal: overwrite the in-progress line with the final state,
+            // then newline. Same as before.
+            last_message = "\033[2K\rExecuted steps: [" +
                     std::to_string(timesteps) + "/" +
                     std::to_string(timesteps) + "]";
-            pybind11::print(last_message);
+        }
+        else
+        {
+            // Non-TTY: plain line, no escapes, no carriage return.
+            last_message = "Executed steps: [" + std::to_string(timesteps) +
+                    "/" + std::to_string(timesteps) + "]";
+        }
+        pybind11::print(last_message, pybind11::arg("flush") = true);
     }
 
     schedule_stop_all_threads(scheduler);
@@ -663,8 +826,6 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
 
     return result;
 }
-
-} // end of anonymous namespace
 
 // Custom Python wrapper class for the Neuron class
 //  While most objects are managed fine, pybind struggles to manage object
@@ -749,10 +910,9 @@ public:
         if (pybind11::isinstance<pybind11::int_>(index))
         {
             // Integer indexing: return a single PyNeuronRef
-            const long i = pybind11::cast<long>(index);
-            // Handle negative indexing
-            const size_t idx = (i < 0) ? (group_->neurons.size() + i) : i;
-
+            const auto i = pybind11::cast<long>(index);
+            const size_t idx = (i < 0) ? (group_->neurons.size() + i) :
+                                         static_cast<size_t>(i);
             if (idx >= group_->neurons.size())
             {
                 throw pybind11::index_error();
@@ -805,6 +965,36 @@ public:
     }
 };
 
+size_t pyconnect_to_neuron(const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
+        const pybind11::object &attr)
+{
+    // Extract the actual neuron from the destination ref
+    sanafe::Neuron &dest = *(dest_ref.get());
+    // Accept either an explicit dict or None (the default).
+    pybind11::dict attr_dict;
+    if (!attr.is_none())
+    {
+        attr_dict = pybind11::cast<pybind11::dict>(attr);
+    }
+    const size_t con_idx = ref.get()->connect_to_neuron(dest);
+    sanafe::Connection &con = ref.get()->edges_out[con_idx];
+    const auto attributes = pydict_to_model_attributes(attr_dict);
+    for (const auto &[key, attribute] : attributes)
+    {
+        if (attribute.forward_to_synapse)
+        {
+            con.synapse_attributes[key] = attribute;
+        }
+        if (attribute.forward_to_dendrite)
+        {
+            con.dendrite_attributes[key] = attribute;
+        }
+    }
+    return con_idx;
+}
+
+} // end of anonymous namespace
+
 // NOLINTBEGIN(readability-function-cognitive-complexity)
 PYBIND11_MODULE(sanafecpp, m)
 {
@@ -815,6 +1005,9 @@ PYBIND11_MODULE(sanafecpp, m)
             pybind11::arg("path"), pybind11::arg("arch"),
             pybind11::arg("use_netlist_format") = false);
 
+    m.attr("framework_attributes") = sanafe::PipelineUnit::framework_attributes;
+    m.attr("model_attributes") = sanafe::get_builtin_models();
+
     pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
             .value("buffer_before_dendrite_unit",
                     sanafe::buffer_before_dendrite_unit)
@@ -824,8 +1017,7 @@ PYBIND11_MODULE(sanafecpp, m)
             .value("buffer_positions", sanafe::buffer_positions);
 
     pybind11::register_exception<sanafe::HardwareMappingError>(
-        m, "HardwareMappingError"
-    );
+            m, "HardwareMappingError");
 
     pybind11::class_<sanafe::SpikingNetwork>(
             m, "Network", docstrings::network_doc)
@@ -876,6 +1068,8 @@ PYBIND11_MODULE(sanafecpp, m)
             m, "NeuronGroup", docstrings::neuron_group_doc)
             .def("__repr__", &sanafe::NeuronGroup::info)
             .def("get_name", &sanafe::NeuronGroup::get_name)
+            .def("map_to_core", &sanafe::NeuronGroup::map_to_core,
+                    docstrings::group_map_to_core_doc)
             .def("connect_neurons_dense", &pyconnect_neurons_dense,
                     docstrings::neuron_group_connect_dense_doc)
             .def("connect_neurons_sparse", &pyconnect_neurons_sparse,
@@ -906,15 +1100,19 @@ PYBIND11_MODULE(sanafecpp, m)
                                 pybind11::cast<sanafe::NeuronGroup &>(self_obj);
                         if (pybind11::isinstance<pybind11::int_>(index))
                         {
-                            // Integer indexing
-                            const auto i = pybind11::cast<size_t>(index);
-                            if (i >= self.neurons.size())
+                            // Integer indexing (supports negative indices)
+                            const auto i = pybind11::cast<long>(index);
+                            const size_t idx = (i < 0) ?
+                                    (self.neurons.size() + i) :
+                                    static_cast<size_t>(i);
+                            if (idx >= self.neurons.size())
                             {
                                 throw pybind11::index_error();
                             }
-                            // Return a NeuronRef that keeps the group reference alive
+                            // Return a NeuronRef that keeps the group reference
+                            //  alive
                             return pybind11::cast(
-                                    PyNeuronRef(self_obj, &self.neurons[i]));
+                                    PyNeuronRef(self_obj, &self.neurons[idx]));
                         }
                         if (pybind11::isinstance<pybind11::slice>(index))
                         {
@@ -997,36 +1195,10 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("model_attributes") = pybind11::dict(),
                     pybind11::arg("soma_attributes") = pybind11::dict(),
                     pybind11::arg("dendrite_attributes") = pybind11::dict())
-            .def(
-                    "connect_to_neuron",
-                    [](const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
-                            std::optional<pybind11::dict> attr =
-                                    pybind11::none()) -> size_t {
-                        // Extract the actual neuron from the destination ref
-                        sanafe::Neuron &dest = *(dest_ref.get());
-                        if (!attr.has_value())
-                        {
-                            attr = pybind11::dict();
-                        }
-                        const size_t con_idx =
-                                ref.get()->connect_to_neuron(dest);
-                        sanafe::Connection &con = ref.get()->edges_out[con_idx];
-                        const auto attributes =
-                                pydict_to_model_attributes(attr.value());
-                        for (const auto &[key, attribute] : attributes)
-                        {
-                            if (attribute.forward_to_synapse)
-                            {
-                                con.synapse_attributes[key] = attribute;
-                            }
-                            if (attribute.forward_to_dendrite)
-                            {
-                                con.dendrite_attributes[key] = attribute;
-                            }
-                        }
-                        return con_idx;
-                    },
-                    docstrings::neuron_connect_to_neuron_doc)
+            .def("connect_to_neuron", &pyconnect_to_neuron,
+                    docstrings::neuron_connect_to_neuron_doc,
+                    pybind11::arg("dest_neuron"),
+                    pybind11::arg("attributes") = pybind11::none())
             // Expose edges_out as a property
             .def_property_readonly("edges_out",
                     [](const PyNeuronRef &ref)
@@ -1077,29 +1249,6 @@ PYBIND11_MODULE(sanafecpp, m)
             .def(pybind11::init<std::string,
                     sanafe::NetworkOnChipConfiguration>())
             .def("__repr__", &sanafe::Architecture::info)
-            .def("create_tile", &pycreate_tile,
-                    docstrings::architecture_create_tile_doc,
-                    pybind11::return_value_policy::reference_internal,
-                    pybind11::arg("name"),
-                    pybind11::arg("energy_north_hop") = 0.0,
-                    pybind11::arg("latency_north_hop") = 0.0,
-                    pybind11::arg("energy_east_hop") = 0.0,
-                    pybind11::arg("latency_east_hop") = 0.0,
-                    pybind11::arg("energy_south_hop") = 0.0,
-                    pybind11::arg("latency_south_hop") = 0.0,
-                    pybind11::arg("energy_west_hop") = 0.0,
-                    pybind11::arg("latency_west_hop") = 0.0,
-                    pybind11::arg("log_energy") = false)
-            .def("create_core", &pycreate_core,
-                    docstrings::architecture_create_core_doc,
-                    pybind11::arg("name"), pybind11::arg("parent_tile_id"),
-                    pybind11::arg("buffer_position") =
-                            sanafe::buffer_before_soma_unit,
-                    pybind11::arg("buffer_inside_unit") = false,
-                    pybind11::arg("max_neurons_supported") =
-                            sanafe::default_max_neurons,
-                    pybind11::arg("log_energy") = false,
-                    pybind11::return_value_policy::reference_internal)
             .def_readwrite("tiles", &sanafe::Architecture::tiles)
             .def("cores", &sanafe::Architecture::cores);
     pybind11::class_<sanafe::TileConfiguration>(m, "Tile")
@@ -1114,8 +1263,13 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("energy_west_hop") = 0.0,
                     pybind11::arg("latency_west_hop") = 0.0,
                     pybind11::arg("log_energy") = false)
-            .def_readwrite("cores", &sanafe::TileConfiguration::cores);
-
+            .def_readonly("id", &sanafe::TileConfiguration::id)
+            .def_readonly("name", &sanafe::TileConfiguration::name)
+            .def_readwrite("cores", &sanafe::TileConfiguration::cores)
+            .def("__repr__", [](const sanafe::TileConfiguration &self) {
+                return "<Tile '" + self.name +
+                        "' cores=" + std::to_string(self.cores.size()) + ">";
+            });
     pybind11::class_<sanafe::CoreConfiguration,
             std::shared_ptr<sanafe::CoreConfiguration>>(m, "Core")
             .def(pybind11::init(&pyconstruct_core), pybind11::arg("name"),
@@ -1127,7 +1281,60 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("buffer_inside_unit") = false,
                     pybind11::arg("max_neurons_supported") =
                             sanafe::default_max_neurons,
-                    pybind11::arg("log_energy") = false);
+                    pybind11::arg("log_energy") = false)
+            .def("__repr__", &pycore_config_repr)
+            .def_readonly("name", &sanafe::CoreConfiguration::name)
+            .def_readonly("axon_in", &sanafe::CoreConfiguration::axon_in)
+            .def_readonly(
+                    "pipeline_hw", &sanafe::CoreConfiguration::pipeline_hw)
+            .def_readonly("axon_out", &sanafe::CoreConfiguration::axon_out);
+    // Various core components
+    pybind11::class_<sanafe::AxonInPowerMetrics>(m, "AxonInPowerMetrics")
+            .def_readonly("energy_message_in",
+                    &sanafe::AxonInPowerMetrics::energy_message_in)
+            .def_readonly("latency_message_in",
+                    &sanafe::AxonInPowerMetrics::latency_message_in);
+    pybind11::class_<sanafe::AxonInConfiguration>(m, "AxonInConfiguration")
+            .def_readonly("metrics", &sanafe::AxonInConfiguration::metrics)
+            .def_readonly("name", &sanafe::AxonInConfiguration::name)
+            .def("__repr__", [](const sanafe::AxonInConfiguration &self) {
+                return "<AxonInConfiguration '" + self.name + "'>";
+            });
+    pybind11::class_<sanafe::AxonOutPowerMetrics>(m, "AxonOutPowerMetrics")
+            .def_readonly("energy_message_out",
+                    &sanafe::AxonOutPowerMetrics::energy_message_out)
+            .def_readonly("latency_message_out",
+                    &sanafe::AxonOutPowerMetrics::latency_message_out);
+    pybind11::class_<sanafe::AxonOutConfiguration>(m, "AxonOutConfiguration")
+            .def_readonly("metrics", &sanafe::AxonOutConfiguration::metrics)
+            .def_readonly("name", &sanafe::AxonOutConfiguration::name)
+            .def("__repr__", [](const sanafe::AxonOutConfiguration &self) {
+                return "<AxonOutConfiguration '" + self.name + "'>";
+            });
+    pybind11::class_<sanafe::PipelineUnitConfiguration>(m, "PipelineUnit")
+            .def_readonly("model_info",
+                    &sanafe::PipelineUnitConfiguration::model_info)
+            .def_readonly("name", &sanafe::PipelineUnitConfiguration::name)
+            .def_readonly("implements_synapse",
+                    &sanafe::PipelineUnitConfiguration::implements_synapse)
+            .def_readonly("implements_dendrite",
+                    &sanafe::PipelineUnitConfiguration::implements_dendrite)
+            .def_readonly("implements_soma",
+                    &sanafe::PipelineUnitConfiguration::implements_soma)
+            .def("__repr__", &pypipeline_unit_config_repr);
+    pybind11::class_<sanafe::ModelInfo>(m, "ModelInfo")
+            .def_readonly("name", &sanafe::ModelInfo::name)
+            .def_readonly("plugin_library_path",
+                    &sanafe::ModelInfo::plugin_library_path)
+            .def_readonly("log_energy", &sanafe::ModelInfo::log_energy)
+            .def_readonly("log_latency", &sanafe::ModelInfo::log_latency)
+            .def_readonly("update_every_timestep",
+                    &sanafe::ModelInfo::update_every_timestep)
+            .def_property_readonly("model_attributes",
+                    [](const sanafe::ModelInfo &self) -> pybind11::object {
+                        return pymodel_attributes_to_pydict(
+                                self.model_attributes);
+                    });
     pybind11::class_<sanafe::MappedNeuron>(
             m, "MappedNeuron", docstrings::mapped_neuron_doc)
             .def("set_attributes", &pyset_attributes_mapped,
@@ -1151,7 +1358,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("arch"))
             .def("load", &sanafe::SpikingChip::load,
                     docstrings::spiking_chip_load_doc, pybind11::arg("net"),
-                    pybind11::arg("overwrite") = false)
+                    pybind11::arg("overwrite") = true)
             .def("sim", &pysim, docstrings::spiking_chip_sim_doc,
                     pybind11::arg("timesteps") = 1,
                     pybind11::arg("timing_model") = "detailed",
@@ -1166,7 +1373,11 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("get_power", &sanafe::SpikingChip::get_power,
                     docstrings::spiking_chip_get_power_doc)
             .def("reset", &sanafe::SpikingChip::reset,
-                    docstrings::spiking_chip_reset_doc);
+                    docstrings::spiking_chip_reset_doc)
+            .def("describe", &pydescribe,
+                    "Enumerate the full chip structure -- every tile, core, pipeline unit, "
+                    "and the attributes each unit supports -- as a nested dictionary. ");
 }
 // NOLINTEND(readability-function-cognitive-complexity)
 // NOLINTEND(bugprone-easily-swappable-parameters,readability-function-size,readability-identifier-naming,bugprone-reserved-identifier)
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)

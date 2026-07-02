@@ -40,15 +40,17 @@ public:
 class MappedConnection
 {
 public:
-    std::reference_wrapper<MappedNeuron> pre_neuron_ref;
-    std::reference_wrapper<MappedNeuron> post_neuron_ref;
+    // Note raw pointers are required here, since there's a circular dependency
+    //  between MappedConnection and MappedNeuron
+    MappedNeuron *const pre_neuron;
+    MappedNeuron *const post_neuron;
     PipelineUnit *synapse_hw{nullptr};
     std::vector<PipelineUnit *> message_processing_pipeline;
     size_t connection_offset{0UL};
     size_t mapped_dendrite_hw_address{0UL};
     size_t mapped_synapse_hw_address{0UL};
 
-    explicit MappedConnection(std::reference_wrapper<MappedNeuron> pre_neuron, std::reference_wrapper<MappedNeuron> post_neuron);
+    explicit MappedConnection(MappedNeuron &pre_neuron, MappedNeuron &post_neuron);
     void set_attributes(const std::map<std::string, sanafe::ModelAttribute> &attributes) const;
     void build_message_processing_pipeline();
 };
@@ -70,9 +72,9 @@ public:
     AxonOutUnit *axon_out_hw{nullptr};
     std::vector<PipelineUnit *> neuron_processing_pipeline;
 
-    size_t mapped_offset_within_core{-1ULL};
-    size_t mapped_dendrite_hw_address{-1ULL};
-    size_t mapped_soma_hw_address{-1ULL};
+    size_t mapped_offset_within_core{std::numeric_limits<size_t>::max()};
+    size_t mapped_dendrite_hw_address{std::numeric_limits<size_t>::max()};
+    size_t mapped_soma_hw_address{std::numeric_limits<size_t>::max()};
     size_t mapping_order;
     int spike_count{0};
     int maps_in_count{0};

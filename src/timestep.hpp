@@ -37,7 +37,7 @@ struct Timestep
     double wall_time{0.0};
 
     Timestep() = default;
-    Timestep(long int ts);
+    explicit Timestep(long int ts);
     void set_cores(size_t core_count);
 };
 

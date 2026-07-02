@@ -59,8 +59,8 @@ void sanafe::PipelineUnit::check_implemented(
 size_t sanafe::PipelineUnit::add_connection(MappedConnection &con)
 {
     // Add connection and update connection's address
-    const MappedNeuron &pre_neuron = con.pre_neuron_ref.get();
-    const MappedNeuron &post_neuron = con.post_neuron_ref.get();
+    const MappedNeuron &pre_neuron = *(con.pre_neuron);
+    const MappedNeuron &post_neuron = *(con.post_neuron);
 
     // TODO: we track this in the synapse but not the dendrite h/w?
 
@@ -121,13 +121,13 @@ void sanafe::PipelineUnit::check_outputs(
     }
 }
 
-bool sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
+bool sanafe::PipelineUnit::check_attribute(const std::string &attribute_name)
 {
-    if (supported_attribute_names.find(attribute_name) ==
-                    supported_attribute_names.end() &&
+    if (supported_attributes.find(attribute_name) ==
+                    supported_attributes.end() &&
             (attribute_warnings < max_attribute_warnings))
     {
-        INFO("Warning: Attribute (%s) not supported by model: %s, will be "
+        INFO("Warning: Attribute (%s) not supported by model: %s, may be "
              "ignored.\nEither remove this attribute from the SNN/Architecture "
              "description file, be more specific which hardware requires it "
              "(using synapse/dendrite/soma sections), or register the "
@@ -148,15 +148,31 @@ bool sanafe::PipelineUnit::check_attribute(const std::string attribute_name)
     return true;
 }
 
-void sanafe::PipelineUnit::set_attributes_hw(
-        std::string unit_name, const ModelInfo &model)
+std::string sanafe::PipelineUnit::get_attribute_help(
+        const std::string &attribute_name) const
 {
-    model_attributes = model.model_attributes;
-    plugin_lib = model.plugin_library_path;
+    std::string help;
+    if (supported_attributes.find(attribute_name) == supported_attributes.end())
+    {
+        help = "Attribute (" + attribute_name + ") is not supported.\n";
+    }
+    else
+    {
+        help = supported_attributes.at(attribute_name);
+    }
+
+    return help;
+}
+
+void sanafe::PipelineUnit::set_attributes_hw(
+        std::string unit_name, const ModelInfo &model_info)
+{
+    model_attributes = model_info.model_attributes;
+    plugin_lib = model_info.plugin_library_path;
     name = std::move(unit_name);
-    log_energy = model.log_energy;
-    log_latency = model.log_latency;
-    update_every_timestep = model.update_every_timestep;
+    log_energy = model_info.log_energy;
+    log_latency = model_info.log_latency;
+    update_every_timestep = model_info.update_every_timestep;
 
     synapse_set_default_attributes();
     dendrite_set_default_attributes();
@@ -220,6 +236,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         for (const auto &metric : energy_metric_names)
         {
             if (!key_exists(metric))
+            // cppcheck-suppress useStlAlgorithm
             {
                 const std::string error = "Metric not defined: " + metric;
                 INFO("Error: %s\n", error.c_str());
@@ -246,6 +263,7 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
         for (const auto &metric : latency_metric_names)
         {
             if (!key_exists(metric))
+            // cppcheck-suppress useStlAlgorithm
             {
                 const std::string error = "Missing metric: " + metric;
                 INFO("Error: %s\n", error.c_str());
