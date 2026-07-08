@@ -204,9 +204,6 @@ private:
     std::ofstream sim_trace_open_potential_trace(const std::filesystem::path &out_dir);
     std::ofstream sim_trace_open_neuron_trace(const std::filesystem::path &out_dir);
     static std::ofstream sim_trace_open_message_trace(const std::filesystem::path &out_dir);
-
-    // Booksim 2
-    static void check_booksim_compatibility(const Scheduler &scheduler, int sim_count);
 };
 
 void sim_trace_record_message(std::ostream &message_trace_file, const Message &m);

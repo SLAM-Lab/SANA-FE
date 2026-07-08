@@ -216,7 +216,6 @@ void schedule_stop_all_threads(Scheduler &scheduler);
 std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NocInfo &noc);
 
 void schedule_messages_thread(Scheduler &scheduler, const int thread_id);
-void schedule_messages_thread_cycle(Scheduler &scheduler, const int thread_id);
 void schedule_handle_message(Message &m, const Scheduler &scheduler, NocInfo &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
 void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);

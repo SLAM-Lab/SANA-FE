@@ -69,9 +69,9 @@ double sanafe::schedule_messages_timestep_simple(
     //  message processing for each core, and takes the maximum latency of
     //  any core in the design.
     //
-    // This scheduler is extremely simple and therefore
-    //  fast (also easily done in parallel), however, it won't capture any
-    //  network interactions or resource contention.
+    // This scheduler is extremely simple and therefore fast (also easily run
+    //  in parallel), however, it won't capture any network interactions or
+    //  resource contention.
     Timestep &ts_data = ts.get();
     const size_t cores = ts_data.messages.size();
     std::vector<double> neuron_processing_latencies(cores, 0.0);
