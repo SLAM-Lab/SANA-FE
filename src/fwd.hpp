@@ -14,7 +14,7 @@ class SpikingChip;
 struct Timestep;
 class TimestepHandle;
 struct RunData;
-class NocInfo;
+class NetworkOnChipState;
 
 struct Scheduler;
 
@@ -60,6 +60,7 @@ class CompareMessagesByID;
 
 enum BufferPosition : uint8_t;
 enum NeuronStatus : uint8_t;
+enum SyncProtocol : uint8_t;
 
 struct ModelAttribute;
 

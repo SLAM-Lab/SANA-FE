@@ -23,6 +23,8 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -60,11 +62,13 @@ std::atomic<int> sanafe::SpikingChip::chip_count = 0;
 
 sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         : ts_sync_delay_table(arch.ts_sync_delay_table)
+        , sync_protocol(arch.sync_protocol)
         , core_count(arch.core_count)
         , max_cores_per_tile(arch.max_cores_per_tile)
         , noc_width_in_tiles(arch.noc_width_in_tiles)
         , noc_height_in_tiles(arch.noc_height_in_tiles)
         , noc_buffer_size(arch.noc_buffer_size)
+        , max_steps_async(arch.max_steps_async)
 {
     INFO("Initializing simulation.\n");
     for (const TileConfiguration &tile_config : arch.tiles)
@@ -177,6 +181,9 @@ void sanafe::SpikingChip::clear_hw()
                 hw->is_used = false;
                 hw->reset();
             }
+            // Clear core-core tracking
+            core.fan_in.clear();
+            core.fan_out.clear();
         }
     }
 
@@ -476,7 +483,8 @@ void sanafe::SpikingChip::update_run_data(
 
 sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
         const TimingModel timing_model, const int scheduler_thread_count,
-        const TraceFlags trace_flags, const std::string &output_dir)
+        const TraceFlags trace_flags, const std::string &output_dir,
+        const bool force_sync_barrier)
 {
     RunData rd(total_timesteps + 1);
     rd.timesteps_executed += timesteps;
@@ -488,6 +496,20 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     scheduler.core_count = core_count;
     scheduler.max_cores_per_tile = max_cores_per_tile;
     scheduler.timing_model = timing_model;
+    scheduler.sync_protocol = sync_protocol;
+    scheduler.max_steps_async = max_steps_async;
+
+    scheduler.core_timing_histories.resize(
+            core_count, scheduler.max_steps_async); // Tadv in Neuroscale
+    scheduler.core_fan_in.resize(core_count);
+    scheduler.core_fan_out.resize(core_count);
+    for (const auto &core_ref : cores())
+    {
+        const Core &core = core_ref.get();
+        scheduler.core_fan_in.at(core.id) = core.fan_in;
+        scheduler.core_fan_out.at(core.id) = core.fan_out;
+    }
+
     schedule_create_threads(scheduler, scheduler_thread_count);
 
     if (total_timesteps <= 0)
@@ -522,7 +544,11 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
             // Print a heart-beat message to show that the simulation is running
             INFO("*** Time-step %ld ***\n", timestep);
         }
-        step(scheduler);
+
+        // Architectures may require all cores to be synchronized at the end of
+        //  a simulation run
+        const bool sync_last = force_sync_barrier && (timestep == timesteps);
+        step(scheduler, sync_last);
         flush_timestep_data(rd, scheduler);
     }
 
@@ -546,14 +572,15 @@ void sanafe::SpikingChip::sim_update_total_energy_and_counts(const Timestep &ts)
     total_neurons_fired += ts.neurons_fired;
 }
 
-void sanafe::SpikingChip::step(Scheduler &scheduler)
+void sanafe::SpikingChip::step(Scheduler &scheduler, const bool force_sync)
 {
     // Run neuromorphic hardware simulation for one timestep
     //  Measure the CPU time it takes and accumulate the stats
     ++total_timesteps;
 
     // Run and measure the wall-clock time taken to run the simulation
-    const auto timestep_handle = sim_hw_timestep(total_timesteps, scheduler);
+    const auto timestep_handle =
+            sim_hw_timestep(total_timesteps, scheduler, force_sync);
     sim_update_total_energy_and_counts(timestep_handle.get());
     // The total_messages_sent is incremented during the simulation since it's
     //  used to calculate the message id, so nothing needs to be done here
@@ -1054,7 +1081,7 @@ void sanafe::SpikingChip::sim_update_ts_counters(Timestep &ts)
 }
 
 sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
-        const long int timestep, Scheduler &scheduler)
+        const long int timestep, Scheduler &scheduler, const bool force_sync)
 {
     SimTimings sim_timings;
 
@@ -1062,6 +1089,7 @@ sanafe::TimestepHandle sanafe::SpikingChip::sim_hw_timestep(
     sim_timings.setup_start_tm = std::chrono::steady_clock::now();
     auto ts = TimestepHandle(timestep);
     Timestep &ts_data = ts.get(); // Get reference to timestep data
+    ts_data.force_sync_barrier = force_sync;
     ts_data.set_cores(core_count);
     sim_reset_measurements();
     auto setup_end_tm = std::chrono::steady_clock::now();
@@ -1277,6 +1305,7 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     TRACE3(CHIP, "Allocated all axons for nid:%zu count: %d\n", pre_neuron.id,
             pre_neuron.maps_out_count);
 
+
     for (MappedConnection &curr_connection : pre_neuron.connections_out)
     {
         // Add every connection to the axon. Also link to the map in the
@@ -1387,6 +1416,11 @@ void sanafe::SpikingChip::sim_allocate_axon(
 
     // Then add the output axon to the sending pre-synaptic neuron
     pre_neuron.axon_out_addresses.push_back(new_axon_out_address);
+
+    // Track core-core connectivity using pre/post core IDs
+    pre_core.fan_out.insert(post_core.id);
+    post_core.fan_in.insert(pre_core.id);
+
     TRACE1(CHIP, "nid:%s.%zu cid:%zu.%zu added one output axon address %zu.\n",
             pre_neuron.parent_group_name.c_str(), pre_neuron.id,
             pre_core.parent_tile_id, pre_core.offset, new_axon_out_address);
@@ -1593,7 +1627,7 @@ void sanafe::SpikingChip::sim_trace_write_message_header(
     message_trace_file << "dest_hw,";
     message_trace_file << "hops,";
     message_trace_file << "spikes,";
-    message_trace_file << "send_timestamp,";
+    message_trace_file << "sent_timestamp,";
     message_trace_file << "received_timestamp,";
     message_trace_file << "processed_timestamp,";
     message_trace_file << "generation_delay,";

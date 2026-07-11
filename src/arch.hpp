@@ -67,17 +67,26 @@ enum NeuronResetModes : uint8_t
     neuron_reset_mode_count = 4U,
 };
 
+enum SyncProtocol : uint8_t
+{
+    sync_clock, // Regular clock with fixed period, e.g., TrueNorth
+    sync_barrier, // Barrier sync per-timestep, e.g., used by Loihi 1&2
+    sync_neuroscale, // NeuroScale's async protocol as described in []
+};
+
 class Architecture
 {
 public:
     std::vector<TileConfiguration> tiles;
     LookupTable<double> ts_sync_delay_table{};
+    SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     std::string name;
     size_t core_count{0UL};
     size_t max_cores_per_tile{0UL};
     size_t noc_width_in_tiles{1UL};
     size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{0UL};
+    size_t max_steps_async{1UL};
 
     double timestep_delay{0.0};
 
@@ -96,9 +105,11 @@ Architecture load_arch(const std::filesystem::path &path);
 struct NetworkOnChipConfiguration
 {
     LookupTable<double> ts_sync_delay_table{};
+    SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     size_t width_in_tiles{1UL};
     size_t height_in_tiles{1UL};
     size_t link_buffer_size{0UL};
+    size_t max_steps_async{1UL};
 
     double timestep_delay{0.0};
 };

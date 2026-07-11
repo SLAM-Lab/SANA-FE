@@ -67,8 +67,8 @@ public:
     SpikingChip(SpikingChip &&other) = delete;
     SpikingChip &operator=(const SpikingChip &copy) = delete;
     SpikingChip &operator=(SpikingChip &&other) = delete;
-    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), const std::string &output_dir = "");
-    void step(Scheduler &scheduler);
+    RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), const std::string &output_dir = "", bool force_sync_barrier = true);
+    void step(Scheduler &scheduler, bool force_sync = true);
     void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
     void flush_timestep_data(RunData &rd, Scheduler &scheduler);
@@ -97,6 +97,7 @@ public:
 
     std::vector<std::reference_wrapper<Core>> cores();
     LookupTable<double> ts_sync_delay_table{};
+    SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
 
     size_t core_count{0UL};
     size_t mapped_cores{0UL};
@@ -105,6 +106,7 @@ public:
     size_t noc_width_in_tiles{1UL};
     size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{1UL};
+    size_t max_steps_async{1UL};
 
 private:
     using TimePoint = std::chrono::steady_clock::time_point;
@@ -166,7 +168,7 @@ private:
 
     // Energy and latency measurements
     void sim_reset_measurements();
-    TimestepHandle sim_hw_timestep(long int timestep, Scheduler &scheduler);
+    TimestepHandle sim_hw_timestep(long int timestep, Scheduler &scheduler, bool force_sync);
     void sim_timestep_sync(Scheduler &scheduler) const;
     void sim_update_ts_counters(Timestep &ts);
     static double sim_estimate_network_costs(const Tile &src, Tile &dest);
@@ -181,7 +183,7 @@ private:
     void sim_print_axon_summary() const noexcept;
 
     // Axon allocation
-    static void sim_create_neuron_axons(MappedNeuron &pre_neuron);
+    void sim_create_neuron_axons(MappedNeuron &pre_neuron);
     static void sim_allocate_axon(MappedNeuron &pre_neuron, Core &post_core);
     static void sim_add_connection_to_axon(MappedConnection &con, Core &post_core);
     static std::set<Core *> sim_get_post_synaptic_cores(const MappedNeuron &neuron);

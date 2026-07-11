@@ -28,12 +28,19 @@
 sanafe::Architecture::Architecture(
         std::string name, const NetworkOnChipConfiguration &noc)
         : ts_sync_delay_table(noc.ts_sync_delay_table)
+        , sync_protocol(noc.sync_protocol)
         , name(std::move(name))
         , noc_width_in_tiles(noc.width_in_tiles)
         , noc_height_in_tiles(noc.height_in_tiles)
         , noc_buffer_size(noc.link_buffer_size)
+        , max_steps_async(noc.max_steps_async)
         , timestep_delay(noc.timestep_delay)
 {
+    if (max_steps_async == 0)
+    {
+        const std::string error("max_steps_async must be >= 1.");
+        throw std::invalid_argument(error);
+    }
 }
 
 std::vector<std::reference_wrapper<sanafe::CoreConfiguration>>

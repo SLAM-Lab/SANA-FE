@@ -439,6 +439,17 @@ sanafe::description_parse_noc_configuration_yaml(
     noc.link_buffer_size = yaml_required_field<int>(
             parser, noc_attributes, "link_buffer_size");
 
+    const std::string sync_protocol_str =
+            yaml_optional_field<std::string>(noc_attributes, "sync_protocol")
+                    .value_or("barrier");
+    noc.sync_protocol = yaml_parse_sync_protocol(sync_protocol_str);
+    noc.max_steps_async =
+            yaml_optional_field<int>(noc_attributes, "max_steps_async")
+                    .value_or(1UL);
+
+    // TODO: get rid of the sync_model parameter, this is confusing with the new
+    //  changes. We can just parse the latency argument if provided, assuming either
+    //  a scalar, or a list or map.. so basically just simplify the following
     const std::string model_type =
             yaml_optional_field<std::string>(noc_attributes, "sync_model")
                     .value_or("fixed");
@@ -454,6 +465,7 @@ sanafe::LookupTable<double> sanafe::yaml_parse_sync_delay_table(
 {
     LookupTable<double> table;
 
+    // TODO: this is redundant - just parse latency_sync regardless of the model type... if specified
     if (model_type == "fixed")
     {
         // Single value, defaults to 0.0 if not provided
@@ -512,6 +524,33 @@ sanafe::LookupTable<double> sanafe::yaml_parse_sync_delay_table(
     }
 
     return table;
+}
+
+sanafe::SyncProtocol sanafe::yaml_parse_sync_protocol(
+        const std::string_view &sync_protocol_str)
+{
+    sanafe::SyncProtocol sync_protocol{
+            sanafe::SyncProtocol::sync_barrier};
+
+    if (sync_protocol_str == "clock")
+    {
+        sync_protocol = sanafe::SyncProtocol::sync_clock;
+    }
+    else if (sync_protocol_str == "barrier")
+    {
+        sync_protocol = sanafe::SyncProtocol::sync_barrier;
+    }
+    else if (sync_protocol_str == "neuroscale")
+    {
+        sync_protocol = sanafe::SyncProtocol::sync_neuroscale;
+    }
+    else
+    {
+        INFO("Error: Sync protocol %s not recognized, default is 'barrier'.\n",
+                std::string(sync_protocol_str).c_str());
+    }
+
+    return sync_protocol;
 }
 
 sanafe::Architecture sanafe::description_parse_arch_section_yaml(

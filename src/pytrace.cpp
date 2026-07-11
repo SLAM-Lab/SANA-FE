@@ -25,7 +25,7 @@ pybind11::dict message_to_dict(const sanafe::Message &m)
     message_dict["network_delay"] = m.network_delay;
     message_dict["processing_delay"] = m.processing_delay;
     message_dict["blocking_delay"] = m.blocking_delay;
-    message_dict["send_timestamp"] = m.sent_timestamp;
+    message_dict["sent_timestamp"] = m.sent_timestamp;
     message_dict["received_timestamp"] = m.received_timestamp;
     message_dict["processed_timestamp"] = m.processed_timestamp;
     message_dict["timestep"] = m.timestep;

@@ -35,6 +35,7 @@ struct Timestep
     double network_energy{0.0};
     double sim_time{0.0};
     double wall_time{0.0};
+    bool force_sync_barrier{true}; // All cores sync'd at end of step
 
     Timestep() = default;
     explicit Timestep(long int ts);

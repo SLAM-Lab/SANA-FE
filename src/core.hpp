@@ -11,6 +11,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "arch.hpp"
@@ -85,6 +86,9 @@ public:
     std::vector<MappedConnection *> connections_in;
     std::vector<AxonOutModel> axons_out;
     std::vector<PipelineResult> timestep_buffer;
+
+    std::unordered_set<size_t> fan_out;
+    std::unordered_set<size_t> fan_in;
 
     std::list<BufferPosition> neuron_processing_units;
     std::list<BufferPosition> message_processing_units;

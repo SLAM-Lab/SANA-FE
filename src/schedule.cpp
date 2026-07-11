@@ -35,15 +35,24 @@
 
 namespace
 {
-sanafe::TimingModelFunc get_model_function(sanafe::TimingModel model)
+sanafe::TimingModelFunc get_model_function(
+        sanafe::TimingModel model, const sanafe::SyncProtocol sync_protocol)
 {
     switch (model)
     {
     case sanafe::TimingModel::timing_model_simple:
-        return &sanafe::schedule_messages_timestep_simple;
-        // Note: You might need to change simple's return type to double to match
+        if (sync_protocol == sanafe::SyncProtocol::sync_neuroscale)
+        {
+            return &sanafe::schedule_messages_timestep_analytical_neuroscale;
+        }
+        else
+        {
+            // TODO: add function for clock-based sync (simply returns clock
+            //  period as the timestep latency)?
+            return &sanafe::schedule_messages_timestep_analytical_barrier;
+        }
     case sanafe::TimingModel::timing_model_detailed:
-        return &sanafe::schedule_messages_timestep_detailed;
+        return &sanafe::schedule_messages_timestep_semianalytical;
     case sanafe::TimingModel::timing_model_cycle_accurate:
         return &sanafe::schedule_messages_timestep_cycle;
     default:
@@ -52,7 +61,24 @@ sanafe::TimingModelFunc get_model_function(sanafe::TimingModel model)
 }
 }
 
-sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
+void sanafe::TimingHistory::push(const double t)
+{
+    write_idx = (write_idx + 1UL) % history.size();
+    history.at(write_idx) = t;
+}
+
+double sanafe::TimingHistory::at(const size_t read_idx)
+{
+    if (read_idx >= history.size())
+    {
+        throw std::out_of_range("Timing history access out of range.");
+    }
+    const size_t access =
+            (history.size() + write_idx - read_idx) % history.size();
+    return history.at(access);
+}
+
+sanafe::NetworkOnChipState::NetworkOnChipState(const Scheduler &scheduler)
         : noc_width_in_tiles(scheduler.noc_width_in_tiles)
         , noc_height_in_tiles(scheduler.noc_height_in_tiles)
         , core_count(scheduler.core_count)
@@ -62,7 +88,7 @@ sanafe::NocInfo::NocInfo(const Scheduler &scheduler)
     core_finished_receiving = std::vector<double>(core_count);
 }
 
-double sanafe::schedule_messages_timestep_simple(
+double sanafe::schedule_messages_timestep_analytical_barrier(
         TimestepHandle &ts, Scheduler &scheduler)
 {
     // Simple analytical model, that takes the maximum of either neuron or
@@ -100,6 +126,97 @@ double sanafe::schedule_messages_timestep_simple(
     ts_data.sim_time = std::max(max_message_processing, max_neuron_processing);
     // Account for fixed costs per timestep e.g., house-keeping or global sync
     ts_data.sim_time += scheduler.timestep_sync_delay;
+    scheduler.timesteps_to_write.push(ts);
+
+    return ts_data.sim_time;
+}
+
+double sanafe::schedule_messages_timestep_analytical_neuroscale(
+        TimestepHandle &ts, Scheduler &scheduler)
+{
+    // INFO("schedule analytical neurofem max_steps_aync:%zu core_count:%zu\n", scheduler.max_steps_async, scheduler.core_count);
+    // Simple analytical model for the Neuroscale sync protocol. This is slightly
+    //  different from the barrier sync methods, as cores can run-ahead from each
+    //  other and diverge from their dependencies by up to a finite number of steps.
+    Timestep &ts_data = ts.get();
+    std::vector<double> neuron_processing_latencies(scheduler.core_count, 0.0);
+    std::vector<double> message_processing_latencies(scheduler.core_count, 0.0);
+    std::vector<double> updated_times(scheduler.core_count, 0.0);
+    for (size_t sending_core = 0UL; sending_core < scheduler.core_count;
+            ++sending_core)
+    {
+        std::list<Message> &q = ts_data.messages.at(sending_core);
+        for (Message &m : q)
+        {
+            neuron_processing_latencies[sending_core] += m.generation_delay;
+            message_processing_latencies[m.dest_core_id] += m.processing_delay;
+            // Update message delays using very simple timing model
+            m.blocking_delay = 0.0; // No blocking modeled
+            m.network_delay = m.min_hop_delay;
+        }
+    }
+
+    for (size_t sending_core = 0UL; sending_core < scheduler.core_count;
+            ++sending_core)
+    {
+        const double core_latency =
+                std::max(neuron_processing_latencies[sending_core],
+                        message_processing_latencies[sending_core]); // + 1.0e-6;
+        // const double core_latency = neuron_processing_latencies[sending_core] +
+        //         message_processing_latencies[sending_core];
+        // INFO("Core latency [%zu]:%e\n", sending_core, core_latency);
+
+        // Calculate the max over fan in of T[fanout][t-1]
+        double max_fan_in = 0.0;
+        // INFO("fan in size:%zu\n", scheduler.core_fan_in);
+        for (const auto fan_in : scheduler.core_fan_in.at(sending_core))
+        {
+            max_fan_in = std::max(max_fan_in,
+                    scheduler.core_timing_histories[fan_in].at(0UL));
+        }
+        // Calculate the max over fan in of T[fanin][t-Tadv]
+        double max_fan_out = 0.0;
+        for (const auto fan_out : scheduler.core_fan_out.at(sending_core))
+        {
+            max_fan_out = std::max(max_fan_out,
+                    scheduler.core_timing_histories[fan_out].at(
+                            scheduler.max_steps_async - 1UL));
+        }
+        const double prev_time =
+                scheduler.core_timing_histories[sending_core].at(0UL);
+        updated_times[sending_core] = core_latency +
+                std::max({prev_time, max_fan_in, max_fan_out});
+        INFO("updated_times[%zu]=%e\n", sending_core, updated_times[sending_core]);
+    }
+
+    // Update timing for all cores
+    for (size_t idx = 0UL; idx < scheduler.core_count; ++idx)
+    {
+        scheduler.core_timing_histories[idx].push(updated_times[idx]);
+        // Record the timing in the last (placeholder) message struct
+        std::list<Message> &q = ts_data.messages.at(idx);
+        const double ts_timing = updated_times[idx];
+        for (Message &m : q)
+        {
+            m.sent_timestamp = ts_timing;
+        }
+    }
+
+    // Since the simulator assumes we sum timesteps at the end, for this
+    //  asynchronous protocol to work, we must always return 0.0 for the
+    //  timestep duration until we force a sync up (e.g. at the end of
+    //  a simulated run). When the kernel sums over all timesteps, it will get
+    //  the correct final time
+    ts_data.sim_time = 0.0;
+    if (ts_data.force_sync_barrier)
+    {
+        for (size_t idx = 0UL; idx < scheduler.core_count; ++idx)
+        {
+            const double core_time =
+                    scheduler.core_timing_histories[idx].at(0UL);
+            ts_data.sim_time = std::max(ts_data.sim_time, core_time);
+        }
+    }
     scheduler.timesteps_to_write.push(ts);
 
     return ts_data.sim_time;
@@ -173,6 +290,19 @@ double sanafe::schedule_messages_timestep_cycle(
 void sanafe::schedule_create_threads(
         Scheduler &scheduler, const int scheduler_thread_count)
 {
+    if ((scheduler.sync_protocol == SyncProtocol::sync_neuroscale) &&
+            (scheduler_thread_count > 1))
+    {
+        // Do not support multithreaded Neuroscale simulations. Its asynchronous
+        //  timing model does not synchronize cores between steps, therefore we
+        //  cannot simulate each time-step in isolation
+        const std::string error(
+                "SANA-FE does not support multi-threaded NeuroScale "
+                "timing simulations.");
+        INFO("Error: %s\n", error.c_str());
+        throw std::runtime_error(error);
+    }
+
     TRACE1(CHIP, "Creating %d scheduler threads\n", scheduler_thread_count);
     for (int thread_id = 0; thread_id < scheduler_thread_count; thread_id++)
     {
@@ -187,13 +317,14 @@ void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
         std::shared_ptr<BookSimConfig> config)
 {
     scheduler.booksim_config = config;
-    if (scheduler.scheduler_threads.empty())
+    if (scheduler.scheduler_threads.empty()) // i.e. no scheduling threads
     {
-        const sanafe::TimingModelFunc timing_model =
-                get_model_function(scheduler.timing_model);
+        // Execute the timing algorithm on the main program thread
+        const sanafe::TimingModelFunc timing_model = get_model_function(
+                scheduler.timing_model, scheduler.sync_protocol);
         timing_model(ts, scheduler);
     }
-    else
+    else // if one or more scheduling threads active
     {
         // Make sure the timestep queue stays within sensible size bounds
         while (scheduler.timesteps_to_schedule.size() > max_buffered_timesteps)
@@ -209,7 +340,7 @@ void sanafe::schedule_messages(TimestepHandle &ts, Scheduler &scheduler,
     }
 }
 
-double sanafe::schedule_messages_timestep_detailed(
+double sanafe::schedule_messages_timestep_semianalytical(
         TimestepHandle &ts, Scheduler &scheduler)
 {
     // Schedule the global order of messages using a semi-analytical timing
@@ -219,7 +350,7 @@ double sanafe::schedule_messages_timestep_detailed(
     //  parameters (mostly NoC configuration parameters). Returns the timestamp
     //  of the last scheduled event, i.e., the total time-step delay
     MessagePriorityQueue priority;
-    NocInfo noc(scheduler);
+    NetworkOnChipState noc(scheduler);
     double last_timestamp = 0.0;
     Timestep &ts_data = ts.get();
 
@@ -296,7 +427,7 @@ double sanafe::schedule_messages_timestep_detailed(
 }
 
 std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
-        const Timestep &ts, NocInfo &noc)
+        const Timestep &ts, NetworkOnChipState &noc)
 {
     const size_t total_links = noc.noc_height_in_tiles *
             noc.noc_width_in_tiles *
@@ -308,7 +439,7 @@ std::vector<sanafe::MessageFifo> sanafe::schedule_init_message_queues(
 }
 
 void sanafe::schedule_handle_message(
-        Message &m, const Scheduler &scheduler, NocInfo &noc)
+        Message &m, const Scheduler &scheduler, NetworkOnChipState &noc)
 {
     TRACE1(SCHEDULER, "Processing message for nid:%s.%zu\n",
             m.src_neuron_group_id.c_str(), m.src_neuron_offset);
@@ -381,7 +512,8 @@ double sanafe::schedule_push_next_message(
     return last_timestamp;
 }
 
-void sanafe::noc_update_all_tracked_messages(const double t, NocInfo &noc)
+void sanafe::noc_update_all_tracked_messages(
+        const double t, NetworkOnChipState &noc)
 {
     // Update the tracked state of the NoC at a given time, t
     for (auto &q : noc.messages_received)
@@ -404,7 +536,7 @@ void sanafe::noc_update_all_tracked_messages(const double t, NocInfo &noc)
 }
 
 void sanafe::noc_update_message_tracking(
-        const Message &m, NocInfo &noc, const bool entering_noc)
+        const Message &m, NetworkOnChipState &noc, const bool entering_noc)
 {
     // Update the tracked state of the NoC, accounting for a single message
     //  either entering or leaving the NoC (message_in)
@@ -450,7 +582,7 @@ sanafe::MessagePriorityQueue sanafe::schedule_init_timing_priority(
     return priority;
 }
 
-void sanafe::NocInfo::update_rolling_averages(
+void sanafe::NetworkOnChipState::update_rolling_averages(
         const Message &message, const bool entering_noc)
 {
     if (entering_noc)
@@ -479,7 +611,7 @@ void sanafe::NocInfo::update_rolling_averages(
     }
 }
 
-void sanafe::NocInfo::update_message_density(
+void sanafe::NetworkOnChipState::update_message_density(
         const Message &message, const bool entering_noc)
 {
     // Start with some sanity checks
@@ -556,7 +688,8 @@ void sanafe::NocInfo::update_message_density(
     }
 }
 
-double sanafe::NocInfo::calculate_route_congestion(const Message &m) const
+double sanafe::NetworkOnChipState::calculate_route_congestion(
+        const Message &m) const
 {
     // Calculate the total flow density as a metric for route congestion along a
     //  spike message's route. This is given by the sum of the densities, for
@@ -614,7 +747,7 @@ double sanafe::NocInfo::calculate_route_congestion(const Message &m) const
     return flow_density;
 }
 
-std::pair<int, int> sanafe::NocInfo::get_route_xy_increments(
+std::pair<int, int> sanafe::NetworkOnChipState::get_route_xy_increments(
         const Message &m) noexcept
 {
     const int x_increment = (m.src_x < m.dest_x) ? 1 : -1;
@@ -634,8 +767,8 @@ void sanafe::schedule_messages_thread(
         {
             TRACE1(SCHEDULER, "tid:%d Scheduling ts:%ld sz:%zu\n", thread_id,
                     ts->timestep, scheduler.timesteps_to_schedule.size());
-            const TimingModelFunc timing_model =
-                    get_model_function(scheduler.timing_model);
+            const TimingModelFunc timing_model = get_model_function(
+                    scheduler.timing_model, scheduler.sync_protocol);
             timing_model(ts, scheduler);
         }
     }

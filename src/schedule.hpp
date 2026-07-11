@@ -17,6 +17,8 @@
 #include <queue>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -145,9 +147,32 @@ struct CompareTimesteps
     }
 };
 
+// Circular buffer for per-core time-step latencies
+class TimingHistory
+{
+public:
+    TimingHistory(size_t history_size)
+            : history(history_size, 0.0)
+            , write_idx(history_size - 1UL)
+    {
+        if (history_size == 0)
+        {
+            throw std::invalid_argument("History size must be greater than 0");
+        }
+    }
+    void push(double t);
+    double at(size_t idx);
+private:
+    std::vector<double> history;
+    size_t write_idx;
+};
+
 struct Scheduler
 {
     std::vector<std::thread> scheduler_threads;
+    std::vector<std::unordered_set<size_t>> core_fan_in;
+    std::vector<std::unordered_set<size_t>> core_fan_out;
+    std::vector<TimingHistory> core_timing_histories;
     std::atomic<bool> should_stop{false};
     ThreadSafePriorityQueue<TimestepHandle, std::vector<TimestepHandle>,
             CompareTimesteps>
@@ -158,17 +183,19 @@ struct Scheduler
     std::shared_ptr<BookSimConfig> booksim_config;
 
     TimingModel timing_model{timing_model_detailed};
+    SyncProtocol sync_protocol;
     size_t noc_width_in_tiles;
     size_t noc_height_in_tiles;
     size_t buffer_size;
     size_t core_count;
     size_t max_cores_per_tile;
+    size_t max_steps_async; // TODO: make per core?
     double timestep_sync_delay;
 };
 
-// NocInfo is used by the scheduler to track the high-level state of the NoC
-//  at a given time
-class NocInfo
+// NetworkOnChipState is used by the scheduler to track the high-level state of
+//  the NoC at a given time
+class NetworkOnChipState
 {
 public:
     std::vector<MessageFifo> messages_received;
@@ -186,7 +213,7 @@ public:
     double mean_in_flight_receive_delay{0.0};
     long int messages_in_noc{0L};
 
-    explicit NocInfo(const Scheduler &scheduler);
+    explicit NetworkOnChipState(const Scheduler &scheduler);
     [[nodiscard]] size_t idx(const size_t x, const size_t y, const size_t link) const
     {
         const size_t links_per_router = max_cores_per_tile + ndirections;
@@ -205,21 +232,22 @@ private:
 
 MessagePriorityQueue schedule_init_timing_priority(std::vector<MessageFifo> &message_queues_per_core);
 void schedule_messages(TimestepHandle &ts, Scheduler &scheduler, std::shared_ptr<BookSimConfig> config);
-double schedule_messages_timestep_simple(TimestepHandle &ts, Scheduler &scheduler);
-double schedule_messages_timestep_detailed(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_analytical_barrier(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_analytical_neuroscale(TimestepHandle &ts, Scheduler &scheduler);
+double schedule_messages_timestep_semianalytical(TimestepHandle &ts, Scheduler &scheduler);
 double schedule_messages_timestep_cycle(TimestepHandle &ts, Scheduler &scheduler);
 
 void schedule_create_threads(Scheduler &scheduler, int scheduler_thread_count);
 void schedule_messages_thread(Scheduler &scheduler, int thread_id);
 void schedule_stop_all_threads(Scheduler &scheduler);
 
-std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NocInfo &noc);
+std::vector<MessageFifo> schedule_init_message_queues(const Timestep &ts, NetworkOnChipState &noc);
 
 void schedule_messages_thread(Scheduler &scheduler, const int thread_id);
-void schedule_handle_message(Message &m, const Scheduler &scheduler, NocInfo &noc);
+void schedule_handle_message(Message &m, const Scheduler &scheduler, NetworkOnChipState &noc);
 double schedule_push_next_message(std::vector<MessageFifo> &messages_sent_per_core, MessagePriorityQueue &priority, const Message &current_message);
-void noc_update_message_tracking(const Message &m, NocInfo &noc, bool entering_noc);
-void noc_update_all_tracked_messages(double t, NocInfo &noc);
+void noc_update_message_tracking(const Message &m, NetworkOnChipState &noc, bool entering_noc);
+void noc_update_all_tracked_messages(double t, NetworkOnChipState &noc);
 
 // TODO: in the future, allow these strings to be setup dynamically. That way
 //  the user can specify the NoC parameters within the architecture
