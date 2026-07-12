@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sanafe"
-version = "2.2.8"
+version = "2.2.9"
 description = "SANA-FE: Simulating Advanced Neuromorphic Architectures for Fast Exploration"
 readme = "README.md"
 requires-python = ">=3.10"
