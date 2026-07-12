@@ -302,19 +302,20 @@ sanafe::NeuronStatus NeuroFEMModel::process_fem(NeuroFEMNeuron &n)
     //         (n.sigma_v * noise) - n.u2_dendritic_accumulator.value_or(0.0);
 
     // Fixed point version
-    n.u1 = (static_cast<int>(511 * n.u1) >> 9) + (static_cast<int>(n.u1_dendritic_accumulator.value_or(0)) << 10);
-    n.u2 = (static_cast<int>(511 * n.u2) >> 9) + (static_cast<int>(n.u2_dendritic_accumulator.value_or(0)) >> 5);
+    n.u1 = (static_cast<int>(511 * n.u1) >> 9) +
+            (static_cast<int>(n.u1_dendritic_accumulator.value_or(0)) << 10);
+    n.u2 = (static_cast<int>(511 * n.u2) >> 9) +
+            (static_cast<int>(n.u2_dendritic_accumulator.value_or(0)) >> 5);
 
     n.u_error = n.u1 + (static_cast<int>(n.bias) << 7);
     n.u_integrated += static_cast<int>(n.u_error);
 
-    const long int noise = std::llround(d(gen) * (n.sigma_v * 268435456.0)); // 24-bit noise generator
+    // 24-bit noise generator, shift left by 28-bits
+    const int noise = std::round(d(gen) * (n.sigma_v * 268435456.0));
 
     n.potential = ((255 * static_cast<int>(n.potential)) >> 8) +
-            (static_cast<int>(n.u_error) << 2) +
-            n.u_integrated +
-            (static_cast<int>(n.u2) >> 4) +
-            (static_cast<int>(noise) >> 3) -
+            (static_cast<int>(n.u_error) << 2) + n.u_integrated +
+            (static_cast<int>(n.u2) >> 4) + (static_cast<int>(noise) >> 3) -
             (static_cast<int>(n.u2_dendritic_accumulator.value_or(0)) << 9);
 
     sanafe::NeuronStatus state{sanafe::updated};
