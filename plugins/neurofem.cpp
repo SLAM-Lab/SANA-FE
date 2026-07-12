@@ -311,7 +311,8 @@ sanafe::NeuronStatus NeuroFEMModel::process_fem(NeuroFEMNeuron &n)
     n.u_integrated += static_cast<int>(n.u_error);
 
     // 24-bit noise generator, shift left by 28-bits
-    const int noise = std::round(d(gen) * (n.sigma_v * 268435456.0));
+    const int noise =
+            static_cast<int>(std::round(d(gen) * (n.sigma_v * 268435456.0)));
 
     n.potential = ((255 * static_cast<int>(n.potential)) >> 8) +
             (static_cast<int>(n.u_error) << 2) + n.u_integrated +
