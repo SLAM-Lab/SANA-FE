@@ -19,6 +19,10 @@ import pandas as pd
 
 import sanafe
 
+FUGU_DIR = fugu.__file__
+
+import sanafe
+
 # pylint: disable=invalid-name,no-self-argument,attribute-defined-outside-init
 class sanafe_Backend(Backend):
     """SANA-FE Fugu backend"""
@@ -63,20 +67,71 @@ class sanafe_Backend(Backend):
             target_core = cores[current_core_id]
             neuron.map_to_core(target_core)
 
-
     def _convert_props(self, fugu_props):
         """
         Convert Fugu properties to equivalent SANA-FE attributes
         """
         param_map = {
             "decay": "leak_decay",
+            "leakage_constant": "leak_decay",
             "reset_voltage": "reset",
         }
+
+        # Change any parameters in the parameter mapping, copy remaining
         sanafe_props = {param_map.get(k, k): v for k, v in fugu_props.items()}
+
+        # Conversion
+        if "decay" in fugu_props:
+            sanafe_props["leak_decay"] = 1.0 - fugu_props["decay"]
+        # TODO: clean up
+        if "leakage_constant" in fugu_props:
+            sanafe_props["leak_decay"] = fugu_props["leakage_constant"]
+        # Scale and quantize here?
+        # TODO: do we need a way to determine the quantization to apply that is
+        #  automated
+        # TODO: requited for LCA but not for the simplest initial application
+        #if "bias" in fugu_props:
+        #    sanafe_props["bias"] = int(sanafe_props["bias"] * 65536)
+        #if "threshold" in fugu_props:
+        #    sanafe_props["threshold"] = int(sanafe_props["threshold"] * 65536)
+
         del sanafe_props["index"]
         del sanafe_props["brick"]
         del sanafe_props["neuron_number"]
         del sanafe_props["p"]
+        # HACK: TODO any other parameters to remove?
+
+        # Additional/more complex parameter conversion steps
+        # TODO: all of this feels a bit arbitrary. SANA-FE can have any h/w
+        #  implementation, which we have to configure using arbitrary Fugu
+        #  arguments. Ideally, parameter names should be the same for both Fugu
+        #  and SANA-FE if possible...
+        #
+        #  However, this assumes some level of communication between the
+        #  (Fugu) application developers and h/w developers to create consistent
+        #  models, parameters, and terminologies
+        # TODO: should we read the architecture file to determine the model
+        #  and its capabilities? SANA-FE now correctly indicates to a user if a
+        #  neuron can't map to a h/w features, so this might be enough. In future
+        #  fugu could read the architecture YAML and see what features are available?
+        #  However, it's not until we create the chip that we know all of its capabilities,
+        #  that might not be an issue though - after creating the chip we can do some actions
+        #  before we map the SNN and load it. Maybe I can add a new routine that simply returns
+        #  the property with all supported args?
+        if "compartment" in sanafe_props:
+            compartment_props = sanafe_props["compartment"]
+            if "tau_syn" in compartment_props:
+                if "dt" not in compartment_props:
+                    raise RuntimeError(
+                        "Synaptic decay specified but no timestep, dt")
+                # Convert from absolute time to per-timestep decay
+                sanafe_props["input_decay"] = \
+                    math.exp(-compartment_props["dt"] / compartment_props["tau_syn"])
+            del sanafe_props["compartment"]
+
+
+        print(f"fugu:{fugu_props}")
+        print(f"sanafe_props:{sanafe_props}")
 
         return sanafe_props
 
@@ -170,6 +225,9 @@ class sanafe_Backend(Backend):
 
         for n1, n2, props in self.fugu_graph.edges.data():
             if n1 in self.node_map and n2 in self.node_map:
+                if "weight" in props:
+                    props["weight"] = int(props["weight"])
+                    #props["weight"] = int(props["weight"] * 65536)  # TODO: cleanup somehow, need to auto-quantize
                 src = self.node_map[n1]
                 dst = self.node_map[n2]
                 src.connect_to_neuron(dst, props)
@@ -205,6 +263,8 @@ class sanafe_Backend(Backend):
             self.debug_mode = False
         if "arch" in compile_args:
             self.arch_name = compile_args["arch"]
+        if "mappings" in compile_args:
+            self.mappings_name = compile_args["mappings"]
 
         self._build_network()
 
@@ -223,12 +283,14 @@ class sanafe_Backend(Backend):
         self.return_potentials = return_potentials
         if debug_mode:
             self.scaffold.summary(verbose=1)
+        print(self.arch_name)
         self.arch = sanafe.load_arch(self.arch_name)
         self._map_to_cores()
 
         # Run simulation
         chip = sanafe.SpikingChip(self.arch)
         chip.load(self.net)
+        self.net.save("snn.yaml")
 
         with (open("spikes.csv", "w", encoding="utf-8") as spike_trace,
               open("potentials.csv", "w", encoding="utf-8") as potential_trace):
