@@ -153,17 +153,17 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
             // Update message delays using very simple timing model
             m.blocking_delay = 0.0; // No blocking modeled
             m.network_delay = m.min_hop_delay;
+            message_processing_latencies[m.dest_core_id] += m.network_delay;
         }
     }
 
     for (size_t sending_core = 0UL; sending_core < scheduler.core_count;
             ++sending_core)
     {
-        const double core_latency =
-                std::max(neuron_processing_latencies[sending_core],
-                        message_processing_latencies[sending_core]); // + 1.0e-6;
-        // const double core_latency = neuron_processing_latencies[sending_core] +
-        //         message_processing_latencies[sending_core];
+        // const double core_latency = std::max(neuron_processing_latencies[sending_core],
+        //                 message_processing_latencies[sending_core]);
+        const double core_latency = neuron_processing_latencies[sending_core] +
+                        message_processing_latencies[sending_core];
         // INFO("Core latency [%zu]:%e\n", sending_core, core_latency);
 
         // Calculate the max over fan in of T[fanout][t-1]

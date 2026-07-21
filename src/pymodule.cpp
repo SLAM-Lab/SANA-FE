@@ -640,6 +640,8 @@ pybind11::dict pydescribe_tile(const sanafe::Tile &tile)
     pybind11::dict d;
     d["name"] = tile.name;
     d["id"] = tile.id;
+    d["x"] = tile.x;
+    d["y"] = tile.y;
 
     pybind11::list cores;
     for (const auto &core : tile.cores)
@@ -1277,6 +1279,8 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("latency_west_hop") = 0.0,
                     pybind11::arg("log_energy") = false)
             .def_readonly("id", &sanafe::TileConfiguration::id)
+            .def_readonly("x", &sanafe::TileConfiguration::x)
+            .def_readonly("y", &sanafe::TileConfiguration::y)
             .def_readonly("name", &sanafe::TileConfiguration::name)
             .def_readwrite("cores", &sanafe::TileConfiguration::cores)
             .def("__repr__", [](const sanafe::TileConfiguration &self) {
@@ -1297,6 +1301,7 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("log_energy") = false)
             .def("__repr__", &pycore_config_repr)
             .def_readonly("name", &sanafe::CoreConfiguration::name)
+            .def_readonly("offset", &sanafe::CoreConfiguration::offset)
             .def_readonly("axon_in", &sanafe::CoreConfiguration::axon_in)
             .def_readonly(
                     "pipeline_hw", &sanafe::CoreConfiguration::pipeline_hw)
