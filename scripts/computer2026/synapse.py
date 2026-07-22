@@ -246,12 +246,14 @@ def main():
     fig = plt.figure(figsize=(1.5, 1.5))
     y_100 = 1.0 / df_100["total_time"].values
 
-    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color='#56B4E9')
+    plt.plot(x, y_100, 'o-', linewidth=1, markersize=2, color='#56B4E9', label='SANA-FE')
 
     x_val = 4
     y_val = y_100[x.values == x_val][0]
     plt.plot([0, x_val], [y_val, y_val], ':', color='gray', linewidth=1.5)
     plt.plot([x_val, x_val], [plt.ylim()[0], y_val], ':', color='gray', linewidth=1.5)
+    loihi_measured = 331
+    plt.plot(x_val, loihi_measured, 'x', markersize=5, color='r', markerfacecolor='none', alpha=0.7, label='Measured')
 
     ax = fig.axes[0]
     ax.ticklabel_format(style='plain', useOffset=False, axis='y')
@@ -262,13 +264,15 @@ def main():
     plt.xticks(range(0, 17, 4))
     plt.xlim((0, 17))
     plt.ylim((100, 600))
+    plt.legend(fontsize=6, loc='best', handlelength=1.5, handletextpad=0.4)
+
 
     plt.tight_layout(pad=0.1)
     plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.png"), dpi=300)
     plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.pdf"))
 
     # --- Energy plot ---
-    n_blues = 2
+    n_blues = 3
     blues_colors = [matplotlib.colormaps['Blues'](v) for v in np.linspace(0.6, 0.9, n_blues)]
     colors = blues_colors
     colors.extend(['black',])  # S=0 gets black
@@ -289,6 +293,8 @@ def main():
     e_val = e_30[x.values == x_val][0]
     plt.plot([0, x_val], [e_val, e_val], ':', color='gray', linewidth=1.5)
     plt.plot([x_val, x_val], [plt.ylim()[0], e_val], ':', color='gray', linewidth=1.5)
+    loihi_measured = 0.324
+    plt.plot(x_val, loihi_measured, 'x', markersize=5, color='r', markerfacecolor='none', alpha=0.7, label='Measured on Loihi')
 
     ax = fig.axes[0]
     ax.ticklabel_format(style='plain', useOffset=False, axis='y')
