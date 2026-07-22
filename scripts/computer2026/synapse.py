@@ -268,8 +268,8 @@ def main():
 
 
     plt.tight_layout(pad=0.1)
-    plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.png"), dpi=300)
-    plt.savefig(os.path.join(RUN_DIR, "fig_5a_concurrency_loihi_latency.pdf"))
+    plt.savefig(os.path.join(RUN_DIR, "fig_6a_concurrency_loihi_latency.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_DIR, "fig_6a_concurrency_loihi_latency.pdf"))
 
     # --- Energy plot ---
     n_blues = 3
@@ -311,8 +311,8 @@ def main():
     plt.text(18, e_30[-1]+0.022, '$s=0.3$', color=colors[0], fontsize=6, va='center', ha='right')
 
     plt.tight_layout(pad=0.1)
-    plt.savefig(os.path.join(RUN_DIR, "fig_5b_concurrency_loihi_energy.png"), dpi=300)
-    plt.savefig(os.path.join(RUN_DIR, "fig_5b_concurrency_loihi_energy.pdf"))
+    plt.savefig(os.path.join(RUN_DIR, "fig_6b_concurrency_loihi_energy.png"), dpi=300)
+    plt.savefig(os.path.join(RUN_DIR, "fig_6b_concurrency_loihi_energy.pdf"))
 
     # plt.show()
     print(results_df)
