@@ -120,8 +120,9 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
         // Integrate input charges
         const size_t syn = synapse_address.value_or(0UL);
         const size_t delay = (syn < delays.size()) ? delays[syn] : 0UL;
-        next_accumulated_charges[delay][neuron_address] =
-                next_accumulated_charges[delay][neuron_address].value_or(0.0) +
+        next_accumulated_charges[delay - 1][neuron_address] =
+                next_accumulated_charges[delay - 1][neuron_address].value_or(
+                        0.0) +
                 current.value();
     }
 
@@ -138,15 +139,19 @@ void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
     if (delays.size() <= synapse_address)
     {
         TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
-        delays.resize(synapse_address + 1UL, 0UL);
+        delays.resize(synapse_address + 1UL, 1UL);
     }
 
     if ((attribute_name == "delay") || (attribute_name == "d"))
     {
         const int delay = static_cast<int>(param);
-        if (static_cast<size_t>(delay) > max_delay)
+        if ((static_cast<size_t>(delay) - 1) > max_delay)
         {
             throw std::runtime_error("Error: delay > max delay\n");
+        }
+        if (static_cast<size_t>(delay) < 1)
+        {
+            throw std::runtime_error("Error: delay < 1\n");
         }
         delays.at(synapse_address) = static_cast<size_t>(delay);
     }
@@ -161,7 +166,7 @@ void sanafe::AccumulatorWithDelayModel::track_connection(
     if (delays.size() <= synapse_address)
     {
         TRACE1(MODELS, "Resizing weights to: %zu\n", synapse_address + 1);
-        delays.resize(synapse_address + 1UL, 0UL);
+        delays.resize(synapse_address + 1UL, 1UL);
     }
 }
 
