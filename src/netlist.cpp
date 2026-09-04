@@ -9,7 +9,6 @@
 #include <limits>
 #include <map>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -813,13 +812,10 @@ std::string sanafe::netlist_nested_attributes_to_netlist(
     TRACE2(DESCRIPTION, "Parsing nested attributes\n");
     ryml::Tree tree; // NOLINT(misc-include-cleaner)
     ryml::NodeRef root = tree.rootref(); // NOLINT(misc-include-cleaner)
-    root |= ryml::MAP; // NOLINT(misc-include-cleaner)
-    root |= ryml::FLOW_SL; // NOLINT(misc-include-cleaner)
+    root.set_map(ryml::FLOW_SL); // NOLINT(misc-include-cleaner)
 
     yaml_serialize_model_attributes(default_attributes, root, model_attributes);
-    std::ostringstream ss;
-    ss << tree;
-    attribute_str = " " + ss.str();
+    attribute_str = " " + ryml::emitrs_yaml<std::string>(tree);
 
     return attribute_str;
 }

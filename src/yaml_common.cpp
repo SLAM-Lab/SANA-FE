@@ -121,7 +121,7 @@ sanafe::description_parse_model_attributes_yaml( // NOLINT(misc-no-recursion)
         for (const auto &node : attributes_node)
         {
             std::string key_str;
-            node >> ryml::key(key_str); // NOLINT(misc-include-cleaner)
+            node.load_key(&key_str); // NOLINT(misc-include-cleaner)
             if (std::find(skip_keys.begin(), skip_keys.end(), key_str) ==
                     skip_keys.end())
             {
@@ -187,7 +187,7 @@ std::vector<sanafe::ModelAttribute> sanafe::yaml_parse_attribute_map(
     {
         TRACE2(DESCRIPTION, "Parsing mapping of attributes.\n");
         std::string key;
-        node >> ryml::key(key);
+        node.load_key(&key); // NOLINT(misc-include-cleaner)
 
         // Recursively parse YAML attribute NOLINTNEXTLINE(misc-no-recursion)
         ModelAttribute curr = yaml_parse_attribute(parser, node);
@@ -211,6 +211,11 @@ sanafe::AttributeVariant sanafe::yaml_parse_attribute_scalar(
     {
         throw std::invalid_argument("Invalid attribute YAML node.\n");
     }
+    if (attribute_node.val_is_null())
+    {
+        throw std::invalid_argument(
+                "Attribute has no value; expected a scalar.\n");
+    }
     //  Parse YAML scalar by attempting type conversions in priority order.
     //   YAML scalars are ambiguous - the same text can often be parsed a
     //   multiple types (e.g., "1" -> bool, int, double, or string;
@@ -228,28 +233,28 @@ sanafe::AttributeVariant sanafe::yaml_parse_attribute_scalar(
     // False positive: clang-tidy is unable to see the RapidYAML headers, so
     //  suppress warnings for c4::yml::read
     int decoded_int = 0;
-    if (c4::yml::read(attribute_node, &decoded_int))
+    if (attribute_node.deserialize(&decoded_int))
     {
         TRACE1(DESCRIPTION, "Parsed as int: %d.\n", decoded_int);
         return decoded_int;
     }
 
     double decoded_double = std::numeric_limits<double>::quiet_NaN();
-    if (c4::yml::read(attribute_node, &decoded_double))
+    if (attribute_node.deserialize(&decoded_double))
     {
         TRACE1(DESCRIPTION, "Parsed as float: %lf.\n", decoded_double);
         return decoded_double;
     }
 
     bool decoded_bool = false;
-    if (c4::yml::read(attribute_node, &decoded_bool))
+    if (attribute_node.deserialize(&decoded_bool))
     {
         TRACE2(DESCRIPTION, "Parsed as bool: %d.\n", decoded_bool);
         return decoded_bool;
     }
 
     std::string decoded_str;
-    if (c4::yml::read(attribute_node, &decoded_str))
+    if (attribute_node.deserialize(&decoded_str))
     {
         TRACE2(DESCRIPTION, "Parsed as string: %s.\n", decoded_str.c_str());
         return std::move(decoded_str);

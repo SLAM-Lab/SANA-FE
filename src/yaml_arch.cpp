@@ -109,31 +109,31 @@ sanafe::ModelInfo sanafe::yaml_parse_processing_unit_attributes(
     const ryml::ConstNodeRef energy_node = attributes.find_child("log_energy");
     if (!energy_node.invalid())
     {
-        energy_node >> model_details.log_energy;
+        energy_node.load(&model_details.log_energy);
     }
 
     const ryml::ConstNodeRef latency_node =
             attributes.find_child("log_latency");
     if (!latency_node.invalid())
     {
-        latency_node >> model_details.log_latency;
+        latency_node.load(&model_details.log_latency);
     }
 
     const ryml::ConstNodeRef update_node =
             attributes.find_child("update_every_timestep");
     if (!update_node.invalid())
     {
-        update_node >> model_details.update_every_timestep;
+        update_node.load(&model_details.update_every_timestep);
     }
 
     // Handle plugin path NOLINTNEXTLINE(misc-include-cleaner)
     const ryml::ConstNodeRef plugin_path_node = attributes.find_child("plugin");
     if (!plugin_path_node.invalid())
     {
-        if (plugin_path_node.has_val())
+        if (plugin_path_node.has_val() && !plugin_path_node.val_is_null())
         {
             std::string plugin_path;
-            plugin_path_node >> plugin_path;
+            plugin_path_node.load(&plugin_path);
             model_details.plugin_library_path = plugin_path;
         }
         else
@@ -330,12 +330,12 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
             attributes.find_child("buffer_inside_unit");
     if (!buffer_inside_node.invalid())
     {
-        buffer_inside_node >> buffer_inside_unit;
+        buffer_inside_node.load(&buffer_inside_unit);
     }
     const ryml::ConstNodeRef energy_node = attributes.find_child("log_energy");
     if (!energy_node.invalid())
     {
-        energy_node >> pipeline_config.log_energy;
+        energy_node.load(&pipeline_config.log_energy);
     }
 
     pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
@@ -376,7 +376,7 @@ sanafe::TilePowerMetrics sanafe::description_parse_tile_metrics_yaml(
     if (!attributes.find_child("log_energy").invalid())
     {
         const ryml::ConstNodeRef energy = attributes["log_energy"];
-        energy >> tile_metrics.log_energy;
+        energy.load(&tile_metrics.log_energy);
     }
 
     return tile_metrics;
@@ -386,7 +386,7 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
         const ryml::ConstNodeRef tile_node, Architecture &arch)
 {
     std::string tile_name;
-    tile_node["name"] >> tile_name;
+    tile_node["name"].load(&tile_name);
     std::pair<size_t, size_t> range = {0UL, 0UL};
 
     if (tile_name.find(range_delimiter) != std::string::npos)
@@ -481,7 +481,7 @@ sanafe::LookupTable<double> sanafe::yaml_parse_sync_delay_table(
             for (const auto &value_node : delay_node)
             {
                 double delay_value = 0.0;
-                value_node >> delay_value;
+                value_node.load(&delay_value);
                 table.values[tile_index++] = delay_value;
             }
         }
@@ -492,15 +492,15 @@ sanafe::LookupTable<double> sanafe::yaml_parse_sync_delay_table(
             {
                 size_t tile_id = 0UL;
                 double delay_value = 0.0;
-                pair >> ryml::key(tile_id);
-                pair >> delay_value;
+                pair.load_key(&tile_id);
+                pair.load(&delay_value);
                 table.values[tile_id] = delay_value;
             }
         }
         else // if single YAML scalar value given
         {
             double delay_value = 0.0;
-            delay_node >> delay_value;
+            delay_node.load(&delay_value);
             table.values[0] = delay_value;
         }
         INFO("Setting (%zu) sync latency values \n", table.values.size());
@@ -524,7 +524,7 @@ sanafe::Architecture sanafe::description_parse_arch_section_yaml(
                 arch_node);
     }
     std::string arch_name;
-    arch_node["name"] >> arch_name;
+    arch_node["name"].load(&arch_name);
     if (arch_name.find('[') != std::string::npos)
     {
         throw YamlDescriptionParsingError(

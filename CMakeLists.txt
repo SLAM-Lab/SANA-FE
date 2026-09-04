@@ -146,7 +146,7 @@ endif()
 
 ############## rapid-yaml
 #project(ryml-quickstart LANGUAGES CXX)
-set(RYML_VERSION "v0.15.0")
+set(RYML_VERSION "v0.16.0")
 message(STATUS "FetchContent for tag: ${RYML_VERSION}")
 set(RYML_INSTALL OFF)
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "Make ryml throw on errors" FORCE)
