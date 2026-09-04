@@ -284,22 +284,14 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
 sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
         const std::string &buffer_pos_str, const bool buffer_inside_unit)
 {
-    BufferPosition buffer_pos{buffer_before_dendrite_unit};
+    BufferPosition buffer_pos{buffer_before_soma_unit};
     // H/w either has SANA-FE insert and manage a time-step buffer on the h/w
     //  unit's inputs (before the unit), or can assume that the unit manages its
     //  own state that is internally buffered over consecutive time-steps e.g.,
     //  using a double buffer
-
-    if (buffer_pos_str == "dendrite")
+    if (buffer_pos_str == "dendrite" && buffer_inside_unit)
     {
-        if (buffer_inside_unit)
-        {
-            buffer_pos = buffer_inside_dendrite_unit;
-        }
-        else
-        {
-            buffer_pos = buffer_before_dendrite_unit;
-        }
+        buffer_pos = buffer_inside_dendrite_unit;
     }
     else if (buffer_pos_str == "soma")
     {

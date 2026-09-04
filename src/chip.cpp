@@ -712,8 +712,7 @@ void sanafe::SpikingChip::receive_message(Message &m)
 void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
 {
     Core &c = *(n.core);
-    const bool simulate_buffer = (c.pipeline_config.buffer_position ==
-                                         buffer_before_dendrite_unit) ||
+    const bool simulate_buffer =
             (c.pipeline_config.buffer_position == buffer_before_soma_unit);
 
     PipelineResult input{};
@@ -1015,6 +1014,12 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
                 sanafe::PipelineResult result =
                         n.dendrite_hw->update(n.mapped_dendrite_hw_address,
                                 std::nullopt, std::nullopt, ts.timestep);
+                if ((core.pipeline_config.buffer_position ==
+                            buffer_before_soma_unit))
+                {
+                    core.timestep_buffer.at(n.mapped_offset_within_core)
+                            .current = result.current;
+                }
                 if (result.energy.has_value())
                 {
                     n.dendrite_hw->energy += result.energy.value();

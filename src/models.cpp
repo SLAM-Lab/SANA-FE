@@ -119,7 +119,7 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
     {
         // Integrate input charges
         const size_t syn = synapse_address.value_or(0UL);
-        const size_t delay = (syn < delays.size()) ? delays[syn] : 0UL;
+        const size_t delay = (syn < delays.size()) ? delays[syn] : 1UL;
         next_accumulated_charges[delay - 1][neuron_address] =
                 next_accumulated_charges[delay - 1][neuron_address].value_or(
                         0.0) +

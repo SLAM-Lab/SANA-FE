@@ -42,7 +42,7 @@ void sanafe::MappedConnection::build_message_processing_pipeline()
     //  affect the results)
     message_processing_pipeline.push_back(synapse_hw);
     if ((mapped_core.pipeline_config.buffer_position >
-                buffer_before_dendrite_unit) &&
+                buffer_inside_dendrite_unit) &&
             (n.dendrite_hw != synapse_hw))
     {
         message_processing_pipeline.push_back(n.dendrite_hw);
@@ -166,9 +166,10 @@ void sanafe::MappedNeuron::set_attributes(
 void sanafe::MappedNeuron::build_neuron_processing_pipeline()
 {
     bool dendrite_hw_added = false;
-    if (core->pipeline_config.buffer_position < buffer_before_dendrite_unit)
+    if (core->pipeline_config.buffer_position < buffer_inside_dendrite_unit)
     {
-        throw std::runtime_error("Error: Buffer must be after synaptic h/w");
+        throw std::runtime_error(
+                "Error: Buffer must be inside or after dendrite h/w");
     }
     if (core->pipeline_config.buffer_position <= buffer_inside_dendrite_unit)
     {
