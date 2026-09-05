@@ -377,11 +377,69 @@ private:
     bool send_spike{false};
 };
 
+constexpr int sango_max_compartments{1024};
+
+// A baseline LIF that is faithful to the Sango DSL's own LIF model, rather
+//  than to any particular chip. Parameter names and update order match
+//  sango.model.LIF and the reference Brian 2 backend exactly, so that a Sango
+//  network simulated here produces the same spike train it would in Brian or
+//  STACS. Use `leaky_integrate_fire` instead when you want Loihi's behavior.
+//
+// Per time-step, for each compartment:
+//   v += input current   (spikes emitted in the previous time-step)
+//   v += bias
+//   if (v > threshold) { fire; v = reset; }
+//   v *= (1 - leak)
+//
+// Note that `leak` is the fraction of the potential *lost* each step, which is
+//  the Sango/Fugu convention and the opposite of Loihi's `leak_decay`.
+class SangoLifModel : public SomaUnit
+{
+public:
+    SangoLifModel() { register_attributes(sango_lif_attributes); }
+    SangoLifModel(const SangoLifModel &copy) = delete;
+    SangoLifModel(SangoLifModel &&other) = delete;
+    ~SangoLifModel() override = default;
+    SangoLifModel &operator=(const SangoLifModel &other) = delete;
+    SangoLifModel &operator=(SangoLifModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
+    void reset() override;
+    double get_potential(const size_t neuron_address) override
+    {
+        return compartments[neuron_address].voltage;
+    }
+
+    struct SangoCompartment
+    {
+        double voltage{0.0};
+        double threshold{1.0};
+        double reset{0.0};
+        double bias{0.0};
+        double leak{1.0};
+    };
+
+    static inline const std::unordered_map<std::string, std::string> sango_lif_attributes{
+            {"voltage", "(float) Membrane potential. Default=0.0"},
+            {"threshold", "(float) Fires when v > threshold, then v <- reset. Default=1.0"},
+            {"reset", "(float) The potential to reset to after a spike. Default=0.0"},
+            {"bias", "(float) Bias applied every step before the threshold check. Default=0.0"},
+            {"leak", "(float) Fraction of potential lost every step: v <- v*(1-leak). Default=1.0 (full leak)"},
+    };
+
+private:
+    std::vector<SangoCompartment> compartments{sango_max_compartments};
+};
+
+
 std::shared_ptr<PipelineUnit> model_get_pipeline_unit(const std::string &model_name);
 NeuronResetModes model_parse_reset_mode(const std::string &str);
 
 using ModelMap = std::map<std::string, const std::unordered_map<std::string, std::string>*>;
 const ModelMap &get_builtin_models();
+
 }
 
 

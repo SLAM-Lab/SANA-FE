@@ -937,6 +937,84 @@ sanafe::PipelineResult sanafe::InputModel::update(
     return output;
 }
 
+void sanafe::SangoLifModel::set_attribute_neuron(const size_t neuron_address,
+        const std::string &attribute_name, const ModelAttribute &param)
+{
+    SangoCompartment &cx = compartments.at(neuron_address);
+
+    if (attribute_name == "voltage")
+    {
+        cx.voltage = static_cast<double>(param);
+    }
+    else if (attribute_name == "threshold")
+    {
+        cx.threshold = static_cast<double>(param);
+    }
+    else if (attribute_name == "reset")
+    {
+        cx.reset = static_cast<double>(param);
+    }
+    else if (attribute_name == "bias")
+    {
+        cx.bias = static_cast<double>(param);
+    }
+    else if (attribute_name == "leak")
+    {
+        cx.leak = static_cast<double>(param);
+    }
+
+    TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
+}
+
+void sanafe::SangoLifModel::reset()
+{
+    for (SangoCompartment &cx : compartments)
+    {
+        cx.voltage = 0.0;
+    }
+}
+
+sanafe::PipelineResult sanafe::SangoLifModel::update(const size_t neuron_address,
+        const std::optional<double> current_in,
+        const long int /*simulation_time*/)
+{
+    SangoCompartment &cx = compartments.at(neuron_address);
+
+    sanafe::NeuronStatus state = sanafe::idle;
+    if ((std::fabs(cx.voltage) > 0.0) || current_in.has_value() ||
+            (std::fabs(cx.bias) > 0.0) || (cx.leak < 1.0))
+    {
+        state = sanafe::updated;
+    }
+
+    // Integrate the current from spikes sent in the previous time-step, then
+    //  the bias. This matches Sango's Brian model, where the 'synapses'
+    //  slot runs at the end of a step and the 'groups' bias update runs at
+    //  the start of the next one.
+    cx.voltage += current_in.value_or(0.0);
+    cx.voltage += cx.bias;
+
+    TRACE1(MODELS, "Updating potential (cx:%zu), v:%lf\n", neuron_address,
+            cx.voltage);
+
+    const bool fired = (cx.voltage > cx.threshold);
+
+    // The leak is applied after the threshold check but before the reset is
+    //  written, so the reset value itself is never leaked. This matches the
+    //  ordering of the 'resets' in Sango's reference Brian 2 backend.
+    cx.voltage *= (1.0 - cx.leak);
+    if (fired)
+    {
+        cx.voltage = cx.reset;
+        state = sanafe::fired;
+        TRACE1(MODELS, "Neuron fired.\n");
+    }
+
+    PipelineResult output{};
+    output.status = state;
+    return output;
+}
+
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 {
     sanafe::NeuronResetModes reset_mode{sanafe::neuron_no_reset};
@@ -996,6 +1074,10 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     {
         return std::shared_ptr<PipelineUnit>(new TrueNorthModel());
     }
+    if (model_name == "sango_lif")
+    {
+        return std::shared_ptr<PipelineUnit>(new SangoLifModel());
+    }
     const std::string error =
             "Pipeline model not supported (" + model_name + ")\n";
     throw std::invalid_argument(error);
@@ -1016,7 +1098,8 @@ const sanafe::ModelMap &sanafe::get_builtin_models()
                     {"input", &InputModel::input_attributes},
                     {"leaky_integrate_fire",
                             &LoihiLifModel::loihi_lif_attributes},
-                    {"truenorth", &TrueNorthModel::truenorth_attributes}};
+                    {"truenorth", &TrueNorthModel::truenorth_attributes},
+                    {"sango", &SangoLifModel::sango_lif_attributes}};
 
     return builtin_models;
 }
