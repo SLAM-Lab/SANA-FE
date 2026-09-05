@@ -1015,6 +1015,251 @@ sanafe::PipelineResult sanafe::SangoLifModel::update(const size_t neuron_address
     return output;
 }
 
+void sanafe::SangoProbLifModel::set_attribute_neuron(
+        const size_t neuron_address, const std::string &attribute_name,
+        const ModelAttribute &param)
+{
+    SangoProbCompartment &cx = compartments.at(neuron_address);
+
+    if (attribute_name == "voltage")
+    {
+        cx.voltage = static_cast<double>(param);
+    }
+    else if (attribute_name == "threshold")
+    {
+        cx.threshold = static_cast<double>(param);
+    }
+    else if (attribute_name == "reset")
+    {
+        cx.reset = static_cast<double>(param);
+    }
+    else if (attribute_name == "bias")
+    {
+        cx.bias = static_cast<double>(param);
+    }
+    else if (attribute_name == "leak")
+    {
+        cx.leak = static_cast<double>(param);
+    }
+    else if (attribute_name == "prob")
+    {
+        cx.prob = static_cast<double>(param);
+    }
+}
+
+void sanafe::SangoProbLifModel::reset()
+{
+    for (SangoProbCompartment &cx : compartments)
+    {
+        cx.voltage = 0.0;
+    }
+}
+
+sanafe::PipelineResult sanafe::SangoProbLifModel::update(
+        const size_t neuron_address, const std::optional<double> current_in,
+        const long int /*simulation_time*/)
+{
+    SangoProbCompartment &cx = compartments.at(neuron_address);
+
+    sanafe::NeuronStatus state = sanafe::idle;
+    if ((std::fabs(cx.voltage) > 0.0) || current_in.has_value() ||
+            (std::fabs(cx.bias) > 0.0) || (cx.leak < 1.0))
+    {
+        state = sanafe::updated;
+    }
+
+    cx.voltage += current_in.value_or(0.0);
+    cx.voltage += cx.bias;
+
+    // Crossing the threshold always resets, but only emits a spike with
+    //  probability `prob`
+    const bool crossed = (cx.voltage > cx.threshold);
+    if (crossed && (uniform_distribution(gen) <= cx.prob))
+    {
+        state = sanafe::fired;
+    }
+
+    cx.voltage *= (1.0 - cx.leak);
+    if (crossed)
+    {
+        cx.voltage = cx.reset;
+    }
+
+    PipelineResult output{};
+    output.status = state;
+    return output;
+}
+
+void sanafe::SangoCubaDendriteModel::set_attribute_neuron(
+        const size_t neuron_address, const std::string &attribute_name,
+        const ModelAttribute &param)
+{
+    CubaConductances &cx = compartments.at(neuron_address);
+
+    if (attribute_name == "taue")
+    {
+        cx.taue = static_cast<double>(param);
+    }
+    else if (attribute_name == "taui")
+    {
+        cx.taui = static_cast<double>(param);
+    }
+    else if (attribute_name == "dt")
+    {
+        cx.dt = static_cast<double>(param);
+    }
+    else
+    {
+        return;
+    }
+
+    // One of the constants changed, so refresh everything derived from them
+    recalculate_constants(cx);
+}
+
+void sanafe::SangoCubaDendriteModel::set_attribute_edge(const size_t synapse_address,
+        const std::string &attribute_name, const ModelAttribute &param)
+{
+    if (channels.size() <= synapse_address)
+    {
+        channels.resize(synapse_address + 1UL, 0);
+    }
+    if (attribute_name == "channel")
+    {
+        channels.at(synapse_address) = static_cast<int>(param);
+    }
+}
+
+void sanafe::SangoCubaDendriteModel::reset()
+{
+    for (CubaConductances &cx : compartments)
+    {
+        cx.excitatory = 0.0;
+        cx.inhibitory = 0.0;
+        cx.timesteps_simulated = 0L;
+    }
+}
+
+sanafe::PipelineResult sanafe::SangoCubaDendriteModel::update(
+        const size_t neuron_address, const std::optional<double> current,
+        const std::optional<size_t> synapse_address,
+        const long int simulation_time)
+{
+    CubaConductances &cx = compartments.at(neuron_address);
+
+    // Decay once per time-step, on the first read. Repeated reads within a
+    //  step return the same running total
+    while (cx.timesteps_simulated < simulation_time)
+    {
+        ++(cx.timesteps_simulated);
+        cx.excitatory *= cx.decay_excitatory;
+        cx.inhibitory *= cx.decay_inhibitory;
+    }
+
+    if (current.has_value())
+    {
+        const size_t syn = synapse_address.value_or(0UL);
+        const int channel = (syn < channels.size()) ? channels[syn] : 0;
+        if (channel == 0)
+        {
+            cx.excitatory += current.value();
+        }
+        else
+        {
+            cx.inhibitory += current.value();
+        }
+    }
+
+    // The soma only needs the sum, so the two channels can stay here
+    PipelineResult output{};
+    output.current = cx.excitatory + cx.inhibitory;
+    return output;
+}
+
+void sanafe::SangoCubaSomaModel::set_attribute_neuron(const size_t neuron_address,
+        const std::string &attribute_name, const ModelAttribute &param)
+{
+    CubaCompartment &cx = compartments.at(neuron_address);
+
+    if (attribute_name == "v")
+    {
+        cx.voltage = static_cast<double>(param);
+    }
+    else if (attribute_name == "Vt")
+    {
+        cx.threshold = static_cast<double>(param);
+    }
+    else if (attribute_name == "Vr")
+    {
+        cx.reset = static_cast<double>(param);
+    }
+    else if (attribute_name == "El")
+    {
+        cx.rest = static_cast<double>(param);
+    }
+    else if (attribute_name == "taum")
+    {
+        cx.taum = static_cast<double>(param);
+    }
+    else if (attribute_name == "tref")
+    {
+        cx.tref = static_cast<double>(param);
+    }
+    else if (attribute_name == "dt")
+    {
+        cx.dt = static_cast<double>(param);
+    }
+
+    if ((attribute_name == "taum") || (attribute_name == "tref") ||
+            (attribute_name == "dt"))
+    {
+        recalculate_constants(cx);
+    }
+}
+
+void sanafe::SangoCubaSomaModel::reset()
+{
+    for (CubaCompartment &cx : compartments)
+    {
+        cx.voltage = 0.0;
+        cx.refractory_left = 0L;
+    }
+}
+
+sanafe::PipelineResult sanafe::SangoCubaSomaModel::update(
+        const size_t neuron_address, const std::optional<double> current_in,
+        const long int /*simulation_time*/)
+{
+    CubaCompartment &cx = compartments.at(neuron_address);
+    sanafe::NeuronStatus state = sanafe::updated;
+
+    if (cx.refractory_left > 0L)
+    {
+        // Brian's '(unless refractory)': the potential is held, and the
+        //  threshold is not evaluated
+        --(cx.refractory_left);
+        PipelineResult held{};
+        held.status = state;
+        return held;
+    }
+
+    // Exponential-Euler step, treating the conductance as constant over dt
+    const double input = current_in.value_or(0.0);
+    cx.voltage = cx.rest + input +
+            ((cx.voltage - cx.rest - input) * cx.decay_voltage);
+
+    if (cx.voltage > cx.threshold)
+    {
+        cx.voltage = cx.reset;
+        state = sanafe::fired;
+        cx.refractory_left = cx.refractory_steps;
+    }
+
+    PipelineResult output{};
+    output.status = state;
+    return output;
+}
+
 sanafe::NeuronResetModes sanafe::model_parse_reset_mode(const std::string &str)
 {
     sanafe::NeuronResetModes reset_mode{sanafe::neuron_no_reset};
@@ -1078,6 +1323,21 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     {
         return std::shared_ptr<PipelineUnit>(new SangoLifModel());
     }
+    if (model_name == "sango_plif")
+    {
+        return std::shared_ptr<PipelineUnit>(new SangoProbLifModel());
+    }
+    // Sango notebook/demo specific
+    // TODO: break into plug-ins before integrating?
+
+    if (model_name == "sango_cuba_dendrite")
+    {
+        return std::shared_ptr<PipelineUnit>(new SangoCubaDendriteModel());
+    }
+        if (model_name == "sango_cuba_soma")
+    {
+        return std::shared_ptr<PipelineUnit>(new SangoCubaSomaModel());
+    }
     const std::string error =
             "Pipeline model not supported (" + model_name + ")\n";
     throw std::invalid_argument(error);
@@ -1099,7 +1359,13 @@ const sanafe::ModelMap &sanafe::get_builtin_models()
                     {"leaky_integrate_fire",
                             &LoihiLifModel::loihi_lif_attributes},
                     {"truenorth", &TrueNorthModel::truenorth_attributes},
-                    {"sango", &SangoLifModel::sango_lif_attributes}};
+                    {"sango", &SangoLifModel::sango_lif_attributes},
+                    // Sango notebook/demo specific
+                    // TODO: break into plug-ins before integrating?
+                    {"sango_plif", &SangoProbLifModel::sango_plif_attributes},
+                    {"sango_cuba_dendrite",
+                            &SangoCubaDendriteModel::cuba_dendrite_attributes},
+                    {"sango_cuba_soma", &SangoCubaSomaModel::cuba_soma_attributes}};
 
     return builtin_models;
 }

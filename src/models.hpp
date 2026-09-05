@@ -433,6 +433,162 @@ private:
     std::vector<SangoCompartment> compartments{sango_max_compartments};
 };
 
+// Probabilistic LIF, matching sango.model.pLIF. Identical to SangoLifModel
+//  except that crossing the threshold resets the neuron unconditionally but
+//  only emits a spike with probability `prob`.
+class SangoProbLifModel : public SomaUnit
+{
+public:
+    SangoProbLifModel() { register_attributes(sango_plif_attributes); }
+    SangoProbLifModel(const SangoProbLifModel &copy) = delete;
+    SangoProbLifModel(SangoProbLifModel &&other) = delete;
+    ~SangoProbLifModel() override = default;
+    SangoProbLifModel &operator=(const SangoProbLifModel &other) = delete;
+    SangoProbLifModel &operator=(SangoProbLifModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
+    void reset() override;
+    double get_potential(const size_t neuron_address) override
+    {
+        return compartments[neuron_address].voltage;
+    }
+
+    struct SangoProbCompartment
+    {
+        double voltage{0.0};
+        double threshold{1.0};
+        double reset{0.0};
+        double bias{0.0};
+        double leak{1.0};
+        double prob{1.0};
+    };
+
+    static inline const std::unordered_map<std::string, std::string> sango_plif_attributes{
+            {"voltage", "(float) Membrane potential. Default=0.0"},
+            {"threshold", "(float) Crosses when v > threshold. Default=1.0"},
+            {"reset", "(float) Potential to reset to after crossing. Default=0.0"},
+            {"bias", "(float) Bias applied every step. Default=0.0"},
+            {"leak", "(float) Fraction of potential lost every step. Default=1.0"},
+            {"prob", "(float) Probability of emitting a spike once the threshold is crossed. Default=1.0"},
+    };
+
+private:
+    std::vector<SangoProbCompartment> compartments{sango_max_compartments};
+    std::uniform_real_distribution<double> uniform_distribution{0.0, 1.0};
+    // Fixed seed, for deterministic results across runs
+    std::mt19937 gen{42};
+};
+
+// Synaptic conductances for a current-based (CUBA) neuron. Two channels with
+//  independent exponential decay, selected per-edge by the `channel`
+//  attribute
+class SangoCubaDendriteModel : public DendriteUnit
+{
+public:
+    SangoCubaDendriteModel() { register_attributes(cuba_dendrite_attributes); }
+    SangoCubaDendriteModel(const SangoCubaDendriteModel &copy) = delete;
+    SangoCubaDendriteModel(SangoCubaDendriteModel &&other) = delete;
+    ~SangoCubaDendriteModel() override = default;
+    SangoCubaDendriteModel &operator=(const SangoCubaDendriteModel &other) = delete;
+    SangoCubaDendriteModel &operator=(SangoCubaDendriteModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, std::optional<size_t> synapse_address, long int simulation_time) override;
+    void reset() override;
+
+    struct CubaConductances
+    {
+        double excitatory{0.0};
+        double inhibitory{0.0};
+        double taue{5.0};
+        double taui{10.0};
+        double dt{1.0};
+        // Derived from dt and the time constants above. Recalculated whenever
+        //  one of them is set, never in update()
+        double decay_excitatory{std::exp(-1.0 / 5.0)};
+        double decay_inhibitory{std::exp(-1.0 / 10.0)};
+        long int timesteps_simulated{0L};
+    };
+
+    static inline const std::unordered_map<std::string, std::string> cuba_dendrite_attributes{
+            {"taue", "(float) Excitatory decay time constant, same units as dt. Default=5.0"},
+            {"taui", "(float) Inhibitory decay time constant, same units as dt. Default=10.0"},
+            {"dt", "(float) Duration of one time-step. Default=1.0"},
+            {"channel", "(int) Per-edge: 0 for the excitatory channel, 1 for the inhibitory one. Default=0"},
+    };
+
+private:
+    static void recalculate_constants(CubaConductances &cx)
+    {
+        cx.decay_excitatory = std::exp(-cx.dt / cx.taue);
+        cx.decay_inhibitory = std::exp(-cx.dt / cx.taui);
+    }
+
+    std::vector<CubaConductances> compartments{sango_max_compartments};
+    std::vector<int> channels;
+};
+
+// CUBA soma: dv/dt = (I - (v - El)) / taum, with a refractory period
+class SangoCubaSomaModel : public SomaUnit
+{
+public:
+    SangoCubaSomaModel() { register_attributes(cuba_soma_attributes); }
+    SangoCubaSomaModel(const SangoCubaSomaModel &copy) = delete;
+    SangoCubaSomaModel(SangoCubaSomaModel &&other) = delete;
+    ~SangoCubaSomaModel() override = default;
+    SangoCubaSomaModel &operator=(const SangoCubaSomaModel &other) = delete;
+    SangoCubaSomaModel &operator=(SangoCubaSomaModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
+    void reset() override;
+    double get_potential(const size_t neuron_address) override
+    {
+        return compartments[neuron_address].voltage;
+    }
+
+    struct CubaCompartment
+    {
+        double voltage{0.0};
+        double threshold{10.0};   // Vt
+        double reset{0.0};        // Vr
+        double rest{5.0};         // El
+        double taum{20.0};
+        double tref{0.0};
+        double dt{1.0};
+        // Derived from the values above, recalculated when any of them is set
+        double decay_voltage{std::exp(-1.0 / 20.0)};
+        long int refractory_steps{0L};
+        long int refractory_left{0L};
+    };
+
+    static inline const std::unordered_map<std::string, std::string> cuba_soma_attributes{
+            {"v", "(float) Membrane potential. Default=0.0"},
+            {"Vt", "(float) Firing threshold. Default=10.0"},
+            {"Vr", "(float) Reset potential. Default=0.0"},
+            {"El", "(float) Resting potential. Default=5.0"},
+            {"taum", "(float) Membrane time constant, same units as dt. Default=20.0"},
+            {"tref", "(float) Refractory period, same units as dt. Default=0.0"},
+            {"dt", "(float) Duration of one time-step. Default=1.0"},
+    };
+
+private:
+    static void recalculate_constants(CubaCompartment &cx)
+    {
+        cx.decay_voltage = std::exp(-cx.dt / cx.taum);
+        cx.refractory_steps = (cx.tref > 0.0) ?
+                static_cast<long int>(std::lround(cx.tref / cx.dt)) :
+                0L;
+    }
+
+    std::vector<CubaCompartment> compartments{sango_max_compartments};
+};
+
 
 std::shared_ptr<PipelineUnit> model_get_pipeline_unit(const std::string &model_name);
 NeuronResetModes model_parse_reset_mode(const std::string &str);
