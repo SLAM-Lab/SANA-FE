@@ -25,10 +25,13 @@ void sanafe::PipelineUnit::check_implemented(
     if (check_implements_synapse != implements_synapse)
     {
         const std::string error = check_implements_synapse ?
-                "Unit does not support synapse functionality, remove from arch "
-                "description's 'synapse' section" :
-                "Unit supports synapse functionality but was not added to "
-                "'synapse' hardware section. Add it or pick a different model.";
+                "Unit " + name + " (model: " + model +
+                        ") does not support synapse functionality, "
+                        "remove from arch description's 'synapse' section" :
+                "Unit " + name + " (model: " + model +
+                        ") supports synapse functionality but was not added to "
+                        "'synapse' hardware section. "
+                        "Add it or pick a different model.";
         INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
@@ -36,10 +39,13 @@ void sanafe::PipelineUnit::check_implemented(
     if (check_implements_dendrite != implements_dendrite)
     {
         const std::string error = check_implements_dendrite ?
-                "Unit does not support dendrite functionality, remove from arch "
-                "description's 'dendrite' section" :
-                "Unit supports dendrite functionality but was not added to "
-                "'dendrite' hardware section. Add it or pick a different model.";
+                "Unit " + name + " (model: " + model +
+                        ") does not support dendrite functionality, "
+                        "remove from arch description's 'dendrite' section" :
+                "Unit " + name + " (model: " + model +
+                        ") supports dendrite functionality but was not added "
+                        "to 'dendrite' hardware section. "
+                        "Add it or pick a different model.";
         INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
@@ -47,10 +53,13 @@ void sanafe::PipelineUnit::check_implemented(
     if (check_implements_soma != implements_soma)
     {
         const std::string error = check_implements_soma ?
-                "Unit does not support soma functionality, remove from arch "
-                "description's 'soma' section" :
-                "Unit supports soma functionality but was not added to "
-                "'soma' hardware section. Add it or pick a different model.";
+                "Unit " + name + " (model: " + model +
+                        ") does not support soma functionality, "
+                        "remove from arch description's 'soma' section" :
+                "Unit " + name + " (model: " + model +
+                        ") supports soma functionality but was not added to "
+                        "'soma' hardware section. "
+                        "Add it or pick a different model.";
         INFO("Error: %s\n", error.c_str());
         throw std::runtime_error(error);
     }
