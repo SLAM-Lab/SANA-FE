@@ -101,7 +101,7 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
 
     while (timesteps_simulated[neuron_address] < simulation_time)
     {
-        // Apply leak for 1 or more timesteps
+        // Process the next timestep
         ++(timesteps_simulated[neuron_address]);
 
         // TODO: suppress bounds checking here for speed
@@ -120,14 +120,27 @@ sanafe::PipelineResult sanafe::AccumulatorWithDelayModel::update(
         // Integrate input charges
         const size_t syn = synapse_address.value_or(0UL);
         const size_t delay = (syn < delays.size()) ? delays[syn] : 1UL;
-        next_accumulated_charges[delay - 1][neuron_address] =
-                next_accumulated_charges[delay - 1][neuron_address].value_or(
-                        0.0) +
-                current.value();
+        if (delay <= 1UL)
+        {
+            // No additional delay, write it immediately to the accumulated
+            //  charge for this step (basically the same as the simpler
+            //  Accumulator model)
+            accumulated_charges[neuron_address] =
+                    accumulated_charges[neuron_address].value_or(0.0) +
+                    current.value();
+        }
+        else
+        {
+            const size_t delay_slot = delay - 2UL;
+            // Add additional delay, store it into a shift register
+            next_accumulated_charges[delay_slot][neuron_address] =
+                    next_accumulated_charges[delay_slot][neuron_address]
+                            .value_or(0.0) +
+                    current.value();
+        }
     }
 
     output.current = accumulated_charges[neuron_address];
-
     return output;
 }
 // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
