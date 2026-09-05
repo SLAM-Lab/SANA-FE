@@ -163,7 +163,7 @@ sanafe::ModelAttribute pyobject_to_model_attribute(
     }
     else if (is_float)
     {
-        attribute.value = pybind11::cast<float>(value);
+        attribute.value = pybind11::cast<double>(value);
         TRACE1(PYMODULE, "Converted float to attribute\n");
     }
     else if (pybind11::isinstance<pybind11::dict>(value))
