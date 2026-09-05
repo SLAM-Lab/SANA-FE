@@ -63,7 +63,19 @@ struct ModelAttribute
     }
     operator int() const
     {
-        return std::get<int>(value);
+        if (std::holds_alternative<int>(value))
+        {
+            return std::get<int>(value);
+        }
+
+        std::string error = "Error: Attribute '";
+        if (name.has_value())
+        {
+            error += name.value();
+            error += "' ";
+        }
+        error += "cannot be cast to an int";
+        throw std::runtime_error(error);
     }
     operator double() const
     {
