@@ -1302,7 +1302,6 @@ PYBIND11_MODULE(sanafecpp, m)
                     pybind11::arg("log_energy") = false)
             .def("__repr__", &pycore_config_repr)
             .def_readonly("name", &sanafe::CoreConfiguration::name)
-            .def_readonly("offset", &sanafe::CoreConfiguration::offset)
             .def_readonly("axon_in", &sanafe::CoreConfiguration::axon_in)
             .def_readonly(
                     "pipeline_hw", &sanafe::CoreConfiguration::pipeline_hw)
