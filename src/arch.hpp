@@ -40,7 +40,6 @@ namespace sanafe
 
 enum BufferPosition : uint8_t
 {
-    buffer_before_dendrite_unit = 0U,
     buffer_inside_dendrite_unit = 1U,
     buffer_before_soma_unit = 2U,
     buffer_inside_soma_unit = 3U,

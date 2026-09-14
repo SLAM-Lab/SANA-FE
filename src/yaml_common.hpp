@@ -56,6 +56,11 @@ T yaml_required_field(const ryml::Parser &parser,
         const std::string message = "'" + key + "' value should be a scalar";
         throw YamlDescriptionParsingError(message, parser, field_node);
     }
+    if (field_node.val_is_null())
+    {
+        const std::string message = "'" + key + "' has no value";
+        throw YamlDescriptionParsingError(message, parser, field_node);
+    }
 
     T field{};
     // Efficiently convert to type T by trying the RapidYAML reader.
@@ -79,8 +84,8 @@ std::optional<T> yaml_optional_field(
     if (!(node.find_child(key.c_str()).invalid()))
     {
         // A few redundant steps needed so that RapidYAML doesn't complain
-        T value;
-        node[key.c_str()] >> value;
+        T value{};
+        node[key.c_str()].load(&value);
         optional_value = value;
     }
 

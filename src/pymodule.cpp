@@ -163,7 +163,7 @@ sanafe::ModelAttribute pyobject_to_model_attribute(
     }
     else if (is_float)
     {
-        attribute.value = pybind11::cast<float>(value);
+        attribute.value = pybind11::cast<double>(value);
         TRACE1(PYMODULE, "Converted float to attribute\n");
     }
     else if (pybind11::isinstance<pybind11::dict>(value))
@@ -1024,9 +1024,10 @@ PYBIND11_MODULE(sanafecpp, m)
     m.attr("model_attributes") = sanafe::get_builtin_models();
 
     pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
-            .value("buffer_before_dendrite_unit",
-                    sanafe::buffer_before_dendrite_unit)
+            .value("buffer_inside_dendrite_unit",
+                    sanafe::buffer_inside_dendrite_unit)
             .value("buffer_before_soma_unit", sanafe::buffer_before_soma_unit)
+            .value("buffer_inside_soma_unit", sanafe::buffer_inside_soma_unit)
             .value("buffer_before_axon_out_unit",
                     sanafe::buffer_before_axon_out_unit)
             .value("buffer_positions", sanafe::buffer_positions);

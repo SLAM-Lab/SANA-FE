@@ -62,8 +62,9 @@ class TestModuleSurface(unittest.TestCase):
     def test_buffer_position_enum(self):
         bp = getattr(sanafe, "BufferPosition", None)
         self.assertIsNotNone(bp)
-        for member in ("buffer_before_dendrite_unit", "buffer_before_soma_unit",
-                       "buffer_before_axon_out_unit", "buffer_positions"):
+        for member in ("buffer_inside_dendrite_unit", "buffer_before_soma_unit",
+                       "buffer_inside_soma_unit", "buffer_before_axon_out_unit",
+                       "buffer_positions"):
             self.assertTrue(hasattr(bp, member), f"enum missing {member}")
 
     def test_hardware_mapping_error_exposed(self):
