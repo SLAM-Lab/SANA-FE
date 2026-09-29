@@ -966,7 +966,7 @@ public:
 };
 
 size_t pyconnect_to_neuron(const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
-        const pybind11::object &attr)
+        const pybind11::object &attr, const pybind11::object &synapse_hw_name)
 {
     // Extract the actual neuron from the destination ref
     sanafe::Neuron &dest = *(dest_ref.get());
@@ -976,6 +976,7 @@ size_t pyconnect_to_neuron(const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
     {
         attr_dict = pybind11::cast<pybind11::dict>(attr);
     }
+
     const size_t con_idx = ref.get()->connect_to_neuron(dest);
     sanafe::Connection &con = ref.get()->edges_out[con_idx];
     const auto attributes = pydict_to_model_attributes(attr_dict);
@@ -990,6 +991,13 @@ size_t pyconnect_to_neuron(const PyNeuronRef &ref, const PyNeuronRef &dest_ref,
             con.dendrite_attributes[key] = attribute;
         }
     }
+
+    // The user can optionally specify h/w mappings for the connection
+    if (!synapse_hw_name.is_none())
+    {
+        con.synapse_hw_name = pybind11::cast<std::string>(synapse_hw_name);
+    }
+
     return con_idx;
 }
 
@@ -1199,7 +1207,8 @@ PYBIND11_MODULE(sanafecpp, m)
             .def("connect_to_neuron", &pyconnect_to_neuron,
                     docstrings::neuron_connect_to_neuron_doc,
                     pybind11::arg("dest_neuron"),
-                    pybind11::arg("attributes") = pybind11::none())
+                    pybind11::arg("attributes") = pybind11::none(),
+                    pybind11::arg("synapse_hw_name") = pybind11::none())
             // Expose edges_out as a property
             .def_property_readonly("edges_out",
                     [](const PyNeuronRef &ref)

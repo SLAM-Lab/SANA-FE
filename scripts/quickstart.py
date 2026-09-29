@@ -1,3 +1,9 @@
+import os
+import sys
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
+sys.path.insert(0, PROJECT_DIR)
+
 import sanafe
 
 # Included examples of architectures and applications
@@ -23,6 +29,8 @@ python_snn.create_neuron_group("foo", 2)
 python_snn.create_neuron_group("bar", 3, model_attributes={"bias": 0})
 src, dst = python_snn.groups["foo"][0], python_snn.groups["bar"][1]
 src.connect_to_neuron(dst, {"weight": 2.5})
+src.connect_to_neuron(python_snn.groups["bar"][2], {"weight": -1},
+                      synapse_hw_name="demo_synapse")
 # Attributes can be set, using either a small subset of simulator built-in
 #  attributes (e.g. log_spikes), or arbitrary model-defined attributes.
 python_snn.groups["bar"].neurons[0].set_attributes(
