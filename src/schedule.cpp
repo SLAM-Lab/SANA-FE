@@ -134,10 +134,12 @@ double sanafe::schedule_messages_timestep_analytical_barrier(
 double sanafe::schedule_messages_timestep_analytical_neuroscale(
         TimestepHandle &ts, Scheduler &scheduler)
 {
-    // INFO("schedule analytical neurofem max_steps_aync:%zu core_count:%zu\n", scheduler.max_steps_async, scheduler.core_count);
-    // Simple analytical model for the Neuroscale sync protocol. This is slightly
-    //  different from the barrier sync methods, as cores can run-ahead from each
-    //  other and diverge from their dependencies by up to a finite number of steps.
+    // INFO("schedule analytical neurofem max_steps_aync:%zu core_count:%zu\n",
+    //          scheduler.max_steps_async, scheduler.core_count);
+    // Simple analytical model for the Neuroscale sync protocol. This is
+    //  slightly different from the barrier sync methods, as cores can run-ahead
+    //  from each other and diverge from their dependencies by up to a finite
+    //  number of steps.
     Timestep &ts_data = ts.get();
     std::vector<double> neuron_processing_latencies(scheduler.core_count, 0.0);
     std::vector<double> message_processing_latencies(scheduler.core_count, 0.0);
@@ -186,6 +188,7 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
                 scheduler.core_timing_histories[sending_core].at(0UL);
         updated_times[sending_core] = core_latency +
                 std::max({prev_time, max_fan_in, max_fan_out});
+        updated_times[sending_core] += scheduler.timestep_sync_delay;
         INFO("updated_times[%zu]=%e\n", sending_core, updated_times[sending_core]);
     }
 
@@ -198,6 +201,8 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
         const double ts_timing = updated_times[idx];
         for (Message &m : q)
         {
+            // Account for any fixed processing delay, i.e., the time each core
+            //  requires to step if doing nothing
             m.sent_timestamp = ts_timing;
         }
     }

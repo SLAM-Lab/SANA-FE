@@ -63,7 +63,7 @@ except ImportError:
 # ===========================================================================
 # Configuration
 # ===========================================================================
-ARCH_PATH = "arch/neuroscale.yaml"
+ARCH_PATH = "arch/neuroscale2.yaml"
 PROTOCOLS = ["clock", "barrier", "neuroscale"]
 PROTOCOL_LABELS = {
     "clock": "TrueNorth (clock)",
@@ -87,9 +87,7 @@ SEED = 41
 
 CLOCK_PERIOD_FALLBACK = None  # seconds
 
-# ===========================================================================
-# Architecture: swap sync_protocol without touching the base file
-# ===========================================================================
+
 def load_arch_dict(path):
     with open(path, "r") as f:
         return yaml.safe_load(f)
@@ -108,9 +106,6 @@ def make_arch_with_protocol(base_arch_dict, protocol):
     return sanafe.load_arch(tmp_path)
 
 
-# ===========================================================================
-# Network construction (1 population -> 1 tile)
-# ===========================================================================
 def compute_tile_order(arch):
     """
     Reproduce the paper tile order, which snakes from the top of the chip to bottom.
@@ -344,11 +339,8 @@ def extract_clock_timing(n_cores, n_steps):
     return rows
 
 
-# ===========================================================================
-# Run one protocol
-# ===========================================================================
-USE_JSON_NETWORK = "1.json"  # set to None to fall back to random generation\
-USE_JSON_NETWORK = None
+USE_JSON_NETWORK = "runs/neuroscale/1.json"  # set to None to fall back to random generation
+# USE_JSON_NETWORK = None
 def run_protocol(protocol, base_arch_dict):
     """
     Run one protocol and return (timing_rows, summary_dict).
@@ -493,15 +485,275 @@ def plot_raster(results, out_path):
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     print(f"Saved {out_path}")
 
-# ===========================================================================
-# Main
-# ===========================================================================
+
+TIMING_COLUMNS = ["protocol", "core_id", "sim_step", "wall_clock"]
+ACTSIM_LABEL = "actsim"
+
+
+def load_actsim_timing(path, protocol=ACTSIM_LABEL):
+    """
+    Read ticks_core_timing.csv from fig4.py into the same tidy frame
+    neuroscale.py builds. Relabels the protocol column so the two sources can
+    be concatenated and plotted by the same code.
+    """
+    df = pd.read_csv(path)
+    missing = set(TIMING_COLUMNS) - set(df.columns)
+    if missing:
+        raise ValueError(f"{path} is missing columns: {sorted(missing)}")
+    df = df[TIMING_COLUMNS].copy()
+    df["protocol"] = protocol
+    return df
+
+
+
+# TODO: remove this once the sim is fully running...
+def last_common_timestep(df, protocol=None, first=1):
+    """Find largest common timestep count among all cores"""
+    if protocol is not None:
+        df = df[df["protocol"] == protocol]
+    if df.empty:
+        return first - 1
+
+    horizons = []
+    for _, sub in df.groupby("protocol"):
+        per_core = sub.groupby("core_id")["sim_step"].apply(set)
+        if per_core.empty:
+            horizons.append(first - 1)
+            continue
+        tick = first
+        while all(tick in ticks for ticks in per_core):
+            tick += 1
+        horizons.append(tick - 1)
+    return min(horizons)
+
+
+# TODO: remove this once the sim is fully running
+def clip_timesteps(df, first=1, last=None):
+    """
+    Restrict to ticks [first, last]. last=None uses common_tick_horizon, so
+    the default behaviour is 'compare as far as every core in every protocol
+    actually got'.
+    """
+    if last is None:
+        last = last_common_timestep(df, first=first)
+    out = df[(df["sim_step"] >= first) & (df["sim_step"] <= last)].copy()
+    return out, first, last
+
+
+def mape(df, reference=ACTSIM_LABEL, model="neuroscale", first=1, last=None):
+    """
+    Absolute percentage error of the model's timestep duration against the
+    reference, matched per (core_id, sim_step).
+
+        APE = |delta_model - delta_reference| / |delta_reference| * 100
+
+    model=None scores every non-reference protocol instead of just one.
+
+    Returns (per_tick, per_core, overall, n_dropped):
+      per_tick  DataFrame, index sim_step, one column per protocol
+      per_core  DataFrame, index core_id,  one column per protocol
+      overall   Series indexed by protocol -- the mean over every matched
+                (core, tick) pair, which is the MAPE for the whole window
+      n_dropped pairs discarded because the reference duration was zero
+    """
+    clipped, first, last = clip_timesteps(df, first, last)
+    deltas = compute_deltas(clipped)
+
+    ref = (deltas[deltas["protocol"] == reference]
+           [["core_id", "sim_step", "delta"]]
+           .rename(columns={"delta": "ref_delta"}))
+    if ref.empty:
+        raise ValueError(f"no rows for reference protocol {reference!r}")
+
+    others = deltas[deltas["protocol"] != reference]
+    if model is not None:
+        others = others[others["protocol"] == model]
+        if others.empty:
+            raise ValueError(f"no rows for model protocol {model!r}")
+    matched = others.merge(ref, on=["core_id", "sim_step"], how="inner")
+
+    n_dropped = int((matched["ref_delta"] == 0).sum())
+    matched = matched[matched["ref_delta"] != 0].copy()
+
+    matched["ape"] = ((matched["delta"] - matched["ref_delta"]).abs()
+                      / matched["ref_delta"].abs() * 100.0)
+
+    per_tick = matched.pivot_table(index="sim_step", columns="protocol",
+                                   values="ape", aggfunc="mean")
+    per_core = matched.pivot_table(index="core_id", columns="protocol",
+                                   values="ape", aggfunc="mean")
+    overall = matched.groupby("protocol")["ape"].mean()
+    return per_tick, per_core, overall, n_dropped
+
+
+
+def compute_deltas(df):
+    """
+    Per-core inter-tick interval. Returns a frame with a `delta` column; the
+    first tick of each core is dropped since it has no predecessor.
+    """
+    df = df.sort_values(["protocol", "core_id", "sim_step"])
+    df = df.copy()
+    df["delta"] = df.groupby(["protocol", "core_id"])["wall_clock"].diff()
+    return df.dropna(subset=["delta"])
+
+
+def align_to_first_tick(df):
+    """
+    Shift each protocol so its earliest point in the window sits at t=0
+    """
+    df = df.copy()
+    for _, sub in df.groupby("protocol"):
+        df.loc[sub.index, "wall_clock"] = (
+            sub["wall_clock"] - sub["wall_clock"].min()
+        )
+    return df
+
+
+def _reps(df_proto, n=16):
+    """One representative core per tile, matching select_representative_cores."""
+    core_ids = sorted(df_proto["core_id"].unique())
+    return core_ids[::4][:n]
+
+
+# Comparison plots
+def plot_side_by_side(df, out_path, first=1, last=None, labels=None,
+                      align_origin=True, sharex=True):
+    """
+    One raster panel per protocol over the same tick window, in absolute
+    seconds. sharex keeps every panel on one x-scale so the protocols can be
+    read against each other directly; set it False to let each panel expand
+    to its own range.
+    """
+    clipped, first, last = clip_timesteps(df, first, last)
+    if align_origin:
+        clipped = align_to_first_tick(clipped)
+    protocols = list(clipped["protocol"].unique())
+    labels = labels or {}
+
+    fig, axes = plt.subplots(1, len(protocols),
+                             figsize=(3.6 * len(protocols), 4.5),
+                             sharey=True, sharex=sharex, squeeze=False)
+    for ax, protocol in zip(axes[0], protocols):
+        dfp = clipped[clipped["protocol"] == protocol]
+        reps = _reps(dfp)
+        for y_index, core_id in enumerate(reps):
+            pts = dfp[dfp["core_id"] == core_id]
+            ax.scatter(pts["wall_clock"] * 1.0e3, [y_index] * len(pts),
+                       s=3, marker="|", color="#1f77b4")
+        ax.set_title(labels.get(protocol, protocol), fontsize=10)
+        ax.set_xlabel("Wall-clock time (ms)")
+        ax.set_ylim(-1, len(reps))
+    axes[0][0].set_ylabel("Core ID")
+    fig.suptitle(f"Protocol comparison, ticks {first}-{last} (absolute time)")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    print(f"Saved {out_path}")
+    return fig
+
+
+def _pick_unit(seconds):
+    """Choose a readable unit from a representative magnitude."""
+    if seconds < 1e-6:
+        return "ns", 1e9
+    if seconds < 1e-3:
+        return "us", 1e6
+    if seconds < 1.0:
+        return "ms", 1e3
+    return "s", 1.0
+
+def latency_table(df, reference=ACTSIM_LABEL, model="neuroscale",
+                  first=1, last=None):
+    """
+    Per-tick timestep latency for the model and the reference side by side,
+    with the MAPE between them.
+
+    The latency columns are means across cores. The error column is the true
+    MAPE -- the mean of per-core absolute percentage errors -- not the error
+    between the two means, so it does not collapse cores whose errors cancel.
+    """
+    clipped, first, last = clip_timesteps(df, first, last)
+    deltas = compute_deltas(clipped)
+    per_tick, _, overall, dropped = mape(df, reference, model, first, last)
+
+    means = (deltas[deltas["protocol"].isin([model, reference])]
+             .pivot_table(index="sim_step", columns="protocol",
+                          values="delta", aggfunc="mean"))
+
+    table = pd.DataFrame({
+        model: means[model],
+        reference: means[reference],
+        "mape": per_tick[model],
+    })
+    return table, overall.get(model, float("nan")), dropped, first, last
+
+
+def print_mape(df, reference=ACTSIM_LABEL, model="neuroscale",
+               first=1, last=None, unit=None):
+    """
+    Print model and reference timestep latencies side by side, with the MAPE
+    in brackets, one row per tick plus a whole-window row.
+    """
+    table, overall, dropped, first, last = latency_table(
+        df, reference, model, first, last)
+
+    if unit is None:
+        unit, scale = _pick_unit(float(table[reference].median()))
+    else:
+        scale = {"ns": 1e9, "us": 1e6, "ms": 1e3, "s": 1.0}[unit]
+
+    lw = 14
+    total = 6 + 2 + lw + 1 + 9 + 2 + lw
+    print(f"\nTimestep latency, timesteps {first}-{last} ")
+    if dropped:
+        print(f"note: {dropped} pairs skipped -- reference duration was zero")
+    print(f"\n{'timestep':>6}  {model[:lw]:>{lw}} {'(MAPE)':>9}  {reference[:lw]:>{lw}}")
+    print("-" * total)
+
+    for timestep, row in table.iterrows():
+        model_s = f"{row[model] * scale:.3f} {unit}"
+        ref_s = f"{row[reference] * scale:.3f} {unit}"
+        print(f"{int(timestep)-1:>6}  {model_s:>{lw}} ({row['mape']:6.2f}%)  {ref_s:>{lw}}")
+
+    print("-" * total)
+    all_model = f"{table[model].mean() * scale:.3f} {unit}"
+    all_ref = f"{table[reference].mean() * scale:.3f} {unit}"
+    print(f"{'all':>6}  {all_model:>{lw}} ({overall:6.2f}%)  {all_ref:>{lw}}")
+    return table, overall
+
+
+
+def compare_actsim(sanafe_df, actsim_csv, out_dir, first=1, last=None,
+                   labels=None, align_origin=True, model="neuroscale"):
+    """Load the actsim CSV, clip to the common window, plot and score."""
+    actsim_df = load_actsim_timing(actsim_csv)
+    combined = pd.concat([sanafe_df[TIMING_COLUMNS], actsim_df[TIMING_COLUMNS]],
+                     ignore_index=True)
+
+    last_timestep = last_common_timestep(combined, first=first)
+    if last is None:
+        last = last_timestep
+    # print(f"\n=== actsim vs SANA-FE, ticks {first}-{last} ===")
+    # print(f"last common timestep (all cores, all protocols): {last_timestep}")
+    for protocol in combined["protocol"].unique():
+        h = last_common_timestep(combined, protocol=protocol, first=first)
+        print(f"  {protocol:<24} last_timestep {h}")
+
+    print_mape(combined, model=model, first=first, last=last)
+
+    os.makedirs(out_dir, exist_ok=True)
+    plot_side_by_side(combined, os.path.join(out_dir, "compare_progression.pdf"),
+                      first=first, last=last, labels=labels,
+                      align_origin=align_origin)
+    return combined
+
+
 def main():
     os.makedirs(LOG_DIR, exist_ok=True)
     base_arch_dict = load_arch_dict(ARCH_PATH)
 
     # Run barrier first so we can derive the clock's fixed period (paper sets
-    # the TrueNorth tick to the longest Loihi barrier interval).
+    # the TrueNorth timestep to the longest Loihi barrier interval).
     order = ["barrier", "neuroscale", "clock"]
     # order = ["barrier", "neuroscale",]
 
@@ -537,4 +789,8 @@ def main():
 
 if __name__ == "__main__":
     main()
-    plt.show()
+
+    sanafe_results = pd.read_csv("/home/usr1/jboyle/neuro/sana-fe/runs/neuroscale/fig4_core_timing.csv")
+    compare_actsim(sanafe_results, "/home/usr1/jboyle/neuro/neuroscale/neuroscale-files/Neuromorphic-Architectures/NeuroScale/ticks_core_timing.csv", "/home/usr1/jboyle/neuro/sana-fe/runs/neuroscale/")
+
+    # plt.show()
