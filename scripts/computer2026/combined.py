@@ -243,7 +243,6 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
                 col = src % 32
                 connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fc1"][dst, src])
-                connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
                 connection_parameters["crossbar_bias"] = int(crossbar_biases[1][dst])
             else:
                 connection_parameters["weight"] = float(weights["fc1"][dst, src])
@@ -259,7 +258,6 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
             col = src % 32
             connection_parameters["crossbar_position"] = [row, col]
             connection_parameters["weight"] = int(weights["fcr"][dst, src])
-            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             connection_parameters["crossbar_bias"] = int(crossbar_biases[3][dst])
 
             network["hidden"][src].connect_to_neuron(
@@ -272,7 +270,6 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
             col = src % 32
             connection_parameters["crossbar_position"] = [row, col]
             connection_parameters["weight"] = int(weights["fc2"][dst, src])
-            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             connection_parameters["crossbar_bias"] = int(crossbar_biases[2][dst])
 
             network["hidden"][src].connect_to_neuron(
@@ -656,7 +653,6 @@ def run_mnist(num_inputs, timesteps=100):
             col = src % 32
             connection_parameters["crossbar_position"] = [row, col]
             connection_parameters["weight"] = int(weights["fc1"][dst, src])
-            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             connection_parameters["crossbar_bias"] = int(crossbar_biases[1][dst])
 
             network["in"][src].connect_to_neuron(
@@ -669,7 +665,6 @@ def run_mnist(num_inputs, timesteps=100):
             col = src % 32
             connection_parameters["crossbar_position"] = [row, col]
             connection_parameters["weight"] = int(weights["fc2"][dst, src])
-            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             connection_parameters["crossbar_bias"] = int(crossbar_biases[2][dst])
 
             network["hidden_1"][src].connect_to_neuron(
@@ -682,7 +677,6 @@ def run_mnist(num_inputs, timesteps=100):
             col = src % 32
             connection_parameters["crossbar_position"] = [row, col]
             connection_parameters["weight"] = int(weights["fc3"][dst, src])
-            connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
             connection_parameters["crossbar_bias"] = int(crossbar_biases[3][dst])
 
             network["hidden_2"][src].connect_to_neuron(
