@@ -108,7 +108,7 @@ sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
     check_outputs(n, output);
 #endif
     energy += output.energy.value_or(0.0);
-    latency += output.energy.value_or(0.0);
+    latency += output.latency.value_or(0.0);
 
     return output;
 }
