@@ -47,8 +47,8 @@ running:
 either by updating the plugin CMake file or providing your own build scripts.
 2. Your new plugin must implement a hardware model class with the hardware
 functionality you want. The model class you implement must be derived from
-`PipelineUnit` in `chip.hpp`, which defines the required interfaces. These are
-enforced by pure virtual methods, including attribute parsing methods update
+`PipelineUnit` in `pipeline.hpp`, which defines the required interfaces. These
+are enforced by pure virtual methods, including attribute parsing methods update
 methods. For examples of different hardware models, see either `models.cpp` or
 the `plugins` folder.
 3. Finally, provide a class factory function that returns a new instance of
