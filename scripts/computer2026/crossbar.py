@@ -150,7 +150,6 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
     perf_filename = f"perf_{platform}_shd.csv"
     potential_filename = f"potential_{platform}_shd.csv"
 
-
     print("Creating network in SANA-FE")
     network = sanafe.Network()
     in_layer = network.create_neuron_group("in", in_neurons)
@@ -247,7 +246,6 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
                 col = src % 32
                 connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fc1"][dst, src])
-                connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
                 connection_parameters["crossbar_bias"] = int(crossbar_biases[1][dst])
             else:
                 connection_parameters["weight"] = float(weights["fc1"][dst, src])
@@ -264,7 +262,6 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
                 col = src % 32
                 connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fcr"][dst, src])
-                connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
                 connection_parameters["crossbar_bias"] = int(crossbar_biases[3][dst])
             else:
                 connection_parameters["weight"] = float(weights["fcr"][dst, src])
@@ -280,7 +277,6 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
                 col = src % 32
                 connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fc2"][dst, src])
-                connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
                 connection_parameters["crossbar_bias"] = int(crossbar_biases[2][dst])
             else:
                 connection_parameters["weight"] = float(weights["fc2"][dst, src])
@@ -313,13 +309,9 @@ def run_spiking_digits(num_inputs, analog_synapses=True):
         is_first_input = (input_idx == 0)
 
         hw.sim(timesteps,
-            #    spike_trace=os.path.join(RUN_PATH, spike_filename),
-            #    perf_trace=os.path.join(RUN_PATH, perf_filename),
-            #    potential_trace=os.path.join(RUN_PATH, potential_filename),
-            #    write_trace_headers=is_first_input,
-               spike_trace=True,
-               perf_trace=True,
-               potential_trace=True,
+               spike_trace=os.path.join(RUN_PATH, spike_filename),
+               perf_trace=os.path.join(RUN_PATH, perf_filename),
+               potential_trace=os.path.join(RUN_PATH, potential_filename),
                write_trace_headers=is_first_input,
                processing_threads=4,
                scheduler_threads=8)
@@ -867,7 +859,6 @@ def run_mnist(num_inputs, analog_synapses=True, timesteps=100):
                 col = src % 32
                 connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fc1"][dst, src])
-                connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
                 connection_parameters["crossbar_bias"] = int(crossbar_biases[1][dst])
             else:
                 connection_parameters["weight"] = float(weights["fc1"][dst, src])
@@ -883,7 +874,6 @@ def run_mnist(num_inputs, analog_synapses=True, timesteps=100):
                 col = src % 32
                 connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fc2"][dst, src])
-                connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
                 connection_parameters["crossbar_bias"] = int(crossbar_biases[2][dst])
 
             else:
@@ -900,7 +890,6 @@ def run_mnist(num_inputs, analog_synapses=True, timesteps=100):
                 col = src % 32
                 connection_parameters["crossbar_position"] = [row, col]
                 connection_parameters["weight"] = int(weights["fc3"][dst, src])
-                connection_parameters["synapse_hw_name"] = f"analog_crossbar[{dst}]"
                 connection_parameters["crossbar_bias"] = int(crossbar_biases[3][dst])
             else:
                 connection_parameters["weight"] = float(weights["fc3"][dst, src])
@@ -931,13 +920,9 @@ def run_mnist(num_inputs, analog_synapses=True, timesteps=100):
         print(f"Simulating for {timesteps} timesteps")
         is_first_input = (input_idx == 0)
         results = hw.sim(timesteps,
-                        # spike_trace=os.path.join(RUN_PATH, spike_filename),
-                        # perf_trace=os.path.join(RUN_PATH, perf_filename),
-                        # potential_trace=os.path.join(RUN_PATH, potential_filename),
-                        # write_trace_headers=is_first_input,
-                        spike_trace=True,
-                        perf_trace=True,
-                        potential_trace=True,
+                        spike_trace=os.path.join(RUN_PATH, spike_filename),
+                        perf_trace=os.path.join(RUN_PATH, perf_filename),
+                        potential_trace=os.path.join(RUN_PATH, potential_filename),
                         write_trace_headers=is_first_input,
                         processing_threads=8,
                         scheduler_threads=8)

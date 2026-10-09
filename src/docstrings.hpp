@@ -171,6 +171,7 @@ Create direct connection to another neuron.
 Args:
     dest_neuron (Neuron): Target neuron
     attributes (dict, optional): Connection-specific parameters
+    synapse_hw_name (str, optional): Synapse processing unit name. Default is None.
 
 Returns:
     int: Connection index for later reference
