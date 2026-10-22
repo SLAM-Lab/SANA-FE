@@ -718,6 +718,7 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
     scheduler.timing_model = timing_model;
     scheduler.sync_protocol = self->sync_protocol;
     scheduler.max_steps_async = self->max_steps_async;
+    scheduler.neuroscale = self->neuroscale;
 
     scheduler.core_timing_histories.resize(
             scheduler.core_count, scheduler.max_steps_async); // Tadv in Neuroscale

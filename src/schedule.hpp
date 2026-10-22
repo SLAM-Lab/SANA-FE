@@ -15,6 +15,7 @@
 #include <list>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
@@ -191,6 +192,13 @@ struct Scheduler
     size_t max_cores_per_tile;
     size_t max_steps_async; // TODO: make per core?
     double timestep_sync_delay;
+
+    // Refinements of the NeuroScale analytical model, plus the state they carry
+    //  from one timestep to the next
+    NeuroscaleModelConfiguration neuroscale;
+    std::vector<std::unordered_set<std::string>> input_axons; // per dest core
+    std::vector<double> prev_window_start; // when each core's last step began
+    std::vector<double> prev_window_end; // ... and when its synapse unit freed
 };
 
 // NetworkOnChipState is used by the scheduler to track the high-level state of

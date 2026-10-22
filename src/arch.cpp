@@ -34,6 +34,7 @@ sanafe::Architecture::Architecture(
         , noc_height_in_tiles(noc.height_in_tiles)
         , noc_buffer_size(noc.link_buffer_size)
         , max_steps_async(noc.max_steps_async)
+        , neuroscale(noc.neuroscale)
         , timestep_delay(noc.timestep_delay)
 {
     if (max_steps_async == 0)

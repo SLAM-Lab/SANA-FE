@@ -134,18 +134,51 @@ double sanafe::schedule_messages_timestep_analytical_barrier(
 double sanafe::schedule_messages_timestep_analytical_neuroscale(
         TimestepHandle &ts, Scheduler &scheduler)
 {
-    // INFO("schedule analytical neurofem max_steps_aync:%zu core_count:%zu\n",
-    //          scheduler.max_steps_async, scheduler.core_count);
     // Simple analytical model for the Neuroscale sync protocol. This is
     //  slightly different from the barrier sync methods, as cores can run-ahead
     //  from each other and diverge from their dependencies by up to a finite
     //  number of steps.
+    //
+    // The basic recurrence is T[c,t] = L[c,t] + max(T[c,t-1], T[fan-in,t-1],
+    //  T[fan-out,t-Tadv]). Optional refinements (see
+    //  NeuroscaleModelConfiguration) account for effects seen in the RTL:
+    //  a per-step scan over the input axons, a router port shared by the cores
+    //  in a tile, done/advance packets, and sender stalls while a destination
+    //  core is not accepting input.
     Timestep &ts_data = ts.get();
-    std::vector<double> neuron_processing_latencies(scheduler.core_count, 0.0);
-    std::vector<double> message_processing_latencies(scheduler.core_count, 0.0);
-    std::vector<double> updated_times(scheduler.core_count, 0.0);
-    for (size_t sending_core = 0UL; sending_core < scheduler.core_count;
-            ++sending_core)
+    const NeuroscaleModelConfiguration &nm = scheduler.neuroscale;
+    const size_t cores = scheduler.core_count;
+    const size_t cores_per_tile = std::max(scheduler.max_cores_per_tile, 1UL);
+    const size_t tiles = (cores + cores_per_tile - 1UL) / cores_per_tile;
+    const bool use_port = nm.packet_latency > 0.0;
+    const bool use_stall = nm.stall_queue_depth > 0UL;
+
+    std::vector<double> neuron_processing_latencies(cores, 0.0);
+    std::vector<double> message_processing_latencies(cores, 0.0);
+    std::vector<double> messages_out(cores, 0.0);
+    std::vector<double> updated_times(cores, 0.0);
+    // Messages from each sender tile to each destination core this step
+    std::vector<size_t> tile_to_core_messages;
+    if (use_stall)
+    {
+        tile_to_core_messages.assign(tiles * cores, 0UL);
+    }
+    if (scheduler.input_axons.size() != cores)
+    {
+        scheduler.input_axons.resize(cores);
+        scheduler.prev_window_start.assign(cores, 0.0);
+        scheduler.prev_window_end.assign(cores, 0.0);
+    }
+    // Each core scans all the input axons it has seen so far (receiving
+    //  spikes only extends the scan next step)
+    std::vector<double> axon_scan_latencies(cores, 0.0);
+    for (size_t core = 0UL; core < cores; ++core)
+    {
+        axon_scan_latencies[core] = nm.axon_scan_latency *
+                static_cast<double>(scheduler.input_axons[core].size());
+    }
+
+    for (size_t sending_core = 0UL; sending_core < cores; ++sending_core)
     {
         std::list<Message> &q = ts_data.messages.at(sending_core);
         for (Message &m : q)
@@ -156,44 +189,138 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
             m.blocking_delay = 0.0; // No blocking modeled
             m.network_delay = m.min_hop_delay;
             message_processing_latencies[m.dest_core_id] += m.network_delay;
+            if (!m.placeholder)
+            {
+                messages_out[sending_core] += 1.0;
+                if (nm.axon_scan_latency > 0.0)
+                {
+                    scheduler.input_axons[m.dest_core_id].insert(
+                            m.src_neuron_group_id + "." +
+                            std::to_string(m.src_neuron_offset));
+                }
+                if (use_stall)
+                {
+                    const size_t src_tile = sending_core / cores_per_tile;
+                    tile_to_core_messages[(src_tile * cores) + m.dest_core_id]++;
+                }
+            }
         }
     }
 
-    for (size_t sending_core = 0UL; sending_core < scheduler.core_count;
-            ++sending_core)
+    // Packets each tile pushes through its shared router port: spikes, plus
+    //  one done per fan-out core and one advance per fan-in core
+    std::vector<double> tile_packets(tiles, 0.0);
+    if (use_port)
     {
-        // const double core_latency = std::max(neuron_processing_latencies[sending_core],
-        //                 message_processing_latencies[sending_core]);
-        const double core_latency = neuron_processing_latencies[sending_core] +
-                        message_processing_latencies[sending_core];
-        // INFO("Core latency [%zu]:%e\n", sending_core, core_latency);
+        for (size_t core = 0UL; core < cores; ++core)
+        {
+            tile_packets[core / cores_per_tile] += messages_out[core];
+            if (nm.sync_packets)
+            {
+                tile_packets[core / cores_per_tile] += static_cast<double>(
+                        scheduler.core_fan_in.at(core).size() +
+                        scheduler.core_fan_out.at(core).size());
+            }
+        }
+    }
+
+    std::vector<double> window_start(cores, 0.0);
+    std::vector<double> window_end(cores, 0.0);
+    for (size_t core = 0UL; core < cores; ++core)
+    {
+        double core_latency = neuron_processing_latencies[core] +
+                message_processing_latencies[core] + axon_scan_latencies[core];
+        if (use_port)
+        {
+            // The core's own spikes are already costed by its message-out
+            //  latency (set this to the port's packet latency). Add the time
+            //  spent waiting behind the other cores' packets (and sync packets)
+            //  in the tile's shared port
+            core_latency += nm.packet_latency *
+                    (tile_packets[core / cores_per_tile] - messages_out[core]);
+        }
 
         // Calculate the max over fan in of T[fanout][t-1]
         double max_fan_in = 0.0;
-        // INFO("fan in size:%zu\n", scheduler.core_fan_in);
-        for (const auto fan_in : scheduler.core_fan_in.at(sending_core))
+        for (const auto fan_in : scheduler.core_fan_in.at(core))
         {
             max_fan_in = std::max(max_fan_in,
                     scheduler.core_timing_histories[fan_in].at(0UL));
         }
         // Calculate the max over fan in of T[fanin][t-Tadv]
         double max_fan_out = 0.0;
-        for (const auto fan_out : scheduler.core_fan_out.at(sending_core))
+        for (const auto fan_out : scheduler.core_fan_out.at(core))
         {
             max_fan_out = std::max(max_fan_out,
                     scheduler.core_timing_histories[fan_out].at(
                             scheduler.max_steps_async - 1UL));
         }
-        const double prev_time =
-                scheduler.core_timing_histories[sending_core].at(0UL);
-        updated_times[sending_core] = core_latency +
-                std::max({prev_time, max_fan_in, max_fan_out});
-        updated_times[sending_core] += scheduler.timestep_sync_delay;
-        INFO("updated_times[%zu]=%e\n", sending_core, updated_times[sending_core]);
+        const double prev_time = scheduler.core_timing_histories[core].at(0UL);
+        const double start_time = std::max({prev_time, max_fan_in, max_fan_out});
+        updated_times[core] = core_latency + start_time +
+                scheduler.timestep_sync_delay;
+        // The synapse unit does not accept input from the NoC until it has
+        //  scanned its axons and finished the fixed per-step sweep
+        window_start[core] = start_time;
+        window_end[core] = start_time + axon_scan_latencies[core] +
+                scheduler.timestep_sync_delay;
     }
 
+    if (use_stall)
+    {
+        // A sender tile that bursts more than the destination's input queue
+        //  can hold, while that destination is still not accepting input,
+        //  blocks until the destination frees up. The router port is shared,
+        //  so the whole tile stalls with it.
+        for (size_t tile = 0UL; tile < tiles; ++tile)
+        {
+            const size_t first_core = tile * cores_per_tile;
+            const size_t last_core = std::min(first_core + cores_per_tile, cores);
+            double emit_start = 0.0;
+            for (size_t core = first_core; core < last_core; ++core)
+            {
+                emit_start = std::max(emit_start, window_end[core]);
+            }
+
+            double release = 0.0;
+            for (size_t dest = 0UL; dest < cores; ++dest)
+            {
+                const size_t burst = tile_to_core_messages[(tile * cores) + dest];
+                if (burst <= nm.stall_queue_depth)
+                {
+                    continue;
+                }
+                // The destination may still be in the previous step's window
+                double dest_free = 0.0;
+                if ((window_start[dest] <= emit_start) &&
+                        (emit_start < window_end[dest]))
+                {
+                    dest_free = window_end[dest];
+                }
+                else if ((scheduler.prev_window_start[dest] <= emit_start) &&
+                        (emit_start < scheduler.prev_window_end[dest]))
+                {
+                    dest_free = scheduler.prev_window_end[dest];
+                }
+                if (dest_free > 0.0)
+                {
+                    const double drained = static_cast<double>(
+                            burst - nm.stall_queue_depth);
+                    release = std::max(release,
+                            dest_free + (drained * nm.stall_drain_latency));
+                }
+            }
+            for (size_t core = first_core; core < last_core; ++core)
+            {
+                updated_times[core] = std::max(updated_times[core], release);
+            }
+        }
+    }
+    scheduler.prev_window_start = window_start;
+    scheduler.prev_window_end = window_end;
+
     // Update timing for all cores
-    for (size_t idx = 0UL; idx < scheduler.core_count; ++idx)
+    for (size_t idx = 0UL; idx < cores; ++idx)
     {
         scheduler.core_timing_histories[idx].push(updated_times[idx]);
         // Record the timing in the last (placeholder) message struct
@@ -215,7 +342,7 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
     ts_data.sim_time = 0.0;
     if (ts_data.force_sync_barrier)
     {
-        for (size_t idx = 0UL; idx < scheduler.core_count; ++idx)
+        for (size_t idx = 0UL; idx < cores; ++idx)
         {
             const double core_time =
                     scheduler.core_timing_histories[idx].at(0UL);

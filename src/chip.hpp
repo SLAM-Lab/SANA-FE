@@ -107,6 +107,7 @@ public:
     size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{1UL};
     size_t max_steps_async{1UL};
+    NeuroscaleModelConfiguration neuroscale{};
 
 private:
     using TimePoint = std::chrono::steady_clock::time_point;
