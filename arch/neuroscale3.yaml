@@ -1,0 +1,86 @@
+# NeuroScale arch from Yale
+architecture:
+  name: neuroscale_chip
+  attributes:
+    topology: mesh
+    width: 4
+    height: 4
+    link_buffer_size: 16
+    sync_model: fixed
+    # latency_sync: 2.6e-05
+    latency_sync: 1.4e-5
+    # latency_sync: 0.0
+    sync_protocol: neuroscale
+    max_steps_async: 6  # TIME_ADVANCE: 7, TIME_HISTORY: 8
+  tile:
+    - name: neuroscale_tile[0..31]
+      attributes:
+        energy_north_hop: 1.2e-05
+        latency_north_hop: 0.0e-10
+        # latency_north_hop: 5.0e-10
+        # latency_north_hop: 2.0e-8
+        energy_east_hop: 1.2e-05
+        latency_east_hop: 0.0e-10
+        # latency_east_hop: 5.0e-10
+        # latency_east_hop: 2.0e-8
+        energy_south_hop: 1.2e-05
+        latency_south_hop: 0.0e-10
+        # latency_south_hop: 5.0e-10
+        # latency_south_hop: 2.0e-8
+        energy_west_hop: 1.2e-05
+        latency_west_hop: 0.0e-10
+        # latency_west_hop: 5.0e-10
+        # latency_west_hop: 2.0e-8
+      core:
+        - name: neuroscale_core[0..3]
+          attributes:
+            buffer_position: dendrite
+            buffer_inside_unit: true
+            max_neurons_supported: 200
+          axon_in:
+            - name: neuroscale_in
+              attributes:
+                energy_message_in: 1.1e-07
+                latency_message_in: 1.12e-08
+          soma:
+            - name: neuroscale_lif
+              attributes:
+                model: neuroscale_neuron
+                energy_access_neuron: 4.5e-10
+                latency_access_neuron: 7.6e-9
+                energy_update_neuron: 0.0
+                latency_update_neuron: 0.0
+                energy_spike_out: 7.0e-10
+                latency_spike_out: 0.0e-9
+            - name: neuroscale_inputs[0..1023]
+              attributes:
+                model: input
+                energy_access_neuron: 0.0
+                latency_access_neuron: 0.0
+                energy_update_neuron: 0.0
+                latency_update_neuron: 0.0
+                energy_spike_out: 0.0
+                latency_spike_out: 0.0
+          dendrite:
+            - name: neuroscale_synapse
+              attributes:
+                model: neuroscale_synapse
+                energy_update: 0.0
+                latency_update: 0.0
+            # - name: neuroscale_dendrites_delay
+            #   attributes:
+            #     model: accumulator_with_delay
+            #     energy_update: 0.0
+            #     latency_update: 0.0
+          synapse:
+            - name: neuroscale_synapse
+              attributes:
+                energy_process_spike: 1.2e-09
+                model: neuroscale_synapse
+                latency_process_spike: 4.7e-09
+          axon_out:
+            - name: neuroscale_out
+              attributes:
+                energy_message_out: 5.5e-10
+                # latency_message_out: 1.8e-09
+                latency_message_out: 3.0e-9

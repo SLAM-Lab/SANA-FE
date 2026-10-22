@@ -63,7 +63,7 @@ except ImportError:
 # ===========================================================================
 # Configuration
 # ===========================================================================
-ARCH_PATH = "arch/neuroscale2.yaml"
+ARCH_PATH = "arch/neuroscale3.yaml"
 PROTOCOLS = ["clock", "barrier", "neuroscale"]
 PROTOCOL_LABELS = {
     "clock": "TrueNorth (clock)",
@@ -790,7 +790,8 @@ def main():
 if __name__ == "__main__":
     main()
 
-    sanafe_results = pd.read_csv("/home/usr1/jboyle/neuro/sana-fe/runs/neuroscale/fig4_core_timing.csv")
-    compare_actsim(sanafe_results, "/home/usr1/jboyle/neuro/neuroscale/neuroscale-files/Neuromorphic-Architectures/NeuroScale/ticks_core_timing.csv", "/home/usr1/jboyle/neuro/sana-fe/runs/neuroscale/")
+    sanafe_results = pd.read_csv("/home/usr1/jboyle/bulkhead-backup/neuro/sana-fe/runs/neuroscale/fig4_core_timing.csv")
+    # compare_actsim(sanafe_results, "/home/usr1/jboyle/neuro/neuroscale/neuroscale-files/Neuromorphic-Architectures/NeuroScale/ticks_core_timing.csv", "/home/usr1/jboyle/neuro/sana-fe/runs/neuroscale/")
+    compare_actsim(sanafe_results, "/home/usr1/jboyle/neuroscale/neuroscale-files/Neuromorphic-Architectures/NeuroScale/ticks_core_timing.csv", "/home/usr1/jboyle/bulkhead-backup/neuro/sana-fe/runs/neuroscale/")
 
     # plt.show()
