@@ -63,14 +63,18 @@ except ImportError:
 # ===========================================================================
 # Configuration
 # ===========================================================================
-ARCH_PATH = "arch/neuroscale3.yaml"
+ARCH_PATH = os.environ.get("NEUROSCALE_ARCH",
+                           os.path.join(PROJECT_DIR, "arch", "neuroscale3.yaml"))
 PROTOCOLS = ["clock", "barrier", "neuroscale"]
 PROTOCOL_LABELS = {
     "clock": "TrueNorth (clock)",
     "barrier": "Loihi (barrier)",
     "neuroscale": "NeuroScale",
 }
-LOG_DIR = "runs/neuroscale"
+LOG_DIR = os.environ.get("NEUROSCALE_LOG_DIR",
+                         os.path.join(PROJECT_DIR, "runs", "neuroscale"))
+# Reference timing from actsim (fig4.py); comparison is skipped if missing
+ACTSIM_CSV = os.environ.get("NEUROSCALE_ACTSIM_CSV")
 
 # Network constants (from the paper's Methods section)
 NUM_POPULATIONS = 16
@@ -339,7 +343,8 @@ def extract_clock_timing(n_cores, n_steps):
     return rows
 
 
-USE_JSON_NETWORK = "runs/neuroscale/1.json"  # set to None to fall back to random generation
+USE_JSON_NETWORK = os.environ.get(  # set to None to fall back to random generation
+    "NEUROSCALE_JSON", os.path.join(PROJECT_DIR, "runs", "neuroscale", "1.json"))
 # USE_JSON_NETWORK = None
 def run_protocol(protocol, base_arch_dict):
     """
@@ -417,6 +422,15 @@ def select_representative_cores(df_proto, n=NUM_POPULATIONS):
     return core_ids[::4][:n]
 
 
+def save_figure(fig, out_path):
+    """Save the figure, plus a PNG copy for quick viewing."""
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    root, ext = os.path.splitext(out_path)
+    if ext.lower() != ".png":
+        fig.savefig(root + ".png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_progression(df, global_max, out_path):
     """Full-range progression (Fig. 4b): 3 stacked panels."""
     fig, axes = plt.subplots(len(PROTOCOLS), 1, figsize=(7, 8), sharex=True)
@@ -434,7 +448,7 @@ def plot_progression(df, global_max, out_path):
     axes[-1].set_xlabel("Wall-clock time (normalized)")
     fig.suptitle("Fig. 4b: simulation-time progression across cores")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    save_figure(fig, out_path)
     print(f"Saved {out_path}")
 
 
@@ -454,7 +468,7 @@ def plot_zoom(df, global_max, out_path, x_lo=0.1, x_hi=0.15):
     axes[0].set_ylabel("Core ID")
     fig.suptitle("Fig. 4c: magnified synchronization behavior")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    save_figure(fig, out_path)
     print(f"Saved {out_path}")
 
 def plot_raster(results, out_path):
@@ -482,7 +496,7 @@ def plot_raster(results, out_path):
     ax.set_ylabel("Neuron (grouped by population P1..P16)")
     ax.set_title("Spike Raster")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    save_figure(fig, out_path)
     print(f"Saved {out_path}")
 
 
@@ -647,7 +661,7 @@ def plot_side_by_side(df, out_path, first=1, last=None, labels=None,
     axes[0][0].set_ylabel("Core ID")
     fig.suptitle(f"Protocol comparison, ticks {first}-{last} (absolute time)")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    save_figure(fig, out_path)
     print(f"Saved {out_path}")
     return fig
 
@@ -790,8 +804,11 @@ def main():
 if __name__ == "__main__":
     main()
 
-    sanafe_results = pd.read_csv("/home/usr1/jboyle/bulkhead-backup/neuro/sana-fe/runs/neuroscale/fig4_core_timing.csv")
-    # compare_actsim(sanafe_results, "/home/usr1/jboyle/neuro/neuroscale/neuroscale-files/Neuromorphic-Architectures/NeuroScale/ticks_core_timing.csv", "/home/usr1/jboyle/neuro/sana-fe/runs/neuroscale/")
-    compare_actsim(sanafe_results, "/home/usr1/jboyle/neuroscale/neuroscale-files/Neuromorphic-Architectures/NeuroScale/ticks_core_timing.csv", "/home/usr1/jboyle/bulkhead-backup/neuro/sana-fe/runs/neuroscale/")
+    if ACTSIM_CSV and os.path.exists(ACTSIM_CSV):
+        sanafe_results = pd.read_csv(os.path.join(LOG_DIR, "fig4_core_timing.csv"))
+        compare_actsim(sanafe_results, ACTSIM_CSV, LOG_DIR)
+    else:
+        print("Skipping actsim comparison (set NEUROSCALE_ACTSIM_CSV to the "
+              "ticks_core_timing.csv from fig4.py)")
 
     # plt.show()

@@ -34,8 +34,8 @@ architecture:
       core:
         - name: neuroscale_core[0..3]
           attributes:
-            buffer_position: dendrite
-            buffer_inside_unit: true
+            buffer_position: synapse
+            buffer_inside_unit: false
             max_neurons_supported: 200
           axon_in:
             - name: neuroscale_in
@@ -45,7 +45,7 @@ architecture:
           soma:
             - name: neuroscale_lif
               attributes:
-                model: neuroscale_neuron
+                model: neuroscale
                 energy_access_neuron: 4.5e-10
                 latency_access_neuron: 7.6e-9
                 energy_update_neuron: 0.0
@@ -62,9 +62,9 @@ architecture:
                 energy_spike_out: 0.0
                 latency_spike_out: 0.0
           dendrite:
-            - name: neuroscale_synapse
+            - name: neuroscale_dendrites
               attributes:
-                model: neuroscale_synapse
+                model: accumulator
                 energy_update: 0.0
                 latency_update: 0.0
             # - name: neuroscale_dendrites_delay
@@ -76,7 +76,7 @@ architecture:
             - name: neuroscale_synapse
               attributes:
                 energy_process_spike: 1.2e-09
-                model: neuroscale_synapse
+                model: current_based
                 latency_process_spike: 4.7e-09
           axon_out:
             - name: neuroscale_out
