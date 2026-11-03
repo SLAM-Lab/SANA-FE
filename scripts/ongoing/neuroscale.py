@@ -504,11 +504,16 @@ TIMING_COLUMNS = ["protocol", "core_id", "sim_step", "wall_clock"]
 ACTSIM_LABEL = "actsim"
 
 
+# actsim's sim_step k is SANA-FE's step k+1 (SANA-FE steps start at 1)
+ACTSIM_STEP_OFFSET = int(os.environ.get("NEUROSCALE_ACTSIM_STEP_OFFSET", "1"))
+
+
 def load_actsim_timing(path, protocol=ACTSIM_LABEL):
     """
     Read ticks_core_timing.csv from fig4.py into the same tidy frame
     neuroscale.py builds. Relabels the protocol column so the two sources can
-    be concatenated and plotted by the same code.
+    be concatenated and plotted by the same code, and shifts actsim's step
+    numbers by ACTSIM_STEP_OFFSET so each step lines up with SANA-FE's.
     """
     df = pd.read_csv(path)
     missing = set(TIMING_COLUMNS) - set(df.columns)
@@ -516,6 +521,7 @@ def load_actsim_timing(path, protocol=ACTSIM_LABEL):
         raise ValueError(f"{path} is missing columns: {sorted(missing)}")
     df = df[TIMING_COLUMNS].copy()
     df["protocol"] = protocol
+    df["sim_step"] = df["sim_step"] + ACTSIM_STEP_OFFSET
     return df
 
 
