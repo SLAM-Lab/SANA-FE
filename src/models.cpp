@@ -70,18 +70,21 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::update(
         const size_t synapse_address, const bool read,
         const long int simulation_time)
 {
-    PipelineResult output =
-            CurrentBasedSynapseModel::update(synapse_address, read, simulation_time);
+    PipelineResult output = CurrentBasedSynapseModel::update(
+            synapse_address, read, simulation_time);
     double latency = 0.0;
     if (read)
     {
+        energy += energy_read_synapse;
         latency += latency_read_synapse;
         if (axons_seen.insert(axon_of_synapse.at(synapse_address)).second)
         {
             // A new axon extends this step's scan by one slot
+            energy += energy_scan_axon;
             latency += latency_scan_axon;
         }
     }
+    output.energy = energy;
     output.latency = latency;
     return output;
 }
@@ -90,6 +93,7 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
         const long int /*timestep*/)
 {
     PipelineResult output;
+    output.energy = energy_scan_axon * static_cast<double>(axons_seen.size());
     output.latency = latency_scan_axon * static_cast<double>(axons_seen.size());
     return output;
 }

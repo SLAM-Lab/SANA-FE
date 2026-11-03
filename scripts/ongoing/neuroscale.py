@@ -65,16 +65,19 @@ except ImportError:
 # ===========================================================================
 ARCH_PATH = os.environ.get("NEUROSCALE_ARCH",
                            os.path.join(PROJECT_DIR, "arch", "neuroscale3.yaml"))
+ARCH_PATH = "/home/jab23579/neuro/sana-fe/arch/neuroscale3.yaml"
 PROTOCOLS = ["clock", "barrier", "neuroscale"]
 PROTOCOL_LABELS = {
     "clock": "TrueNorth (clock)",
     "barrier": "Loihi (barrier)",
     "neuroscale": "NeuroScale",
 }
-LOG_DIR = os.environ.get("NEUROSCALE_LOG_DIR",
-                         os.path.join(PROJECT_DIR, "runs", "neuroscale"))
+# LOG_DIR = os.environ.get("NEUROSCALE_LOG_DIR",
+#                          os.path.join(PROJECT_DIR, "runs", "neuroscale"))
+LOG_DIR = "/home/jab23579/neuro/sana-fe/runs/neuroscale"
 # Reference timing from actsim (fig4.py); comparison is skipped if missing
-ACTSIM_CSV = os.environ.get("NEUROSCALE_ACTSIM_CSV")
+# ACTSIM_CSV = os.environ.get("NEUROSCALE_ACTSIM_CSV")
+ACTSIM_CSV = "/home/jab23579/neuro/sana-fe/runs/neuroscale/ticks_core_timing.csv"
 
 # Network constants (from the paper's Methods section)
 NUM_POPULATIONS = 16

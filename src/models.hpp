@@ -83,7 +83,9 @@ public:
 private:
     std::vector<size_t> axon_of_synapse;
     std::unordered_set<size_t> axons_seen;
+    double energy_read_synapse{0.0};
     double latency_read_synapse{0.0};
+    double energy_scan_axon{0.0};
     double latency_scan_axon{0.0};
 };
 

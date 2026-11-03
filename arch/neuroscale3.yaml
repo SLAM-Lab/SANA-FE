@@ -73,11 +73,14 @@ architecture:
             #     energy_update: 0.0
             #     latency_update: 0.0
           synapse:
-            - name: neuroscale_synapse
+            - name: neuroscale_synapses
               attributes:
-                energy_process_spike: 1.2e-09
-                model: current_based
-                latency_process_spike: 4.7e-09
+                model: neuroscale_synapse
+                energy_read_synapse: 1.2e-09
+                energy_scan_axon: 0.0e-9
+                latency_read_synapse: 4.7e-09
+                # TODO: figure out how to calibrate these?
+                latency_scan_axon: 3.8e-9
           axon_out:
             - name: neuroscale_out
               attributes:
