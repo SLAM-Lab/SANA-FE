@@ -13,7 +13,7 @@ architecture:
     sync_protocol: neuroscale
     max_steps_async: 6  # TIME_ADVANCE: 7, TIME_HISTORY: 8
   tile:
-    - name: neuroscale_tile[0..31]
+    - name: neuroscale_tile[0..15]
       attributes:
         energy_north_hop: 1.2e-05
         latency_north_hop: 0.0e-10
