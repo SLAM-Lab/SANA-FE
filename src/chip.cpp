@@ -724,8 +724,10 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
         // Fixed latency of every unit in use, called once per time-step
         for (PipelineUnit &unit : core.pipeline_hw_in_use)
         {
-            core.next_message_generation_delay +=
-                    unit.timestep_latency(ts.timestep);
+            const PipelineResult result = unit.begin_timestep(ts.timestep);
+            unit.energy += result.energy.value_or(0.0);
+            unit.latency += result.latency.value_or(0.0);
+            core.next_message_generation_delay += result.latency.value_or(0.0);
         }
 
         // Per-spike updates, i.e., synapse and dendrite ops

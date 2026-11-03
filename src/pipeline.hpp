@@ -108,9 +108,12 @@ public:
         throw std::logic_error("Error: Soma input not implemented");
     }
     virtual void track_connection(size_t /*synapse_address*/, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) {}
-    // Latency the unit spends every time-step regardless of input (e.g., to
-    //  scan its memory). It delays the core's next outgoing message
-    virtual double timestep_latency(long int /*timestep*/) { return 0.0; }
+    // Called once per unit at the start of every time-step, before the core
+    //  replays latched input or processes any events. Use it for per-step work
+    //  that doesn't depend on input (e.g., scanning memory, updating counters).
+    //  Returns the energy and latency spent (any current or neuron status is
+    //  ignored). The latency delays the core's next outgoing message
+    virtual PipelineResult begin_timestep(long int /*timestep*/) { return {}; }
     virtual double get_potential(size_t /*neuron_address*/)
     {
         return 0.0;

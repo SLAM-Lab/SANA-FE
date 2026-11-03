@@ -86,10 +86,12 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::update(
     return output;
 }
 
-double sanafe::NeuroScaleSynapseModel::timestep_latency(
+sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
         const long int /*timestep*/)
 {
-    return latency_scan_axon * static_cast<double>(axons_seen.size());
+    PipelineResult output;
+    output.latency = latency_scan_axon * static_cast<double>(axons_seen.size());
+    return output;
 }
 
 void sanafe::NeuroScaleSynapseModel::set_attribute_hw(
