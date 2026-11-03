@@ -45,14 +45,12 @@ public:
     MappedNeuron *const pre_neuron;
     MappedNeuron *const post_neuron;
     PipelineUnit *synapse_hw{nullptr};
-    std::vector<PipelineUnit *> message_processing_pipeline;
     size_t connection_offset{0UL};
     size_t mapped_dendrite_hw_address{0UL};
     size_t mapped_synapse_hw_address{0UL};
 
     explicit MappedConnection(MappedNeuron &pre_neuron, MappedNeuron &post_neuron);
     void set_attributes(const std::map<std::string, sanafe::ModelAttribute> &attributes) const;
-    void build_message_processing_pipeline();
 };
 
 class MappedNeuron
@@ -70,7 +68,6 @@ public:
     PipelineUnit *dendrite_hw{nullptr};
     PipelineUnit *soma_hw{nullptr};
     AxonOutUnit *axon_out_hw{nullptr};
-    std::vector<PipelineUnit *> neuron_processing_pipeline;
 
     size_t mapped_offset_within_core{std::numeric_limits<size_t>::max()};
     size_t mapped_dendrite_hw_address{std::numeric_limits<size_t>::max()};
@@ -95,9 +92,6 @@ public:
 
     MappedNeuron& operator=(MappedNeuron&& other) = default;
     void set_attributes(const std::map<std::string, ModelAttribute> &attributes, std::optional<bool> set_log_spikes=std::nullopt);
-
-private:
-    void build_neuron_processing_pipeline();
 };
 
 }

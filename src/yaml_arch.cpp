@@ -338,7 +338,7 @@ sanafe::CorePipelineConfiguration sanafe::description_parse_core_pipeline_yaml(
         energy_node.load(&pipeline_config.log_energy);
     }
 
-    pipeline_config.buffer_position = pipeline_parse_buffer_pos_str(
+    pipeline_config.buffer_position = pipeline_parse_buffer_position_str(
             yaml_required_field<std::string>(
                     parser, attributes, "buffer_position"),
             buffer_inside_unit);

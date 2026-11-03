@@ -22,39 +22,6 @@ sanafe::MappedConnection::MappedConnection(
 {
 }
 
-void sanafe::MappedConnection::build_message_processing_pipeline()
-{
-    MappedNeuron &n = *post_neuron;
-    const Core &mapped_core = *(n.core);
-
-    // Cache whether *any* of the post-synaptic neuron's connections requires
-    //  forcing updates every time-step. The connections might be mapped to
-    //  different synapse units, so if this is true we still need to check each
-    //  connection before updating. However, if false, it avoids us iterating
-    //  over every connection every time-step
-    n.check_for_synapse_updates_every_timestep |=
-            synapse_hw->update_every_timestep;
-
-    // We don't support putting the buffer inside or before the synapse unit, so
-    //  unconditionally push the synapse h/w. This is because putting the buffer
-    //  here could result in a spike being sent before all computation for the
-    //  time-step has being completed (i.e. the order of spike arrival can
-    //  affect the results)
-    message_processing_pipeline.push_back(synapse_hw);
-    if ((mapped_core.pipeline_config.buffer_position >
-                buffer_inside_dendrite_unit) &&
-            (n.dendrite_hw != synapse_hw))
-    {
-        message_processing_pipeline.push_back(n.dendrite_hw);
-    }
-    if ((mapped_core.pipeline_config.buffer_position >
-                buffer_before_soma_unit) &&
-            (n.soma_hw != n.dendrite_hw))
-    {
-        message_processing_pipeline.push_back(n.soma_hw);
-    }
-}
-
 void sanafe::MappedConnection::set_attributes(
         const std::map<std::string, sanafe::ModelAttribute> &model_attributes)
         const
@@ -102,10 +69,6 @@ sanafe::MappedNeuron::MappedNeuron(const size_t nid,
         , log_spikes(neuron_to_map.log_spikes)
         , log_potential(neuron_to_map.log_potential)
 {
-    // The neuron processing pipeline is a sequence of hardware to update the
-    //  neuron, the message processing pipeline is built later when mapping
-    //  connections
-    build_neuron_processing_pipeline();
 }
 
 void sanafe::MappedNeuron::set_attributes(
@@ -159,29 +122,6 @@ void sanafe::MappedNeuron::set_attributes(
                     "Mapping to h/w failed.");
             INFO("Error: %s\n", error.c_str());
             throw HardwareMappingError(error);
-        }
-    }
-}
-
-void sanafe::MappedNeuron::build_neuron_processing_pipeline()
-{
-    bool dendrite_hw_added = false;
-    if (core->pipeline_config.buffer_position < buffer_inside_dendrite_unit)
-    {
-        throw std::runtime_error(
-                "Error: Buffer must be inside or after dendrite h/w");
-    }
-    if (core->pipeline_config.buffer_position <= buffer_inside_dendrite_unit)
-    {
-        neuron_processing_pipeline.push_back(dendrite_hw);
-        dendrite_hw_added = true;
-    }
-    if (core->pipeline_config.buffer_position <= buffer_inside_soma_unit)
-    {
-        // Avoid pushing the same h/w unit twice
-        if ((soma_hw != dendrite_hw) || !dendrite_hw_added)
-        {
-            neuron_processing_pipeline.push_back(soma_hw);
         }
     }
 }

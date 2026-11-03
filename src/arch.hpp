@@ -40,11 +40,14 @@ namespace sanafe
 
 enum BufferPosition : uint8_t
 {
-    buffer_inside_dendrite_unit = 1U,
-    buffer_before_soma_unit = 2U,
-    buffer_inside_soma_unit = 3U,
-    buffer_before_axon_out_unit = 4U,
-    buffer_positions = 5U,
+    buffer_before_synapse_unit = 0U,
+    buffer_inside_synapse_unit = 1U,
+    buffer_before_dendrite_unit = 2U,
+    buffer_inside_dendrite_unit = 3U,
+    buffer_before_soma_unit = 4U,
+    buffer_inside_soma_unit = 5U,
+    buffer_before_axon_out_unit = 6U,
+    buffer_positions = 7U,
 };
 
 struct ModelInfo

@@ -85,7 +85,14 @@ public:
     std::vector<MappedNeuron> neurons;
     std::vector<MappedConnection *> connections_in;
     std::vector<AxonOutModel> axons_out;
-    std::vector<PipelineResult> timestep_buffer;
+    // Pipeline results stored between stages. Results for spikes (before
+    //  the dendrite reduces them) go in the message buffer, identified by
+    //  axon_id/synapse_id. Results after that go in the neuron buffer, one per
+    //  neuron. The time-step buffer is the position between the two halves of
+    //  each time-step, and whichever buffer is used there is kept until the
+    //  next update
+    std::vector<PipelineResult> message_buffer;
+    std::vector<PipelineResult> neuron_buffer;
 
     std::unordered_set<size_t> fan_out;
     std::unordered_set<size_t> fan_in;

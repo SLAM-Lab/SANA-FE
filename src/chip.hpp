@@ -192,10 +192,12 @@ private:
     void process_neurons(Timestep &ts);
     void process_messages(Timestep &ts);
     void forced_updates(const Timestep &ts);
-    void process_neuron(Timestep &ts, MappedNeuron &n);
     void receive_message(Message &m);
-    static double process_message(Timestep &ts, Core &c, Message &m);
-    static PipelineResult execute_pipeline(const std::vector<PipelineUnit *> &pipeline, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
+    static void process_message(Timestep &ts, Core &core, size_t stage, bool receiving);
+    static void process_neuron(Timestep &ts, Core &core, size_t stage, size_t first_stage);
+    static void buffer_synapse_results(Core &core);
+    static void axon_lookups(Core &core);
+    static PipelineResult process_unit(PipelineUnit &unit, Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con, const PipelineResult &input);
     static double pipeline_process_axon_in(Core &core, const Message &m);
     PipelineResult pipeline_process_axon_out(Timestep &ts, MappedNeuron &n);
 

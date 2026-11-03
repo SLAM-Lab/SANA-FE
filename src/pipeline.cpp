@@ -100,6 +100,8 @@ sanafe::PipelineResult sanafe::PipelineUnit::process(Timestep &ts,
     TRACE2(CHIP, "Updating nid:%zu (ts:%ld)\n", n.id, ts.timestep);
     // Process inputs
     PipelineResult output = process_input_fn(ts, n, con, input);
+    output.axon_id = input.axon_id;
+    output.synapse_id = input.synapse_id;
 
     // Post-processing on outputs
     process_output_fn(n, con, output);
@@ -290,27 +292,30 @@ void sanafe::PipelineUnit::soma_set_default_attributes()
     }
 }
 
-sanafe::BufferPosition sanafe::pipeline_parse_buffer_pos_str(
+sanafe::BufferPosition sanafe::pipeline_parse_buffer_position_str(
         const std::string &buffer_pos_str, const bool buffer_inside_unit)
 {
     BufferPosition buffer_pos{buffer_before_soma_unit};
     // H/w either has SANA-FE insert and manage a time-step buffer on the h/w
     //  unit's inputs (before the unit), or can assume that the unit manages its
     //  own state that is internally buffered over consecutive time-steps e.g.,
-    //  using a double buffer
-    if (buffer_pos_str == "dendrite" && buffer_inside_unit)
+    //  using a double buffer managed by a plugin
+    if (buffer_pos_str == "synapse")
     {
-        buffer_pos = buffer_inside_dendrite_unit;
+        buffer_pos = buffer_inside_unit ? buffer_inside_synapse_unit :
+                                          buffer_before_synapse_unit;
+    }
+    else if (buffer_pos_str == "dendrite")
+    {
+        buffer_pos = buffer_inside_unit ? buffer_inside_dendrite_unit :
+                                          buffer_before_dendrite_unit;
     }
     else if (buffer_pos_str == "soma")
     {
         if (buffer_inside_unit)
         {
-            buffer_pos = buffer_inside_soma_unit;
-        }
-        else
-        {
-            buffer_pos = buffer_before_soma_unit;
+            buffer_pos = buffer_inside_unit ? buffer_inside_soma_unit :
+                                              buffer_before_soma_unit;
         }
     }
     else if (buffer_pos_str == "axon_out")

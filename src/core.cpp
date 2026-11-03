@@ -41,7 +41,7 @@ sanafe::Core::Core(const CoreConfiguration &config)
         , parent_tile_id(config.address.parent_tile_id)
         , log_energy(config.pipeline.log_energy)
 {
-    timestep_buffer.resize(pipeline_config.max_neurons_supported);
+    neuron_buffer.resize(pipeline_config.max_neurons_supported);
 }
 
 void sanafe::Core::update_hw_in_use()
@@ -225,7 +225,21 @@ void sanafe::Core::map_connection(const Connection &con,
     mapped_con.synapse_hw = get_synapse_hw(synapse_hw_name);
     mapped_con.synapse_hw->add_connection(mapped_con);
 
-    mapped_con.build_message_processing_pipeline();
+    if ((pipeline_config.buffer_position == buffer_before_dendrite_unit) &&
+            (mapped_con.synapse_hw == post_neuron.dendrite_hw))
+    {
+        throw std::invalid_argument("Error: Buffer can't be before the "
+                                    "dendrite when one unit implements both "
+                                    "the synapse and dendrite");
+    }
+
+    // Cache whether *any* of the post-synaptic neuron's connections requires
+    //  forcing updates every time-step. The connections might be mapped to
+    //  different synapse units, so if this is true we still need to check each
+    //  connection before updating. However, if false, it avoids us iterating
+    //  over every connection every time-step
+    post_neuron.check_for_synapse_updates_every_timestep |=
+            mapped_con.synapse_hw->update_every_timestep;
     mapped_con.set_attributes(con.synapse_attributes);
     TRACE2(CHIP, "Mapped connection to hw: %s\n",
             mapped_con.synapse_hw->name.c_str());

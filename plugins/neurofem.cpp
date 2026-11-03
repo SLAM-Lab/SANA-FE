@@ -248,7 +248,9 @@ sanafe::PipelineResult NeuroFEMModel::update(size_t neuron_address,
         }
     }
 
-    return {std::nullopt, state, std::nullopt, std::nullopt};
+    sanafe::PipelineResult result;
+    result.status = state;
+    return result;
 }
 
 //  ######################

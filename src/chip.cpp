@@ -170,7 +170,8 @@ void sanafe::SpikingChip::clear_hw()
             mapped_cores = 0UL;
 
             // Clear any core pipeline buffers
-            std::fill(core.timestep_buffer.begin(), core.timestep_buffer.end(),
+            core.message_buffer.clear();
+            std::fill(core.neuron_buffer.begin(), core.neuron_buffer.end(),
                     PipelineResult{});
 
             for (auto &hw : core.pipeline_hw)
@@ -607,7 +608,8 @@ void sanafe::SpikingChip::reset()
         for (Core &core : tile.cores)
         {
             // Clear any core pipeline buffers
-            std::fill(core.timestep_buffer.begin(), core.timestep_buffer.end(),
+            core.message_buffer.clear();
+            std::fill(core.neuron_buffer.begin(), core.neuron_buffer.end(),
                     PipelineResult{});
 
             for (auto &hw : core.pipeline_hw)
@@ -647,7 +649,63 @@ double sanafe::SpikingChip::get_power() const noexcept
     return power;
 }
 
-// Pipeline modeling
+// Each time-step is executed in two phases. The time-step double buffer
+//  determines which neural operations execute in each phase. When messages are
+//  received, their spikes progress through the pipeline stages up to the
+//  time-step buffer. In the following neuron update, the remaining stages
+//  execute for every neuron. SANA-FE executes one stage at a time over all
+//  spikes (or neurons) on a core, storing the results between stages in the
+//  core's message or neuron buffer. This is *not* totally true to the hardware
+//  (which is purely spike-driven), but executing each neural stage in turn
+//  is simpler and makes it easier for other simulation optimizations, e.g.,
+//  batch processing
+
+// Keep as constexpr (rather than enum) to make arithmetic possible later
+constexpr size_t synapse_stage = 0UL;
+constexpr size_t dendrite_stage = 1UL;
+constexpr size_t soma_stage = 2UL;
+constexpr size_t axon_out_stage = 3UL;
+
+size_t get_buffer_stage(const sanafe::Core &core)
+{
+    switch (core.pipeline_config.buffer_position)
+    {
+    case sanafe::buffer_before_synapse_unit:
+    case sanafe::buffer_inside_synapse_unit:
+        return synapse_stage;
+    case sanafe::buffer_before_dendrite_unit:
+    case sanafe::buffer_inside_dendrite_unit:
+        return dendrite_stage;
+    case sanafe::buffer_before_soma_unit:
+    case sanafe::buffer_inside_soma_unit:
+        return soma_stage;
+    default:
+        return axon_out_stage;
+    }
+}
+
+// If inside, the unit (plug-in) manages buffered state itself (instead of in
+//  the SANA-FE kernel). The unit will then be executed in both time-step
+//  phases: first for every spike message, then in the next neuron update
+bool buffer_inside_unit(const sanafe::Core &core)
+{
+    const sanafe::BufferPosition position =
+            core.pipeline_config.buffer_position;
+    return (position == sanafe::buffer_inside_synapse_unit) ||
+            (position == sanafe::buffer_inside_dendrite_unit) ||
+            (position == sanafe::buffer_inside_soma_unit);
+}
+
+sanafe::PipelineUnit *get_unit(const size_t stage,
+        const sanafe::MappedConnection *con, const sanafe::MappedNeuron &n)
+{
+    if (stage == synapse_stage)
+    {
+        return con->synapse_hw;
+    }
+    return (stage == dendrite_stage) ? n.dendrite_hw : n.soma_hw;
+}
+
 void sanafe::SpikingChip::process_neurons(Timestep &ts)
 {
     auto core_list = cores();
@@ -660,9 +718,36 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
     for (int idx = 0; idx < static_cast<int>(core_list.size()); idx++)
     {
         Core &core = core_list.at(idx);
+
+        // Per-spike updates, i.e., synapse and dendrite ops
+        if (get_buffer_stage(core) == synapse_stage)
+        {
+            for (size_t stage = get_buffer_stage(core); stage <= dendrite_stage;
+                    ++stage)
+            {
+                process_message(ts, core, stage, false);
+            }
+        }
+        core.message_buffer.clear();
+
+        // Per-neuron updates
+        const size_t first_neuron_processing_stage =
+                std::max(get_buffer_stage(core), dendrite_stage);
+        for (size_t stage = first_neuron_processing_stage; stage <= soma_stage;
+                ++stage)
+        {
+            process_neuron(ts, core, stage, first_neuron_processing_stage);
+        }
+
+        // Finally send spikes for any neurons that fired
         for (MappedNeuron &n : core.neurons)
         {
-            process_neuron(ts, n);
+            core.neuron_buffer.at(n.mapped_offset_within_core) =
+                    PipelineResult{};
+            if (n.status == fired)
+            {
+                pipeline_process_axon_out(ts, n);
+            }
         }
 
         // Account for any remaining neuron processing
@@ -715,8 +800,23 @@ void sanafe::SpikingChip::process_messages(Timestep &ts)
         for (auto &m_ref : core.messages_in)
         {
             Message &m = m_ref;
-            m.processing_delay += process_message(ts, core, m);
+            m.processing_delay += pipeline_process_axon_in(core, m);
+            core.axons_in.at(m.dest_axon_id).message = &m;
+
+            PipelineResult spike{};
+            spike.axon_id = m.dest_axon_id;
+            core.message_buffer.push_back(spike);
         }
+
+        // Execute any units before the timestep buffer
+        const size_t end_stage =
+                get_buffer_stage(core) + (buffer_inside_unit(core) ? 1UL : 0UL);
+        for (size_t stage = synapse_stage;
+                stage < std::min(end_stage, axon_out_stage); ++stage)
+        {
+            process_message(ts, core, stage, true);
+        }
+        buffer_synapse_results(core);
     }
 }
 
@@ -736,83 +836,130 @@ void sanafe::SpikingChip::receive_message(Message &m)
     core.messages_in.emplace_back(m);
 }
 
-void sanafe::SpikingChip::process_neuron(Timestep &ts, MappedNeuron &n)
+void sanafe::SpikingChip::process_message(
+        Timestep &ts, Core &core, const size_t stage, const bool receiving)
 {
-    Core &c = *(n.core);
-    const bool simulate_buffer =
-            (c.pipeline_config.buffer_position == buffer_before_soma_unit);
-
-    PipelineResult input{};
-    if (simulate_buffer)
+    // Process every spike in the message buffer. Latency is added to each
+    //  spike's message when it is received, or delays the core's next spikes
+    //  when processed in the next update
+    if (stage == synapse_stage)
     {
-        // Read then clear the pipeline buffer entry
-        input = c.timestep_buffer.at(n.mapped_offset_within_core);
-        c.timestep_buffer.at(n.mapped_offset_within_core) = PipelineResult{};
+        axon_lookups(core);
     }
-    const std::optional<MappedConnection *> no_con{std::nullopt};
-    const PipelineResult pipeline_output = execute_pipeline(
-            n.neuron_processing_pipeline, ts, n, no_con, input);
-    n.core->next_message_generation_delay +=
-            pipeline_output.latency.value_or(0.0);
-    TRACE2(CHIP, "nid:%s.%zu +%e:%e\n", n.parent_group_name.c_str(), n.offset,
-            pipeline_output.latency.value_or(0.0),
-            n.core->next_message_generation_delay);
-    if (n.status == fired)
+    for (PipelineResult &result : core.message_buffer)
     {
-        pipeline_process_axon_out(ts, n);
-    }
-}
-
-double sanafe::SpikingChip::process_message(
-        Timestep &ts, Core &core, Message &m)
-{
-    double message_processing_latency = pipeline_process_axon_in(core, m);
-
-    assert(static_cast<size_t>(m.dest_axon_id) < core.axons_in.size());
-    const AxonInModel &axon_in = core.axons_in.at(m.dest_axon_id);
-    const PipelineResult
-            empty_input{}; // Empty/default struct used as dummy input
-
-    for (const size_t synapse_address : axon_in.synapse_addresses)
-    {
-        MappedConnection &con = *(core.connections_in.at(synapse_address));
-        // In certain pipeline configurations, every synaptic lookup requires
-        //  updates to the dendrite and/or soma units as well. Keep propagating
-        //  outputs/inputs until we hit the time-step buffer, where outputs
-        //  are stored as inputs ready for the next time-step
-        MappedNeuron &n = *(con.post_neuron);
-
-        const PipelineResult pipeline_output = execute_pipeline(
-                con.message_processing_pipeline, ts, n, &con, empty_input);
-        core.timestep_buffer.at(n.mapped_offset_within_core) = pipeline_output;
-        message_processing_latency += pipeline_output.latency.value_or(0.0);
-    }
-
-    return message_processing_latency;
-}
-
-sanafe::PipelineResult sanafe::SpikingChip::execute_pipeline(
-        const std::vector<PipelineUnit *> &pipeline, Timestep &ts,
-        MappedNeuron &n, std::optional<MappedConnection *> con,
-        const PipelineResult &input)
-{
-    double total_energy{0.0};
-    double total_latency{0.0};
-
-    PipelineResult output{input};
-    for (auto *unit : pipeline)
-    {
-        output = unit->process(ts, n, con, output);
-        total_energy += output.energy.value_or(0.0);
-        total_latency += output.latency.value_or(0.0);
-        if (output.status != NeuronStatus::neuron_state_unset)
+        MappedConnection *con =
+                core.connections_in.at(result.synapse_id.value());
+        MappedNeuron &n = *(con->post_neuron);
+        PipelineUnit *unit = get_unit(stage, con, n);
+        if ((stage > synapse_stage) && (unit == get_unit(stage - 1UL, con, n)))
         {
-            n.status = output.status;
+            continue; // Combined unit, already ran in the previous stage
+        }
+        result = process_unit(*unit, ts, n, con, result);
+
+        double &delay = receiving ? core.axons_in.at(result.axon_id.value())
+                                            .message->processing_delay :
+                                    core.next_message_generation_delay;
+        delay += result.latency.value_or(0.0);
+    }
+}
+
+void sanafe::SpikingChip::process_neuron(Timestep &ts, Core &core,
+        const size_t stage, const size_t first_neuron_processing_stage)
+{
+    // Process all neurons at a given pipeline stage, e.g., process all soma
+    //  updates for the core
+    // TODO: in future it may be useful to batch process a set of mapped neurons
+    for (MappedNeuron &n : core.neurons)
+    {
+        PipelineUnit *unit = get_unit(stage, nullptr, n);
+        if ((stage > first_neuron_processing_stage) &&
+                (unit == get_unit(stage - 1UL, nullptr, n)))
+        {
+            continue; // Combined unit, already ran in the previous stage
+        }
+        PipelineResult &result =
+                core.neuron_buffer.at(n.mapped_offset_within_core);
+        result = process_unit(*unit, ts, n, std::nullopt, result);
+        core.next_message_generation_delay += result.latency.value_or(0.0);
+    }
+}
+
+void sanafe::SpikingChip::buffer_synapse_results(Core &core)
+{
+    const bool spikes_buffered = (get_buffer_stage(core) == synapse_stage) ||
+            ((get_buffer_stage(core) == dendrite_stage) &&
+                    !buffer_inside_unit(core));
+    // Received spikes have been processed up to the time-step buffer
+    if (spikes_buffered)
+    {
+        if ((get_buffer_stage(core) == synapse_stage) &&
+                buffer_inside_unit(core))
+        {
+            // The synapse holds the input; keep which synapses to deliver from
+            for (PipelineResult &result : core.message_buffer)
+            {
+                PipelineResult delivery{};
+                delivery.synapse_id = result.synapse_id;
+                result = delivery;
+            }
+        }
+        // Spikes wait in the message buffer until the next update
+        return;
+    }
+
+    if ((get_buffer_stage(core) == soma_stage) && !buffer_inside_unit(core))
+    {
+        // The buffer is before the soma: each neuron's dendritic output is
+        //  the soma's input in the next update. Later spikes for the same
+        //  neuron overwrite earlier ones, as the dendrite accumulates them
+        for (const PipelineResult &result : core.message_buffer)
+        {
+            const MappedConnection &con =
+                    *(core.connections_in.at(result.synapse_id.value()));
+            core.neuron_buffer.at(con.post_neuron->mapped_offset_within_core)
+                    .current = result.current;
         }
     }
+    // Otherwise, any units after this point read their state from inside
+    //  the unit holding the buffer
+    core.message_buffer.clear();
+}
 
-    output.energy = total_energy;
-    output.latency = total_latency;
+void sanafe::SpikingChip::axon_lookups(Core &core)
+{
+    // Lookup axons over all buffered spike messages in a single pass. This
+    //  updates the buffer with all read synapse addresses
+    std::vector<PipelineResult> synapse_results;
+    synapse_results.reserve(core.message_buffer.size());
+    for (const PipelineResult &result : core.message_buffer)
+    {
+        if (result.synapse_id.has_value())
+        {
+            synapse_results.push_back(result);
+            continue;
+        }
+        const AxonInModel &axon = core.axons_in.at(result.axon_id.value());
+        for (const size_t synapse_address : axon.synapse_addresses)
+        {
+            PipelineResult synapse_result = result;
+            synapse_result.synapse_id = synapse_address;
+            synapse_results.push_back(synapse_result);
+        }
+    }
+    core.message_buffer = std::move(synapse_results);
+}
+
+sanafe::PipelineResult sanafe::SpikingChip::process_unit(PipelineUnit &unit,
+        Timestep &ts, MappedNeuron &n, std::optional<MappedConnection *> con,
+        const PipelineResult &input)
+{
+    PipelineResult output = unit.process(ts, n, con, input);
+    if (output.status != NeuronStatus::neuron_state_unset)
+    {
+        n.status = output.status;
+    }
     return output;
 }
 
@@ -1044,8 +1191,8 @@ void sanafe::SpikingChip::forced_updates(const Timestep &ts)
                 if ((core.pipeline_config.buffer_position ==
                             buffer_before_soma_unit))
                 {
-                    core.timestep_buffer.at(n.mapped_offset_within_core)
-                            .current = result.current;
+                    core.neuron_buffer.at(n.mapped_offset_within_core).current =
+                            result.current;
                 }
                 if (result.energy.has_value())
                 {
@@ -1309,7 +1456,6 @@ void sanafe::SpikingChip::sim_create_neuron_axons(MappedNeuron &pre_neuron)
     }
     TRACE3(CHIP, "Allocated all axons for nid:%zu count: %d\n", pre_neuron.id,
             pre_neuron.maps_out_count);
-
 
     for (MappedConnection &curr_connection : pre_neuron.connections_out)
     {

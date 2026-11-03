@@ -166,7 +166,9 @@ public:
 
         INFO("Updating potential, after:%f\n", V);
 
-        return {std::nullopt, status, std::nullopt, std::nullopt};
+        sanafe::PipelineResult update_result;
+        update_result.status = status;
+        return update_result;
     }
 };
 

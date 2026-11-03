@@ -59,6 +59,8 @@ struct SomaLatencyMetrics
 struct PipelineResult
 {
     // Hardware outputs
+    std::optional<size_t> axon_id{std::nullopt};
+    std::optional<size_t> synapse_id{std::nullopt};
     std::optional<double> current{std::nullopt};
     NeuronStatus status{neuron_state_unset};
     // Optionally simulate energy and/or latency
@@ -301,7 +303,7 @@ public:
     void track_connection(size_t /*synapse_address*/, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) final {};
 };
 
-BufferPosition pipeline_parse_buffer_pos_str(
+BufferPosition pipeline_parse_buffer_position_str(
         const std::string &buffer_pos_str, bool buffer_inside_unit);
 }
 
@@ -442,6 +444,12 @@ inline void sanafe::PipelineUnit::process_synapse_output(
         const MappedNeuron & /*n*/, std::optional<MappedConnection *> con,
         PipelineResult &output)
 {
+    if (!output.axon_id.has_value() && con.has_value())
+    {
+        output.energy = output.energy.value_or(0.0);
+        output.latency = output.latency.value_or(0.0);
+        return;
+    }
     calculate_synapse_default_energy_latency(*(con.value_or(nullptr)), output);
 }
 
@@ -460,7 +468,7 @@ inline void sanafe::PipelineUnit::process_soma_output(MappedNeuron &n,
 
 inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
         const Timestep &ts, const MappedNeuron & /*n*/,
-        std::optional<MappedConnection *> con, const PipelineResult & /*input*/)
+        std::optional<MappedConnection *> con, const PipelineResult &input)
 {
     bool read = false;
     size_t synapse_address = 0UL;
@@ -474,10 +482,16 @@ inline sanafe::PipelineResult sanafe::PipelineUnit::process_synapse_input(
     else
     {
         synapse_address = con.value()->mapped_synapse_hw_address;
-        read = true;
+        // If there is no buffered input, assume that the synapse unit is
+        //  managing any buffered spikes internally
+        read = input.axon_id.has_value();
     }
     PipelineResult output = update(synapse_address, read, ts.timestep);
-    ++spikes_processed;
+    if (read || !con.has_value())
+    {
+        ++spikes_processed;
+    }
+    // else updated without logging spikes
 
     return output;
 }

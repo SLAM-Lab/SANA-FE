@@ -14,8 +14,8 @@ architecture:
     # Enable this if simulating with more detailed timing models
     sync_model: table
     latency_sync: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
-    sync_protocol: neuroscale
-    max_steps_async: 7
+    # sync_protocol: neuroscale
+    # max_steps_async: 7
   tile:
     - name: loihi_tile[0..31]
       attributes:

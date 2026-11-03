@@ -418,8 +418,9 @@ std::unique_ptr<sanafe::CoreConfiguration> pyconstruct_core(std::string name,
 {
     sanafe::CorePipelineConfiguration pipeline_config{};
 
-    pipeline_config.buffer_position = sanafe::pipeline_parse_buffer_pos_str(
-            buffer_position, buffer_inside_unit);
+    pipeline_config.buffer_position =
+            sanafe::pipeline_parse_buffer_position_str(
+                    buffer_position, buffer_inside_unit);
     pipeline_config.max_neurons_supported = max_neurons_supported;
     pipeline_config.log_energy = log_energy;
 
@@ -1032,6 +1033,10 @@ PYBIND11_MODULE(sanafecpp, m)
     m.attr("model_attributes") = sanafe::get_builtin_models();
 
     pybind11::enum_<sanafe::BufferPosition>(m, "BufferPosition")
+            .value("buffer_before_synapse_unit",
+                    sanafe::buffer_before_synapse_unit)
+            .value("buffer_inside_synapse_unit",
+                    sanafe::buffer_inside_synapse_unit)
             .value("buffer_inside_dendrite_unit",
                     sanafe::buffer_inside_dendrite_unit)
             .value("buffer_before_soma_unit", sanafe::buffer_before_soma_unit)
