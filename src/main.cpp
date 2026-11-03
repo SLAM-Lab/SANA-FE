@@ -63,7 +63,7 @@ int main(int argc, const char *argv[])
         trace_flags.record_spikes = optional_flags.record_spikes;
         trace_flags.record_potentials = optional_flags.record_spikes;
         trace_flags.record_neuron_state = optional_flags.record_neuron_state;
-        trace_flags.record_perf = optional_flags.record_spikes;
+        trace_flags.record_perf = optional_flags.record_perf;
         trace_flags.record_messages = optional_flags.record_messages;
 
         const sanafe::RunData run_summary = hw.sim(

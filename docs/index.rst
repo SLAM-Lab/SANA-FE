@@ -108,6 +108,10 @@ please cite our paper:
 References
 ==========
 
+James A. Boyle,, Jason Ho, Andreas Gerstlauer, Suma George Cardwell, and Frances S. Chance,
+"Bridging the Gap in Neuromorphic Co-Design With the SANA-FE Co-Simulation Framework,"in IEEE Computer, vol. 59, no. 11, pp. 65–75, 2026,
+`doi:10.1109/MC.2026.3718825 <https://doi.org/10.1109/MC.2026.3718825>`_.
+
 James A. Boyle, Jason Ho, Mark Plagge, Suma George Cardwell, Frances S. Chance, and Andreas Gerstlauer,
 "Exploring Dendrites in Large-Scale Neuromorphic Architectures,"
 in International Conference on Neuromorphic Systems (ICONS), Seattle, WA, USA, 2025,

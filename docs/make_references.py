@@ -9,17 +9,14 @@ Usage (from docs/ directory):
 Requirements:
     pip install bibtexparser
 """
-
 import re
 import sys
 from pathlib import Path
 try:
     import bibtexparser
-    from bibtexparser.bparser import BibTexParser
 except ImportError:
-    print("Error: bibtexparser not found. Install with: pip install bibtexparser")
+    print("Error: bibtexparser not found. Install with: pip install 'bibtexparser>=2'")
     sys.exit(1)
-
 
 def load_bibtex(bib_file: Path) -> dict:
     """Load and parse BibTeX file."""
@@ -27,11 +24,20 @@ def load_bibtex(bib_file: Path) -> dict:
         print(f"Error: {bib_file} not found!")
         sys.exit(1)
 
-    with open(bib_file, 'r', encoding='utf-8') as f:
-        parser = BibTexParser(common_strings=True)
-        bib_database = bibtexparser.load(f, parser=parser)
+    library = bibtexparser.parse_file(str(bib_file))
 
-    return {entry['ID']: entry for entry in bib_database.entries}
+    if library.failed_blocks:
+        for block in library.failed_blocks:
+            print(f"Warning: failed to parse block: {block.error}")
+
+    entries = {}
+    for entry in library.entries:
+        # Rebuild the v1-style dict the rest of the script expects
+        d = {field.key.lower(): field.value for field in entry.fields}
+        d['ID'] = entry.key
+        d['ENTRYTYPE'] = entry.entry_type.lower()
+        entries[entry.key] = d
+    return entries
 
 
 def format_authors(authors_str: str) -> str:
