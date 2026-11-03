@@ -66,6 +66,61 @@ void sanafe::CurrentBasedSynapseModel::reset()
 {
 }
 
+sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::update(
+        const size_t synapse_address, const bool read,
+        const long int simulation_time)
+{
+    PipelineResult output =
+            CurrentBasedSynapseModel::update(synapse_address, read, simulation_time);
+    double latency = 0.0;
+    if (read)
+    {
+        latency += latency_read_synapse;
+        if (axons_seen.insert(axon_of_synapse.at(synapse_address)).second)
+        {
+            // A new axon extends this step's scan by one slot
+            latency += latency_scan_axon;
+        }
+    }
+    output.latency = latency;
+    return output;
+}
+
+double sanafe::NeuroScaleSynapseModel::timestep_latency(
+        const long int /*timestep*/)
+{
+    return latency_scan_axon * static_cast<double>(axons_seen.size());
+}
+
+void sanafe::NeuroScaleSynapseModel::set_attribute_hw(
+        const std::string &attribute_name, const ModelAttribute &param)
+{
+    if (attribute_name == "latency_read_synapse")
+    {
+        latency_read_synapse = static_cast<double>(param);
+    }
+    else if (attribute_name == "latency_scan_axon")
+    {
+        latency_scan_axon = static_cast<double>(param);
+    }
+}
+
+void sanafe::NeuroScaleSynapseModel::track_connection(
+        const size_t synapse_address, const size_t src_neuron_id,
+        const size_t /*dest_neuron_id*/)
+{
+    if (axon_of_synapse.size() <= synapse_address)
+    {
+        axon_of_synapse.resize(synapse_address + 1UL);
+    }
+    axon_of_synapse[synapse_address] = src_neuron_id;
+}
+
+void sanafe::NeuroScaleSynapseModel::reset()
+{
+    axons_seen.clear();
+}
+
 // *** Dendrite models ***
 sanafe::PipelineResult sanafe::AccumulatorModel::update(size_t neuron_address,
         std::optional<double> current,
@@ -1155,6 +1210,10 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     {
         return std::shared_ptr<PipelineUnit>(new CurrentBasedSynapseModel());
     }
+    if (model_name == "neuroscale_synapse")
+    {
+        return std::shared_ptr<PipelineUnit>(new NeuroScaleSynapseModel());
+    }
     if (model_name == "accumulator")
     {
         return std::shared_ptr<PipelineUnit>(new AccumulatorModel());
@@ -1197,6 +1256,9 @@ const sanafe::ModelMap &sanafe::get_builtin_models()
             builtin_models = {{"current_based",
                                       &CurrentBasedSynapseModel::
                                               current_based_synapse_attributes},
+                    {"neuroscale_synapse",
+                            &NeuroScaleSynapseModel::
+                                    neuroscale_synapse_attributes},
                     {"accumulator", nullptr},
                     {"accumulator_with_delay", nullptr},
                     {"taps", &MultiTapModel1D::multitap_attributes},

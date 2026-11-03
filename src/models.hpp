@@ -16,6 +16,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -54,6 +55,36 @@ private:
     std::vector<double> weights;
     double min_synaptic_resolution{0.0};
     int weight_bits{default_weight_bits};
+};
+
+// NeuroScale's synapse unit. Each step it scans every input axon up to the
+//  highest axon id seen so far, whether or not that axon spiked, and then reads
+//  the synapse table for every spike. The scan cost is therefore dynamic: it
+//  grows as new axons are first seen. Every step costs one scan slot per axon
+//  seen in earlier steps (timestep_latency), plus one more slot for each axon
+//  that spikes for the first time (update).
+//  Since the framework forbids a model simulating latency while a default
+//  per-spike latency is set, this model charges both (latency_process_spike
+//  must not be set in the architecture).
+class NeuroScaleSynapseModel : public CurrentBasedSynapseModel
+{
+public:
+    NeuroScaleSynapseModel() { register_attributes(neuroscale_synapse_attributes); }
+    PipelineResult update(size_t synapse_address, bool read, long int simulation_time) override;
+    double timestep_latency(long int timestep) override;
+    void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override;
+    void track_connection(size_t synapse_address, size_t src_neuron_id, size_t dest_neuron_id) override;
+    void reset() override;
+    static inline const std::unordered_map<std::string, std::string> neuroscale_synapse_attributes{
+        {"latency_read_synapse", "(float) Latency for one synapse table read (s)."},
+        {"latency_scan_axon", "(float) Per-step latency for scanning one input axon (s)."},
+    };
+
+private:
+    std::vector<size_t> axon_of_synapse;
+    std::unordered_set<size_t> axons_seen;
+    double latency_read_synapse{0.0};
+    double latency_scan_axon{0.0};
 };
 
 class AccumulatorModel : public DendriteUnit

@@ -721,8 +721,15 @@ void sanafe::SpikingChip::process_neurons(Timestep &ts)
     {
         Core &core = core_list.at(idx);
 
+        // Fixed latency of every unit in use, called once per time-step
+        for (PipelineUnit &unit : core.pipeline_hw_in_use)
+        {
+            core.next_message_generation_delay +=
+                    unit.timestep_latency(ts.timestep);
+        }
+
         // Per-spike updates, i.e., synapse and dendrite ops
-        if (get_buffer_stage(core) == synapse_stage)
+        if (!core.message_buffer.empty())
         {
             for (size_t stage = get_buffer_stage(core); stage <= dendrite_stage;
                     ++stage)

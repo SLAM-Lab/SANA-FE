@@ -141,43 +141,20 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
     //
     // The basic recurrence is T[c,t] = L[c,t] + max(T[c,t-1], T[fan-in,t-1],
     //  T[fan-out,t-Tadv]). Optional refinements (see
-    //  NeuroscaleModelConfiguration) account for effects seen in the RTL:
-    //  a per-step scan over the input axons, a router port shared by the cores
-    //  in a tile, done/advance packets, and sender stalls while a destination
-    //  core is not accepting input.
+    //  NeuroscaleModelConfiguration) account for a router port shared by the
+    //  cores in a tile, and for the done/advance packets. The per-step axon
+    //  scan is a synapse unit cost (see NeuroScaleSynapseModel).
     Timestep &ts_data = ts.get();
     const NeuroscaleModelConfiguration &nm = scheduler.neuroscale;
     const size_t cores = scheduler.core_count;
     const size_t cores_per_tile = std::max(scheduler.max_cores_per_tile, 1UL);
     const size_t tiles = (cores + cores_per_tile - 1UL) / cores_per_tile;
     const bool use_port = nm.packet_latency > 0.0;
-    const bool use_stall = nm.stall_queue_depth > 0UL;
 
     std::vector<double> neuron_processing_latencies(cores, 0.0);
     std::vector<double> message_processing_latencies(cores, 0.0);
     std::vector<double> messages_out(cores, 0.0);
     std::vector<double> updated_times(cores, 0.0);
-    // Messages from each sender tile to each destination core this step
-    std::vector<size_t> tile_to_core_messages;
-    if (use_stall)
-    {
-        tile_to_core_messages.assign(tiles * cores, 0UL);
-    }
-    if (scheduler.input_axons.size() != cores)
-    {
-        scheduler.input_axons.resize(cores);
-        scheduler.prev_window_start.assign(cores, 0.0);
-        scheduler.prev_window_end.assign(cores, 0.0);
-    }
-    // Each core scans all the input axons it has seen so far (receiving
-    //  spikes only extends the scan next step)
-    std::vector<double> axon_scan_latencies(cores, 0.0);
-    for (size_t core = 0UL; core < cores; ++core)
-    {
-        axon_scan_latencies[core] = nm.axon_scan_latency *
-                static_cast<double>(scheduler.input_axons[core].size());
-    }
-
     for (size_t sending_core = 0UL; sending_core < cores; ++sending_core)
     {
         std::list<Message> &q = ts_data.messages.at(sending_core);
@@ -192,17 +169,6 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
             if (!m.placeholder)
             {
                 messages_out[sending_core] += 1.0;
-                if (nm.axon_scan_latency > 0.0)
-                {
-                    scheduler.input_axons[m.dest_core_id].insert(
-                            m.src_neuron_group_id + "." +
-                            std::to_string(m.src_neuron_offset));
-                }
-                if (use_stall)
-                {
-                    const size_t src_tile = sending_core / cores_per_tile;
-                    tile_to_core_messages[(src_tile * cores) + m.dest_core_id]++;
-                }
             }
         }
     }
@@ -224,12 +190,10 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
         }
     }
 
-    std::vector<double> window_start(cores, 0.0);
-    std::vector<double> window_end(cores, 0.0);
     for (size_t core = 0UL; core < cores; ++core)
     {
         double core_latency = neuron_processing_latencies[core] +
-                message_processing_latencies[core] + axon_scan_latencies[core];
+                message_processing_latencies[core];
         if (use_port)
         {
             // The core's own spikes are already costed by its message-out
@@ -259,65 +223,7 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
         const double start_time = std::max({prev_time, max_fan_in, max_fan_out});
         updated_times[core] = core_latency + start_time +
                 scheduler.timestep_sync_delay;
-        // The synapse unit does not accept input from the NoC until it has
-        //  scanned its axons and finished the fixed per-step sweep
-        window_start[core] = start_time;
-        window_end[core] = start_time + axon_scan_latencies[core] +
-                scheduler.timestep_sync_delay;
     }
-
-    if (use_stall)
-    {
-        // A sender tile that bursts more than the destination's input queue
-        //  can hold, while that destination is still not accepting input,
-        //  blocks until the destination frees up. The router port is shared,
-        //  so the whole tile stalls with it.
-        for (size_t tile = 0UL; tile < tiles; ++tile)
-        {
-            const size_t first_core = tile * cores_per_tile;
-            const size_t last_core = std::min(first_core + cores_per_tile, cores);
-            double emit_start = 0.0;
-            for (size_t core = first_core; core < last_core; ++core)
-            {
-                emit_start = std::max(emit_start, window_end[core]);
-            }
-
-            double release = 0.0;
-            for (size_t dest = 0UL; dest < cores; ++dest)
-            {
-                const size_t burst = tile_to_core_messages[(tile * cores) + dest];
-                if (burst <= nm.stall_queue_depth)
-                {
-                    continue;
-                }
-                // The destination may still be in the previous step's window
-                double dest_free = 0.0;
-                if ((window_start[dest] <= emit_start) &&
-                        (emit_start < window_end[dest]))
-                {
-                    dest_free = window_end[dest];
-                }
-                else if ((scheduler.prev_window_start[dest] <= emit_start) &&
-                        (emit_start < scheduler.prev_window_end[dest]))
-                {
-                    dest_free = scheduler.prev_window_end[dest];
-                }
-                if (dest_free > 0.0)
-                {
-                    const double drained = static_cast<double>(
-                            burst - nm.stall_queue_depth);
-                    release = std::max(release,
-                            dest_free + (drained * nm.stall_drain_latency));
-                }
-            }
-            for (size_t core = first_core; core < last_core; ++core)
-            {
-                updated_times[core] = std::max(updated_times[core], release);
-            }
-        }
-    }
-    scheduler.prev_window_start = window_start;
-    scheduler.prev_window_end = window_end;
 
     // Update timing for all cores
     for (size_t idx = 0UL; idx < cores; ++idx)

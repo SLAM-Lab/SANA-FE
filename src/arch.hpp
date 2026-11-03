@@ -81,19 +81,11 @@ enum SyncProtocol : uint8_t
 //  recurrence.
 struct NeuroscaleModelConfiguration
 {
-    // Per step cost per input axon the synapse unit scans (all axons up to the
-    //  highest id seen so far, regardless of whether they spiked)
-    double axon_scan_latency{0.0};
     // Service time per packet of the tile's shared router port. Replaces the
     //  per core message_out cost: all cores in a tile share one output port
     double packet_latency{0.0};
     // Count the done/advance packets each core sends per fan-out/fan-in core
     bool sync_packets{false};
-    // Max messages one sender tile can have outstanding to one destination core
-    //  while that core's synapse unit is busy; 0 disables the stall model
-    size_t stall_queue_depth{0UL};
-    // Time for the destination to consume one queued message
-    double stall_drain_latency{0.0};
 };
 
 class Architecture
