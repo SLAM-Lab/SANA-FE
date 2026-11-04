@@ -375,61 +375,6 @@ private:
     static bool truenorth_threshold_and_reset(TrueNorthNeuron &n);
 };
 
-class NeuroScaleModel : public SomaUnit
-{
-public:
-    NeuroScaleModel() { register_attributes(neuroscale_attributes); }
-    NeuroScaleModel(const NeuroScaleModel &copy) = delete;
-    NeuroScaleModel(NeuroScaleModel &&other) = delete;
-    ~NeuroScaleModel() override = default;
-    NeuroScaleModel &operator=(const NeuroScaleModel &other) = delete;
-    NeuroScaleModel &operator=(NeuroScaleModel &&other) = delete;
-
-    void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override {};
-    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
-    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
-    void reset() override;
-    double get_potential(const size_t neuron_address) override
-    {
-        return compartments[neuron_address].potential;
-    }
-    std::map<std::string, double> get_neuron_traces(size_t neuron_address) override;
-
-    struct NeuroScaleCompartment
-    {
-        double bias{0.0};
-        std::vector<double> biases;
-        bool force_update_every_timestep{false};
-        double input_current{0.0};
-        double input_decay{0.0};
-        double leak_decay{1.0};
-        bool log_current{false};
-        double potential{0.0};
-        int refractory_delay{0};
-        int refractory_count{0};
-        double reset{0.0};
-        double reverse_reset{0.0};
-        double reverse_threshold{0.0};
-        double threshold{0.0};
-        long int timesteps_simulated{0L};
-    };
-
-private:
-    static inline const std::set<std::string> neuroscale_attributes{
-            "bias",
-            "leak_decay",
-            "log_u",
-            "refractory_delay",
-            "reset",
-            "threshold",
-    };
-    std::vector<NeuroScaleCompartment> compartments{neuroscale_max_compartments};
-
-    static void neuroscale_leak(NeuroScaleCompartment &cx);
-    static void neuroscale_quantize(NeuroScaleCompartment &cx);
-    static bool neuroscale_threshold_and_reset(NeuroScaleCompartment &cx);
-};
-
 class InputModel : public SomaUnit
 {
 public:
@@ -570,25 +515,24 @@ private:
     std::mt19937 gen{42};
 };
 
-// NeuroScale neuron following the RTL (neuron_models/lif and rw_*), one model
-//  for the plain, refractory and probabilistic ("random walker") variants.
-//  Each tick a neuron skips `refractory_delay` ticks after a spike (its input is
-//  dropped), otherwise adds input and bias, optionally floors at zero (the `lif`
-//  chip), and on reaching the threshold fires. With a spike probability below 1
-//  the neuron only fires if the next draw of the core's LFSR is at most the
-//  quantized probability; a failed draw leaves the potential as it is. The
-//  `decay` bit clears the potential at the end of every tick. The LFSR is one
-//  per soma unit (one per core), a Fibonacci LFSR (std::fib_lfsr in the RTL),
+// The NeuroScale random-walker neuron (neuron_models/rw_*), exactly. The
+//  potential is signed and never floored. Each tick a neuron skips
+//  `refractory_delay` ticks after a spike (its input is dropped), otherwise adds
+//  input and bias and, on reaching the threshold, fires. With a spike
+//  probability below 1 the neuron only fires if the next draw of the core's LFSR
+//  is at most the quantized probability; a failed draw leaves the potential as it
+//  is. The `decay` bit clears the potential at the end of every tick. The LFSR is
+//  one per soma unit (one per core), a Fibonacci LFSR (std::fib_lfsr in the RTL),
 //  seeded by setting `lfsr_seed` on any neuron mapped to the core.
-class NeuroScalePlifModel : public SomaUnit
+class NeuroScaleRwModel : public SomaUnit
 {
 public:
-    NeuroScalePlifModel() { register_attributes(neuroscale_plif_attributes); }
-    NeuroScalePlifModel(const NeuroScalePlifModel &copy) = delete;
-    NeuroScalePlifModel(NeuroScalePlifModel &&other) = delete;
-    ~NeuroScalePlifModel() override = default;
-    NeuroScalePlifModel &operator=(const NeuroScalePlifModel &other) = delete;
-    NeuroScalePlifModel &operator=(NeuroScalePlifModel &&other) = delete;
+    NeuroScaleRwModel() { register_attributes(neuroscale_rw_attributes); }
+    NeuroScaleRwModel(const NeuroScaleRwModel &copy) = delete;
+    NeuroScaleRwModel(NeuroScaleRwModel &&other) = delete;
+    ~NeuroScaleRwModel() override = default;
+    NeuroScaleRwModel &operator=(const NeuroScaleRwModel &other) = delete;
+    NeuroScaleRwModel &operator=(NeuroScaleRwModel &&other) = delete;
 
     void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
     void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
@@ -599,7 +543,7 @@ public:
         return compartments[neuron_address].potential;
     }
 
-    struct NeuroScalePlifCompartment
+    struct NeuroScaleRwCompartment
     {
         double potential{0.0};
         double threshold{1.0};
@@ -607,21 +551,19 @@ public:
         int refractory_delay{0};
         int refractory_count{0};
         bool decay{false};
-        bool floor_at_zero{false};
         double spike_probability{1.0};
         // Quantized probability code; negative means derive it from
         //  spike_probability and the LFSR width
         long int prob_spike{-1};
     };
 
-    static inline const std::unordered_map<std::string, std::string> neuroscale_plif_attributes{
+    static inline const std::unordered_map<std::string, std::string> neuroscale_rw_attributes{
             {"potential", "(float) Initial membrane potential. Default=0.0"},
             {"voltage", "(float) Alias for potential"},
             {"threshold", "(float) Fires when potential >= threshold. Default=1.0"},
             {"bias", "(float) Added every tick. Default=0.0"},
             {"refractory_delay", "(int) Ticks skipped after a spike. Default=0"},
             {"decay", "(int) 1 clears the potential at the end of every tick. Default=0"},
-            {"floor_at_zero", "(bool) Floor the potential at zero before the threshold check (the lif chip). Default=false"},
             {"spike_probability", "(float) Probability of firing on crossing, quantized to the LFSR width. Default=1.0"},
             {"prob_spike", "(int) Quantized probability code, overrides spike_probability. Default=derived"},
             {"lfsr_bits", "(int) LFSR width: 8, 12 or 16. Default=8"},
@@ -630,11 +572,109 @@ public:
 
 private:
     [[nodiscard]] unsigned int draw_lfsr();
-    [[nodiscard]] long int probability_code(const NeuroScalePlifCompartment &cx) const;
+    [[nodiscard]] long int probability_code(const NeuroScaleRwCompartment &cx) const;
 
-    std::vector<NeuroScalePlifCompartment> compartments{neuroscale_max_compartments};
+    std::vector<NeuroScaleRwCompartment> compartments{neuroscale_max_compartments};
     unsigned int lfsr_bits{8};
     unsigned int lfsr_state{1};
+};
+
+// The NeuroScale `lif` neuron (neuron_models/lif), exactly: the potential is
+//  floored at zero, there is no probability, decay or LFSR. Each tick a neuron
+//  skips `refractory_delay` ticks after a spike (its input is dropped),
+//  otherwise u <- max(u + input + bias, 0) and it fires and resets to 0 at the
+//  threshold. `bias` is the RTL's negated leak.
+class NeuroScaleLifModel : public SomaUnit
+{
+public:
+    NeuroScaleLifModel() { register_attributes(neuroscale_lif_attributes); }
+    NeuroScaleLifModel(const NeuroScaleLifModel &copy) = delete;
+    NeuroScaleLifModel(NeuroScaleLifModel &&other) = delete;
+    ~NeuroScaleLifModel() override = default;
+    NeuroScaleLifModel &operator=(const NeuroScaleLifModel &other) = delete;
+    NeuroScaleLifModel &operator=(NeuroScaleLifModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
+    void reset() override;
+    double get_potential(const size_t neuron_address) override
+    {
+        return compartments[neuron_address].potential;
+    }
+
+    struct NeuroScaleLifCompartment
+    {
+        double potential{0.0};
+        double threshold{1.0};
+        double bias{0.0};
+        int refractory_delay{0};
+        int refractory_count{0};
+    };
+
+    static inline const std::unordered_map<std::string, std::string> neuroscale_lif_attributes{
+            {"potential", "(float) Initial membrane potential. Default=0.0"},
+            {"voltage", "(float) Alias for potential"},
+            {"threshold", "(float) Fires when potential >= threshold. Default=1.0"},
+            {"bias", "(float) Added every tick (the RTL's negated leak). Default=0.0"},
+            {"refractory_delay", "(int) Ticks skipped after a spike. Default=0"},
+    };
+
+private:
+    std::vector<NeuroScaleLifCompartment> compartments{neuroscale_max_compartments};
+};
+
+// The NeuroScale spiking-LCA trace neuron (neuron_models/lca_t*), exactly: the
+//  `lif` neuron whose synaptic input goes through a decaying current I, kept as
+//  an integer with `trace_frac_bits` fractional bits:
+//      I <- I - (I >> trace_shift) + (d << trace_frac_bits)    (>> floors)
+//      u <- max(u + bias + (I >> trace_frac_bits), 0)
+//  d is this tick's summed input. The trace only advances on ticks the neuron is
+//  not refractory. Every neuron of a trace chip is a trace neuron.
+class NeuroScaleLcaModel : public SomaUnit
+{
+public:
+    NeuroScaleLcaModel() { register_attributes(neuroscale_lca_attributes); }
+    NeuroScaleLcaModel(const NeuroScaleLcaModel &copy) = delete;
+    NeuroScaleLcaModel(NeuroScaleLcaModel &&other) = delete;
+    ~NeuroScaleLcaModel() override = default;
+    NeuroScaleLcaModel &operator=(const NeuroScaleLcaModel &other) = delete;
+    NeuroScaleLcaModel &operator=(NeuroScaleLcaModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
+    void reset() override;
+    double get_potential(const size_t neuron_address) override
+    {
+        return compartments[neuron_address].potential;
+    }
+    std::map<std::string, double> get_neuron_traces(size_t neuron_address) override;
+
+    struct NeuroScaleLcaCompartment
+    {
+        double potential{0.0};
+        double threshold{1.0};
+        double bias{0.0};
+        int refractory_delay{0};
+        int refractory_count{0};
+        long int trace{0};
+        int trace_shift{5};
+        int trace_frac_bits{8};
+    };
+
+    static inline const std::unordered_map<std::string, std::string> neuroscale_lca_attributes{
+            {"potential", "(float) Initial membrane potential. Default=0.0"},
+            {"voltage", "(float) Alias for potential"},
+            {"threshold", "(float) Fires when potential >= threshold. Default=1.0"},
+            {"bias", "(float) Added every tick (the RTL's negated leak). Default=0.0"},
+            {"refractory_delay", "(int) Ticks skipped after a spike. Default=0"},
+            {"trace_shift", "(int) The trace decays by 2^-trace_shift per tick (TRACE_SHIFT). Default=5"},
+            {"trace_frac_bits", "(int) Fractional bits of the trace (TRACE_BITS - 16). Default=8"},
+    };
+
+private:
+    std::vector<NeuroScaleLcaCompartment> compartments{neuroscale_max_compartments};
 };
 
 // Synaptic conductances for a current-based (CUBA) neuron. Two channels with

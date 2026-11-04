@@ -920,185 +920,6 @@ sanafe::PipelineResult sanafe::TrueNorthModel::update(
     return output;
 }
 
-// NOLINTNEXTLINE(readability-function-size)
-void sanafe::NeuroScaleModel::set_attribute_neuron(const size_t neuron_address,
-        const std::string &attribute_name, const ModelAttribute &param)
-{
-    NeuroScaleCompartment &cx = compartments.at(neuron_address);
-
-    // TODO: HACK for some of these attributes, ensure they are not 0 < x < 1 as they will be
-    //  quantized away to 0 unintentionally (perhaps any fractional value should
-    //  error out..) Specifically, thresholds, resets, biases. The decays are
-    //  scaling factors. Should I just force these to be integers?
-    if (attribute_name == "threshold")
-    {
-        cx.threshold = static_cast<double>(param);
-    }
-    // else if (attribute_name == "reverse_threshold")
-    // {
-    //     cx.reverse_threshold = static_cast<double>(param);
-    // }
-    else if (attribute_name == "reset")
-    {
-        cx.reset = static_cast<double>(param);
-    }
-    // else if (attribute_name == "reverse_reset")
-    // {
-    //     cx.reverse_reset = static_cast<double>(param);
-    // }
-    // else if (attribute_name == "reverse_reset_mode")
-    // {
-    //     const std::string reverse_reset_mode_str =
-    //             static_cast<std::string>(param);
-    //     cx.reverse_reset_mode = model_parse_reset_mode(reverse_reset_mode_str);
-    // }
-    else if (attribute_name == "leak_decay")
-    {
-        cx.leak_decay = static_cast<double>(param);
-    }
-    else if (attribute_name == "log_u")
-    {
-        cx.log_current = static_cast<bool>(param);
-    }
-    else if (attribute_name == "input_decay")
-    {
-        cx.input_decay = static_cast<double>(param);
-    }
-    else if (attribute_name == "bias")
-    {
-        cx.bias = static_cast<double>(param);
-        TRACE2(MODELS, "Setting bias of %zu=%lf\n", neuron_address, cx.bias);
-    }
-    // else if ((attribute_name == "force_update") ||
-    //         (attribute_name == "force_update_every_timestep"))
-    // {
-    //     cx.force_update_every_timestep = static_cast<bool>(param);
-    // }
-    else if (attribute_name == "refractory_delay")
-    {
-        cx.refractory_delay = static_cast<int>(param);
-    }
-    else if (attribute_name == "potential")
-    {
-        cx.potential = static_cast<double>(param);
-    }
-
-    TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
-}
-
-void sanafe::NeuroScaleModel::neuroscale_leak(NeuroScaleCompartment &cx)
-{
-    cx.input_current *= cx.input_decay;
-    cx.potential *= cx.leak_decay;
-}
-
-void sanafe::NeuroScaleModel::neuroscale_quantize(NeuroScaleCompartment &cx)
-{
-    cx.potential = static_cast<int>(cx.potential);
-}
-
-bool sanafe::NeuroScaleModel::neuroscale_threshold_and_reset(
-        NeuroScaleCompartment &cx)
-{
-    bool fired = false;
-
-    if (cx.potential >= cx.threshold)
-    {
-        cx.potential = cx.reset;
-        TRACE1(MODELS, "Neuron fired.\n");
-        // Set the refractory period countdown which decrements every timestep,
-        //  when this gets to zero, the neuron can spike again
-        cx.refractory_count = cx.refractory_delay;
-        fired = true;
-    }
-
-    return fired;
-}
-
-sanafe::PipelineResult sanafe::NeuroScaleModel::update(
-        const size_t neuron_address, const std::optional<double> current_in,
-        const long int simulation_time)
-{
-    NeuroScaleCompartment &cx = compartments[neuron_address];
-    if (cx.timesteps_simulated == simulation_time)
-    {
-        throw std::runtime_error(
-                "This model does not support multiple updates to the "
-                "same compartment in one time-step.");
-    }
-    if (cx.timesteps_simulated < (simulation_time - 1))
-    {
-        throw std::runtime_error("This model must update every time-step.\n");
-    }
-
-    // Calculate the change in potential since the last update e.g.
-    //  integate inputs and apply any potential leak
-    TRACE1(MODELS, "Updating potential (cx:%zu), before:%lf\n", neuron_address,
-            cx.potential);
-    sanafe::NeuronStatus state = sanafe::idle;
-    // Update soma, if there are any received spikes, there is a non-zero
-    //  bias or we force the neuron to update every time-step
-    if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
-            (std::fabs(cx.bias) > 0.0) || cx.force_update_every_timestep)
-    {
-        // Neuron is turned on and potential write
-        state = sanafe::updated;
-    }
-
-    if (cx.timesteps_simulated > 0)
-    {
-        // Don't leak on the very first time-step, in case the user wants to
-        //  initialize neuron potentials with some non-zero value
-        neuroscale_leak(cx);
-    }
-    neuroscale_quantize(cx);
-
-    const bool in_refractory_period = cx.refractory_count > 0;
-    if (!in_refractory_period)
-    {
-        cx.potential += cx.bias;
-        cx.input_current += current_in.value_or(0.0);
-        cx.potential += cx.input_current;
-
-        TRACE1(MODELS, "Updating potential (nid:%zu), after:%lf\n",
-                neuron_address, cx.potential);
-
-        // Check against threshold potential (for spiking)
-        if (neuroscale_threshold_and_reset(cx))
-        {
-            state = sanafe::fired;
-        }
-    }
-
-    // Manage timestep counters
-    ++(cx.timesteps_simulated);
-    cx.refractory_count = std::max(0, cx.refractory_count - 1);
-
-    PipelineResult output{};
-    output.status = state;
-    return output;
-}
-
-void sanafe::NeuroScaleModel::reset()
-{
-    for (NeuroScaleCompartment &cx : compartments)
-    {
-        cx.input_current = 0.0;
-        cx.potential = 0.0;
-    }
-}
-
-std::map<std::string, double> sanafe::NeuroScaleModel::get_neuron_traces(
-        size_t neuron_address)
-{
-    if (compartments.at(neuron_address).log_current)
-    {
-        return {{"u", compartments.at(neuron_address).input_current}};
-    }
-
-    return {};
-}
-
 void sanafe::InputModel::set_attribute_neuron(const size_t /*neuron_address*/,
         const std::string &attribute_name, const ModelAttribute &param)
 {
@@ -1259,11 +1080,11 @@ sanafe::PipelineResult sanafe::SangoLifModel::update(const size_t neuron_address
     return output;
 }
 
-void sanafe::NeuroScalePlifModel::set_attribute_neuron(
+void sanafe::NeuroScaleRwModel::set_attribute_neuron(
         const size_t neuron_address, const std::string &attribute_name,
         const ModelAttribute &param)
 {
-    NeuroScalePlifCompartment &cx = compartments.at(neuron_address);
+    NeuroScaleRwCompartment &cx = compartments.at(neuron_address);
 
     if ((attribute_name == "potential") || (attribute_name == "voltage"))
     {
@@ -1284,10 +1105,6 @@ void sanafe::NeuroScalePlifModel::set_attribute_neuron(
     else if (attribute_name == "decay")
     {
         cx.decay = static_cast<double>(param) != 0.0;
-    }
-    else if (attribute_name == "floor_at_zero")
-    {
-        cx.floor_at_zero = static_cast<bool>(param);
     }
     else if (attribute_name == "spike_probability")
     {
@@ -1319,7 +1136,7 @@ void sanafe::NeuroScalePlifModel::set_attribute_neuron(
     TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
 }
 
-unsigned int sanafe::NeuroScalePlifModel::draw_lfsr()
+unsigned int sanafe::NeuroScaleRwModel::draw_lfsr()
 {
     // The RTL returns the current state, then advances it with std::fib_lfsr:
     //  next = (xor of the tap bits << (W-1)) | (state >> 1)
@@ -1336,8 +1153,8 @@ unsigned int sanafe::NeuroScalePlifModel::draw_lfsr()
     return draw;
 }
 
-long int sanafe::NeuroScalePlifModel::probability_code(
-        const NeuroScalePlifCompartment &cx) const
+long int sanafe::NeuroScaleRwModel::probability_code(
+        const NeuroScaleRwCompartment &cx) const
 {
     const long int always = (1L << lfsr_bits) - 1L;
     if (cx.prob_spike >= 0)
@@ -1348,11 +1165,11 @@ long int sanafe::NeuroScalePlifModel::probability_code(
     return static_cast<long int>(std::lround(p * static_cast<double>(always)));
 }
 
-sanafe::PipelineResult sanafe::NeuroScalePlifModel::update(
+sanafe::PipelineResult sanafe::NeuroScaleRwModel::update(
         const size_t neuron_address, const std::optional<double> current_in,
         const long int /*simulation_time*/)
 {
-    NeuroScalePlifCompartment &cx = compartments.at(neuron_address);
+    NeuroScaleRwCompartment &cx = compartments.at(neuron_address);
 
     sanafe::NeuronStatus state = sanafe::idle;
     if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
@@ -1369,10 +1186,6 @@ sanafe::PipelineResult sanafe::NeuroScalePlifModel::update(
     else
     {
         cx.potential += current_in.value_or(0.0) + cx.bias;
-        if (cx.floor_at_zero && (cx.potential < 0.0))
-        {
-            cx.potential = 0.0;
-        }
 
         if (cx.potential >= cx.threshold)
         {
@@ -1398,14 +1211,167 @@ sanafe::PipelineResult sanafe::NeuroScalePlifModel::update(
     return output;
 }
 
-void sanafe::NeuroScalePlifModel::reset()
+void sanafe::NeuroScaleRwModel::reset()
 {
-    for (NeuroScalePlifCompartment &cx : compartments)
+    for (NeuroScaleRwCompartment &cx : compartments)
     {
         cx.potential = 0.0;
         cx.refractory_count = 0;
     }
     lfsr_state = 1U;
+}
+
+void sanafe::NeuroScaleLifModel::set_attribute_neuron(
+        const size_t neuron_address, const std::string &attribute_name,
+        const ModelAttribute &param)
+{
+    NeuroScaleLifCompartment &cx = compartments.at(neuron_address);
+    if ((attribute_name == "potential") || (attribute_name == "voltage"))
+    {
+        cx.potential = static_cast<double>(param);
+    }
+    else if (attribute_name == "threshold")
+    {
+        cx.threshold = static_cast<double>(param);
+    }
+    else if (attribute_name == "bias")
+    {
+        cx.bias = static_cast<double>(param);
+    }
+    else if (attribute_name == "refractory_delay")
+    {
+        cx.refractory_delay = static_cast<int>(param);
+    }
+}
+
+sanafe::PipelineResult sanafe::NeuroScaleLifModel::update(
+        const size_t neuron_address, const std::optional<double> current_in,
+        const long int /*simulation_time*/)
+{
+    NeuroScaleLifCompartment &cx = compartments.at(neuron_address);
+
+    sanafe::NeuronStatus state = sanafe::idle;
+    if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
+            (std::fabs(cx.bias) > 0.0) || (cx.refractory_count > 0))
+    {
+        state = sanafe::updated;
+    }
+
+    if (cx.refractory_count > 0)
+    {
+        --cx.refractory_count;
+    }
+    else
+    {
+        cx.potential += current_in.value_or(0.0) + cx.bias;
+        cx.potential = std::max(cx.potential, 0.0);
+        if (cx.potential >= cx.threshold)
+        {
+            state = sanafe::fired;
+            cx.refractory_count = cx.refractory_delay;
+            cx.potential = 0.0;
+        }
+    }
+
+    PipelineResult output{};
+    output.status = state;
+    return output;
+}
+
+void sanafe::NeuroScaleLifModel::reset()
+{
+    for (NeuroScaleLifCompartment &cx : compartments)
+    {
+        cx.potential = 0.0;
+        cx.refractory_count = 0;
+    }
+}
+
+void sanafe::NeuroScaleLcaModel::set_attribute_neuron(
+        const size_t neuron_address, const std::string &attribute_name,
+        const ModelAttribute &param)
+{
+    NeuroScaleLcaCompartment &cx = compartments.at(neuron_address);
+    if ((attribute_name == "potential") || (attribute_name == "voltage"))
+    {
+        cx.potential = static_cast<double>(param);
+    }
+    else if (attribute_name == "threshold")
+    {
+        cx.threshold = static_cast<double>(param);
+    }
+    else if (attribute_name == "bias")
+    {
+        cx.bias = static_cast<double>(param);
+    }
+    else if (attribute_name == "refractory_delay")
+    {
+        cx.refractory_delay = static_cast<int>(param);
+    }
+    else if (attribute_name == "trace_shift")
+    {
+        cx.trace_shift = static_cast<int>(param);
+    }
+    else if (attribute_name == "trace_frac_bits")
+    {
+        cx.trace_frac_bits = static_cast<int>(param);
+    }
+}
+
+sanafe::PipelineResult sanafe::NeuroScaleLcaModel::update(
+        const size_t neuron_address, const std::optional<double> current_in,
+        const long int /*simulation_time*/)
+{
+    NeuroScaleLcaCompartment &cx = compartments.at(neuron_address);
+
+    sanafe::NeuronStatus state = sanafe::idle;
+    if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
+            (std::fabs(cx.bias) > 0.0) || (cx.refractory_count > 0) ||
+            (cx.trace != 0))
+    {
+        state = sanafe::updated;
+    }
+
+    if (cx.refractory_count > 0)
+    {
+        --cx.refractory_count;
+    }
+    else
+    {
+        const long int d = std::lround(current_in.value_or(0.0));
+        // >> on a negative value is an arithmetic shift, like the RTL's
+        cx.trace = cx.trace - (cx.trace >> cx.trace_shift) +
+                (d * (1L << cx.trace_frac_bits));
+        const long int trace_out = cx.trace >> cx.trace_frac_bits;
+        cx.potential += cx.bias + static_cast<double>(trace_out);
+        cx.potential = std::max(cx.potential, 0.0);
+        if (cx.potential >= cx.threshold)
+        {
+            state = sanafe::fired;
+            cx.refractory_count = cx.refractory_delay;
+            cx.potential = 0.0;
+        }
+    }
+
+    PipelineResult output{};
+    output.status = state;
+    return output;
+}
+
+void sanafe::NeuroScaleLcaModel::reset()
+{
+    for (NeuroScaleLcaCompartment &cx : compartments)
+    {
+        cx.potential = 0.0;
+        cx.refractory_count = 0;
+        cx.trace = 0;
+    }
+}
+
+std::map<std::string, double> sanafe::NeuroScaleLcaModel::get_neuron_traces(
+        size_t neuron_address)
+{
+    return {{"trace", static_cast<double>(compartments.at(neuron_address).trace)}};
 }
 
 void sanafe::SangoProbLifModel::set_attribute_neuron(
@@ -1716,13 +1682,17 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     {
         return std::shared_ptr<PipelineUnit>(new TrueNorthModel());
     }
-    if (model_name == "neuroscale")
+    if (model_name == "neuroscale_rw")
     {
-        return std::shared_ptr<PipelineUnit>(new NeuroScaleModel());
+        return std::shared_ptr<PipelineUnit>(new NeuroScaleRwModel());
     }
-    if (model_name == "neuroscale_plif")
+    if ((model_name == "neuroscale_lif") || (model_name == "neuroscale"))
     {
-        return std::shared_ptr<PipelineUnit>(new NeuroScalePlifModel());
+        return std::shared_ptr<PipelineUnit>(new NeuroScaleLifModel());
+    }
+    if (model_name == "neuroscale_lca")
+    {
+        return std::shared_ptr<PipelineUnit>(new NeuroScaleLcaModel());
     }
     if (model_name == "sango_lif")
     {
@@ -1767,8 +1737,14 @@ const sanafe::ModelMap &sanafe::get_builtin_models()
                     {"leaky_integrate_fire",
                             &LoihiLifModel::loihi_lif_attributes},
                     {"truenorth", &TrueNorthModel::truenorth_attributes},
-                    {"neuroscale_plif",
-                            &NeuroScalePlifModel::neuroscale_plif_attributes},
+                    {"neuroscale_lif",
+                            &NeuroScaleLifModel::neuroscale_lif_attributes},
+                    {"neuroscale", // the lif neuron, under its old name
+                            &NeuroScaleLifModel::neuroscale_lif_attributes},
+                    {"neuroscale_lca",
+                            &NeuroScaleLcaModel::neuroscale_lca_attributes},
+                    {"neuroscale_rw",
+                            &NeuroScaleRwModel::neuroscale_rw_attributes},
                     {"sango", &SangoLifModel::sango_lif_attributes},
                     // Sango notebook/demo specific
                     // TODO: break into plug-ins before integrating?
