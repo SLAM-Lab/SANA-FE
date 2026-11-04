@@ -8,7 +8,10 @@ architecture:
     link_buffer_size: 16
     sync_model: fixed
     # latency_sync: 2.6e-05
-    latency_sync: 1.4e-5
+    # latency_sync: 1.4e-5  # stale: calibrated against an older design
+    # Measured on an idle chip (no input axons yet): a step takes 1.77 us, which is
+    #  this sync cost plus 50 neurons x 7.6 ns of neuron updates
+    latency_sync: 1.39e-6
     # latency_sync: 0.0
     sync_protocol: neuroscale
     max_steps_async: 6  # TIME_ADVANCE: 7, TIME_HISTORY: 8
@@ -79,8 +82,12 @@ architecture:
                 energy_read_synapse: 1.2e-09
                 energy_scan_axon: 0.0e-9
                 latency_read_synapse: 4.7e-09
-                # TODO: figure out how to calibrate these?
-                latency_scan_axon: 3.8e-9
+                # Measured from the current RTL (syn.act). Once a core has seen an
+                #  input axon, every step it scans every axon twice, whether or not
+                #  that axon spiked: 4.41 ns/axon in the accumulate step plus
+                #  4.23 ns/axon in the learning step (bit-vector clear). The old
+                #  3.8 ns value only covered one of the two loops.
+                latency_scan_axon: 8.64e-9
           axon_out:
             - name: neuroscale_out
               attributes:
