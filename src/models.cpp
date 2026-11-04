@@ -1259,6 +1259,155 @@ sanafe::PipelineResult sanafe::SangoLifModel::update(const size_t neuron_address
     return output;
 }
 
+void sanafe::NeuroScalePlifModel::set_attribute_neuron(
+        const size_t neuron_address, const std::string &attribute_name,
+        const ModelAttribute &param)
+{
+    NeuroScalePlifCompartment &cx = compartments.at(neuron_address);
+
+    if ((attribute_name == "potential") || (attribute_name == "voltage"))
+    {
+        cx.potential = static_cast<double>(param);
+    }
+    else if (attribute_name == "threshold")
+    {
+        cx.threshold = static_cast<double>(param);
+    }
+    else if (attribute_name == "bias")
+    {
+        cx.bias = static_cast<double>(param);
+    }
+    else if (attribute_name == "refractory_delay")
+    {
+        cx.refractory_delay = static_cast<int>(param);
+    }
+    else if (attribute_name == "decay")
+    {
+        cx.decay = static_cast<double>(param) != 0.0;
+    }
+    else if (attribute_name == "floor_at_zero")
+    {
+        cx.floor_at_zero = static_cast<bool>(param);
+    }
+    else if (attribute_name == "spike_probability")
+    {
+        cx.spike_probability = static_cast<double>(param);
+    }
+    else if (attribute_name == "prob_spike")
+    {
+        cx.prob_spike = static_cast<long int>(static_cast<double>(param));
+    }
+    else if (attribute_name == "lfsr_bits")
+    {
+        const auto bits = static_cast<unsigned int>(static_cast<double>(param));
+        if ((bits != 8U) && (bits != 12U) && (bits != 16U))
+        {
+            throw std::invalid_argument("lfsr_bits must be 8, 12 or 16");
+        }
+        lfsr_bits = bits;
+    }
+    else if (attribute_name == "lfsr_seed")
+    {
+        // A zero seed would lock the LFSR, the RTL ignores it
+        const auto seed = static_cast<unsigned int>(static_cast<double>(param));
+        if (seed != 0U)
+        {
+            lfsr_state = seed & ((1U << lfsr_bits) - 1U);
+        }
+    }
+
+    TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
+}
+
+unsigned int sanafe::NeuroScalePlifModel::draw_lfsr()
+{
+    // The RTL returns the current state, then advances it with std::fib_lfsr:
+    //  next = (xor of the tap bits << (W-1)) | (state >> 1)
+    static const std::map<unsigned int, std::vector<unsigned int>> taps = {
+            {8U, {0U, 1U, 2U, 7U}}, {12U, {0U, 2U, 10U, 11U}},
+            {16U, {0U, 7U, 12U, 13U}}};
+    const unsigned int draw = lfsr_state;
+    unsigned int bit = 0U;
+    for (const unsigned int tap : taps.at(lfsr_bits))
+    {
+        bit ^= (lfsr_state >> tap) & 1U;
+    }
+    lfsr_state = (bit << (lfsr_bits - 1U)) | (lfsr_state >> 1U);
+    return draw;
+}
+
+long int sanafe::NeuroScalePlifModel::probability_code(
+        const NeuroScalePlifCompartment &cx) const
+{
+    const long int always = (1L << lfsr_bits) - 1L;
+    if (cx.prob_spike >= 0)
+    {
+        return cx.prob_spike;
+    }
+    const double p = std::min(std::max(cx.spike_probability, 0.0), 1.0);
+    return static_cast<long int>(std::lround(p * static_cast<double>(always)));
+}
+
+sanafe::PipelineResult sanafe::NeuroScalePlifModel::update(
+        const size_t neuron_address, const std::optional<double> current_in,
+        const long int /*simulation_time*/)
+{
+    NeuroScalePlifCompartment &cx = compartments.at(neuron_address);
+
+    sanafe::NeuronStatus state = sanafe::idle;
+    if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
+            (std::fabs(cx.bias) > 0.0) || (cx.refractory_count > 0))
+    {
+        state = sanafe::updated;
+    }
+
+    if (cx.refractory_count > 0)
+    {
+        // Refractory ticks only count down; the input is dropped
+        --cx.refractory_count;
+    }
+    else
+    {
+        cx.potential += current_in.value_or(0.0) + cx.bias;
+        if (cx.floor_at_zero && (cx.potential < 0.0))
+        {
+            cx.potential = 0.0;
+        }
+
+        if (cx.potential >= cx.threshold)
+        {
+            const long int code = probability_code(cx);
+            const long int always = (1L << lfsr_bits) - 1L;
+            const bool fire =
+                    (code >= always) || (static_cast<long int>(draw_lfsr()) <= code);
+            if (fire)
+            {
+                state = sanafe::fired;
+                cx.refractory_count = cx.refractory_delay;
+                cx.potential = 0.0;
+            }
+        }
+        if (cx.decay)
+        {
+            cx.potential = 0.0;
+        }
+    }
+
+    PipelineResult output{};
+    output.status = state;
+    return output;
+}
+
+void sanafe::NeuroScalePlifModel::reset()
+{
+    for (NeuroScalePlifCompartment &cx : compartments)
+    {
+        cx.potential = 0.0;
+        cx.refractory_count = 0;
+    }
+    lfsr_state = 1U;
+}
+
 void sanafe::SangoProbLifModel::set_attribute_neuron(
         const size_t neuron_address, const std::string &attribute_name,
         const ModelAttribute &param)
@@ -1571,6 +1720,10 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     {
         return std::shared_ptr<PipelineUnit>(new NeuroScaleModel());
     }
+    if (model_name == "neuroscale_plif")
+    {
+        return std::shared_ptr<PipelineUnit>(new NeuroScalePlifModel());
+    }
     if (model_name == "sango_lif")
     {
         return std::shared_ptr<PipelineUnit>(new SangoLifModel());
@@ -1614,6 +1767,8 @@ const sanafe::ModelMap &sanafe::get_builtin_models()
                     {"leaky_integrate_fire",
                             &LoihiLifModel::loihi_lif_attributes},
                     {"truenorth", &TrueNorthModel::truenorth_attributes},
+                    {"neuroscale_plif",
+                            &NeuroScalePlifModel::neuroscale_plif_attributes},
                     {"sango", &SangoLifModel::sango_lif_attributes},
                     // Sango notebook/demo specific
                     // TODO: break into plug-ins before integrating?

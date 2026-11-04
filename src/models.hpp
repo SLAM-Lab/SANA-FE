@@ -570,6 +570,73 @@ private:
     std::mt19937 gen{42};
 };
 
+// NeuroScale neuron following the RTL (neuron_models/lif and rw_*), one model
+//  for the plain, refractory and probabilistic ("random walker") variants.
+//  Each tick a neuron skips `refractory_delay` ticks after a spike (its input is
+//  dropped), otherwise adds input and bias, optionally floors at zero (the `lif`
+//  chip), and on reaching the threshold fires. With a spike probability below 1
+//  the neuron only fires if the next draw of the core's LFSR is at most the
+//  quantized probability; a failed draw leaves the potential as it is. The
+//  `decay` bit clears the potential at the end of every tick. The LFSR is one
+//  per soma unit (one per core), a Fibonacci LFSR (std::fib_lfsr in the RTL),
+//  seeded by setting `lfsr_seed` on any neuron mapped to the core.
+class NeuroScalePlifModel : public SomaUnit
+{
+public:
+    NeuroScalePlifModel() { register_attributes(neuroscale_plif_attributes); }
+    NeuroScalePlifModel(const NeuroScalePlifModel &copy) = delete;
+    NeuroScalePlifModel(NeuroScalePlifModel &&other) = delete;
+    ~NeuroScalePlifModel() override = default;
+    NeuroScalePlifModel &operator=(const NeuroScalePlifModel &other) = delete;
+    NeuroScalePlifModel &operator=(NeuroScalePlifModel &&other) = delete;
+
+    void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
+    void set_attribute_neuron(size_t neuron_address, const std::string &attribute_name, const ModelAttribute &param) override;
+    PipelineResult update(size_t neuron_address, std::optional<double> current_in, long int simulation_time) override;
+    void reset() override;
+    double get_potential(const size_t neuron_address) override
+    {
+        return compartments[neuron_address].potential;
+    }
+
+    struct NeuroScalePlifCompartment
+    {
+        double potential{0.0};
+        double threshold{1.0};
+        double bias{0.0};
+        int refractory_delay{0};
+        int refractory_count{0};
+        bool decay{false};
+        bool floor_at_zero{false};
+        double spike_probability{1.0};
+        // Quantized probability code; negative means derive it from
+        //  spike_probability and the LFSR width
+        long int prob_spike{-1};
+    };
+
+    static inline const std::unordered_map<std::string, std::string> neuroscale_plif_attributes{
+            {"potential", "(float) Initial membrane potential. Default=0.0"},
+            {"voltage", "(float) Alias for potential"},
+            {"threshold", "(float) Fires when potential >= threshold. Default=1.0"},
+            {"bias", "(float) Added every tick. Default=0.0"},
+            {"refractory_delay", "(int) Ticks skipped after a spike. Default=0"},
+            {"decay", "(int) 1 clears the potential at the end of every tick. Default=0"},
+            {"floor_at_zero", "(bool) Floor the potential at zero before the threshold check (the lif chip). Default=false"},
+            {"spike_probability", "(float) Probability of firing on crossing, quantized to the LFSR width. Default=1.0"},
+            {"prob_spike", "(int) Quantized probability code, overrides spike_probability. Default=derived"},
+            {"lfsr_bits", "(int) LFSR width: 8, 12 or 16. Default=8"},
+            {"lfsr_seed", "(int) Seed for this core's LFSR (non-zero; zero is ignored, as in the RTL). Default=1"},
+    };
+
+private:
+    [[nodiscard]] unsigned int draw_lfsr();
+    [[nodiscard]] long int probability_code(const NeuroScalePlifCompartment &cx) const;
+
+    std::vector<NeuroScalePlifCompartment> compartments{neuroscale_max_compartments};
+    unsigned int lfsr_bits{8};
+    unsigned int lfsr_state{1};
+};
+
 // Synaptic conductances for a current-based (CUBA) neuron. Two channels with
 //  independent exponential decay, selected per-edge by the `channel`
 //  attribute
