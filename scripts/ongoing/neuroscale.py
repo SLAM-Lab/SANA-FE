@@ -64,8 +64,8 @@ except ImportError:
 # Configuration
 # ===========================================================================
 ARCH_PATH = os.environ.get("NEUROSCALE_ARCH",
-                           os.path.join(PROJECT_DIR, "arch", "neuroscale3.yaml"))
-ARCH_PATH = "/home/jab23579/neuro/sana-fe/arch/neuroscale3.yaml"
+                           os.path.join(PROJECT_DIR, "arch", "neuroscale.yaml"))
+ARCH_PATH = "/home/jab23579/neuro/sana-fe/arch/neuroscale.yaml"
 PROTOCOLS = ["clock", "barrier", "neuroscale"]
 PROTOCOL_LABELS = {
     "clock": "TrueNorth (clock)",

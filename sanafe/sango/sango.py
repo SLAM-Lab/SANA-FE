@@ -36,11 +36,24 @@ HW_KEYWORDS = {"soma": "soma_hw_name",
 class SimSANAFE(Backend):
     """SANA-FE hardware-performance backend."""
 
+    def import_registry(self):
+        """Load model/*.py through the Sango Backend loader (current Sango layout:
+        backend/<name>/model/*.py) and give every field both the 'mapfrom' key the
+        Backend base class reads and the 'dsl' key this backend reads, so the
+        registry files may use either spelling."""
+        registry = super().import_registry()
+        for entry in registry.values():
+            for section in ("param", "state"):
+                for field in entry.get(section, {}).values():
+                    field.setdefault("mapfrom", field.get("dsl"))
+                    field.setdefault("dsl", field.get("mapfrom"))
+        return registry
+
     def __init__(self, net, debug=False, verbose=False):
         if sanafe is None:
             raise ImportError("sanafe package is required for SimSANAFE "
                               "(pip install sanafe)")
-        # Populates self.model_registry from registry/*.py
+        # Populates self.model_registry from model/*.py (see import_registry)
         super().__init__(net, debug=debug, verbose=verbose)
 
         self.dt = 1.0
