@@ -44,7 +44,12 @@ architecture:
             - name: neuroscale_in
               attributes:
                 energy_message_in: 1.1e-07
-                latency_message_in: 1.12e-08
+                # Per spiking axon, from the axon microbenchmark (bmarks/axon_micro): the
+                #  cost a spike adds beyond its synapses, 15.21 ns. This is the input unit's
+                #  handling of the arriving spike (about 11.2 ns) plus the accumulate step's
+                #  synapse-list header read for that axon (about 2.2 ns) and a remainder
+                #  not yet attributed. The header read is charged here with the arrival.
+                latency_message_in: 1.521e-08
           soma:
             - name: neuroscale_lif
               attributes:
@@ -81,17 +86,14 @@ architecture:
                 model: neuroscale_synapse
                 energy_read_synapse: 1.2e-09
                 energy_scan_axon: 0.0e-9
-                # 4.72 ns per synapse (RTL, fitted exactly) plus the 2.16 ns table
-                #  read of each spiking axon's synapse-list header, spread over the
-                #  ~3.97 synapses per spiking axon in this network (2.16 / 3.97 =
-                #  0.54 ns). The header read is not modeled as its own cost.
-                latency_read_synapse: 5.26e-09
-                # Measured from the current RTL (syn.act). Once a core has seen an
-                #  input axon, every step it scans every axon twice, whether or not
-                #  that axon spiked: 4.41 ns/axon in the accumulate step plus
-                #  4.23 ns/axon in the learning step (bit-vector clear). The old
-                #  3.8 ns value only covered one of the two loops.
-                latency_scan_axon: 8.64e-9
+                # Per synapse event, from the axon microbenchmark: 4.72 ns (also the exact
+                #  fit to the RTL's accumulate step).
+                latency_read_synapse: 4.72e-09
+                # Per axon per step, whether or not it spiked, from the axon microbenchmark:
+                #  8.61 ns. The RTL scans every used axon twice (4.41 ns in the accumulate
+                #  step plus 4.23 ns in the learning step), so a single-loop value of ~3.8 ns
+                #  is too low. The scan only starts once a core has seen its first spike.
+                latency_scan_axon: 8.61e-9
           axon_out:
             - name: neuroscale_out
               attributes:
