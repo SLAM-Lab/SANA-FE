@@ -81,7 +81,11 @@ architecture:
                 model: neuroscale_synapse
                 energy_read_synapse: 1.2e-09
                 energy_scan_axon: 0.0e-9
-                latency_read_synapse: 4.7e-09
+                # 4.72 ns per synapse (RTL, fitted exactly) plus the 2.16 ns table
+                #  read of each spiking axon's synapse-list header, spread over the
+                #  ~3.97 synapses per spiking axon in this network (2.16 / 3.97 =
+                #  0.54 ns). The header read is not modeled as its own cost.
+                latency_read_synapse: 5.26e-09
                 # Measured from the current RTL (syn.act). Once a core has seen an
                 #  input axon, every step it scans every axon twice, whether or not
                 #  that axon spiked: 4.41 ns/axon in the accumulate step plus
