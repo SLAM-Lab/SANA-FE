@@ -39,7 +39,8 @@ architecture:
           attributes:
             buffer_position: synapse
             buffer_inside_unit: false
-            max_neurons_supported: 200
+            # The RTL core holds 1024 neurons (NEURONS_PER_CORE in parameters.act)
+            max_neurons_supported: 1024
           axon_in:
             - name: neuroscale_in
               attributes:
@@ -54,6 +55,19 @@ architecture:
             - name: neuroscale_lif
               attributes:
                 model: neuroscale
+                energy_access_neuron: 4.5e-10
+                latency_access_neuron: 7.6e-9
+                energy_update_neuron: 0.0
+                latency_update_neuron: 0.0
+                energy_spike_out: 7.0e-10
+                latency_spike_out: 0.0e-9
+            # RTL-exact neuron (neuron_models/lif and rw_*): refractory period,
+            #  probabilistic firing from a per-core LFSR, decay bit, optional floor at
+            #  zero. Latencies are copied from neuroscale_lif and have not been
+            #  calibrated separately for the random-walker chips.
+            - name: neuroscale_plif
+              attributes:
+                model: neuroscale_plif
                 energy_access_neuron: 4.5e-10
                 latency_access_neuron: 7.6e-9
                 energy_update_neuron: 0.0
