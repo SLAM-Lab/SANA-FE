@@ -41,10 +41,10 @@ architecture:
               name: neuroscale_rw
               attributes:
                 model: neuroscale_rw
-                energy_access_neuron: 5.842e-11
-                latency_access_neuron: 7.251e-09
-                energy_update_neuron: 0.0
-                latency_update_neuron: 0.0
+                energy_access_neuron: 4.305e-11
+                latency_access_neuron: 5.176e-09
+                energy_update_neuron: 1.536e-11
+                latency_update_neuron: 2.075e-09
                 energy_spike_out: 6.745e-11
                 latency_spike_out: 6.480e-10
             -

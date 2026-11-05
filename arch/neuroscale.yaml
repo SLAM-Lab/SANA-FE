@@ -41,10 +41,10 @@ architecture:
               name: neuroscale_lif
               attributes:
                 model: neuroscale_lif
-                energy_access_neuron: 5.792e-11
-                latency_access_neuron: 7.244e-09
-                energy_update_neuron: 0.0
-                latency_update_neuron: 0.0
+                energy_access_neuron: 4.267e-11
+                latency_access_neuron: 5.169e-09
+                energy_update_neuron: 1.526e-11
+                latency_update_neuron: 2.075e-09
                 energy_spike_out: 6.630e-11
                 latency_spike_out: 3.790e-10
             -
