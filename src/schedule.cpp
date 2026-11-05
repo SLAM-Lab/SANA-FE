@@ -140,7 +140,8 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
     //  number of steps.
     //
     // The basic recurrence is T[c,t] = L[c,t] + max(T[c,t-1], T[fan-in,t-1],
-    //  T[fan-out,t-Tadv]). Optional refinements (see
+    //  T[fan-out,t-Tadv]), where L[c,t] is the larger of the core's message
+    //  receive time and its neuron processing time. Optional refinements (see
     //  NeuroscaleModelConfiguration) account for a router port shared by the
     //  cores in a tile, and for the done/advance packets. The per-step axon
     //  scan is a synapse unit cost (see NeuroScaleSynapseModel).
@@ -192,8 +193,17 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
 
     for (size_t core = 0UL; core < cores; ++core)
     {
-        double core_latency = neuron_processing_latencies[core] +
-                message_processing_latencies[core];
+        // A core receives spikes concurrently with its own neuron processing
+        //  (separate units; spike arrival is handled by the input unit while
+        //  the neuron unit runs), so take the larger of the two as in the
+        //  simple scheduler. The true overlap lies between this and the sum:
+        //  it depends on when spikes arrive and which unit is free. For the
+        //  applications the max is the closer of the two (see
+        //  bmarks/app_compare/RESULTS.md). The microbenchmarks, which have
+        //  little neuron work to hide behind, then read lower than actsim for
+        //  the per-spike receive cost (latency_message_in).
+        double core_latency = std::max(neuron_processing_latencies[core],
+                message_processing_latencies[core]);
         if (use_port)
         {
             // The core's own spikes are already costed by its message-out
