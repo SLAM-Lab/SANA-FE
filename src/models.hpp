@@ -60,9 +60,11 @@ private:
 // NeuroScale's synapse unit. Each step it scans every input axon up to the
 //  highest axon id seen so far, whether or not that axon spiked, and then reads
 //  the synapse table for every spike. The scan cost is therefore dynamic: it
-//  grows as new axons are first seen. Every step costs one scan slot per axon
-//  seen in earlier steps (begin_timestep), plus one more slot for each axon
-//  that spikes for the first time (update).
+//  grows when an axon with a higher id than any before spikes. Every step costs
+//  one scan slot per id up to the high-water mark of earlier steps
+//  (begin_timestep), plus one slot for each id the mark rises by (update). Axon
+//  ids come from the synapses' "axon" edge attribute (the chip flow's
+//  numbering); without it a source's id is its rank by neuron id on the core.
 //  Since the framework forbids a model simulating latency while a default
 //  per-spike latency is set, this model charges both (latency_process_spike
 //  must not be set in the architecture).
@@ -74,15 +76,21 @@ public:
     PipelineResult begin_timestep(long int timestep) override;
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override;
     void track_connection(size_t synapse_address, size_t src_neuron_id, size_t dest_neuron_id) override;
+    void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void reset() override;
     static inline const std::unordered_map<std::string, std::string> neuroscale_synapse_attributes{
+        {"axon", "(int) Input axon id of the synapse's source on this core (the scan runs up to the highest id seen)."},
         {"latency_read_synapse", "(float) Latency for one synapse table read (s)."},
         {"latency_scan_axon", "(float) Per-step latency for scanning one input axon (s)."},
     };
 
 private:
     std::vector<size_t> axon_of_synapse;
-    std::unordered_set<size_t> axons_seen;
+    size_t axon_rank(size_t src_neuron_id);
+    std::vector<long int> axon_id;
+    std::vector<size_t> sources;
+    bool sources_sorted{true};
+    size_t scanned_axons{0};
     double energy_read_synapse{0.0};
     double latency_read_synapse{0.0};
     double energy_scan_axon{0.0};

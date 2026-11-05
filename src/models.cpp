@@ -77,11 +77,17 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::update(
     {
         energy += energy_read_synapse;
         latency += latency_read_synapse;
-        if (axons_seen.insert(axon_of_synapse.at(synapse_address)).second)
+        // The RTL scans axon ids 0..(highest id that has received a spike): a
+        // spike on a higher id than any before extends this step's scan
+        const long int given = synapse_address < axon_id.size() ? axon_id[synapse_address] : -1L;
+        const size_t scan_length = (given >= 0L) ? static_cast<size_t>(given) + 1UL :
+                                                   axon_rank(axon_of_synapse.at(synapse_address)) + 1UL;
+        if (scan_length > scanned_axons)
         {
-            // A new axon extends this step's scan by one slot
-            energy += energy_scan_axon;
-            latency += latency_scan_axon;
+            const double extra = static_cast<double>(scan_length - scanned_axons);
+            energy += energy_scan_axon * extra;
+            latency += latency_scan_axon * extra;
+            scanned_axons = scan_length;
         }
     }
     output.energy = energy;
@@ -93,8 +99,8 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
         const long int /*timestep*/)
 {
     PipelineResult output;
-    output.energy = energy_scan_axon * static_cast<double>(axons_seen.size());
-    output.latency = latency_scan_axon * static_cast<double>(axons_seen.size());
+    output.energy = energy_scan_axon * static_cast<double>(scanned_axons);
+    output.latency = latency_scan_axon * static_cast<double>(scanned_axons);
     return output;
 }
 
@@ -111,6 +117,23 @@ void sanafe::NeuroScaleSynapseModel::set_attribute_hw(
     }
 }
 
+void sanafe::NeuroScaleSynapseModel::set_attribute_edge(
+        const size_t synapse_address, const std::string &attribute_name,
+        const ModelAttribute &param)
+{
+    if (attribute_name == "axon")
+    {
+        // The input axon id the chip's flow gave this synapse's source on this core
+        if (axon_id.size() <= synapse_address)
+        {
+            axon_id.resize(synapse_address + 1UL, -1L);
+        }
+        axon_id[synapse_address] = static_cast<long int>(static_cast<double>(param));
+        return;
+    }
+    CurrentBasedSynapseModel::set_attribute_edge(synapse_address, attribute_name, param);
+}
+
 void sanafe::NeuroScaleSynapseModel::track_connection(
         const size_t synapse_address, const size_t src_neuron_id,
         const size_t /*dest_neuron_id*/)
@@ -120,11 +143,26 @@ void sanafe::NeuroScaleSynapseModel::track_connection(
         axon_of_synapse.resize(synapse_address + 1UL);
     }
     axon_of_synapse[synapse_address] = src_neuron_id;
+    sources.push_back(src_neuron_id);
+    sources_sorted = false;
+}
+
+size_t sanafe::NeuroScaleSynapseModel::axon_rank(const size_t src_neuron_id)
+{
+    // Axon ids are approximated by the rank of the source neuron among this
+    //  core's sources (the flow numbers them in order of first appearance)
+    if (!sources_sorted)
+    {
+        std::sort(sources.begin(), sources.end());
+        sources.erase(std::unique(sources.begin(), sources.end()), sources.end());
+        sources_sorted = true;
+    }
+    return static_cast<size_t>(std::lower_bound(sources.begin(), sources.end(), src_neuron_id) - sources.begin());
 }
 
 void sanafe::NeuroScaleSynapseModel::reset()
 {
-    axons_seen.clear();
+    scanned_axons = 0;
 }
 
 // *** Dendrite models ***

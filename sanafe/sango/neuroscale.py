@@ -95,9 +95,23 @@ def neuroscale_registry(kind):
             "hw_type": "synapse",
             "model_type": "neuroscale_synapse",
             "param": {},
-            "state": {"weight": _field("weight", 1.0)},
+            "state": {"weight": _field("weight", 1.0), "axon": _field(None, -1)},
         },
     }
+
+
+def flow_axon_ids(graph, placements):
+    """{(pre name, post name): input axon id on the post neuron's core}, numbered as the chip
+    flow does (benchmarks/fugu_to_neuroscale.py register_synapses): post neurons in neuron
+    number order, each source taking the next id on a core the first time it reaches it.
+    The synapse model's scan runs up to the highest id that has received a spike."""
+    order = sorted(graph.nodes, key=lambda n: int(graph.nodes[n].get("neuron_number", 0)))
+    taken, ids = {}, {}
+    for post in order:
+        axons = taken.setdefault(tuple(placements[post][0]), {})
+        for pre in graph.predecessors(post):
+            ids[(pre, post)] = axons.setdefault(pre, len(axons))
+    return ids
 
 
 def send_times(messages, labels):
@@ -140,7 +154,7 @@ class SimNeuroScale(SimSANAFE):
         return neuroscale_registry("rw")
 
     def compile(self, placements=None, kind="rw", lfsr_bits=None, refractory_period=0,
-                seed_for_core=None, trace_shift=None, trace_frac_bits=None, **kwargs):
+                seed_for_core=None, trace_shift=None, trace_frac_bits=None, axon_ids=None, **kwargs):
         """
         placements: {node name: ((x, y, core), neuron index)}; None maps greedily
         kind: the chip's neuron: "lif" (floor at 0), "rw" (probabilistic, LFSR) or
@@ -150,12 +164,15 @@ class SimNeuroScale(SimSANAFE):
         seed_for_core: f((x, y, core)) -> LFSR seed (rw); default (y * grid_x + x) *
             cores_per_tile + core + 1, the chip variants' rule
         trace_shift, trace_frac_bits: the lca chip's trace (TRACE_SHIFT, TRACE_BITS - 16)
+        axon_ids: {(pre name, post name): input axon id}, see flow_axon_ids; without it the
+            synapse model ranks sources by neuron id
         """
         if kind not in KINDS:
             raise ValueError(f"kind must be one of {sorted(KINDS)}, not {kind!r}")
         self.kind = kind
         self.model_registry = neuroscale_registry(kind)
         self.placements = placements
+        self.axon_ids = axon_ids
         self.seed_for_core = seed_for_core
         if lfsr_bits is not None:
             self.lfsr_bits = lfsr_bits
@@ -169,6 +186,14 @@ class SimNeuroScale(SimSANAFE):
         self.model_registry["RefractoryLIF"]["state"]["refractory_delay"]["default"] = \
             int(refractory_period)
         super().compile(**kwargs)
+
+    def _build_network(self):
+        if getattr(self, "axon_ids", None):
+            names = {n: name for name, n in self.node_index.items()}
+            for pre, targets in enumerate(self.edge_data):
+                for post, data in targets.items():
+                    data["axon"] = self.axon_ids.get((names[pre], names[post]), -1)
+        super()._build_network()
 
     # -- mapping --------------------------------------------------------------
     def _map_to_cores(self):
@@ -222,7 +247,7 @@ class ScaffoldRun:
     send_times: dict = field(default_factory=dict)   # {(node name, tick): seconds the spike left}
 
 
-def run_scaffold(graph, ticks, arch, placements, kind="rw", lfsr_bits=None,
+def run_scaffold(graph, ticks, arch, placements, kind="rw", lfsr_bits=None, axon_ids=None,
                  seed_for_core=None, trace_shift=None, trace_frac_bits=None, spike_trace=None):
     """Simulate a Fugu scaffold graph (as lowered to the chip) in SANA-FE.
 
@@ -255,7 +280,10 @@ def run_scaffold(graph, ticks, arch, placements, kind="rw", lfsr_bits=None,
             attributes["refractory_delay"] = int(compartment["period"])
         neurons[name].set_attributes(model_attributes=attributes, log_spikes=True)
     for source, target, e in graph.edges(data=True):
-        neurons[source].connect_to_neuron(neurons[target], {"weight": float(e["weight"])})
+        edge = {"weight": float(e["weight"])}
+        if axon_ids is not None:
+            edge["axon"] = float(axon_ids.get((source, target), -1))
+        neurons[source].connect_to_neuron(neurons[target], edge)
 
     tiles = {(t.x, t.y): t for t in arch.tiles}
     by_core = {}
