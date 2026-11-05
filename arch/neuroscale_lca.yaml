@@ -8,7 +8,7 @@ architecture:
     height: 4
     link_buffer_size: 16
     sync_model: fixed
-    latency_sync: 1.399e-05
+    latency_sync: 1.334e-06
     sync_protocol: neuroscale
     max_steps_async: 6
   tile:
