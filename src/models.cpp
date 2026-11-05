@@ -1209,12 +1209,11 @@ sanafe::PipelineResult sanafe::NeuroScaleRwModel::update(
 {
     NeuroScaleRwCompartment &cx = compartments.at(neuron_address);
 
-    sanafe::NeuronStatus state = sanafe::idle;
-    if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
-            (std::fabs(cx.bias) > 0.0) || (cx.refractory_count > 0))
-    {
-        state = sanafe::updated;
-    }
+    // The RTL runs the full update (parameter fetch, membrane arithmetic) for every neuron
+    //  that is not refractory, whatever its state; a refractory one only counts down, which
+    //  is cheaper. The soma unit's update latency is that difference.
+    sanafe::NeuronStatus state =
+            (cx.refractory_count > 0) ? sanafe::idle : sanafe::updated;
 
     if (cx.refractory_count > 0)
     {
@@ -1288,12 +1287,11 @@ sanafe::PipelineResult sanafe::NeuroScaleLifModel::update(
 {
     NeuroScaleLifCompartment &cx = compartments.at(neuron_address);
 
-    sanafe::NeuronStatus state = sanafe::idle;
-    if ((std::fabs(cx.potential) > 0.0) || current_in.has_value() ||
-            (std::fabs(cx.bias) > 0.0) || (cx.refractory_count > 0))
-    {
-        state = sanafe::updated;
-    }
+    // The RTL runs the full update (parameter fetch, membrane arithmetic) for every neuron
+    //  that is not refractory, whatever its state; a refractory one only counts down, which
+    //  is cheaper. The soma unit's update latency is that difference.
+    sanafe::NeuronStatus state =
+            (cx.refractory_count > 0) ? sanafe::idle : sanafe::updated;
 
     if (cx.refractory_count > 0)
     {
