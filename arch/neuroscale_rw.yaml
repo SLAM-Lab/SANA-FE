@@ -15,14 +15,14 @@ architecture:
     -
       name: neuroscale_tile[0..15]
       attributes:
-        energy_north_hop: 1.200e-05
-        latency_north_hop: 0.0
-        energy_east_hop: 1.200e-05
-        latency_east_hop: 0.0
-        energy_south_hop: 1.200e-05
-        latency_south_hop: 0.0
-        energy_west_hop: 1.200e-05
-        latency_west_hop: 0.0
+        energy_north_hop: 5.044e-12
+        latency_north_hop: 6.357e-10
+        energy_east_hop: 5.432e-12
+        latency_east_hop: 6.357e-10
+        energy_south_hop: 5.432e-12
+        latency_south_hop: 6.357e-10
+        energy_west_hop: 5.044e-12
+        latency_west_hop: 6.357e-10
       core:
         -
           name: neuroscale_core[0..3]

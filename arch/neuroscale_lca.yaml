@@ -15,14 +15,14 @@ architecture:
     -
       name: neuroscale_tile[0..15]
       attributes:
-        energy_north_hop: 1.200e-05
-        latency_north_hop: 0.0
-        energy_east_hop: 1.200e-05
-        latency_east_hop: 0.0
-        energy_south_hop: 1.200e-05
-        latency_south_hop: 0.0
-        energy_west_hop: 1.200e-05
-        latency_west_hop: 0.0
+        energy_north_hop: 5.044e-12
+        latency_north_hop: 6.357e-10
+        energy_east_hop: 5.432e-12
+        latency_east_hop: 6.357e-10
+        energy_south_hop: 5.432e-12
+        latency_south_hop: 6.357e-10
+        energy_west_hop: 5.044e-12
+        latency_west_hop: 6.357e-10
       core:
         -
           name: neuroscale_core[0..3]
@@ -34,8 +34,8 @@ architecture:
             -
               name: neuroscale_in
               attributes:
-                energy_message_in: 2.303e-10
-                latency_message_in: 1.521e-08
+                energy_message_in: 2.170e-10
+                latency_message_in: 1.388e-08
           soma:
             -
               name: neuroscale_lca
@@ -69,10 +69,10 @@ architecture:
               name: neuroscale_synapses
               attributes:
                 model: neuroscale_synapse
-                energy_read_synapse: 7.786e-11
+                energy_read_synapse: 7.790e-11
                 latency_read_synapse: 4.723e-09
-                energy_scan_axon: 1.016e-10
-                latency_scan_axon: 8.609e-09
+                energy_scan_axon: 1.065e-10
+                latency_scan_axon: 8.610e-09
           axon_out:
             -
               name: neuroscale_out
