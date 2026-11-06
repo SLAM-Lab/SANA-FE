@@ -144,11 +144,7 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
     //  where L[c,t] is the larger of the core's message receive time and its
     //  neuron processing time.
     Timestep &ts_data = ts.get();
-    const NeuroscaleModelConfiguration &nm = scheduler.neuroscale;
     const size_t cores = scheduler.core_count;
-    const size_t cores_per_tile = std::max(scheduler.max_cores_per_tile, 1UL);
-    const size_t tiles = (cores + cores_per_tile - 1UL) / cores_per_tile;
-    const bool use_port = nm.packet_latency > 0.0;
 
     std::vector<double> neuron_processing_latencies(cores, 0.0);
     std::vector<double> message_processing_latencies(cores, 0.0);
@@ -172,23 +168,6 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
         }
     }
 
-    // Packets each tile pushes through its shared router port: spikes, plus
-    //  one done per fan-out core and one advance per fan-in core
-    std::vector<double> tile_packets(tiles, 0.0);
-    if (use_port)
-    {
-        for (size_t core = 0UL; core < cores; ++core)
-        {
-            tile_packets[core / cores_per_tile] += messages_out[core];
-            if (nm.sync_packets)
-            {
-                tile_packets[core / cores_per_tile] += static_cast<double>(
-                        scheduler.core_fan_in.at(core).size() +
-                        scheduler.core_fan_out.at(core).size());
-            }
-        }
-    }
-
     for (size_t core = 0UL; core < cores; ++core)
     {
         // Here I assumes message and neuron processing stages execute in
@@ -200,15 +179,6 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
         //  far more complicated for little gain.
         double core_latency = std::max(neuron_processing_latencies[core],
                 message_processing_latencies[core]);
-        if (use_port)
-        {
-            // The core's own spikes are already costed by its message-out
-            //  latency (set this to the port's packet latency). Add the time
-            //  spent waiting behind the other cores' packets (and sync packets)
-            //  in the tile's shared port
-            core_latency += nm.packet_latency *
-                    (tile_packets[core / cores_per_tile] - messages_out[core]);
-        }
 
         // Calculate the max over fan in of T[fanout][t-1]
         double max_fan_in = 0.0;
@@ -226,9 +196,10 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
                             scheduler.max_steps_async - 1UL));
         }
         const double prev_time = scheduler.core_timing_histories[core].at(0UL);
-        const double start_time = std::max({prev_time, max_fan_in, max_fan_out});
-        updated_times[core] = core_latency + start_time +
-                scheduler.timestep_sync_delay;
+        const double start_time =
+                std::max({prev_time, max_fan_in, max_fan_out});
+        updated_times[core] =
+                core_latency + start_time + scheduler.timestep_sync_delay;
     }
 
     // Update timing for all cores

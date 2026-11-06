@@ -192,9 +192,6 @@ struct Scheduler
     size_t max_cores_per_tile;
     size_t max_steps_async; // TODO: make per core?
     double timestep_sync_delay;
-
-    // Refinements of the NeuroScale analytical model
-    NeuroscaleModelConfiguration neuroscale;
 };
 
 // NetworkOnChipState is used by the scheduler to track the high-level state of

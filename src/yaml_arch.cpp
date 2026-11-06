@@ -446,12 +446,6 @@ sanafe::description_parse_noc_configuration_yaml(
     noc.max_steps_async =
             yaml_optional_field<int>(noc_attributes, "max_steps_async")
                     .value_or(1UL);
-    noc.neuroscale.packet_latency =
-            yaml_optional_field<double>(noc_attributes, "neuroscale_packet_latency")
-                    .value_or(0.0);
-    noc.neuroscale.sync_packets =
-            yaml_optional_field<bool>(noc_attributes, "neuroscale_sync_packets")
-                    .value_or(false);
 
     // TODO: get rid of the sync_model parameter, this is confusing with the new
     //  changes. We can just parse the latency argument if provided, assuming either

@@ -69,7 +69,6 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         , noc_height_in_tiles(arch.noc_height_in_tiles)
         , noc_buffer_size(arch.noc_buffer_size)
         , max_steps_async(arch.max_steps_async)
-        , neuroscale(arch.neuroscale)
 {
     INFO("Initializing simulation.\n");
     for (const TileConfiguration &tile_config : arch.tiles)
@@ -500,7 +499,6 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
     scheduler.timing_model = timing_model;
     scheduler.sync_protocol = sync_protocol;
     scheduler.max_steps_async = max_steps_async;
-    scheduler.neuroscale = neuroscale;
 
     scheduler.core_timing_histories.resize(
             core_count, scheduler.max_steps_async); // Tadv in Neuroscale

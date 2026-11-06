@@ -76,18 +76,6 @@ enum SyncProtocol : uint8_t
     sync_neuroscale, // NeuroScale's async protocol as described in []
 };
 
-// Optional refinements of the NeuroScale analytical timing model. Each term is
-//  disabled when its parameter is zero (the default), which recovers the plain
-//  recurrence.
-struct NeuroscaleModelConfiguration
-{
-    // Service time per packet of the tile's shared router port. Replaces the
-    //  per core message_out cost: all cores in a tile share one output port
-    double packet_latency{0.0};
-    // Count the done/advance packets each core sends per fan-out/fan-in core
-    bool sync_packets{false};
-};
-
 class Architecture
 {
 public:
@@ -101,7 +89,6 @@ public:
     size_t noc_height_in_tiles{1UL};
     size_t noc_buffer_size{0UL};
     size_t max_steps_async{1UL};
-    NeuroscaleModelConfiguration neuroscale{};
 
     double timestep_delay{0.0};
 
@@ -119,7 +106,6 @@ Architecture load_arch(const std::filesystem::path &path);
 
 struct NetworkOnChipConfiguration
 {
-    NeuroscaleModelConfiguration neuroscale;
     LookupTable<double> ts_sync_delay_table{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     size_t width_in_tiles{1UL};
