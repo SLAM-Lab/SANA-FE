@@ -573,7 +573,7 @@ public:
     };
 
 private:
-    [[nodiscard]] unsigned int draw_lfsr();
+    [[nodiscard]] unsigned int lfsr();
     [[nodiscard]] long int probability_code(const NeuroScaleRwCompartment &cx) const;
 
     std::vector<NeuroScaleRwCompartment> compartments{neuroscale_max_compartments};

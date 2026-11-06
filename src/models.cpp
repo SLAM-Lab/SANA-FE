@@ -174,8 +174,8 @@ size_t sanafe::NeuroScaleSynapseModel::generate_default_axon_ids(
                 neuron_ids.end());
         neuron_ids_sorted = true;
     }
-    return static_cast<size_t>(
-            std::lower_bound(neuron_ids.begin(), neuron_ids.end(), src_neuron_id) -
+    return static_cast<size_t>(std::lower_bound(neuron_ids.begin(),
+                                       neuron_ids.end(), src_neuron_id) -
             neuron_ids.begin());
 }
 
@@ -1096,8 +1096,8 @@ void sanafe::SangoLifModel::reset()
     }
 }
 
-sanafe::PipelineResult sanafe::SangoLifModel::update(const size_t neuron_address,
-        const std::optional<double> current_in,
+sanafe::PipelineResult sanafe::SangoLifModel::update(
+        const size_t neuron_address, const std::optional<double> current_in,
         const long int /*simulation_time*/)
 {
     SangoCompartment &cx = compartments.at(neuron_address);
@@ -1193,7 +1193,7 @@ void sanafe::NeuroScaleRwModel::set_attribute_neuron(
     TRACE1(MODELS, "Set attribute: %s\n", attribute_name.c_str());
 }
 
-unsigned int sanafe::NeuroScaleRwModel::draw_lfsr()
+unsigned int sanafe::NeuroScaleRwModel::lfsr()
 {
     // The RTL returns the current state, then advances it with std::fib_lfsr:
     //  next = (xor of the tap bits << (W-1)) | (state >> 1)
@@ -1228,11 +1228,10 @@ sanafe::PipelineResult sanafe::NeuroScaleRwModel::update(
 {
     NeuroScaleRwCompartment &cx = compartments.at(neuron_address);
 
-    // The RTL runs the full update (parameter fetch, membrane arithmetic) for every neuron
-    //  that is not refractory, whatever its state; a refractory one only counts down, which
-    //  is cheaper. The soma unit's update latency is that difference.
-    sanafe::NeuronStatus state =
-            (cx.refractory_count > 0) ? sanafe::idle : sanafe::updated;
+    //  Neurons in a refractory state are cheaper to update because they skip
+    //  their update logic (so are essentially inactive)
+    sanafe::NeuronStatus state = (cx.refractory_count > 0) ? sanafe::idle :
+                                                             sanafe::updated;
 
     if (cx.refractory_count > 0)
     {
@@ -1247,8 +1246,8 @@ sanafe::PipelineResult sanafe::NeuroScaleRwModel::update(
         {
             const long int code = probability_code(cx);
             const long int always = (1L << lfsr_bits) - 1L;
-            const bool fire =
-                    (code >= always) || (static_cast<long int>(draw_lfsr()) <= code);
+            const bool fire = (code >= always) ||
+                    (static_cast<long int>(lfsr()) <= code);
             if (fire)
             {
                 state = sanafe::fired;
@@ -1309,8 +1308,8 @@ sanafe::PipelineResult sanafe::NeuroScaleLifModel::update(
     // The RTL runs the full update (parameter fetch, membrane arithmetic) for every neuron
     //  that is not refractory, whatever its state; a refractory one only counts down, which
     //  is cheaper. The soma unit's update latency is that difference.
-    sanafe::NeuronStatus state =
-            (cx.refractory_count > 0) ? sanafe::idle : sanafe::updated;
+    sanafe::NeuronStatus state = (cx.refractory_count > 0) ? sanafe::idle :
+                                                             sanafe::updated;
 
     if (cx.refractory_count > 0)
     {
@@ -1426,7 +1425,8 @@ void sanafe::NeuroScaleLcaModel::reset()
 std::map<std::string, double> sanafe::NeuroScaleLcaModel::get_neuron_traces(
         size_t neuron_address)
 {
-    return {{"trace", static_cast<double>(compartments.at(neuron_address).trace)}};
+    return {{"trace",
+            static_cast<double>(compartments.at(neuron_address).trace)}};
 }
 
 void sanafe::SangoProbLifModel::set_attribute_neuron(
@@ -1531,8 +1531,9 @@ void sanafe::SangoCubaDendriteModel::set_attribute_neuron(
     recalculate_constants(cx);
 }
 
-void sanafe::SangoCubaDendriteModel::set_attribute_edge(const size_t synapse_address,
-        const std::string &attribute_name, const ModelAttribute &param)
+void sanafe::SangoCubaDendriteModel::set_attribute_edge(
+        const size_t synapse_address, const std::string &attribute_name,
+        const ModelAttribute &param)
 {
     if (channels.size() <= synapse_address)
     {
@@ -1590,8 +1591,9 @@ sanafe::PipelineResult sanafe::SangoCubaDendriteModel::update(
     return output;
 }
 
-void sanafe::SangoCubaSomaModel::set_attribute_neuron(const size_t neuron_address,
-        const std::string &attribute_name, const ModelAttribute &param)
+void sanafe::SangoCubaSomaModel::set_attribute_neuron(
+        const size_t neuron_address, const std::string &attribute_name,
+        const ModelAttribute &param)
 {
     CubaCompartment &cx = compartments.at(neuron_address);
 
@@ -1764,7 +1766,7 @@ std::shared_ptr<sanafe::PipelineUnit> sanafe::model_get_pipeline_unit(
     {
         return std::shared_ptr<PipelineUnit>(new SangoCubaDendriteModel());
     }
-        if (model_name == "sango_cuba_soma")
+    if (model_name == "sango_cuba_soma")
     {
         return std::shared_ptr<PipelineUnit>(new SangoCubaSomaModel());
     }
@@ -1806,7 +1808,8 @@ const sanafe::ModelMap &sanafe::get_builtin_models()
                     {"sango_plif", &SangoProbLifModel::sango_plif_attributes},
                     {"sango_cuba_dendrite",
                             &SangoCubaDendriteModel::cuba_dendrite_attributes},
-                    {"sango_cuba_soma", &SangoCubaSomaModel::cuba_soma_attributes}};
+                    {"sango_cuba_soma",
+                            &SangoCubaSomaModel::cuba_soma_attributes}};
 
     return builtin_models;
 }
