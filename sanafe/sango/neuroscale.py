@@ -252,7 +252,7 @@ class ScaffoldRun:
     send_times: dict = field(default_factory=dict)   # {(node name, tick): seconds the spike left}
 
 
-def run_scaffold(graph, ticks, arch, placements, neuron_type="rw", lfsr_bits=None, axon_ids=None,
+def run_scaffold(graph, ticks, arch, placements, kind="rw", lfsr_bits=None, axon_ids=None,
                  seed_for_core=None, trace_shift=None, trace_frac_bits=None, spike_trace=None):
     """Simulate a Fugu scaffold in SANA-FE.
 
@@ -262,7 +262,7 @@ def run_scaffold(graph, ticks, arch, placements, neuron_type="rw", lfsr_bits=Non
     arch = sanafe.load_arch(arch) if isinstance(arch, str) else arch
     names = list(graph.nodes)
     net = sanafe.Network()
-    group = net.create_neuron_group("n", len(names), soma_hw_name=NEURON_TYPES[neuron_type]["hw_name"])
+    group = net.create_neuron_group("n", len(names), soma_hw_name=NEURON_TYPES[kind]["hw_name"])
     neurons = {name: group[i] for i, name in enumerate(names)}
     offset = {name: i for i, name in enumerate(names)}
     for name, a in graph.nodes(data=True):
@@ -271,10 +271,10 @@ def run_scaffold(graph, ticks, arch, placements, neuron_type="rw", lfsr_bits=Non
             "threshold": float(a["threshold"]),
             "bias": float(a.get("bias", 0.0)),
         }
-        if neuron_type == "rw":
+        if kind == "rw":
             attributes["decay"] = float(a.get("decay", 0.0))
             attributes["spike_probability"] = float(a.get("p", 1.0))
-        if neuron_type == "lca":
+        if kind == "lca":
             attributes["trace_shift"] = int(trace_shift)
             attributes["trace_frac_bits"] = int(trace_frac_bits)
         compartment = a.get("compartment") or {}
@@ -300,7 +300,7 @@ def run_scaffold(graph, ticks, arch, placements, neuron_type="rw", lfsr_bits=Non
         for _, name in members:
             neurons[name].map_to_core(target)
             cores[name] = core
-        if neuron_type == "rw" and lfsr_bits is not None:
+        if kind == "rw" and lfsr_bits is not None:
             seed = seed_for_core(core) if seed_for_core else default_seed(arch, core)
             seed_core(neurons[members[0][1]], lfsr_bits, seed)
 
