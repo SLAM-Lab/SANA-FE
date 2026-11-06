@@ -139,12 +139,10 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
     //  from each other and diverge from their dependencies by up to a finite
     //  number of steps.
     //
-    // The basic recurrence is T[c,t] = L[c,t] + max(T[c,t-1], T[fan-in,t-1],
-    //  T[fan-out,t-Tadv]), where L[c,t] is the larger of the core's message
-    //  receive time and its neuron processing time. Optional refinements (see
-    //  NeuroscaleModelConfiguration) account for a router port shared by the
-    //  cores in a tile, and for the done/advance packets. The per-step axon
-    //  scan is a synapse unit cost (see NeuroScaleSynapseModel).
+    // The recurrent equation used is:
+    //    T[c,t] = L[c,t] + max(T[c,t-1], T[fan-in,t-1], T[fan-out,t-Tadv])
+    //  where L[c,t] is the larger of the core's message receive time and its
+    //  neuron processing time.
     Timestep &ts_data = ts.get();
     const NeuroscaleModelConfiguration &nm = scheduler.neuroscale;
     const size_t cores = scheduler.core_count;
@@ -193,15 +191,13 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
 
     for (size_t core = 0UL; core < cores; ++core)
     {
-        // A core receives spikes concurrently with its own neuron processing
-        //  (separate units; spike arrival is handled by the input unit while
-        //  the neuron unit runs), so take the larger of the two as in the
-        //  simple scheduler. The true overlap lies between this and the sum:
-        //  it depends on when spikes arrive and which unit is free. For the
-        //  applications the max is the closer of the two (see
-        //  bmarks/app_compare/RESULTS.md). The microbenchmarks, which have
-        //  little neuron work to hide behind, then read lower than actsim for
-        //  the per-spike receive cost (latency_message_in).
+        // Here I assumes message and neuron processing stages execute in
+        //  parallel within the NeuroScale pipeline (similar to other Loihi-like
+        //  architectures). In reality, both pipeline halves sometimes contend
+        //  over shared core resources. Empirically, I found that there's
+        //  usually minimal blocking and results are much closer to max() than a
+        //  sum(). Modeling contention/stalls in detail would make this model
+        //  far more complicated for little gain.
         double core_latency = std::max(neuron_processing_latencies[core],
                 message_processing_latencies[core]);
         if (use_port)

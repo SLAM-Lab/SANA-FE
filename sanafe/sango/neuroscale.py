@@ -3,17 +3,19 @@
 #  Engineering Solutions of Sandia, LLC which is under contract
 #  No. DE-NA0003525 with the U.S. Department of Energy.
 """
-SANA-FE backend for Sango networks on the NeuroScale chip.
+SANA-FE backend for Sango with specific changes for the NeuroScale chip.
 
-Extends the generic SimSANAFE backend with what the NeuroScale benchmarks need:
+Extends the generic SimSANAFE backend with NeuroScale specific changes:
 
-  * its own model registry: the RTL-exact soma for the chip's neuron kind
+  * its own model registry: the RTL-exact soma for the chip's neuron type
     (`lif`, `rw` random walker or `lca` trace neuron) and the `neuroscale_synapse`
   * explicit placement: {Sango node name: ((x, y, core), neuron index)}, mapped in
     neuron-index order (the RTL updates neurons in index order, which fixes the
     order of LFSR draws within a core)
   * per-core LFSR seeding from the first neuron mapped to each core
   * chip-variant settings: neuron kind, LFSR width, trace shift, refractory period
+
+TODO: we possibly want to merge these changes into the baseline sango backend?
 
 Usage:
 
@@ -43,44 +45,46 @@ def _field(dsl, default):
     return {"dsl": dsl, "mapfrom": dsl, "default": default}
 
 
-# One soma per RTL neuron. The chip variant decides which one: every neuron of a
-# chip is of its kind (neuron_models/lif, rw_*, lca_*).
-KINDS = {
+# One soma per RTL neuron (neuron_models/lif, rw_*, lca_*).
+NEURON_TYPES = {
     "lif": dict(hw_name="neuroscale_lif", model="neuroscale_lif"),
     "rw": dict(hw_name="neuroscale_rw", model="neuroscale_rw"),
     "lca": dict(hw_name="neuroscale_lca", model="neuroscale_lca"),
 }
 
 
-def arch_for_kind(arch_dir, kind):
-    """The architecture file for a neuron kind: neuroscale.yaml (lif, fig4's chip),
-    neuroscale_rw.yaml, neuroscale_lca.yaml. Each has the one soma unit of its kind."""
-    return os.path.join(arch_dir, "neuroscale.yaml" if kind == "lif" else f"neuroscale_{kind}.yaml")
+# TODO: rename to get_arch_yaml_for_neuron_type doing so will mess up my scripts in NeuroScale so don't do yet...
+def arch_for_kind(arch_dir, neuron_type):
+    """Get the arch description based on the neuron type."""
+    return os.path.join(arch_dir, "neuroscale.yaml" if neuron_type == "lif" else f"neuroscale_{neuron_type}.yaml")
 
 
+# TODO: rename to get_neuron_type_for_chip_variant doing so will mess up my scripts in NeuroScale so don't do yet...
 def kind_for_variant(variant):
-    """The soma kind of a chip variant (benchmarks.variants.Variant)."""
+    """The soma type for a given chip variant (benchmarks.variants.Variant).
+
+    Autodetect based on the feature names provided for now."""
     if "trace" in variant.features:
         return "lca"
     return "rw" if "prob" in variant.features else "lif"
 
 
-def _neuron_entry(kind):
+def _neuron_entry(neuron_type):
     state = {
         "potential": _field("voltage", 0.0),
         "threshold": _field("threshold", 1.0),
         "bias": _field("bias", 0.0),
         "refractory_delay": _field(None, 0),
     }
-    if kind == "rw":
+    if neuron_type == "rw":
         # Sango leak 1.0 (full leak) is the chip's decay bit; it has nothing in between
         state["decay"] = _field("leak", 1.0)
         state["spike_probability"] = _field("prob", 1.0)
-    if kind == "lca":
+    if neuron_type == "lca":
         state["trace_shift"] = _field(None, 5)
         state["trace_frac_bits"] = _field(None, 8)
-    return {"graph_type": "neuron", "hw_type": "soma", "hw_name": KINDS[kind]["hw_name"],
-            "model_type": KINDS[kind]["model"], "param": {}, "state": state}
+    return {"graph_type": "neuron", "hw_type": "soma", "hw_name": NEURON_TYPES[neuron_type]["hw_name"],
+            "model_type": NEURON_TYPES[neuron_type]["model"], "param": {}, "state": state}
 
 
 def neuroscale_registry(kind):
@@ -100,6 +104,8 @@ def neuroscale_registry(kind):
     }
 
 
+# TODO: rename to mapped_axon_ids doing so will mess up my scripts in NeuroScale so don't do yet...
+# TODO: change placements to mappings
 def flow_axon_ids(graph, placements):
     """{(pre name, post name): input axon id on the post neuron's core}, numbered as the chip
     flow does (benchmarks/fugu_to_neuroscale.py register_synapses): post neurons in neuron
@@ -116,14 +122,14 @@ def flow_axon_ids(graph, placements):
 
 def send_times(messages, labels):
     """{(key, 0-based tick): seconds at which the neuron's spike message was sent}, for the
-    neurons in ``labels`` = {"group.index": key}. A neuron without a fan-out sends no message."""
+    neurons in ``labels`` = {"group.index": key}."""
     first = messages.groupby(["src_neuron", "timestep"]).sent_timestamp.min()
     return {(labels[label], int(tick) - 1): float(when)
             for (label, tick), when in first.items() if label in labels}
 
 
 def default_seed(arch, core):
-    """The chip variants' LFSR seed for a core: its logical index + 1 (0 would lock the LFSR)."""
+    """The LFSR seed for a core is the logical index + 1 (0 would lock the LFSR)."""
     x, y, core_id = core
     tiles = {(t.x, t.y): t for t in arch.tiles}
     grid_x = max(t.x for t in arch.tiles) + 1
@@ -131,14 +137,12 @@ def default_seed(arch, core):
 
 
 def seed_core(first_neuron, lfsr_bits, seed):
-    """One LFSR per core: any neuron mapped to it carries the width and seed. The width
-    is set first, since the seed is masked to it."""
     first_neuron.set_attributes(model_attributes={"lfsr_bits": lfsr_bits})
     first_neuron.set_attributes(model_attributes={"lfsr_seed": seed})
 
 
 class SimNeuroScale(SimSANAFE):
-    """SANA-FE backend for Sango networks mapped to the NeuroScale chip."""
+    """SANA-FE backend for Sango with additional NeuroScale features."""
 
     def __init__(self, net, debug=False, verbose=False):
         super().__init__(net, debug=debug, verbose=verbose)
@@ -156,19 +160,20 @@ class SimNeuroScale(SimSANAFE):
     def compile(self, placements=None, kind="rw", lfsr_bits=None, refractory_period=0,
                 seed_for_core=None, trace_shift=None, trace_frac_bits=None, axon_ids=None, **kwargs):
         """
-        placements: {node name: ((x, y, core), neuron index)}; None maps greedily
-        kind: the chip's neuron: "lif" (floor at 0), "rw" (probabilistic, LFSR) or
+        placements: {node name: ((x, y, core), neuron index)}; None generates a greedy mapping.
+        kind: the chip's neuron type: "lif", "rw" (probabilistic) or
             "lca" (trace neuron); see kind_for_variant
         lfsr_bits: LFSR width of the rw chips' neurons (8, 12 or 16)
         refractory_period: ticks skipped after a spike by RefractoryLIF neurons
-        seed_for_core: f((x, y, core)) -> LFSR seed (rw); default (y * grid_x + x) *
-            cores_per_tile + core + 1, the chip variants' rule
+        seed_for_core: f((x, y, core)) -> LFSR seed (rw).
+            The default seed is set to: (y * grid_x + x) * cores_per_tile + core + 1
         trace_shift, trace_frac_bits: the lca chip's trace (TRACE_SHIFT, TRACE_BITS - 16)
-        axon_ids: {(pre name, post name): input axon id}, see flow_axon_ids; without it the
-            synapse model ranks sources by neuron id
+        axon_ids: {(pre name, post name): input axon id}, see flow_axon_ids;
+            otherwise, by default the synapse model just assumes neuron id
+            order
         """
-        if kind not in KINDS:
-            raise ValueError(f"kind must be one of {sorted(KINDS)}, not {kind!r}")
+        if kind not in NEURON_TYPES:
+            raise ValueError(f"kind must be one of {sorted(NEURON_TYPES)}, not {kind!r}")
         self.kind = kind
         self.model_registry = neuroscale_registry(kind)
         self.placements = placements
@@ -247,20 +252,17 @@ class ScaffoldRun:
     send_times: dict = field(default_factory=dict)   # {(node name, tick): seconds the spike left}
 
 
-def run_scaffold(graph, ticks, arch, placements, kind="rw", lfsr_bits=None, axon_ids=None,
+def run_scaffold(graph, ticks, arch, placements, neuron_type="rw", lfsr_bits=None, axon_ids=None,
                  seed_for_core=None, trace_shift=None, trace_frac_bits=None, spike_trace=None):
-    """Simulate a Fugu scaffold graph (as lowered to the chip) in SANA-FE.
+    """Simulate a Fugu scaffold in SANA-FE.
 
-    Use this instead of SimNeuroScale when the chip network is not the Sango network
-    itself, e.g. after delays are expanded into relay neurons. Nodes carry threshold,
-    bias, voltage, decay and optionally p (spike probability); edges carry weight.
-    placements: {node name: ((x, y, core), neuron index)}. kind, lfsr_bits, trace_shift and
-    trace_frac_bits are as in SimNeuroScale.compile.
+    Use this instead of SimNeuroScale if hardware-specific changes are made to
+    the raw SNN, e.g. after delays are expanded into relay neurons.
     """
     arch = sanafe.load_arch(arch) if isinstance(arch, str) else arch
     names = list(graph.nodes)
     net = sanafe.Network()
-    group = net.create_neuron_group("n", len(names), soma_hw_name=KINDS[kind]["hw_name"])
+    group = net.create_neuron_group("n", len(names), soma_hw_name=NEURON_TYPES[neuron_type]["hw_name"])
     neurons = {name: group[i] for i, name in enumerate(names)}
     offset = {name: i for i, name in enumerate(names)}
     for name, a in graph.nodes(data=True):
@@ -269,10 +271,10 @@ def run_scaffold(graph, ticks, arch, placements, kind="rw", lfsr_bits=None, axon
             "threshold": float(a["threshold"]),
             "bias": float(a.get("bias", 0.0)),
         }
-        if kind == "rw":
+        if neuron_type == "rw":
             attributes["decay"] = float(a.get("decay", 0.0))
             attributes["spike_probability"] = float(a.get("p", 1.0))
-        if kind == "lca":
+        if neuron_type == "lca":
             attributes["trace_shift"] = int(trace_shift)
             attributes["trace_frac_bits"] = int(trace_frac_bits)
         compartment = a.get("compartment") or {}
@@ -298,7 +300,7 @@ def run_scaffold(graph, ticks, arch, placements, kind="rw", lfsr_bits=None, axon
         for _, name in members:
             neurons[name].map_to_core(target)
             cores[name] = core
-        if kind == "rw" and lfsr_bits is not None:
+        if neuron_type == "rw" and lfsr_bits is not None:
             seed = seed_for_core(core) if seed_for_core else default_seed(arch, core)
             seed_core(neurons[members[0][1]], lfsr_bits, seed)
 

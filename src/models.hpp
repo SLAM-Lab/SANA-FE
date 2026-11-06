@@ -86,10 +86,10 @@ public:
 
 private:
     std::vector<size_t> axon_of_synapse;
-    size_t axon_rank(size_t src_neuron_id);
+    size_t generate_default_axon_ids(size_t src_neuron_id);
     std::vector<long int> axon_id;
-    std::vector<size_t> sources;
-    bool sources_sorted{true};
+    std::vector<size_t> neuron_ids;
+    bool neuron_ids_sorted{true};
     size_t scanned_axons{0};
     double energy_read_synapse{0.0};
     double latency_read_synapse{0.0};
@@ -523,15 +523,9 @@ private:
     std::mt19937 gen{42};
 };
 
-// The NeuroScale random-walker neuron (neuron_models/rw_*), exactly. The
-//  potential is signed and never floored. Each tick a neuron skips
-//  `refractory_delay` ticks after a spike (its input is dropped), otherwise adds
-//  input and bias and, on reaching the threshold, fires. With a spike
-//  probability below 1 the neuron only fires if the next draw of the core's LFSR
-//  is at most the quantized probability; a failed draw leaves the potential as it
-//  is. The `decay` bit clears the potential at the end of every tick. The LFSR is
-//  one per soma unit (one per core), a Fibonacci LFSR (std::fib_lfsr in the RTL),
-//  seeded by setting `lfsr_seed` on any neuron mapped to the core.
+// The NeuroScale random-walker neuron. Neurons are probabilistic. Neurons
+//  can randomly draw from a random number generator (Fibonacci LFSR).
+//  The `decay` bit clears the potential at the end of every time-step.
 class NeuroScaleRwModel : public SomaUnit
 {
 public:
@@ -587,11 +581,8 @@ private:
     unsigned int lfsr_state{1};
 };
 
-// The NeuroScale `lif` neuron (neuron_models/lif), exactly: the potential is
-//  floored at zero, there is no probability, decay or LFSR. Each tick a neuron
-//  skips `refractory_delay` ticks after a spike (its input is dropped),
-//  otherwise u <- max(u + input + bias, 0) and it fires and resets to 0 at the
-//  threshold. `bias` is the RTL's negated leak.
+// The NeuroScale `lif` neuron: a standard LIF but with nonnegative potential
+//  and subtractive leak
 class NeuroScaleLifModel : public SomaUnit
 {
 public:
@@ -632,13 +623,14 @@ private:
     std::vector<NeuroScaleLifCompartment> compartments{neuroscale_max_compartments};
 };
 
-// The NeuroScale spiking-LCA trace neuron (neuron_models/lca_t*), exactly: the
-//  `lif` neuron whose synaptic input goes through a decaying current I, kept as
-//  an integer with `trace_frac_bits` fractional bits:
+// The NeuroScale spiking-LCA trace neuron (neuron_models/lca_t*): the
+//  synaptic input goes through a decaying current I, which is an integer with
+//  `trace_frac_bits` fractional bits:
 //      I <- I - (I >> trace_shift) + (d << trace_frac_bits)    (>> floors)
 //      u <- max(u + bias + (I >> trace_frac_bits), 0)
-//  d is this tick's summed input. The trace only advances on ticks the neuron is
-//  not refractory. Every neuron of a trace chip is a trace neuron.
+//  Bit shifts are used to approximate division without requiring a full fixed-
+//  point implementation. d is the current time-step's summed input. The trace
+//  only advances on steps if the neuron is not refractory.
 class NeuroScaleLcaModel : public SomaUnit
 {
 public:

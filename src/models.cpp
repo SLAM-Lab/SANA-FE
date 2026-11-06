@@ -77,14 +77,21 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::update(
     {
         energy += energy_read_synapse;
         latency += latency_read_synapse;
-        // The RTL scans axon ids 0..(highest id that has received a spike): a
-        // spike on a higher id than any before extends this step's scan
-        const long int given = synapse_address < axon_id.size() ? axon_id[synapse_address] : -1L;
-        const size_t scan_length = (given >= 0L) ? static_cast<size_t>(given) + 1UL :
-                                                   axon_rank(axon_of_synapse.at(synapse_address)) + 1UL;
+        // NeuroScale scans axon ids 0..(highest id that has received a spike)
+        //  This is purely a design quirk of this implementation but it can
+        //  add a significant (dynamic) cost. Therefore, we keep track of the
+        //  highest axon ID that received a spike so far.
+        const long int axon_ids_given = synapse_address < axon_id.size() ?
+                axon_id[synapse_address] :
+                -1L;
+        const size_t scan_length = (axon_ids_given >= 0L) ?
+                static_cast<size_t>(axon_ids_given) + 1UL :
+                generate_default_axon_ids(axon_of_synapse.at(synapse_address)) +
+                        1UL;
         if (scan_length > scanned_axons)
         {
-            const double extra = static_cast<double>(scan_length - scanned_axons);
+            const double extra =
+                    static_cast<double>(scan_length - scanned_axons);
             energy += energy_scan_axon * extra;
             latency += latency_scan_axon * extra;
             scanned_axons = scan_length;
@@ -123,15 +130,22 @@ void sanafe::NeuroScaleSynapseModel::set_attribute_edge(
 {
     if (attribute_name == "axon")
     {
-        // The input axon id the chip's flow gave this synapse's source on this core
+        // Because axons are so important for predicting energy/latency and the
+        //  cost depends on the highest ID that received a spike, it is somewhat
+        //  important to correctly model axon ID mappings to the hardware.
+        //  There's not a straightforward way of inferring it correctly and
+        //  generally, so the user can manually associate a mapped axon ID with
+        //  an edge
         if (axon_id.size() <= synapse_address)
         {
             axon_id.resize(synapse_address + 1UL, -1L);
         }
-        axon_id[synapse_address] = static_cast<long int>(static_cast<double>(param));
+        axon_id[synapse_address] =
+                static_cast<long int>(static_cast<double>(param));
         return;
     }
-    CurrentBasedSynapseModel::set_attribute_edge(synapse_address, attribute_name, param);
+    CurrentBasedSynapseModel::set_attribute_edge(
+            synapse_address, attribute_name, param);
 }
 
 void sanafe::NeuroScaleSynapseModel::track_connection(
@@ -143,21 +157,26 @@ void sanafe::NeuroScaleSynapseModel::track_connection(
         axon_of_synapse.resize(synapse_address + 1UL);
     }
     axon_of_synapse[synapse_address] = src_neuron_id;
-    sources.push_back(src_neuron_id);
-    sources_sorted = false;
+    neuron_ids.push_back(src_neuron_id);
+    neuron_ids_sorted = false;
 }
 
-size_t sanafe::NeuroScaleSynapseModel::axon_rank(const size_t src_neuron_id)
+size_t sanafe::NeuroScaleSynapseModel::generate_default_axon_ids(
+        const size_t src_neuron_id)
 {
-    // Axon ids are approximated by the rank of the source neuron among this
-    //  core's sources (the flow numbers them in order of first appearance)
-    if (!sources_sorted)
+    // Axon IDs by default are (guessed to be) just the mapped neuron order.
+    //  This isn't generally correct but the user also has the option of
+    //  manually passing the IDs from actsim generated mappings etc.
+    if (!neuron_ids_sorted)
     {
-        std::sort(sources.begin(), sources.end());
-        sources.erase(std::unique(sources.begin(), sources.end()), sources.end());
-        sources_sorted = true;
+        std::sort(neuron_ids.begin(), neuron_ids.end());
+        neuron_ids.erase(std::unique(neuron_ids.begin(), neuron_ids.end()),
+                neuron_ids.end());
+        neuron_ids_sorted = true;
     }
-    return static_cast<size_t>(std::lower_bound(sources.begin(), sources.end(), src_neuron_id) - sources.begin());
+    return static_cast<size_t>(
+            std::lower_bound(neuron_ids.begin(), neuron_ids.end(), src_neuron_id) -
+            neuron_ids.begin());
 }
 
 void sanafe::NeuroScaleSynapseModel::reset()
