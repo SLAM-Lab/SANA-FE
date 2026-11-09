@@ -25,7 +25,15 @@ class EnergyAccounting(unittest.TestCase):
         payload = yaml.safe_load((SANAFE_ROOT / "arch/neuroscale.yaml").read_text())
         attrs = payload["architecture"]["attributes"]
         attrs.pop("energy_sync", None)
-        if sync is not None:
+        if handshake or handshake_base:
+            attrs["energy_sync"] = {
+                "per_sending_core": handshake_base,
+                "per_receiving_core": handshake_base,
+                "per_sync_message": handshake,
+            }
+            if sync is not None:
+                attrs["energy_sync"]["fixed"] = sync
+        elif sync is not None:
             attrs["energy_sync"] = sync
         tile = payload["architecture"]["tile"][0]
         core = tile["core"][0]
@@ -46,8 +54,6 @@ class EnergyAccounting(unittest.TestCase):
         core["synapse"][0]["attributes"].update(
             energy_read_synapse=read,
             energy_scan_axon=scan,
-            energy_handshake_message=handshake,
-            energy_handshake_table=handshake_base,
         )
         if extra_synapse:
             second = copy.deepcopy(core["synapse"][0])
@@ -85,7 +91,7 @@ class EnergyAccounting(unittest.TestCase):
                     energy = chip.sim(ticks, timing_model=timing)["energy"]
                     self.assertAlmostEqual(energy["total"], ticks * 2e-9, delta=1e-20)
                     self.assertAlmostEqual(
-                        energy["network"], energy["total"], delta=1e-20
+                        energy["sync"], energy["total"], delta=1e-20
                     )
 
     def test_omitted_sync_defaults_to_zero(self):
@@ -134,7 +140,7 @@ class EnergyAccounting(unittest.TestCase):
                         result["energy"]["total"], ticks * count * 2e-9, delta=1e-20
                     )
                     self.assertAlmostEqual(
-                        result["energy"]["synapse"],
+                        result["energy"]["sync"],
                         result["energy"]["total"],
                         delta=1e-20,
                     )
@@ -214,14 +220,30 @@ class EnergyAccounting(unittest.TestCase):
                 delta=1e-20,
             )
 
+    def test_reset_keeps_handshake_energy(self):
+        arch = self.architecture(handshake=2e-9, handshake_base=3e-9)
+        chip = sanafe.SpikingChip(arch)
+        chip.load(self.handshake_network(arch, [(0, 2)]))
+        expected = 3 * (2e-9 + 2 * 3e-9)
+        self.assertAlmostEqual(
+            chip.sim(3, timing_model="simple")["energy"]["total"], expected, delta=1e-20
+        )
+        chip.reset()
+        self.assertAlmostEqual(
+            chip.sim(3, timing_model="simple")["energy"]["total"], expected, delta=1e-20
+        )
+
     def test_handshake_rejects_invalid_energy(self):
-        for attribute in ("handshake", "handshake_base"):
+        for attribute in ("handshake", "handshake_base", "sync"):
             for cost in (-1.0, float("nan"), float("inf")):
                 with (
                     self.subTest(attribute=attribute, cost=cost),
                     self.assertRaises(ValueError),
                 ):
-                    sanafe.SpikingChip(self.architecture(**{attribute: cost}))
+                    kwargs = {attribute: cost}
+                    if attribute == "sync":
+                        kwargs["handshake"] = 1e-9  # Use the dict form
+                    sanafe.SpikingChip(self.architecture(**kwargs))
 
 
 if __name__ == "__main__":

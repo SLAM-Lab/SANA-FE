@@ -53,6 +53,13 @@ struct TraceFlags
     bool record_messages{false};
 };
 
+// Timestep synchronization messages sent and received by one core, per step
+struct SyncActivity
+{
+    size_t messages_sent{0UL};
+    size_t messages_received{0UL};
+};
+
 class SpikingChip
 {
 public:
@@ -97,7 +104,7 @@ public:
 
     std::vector<std::reference_wrapper<Core>> cores();
     LookupTable<double> ts_sync_delay_table{};
-    double energy_sync{0.0};
+    SyncEnergyMetrics energy_sync{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
 
     size_t core_count{0UL};
@@ -139,6 +146,7 @@ private:
     double dendrite_energy{0.0};
     double soma_energy{0.0};
     double network_energy{0.0};
+    double sync_energy{0.0};
 
     // Performance and other misc tracking
     static std::atomic<int> chip_count;
@@ -174,8 +182,10 @@ private:
     void sim_update_ts_counters(Timestep &ts);
     static double sim_estimate_network_costs(const Tile &src, Tile &dest);
     void sim_calculate_ts_energy(Timestep &ts);
-    static double sim_calculate_tile_energy(Timestep &ts, Tile &tile);
-    static double sim_calculate_core_energy(Timestep &ts, Core &core);
+    double sim_calculate_tile_energy(Timestep &ts, Tile &tile) const;
+    double sim_calculate_core_energy(Timestep &ts, Core &core) const;
+    [[nodiscard]] SyncActivity sync_activity(const Core &core) const;
+    [[nodiscard]] double sim_calculate_core_sync_energy(const Core &core) const;
     void sim_update_total_energy_and_counts(const Timestep &ts);
     void update_simulator_timings(const SimTimings &timings);
 
@@ -229,6 +239,7 @@ struct RunData
     double dendrite_energy{0.0};
     double soma_energy{0.0};
     double network_energy{0.0};
+    double sync_energy{0.0};
     double sim_time{0.0};
 
     explicit RunData(long int start);

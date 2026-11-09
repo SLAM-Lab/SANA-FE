@@ -277,6 +277,7 @@ pybind11::dict run_data_to_dict(const sanafe::RunData &run)
     energy_dict["dendrite"] = run.dendrite_energy;
     energy_dict["soma"] = run.soma_energy;
     energy_dict["network"] = run.network_energy;
+    energy_dict["sync"] = run.sync_energy;
 
     pybind11::dict run_data_dict;
     run_data_dict["timestep_start"] = run.timestep_start;

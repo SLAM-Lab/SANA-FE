@@ -88,10 +88,6 @@ public:
                     "(float) Latency for one synapse table read (s)."},
             {"energy_scan_axon",
                     "(float) Per-step energy for scanning one input axon (J)."},
-            {"energy_handshake_message",
-                    "(float) Energy per tick for a directed core link's done/advance handshake (J), charged at the destination."},
-            {"energy_handshake_table",
-                    "(float) Fixed energy per tick for each nonempty fan-in or fan-out table (J)."},
             {"latency_scan_axon",
                     "(float) Per-step latency for scanning one input axon (s)."},
     };
@@ -106,10 +102,6 @@ private:
     double energy_read_synapse{0.0};
     double latency_read_synapse{0.0};
     double energy_scan_axon{0.0};
-    double energy_handshake_message{0.0};
-    double energy_handshake_table{0.0};
-    std::unordered_map<size_t, const Core *> fanin_cores;
-    bool owns_handshake_input_table{false};
     double latency_scan_axon{0.0};
 };
 

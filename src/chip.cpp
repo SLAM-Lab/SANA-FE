@@ -71,6 +71,17 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         , noc_buffer_size(arch.noc_buffer_size)
         , max_steps_async(arch.max_steps_async)
 {
+    for (const auto &[name, cost] : {std::pair{"fixed", energy_sync.fixed},
+                 std::pair{"per_sending_core", energy_sync.per_sending_core},
+                 std::pair{"per_receiving_core", energy_sync.per_receiving_core},
+                 std::pair{"per_sync_message", energy_sync.per_sync_message}})
+    {
+        if (!std::isfinite(cost) || (cost < 0.0))
+        {
+            throw std::invalid_argument(std::string("energy_sync ") + name +
+                    " must be finite and nonnegative");
+        }
+    }
     INFO("Initializing simulation.\n");
     for (const TileConfiguration &tile_config : arch.tiles)
     {
@@ -476,6 +487,7 @@ void sanafe::SpikingChip::update_run_data(
     rd.dendrite_energy += ts.dendrite_energy;
     rd.soma_energy += ts.soma_energy;
     rd.network_energy += ts.network_energy;
+    rd.sync_energy += ts.sync_energy;
     rd.sim_time += ts.sim_time;
     rd.spikes += ts.spike_count;
     rd.packets_sent += ts.packets_sent;
@@ -568,6 +580,7 @@ void sanafe::SpikingChip::sim_update_total_energy_and_counts(const Timestep &ts)
     dendrite_energy += ts.dendrite_energy;
     soma_energy += ts.soma_energy;
     network_energy += ts.network_energy;
+    sync_energy += ts.sync_energy;
 
     total_spikes += ts.spike_count;
     total_neurons_updated += ts.neurons_updated;
@@ -1071,6 +1084,7 @@ void sanafe::SpikingChip::sim_format_run_summary(
     out << "  dendrite:" << std::scientific << run_data.dendrite_energy << "\n";
     out << "  soma:" << std::scientific << run_data.soma_energy << "\n";
     out << "  network: " << std::scientific << run_data.network_energy << "\n";
+    out << "  sync: " << std::scientific << run_data.sync_energy << "\n";
     out << "  total: " << std::scientific << run_data.total_energy << "\n";
     // Give a more detailed simulator walltime breakdown too
     out << "wall_time:\n";
@@ -1367,8 +1381,9 @@ void sanafe::SpikingChip::sim_calculate_ts_energy(Timestep &ts)
     ts.synapse_energy = 0.0;
     ts.dendrite_energy = 0.0;
     ts.soma_energy = 0.0;
-    ts.network_energy = energy_sync;
-    ts.total_energy = energy_sync;
+    ts.network_energy = 0.0;
+    ts.sync_energy = energy_sync.fixed;
+    ts.total_energy = energy_sync.fixed;
 
     for (auto &tile : tiles)
     {
@@ -1379,7 +1394,8 @@ void sanafe::SpikingChip::sim_calculate_ts_energy(Timestep &ts)
     TRACE1(CHIP, "\tnetwork_energy:%e\n", ts.network_energy);
 }
 
-double sanafe::SpikingChip::sim_calculate_tile_energy(Timestep &ts, Tile &tile)
+double sanafe::SpikingChip::sim_calculate_tile_energy(
+        Timestep &ts, Tile &tile) const
 {
     double total_hop_energy =
             (static_cast<double>(tile.east_hops) * tile.energy_east_hop);
@@ -1402,12 +1418,56 @@ double sanafe::SpikingChip::sim_calculate_tile_energy(Timestep &ts, Tile &tile)
     return tile.energy;
 }
 
-double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
+sanafe::SyncActivity sanafe::SpikingChip::sync_activity(const Core &core) const
+{
+    // Sync messages a core sends and receives each timestep. This is where
+    //  each sync protocol defines its message pattern
+    SyncActivity activity{};
+    switch (sync_protocol)
+    {
+    case SyncProtocol::sync_neuroscale:
+        // Point-to-point handshakes: every step, each core exchanges sync
+        //  messages with the cores it sends spikes to and receives spikes from.
+        //  Recurrently connected cores count themselves as a partner
+    case SyncProtocol::sync_barrier:
+    case SyncProtocol::sync_clock:
+    default:
+        // TODO: barrier and clock protocols use the same connectivity-based
+        //  pattern for now. A barrier implemented as, e.g., a tree or a mesh
+        //  wave would send and receive messages differently
+        activity.messages_sent = core.fan_out.size();
+        activity.messages_received = core.fan_in.size();
+        break;
+    }
+    return activity;
+}
+
+double sanafe::SpikingChip::sim_calculate_core_sync_energy(
+        const Core &core) const
+{
+    // Each message is charged once, at the receiving core
+    const SyncActivity activity = sync_activity(core);
+    double energy = 0.0;
+    if (activity.messages_sent > 0UL)
+    {
+        energy += energy_sync.per_sending_core;
+    }
+    if (activity.messages_received > 0UL)
+    {
+        energy += energy_sync.per_receiving_core;
+    }
+    energy += static_cast<double>(activity.messages_received) *
+            energy_sync.per_sync_message;
+    return energy;
+}
+
+double sanafe::SpikingChip::sim_calculate_core_energy(
+        Timestep &ts, Core &core) const
 {
     double axon_in_energy{0.0};
     for (const auto &axon : core.axon_in_hw)
     {
-        axon_in_energy = static_cast<double>(axon.spike_messages_in) *
+        axon_in_energy += static_cast<double>(axon.spike_messages_in) *
                 axon.energy_spike_message;
         TRACE1(CHIP, "spikes in: %ld, energy:%e\n", axon.spike_messages_in,
                 axon.energy_spike_message);
@@ -1440,15 +1500,19 @@ double sanafe::SpikingChip::sim_calculate_core_energy(Timestep &ts, Core &core)
     double axon_out_energy{0.0};
     for (const auto &axon : core.axon_out_hw)
     {
-        axon_out_energy = axon.energy;
+        axon_out_energy += axon.energy;
         TRACE1(CHIP, "packets: %ld, energy per packet:%e\n", axon.packets_out,
                 axon.energy_access);
     }
     ts.network_energy += axon_out_energy;
 
+    const double sync_energy = sim_calculate_core_sync_energy(core);
+    ts.sync_energy += sync_energy;
+
     core.energy = axon_in_energy;
     core.energy += pipeline_energy;
     core.energy += axon_out_energy;
+    core.energy += sync_energy;
 
     return core.energy;
 }
@@ -1764,6 +1828,7 @@ void sanafe::SpikingChip::sim_trace_write_perf_header(
     perf_trace_file << "dendrite_energy,";
     perf_trace_file << "soma_energy,";
     perf_trace_file << "network_energy,";
+    perf_trace_file << "sync_energy,";
     perf_trace_file << "total_energy";
 
     // Optional performance metrics
@@ -1909,6 +1974,7 @@ void sanafe::SpikingChip::sim_trace_record_perf(
     perf_trace_file << std::scientific << ts.dendrite_energy << ",";
     perf_trace_file << std::scientific << ts.soma_energy << ",";
     perf_trace_file << std::scientific << ts.network_energy << ",";
+    perf_trace_file << std::scientific << ts.sync_energy << ",";
     perf_trace_file << std::scientific << ts.total_energy;
     // Finish with the optional traces, which can be enabled or disabled per
     //  tile, core, or pipeline h/w unit

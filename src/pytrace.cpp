@@ -68,6 +68,7 @@ std::map<std::string, PerfStatistic> timestep_data_to_map(
     ts_map["dendrite_energy"] = ts.dendrite_energy;
     ts_map["soma_energy"] = ts.soma_energy;
     ts_map["network_energy"] = ts.network_energy;
+    ts_map["sync_energy"] = ts.sync_energy;
     ts_map["total_energy"] = ts.total_energy;
 
     return ts_map;

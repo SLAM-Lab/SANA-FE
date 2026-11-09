@@ -427,6 +427,15 @@ void sanafe::description_parse_tile_section_yaml(const ryml::Parser &parser,
     }
 }
 
+namespace
+{
+void yaml_set_optional_value(const ryml::ConstNodeRef node,
+        const std::string &key, double &value)
+{
+    value = sanafe::yaml_optional_field<double>(node, key).value_or(value);
+}
+}
+
 sanafe::NetworkOnChipConfiguration
 sanafe::description_parse_noc_configuration_yaml(
         const ryml::Parser &parser, const ryml::ConstNodeRef noc_attributes)
@@ -455,8 +464,27 @@ sanafe::description_parse_noc_configuration_yaml(
                     .value_or("fixed");
     noc.ts_sync_delay_table =
             yaml_parse_sync_delay_table(parser, noc_attributes, model_type);
-    noc.energy_sync = yaml_optional_field<double>(noc_attributes, "energy_sync")
-                              .value_or(0.0);
+    // energy_sync is either a scalar (fixed chip-wide energy per timestep), or
+    //  a map breaking down the sync protocol's energy (see SyncEnergyMetrics)
+    const ryml::ConstNodeRef energy_sync_node =
+            noc_attributes.find_child("energy_sync");
+    if (!energy_sync_node.invalid() && energy_sync_node.is_map())
+    {
+        yaml_set_optional_value(energy_sync_node, "fixed",
+                noc.energy_sync.fixed);
+        yaml_set_optional_value(energy_sync_node, "per_sending_core",
+                noc.energy_sync.per_sending_core);
+        yaml_set_optional_value(energy_sync_node, "per_receiving_core",
+                noc.energy_sync.per_receiving_core);
+        yaml_set_optional_value(energy_sync_node, "per_sync_message",
+                noc.energy_sync.per_sync_message);
+    }
+    else
+    {
+        noc.energy_sync.fixed =
+                yaml_optional_field<double>(noc_attributes, "energy_sync")
+                        .value_or(0.0);
+    }
 
     return noc;
 }

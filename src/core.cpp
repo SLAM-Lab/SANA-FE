@@ -6,8 +6,6 @@
 #include <filesystem>
 #include <functional> // For std::reference_wrapper
 #include <sstream>
-#include <stdexcept>
-#include <string>
 #include <vector>
 
 #include "arch.hpp"
