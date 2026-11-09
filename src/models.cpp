@@ -160,9 +160,9 @@ void sanafe::NeuroScaleSynapseModel::set_attribute_edge(
 }
 
 void sanafe::NeuroScaleSynapseModel::track_connection(
-        const size_t synapse_address, const size_t src_neuron_id,
-        const size_t /*dest_neuron_id*/)
+        const size_t synapse_address, const MappedConnection &connection)
 {
+    const size_t src_neuron_id = connection.pre_neuron->id;
     if (axon_of_synapse.size() <= synapse_address)
     {
         axon_of_synapse.resize(synapse_address + 1UL);
@@ -302,8 +302,7 @@ void sanafe::AccumulatorWithDelayModel::set_attribute_edge(
 // TODO: this isn't getting called, at the moment the framework doesn't add and
 //  track connections in the dendrite h/w properly, only per neuron
 void sanafe::AccumulatorWithDelayModel::track_connection(
-        const size_t synapse_address, size_t /*src_neuron_id*/,
-        size_t /*dest_neuron_id*/)
+        const size_t synapse_address, const MappedConnection & /*connection*/)
 {
     if (delays.size() <= synapse_address)
     {

@@ -107,7 +107,12 @@ public:
     {
         throw std::logic_error("Error: Soma input not implemented");
     }
-    virtual void track_connection(size_t /*synapse_address*/, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) {}
+    // Called while mapping a connection. Inspect mapped endpoints here, but
+    // do not retain the connection reference: its containing vector may grow.
+    virtual void track_connection(
+            size_t /*synapse_address*/, const MappedConnection & /*connection*/)
+    {
+    }
     // Called once per unit at the start of every time-step, before the core
     //  replays latched input or processes any events. Use it for per-step work
     //  that doesn't depend on input (e.g., scanning memory, updating counters).
@@ -306,7 +311,8 @@ public:
         throw std::logic_error("Error: Soma H/W called with dendrite inputs");
     }
     void set_attribute_edge(size_t /*synapse_address*/, const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) final {};
-    void track_connection(size_t /*synapse_address*/, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) final {};
+    void track_connection(size_t /*synapse_address*/,
+            const MappedConnection & /*connection*/) final {};
 };
 
 BufferPosition pipeline_parse_buffer_position_str(

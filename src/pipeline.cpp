@@ -68,16 +68,12 @@ void sanafe::PipelineUnit::check_implemented(
 size_t sanafe::PipelineUnit::add_connection(MappedConnection &con)
 {
     // Add connection and update connection's address
-    const MappedNeuron &pre_neuron = *(con.pre_neuron);
-    const MappedNeuron &post_neuron = *(con.post_neuron);
-
     // TODO: we track this in the synapse but not the dendrite h/w?
 
     // Allow the implemented h/w unit to add its own tracking for each
     //  connection if needed
     con.mapped_synapse_hw_address = connection_count;
-    track_connection(
-            con.mapped_synapse_hw_address, pre_neuron.id, post_neuron.id);
+    track_connection(con.mapped_synapse_hw_address, con);
 
     is_used = true;
     connection_count++;

@@ -75,7 +75,8 @@ public:
     PipelineResult update(size_t synapse_address, bool read, long int simulation_time) override;
     PipelineResult begin_timestep(long int timestep) override;
     void set_attribute_hw(const std::string &attribute_name, const ModelAttribute &param) override;
-    void track_connection(size_t synapse_address, size_t src_neuron_id, size_t dest_neuron_id) override;
+    void track_connection(size_t synapse_address,
+            const MappedConnection &connection) override;
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void reset() override;
     static inline const std::unordered_map<std::string, std::string> neuroscale_synapse_attributes{
@@ -182,7 +183,8 @@ public:
     void set_attribute_hw(const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
     void set_attribute_neuron(size_t /*neuron_address*/, const std::string &/*attribute_name*/, const ModelAttribute &/*param*/) override {};
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
-    void track_connection(size_t synapse_address, size_t /*src_neuron_id*/, size_t /*dest_neuron_id*/) override;
+    void track_connection(size_t synapse_address,
+            const MappedConnection &connection) override;
 
     static inline const std::set<std::string> accumulator_attributes{
             "reset_mode",

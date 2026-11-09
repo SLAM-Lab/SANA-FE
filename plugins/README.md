@@ -65,3 +65,11 @@ extern "C" sanafe::PipelineUnit *create_HodgkinHuxley()
 
 It is recommended new users look through the rest of the `hodgkin_huxley.cpp`
 file to see what an example plugin looks like.
+
+The optional mapping hook `track_connection(size_t synapse_address,
+const MappedConnection &connection)` provides the mapped source and destination
+neurons and their core assignments. Copy identifiers needed by the model rather
+than retaining the connection reference, since mapping can reallocate its
+containing vector. Core fan-in/fan-out sets are finalized after connection
+mapping. Plugins overriding this hook must use this signature and be rebuilt
+against the updated headers.
