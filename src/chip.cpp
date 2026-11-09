@@ -62,6 +62,7 @@ std::atomic<int> sanafe::SpikingChip::chip_count = 0;
 
 sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         : ts_sync_delay_table(arch.ts_sync_delay_table)
+        , energy_sync(arch.energy_sync)
         , sync_protocol(arch.sync_protocol)
         , core_count(arch.core_count)
         , max_cores_per_tile(arch.max_cores_per_tile)
@@ -1366,8 +1367,8 @@ void sanafe::SpikingChip::sim_calculate_ts_energy(Timestep &ts)
     ts.synapse_energy = 0.0;
     ts.dendrite_energy = 0.0;
     ts.soma_energy = 0.0;
-    ts.network_energy = 0.0;
-    ts.total_energy = 0.0;
+    ts.network_energy = energy_sync;
+    ts.total_energy = energy_sync;
 
     for (auto &tile : tiles)
     {

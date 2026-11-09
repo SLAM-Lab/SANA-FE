@@ -81,6 +81,7 @@ class Architecture
 public:
     std::vector<TileConfiguration> tiles;
     LookupTable<double> ts_sync_delay_table{};
+    double energy_sync{0.0}; // Fixed chip-wide energy per timestep (J).
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     std::string name;
     size_t core_count{0UL};
@@ -107,6 +108,7 @@ Architecture load_arch(const std::filesystem::path &path);
 struct NetworkOnChipConfiguration
 {
     LookupTable<double> ts_sync_delay_table{};
+    double energy_sync{0.0};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     size_t width_in_tiles{1UL};
     size_t height_in_tiles{1UL};

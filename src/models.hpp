@@ -79,9 +79,16 @@ public:
     void set_attribute_edge(size_t synapse_address, const std::string &attribute_name, const ModelAttribute &param) override;
     void reset() override;
     static inline const std::unordered_map<std::string, std::string> neuroscale_synapse_attributes{
-        {"axon", "(int) Input axon id of the synapse's source on this core (the scan runs up to the highest id seen)."},
-        {"latency_read_synapse", "(float) Latency for one synapse table read (s)."},
-        {"latency_scan_axon", "(float) Per-step latency for scanning one input axon (s)."},
+            {"axon",
+                    "(int) Input axon id of the synapse's source on this core (the scan runs up to the highest id seen)."},
+            {"energy_read_synapse",
+                    "(float) Energy for one synapse table read (J)."},
+            {"latency_read_synapse",
+                    "(float) Latency for one synapse table read (s)."},
+            {"energy_scan_axon",
+                    "(float) Per-step energy for scanning one input axon (J)."},
+            {"latency_scan_axon",
+                    "(float) Per-step latency for scanning one input axon (s)."},
     };
 
 private:

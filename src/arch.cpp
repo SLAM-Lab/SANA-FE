@@ -28,6 +28,7 @@
 sanafe::Architecture::Architecture(
         std::string name, const NetworkOnChipConfiguration &noc)
         : ts_sync_delay_table(noc.ts_sync_delay_table)
+        , energy_sync(noc.energy_sync)
         , sync_protocol(noc.sync_protocol)
         , name(std::move(name))
         , noc_width_in_tiles(noc.width_in_tiles)

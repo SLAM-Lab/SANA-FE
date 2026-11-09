@@ -9,6 +9,7 @@ architecture:
     link_buffer_size: 16
     sync_model: fixed
     latency_sync: 1.334e-06
+    energy_sync: 6.875e-07
     sync_protocol: neuroscale
     max_steps_async: 6
   tile:
@@ -34,7 +35,7 @@ architecture:
             -
               name: neuroscale_in
               attributes:
-                energy_message_in: 2.303e-10
+                energy_message_in: 1.640e-10
                 latency_message_in: 1.521e-08
           soma:
             -
@@ -71,11 +72,11 @@ architecture:
                 model: neuroscale_synapse
                 energy_read_synapse: 7.786e-11
                 latency_read_synapse: 4.723e-09
-                energy_scan_axon: 1.016e-10
+                energy_scan_axon: 4.364e-11
                 latency_scan_axon: 8.609e-09
           axon_out:
             -
               name: neuroscale_out
               attributes:
-                energy_message_out: 5.500e-10
+                energy_message_out: 0.0
                 latency_message_out: 3.000e-09

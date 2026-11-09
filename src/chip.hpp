@@ -97,6 +97,7 @@ public:
 
     std::vector<std::reference_wrapper<Core>> cores();
     LookupTable<double> ts_sync_delay_table{};
+    double energy_sync{0.0};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
 
     size_t core_count{0UL};

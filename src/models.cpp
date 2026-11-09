@@ -72,10 +72,13 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::update(
 {
     PipelineResult output = CurrentBasedSynapseModel::update(
             synapse_address, read, simulation_time);
+    // Per-call costs. These must be locals: the member `energy` is the unit's
+    //  running total (PipelineUnit::process() adds the returned value to it)
+    double energy_cost = 0.0;
     double latency = 0.0;
     if (read)
     {
-        energy += energy_read_synapse;
+        energy_cost += energy_read_synapse;
         latency += latency_read_synapse;
         // NeuroScale scans axon ids 0..(highest id that has received a spike)
         //  This is purely a design quirk of this implementation but it can
@@ -92,12 +95,12 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::update(
         {
             const double extra =
                     static_cast<double>(scan_length - scanned_axons);
-            energy += energy_scan_axon * extra;
+            energy_cost += energy_scan_axon * extra;
             latency += latency_scan_axon * extra;
             scanned_axons = scan_length;
         }
     }
-    output.energy = energy;
+    output.energy = energy_cost;
     output.latency = latency;
     return output;
 }
@@ -114,9 +117,17 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
 void sanafe::NeuroScaleSynapseModel::set_attribute_hw(
         const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (attribute_name == "latency_read_synapse")
+    if (attribute_name == "energy_read_synapse")
+    {
+        energy_read_synapse = static_cast<double>(param);
+    }
+    else if (attribute_name == "latency_read_synapse")
     {
         latency_read_synapse = static_cast<double>(param);
+    }
+    else if (attribute_name == "energy_scan_axon")
+    {
+        energy_scan_axon = static_cast<double>(param);
     }
     else if (attribute_name == "latency_scan_axon")
     {

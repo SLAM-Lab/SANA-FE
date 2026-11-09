@@ -455,6 +455,8 @@ sanafe::description_parse_noc_configuration_yaml(
                     .value_or("fixed");
     noc.ts_sync_delay_table =
             yaml_parse_sync_delay_table(parser, noc_attributes, model_type);
+    noc.energy_sync = yaml_optional_field<double>(noc_attributes, "energy_sync")
+                              .value_or(0.0);
 
     return noc;
 }
