@@ -112,19 +112,22 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
     PipelineResult output;
     output.energy = energy_scan_axon * static_cast<double>(scanned_axons);
     output.energy.value() += energy_handshake_message *
-            static_cast<double>(handshake_source_cores.size());
+            static_cast<double>(fanin_cores.size());
+    // NeuroScale tracks core-core connectivity and handshakes in a table. If
+    //  a core is connected to one or more other cores, it must exchange these
+    //  messages once every step and so will activate this table lookup
+    // TODO: the way of doing this is quite obscure. It might be simpler to
+    //  correctly add this within the correct core, possible at the axon in or
+    //  out unit? maybe an optional core-core sync cost?
     if (energy_handshake_table > 0.0)
     {
         double tables = owns_handshake_input_table ? 1.0 : 0.0;
-        // The source's fixed fan-out budget is shared by its destinations.
-        // Core objects remain stable after construction; read their finalized
-        // degrees here so source-only cores need no active synapse unit.
-        for (const auto &[source_id, source] : handshake_source_cores)
+        for (const auto &[source_id, source] : fanin_cores)
         {
             if (source->fan_out.empty())
             {
                 throw std::logic_error(
-                        "Handshake energy requires finalized core connectivity");
+                        "Handshake energy requires core-core connectivity");
             }
             tables += 1.0 / static_cast<double>(source->fan_out.size());
         }
@@ -209,32 +212,34 @@ void sanafe::NeuroScaleSynapseModel::track_connection(
     neuron_ids.push_back(src_neuron_id);
     neuron_ids_sorted = false;
 
-    // A handshake belongs to a directed core pair, not to individual neurons
-    // or synapses. Charge both done and advance at the destination only.
+    // In this implementation we charge both handshake message (done/advance)
+    //  costs at the destination core
     const Core &source = *connection.pre_neuron->core;
     const Core &destination = *connection.post_neuron->core;
-    if (handshake_source_cores.count(source.id) == 0)
+    if (fanin_cores.count(source.id) == 0)
     {
-        bool input_table_owned = !handshake_source_cores.empty();
-        // Multiple synapse units on one core must not charge the same link.
+        bool tracks_input_core_handshakes = !fanin_cores.empty();
+        // This cost must only be accounted for once per core, so ignore other
+        //  synapse units on the same core
+        // TODO: just assert one instance per core and don't allow multiple
         for (const auto &unit : destination.pipeline_hw)
         {
             const auto *other =
                     dynamic_cast<const NeuroScaleSynapseModel *>(unit.get());
             if (other != nullptr && other != this)
             {
-                input_table_owned |= !other->handshake_source_cores.empty();
-                if (other->handshake_source_cores.count(source.id) != 0)
+                tracks_input_core_handshakes |= !other->fanin_cores.empty();
+                if (other->fanin_cores.count(source.id) != 0)
                 {
                     return;
                 }
             }
         }
-        if (!input_table_owned)
+        if (!tracks_input_core_handshakes)
         {
             owns_handshake_input_table = true;
         }
-        handshake_source_cores.emplace(source.id, &source);
+        fanin_cores.emplace(source.id, &source);
     }
 }
 
@@ -259,7 +264,7 @@ size_t sanafe::NeuroScaleSynapseModel::generate_default_axon_ids(
 void sanafe::NeuroScaleSynapseModel::reset()
 {
     scanned_axons = 0;
-    handshake_source_cores.clear();
+    fanin_cores.clear();
     owns_handshake_input_table = false;
 }
 

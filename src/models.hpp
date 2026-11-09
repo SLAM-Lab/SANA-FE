@@ -108,7 +108,7 @@ private:
     double energy_scan_axon{0.0};
     double energy_handshake_message{0.0};
     double energy_handshake_table{0.0};
-    std::unordered_map<size_t, const Core *> handshake_source_cores;
+    std::unordered_map<size_t, const Core *> fanin_cores;
     bool owns_handshake_input_table{false};
     double latency_scan_axon{0.0};
 };
