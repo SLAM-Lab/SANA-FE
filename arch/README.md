@@ -55,16 +55,3 @@ Units must also have both an `attributes` section and the next hardware units
 in the hierarchy. The attributes section will generate one or more parameters
 that are passed to be parsed by the simulator and the relevant hardware models
 implemented either internally (`models.cpp`) or externally (plugins).
-
-The NeuroScale synapse attribute `energy_core_handshake` specifies energy per
-unique directed core link per tick for the combined done/advance handshake. It
-defaults to zero. The destination registers source core IDs from mapped
-connections and charges each link once per timestep, including silent ticks and
-self-links. Multiple neurons, synapses, or NeuroScale synapse units sharing a core
-link do not multiply the charge. The first unit registering a link owns its
-charge; configure the same handshake cost on these units.
-
-This constant-cost approximation is calibrated with independent silent core
-pairs. It omits handshake routing distance and shared bookkeeping across
-neighbors. Energy is reported in the synapse category, separately from the
-chip-wide empty-core `energy_sync` baseline. Latency parameters are unaffected.

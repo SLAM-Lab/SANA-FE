@@ -73,7 +73,8 @@ architecture:
                 energy_read_synapse: 7.790e-11
                 latency_read_synapse: 4.723e-09
                 energy_scan_axon: 4.364e-11
-                energy_core_handshake: 8.810e-10
+                energy_core_handshake: 1.709e-10
+                energy_core_handshake_base: 3.550e-10
                 latency_scan_axon: 8.610e-09
           axon_out:
             -

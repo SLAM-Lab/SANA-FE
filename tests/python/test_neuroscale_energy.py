@@ -14,7 +14,13 @@ SANAFE_ROOT = Path(__file__).resolve().parents[2]
 
 class EnergyAccounting(unittest.TestCase):
     def architecture(
-        self, sync=None, read=0.0, scan=0.0, handshake=0.0, extra_synapse=False
+        self,
+        sync=None,
+        read=0.0,
+        scan=0.0,
+        handshake=0.0,
+        handshake_base=0.0,
+        extra_synapse=False,
     ):
         payload = yaml.safe_load((SANAFE_ROOT / "arch/neuroscale.yaml").read_text())
         attrs = payload["architecture"]["attributes"]
@@ -40,7 +46,8 @@ class EnergyAccounting(unittest.TestCase):
         core["synapse"][0]["attributes"].update(
             energy_read_synapse=read,
             energy_scan_axon=scan,
-            energy_core_handshake=handshake,
+            energy_handshake_message=handshake,
+            energy_handshake_table=handshake_base,
         )
         if extra_synapse:
             second = copy.deepcopy(core["synapse"][0])
@@ -150,10 +157,71 @@ class EnergyAccounting(unittest.TestCase):
         chip.load(self.handshake_network(arch, []))
         self.assertEqual(chip.sim(3, timing_model="simple")["energy"]["total"], 0.0)
 
+    def test_handshake_base_counts_nonempty_tables(self):
+        cases = [
+            ([], 0, 0),
+            ([(0, 2), (1, 3)], 2, 1),
+            ([(0, 2), (0, 4)], 3, 2),
+            ([(0, 4), (2, 4)], 3, 2),
+            ([(0, 2), (2, 4)], 4, 2),
+            ([(0, 2), (2, 0)], 4, 2),
+            ([(0, 1), (1, 0)], 2, 1),
+            ([(0, 2), (0, 4), (0, 6)], 4, 3),
+        ]
+        for links, tables, count in cases:
+            for timing in ("simple", "detailed"):
+                with self.subTest(links=links, timing=timing):
+                    arch = self.architecture(handshake=2e-9, handshake_base=3e-9)
+                    chip = sanafe.SpikingChip(arch)
+                    chip.load(self.handshake_network(arch, links))
+                    for ticks in (3, 4):
+                        energy = chip.sim(ticks, timing_model=timing)["energy"]
+                        self.assertAlmostEqual(
+                            energy["total"],
+                            ticks * (count * 2e-9 + tables * 3e-9),
+                            delta=1e-20,
+                        )
+
+    def test_handshake_base_is_shared_between_synapse_units(self):
+        for links, tables, count in [
+            ([(0, 2), (1, 3)], 2, 1),
+            ([(0, 4), (2, 5)], 3, 2),
+        ]:
+            with self.subTest(links=links):
+                arch = self.architecture(
+                    handshake=2e-9, handshake_base=3e-9, extra_synapse=True
+                )
+                chip = sanafe.SpikingChip(arch)
+                chip.load(self.handshake_network(arch, links, split_units=True))
+                self.assertAlmostEqual(
+                    chip.sim(3, timing_model="simple")["energy"]["total"],
+                    3 * (count * 2e-9 + tables * 3e-9),
+                    delta=1e-20,
+                )
+
+    def test_reloading_clears_fixed_table_ownership(self):
+        arch = self.architecture(handshake=2e-9, handshake_base=3e-9)
+        chip = sanafe.SpikingChip(arch)
+        for links, tables, count in [
+            ([(0, 2)], 2, 1),
+            ([], 0, 0),
+            ([(0, 2), (0, 4)], 3, 2),
+        ]:
+            chip.load(self.handshake_network(arch, links))
+            self.assertAlmostEqual(
+                chip.sim(3, timing_model="simple")["energy"]["total"],
+                3 * (count * 2e-9 + tables * 3e-9),
+                delta=1e-20,
+            )
+
     def test_handshake_rejects_invalid_energy(self):
-        for cost in (-1.0, float("nan"), float("inf")):
-            with self.subTest(cost=cost), self.assertRaises(ValueError):
-                sanafe.SpikingChip(self.architecture(handshake=cost))
+        for attribute in ("handshake", "handshake_base"):
+            for cost in (-1.0, float("nan"), float("inf")):
+                with (
+                    self.subTest(attribute=attribute, cost=cost),
+                    self.assertRaises(ValueError),
+                ):
+                    sanafe.SpikingChip(self.architecture(**{attribute: cost}))
 
 
 if __name__ == "__main__":

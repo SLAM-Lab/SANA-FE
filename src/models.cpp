@@ -111,8 +111,25 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
 {
     PipelineResult output;
     output.energy = energy_scan_axon * static_cast<double>(scanned_axons);
-    output.energy.value() += energy_core_handshake *
+    output.energy.value() += energy_handshake_message *
             static_cast<double>(handshake_source_cores.size());
+    if (energy_handshake_table > 0.0)
+    {
+        double tables = owns_handshake_input_table ? 1.0 : 0.0;
+        // The source's fixed fan-out budget is shared by its destinations.
+        // Core objects remain stable after construction; read their finalized
+        // degrees here so source-only cores need no active synapse unit.
+        for (const auto &[source_id, source] : handshake_source_cores)
+        {
+            if (source->fan_out.empty())
+            {
+                throw std::logic_error(
+                        "Handshake energy requires finalized core connectivity");
+            }
+            tables += 1.0 / static_cast<double>(source->fan_out.size());
+        }
+        output.energy.value() += energy_handshake_table * tables;
+    }
     output.latency = latency_scan_axon * static_cast<double>(scanned_axons);
     return output;
 }
@@ -120,15 +137,23 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
 void sanafe::NeuroScaleSynapseModel::set_attribute_hw(
         const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (attribute_name == "energy_core_handshake")
+    if (attribute_name == "energy_handshake_message" ||
+            attribute_name == "energy_handshake_table")
     {
         const double cost = static_cast<double>(param);
         if (!std::isfinite(cost) || cost < 0.0)
         {
             throw std::invalid_argument(
-                    "energy_core_handshake must be finite and nonnegative");
+                    attribute_name + " must be finite and nonnegative");
         }
-        energy_core_handshake = cost;
+        if (attribute_name == "energy_handshake_message")
+        {
+            energy_handshake_message = cost;
+        }
+        else
+        {
+            energy_handshake_table = cost;
+        }
     }
     else if (attribute_name == "energy_read_synapse")
     {
@@ -190,18 +215,26 @@ void sanafe::NeuroScaleSynapseModel::track_connection(
     const Core &destination = *connection.post_neuron->core;
     if (handshake_source_cores.count(source.id) == 0)
     {
+        bool input_table_owned = !handshake_source_cores.empty();
         // Multiple synapse units on one core must not charge the same link.
         for (const auto &unit : destination.pipeline_hw)
         {
             const auto *other =
                     dynamic_cast<const NeuroScaleSynapseModel *>(unit.get());
-            if (other != nullptr && other != this &&
-                    other->handshake_source_cores.count(source.id) != 0)
+            if (other != nullptr && other != this)
             {
-                return;
+                input_table_owned |= !other->handshake_source_cores.empty();
+                if (other->handshake_source_cores.count(source.id) != 0)
+                {
+                    return;
+                }
             }
         }
-        handshake_source_cores.insert(source.id);
+        if (!input_table_owned)
+        {
+            owns_handshake_input_table = true;
+        }
+        handshake_source_cores.emplace(source.id, &source);
     }
 }
 
@@ -227,6 +260,7 @@ void sanafe::NeuroScaleSynapseModel::reset()
 {
     scanned_axons = 0;
     handshake_source_cores.clear();
+    owns_handshake_input_table = false;
 }
 
 // *** Dendrite models ***
