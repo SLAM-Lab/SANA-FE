@@ -88,6 +88,8 @@ public:
                     "(float) Latency for one synapse table read (s)."},
             {"energy_scan_axon",
                     "(float) Per-step energy for scanning one input axon (J)."},
+            {"energy_core_handshake",
+                    "(float) Energy per tick for a directed core link's done/advance handshake (J), charged at the destination."},
             {"latency_scan_axon",
                     "(float) Per-step latency for scanning one input axon (s)."},
     };
@@ -102,6 +104,8 @@ private:
     double energy_read_synapse{0.0};
     double latency_read_synapse{0.0};
     double energy_scan_axon{0.0};
+    double energy_core_handshake{0.0};
+    std::unordered_set<size_t> handshake_source_cores;
     double latency_scan_axon{0.0};
 };
 

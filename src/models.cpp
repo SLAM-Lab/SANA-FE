@@ -19,6 +19,7 @@
 
 #include "arch.hpp"
 #include "attribute.hpp"
+#include "core.hpp"
 #include "mapped.hpp"
 #include "models.hpp"
 #include "pipeline.hpp"
@@ -110,6 +111,8 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
 {
     PipelineResult output;
     output.energy = energy_scan_axon * static_cast<double>(scanned_axons);
+    output.energy.value() += energy_core_handshake *
+            static_cast<double>(handshake_source_cores.size());
     output.latency = latency_scan_axon * static_cast<double>(scanned_axons);
     return output;
 }
@@ -117,7 +120,17 @@ sanafe::PipelineResult sanafe::NeuroScaleSynapseModel::begin_timestep(
 void sanafe::NeuroScaleSynapseModel::set_attribute_hw(
         const std::string &attribute_name, const ModelAttribute &param)
 {
-    if (attribute_name == "energy_read_synapse")
+    if (attribute_name == "energy_core_handshake")
+    {
+        const double cost = static_cast<double>(param);
+        if (!std::isfinite(cost) || cost < 0.0)
+        {
+            throw std::invalid_argument(
+                    "energy_core_handshake must be finite and nonnegative");
+        }
+        energy_core_handshake = cost;
+    }
+    else if (attribute_name == "energy_read_synapse")
     {
         energy_read_synapse = static_cast<double>(param);
     }
@@ -170,6 +183,26 @@ void sanafe::NeuroScaleSynapseModel::track_connection(
     axon_of_synapse[synapse_address] = src_neuron_id;
     neuron_ids.push_back(src_neuron_id);
     neuron_ids_sorted = false;
+
+    // A handshake belongs to a directed core pair, not to individual neurons
+    // or synapses. Charge both done and advance at the destination only.
+    const Core &source = *connection.pre_neuron->core;
+    const Core &destination = *connection.post_neuron->core;
+    if (handshake_source_cores.count(source.id) == 0)
+    {
+        // Multiple synapse units on one core must not charge the same link.
+        for (const auto &unit : destination.pipeline_hw)
+        {
+            const auto *other =
+                    dynamic_cast<const NeuroScaleSynapseModel *>(unit.get());
+            if (other != nullptr && other != this &&
+                    other->handshake_source_cores.count(source.id) != 0)
+            {
+                return;
+            }
+        }
+        handshake_source_cores.insert(source.id);
+    }
 }
 
 size_t sanafe::NeuroScaleSynapseModel::generate_default_axon_ids(
@@ -193,6 +226,7 @@ size_t sanafe::NeuroScaleSynapseModel::generate_default_axon_ids(
 void sanafe::NeuroScaleSynapseModel::reset()
 {
     scanned_axons = 0;
+    handshake_source_cores.clear();
 }
 
 // *** Dendrite models ***
