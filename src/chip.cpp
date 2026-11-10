@@ -540,14 +540,11 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
             core_count, scheduler.max_steps_async); // Tadv in Neuroscale
     scheduler.core_fan_in.resize(core_count);
     scheduler.core_fan_out.resize(core_count);
-    scheduler.core_sync_costs.resize(core_count);
     for (const auto &core_ref : cores())
     {
         const Core &core = core_ref.get();
         scheduler.core_fan_in.at(core.id) = core.fan_in;
         scheduler.core_fan_out.at(core.id) = core.fan_out;
-        scheduler.core_sync_costs.at(core.id) =
-                calculate_core_sync_latency(core);
     }
 
     schedule_create_threads(scheduler, scheduler_thread_count);
@@ -1468,18 +1465,6 @@ sanafe::SyncActivity sanafe::SpikingChip::sync_activity(const Core &core) const
         break;
     }
     return activity;
-}
-
-double sanafe::SpikingChip::calculate_core_sync_latency(const Core &core) const
-{
-    const SyncActivity activity = sync_activity(core);
-    return (activity.messages_sent > 0 ? latency_sync.per_sending_core : 0.0) +
-            (activity.messages_received > 0 ? latency_sync.per_receiving_core :
-                                              0.0) +
-            static_cast<double>(activity.messages_sent) *
-            latency_sync.per_message_sent +
-            static_cast<double>(activity.messages_received) *
-            latency_sync.per_message_received;
 }
 
 double sanafe::SpikingChip::sim_calculate_core_sync_energy(

@@ -12,7 +12,7 @@ architecture:
 
     latency_timestep_fixed: 0.6e-6
     latency_sync:
-      by_tile_count: {0: 0.0, 2: 0.4e-6, 4: 0.8e-6, 29: 1.2e-6}
+      per_tile: {0: 0.0, 2: 0.4e-6, 4: 0.8e-6, 29: 1.2e-6}
   tile:
     - name: loihi_tile[0..31]
       attributes:

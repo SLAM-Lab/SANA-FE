@@ -76,7 +76,6 @@ public:
     SpikingChip &operator=(SpikingChip &&other) = delete;
     RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), const std::string &output_dir = "", bool force_sync_barrier = true);
     void step(Scheduler &scheduler, bool force_sync = true);
-    [[nodiscard]] double calculate_core_sync_latency(const Core &core) const;
     void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
     void flush_timestep_data(RunData &rd, Scheduler &scheduler);

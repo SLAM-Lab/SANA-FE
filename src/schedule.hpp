@@ -174,7 +174,8 @@ struct Scheduler
     std::vector<std::unordered_set<size_t>> core_fan_in;
     std::vector<std::unordered_set<size_t>> core_fan_out;
     std::vector<TimingHistory> core_timing_histories;
-    std::vector<double> core_sync_costs; // Per-core sync work before overlap (s)
+    // Dependency completion bounds include both pipeline workloads.
+    std::vector<TimingHistory> core_upper_timing_histories;
     std::atomic<bool> should_stop{false};
     ThreadSafePriorityQueue<TimestepHandle, std::vector<TimestepHandle>,
             CompareTimesteps>

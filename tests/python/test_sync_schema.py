@@ -126,7 +126,7 @@ class SyncSchema(unittest.TestCase):
         )
         self.assertAlmostEqual(result["sim_time"], 6e-6, delta=1e-18)
 
-    def test_energy_and_latency_share_endpoint_field_semantics(self):
+    def test_energy_endpoint_fields_remain_active_without_latency_charges(self):
         result = self.run_chip(
             dict(
                 energy_timestep_fixed=3e-9,
@@ -148,7 +148,7 @@ class SyncSchema(unittest.TestCase):
             links=((0, 1), (1, 0)),
         )
         self.assertAlmostEqual(result["energy"]["total"], 225e-9, delta=1e-20)
-        self.assertAlmostEqual(result["sim_time"], 45e-9, delta=1e-20)
+        self.assertAlmostEqual(result["sim_time"], 3e-9, delta=1e-20)
 
     def test_legacy_scalar_costs_still_load(self):
         result = self.run_chip(
@@ -184,7 +184,7 @@ class SyncSchema(unittest.TestCase):
             positions=((0, 0), (0, 1)),
             links=((0, 1), (1, 0)),
         )
-        self.assertAlmostEqual(result["sim_time"], 18e-9, delta=1e-20)
+        self.assertAlmostEqual(result["sim_time"], 3e-9, delta=1e-20)
 
     def test_invalid_fixed_costs_are_rejected(self):
         for field in ("energy_timestep_fixed", "latency_timestep_fixed"):

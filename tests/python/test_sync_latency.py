@@ -1,4 +1,4 @@
-"""Sync processing latency, overlap and synchronization compatibility."""
+"""Dependency completion bounds and synchronization latency compatibility."""
 
 import tempfile
 import unittest
@@ -18,6 +18,7 @@ class SyncLatency(unittest.TestCase):
         fixed=0.0,
         table=False,
         protocol="neuroscale",
+        arrival=0.0,
     ):
         data = yaml.safe_load((ROOT / "arch/neuroscale.yaml").read_text())
         attrs = data["architecture"]["attributes"]
@@ -45,6 +46,7 @@ class SyncLatency(unittest.TestCase):
                     clear(child)
 
         clear(tile)
+        tile["core"][0]["axon_in"][0]["attributes"]["latency_message_in"] = arrival
         tile["core"][0]["soma"][0]["attributes"]["latency_access_neuron"] = neuron
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "arch.yaml"
@@ -82,20 +84,20 @@ class SyncLatency(unittest.TestCase):
                 self.run_chip(12, links, processing), 12 * 20e-9, delta=1e-18
             )
 
-    def test_cycles_expose_receive_work_and_duplicate_links_are_counted_once(self):
+    def test_endpoint_latency_metrics_do_not_delay_dependencies(self):
         links = [(0, 2), (1, 3), (2, 0), (3, 1)]
         self.assertAlmostEqual(
-            self.run_chip(12, links, self.costs()), 12 * 240e-9, delta=1e-18
+            self.run_chip(12, links, self.costs()), 12 * 20e-9, delta=1e-18
         )
 
-    def test_sync_delay_charges_only_work_not_hidden_by_neurons(self):
+    def test_endpoint_latency_metrics_do_not_change_neuron_progress(self):
         for neuron_latency in (10e-9, 100e-9, 200e-9):
             with self.subTest(neuron_latency=neuron_latency):
                 self.assertAlmostEqual(
                     self.run_chip(
                         12, [(0, 2), (2, 0)], self.costs(), neuron=neuron_latency
                     ),
-                    12 * max(2 * neuron_latency, 240e-9),
+                    12 * 2 * neuron_latency,
                     delta=1e-18,
                 )
 
@@ -108,12 +110,12 @@ class SyncLatency(unittest.TestCase):
 
     def test_source_only_core_needs_no_active_synapse_model(self):
         costs = dict(per_sending_core=90e-9, per_message_sent=5e-9)
-        self.assertAlmostEqual(self.run_chip(1, [(0, 2)], costs), 95e-9, delta=1e-18)
+        self.assertAlmostEqual(self.run_chip(1, [(0, 2)], costs), 20e-9, delta=1e-18)
 
     def test_detailed_receiver_occupancy_without_spikes(self):
         self.assertAlmostEqual(
             self.run_chip(12, [(0, 2), (2, 0)], self.costs(), timing="detailed"),
-            12 * 240e-9,
+            12 * 20e-9,
             delta=1e-18,
         )
 
@@ -123,14 +125,14 @@ class SyncLatency(unittest.TestCase):
                 self.run_chip(
                     12, [(0, 2), (2, 0)], self.costs(), fixed=1e-6, table=table
                 ),
-                12 * (1e-6 + 240e-9),
+                12 * (1e-6 + 20e-9),
                 delta=1e-18,
             )
 
-    def test_analytical_barrier_overlaps_receive_work_with_neurons(self):
+    def test_analytical_barrier_ignores_endpoint_latency_metrics(self):
         self.assertAlmostEqual(
             self.run_chip(12, [(0, 2), (2, 0)], self.costs(), protocol="barrier"),
-            12 * 240e-9,
+            12 * 20e-9,
             delta=1e-18,
         )
 
@@ -143,9 +145,34 @@ class SyncLatency(unittest.TestCase):
                 ):
                     sanafe.SpikingChip(self.architecture({field: value}))
 
-    def test_external_network_timing_rejects_unsupported_processing_budget(self):
-        with self.assertRaisesRegex(ValueError, "Sync processing latency"):
-            self.run_chip(1, [(0, 2)], self.costs(), timing="cycle")
+    def test_external_network_timing_ignores_endpoint_latency_metrics(self):
+        self.assertEqual(
+            self.run_chip(1, [(0, 2)], self.costs(), timing="cycle"),
+            self.run_chip(1, [(0, 2)], timing="cycle"),
+        )
+
+    def test_dependencies_use_both_pipeline_workloads(self):
+        # Each active core has 10 ns neuron work and 5 ns arrival work.
+        # The first completion overlaps them; later ticks depend on their sum.
+        for ticks in (1, 4):
+            with self.subTest(ticks=ticks):
+                arch = self.architecture(arrival=5e-9)
+                chip = sanafe.SpikingChip(arch)
+                net = sanafe.Network()
+                neurons = net.create_neuron_group(
+                    "spiking", 2, {"threshold": 1.0, "bias": 1.0}
+                )
+                for i, neuron in enumerate(neurons):
+                    neuron.map_to_core(arch.tiles[0].cores[i])
+                neurons[0].connect_to_neuron(neurons[1], {"weight": 0.0})
+                neurons[1].connect_to_neuron(neurons[0], {"weight": 0.0})
+                chip.load(net)
+                result = chip.sim(ticks, timing_model="simple")
+                self.assertAlmostEqual(
+                    result["sim_time"],
+                    10e-9 + (ticks - 1) * 15e-9,
+                    delta=1e-18,
+                )
 
 
 if __name__ == "__main__":
