@@ -70,8 +70,8 @@ class SyncSchema(unittest.TestCase):
                 dict(
                     energy_timestep_fixed=2e-9,
                     latency_timestep_fixed=3e-9,
-                    energy_sync={"by_tile_count": energy},
-                    latency_sync={"by_tile_count": latency},
+                    energy_sync={"per_tile": energy},
+                    latency_sync={"per_tile": latency},
                 )
             )
             self.assertAlmostEqual(result["energy"]["total"], 27e-9, delta=1e-20)
@@ -81,8 +81,8 @@ class SyncSchema(unittest.TestCase):
         costs = dict(
             energy_timestep_fixed=2e-9,
             latency_timestep_fixed=3e-9,
-            energy_sync={"by_tile_count": {1: 7e-9, 2: 9e-9}},
-            latency_sync={"by_tile_count": {1: 11e-9, 2: 13e-9}},
+            energy_sync={"per_tile": {1: 7e-9, 2: 9e-9}},
+            latency_sync={"per_tile": {1: 11e-9, 2: 13e-9}},
         )
         for positions, energy, latency in (
             (((0, 0), (0, 1)), 27e-9, 42e-9),
@@ -119,7 +119,7 @@ class SyncSchema(unittest.TestCase):
         result = self.run_chip(
             dict(
                 latency_timestep_fixed=0.6e-6,
-                latency_sync={"by_tile_count": {0: 0.0, 2: 0.4e-6}},
+                latency_sync={"per_tile": {0: 0.0, 2: 0.4e-6}},
             ),
             positions=((0, 0), (1, 0)),
             neuron_latency=1e-6,
@@ -202,7 +202,7 @@ class SyncSchema(unittest.TestCase):
                     self.subTest(field=field, value=value),
                     self.assertRaises(ValueError),
                 ):
-                    self.run_chip({field: {"by_tile_count": value}})
+                    self.run_chip({field: {"per_tile": value}})
 
     def test_new_fixed_fields_override_legacy_baselines_without_double_counting(self):
         result = self.run_chip(

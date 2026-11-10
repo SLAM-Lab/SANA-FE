@@ -445,7 +445,7 @@ double yaml_parse_fixed_scalar(
     if (node.is_map() || node.is_seq())
     {
         throw sanafe::YamlDescriptionParsingError(
-                "Fixed timestep cost must be a scalar; use sync.by_tile_count for tables",
+                "Fixed timestep cost must be a scalar; use sync.per_tile for tables",
                 parser, node);
     }
     double value = 0.0;
@@ -466,8 +466,8 @@ sanafe::SyncMetrics yaml_parse_sync_metrics(const ryml::Parser &parser,
         throw sanafe::YamlDescriptionParsingError(
                 name + " must be a map", parser, node);
     }
-    metrics.by_tile_count = sanafe::yaml_parse_tile_cost(
-            parser, node.find_child("by_tile_count"));
+    metrics.per_tile = sanafe::yaml_parse_tile_cost(
+            parser, node.find_child("per_tile"));
     yaml_set_optional_value(node, "per_sending_core", metrics.per_sending_core);
     yaml_set_optional_value(
             node, "per_receiving_core", metrics.per_receiving_core);
@@ -522,7 +522,7 @@ sanafe::description_parse_noc_configuration_yaml(
     const auto latency = noc_attributes.find_child("latency_sync");
     const bool latency_metrics = !latency.invalid() && latency.is_map() &&
             (latency.num_children() == 0 ||
-                    latency.has_child("by_tile_count") ||
+                    latency.has_child("per_tile") ||
                     latency.has_child("per_sending_core") ||
                     latency.has_child("per_receiving_core") ||
                     latency.has_child("per_message_sent") ||
@@ -547,7 +547,7 @@ sanafe::description_parse_noc_configuration_yaml(
             parser, latency_metrics ? latency : old_latency, "latency_sync");
     if (legacy_latency_table)
     {
-        noc.latency_sync.by_tile_count = yaml_parse_tile_cost(parser, latency);
+        noc.latency_sync.per_tile = yaml_parse_tile_cost(parser, latency);
     }
     return noc;
 }
