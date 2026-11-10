@@ -76,7 +76,7 @@ public:
     SpikingChip &operator=(SpikingChip &&other) = delete;
     RunData sim(long int timesteps = 1, TimingModel timing_model = timing_model_detailed, int scheduler_thread_count = 1, TraceFlags trace_flags = TraceFlags(), const std::string &output_dir = "", bool force_sync_barrier = true);
     void step(Scheduler &scheduler, bool force_sync = true);
-    [[nodiscard]] double sync_processing_delay(const Core &core) const;
+    [[nodiscard]] double calculate_core_sync_latency(const Core &core) const;
     void load(const SpikingNetwork &net, bool overwrite = true);
     void reset();
     void flush_timestep_data(RunData &rd, Scheduler &scheduler);
@@ -104,9 +104,10 @@ public:
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
 
     std::vector<std::reference_wrapper<Core>> cores();
-    LookupTable<double> ts_sync_delay_table{};
-    SyncEnergyMetrics energy_sync{};
-    SyncProcessingLatency sync_processing_latency{};
+    LookupTable<double> latency_timestep_fixed{};
+    LookupTable<double> energy_timestep_fixed{};
+    SyncMetrics energy_sync{};
+    SyncMetrics latency_sync{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
 
     size_t core_count{0UL};

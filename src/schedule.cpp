@@ -102,7 +102,7 @@ double sanafe::schedule_messages_timestep_analytical_barrier(
     const size_t cores = ts_data.messages.size();
     std::vector<double> neuron_processing_latencies(cores, 0.0);
     std::vector<double> message_processing_latencies =
-            scheduler.core_sync_processing_delays;
+            scheduler.core_sync_costs;
     for (size_t sending_core = 0; sending_core < ts_data.messages.size();
             ++sending_core)
     {
@@ -126,7 +126,7 @@ double sanafe::schedule_messages_timestep_analytical_barrier(
 
     ts_data.sim_time = std::max(max_message_processing, max_neuron_processing);
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts_data.sim_time += scheduler.timestep_sync_delay;
+    ts_data.sim_time += scheduler.latency_timestep_fixed;
     scheduler.timesteps_to_write.push(ts);
 
     return ts_data.sim_time;
@@ -140,16 +140,15 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
     //  from each other and diverge from their dependencies by up to a finite
     //  number of steps.
     //
-    // The recurrent equation used is:
-    //    T[c,t] = L[c,t] + max(T[c,t-1], T[fan-in,t-1], T[fan-out,t-Tadv])
-    //  where L[c,t] is the larger of the core's message receive time and its
-    //  neuron processing time.
+    // T[c,t] = fixed + core_latency + max(
+    //     T[c,t-1], max_fan_in + sync_delay, max_fan_out + sync_delay)
+    // core_latency overlaps neuron and spike processing. sync_delay is only
+    // the sync work that remains exposed after that overlap.
     Timestep &ts_data = ts.get();
     const size_t cores = scheduler.core_count;
 
     std::vector<double> neuron_processing_latencies(cores, 0.0);
     std::vector<double> message_processing_latencies(cores, 0.0);
-    std::vector<double> messages_out(cores, 0.0);
     std::vector<double> updated_times(cores, 0.0);
     for (size_t sending_core = 0UL; sending_core < cores; ++sending_core)
     {
@@ -162,33 +161,24 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
             m.blocking_delay = 0.0; // No blocking modeled
             m.network_delay = m.min_hop_delay;
             message_processing_latencies[m.dest_core_id] += m.network_delay;
-            if (!m.placeholder)
-            {
-                messages_out[sending_core] += 1.0;
-            }
         }
     }
 
     for (size_t core = 0UL; core < cores; ++core)
     {
-        // Here I assumes message and neuron processing stages execute in
-        //  parallel within the NeuroScale pipeline (similar to other Loihi-like
-        //  architectures). In reality, both pipeline halves sometimes contend
-        //  over shared core resources. Empirically, I found that there's
-        //  usually minimal blocking and results are much closer to max() than a
-        //  sum(). Modeling contention/stalls in detail would make this model
-        //  far more complicated for little gain.
-        double core_latency = std::max(neuron_processing_latencies[core],
+        // Neuron and input-message stages overlap. Shared-resource contention
+        // is approximated by the larger workload.
+        const double core_latency = std::max(neuron_processing_latencies[core],
                 message_processing_latencies[core]);
 
-        // Calculate the max over fan in of T[fanout][t-1]
+        // Latest fan-in completion at the preceding timestep.
         double max_fan_in = 0.0;
         for (const auto fan_in : scheduler.core_fan_in.at(core))
         {
             max_fan_in = std::max(max_fan_in,
                     scheduler.core_timing_histories[fan_in].at(0UL));
         }
-        // Calculate the max over fan in of T[fanin][t-Tadv]
+        // Latest fan-out completion allowed by the advance window.
         double max_fan_out = 0.0;
         for (const auto fan_out : scheduler.core_fan_out.at(core))
         {
@@ -197,24 +187,15 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
                             scheduler.max_steps_async - 1UL));
         }
         const double prev_time = scheduler.core_timing_histories[core].at(0UL);
-        // Control receive work constrains dependency paths. Preserve self
-        // progress when an acyclic core can run ahead within the advance window.
-        const double dependency_latency =
-                std::max(neuron_processing_latencies[core],
-                        message_processing_latencies[core] +
-                                scheduler.core_sync_processing_delays.at(core));
-        double finish_time = prev_time + core_latency;
-        if (!scheduler.core_fan_in.at(core).empty())
-        {
-            finish_time =
-                    std::max(finish_time, max_fan_in + dependency_latency);
-        }
-        if (!scheduler.core_fan_out.at(core).empty())
-        {
-            finish_time =
-                    std::max(finish_time, max_fan_out + dependency_latency);
-        }
-        updated_times[core] = finish_time + scheduler.timestep_sync_delay;
+        // Only sync work that cannot overlap local processing delays a
+        // dependency. Keep self progress independent of this additional delay.
+        const double sync_cost = scheduler.core_sync_costs.at(core);
+        const double sync_delay = std::clamp(
+                message_processing_latencies[core] + sync_cost - core_latency,
+                0.0, sync_cost);
+        updated_times[core] = core_latency + scheduler.latency_timestep_fixed +
+                std::max({prev_time, max_fan_in + sync_delay,
+                        max_fan_out + sync_delay});
     }
 
     // Update timing for all cores
@@ -311,7 +292,7 @@ double sanafe::schedule_messages_timestep_cycle(
 
     ts_data.sim_time = booksim_time;
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts_data.sim_time += scheduler.timestep_sync_delay;
+    ts_data.sim_time += scheduler.latency_timestep_fixed;
     scheduler.timesteps_to_write.push(ts);
 
     return ts_data.sim_time;
@@ -321,8 +302,8 @@ void sanafe::schedule_create_threads(
         Scheduler &scheduler, const int scheduler_thread_count)
 {
     if (scheduler.timing_model == TimingModel::timing_model_cycle_accurate &&
-            std::any_of(scheduler.core_sync_processing_delays.begin(),
-                    scheduler.core_sync_processing_delays.end(),
+            std::any_of(scheduler.core_sync_costs.begin(),
+                    scheduler.core_sync_costs.end(),
                     [](double delay) { return delay > 0.0; }))
     {
         throw std::invalid_argument(
@@ -389,7 +370,7 @@ double sanafe::schedule_messages_timestep_semianalytical(
     //  of the last scheduled event, i.e., the total time-step delay
     MessagePriorityQueue priority;
     NetworkOnChipState noc(scheduler);
-    noc.core_finished_receiving = scheduler.core_sync_processing_delays;
+    noc.core_finished_receiving = scheduler.core_sync_costs;
     double last_timestamp =
             *std::max_element(noc.core_finished_receiving.begin(),
                     noc.core_finished_receiving.end());
@@ -458,7 +439,7 @@ double sanafe::schedule_messages_timestep_semianalytical(
     TRACE1(SCHEDULER, "Scheduler finished.\n");
 
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts_data.sim_time = last_timestamp + scheduler.timestep_sync_delay;
+    ts_data.sim_time = last_timestamp + scheduler.latency_timestep_fixed;
 
     // Update all messages with delays and timestamps set
     ts_data.messages = std::move(scheduled_messages_per_core);

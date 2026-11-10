@@ -9,11 +9,9 @@ architecture:
     width: 8
     height: 4
     link_buffer_size: 16
-    # sync_model: fixed
-    # latency_sync: 0.0
+    # latency_timestep_fixed: 0.0
     # Enable this if simulating with more detailed timing models
-    sync_model: table
-    latency_sync: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
+    latency_timestep_fixed: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
     # sync_protocol: neuroscale
     # max_steps_async: 7
   tile:

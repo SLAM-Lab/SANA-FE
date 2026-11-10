@@ -21,13 +21,13 @@ class SyncLatency(unittest.TestCase):
     ):
         data = yaml.safe_load((ROOT / "arch/neuroscale.yaml").read_text())
         attrs = data["architecture"]["attributes"]
-        attrs["energy_sync"] = 0.0
+        attrs["energy_sync"] = {}
+        attrs["energy_timestep_fixed"] = 0.0
         attrs["sync_protocol"] = protocol
-        attrs.pop("latency_sync_processing", None)
-        attrs["latency_sync"] = {0: fixed, 1: fixed} if table else fixed
-        attrs["sync_model"] = "table" if table else "fixed"
+        attrs.pop("latency_sync", None)
+        attrs["latency_timestep_fixed"] = {0: fixed, 1: fixed} if table else fixed
         if processing is not None:
-            attrs["latency_sync_processing"] = processing
+            attrs["latency_sync"] = processing
         tile = data["architecture"]["tile"][0]
 
         def clear(value):
@@ -85,12 +85,16 @@ class SyncLatency(unittest.TestCase):
             self.run_chip(12, links, self.costs()), 12 * 240e-9, delta=1e-18
         )
 
-    def test_neuron_work_can_hide_processing_latency(self):
-        self.assertAlmostEqual(
-            self.run_chip(12, [(0, 2), (2, 0)], self.costs(), neuron=200e-9),
-            12 * 400e-9,
-            delta=1e-18,
-        )
+    def test_sync_delay_charges_only_work_not_hidden_by_neurons(self):
+        for neuron_latency in (10e-9, 100e-9, 200e-9):
+            with self.subTest(neuron_latency=neuron_latency):
+                self.assertAlmostEqual(
+                    self.run_chip(
+                        12, [(0, 2), (2, 0)], self.costs(), neuron=neuron_latency
+                    ),
+                    12 * max(2 * neuron_latency, 240e-9),
+                    delta=1e-18,
+                )
 
     def test_acyclic_progress_within_advance_window(self):
         times = [

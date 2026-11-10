@@ -25,16 +25,15 @@ class EnergyAccounting(unittest.TestCase):
         payload = yaml.safe_load((SANAFE_ROOT / "arch/neuroscale.yaml").read_text())
         attrs = payload["architecture"]["attributes"]
         attrs.pop("energy_sync", None)
+        attrs.pop("energy_timestep_fixed", None)
         if handshake or handshake_base:
             attrs["energy_sync"] = {
                 "per_sending_core": handshake_base,
                 "per_receiving_core": handshake_base,
-                "per_sync_message": handshake,
+                "per_message_received": handshake,
             }
-            if sync is not None:
-                attrs["energy_sync"]["fixed"] = sync
-        elif sync is not None:
-            attrs["energy_sync"] = sync
+        if sync is not None:
+            attrs["energy_timestep_fixed"] = sync
         tile = payload["architecture"]["tile"][0]
         core = tile["core"][0]
 
@@ -90,9 +89,7 @@ class EnergyAccounting(unittest.TestCase):
                 for ticks in (3, 4):
                     energy = chip.sim(ticks, timing_model=timing)["energy"]
                     self.assertAlmostEqual(energy["total"], ticks * 2e-9, delta=1e-20)
-                    self.assertAlmostEqual(
-                        energy["sync"], energy["total"], delta=1e-20
-                    )
+                    self.assertAlmostEqual(energy["sync"], energy["total"], delta=1e-20)
 
     def test_omitted_sync_defaults_to_zero(self):
         self.assertEqual(
@@ -242,7 +239,7 @@ class EnergyAccounting(unittest.TestCase):
                 ):
                     kwargs = {attribute: cost}
                     if attribute == "sync":
-                        kwargs["handshake"] = 1e-9  # Use the dict form
+                        kwargs["handshake"] = 1e-9
                     sanafe.SpikingChip(self.architecture(**kwargs))
 
 

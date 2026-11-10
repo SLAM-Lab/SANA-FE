@@ -61,7 +61,8 @@ void yaml_parse_pipeline_entry(const ryml::Parser &parser, const ryml::ConstNode
 CorePipelineConfiguration description_parse_core_pipeline_yaml(const ryml::Parser &parser, ryml::ConstNodeRef attributes);
 TilePowerMetrics description_parse_tile_metrics_yaml(const ryml::Parser &parser, ryml::ConstNodeRef attributes);
 NetworkOnChipConfiguration description_parse_noc_configuration_yaml(const ryml::Parser &parser, ryml::ConstNodeRef noc_attributes);
-LookupTable<double> yaml_parse_sync_delay_table(const ryml::Parser &parser, const ryml::ConstNodeRef &noc_attributes, const std::string &model_type);
+LookupTable<double> yaml_parse_fixed_cost(
+        const ryml::Parser &parser, const ryml::ConstNodeRef &node);
 SyncProtocol yaml_parse_sync_protocol(const std::string_view &sync_protocol_str);
 }
 

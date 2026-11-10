@@ -76,24 +76,9 @@ enum SyncProtocol : uint8_t
     sync_neuroscale, // NeuroScale's async protocol as described in []
 };
 
-// Energy of the timestep synchronization protocol. Each step, the protocol
-//  exchanges sync messages between cores (see SpikingChip::sync_activity). A
-//  core is a sender if it sends any sync messages that step and a receiver if
-//  it receives any. The energy per step is then linear in these counts:
-//  fixed + per_sending_core*sending_cores + per_receiving_core*receiving_cores
-//      + per_sync_message*sync_messages
-struct SyncEnergyMetrics
-{
-    double fixed{0.0}; // Chip-wide energy per timestep (J)
-    double per_sending_core{0.0}; // Per core sending any sync messages (J)
-    double per_receiving_core{0.0}; // Per core receiving any sync messages (J)
-    double per_sync_message{0.0}; // Per sync message (J)
-};
-
-// Per-core synchronization processing work, separate from chip-wide latency_sync.
-// These coefficients describe local endpoint work; energy_sync instead charges
-// each directed message once. All costs default to zero (seconds).
-struct SyncProcessingLatency
+// Local synchronization activity costs, in joules or seconds. A nonempty
+// direction incurs its per-core cost, plus the cost for each logical message.
+struct SyncMetrics
 {
     double per_sending_core{0.0};
     double per_receiving_core{0.0};
@@ -105,9 +90,10 @@ class Architecture
 {
 public:
     std::vector<TileConfiguration> tiles;
-    LookupTable<double> ts_sync_delay_table{};
-    SyncEnergyMetrics energy_sync{};
-    SyncProcessingLatency sync_processing_latency{};
+    LookupTable<double> latency_timestep_fixed{{{0UL, 0.0}}};
+    LookupTable<double> energy_timestep_fixed{{{0UL, 0.0}}};
+    SyncMetrics energy_sync{};
+    SyncMetrics latency_sync{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     std::string name;
     size_t core_count{0UL};
@@ -133,9 +119,10 @@ Architecture load_arch(const std::filesystem::path &path);
 
 struct NetworkOnChipConfiguration
 {
-    LookupTable<double> ts_sync_delay_table{};
-    SyncEnergyMetrics energy_sync{};
-    SyncProcessingLatency sync_processing_latency{};
+    LookupTable<double> latency_timestep_fixed{{{0UL, 0.0}}};
+    LookupTable<double> energy_timestep_fixed{{{0UL, 0.0}}};
+    SyncMetrics energy_sync{};
+    SyncMetrics latency_sync{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     size_t width_in_tiles{1UL};
     size_t height_in_tiles{1UL};

@@ -434,6 +434,28 @@ void yaml_set_optional_value(const ryml::ConstNodeRef node,
 {
     value = sanafe::yaml_optional_field<double>(node, key).value_or(value);
 }
+
+sanafe::SyncMetrics yaml_parse_sync_metrics(const ryml::Parser &parser,
+        const ryml::ConstNodeRef node, const std::string &name)
+{
+    sanafe::SyncMetrics metrics;
+    if (node.invalid())
+    {
+        return metrics;
+    }
+    if (!node.is_map())
+    {
+        throw sanafe::YamlDescriptionParsingError(
+                name + " must be a map", parser, node);
+    }
+    yaml_set_optional_value(node, "per_sending_core", metrics.per_sending_core);
+    yaml_set_optional_value(
+            node, "per_receiving_core", metrics.per_receiving_core);
+    yaml_set_optional_value(node, "per_message_sent", metrics.per_message_sent);
+    yaml_set_optional_value(
+            node, "per_message_received", metrics.per_message_received);
+    return metrics;
+}
 }
 
 sanafe::NetworkOnChipConfiguration
@@ -456,123 +478,93 @@ sanafe::description_parse_noc_configuration_yaml(
             yaml_optional_field<int>(noc_attributes, "max_steps_async")
                     .value_or(1UL);
 
-    // TODO: get rid of the sync_model parameter, this is confusing with the new
-    //  changes. We can just parse the latency argument if provided, assuming either
-    //  a scalar, or a list or map.. so basically just simplify the following
-    const std::string model_type =
-            yaml_optional_field<std::string>(noc_attributes, "sync_model")
-                    .value_or("fixed");
-    noc.ts_sync_delay_table =
-            yaml_parse_sync_delay_table(parser, noc_attributes, model_type);
-    // energy_sync is either a scalar (fixed chip-wide energy per timestep), or
-    //  a map breaking down the sync protocol's energy (see SyncEnergyMetrics)
-    const ryml::ConstNodeRef energy_sync_node =
-            noc_attributes.find_child("energy_sync");
-    if (!energy_sync_node.invalid() && energy_sync_node.is_map())
+    // The modern schema separates timestep baselines from sync activity.
+    // Legacy scalar/table latency_sync and energy_sync.fixed remain readable.
+    const auto energy_node = noc_attributes.find_child("energy_sync");
+    auto energy_fixed = noc_attributes.find_child("energy_timestep_fixed");
+    if (energy_fixed.invalid() && !energy_node.invalid())
     {
-        yaml_set_optional_value(energy_sync_node, "fixed",
-                noc.energy_sync.fixed);
-        yaml_set_optional_value(energy_sync_node, "per_sending_core",
-                noc.energy_sync.per_sending_core);
-        yaml_set_optional_value(energy_sync_node, "per_receiving_core",
-                noc.energy_sync.per_receiving_core);
-        yaml_set_optional_value(energy_sync_node, "per_sync_message",
-                noc.energy_sync.per_sync_message);
+        energy_fixed = energy_node.is_map() ? energy_node.find_child("fixed") :
+                                              energy_node;
     }
-    else
+    noc.energy_timestep_fixed = yaml_parse_fixed_cost(parser, energy_fixed);
+    if (!energy_node.invalid() && energy_node.is_map())
     {
-        noc.energy_sync.fixed =
-                yaml_optional_field<double>(noc_attributes, "energy_sync")
-                        .value_or(0.0);
-    }
-
-    const auto processing =
-            noc_attributes.find_child("latency_sync_processing");
-    if (!processing.invalid())
-    {
-        if (!processing.is_map())
+        noc.energy_sync =
+                yaml_parse_sync_metrics(parser, energy_node, "energy_sync");
+        if (!energy_node.has_child("per_message_received"))
         {
-            throw YamlDescriptionParsingError(
-                    "latency_sync_processing must be a map", parser,
-                    processing);
+            yaml_set_optional_value(energy_node, "per_sync_message",
+                    noc.energy_sync.per_message_received);
         }
-        yaml_set_optional_value(processing, "per_sending_core",
-                noc.sync_processing_latency.per_sending_core);
-        yaml_set_optional_value(processing, "per_receiving_core",
-                noc.sync_processing_latency.per_receiving_core);
-        yaml_set_optional_value(processing, "per_message_sent",
-                noc.sync_processing_latency.per_message_sent);
-        yaml_set_optional_value(processing, "per_message_received",
-                noc.sync_processing_latency.per_message_received);
     }
 
+    const auto latency = noc_attributes.find_child("latency_sync");
+    const bool latency_metrics = !latency.invalid() && latency.is_map() &&
+            (latency.num_children() == 0 ||
+                    latency.has_child("per_sending_core") ||
+                    latency.has_child("per_receiving_core") ||
+                    latency.has_child("per_message_sent") ||
+                    latency.has_child("per_message_received"));
+    auto latency_fixed = noc_attributes.find_child("latency_timestep_fixed");
+    if (latency_fixed.invalid() && !latency_metrics)
+    {
+        latency_fixed = latency;
+    }
+    noc.latency_timestep_fixed = yaml_parse_fixed_cost(parser, latency_fixed);
+    const auto old_latency =
+            noc_attributes.find_child("latency_sync_processing");
+    if (latency_metrics && !old_latency.invalid())
+    {
+        throw YamlDescriptionParsingError(
+                "Specify latency_sync or latency_sync_processing, not both",
+                parser, noc_attributes);
+    }
+    noc.latency_sync = yaml_parse_sync_metrics(
+            parser, latency_metrics ? latency : old_latency, "latency_sync");
     return noc;
 }
 
-sanafe::LookupTable<double> sanafe::yaml_parse_sync_delay_table(
-        const ryml::Parser &parser, const ryml::ConstNodeRef &noc_attributes,
-        const std::string &model_type)
+sanafe::LookupTable<double> sanafe::yaml_parse_fixed_cost(
+        const ryml::Parser &parser, const ryml::ConstNodeRef &node)
 {
     LookupTable<double> table;
-
-    // TODO: this is redundant - just parse latency_sync regardless of the model type... if specified
-    if (model_type == "fixed")
+    if (node.invalid())
     {
-        // Single value, defaults to 0.0 if not provided
-        const double delay =
-                yaml_optional_field<double>(noc_attributes, "latency_sync")
-                        .value_or(0.0);
-        table.values[0] = delay;
+        table.values[0] = 0.0;
     }
-    else if (model_type == "table")
+    else if (node.is_seq())
     {
-        const ryml::ConstNodeRef delay_node =
-                noc_attributes.find_child("latency_sync");
-        if (delay_node.invalid())
+        size_t index = 0;
+        for (const auto &entry : node)
         {
-            throw YamlDescriptionParsingError(
-                    "Attribute 'latency_sync' required when "
-                    "'table' synchronization model is chosen.",
-                    parser, noc_attributes);
+            double value = 0.0;
+            entry.load(&value);
+            table.values[index++] = value;
         }
-
-        if (delay_node.is_seq()) // YAML list
+    }
+    else if (node.is_map())
+    {
+        for (const auto &entry : node)
         {
-            // Array of values - tile index is implicit (0, 1, 2, ...)
-            size_t tile_index = 0;
-            for (const auto &value_node : delay_node)
-            {
-                double delay_value = 0.0;
-                value_node.load(&delay_value);
-                table.values[tile_index++] = delay_value;
-            }
+            size_t index = 0;
+            double value = 0.0;
+            entry.load_key(&index);
+            entry.load(&value);
+            table.values[index] = value;
         }
-        else if (delay_node.is_map()) // YAML mapping
-        {
-            // Mapping of tile_id -> delay_value
-            for (const auto &pair : delay_node)
-            {
-                size_t tile_id = 0UL;
-                double delay_value = 0.0;
-                pair.load_key(&tile_id);
-                pair.load(&delay_value);
-                table.values[tile_id] = delay_value;
-            }
-        }
-        else // if single YAML scalar value given
-        {
-            double delay_value = 0.0;
-            delay_node.load(&delay_value);
-            table.values[0] = delay_value;
-        }
-        INFO("Setting (%zu) sync latency values \n", table.values.size());
     }
     else
     {
-        throw YamlDescriptionParsingError(
-                "Unknown sync_model: " + model_type, parser, noc_attributes);
+        double value = 0.0;
+        node.load(&value);
+        table.values[0] = value;
     }
-
+    if (table.values.empty())
+    {
+        throw YamlDescriptionParsingError(
+                "Fixed timestep cost table must not be empty", parser, node);
+    }
     return table;
 }
 

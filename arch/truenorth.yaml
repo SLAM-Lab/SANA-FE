@@ -6,8 +6,7 @@ architecture:
     width: 64
     height: 64
     link_buffer_size: 1
-    sync_model: fixed
-    latency_sync: 0.0
+    latency_timestep_fixed: 0.0
   tile:
     - name: truenorth_tile[0..4095]
       attributes:

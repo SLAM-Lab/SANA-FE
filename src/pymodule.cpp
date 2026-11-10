@@ -724,14 +724,14 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             scheduler.core_count, scheduler.max_steps_async); // Tadv in Neuroscale
     scheduler.core_fan_in.resize(scheduler.core_count);
     scheduler.core_fan_out.resize(scheduler.core_count);
-    scheduler.core_sync_processing_delays.resize(scheduler.core_count);
+    scheduler.core_sync_costs.resize(scheduler.core_count);
     for (const auto &core_ref : self->cores())
     {
         const sanafe::Core &core = core_ref.get();
         scheduler.core_fan_in.at(core.id) = core.fan_in;
         scheduler.core_fan_out.at(core.id) = core.fan_out;
-        scheduler.core_sync_processing_delays.at(core.id) =
-                self->sync_processing_delay(core);
+        scheduler.core_sync_costs.at(core.id) =
+                self->calculate_core_sync_latency(core);
     }
     schedule_create_threads(scheduler, scheduler_threads);
 

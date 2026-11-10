@@ -61,9 +61,10 @@ sanafe::RunData::RunData(const long int start)
 std::atomic<int> sanafe::SpikingChip::chip_count = 0;
 
 sanafe::SpikingChip::SpikingChip(const Architecture &arch)
-        : ts_sync_delay_table(arch.ts_sync_delay_table)
+        : latency_timestep_fixed(arch.latency_timestep_fixed)
+        , energy_timestep_fixed(arch.energy_timestep_fixed)
         , energy_sync(arch.energy_sync)
-        , sync_processing_latency(arch.sync_processing_latency)
+        , latency_sync(arch.latency_sync)
         , sync_protocol(arch.sync_protocol)
         , core_count(arch.core_count)
         , max_cores_per_tile(arch.max_cores_per_tile)
@@ -72,32 +73,31 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         , noc_buffer_size(arch.noc_buffer_size)
         , max_steps_async(arch.max_steps_async)
 {
-    for (const auto &[name, cost] : {std::pair{"fixed", energy_sync.fixed},
-                 std::pair{"per_sending_core", energy_sync.per_sending_core},
-                 std::pair{"per_receiving_core", energy_sync.per_receiving_core},
-                 std::pair{"per_sync_message", energy_sync.per_sync_message}})
+    for (const auto &[name, table] : {
+                 std::pair{"energy_timestep_fixed", &energy_timestep_fixed},
+                 std::pair{"latency_timestep_fixed", &latency_timestep_fixed}})
     {
-        if (!std::isfinite(cost) || (cost < 0.0))
+        for (const auto &[tiles, cost] : table->values)
         {
-            throw std::invalid_argument(std::string("energy_sync ") + name +
-                    " must be finite and nonnegative");
+            if (!std::isfinite(cost) || cost < 0.0)
+            {
+                throw std::invalid_argument(
+                        std::string(name) + " must be finite and nonnegative");
+            }
         }
     }
-    for (const auto &[name, cost] :
-            {std::pair{"per_sending_core",
-                     sync_processing_latency.per_sending_core},
-                    std::pair{"per_receiving_core",
-                            sync_processing_latency.per_receiving_core},
-                    std::pair{"per_message_sent",
-                            sync_processing_latency.per_message_sent},
-                    std::pair{"per_message_received",
-                            sync_processing_latency.per_message_received}})
+    for (const auto &[name, metrics] : {std::pair{"energy_sync", &energy_sync},
+                 std::pair{"latency_sync", &latency_sync}})
     {
-        if (!std::isfinite(cost) || cost < 0.0)
+        for (const double cost : {metrics->per_sending_core,
+                     metrics->per_receiving_core, metrics->per_message_sent,
+                     metrics->per_message_received})
         {
-            throw std::invalid_argument(
-                    std::string("latency_sync_processing ") + name +
-                    " must be finite and nonnegative");
+            if (!std::isfinite(cost) || cost < 0.0)
+            {
+                throw std::invalid_argument(std::string(name) +
+                        " costs must be finite and nonnegative");
+            }
         }
     }
     INFO("Initializing simulation.\n");
@@ -535,14 +535,14 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
             core_count, scheduler.max_steps_async); // Tadv in Neuroscale
     scheduler.core_fan_in.resize(core_count);
     scheduler.core_fan_out.resize(core_count);
-    scheduler.core_sync_processing_delays.resize(core_count);
+    scheduler.core_sync_costs.resize(core_count);
     for (const auto &core_ref : cores())
     {
         const Core &core = core_ref.get();
         scheduler.core_fan_in.at(core.id) = core.fan_in;
         scheduler.core_fan_out.at(core.id) = core.fan_out;
-        scheduler.core_sync_processing_delays.at(core.id) =
-                sync_processing_delay(core);
+        scheduler.core_sync_costs.at(core.id) =
+                calculate_core_sync_latency(core);
     }
 
     schedule_create_threads(scheduler, scheduler_thread_count);
@@ -632,8 +632,8 @@ void sanafe::SpikingChip::sim_timestep_sync(Scheduler &scheduler) const
     // TODO: in future we may want to have the option of simulating this
     //  dynamically e.g., by modeling synchronization messages in the NoC
 
-    // Use a simple table based model for sync costs
-    scheduler.timestep_sync_delay = ts_sync_delay_table.get(mapped_tiles);
+    // Select the chip-wide timestep latency for the mapped tile count.
+    scheduler.latency_timestep_fixed = latency_timestep_fixed.get(mapped_tiles);
 }
 
 void sanafe::SpikingChip::reset()
@@ -1403,8 +1403,9 @@ void sanafe::SpikingChip::sim_calculate_ts_energy(Timestep &ts)
     ts.dendrite_energy = 0.0;
     ts.soma_energy = 0.0;
     ts.network_energy = 0.0;
-    ts.sync_energy = energy_sync.fixed;
-    ts.total_energy = energy_sync.fixed;
+    const double fixed_energy = energy_timestep_fixed.get(mapped_tiles);
+    ts.sync_energy = fixed_energy;
+    ts.total_energy = fixed_energy;
 
     for (auto &tile : tiles)
     {
@@ -1463,25 +1464,22 @@ sanafe::SyncActivity sanafe::SpikingChip::sync_activity(const Core &core) const
     return activity;
 }
 
-double sanafe::SpikingChip::sync_processing_delay(const Core &core) const
+double sanafe::SpikingChip::calculate_core_sync_latency(const Core &core) const
 {
     const SyncActivity activity = sync_activity(core);
-    return (activity.messages_sent > 0 ?
-                           sync_processing_latency.per_sending_core :
-                           0.0) +
-            (activity.messages_received > 0 ?
-                            sync_processing_latency.per_receiving_core :
-                            0.0) +
+    return (activity.messages_sent > 0 ? latency_sync.per_sending_core : 0.0) +
+            (activity.messages_received > 0 ? latency_sync.per_receiving_core :
+                                              0.0) +
             static_cast<double>(activity.messages_sent) *
-            sync_processing_latency.per_message_sent +
+            latency_sync.per_message_sent +
             static_cast<double>(activity.messages_received) *
-            sync_processing_latency.per_message_received;
+            latency_sync.per_message_received;
 }
 
 double sanafe::SpikingChip::sim_calculate_core_sync_energy(
         const Core &core) const
 {
-    // Each message is charged once, at the receiving core
+    // Endpoint costs follow the protocol's logical activity counts.
     const SyncActivity activity = sync_activity(core);
     double energy = 0.0;
     if (activity.messages_sent > 0UL)
@@ -1492,8 +1490,10 @@ double sanafe::SpikingChip::sim_calculate_core_sync_energy(
     {
         energy += energy_sync.per_receiving_core;
     }
+    energy += static_cast<double>(activity.messages_sent) *
+            energy_sync.per_message_sent;
     energy += static_cast<double>(activity.messages_received) *
-            energy_sync.per_sync_message;
+            energy_sync.per_message_received;
     return energy;
 }
 

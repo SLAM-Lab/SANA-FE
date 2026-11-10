@@ -174,7 +174,7 @@ struct Scheduler
     std::vector<std::unordered_set<size_t>> core_fan_in;
     std::vector<std::unordered_set<size_t>> core_fan_out;
     std::vector<TimingHistory> core_timing_histories;
-    std::vector<double> core_sync_processing_delays;
+    std::vector<double> core_sync_costs; // Per-core sync work before overlap (s)
     std::atomic<bool> should_stop{false};
     ThreadSafePriorityQueue<TimestepHandle, std::vector<TimestepHandle>,
             CompareTimesteps>
@@ -192,7 +192,7 @@ struct Scheduler
     size_t core_count;
     size_t max_cores_per_tile;
     size_t max_steps_async; // TODO: make per core?
-    double timestep_sync_delay;
+    double latency_timestep_fixed;
 };
 
 // NetworkOnChipState is used by the scheduler to track the high-level state of

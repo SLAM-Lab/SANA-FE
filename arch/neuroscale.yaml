@@ -7,14 +7,14 @@ architecture:
     width: 4
     height: 4
     link_buffer_size: 16
-    sync_model: fixed
-    latency_sync: 1.334e-06
+    latency_timestep_fixed: 1.334e-06
+    energy_timestep_fixed: 6.874e-07
     energy_sync:
-      fixed: 6.874e-07
       per_sending_core: 3.550e-10    # Fan-out table read
       per_receiving_core: 3.550e-10  # Fan-in table read
-      per_sync_message: 1.709e-10    # Done/advance handshake, per core link
-    latency_sync_processing:
+      per_message_sent: 0.0
+      per_message_received: 1.709e-10    # Done/advance handshake, per core link
+    latency_sync:
       per_sending_core: 1.731e-08
       per_receiving_core: 1.731e-08
       per_message_sent: 7.317e-09

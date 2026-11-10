@@ -56,35 +56,67 @@ in the hierarchy. The attributes section will generate one or more parameters
 that are passed to be parsed by the simulator and the relevant hardware models
 implemented either internally (`models.cpp`) or externally (plugins).
 
-Synchronization processing latency can be specified separately from the fixed
-or table-based `latency_sync` setting:
+Timestep baselines and synchronization activity costs use separate attributes:
 
 ```yaml
-latency_sync_processing:
+energy_timestep_fixed: 6.874e-07     # Chip-wide joules per timestep
+latency_timestep_fixed: 1.334e-06    # Seconds per timestep
+energy_sync:
+  per_sending_core: 3.550e-10
+  per_receiving_core: 3.550e-10
+  per_message_sent: 0.0
+  per_message_received: 1.709e-10
+latency_sync:
   per_sending_core: 1.731e-08
   per_receiving_core: 1.731e-08
   per_message_sent: 7.317e-09
   per_message_received: 7.317e-09
 ```
 
-These optional, finite, nonnegative costs default to zero. They follow the chip
-sync protocol's logical send/receive activity counts. A core pays the first two
-costs when its corresponding direction is nonempty, plus the latter two costs
-multiplied by its respective message counts. Unlike energy, these local endpoint
-costs are not summed over the chip to obtain elapsed time. Source-only cores
-require no active synapse model for this accounting.
+Both fixed fields accept a scalar, list, or map indexed by mapped tile count.
+Lookup uses the largest key at or below that count, or the first entry when the
+count is below all keys. For example, Loihi's existing calibration becomes:
 
-Analytical NeuroScale timing overlaps this budget with neuron processing on
-fan-in/fan-out dependency paths. Self progress retains the existing neuron/spike
-processing cost. Zero costs reproduce the existing recurrence, and the async
-history lag is unchanged. This is an aggregate approximation: control packets,
-queue arbitration, shared-resource stalls and hash collisions are not explicitly
-simulated. Detailed barrier timing treats the budget as initial receiver
-occupancy; external cycle-level network timing rejects nonzero budgets.
+```yaml
+latency_timestep_fixed: {1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6}
+```
 
-The example coefficients fit two effective costs using silent, recurrent
-intra-tile groups. Equal sender/receiver values assume symmetry; they are not
-four independently identified coefficients. In the NeuroScale activity model,
-the logical counts represent directed core links rather than separate physical
-done/advance packets. Do not interpret these costs as packet propagation delays
-or derive them from the energy coefficients.
+No `sync_model` selector is needed. Fixed energy is charged once chip-wide per
+timestep; fixed latency is added once on the critical timing path. Lists and
+maps select that chip-wide value, rather than multiplying it by the tile count.
+For compatibility, legacy scalar/table `latency_sync`, scalar `energy_sync`,
+`energy_sync.fixed`, `energy_sync.per_sync_message`, and the previous
+`latency_sync_processing` map remain readable. Explicit new fixed fields take
+precedence over legacy baselines. Energy reports retain the `sync` category,
+which includes both the fixed timestep energy and activity-dependent sync energy.
+
+The `energy_sync` and `latency_sync` dictionaries have identical endpoint fields,
+in joules and seconds respectively. A core pays the per-core cost for each
+nonempty direction, plus the per-message cost multiplied by its logical activity
+count. Missing costs default to zero; all costs must be finite and nonnegative.
+The chip computes activity directly, including source-only cores without an
+active synapse model. Energy sums endpoint costs; latency combines local work
+through the scheduler's dependency graph.
+
+For analytical NeuroScale timing, let `core_latency = max(neuron_work,
+message_work)`. Only the sync work not hidden by this existing processing
+contributes to `sync_delay`:
+
+```text
+sync_delay = clamp(message_work + sync_cost - core_latency, 0, sync_cost)
+completion = latency_timestep_fixed + core_latency
+           + max(previous_time, fanin_time + sync_delay, fanout_time + sync_delay)
+```
+
+The async history lag is unchanged, and zero sync costs reproduce existing
+behavior. This is an aggregate approximation: control packets, arbitration,
+hash collisions and shared-resource stalls are not explicitly simulated.
+Detailed barrier timing treats sync work as initial receiver occupancy; external
+cycle-level timing rejects nonzero sync costs.
+
+The example coefficients fit two effective costs using silent recurrent groups.
+Equal sender/receiver latency values assume symmetry; they are not four
+independently identified parameters. NeuroScale's logical activity counts
+represent directed core links rather than individual physical done/advance
+packets. These local processing costs are independent of energy coefficients
+and packet propagation delays.
