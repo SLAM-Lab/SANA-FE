@@ -253,7 +253,7 @@ diff --git a/README.md b/README.md
 +separately. `latency_sync` and `energy_sync` use the same endpoint field names,
 +but their coefficients are calibrated independently. Fixed timestep costs use
 +`latency_timestep_fixed` and `energy_timestep_fixed` are scalars. Optional
-+`latency_sync.by_tile_count` and `energy_sync.by_tile_count` accept scalar,
++`latency_sync.per_tile` and `energy_sync.per_tile` accept scalar,
 +list or map values for an additional chip-wide size-dependent sync cost.
 +
  ### axout-balanced
@@ -281,7 +281,7 @@ diff --git a/README.md b/README.md
 +`latency_timestep_fixed`. Activity-dependent costs use matching `energy_sync`
 +and `latency_sync` dictionaries with `per_sending_core`, `per_receiving_core`,
 +`per_message_sent` and `per_message_received` fields. The fixed fields are always scalar. Size-dependent Loihi synchronization uses
-+`latency_sync.by_tile_count`, whose scalar/list/map values are added to the fixed
++`latency_sync.per_tile`, whose scalar/list/map values are added to the fixed
 +baseline according to the number of mapped tiles, independently of endpoint work.
  
  For each benchmark it reads the newest `*_benchmark_summary.csv` under

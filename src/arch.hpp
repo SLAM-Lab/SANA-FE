@@ -81,7 +81,7 @@ enum SyncProtocol : uint8_t
 struct SyncMetrics
 {
     // Chip-wide addition selected by mapped tile count, not multiplied by it.
-    LookupTable<double> by_tile_count{{{0UL, 0.0}}};
+    LookupTable<double> per_tile{{{0UL, 0.0}}};
     double per_sending_core{0.0};
     double per_receiving_core{0.0};
     double per_message_sent{0.0};

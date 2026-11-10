@@ -86,12 +86,12 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
     for (const auto &[name, metrics] : {std::pair{"energy_sync", &energy_sync},
                  std::pair{"latency_sync", &latency_sync}})
     {
-        for (const auto &[tiles, cost] : metrics->by_tile_count.values)
+        for (const auto &[tiles, cost] : metrics->per_tile.values)
         {
             if (!std::isfinite(cost) || cost < 0.0)
             {
                 throw std::invalid_argument(std::string(name) +
-                        " by_tile_count costs must be finite and nonnegative");
+                        " per_tile costs must be finite and nonnegative");
             }
         }
         for (const double cost : {metrics->per_sending_core,
@@ -638,7 +638,7 @@ void sanafe::SpikingChip::sim_timestep_sync(Scheduler &scheduler) const
     //  dynamically e.g., by modeling synchronization messages in the NoC
 
     scheduler.latency_timestep_fixed = latency_timestep_fixed;
-    scheduler.sync_barrier_delay = latency_sync.by_tile_count.get(mapped_tiles);
+    scheduler.sync_barrier_delay = latency_sync.per_tile.get(mapped_tiles);
 }
 
 void sanafe::SpikingChip::reset()
@@ -1409,7 +1409,7 @@ void sanafe::SpikingChip::sim_calculate_ts_energy(Timestep &ts)
     ts.soma_energy = 0.0;
     ts.network_energy = 0.0;
     const double timestep_energy =
-            energy_timestep_fixed + energy_sync.by_tile_count.get(mapped_tiles);
+            energy_timestep_fixed + energy_sync.per_tile.get(mapped_tiles);
     ts.sync_energy = timestep_energy;
     ts.total_energy = timestep_energy;
 

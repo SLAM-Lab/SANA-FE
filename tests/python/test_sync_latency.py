@@ -27,7 +27,7 @@ class SyncLatency(unittest.TestCase):
         attrs.pop("latency_sync", None)
         attrs["latency_timestep_fixed"] = fixed
         if table:
-            attrs["latency_sync"] = {"by_tile_count": {0: 0.0, 1: fixed}}
+            attrs["latency_sync"] = {"per_tile": {0: 0.0, 1: fixed}}
             attrs["latency_timestep_fixed"] = 0.0
         if processing is not None:
             attrs.setdefault("latency_sync", {}).update(processing)
