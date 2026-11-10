@@ -73,22 +73,33 @@ latency_sync:
   per_message_received: 7.317e-09
 ```
 
-Both fixed fields accept a scalar, list, or map indexed by mapped tile count.
-Lookup uses the largest key at or below that count, or the first entry when the
-count is below all keys. For example, Loihi's existing calibration becomes:
+Both fixed timestep fields are scalars. The optional `by_tile_count` field in
+either sync dictionary accepts a scalar, list, or map indexed by mapped tile
+count. It selects an additional chip-wide synchronization cost, added once per
+timestep rather than multiplied by the number of tiles. This size-dependent
+barrier cost is separate from local endpoint processing and is not hidden by
+neuron work. For example, Loihi separates its 0.6 microsecond baseline from its
+additional synchronization cost:
 
 ```yaml
-latency_timestep_fixed: {1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6}
+latency_timestep_fixed: 0.6e-6
+latency_sync:
+  by_tile_count: {0: 0.0, 2: 0.4e-6, 4: 0.8e-6, 29: 1.2e-6}
 ```
 
-No `sync_model` selector is needed. Fixed energy is charged once chip-wide per
-timestep; fixed latency is added once on the critical timing path. Lists and
-maps select that chip-wide value, rather than multiplying it by the tile count.
-For compatibility, legacy scalar/table `latency_sync`, scalar `energy_sync`,
-`energy_sync.fixed`, `energy_sync.per_sync_message`, and the previous
-`latency_sync_processing` map remain readable. Explicit new fixed fields take
-precedence over legacy baselines. Energy reports retain the `sync` category,
-which includes both the fixed timestep energy and activity-dependent sync energy.
+This gives total delays of 0.6, 1.0, 1.4 and 1.8 microseconds at 1, 2, 4 and
+29 mapped tiles. Zero or one mapped tile incurs only the fixed baseline.
+Lookup uses the largest key at or below the tile count, or the first entry when
+the count is below all keys. Lists have implicit indices starting at zero.
+Mapped tiles, rather than individual cores, preserve the Loihi calibration's
+original indexing; multiple cores on one tile do not select another entry.
+
+No `sync_model` selector is needed. Legacy scalar/table `latency_sync`, scalar
+`energy_sync`, `energy_sync.fixed`, `energy_sync.per_sync_message` and the earlier
+`latency_sync_processing` map remain readable. Legacy latency tables retain
+their absolute tile-dependent costs and use a zero fixed baseline. Explicit
+fixed timestep fields are always scalar. Energy reports retain the `sync`
+category for fixed timestep energy, tile-dependent energy and endpoint energy.
 
 The `energy_sync` and `latency_sync` dictionaries have identical endpoint fields,
 in joules and seconds respectively. A core pays the per-core cost for each
@@ -104,7 +115,7 @@ contributes to `sync_delay`:
 
 ```text
 sync_delay = clamp(message_work + sync_cost - core_latency, 0, sync_cost)
-completion = latency_timestep_fixed + core_latency
+completion = latency_timestep_fixed + sync_barrier_delay + core_latency
            + max(previous_time, fanin_time + sync_delay, fanout_time + sync_delay)
 ```
 
@@ -120,3 +131,16 @@ independently identified parameters. NeuroScale's logical activity counts
 represent directed core links rather than individual physical done/advance
 packets. These local processing costs are independent of energy coefficients
 and packet propagation delays.
+
+The NeuroScale benchmark framework is maintained outside this repository. Its
+focused source changes are versioned in `patches/neuroscale-framework.patch`.
+From the outer project directory, apply them to the original framework sources:
+
+```sh
+patch --dry-run -p1 < SANA-FE/patches/neuroscale-framework.patch
+patch -p1 < SANA-FE/patches/neuroscale-framework.patch
+```
+
+The companion contains only benchmark cases, calibration/YAML generation,
+focused regression tests and documentation. It excludes application runners,
+analysis scripts and generated simulation results.

@@ -1,0 +1,816 @@
+diff --git a/NeuroScale/benchmarks/__main__.py b/NeuroScale/benchmarks/__main__.py
+--- a/NeuroScale/benchmarks/__main__.py
++++ b/NeuroScale/benchmarks/__main__.py
+@@ -5,6 +5,7 @@
+ <name>:
+   baseline, soma, syn, hop, axout-balanced   one microbenchmark
+   axon                                       axon-side costs (scan, spiking axon, synapse); not part of micro
++  handshake                                  quiet directed-core handshake energy calibration
+   micro                                      all five microbenchmarks
+   prob-tests                                 LFSR spike-probability tests
+   trace-tests                                synaptic-trace tests (lca_* variants; all of them by default)
+diff --git a/NeuroScale/benchmarks/cases.py b/NeuroScale/benchmarks/cases.py
+--- a/NeuroScale/benchmarks/cases.py
++++ b/NeuroScale/benchmarks/cases.py
+@@ -7,7 +7,7 @@
+ 
+ from dataclasses import dataclass, field
+ 
+-from .networks import AxonOutBalanced, AxonSweep, Baseline, Hop, Soma, Syn
++from .networks import AxonOutBalanced, AxonSweep, Baseline, CoreHandshakes, Hop, Soma, Syn
+ from .sango_bridge import NSLIF, MicroNet
+ from .variants import get_variant
+ 
+@@ -15,10 +15,13 @@
+ # Run by --benchmark all.
+ BENCHMARK_NAMES = ("baseline", "soma", "axout-balanced", "syn", "hop")
+ # Selectable by name but not part of "micro" (they take a while).
+-EXTRA_BENCHMARK_NAMES = ("axon",)
++EXTRA_BENCHMARK_NAMES = ("axon", "handshake")
+ ALL_BENCHMARK_NAMES = BENCHMARK_NAMES + EXTRA_BENCHMARK_NAMES
+ 
+ BASELINE_TIMESTEPS = 100
++HANDSHAKE_LINK_COUNTS = (0, 1, 4, 16, 32)
++HANDSHAKE_CLIQUE_COUNTS = (1, 4, 16)
++HANDSHAKE_TICKS = (12, 24)
+ 
+ # This is the neurons-per-core sweep. The benchmark builder multiplies each
+ # entry by the selected SOMA core count. Set SOMA_CORE_COUNTS = None to use
+@@ -422,6 +425,75 @@
+     return cases
+ 
+ 
++def handshake_cases(mapped_num_cores, benchmark_metadata):
++    # Pair adjacent cores within each four-core tile; no routing-distance cost.
++    cores = mapped_num_cores - mapped_num_cores % 4
++    cases = [
++        BenchmarkCase(
++            benchmark="handshake",
++            variant="pairs",
++            case_id=f"links{links}_t{ticks}",
++            network=CoreHandshakes(cores, links),
++            timesteps=ticks,
++            metadata={
++                **benchmark_metadata,
++                "VARIANT": "pairs",
++                "NEURON_COUNT": cores,
++                "TIMESTEPS": ticks,
++                "DIRECTED_CORE_LINKS": links,
++                "ACTIVE_HANDSHAKE_TABLES": 2 * links,
++                "MAPPING_STRATEGY": "preferred_core",
++            },
++        )
++        for links in HANDSHAKE_LINK_COUNTS
++        if links <= cores // 2
++        for ticks in HANDSHAKE_TICKS
++    ]
++    cases.extend(
++        BenchmarkCase(
++            benchmark="handshake",
++            variant="cliques",
++            case_id=f"cliques{count}_t{ticks}",
++            network=CoreHandshakes(cores, count, "cliques"),
++            timesteps=ticks,
++            metadata={
++                **benchmark_metadata,
++                "VARIANT": "cliques",
++                "NEURON_COUNT": cores,
++                "TIMESTEPS": ticks,
++                "DIRECTED_CORE_LINKS": 12 * count,
++                "ACTIVE_HANDSHAKE_TABLES": 8 * count,
++                "MAPPING_STRATEGY": "preferred_core",
++            },
++        )
++        for count in HANDSHAKE_CLIQUE_COUNTS
++        if 4 * count <= cores
++        for ticks in HANDSHAKE_TICKS
++    )
++    cases.extend(
++        BenchmarkCase(
++            benchmark="handshake",
++            variant=topology,
++            case_id=f"group1_t{ticks}",
++            network=CoreHandshakes(cores, 1, topology),
++            timesteps=ticks,
++            metadata={
++                **benchmark_metadata,
++                "VARIANT": topology,
++                "NEURON_COUNT": cores,
++                "TIMESTEPS": ticks,
++                "DIRECTED_CORE_LINKS": size * (size - 1),
++                "ACTIVE_HANDSHAKE_TABLES": 2 * size,
++                "MAPPING_STRATEGY": "preferred_core",
++            },
++        )
++        for topology, size in (("reciprocal", 2), ("triangles", 3))
++        if size <= cores
++        for ticks in HANDSHAKE_TICKS
++    )
++    return cases
++
++
+ CASE_BUILDERS = {
+     "baseline": baseline_cases,
+     "soma": soma_cases,
+@@ -429,6 +501,7 @@
+     "syn": syn_cases,
+     "hop": hop_cases,
+     "axon": axon_cases,
++    "handshake": handshake_cases,
+ }
+ 
+ 
+diff --git a/NeuroScale/benchmarks/networks.py b/NeuroScale/benchmarks/networks.py
+--- a/NeuroScale/benchmarks/networks.py
++++ b/NeuroScale/benchmarks/networks.py
+@@ -19,6 +19,49 @@
+ 
+     def build(self):
+         pass
++
++
++class CoreHandshakes(MicroNet):
++    """Silent pairs or four-core cliques at constant neuron count and occupancy.
++
++    Both topologies stay within tiles, removing inter-tile routing energy.
++    Their different ratios of nonempty tables to directed links identify the
++    two handshake coefficients. Unconnected neurons provide the reference.
++    """
++
++    def __init__(self, cores, groups, topology="pairs"):
++        super().__init__()
++        self.cores, self.group_count = cores, groups
++        self.topology = topology
++
++    def build(self):
++        self.neurons = [
++            NodeGroup(NSLIF(threshold=32000, bias=0), 1) for _ in range(self.cores)
++        ]
++        if self.group_count:
++            if self.topology in ("cliques", "reciprocal", "triangles"):
++                size = {"cliques": 4, "reciprocal": 2, "triangles": 3}[self.topology]
++                edges = [
++                    (source, target)
++                    for first in range(0, self.group_count * size, size)
++                    for source in range(first, first + size)
++                    for target in range(first, first + size)
++                    if source != target
++                ]
++            else:
++                edges = [(2 * i, 2 * i + 1) for i in range(self.group_count)]
++            self.synapses = [
++                EdgeGroup(
++                    self.neurons[source],
++                    self.neurons[target],
++                    PSP(weight=1, delay=1),
++                    edges=[(0, 0)],
++                )
++                for source, target in edges
++            ]
++
++    def placements(self):
++        return [Place(group, core, "quiet") for core, group in enumerate(self.neurons)]
+ 
+ 
+ class Soma(MicroNet):
+@@ -27,9 +70,18 @@
+     neuron fires on tick 1 and then stays refractory (the longest the hardware holds), which
+     takes the cheaper path of the neuron loop."""
+ 
+-    REFRACTORY = 1023                    # (1 << REFRACTORY_PERIOD_BITS) - 1
+-
+-    def __init__(self, neurons_per_core, core_count, threshold, bias, voltage, prob=1.0, refractory=False):
++    REFRACTORY = 1023  # (1 << REFRACTORY_PERIOD_BITS) - 1
++
++    def __init__(
++        self,
++        neurons_per_core,
++        core_count,
++        threshold,
++        bias,
++        voltage,
++        prob=1.0,
++        refractory=False,
++    ):
+         super().__init__()
+         self.neurons_per_core = neurons_per_core
+         self.core_count = core_count
+diff --git a/NeuroScale/benchmarks/results.py b/NeuroScale/benchmarks/results.py
+--- a/NeuroScale/benchmarks/results.py
++++ b/NeuroScale/benchmarks/results.py
+@@ -49,6 +49,8 @@
+     ("SPIKING_AXONS", "spiking axons"),
+     ("SYNAPSES_PER_AXON", "synapses per axon"),
+     ("SOURCE_CORES", "source cores"),
++    ("DIRECTED_CORE_LINKS", "directed core links"),
++    ("ACTIVE_HANDSHAKE_TABLES", "active handshake tables"),
+ )
+ 
+ 
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -364,6 +364,48 @@
+ Setting `SOMA_CORE_COUNTS = None` uses every mapped core (all cores in `parameters.act`). The per-variant
+ parameters are in `SOMA_POPULATIONS`. Knob: `SOMA_TIMESTEPS`.
+ 
++### handshake
++
++Silent core pairs and intra-tile four-core cliques calibrate the incremental
++`energy_sync.per_message_received` cost and the fixed table costs
++`energy_sync.per_sending_core` and `energy_sync.per_receiving_core`. One neuron
++remains on every core while the number and shape of connected groups vary.
++Neuron count and occupancy are fixed; no spikes, axon scans, or inter-tile hops
++contribute. Two tick counts cancel programming and startup energy before fitting
++energy against nonempty fan-in/fan-out tables and directed core links:
++
++```sh
++python -m benchmarks handshake --variant lif --mode performance -j 4
++```
++
++For each topology, the energy slope `(E(24) - E(12)) / 12` removes fixed
++programming and startup costs. Subtract the unconnected slope, then fit
++`extra_energy_per_tick = tables * table_cost + links * link_cost`.
++A pair contributes two tables and one directed link; a four-core clique
++contributes eight tables and twelve directed links. Pair-only measurements
++cannot separate the two coefficients. Five pair counts
++(0, 1, 4, 16, 32) and three clique counts (1, 4, 16) produce sixteen runs on
++the 64-core chip when measured at both 12 and 24 ticks.
++
++Reciprocal groups of two and three cores add four latency-calibration runs.
++Their critical cores have two or four incident links, compared with six in a
++four-core clique. Fitting critical-core latency against incident degree, after
++subtracting the source chip's `latency_timestep_fixed`, estimates local table
++and link processing costs. These populate matching sender/receiver fields in
++`latency_sync`. Energy remains fitted using the original pairs and cliques.
++
++The chip synchronization model charges each nonempty fan-out table at its
++sending core, each nonempty fan-in table at its receiving core, and each directed
++link once at its receiver. Both table coefficients use the same calibrated cost.
++The chip-wide baseline is `energy_timestep_fixed`; all synchronization energy is
++reported in the `sync` category.
++Higher-degree sharing and routing remain approximate; validate dense topologies
++separately. `latency_sync` and `energy_sync` use the same endpoint field names,
++but their coefficients are calibrated independently. Fixed timestep costs use
++`latency_timestep_fixed` and `energy_timestep_fixed` are scalars. Optional
++`latency_sync.by_tile_count` and `energy_sync.by_tile_count` accept scalar,
++list or map values for an additional chip-wide size-dependent sync cost.
++
+ ### axout-balanced
+ 
+ Measures the cost of remote axon output while keeping the number of populated
+@@ -529,14 +571,18 @@
+ 
+ | Benchmark | Derived cost |
+ |---|---|
+-| `baseline` | fixed per-timestep energy and latency |
+-| `soma` | `soma_access`, `soma_update`, `soma_spike_out`: the slope against neuron count for the inactive, active and spiking variants |
+-| `syn` | `synapse_process`: slope of an offset-exponential fit against connections per timestep. `axon_in`: that fit's intercept minus baseline |
+-| `hop` | per-hop energy and latency for north, east, south and west |
+-| `axout-balanced` | `axon_out`: slope against remote axons per timestep |
+-
+-Synchronization is not measured: the YAML keeps the schema's `latency_sync` table
+-as a `{0: 0}` placeholder.
++| `soma` | Access, update and spike-out costs from neuron-count slopes; fixed timestep energy and latency from the inactive-population intercepts |
++| `axon` | Axon scan, synapse read and spike-message costs, with source-neuron work removed from energy fits |
++| `hop` | Per-hop energy and latency for north, east, south and west |
++| `axout-balanced` | Remote-axon output latency; axon traffic energy is combined with message input when axon sweeps are available |
++| `handshake` | Independent table/link energy and latency fits for `energy_sync` and `latency_sync` |
++
++The chip-wide baselines are emitted as `energy_timestep_fixed` and
++`latency_timestep_fixed`. Activity-dependent costs use matching `energy_sync`
++and `latency_sync` dictionaries with `per_sending_core`, `per_receiving_core`,
++`per_message_sent` and `per_message_received` fields. The fixed fields are always scalar. Size-dependent Loihi synchronization uses
++`latency_sync.by_tile_count`, whose scalar/list/map values are added to the fixed
++baseline according to the number of mapped tiles, independently of endpoint work.
+ 
+ For each benchmark it reads the newest `*_benchmark_summary.csv` under
+ `bmarks/micro/<variant>/<benchmark>/`, so neuron models are never mixed into one
+diff --git a/bmarks/regress_microbenchmarks.py b/bmarks/regress_microbenchmarks.py
+--- a/bmarks/regress_microbenchmarks.py
++++ b/bmarks/regress_microbenchmarks.py
+@@ -18,7 +18,8 @@
+ - axon_out: use axout-balanced only; regress versus remote axons per timestep.
+   This is "cost per remote connection" (routing plus the one synapse op that
+   connection requires), matching the Loihi axon-out reference benchmark,
+-  not isolated routing cost.
++  not isolated routing cost. Its latency is retained; when axon sweeps are
++  available, traffic energy is combined in message_in and axon_out energy is zero.
+ - dendrites are set to zero for NeuroScale.
+ 
+ Input: the newest summary CSV of each benchmark under bmarks/micro/<variant>/,
+@@ -28,8 +29,9 @@
+ its *_metadata.json, or its logs for older runs); otherwise the script exits with an
+ error and writes nothing.
+ - sync: the fixed cost of every tick is the offset (y-intercept) of the soma regression
+-  of the inactive population, a chip with no neurons at all; it becomes `latency_sync`
+-  (sync_model fixed, sync_protocol neuroscale).
++  of the inactive population, a chip with no neurons at all; it becomes
++  `latency_timestep_fixed` and `energy_timestep_fixed` (baseline seconds and
++  chip-wide joules per tick, including idle ticks). Sync activity costs are calibrated separately.
+ - Benchmarks run at several tick counts (soma, axon) are reduced to the extra time per
+   extra tick (the slope of total time against ticks), which cancels startup and the
+   faster last ticks; with one tick count the average per tick is used.
+@@ -37,11 +39,16 @@
+   spiking axon adds beyond its synapses (latency_message_in), and the cost per synapse
+   (latency_read_synapse), as in bmarks/axon_micro/axon_framework_analysis.py. A variant
+   without its own axon run uses the lif chip's (the input and synapse units are common).
++  Whole-chip energy slopes include source soma work. Subtract the axon chip's
++  inactive-neuron slope from scan energy and its spike-out increment from message
++  energy. The remaining message energy combines egress and arrival, with no
++  separate axon_out energy charge. Latency slopes are left unchanged.
+ - The soma entry is the variant's RTL neuron in SANA-FE: neuroscale_lif, neuroscale_rw
+   (random walker) or neuroscale_lca (trace neuron), selected by the variant's features.
+   The LFSR draw is not modelled separately in SANA-FE, so there is no *_lfsr entry.
+-- Anything not measured (axon_out without an axout-balanced run, energies of the axon
+-  costs, hops without a hop run) keeps the value in DEFAULTS, with a warning.
++- Anything not measured keeps the value in DEFAULTS, with a warning. A missing
++  axout-balanced run retains default axon_out latency; with axon energy measured,
++  axon_out energy remains zero because egress is included in message_in.
+ 
+ Units:
+ - CSV energy columns are dynamic energy (no leakage) in mJ per timestep; output
+@@ -437,7 +444,7 @@
+     return metric
+ 
+ 
+-ROW_KEYS = ("variant", "num neurons (total)", "input axons", "spiking axons", "synapses per axon")
++ROW_KEYS = ("variant", "num neurons (total)", "input axons", "spiking axons", "synapses per axon", "directed core links", "active handshake tables")
+ 
+ 
+ def marginal_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+@@ -468,7 +475,10 @@
+ 
+ def fit_axon(rows: list[dict[str, str]]) -> dict[str, Metric]:
+     """Axon-side costs from the axon sweeps (three one-parameter fits, see axon_framework_analysis.py):
+-    scan per input axon, per spiking axon (including its one synapse), per synapse."""
++    scan per input axon, per spiking axon (including its one synapse), per synapse.
++    Energy slopes still include source-neuron work; pass through isolate_axon_energy
++    before assigning hardware costs. Latency slopes are already critical-path costs.
++    """
+     def col(r, name):
+         return int(parse_float(r[name]))
+ 
+@@ -489,6 +499,113 @@
+     scan_m, spk_m, syn_m = slope(scan), slope(spk), slope(syn)
+     per_synapse = Metric(syn_m.energy / spiking_for_synapse, syn_m.latency / spiking_for_synapse)
+     return {"scan_axon": scan_m, "read_synapse": per_synapse, "message_in": subtract_metric(spk_m, per_synapse)}
++
++
++def fit_handshake_components(rows: list[dict[str, str]]) -> tuple[Metric, Metric]:
++    """Fit per-nonempty-table and per-link energy at fixed neuron occupancy."""
++    points = []
++    for row in marginal_rows(rows):
++        if row.get("variant") in ("reciprocal", "triangles"):
++            continue  # Keep the energy fit independent of latency probes.
++        tables = parse_float(row.get("active handshake tables"))
++        links = parse_float(row.get("directed core links"))
++        energy = parse_float(row.get(ENERGY_COL))
++        if tables is None or links is None or energy is None:
++            raise RegressionError(
++                "handshake calibration requires table and link counts"
++            )
++        if min(tables, links) < 0 or not all(
++            math.isfinite(value) for value in (tables, links, energy)
++        ):
++            raise RegressionError(
++                "handshake measurements must be finite with nonnegative counts"
++            )
++        points.append((tables, links, energy * MILLIJOULE_TO_JOULE))
++    references = [
++        energy for tables, links, energy in points if tables == 0 and links == 0
++    ]
++    if not references:
++        raise RegressionError("handshake calibration requires an unconnected reference")
++    baseline = sum(references) / len(references)
++    aa = sum(a * a for a, _, _ in points)
++    ab = sum(a * b for a, b, _ in points)
++    bb = sum(b * b for _, b, _ in points)
++    ay = sum(a * (energy - baseline) for a, _, energy in points)
++    by = sum(b * (energy - baseline) for _, b, energy in points)
++    determinant = aa * bb - ab * ab
++    if determinant <= 1e-12 * aa * bb:
++        raise RegressionError(
++            "handshake calibration needs independent table/link counts; run pairs and cliques"
++        )
++    base = (ay * bb - by * ab) / determinant
++    link = (by * aa - ay * ab) / determinant
++    if min(base, link) < 0 or not all(math.isfinite(value) for value in (base, link)):
++        raise RegressionError("handshake components must be finite and nonnegative")
++    return Metric(energy=base), Metric(energy=link)
++
++
++def fit_handshake_latency(rows, sync_latency):
++    """Effective endpoint work from recurrent, intra-tile silent groups.
++
++    The critical core has two nonempty tables and 2, 4 or 6 incident links;
++    parallel copies do not multiply the observed latency. Remove the source
++    chip's fixed sync latency before assigning the two-table intercept.
++    """
++    degrees = {"reciprocal": 2, "triangles": 4, "cliques": 6}
++    points = [
++        (degrees[row["variant"]], float(row[LATENCY_COL]) * MILLISECOND_TO_SECOND)
++        for row in marginal_rows(rows)
++        if row.get("variant") in degrees
++    ]
++    if len({degree for degree, _ in points}) < 3:
++        raise RegressionError(
++            "handshake latency needs reciprocal pairs, triangles and cliques"
++        )
++    fit = linear_fit(points)
++    base = (fit.intercept - sync_latency) / 2.0
++    if not all(math.isfinite(cost) and cost >= 0 for cost in (base, fit.slope)):
++        raise RegressionError("handshake latency costs must be finite and nonnegative")
++    return base, fit.slope
++
++
++def isolate_axon_energy(
++    metrics: dict[str, Metric], source_soma_rows: list[dict[str, str]]
++) -> dict[str, Metric]:
++    """Remove source soma work from whole-chip axon energy slopes.
++
++    Scan adds one non-refractory source neuron per axon. The spiking sweep
++    replaces one-shot sources with periodic sources, adding spike-out energy.
++    Egress and arrival cannot be separated by these sweeps: charge their sum
++    in message_in, with zero separate axon_out energy. Latencies are unchanged.
++    The soma measurements must be from the chip that ran the axon sweep, which
++    can differ from the chip whose architecture we are generating.
++    """
++    rows = marginal_rows(source_soma_rows)
++    fits = {}
++    for population in ("inactive", "active", "spiking"):
++        fit, _ = fit_metric([r for r in rows if r.get("variant") == population], soma_x)
++        if fit is None:
++            raise RegressionError(
++                f"axon energy needs source-chip soma {population} measurements"
++            )
++        fits[population] = fit
++    source_access_update = fits["inactive"].slope
++    source_spike = fits["spiking"].slope - fits["active"].slope
++    corrected = dict(metrics)
++    for name, subtraction in (
++        ("scan_axon", source_access_update),
++        ("message_in", source_spike),
++    ):
++        original = metrics[name]
++        if original.energy is None:
++            raise RegressionError(f"missing {name} energy")
++        energy = original.energy - subtraction
++        if energy < 0:
++            raise RegressionError(
++                f"isolated {name} energy is negative ({energy:.6e} J)"
++            )
++        corrected[name] = Metric(energy=energy, latency=original.latency)
++    return corrected
+ 
+ 
+ def fmt(value: float | None) -> str:
+@@ -539,6 +656,7 @@
+     hop: dict[str, Metric],
+     kind: str = "lif",
+     sync_latency: float = 0.0,
++    sync_energy: float = 0.0,
+ ) -> dict:
+ 
+     return {
+@@ -549,8 +667,20 @@
+                 "width": 4,
+                 "height": 4,
+                 "link_buffer_size": 16,
+-                "sync_model": "fixed",
+-                "latency_sync": sync_latency,
++                "latency_timestep_fixed": sync_latency,
++                "energy_timestep_fixed": sync_energy,
++                "energy_sync": {
++                    "per_sending_core": values["core_handshake_base"].energy,
++                    "per_receiving_core": values["core_handshake_base"].energy,
++                    "per_message_sent": 0.0,
++                    "per_message_received": values["core_handshake"].energy,
++                },
++                "latency_sync": {
++                    "per_sending_core": values["core_handshake_base"].latency,
++                    "per_receiving_core": values["core_handshake_base"].latency,
++                    "per_message_sent": values["core_handshake"].latency,
++                    "per_message_received": values["core_handshake"].latency,
++                },
+                 "sync_protocol": "neuroscale",
+                 "max_steps_async": 6,      # TIME_ADVANCE 7: a core runs at most 6 steps ahead
+             },
+@@ -735,9 +865,9 @@
+     # run rather than silently falling back to older data.
+     summaries: dict[str, tuple[Path, list[dict[str, str]]]] = {}
+     non_performance: list[str] = []
+-    for bench in ["soma", "axon", "hop", "axout-balanced"]:
++    for bench in ["soma", "axon", "hop", "axout-balanced", "handshake"]:
+         path = summary_for(micro_dir, bench, run_id)
+-        if path is None and bench in ("axon", "hop") and args.axon_variant != args.variant:
++        if path is None and bench in ("axon", "hop", "handshake") and args.axon_variant != args.variant:
+             path = summary_for(micro_dir.parent / args.axon_variant, bench, run_id)
+             if path is not None:
+                 warnings.append(f"{bench}: no run for {args.variant}; using the {args.axon_variant} chip's "
+@@ -746,7 +876,7 @@
+             warnings.append(f"missing {bench} summary")
+             continue
+         recorded = (run_metadata(path, bench) or {}).get("neuron_variant")
+-        if recorded is not None and recorded not in (args.variant, args.axon_variant if bench in ("axon", "hop") else None):
++        if recorded is not None and recorded not in (args.variant, args.axon_variant if bench in ("axon", "hop", "handshake") else None):
+             print(f"error: {path} was run on variant {recorded}, not {args.variant}", file=sys.stderr)
+             return 1
+         mode = run_mode(path, bench)
+@@ -769,11 +899,14 @@
+         "soma_update": Metric(),
+         "soma_spike_out": Metric(),
+         "scan_axon": Metric(energy=DEFAULTS["scan_axon_energy"]),
++        "core_handshake": Metric(energy=0.0, latency=0.0),
++        "core_handshake_base": Metric(energy=0.0, latency=0.0),
+         "message_in": Metric(energy=DEFAULTS["message_in_energy"]),
+         "read_synapse": Metric(energy=DEFAULTS["read_synapse_energy"]),
+         "axon_out": Metric(energy=DEFAULTS["axon_out_energy"], latency=DEFAULTS["axon_out_latency"]),
+     }
+     sync_latency = 0.0
++    sync_energy = 0.0
+     hop_values = {d: Metric(energy=DEFAULTS["hop_energy"], latency=DEFAULTS["hop_latency"])
+                   for d in ["north", "east", "south", "west"]}
+ 
+@@ -799,15 +932,30 @@
+                                                    slope_metric(*soma_fits["active"]))
+         if soma_fits["inactive"][1] is not None:
+             sync_latency = soma_fits["inactive"][1].intercept     # offset: a chip with no neurons
+-
+-    if "axon" in summaries:
+-        try:
+-            values.update(fit_axon(summaries["axon"][1]))
+-        except RegressionError as exc:
+-            warnings.append(str(exc))
+-    else:
++        if soma_fits["inactive"][0] is not None:
++            sync_energy = soma_fits["inactive"][0].intercept
++
++    if "axon" not in summaries:
+         warnings.append("no axon run: latency_message_in, latency_read_synapse and latency_scan_axon are null; "
+                         f"run `python -m benchmarks axon --variant {args.variant} --mode performance`")
++
++    if "handshake" in summaries:
++        try:
++            values["core_handshake_base"], values["core_handshake"] = fit_handshake_components(summaries["handshake"][1])
++            source_dir = summaries["handshake"][0].parents[2]
++            source_soma = summary_for(source_dir, "soma", "latest")
++            if source_soma is None or run_mode(source_soma, "soma") != "performance":
++                raise RegressionError("handshake latency requires source-chip performance soma data")
++            _, source_fit = fit_metric(
++                [row for row in marginal_rows(read_csv(source_soma)) if row.get("variant") == "inactive"], soma_x)
++            if source_fit is None:
++                raise RegressionError("missing inactive source-chip latency calibration")
++            base, link = fit_handshake_latency(summaries["handshake"][1], source_fit.intercept)
++            values["core_handshake_base"].latency = base
++            values["core_handshake"].latency = link
++        except RegressionError as exc:
++            print(f"error: {exc}", file=sys.stderr)
++            return 1
+ 
+     if "hop" in summaries:
+         for direction in ["north", "east", "south", "west"]:
+@@ -827,13 +975,43 @@
+         except RegressionError as exc:
+             warnings.append(f"axout-balanced: {exc}")
+ 
+-    for name, metric in {**values, **{f"hop_{k}": v for k, v in hop_values.items()}}.items():
++    if "axon" in summaries:
++        # Use the soma of the measured axon chip, including when the axon run
++        # was borrowed from lif for a walker architecture.
++        source_dir = summaries["axon"][0].parents[2]
++        source_soma = summary_for(source_dir, "soma", "latest")
++        if source_soma is None or run_mode(source_soma, "soma") != "performance":
++            print(
++                f"error: axon energy requires performance soma data under {source_dir}",
++                file=sys.stderr,
++            )
++            return 1
++        try:
++            corrected = isolate_axon_energy(
++                fit_axon(summaries["axon"][1]), read_csv(source_soma)
++            )
++        except RegressionError as exc:
++            print(f"error: {exc}", file=sys.stderr)
++            return 1
++        values.update(corrected)
++        values["axon_out"].energy = 0.0
++
++    for name, metric in {
++        **values,
++        **{f"hop_{k}": v for k, v in hop_values.items()},
++    }.items():
+         if metric.energy is not None and metric.energy < 0:
+-            warnings.append(f"{name} energy is negative ({metric.energy:.6e}); check regression model/data")
++            warnings.append(
++                f"{name} energy is negative ({metric.energy:.6e}); check regression model/data"
++            )
+         if metric.latency is not None and metric.latency < 0:
+-            warnings.append(f"{name} latency is negative ({metric.latency:.6e}); check regression model/data")
+-
+-    payload = build_architecture_dict(values, hop_values, neuron_kind(args.variant), sync_latency)
++            warnings.append(
++                f"{name} latency is negative ({metric.latency:.6e}); check regression model/data"
++            )
++
++    payload = build_architecture_dict(
++        values, hop_values, neuron_kind(args.variant), sync_latency, sync_energy
++    )
+     header = (f"# Generated by bmarks/regress_microbenchmarks.py (make gen-yaml VARIANT={args.variant}) from the soma and axon\n"
+               "# microbenchmarks in actsim performance mode; see bmarks/axon_micro/README.md. Do not edit by hand.\n")
+     output = header + dump_yaml_dict(payload)
+diff --git a/bmarks/energy_validation/test_calibration.py b/bmarks/energy_validation/test_calibration.py
+--- /dev/null
++++ b/bmarks/energy_validation/test_calibration.py
+@@ -0,0 +1,191 @@
++"""Regression tests for separating axon energy from source-neuron work."""
++
++from pathlib import Path
++import sys
++import unittest
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++import regress_microbenchmarks as regression
++
++
++class AxonEnergyCalibration(unittest.TestCase):
++    def soma_rows(self):
++        # Slopes are 10 pJ for a quiet source and 17 pJ for a firing source.
++        return [
++            {
++                "variant": population,
++                "num neurons (total)": str(n),
++                regression.ENERGY_COL: str((100 + n * slope) * 1e-9),
++                regression.LATENCY_COL: "0.0",
++            }
++            for population, slope in (("inactive", 10), ("active", 10), ("spiking", 17))
++            for n in (2, 8)
++        ]
++
++    def test_subtracts_source_energy_and_preserves_latency(self):
++        metrics = {
++            "scan_axon": regression.Metric(30e-12, 3e-9),
++            "message_in": regression.Metric(50e-12, 5e-9),
++            "read_synapse": regression.Metric(2e-12, 2e-9),
++        }
++        corrected = regression.isolate_axon_energy(metrics, self.soma_rows())
++        self.assertAlmostEqual(corrected["scan_axon"].energy, 20e-12, delta=1e-24)
++        self.assertAlmostEqual(corrected["message_in"].energy, 43e-12, delta=1e-24)
++        for key in metrics:
++            self.assertEqual(corrected[key].latency, metrics[key].latency)
++        self.assertEqual(
++            corrected["read_synapse"].energy, metrics["read_synapse"].energy
++        )
++        self.assertEqual(metrics["scan_axon"].energy, 30e-12)
++
++    def test_rejects_missing_source_calibration(self):
++        with self.assertRaises(regression.RegressionError):
++            regression.isolate_axon_energy({}, [])
++
++    def test_rejects_negative_isolated_cost(self):
++        metrics = {
++            "scan_axon": regression.Metric(1e-12, 3e-9),
++            "message_in": regression.Metric(50e-12, 5e-9),
++        }
++        with self.assertRaises(regression.RegressionError):
++            regression.isolate_axon_energy(metrics, self.soma_rows())
++
++
++class HandshakeComponentCalibration(unittest.TestCase):
++    def rows(self, layouts=((0, 0), (2, 1), (8, 4), (8, 12), (32, 48))):
++        rows = []
++        for tables, links in layouts:
++            for ticks in (12, 24):
++                total_nJ = (
++                    500
++                    + 99 * links
++                    + 25 * tables
++                    + ticks * (700 + 0.355 * tables + 0.171 * links)
++                    - 674
++                )
++                rows.append(
++                    {
++                        "variant": f"t{tables}_l{links}",
++                        "num neurons (total)": "64",
++                        "active handshake tables": str(tables),
++                        "directed core links": str(links),
++                        "timesteps": str(ticks),
++                        regression.DYNAMIC_ENERGY_COL: str(total_nJ * 1e-6),
++                        regression.TOTAL_TIME_COL: str(ticks * 1e-3),
++                        regression.ENERGY_COL: str(total_nJ * 1e-6 / ticks),
++                        regression.LATENCY_COL: "0.001",
++                    }
++                )
++        return rows
++
++    def test_recovers_independent_table_and_link_energy(self):
++        fixed, link = regression.fit_handshake_components(self.rows())
++        self.assertAlmostEqual(fixed.energy, 0.355e-9, delta=1e-20)
++        self.assertAlmostEqual(link.energy, 0.171e-9, delta=1e-20)
++
++    def test_rejects_collinear_pair_only_sweep(self):
++        with self.assertRaises(regression.RegressionError):
++            regression.fit_handshake_components(self.rows(((0, 0), (2, 1), (8, 4))))
++
++    def test_requires_zero_link_reference(self):
++        with self.assertRaises(regression.RegressionError):
++            regression.fit_handshake_components(self.rows(((2, 1), (8, 12))))
++
++
++class SyncArchitectureGeneration(unittest.TestCase):
++    def test_generates_chip_sync_attributes_for_all_neuron_kinds(self):
++        names = (
++            "soma_access",
++            "soma_update",
++            "soma_spike_out",
++            "scan_axon",
++            "core_handshake",
++            "core_handshake_base",
++            "message_in",
++            "read_synapse",
++            "axon_out",
++        )
++        values = {name: regression.Metric(0.0, 0.0) for name in names}
++        values["core_handshake"] = regression.Metric(0.171e-9, 7e-9)
++        values["core_handshake_base"] = regression.Metric(0.355e-9, 17e-9)
++        hops = {
++            direction: regression.Metric(0.0, 0.0)
++            for direction in ("north", "east", "south", "west")
++        }
++        for kind in ("lif", "rw", "lca"):
++            with self.subTest(kind=kind):
++                arch = regression.build_architecture_dict(
++                    values,
++                    hops,
++                    kind,
++                    sync_latency=1e-6,
++                    sync_energy=687e-9,
++                )["architecture"]
++                self.assertEqual(
++                    arch["attributes"]["energy_sync"],
++                    {
++                        "per_sending_core": 0.355e-9,
++                        "per_receiving_core": 0.355e-9,
++                        "per_message_sent": 0.0,
++                        "per_message_received": 0.171e-9,
++                    },
++                )
++                self.assertEqual(
++                    arch["attributes"]["latency_sync"],
++                    {
++                        "per_sending_core": 17e-9,
++                        "per_receiving_core": 17e-9,
++                        "per_message_sent": 7e-9,
++                        "per_message_received": 7e-9,
++                    },
++                )
++                synapse = arch["tile"][0]["core"][0]["synapse"][0]["attributes"]
++                for name in (
++                    "energy_handshake_message",
++                    "energy_handshake_table",
++                    "energy_core_handshake",
++                    "energy_core_handshake_base",
++                ):
++                    self.assertNotIn(name, synapse)
++                self.assertEqual(arch["attributes"]["latency_timestep_fixed"], 1e-6)
++                self.assertEqual(arch["attributes"]["energy_timestep_fixed"], 687e-9)
++
++
++class HandshakeLatencyCalibration(unittest.TestCase):
++    def rows(self):
++        return [
++            {
++                "variant": topology,
++                "num neurons (total)": "64",
++                "timesteps": str(ticks),
++                regression.TOTAL_TIME_COL: str(
++                    0.001 + ticks * (1000 + 2 * 17 + degree * 7) * 1e-6
++                ),
++                regression.DYNAMIC_ENERGY_COL: "0.0",
++                regression.ENERGY_COL: "0.0",
++                regression.LATENCY_COL: "0.0",
++            }
++            for topology, degree in (
++                ("reciprocal", 2),
++                ("triangles", 4),
++                ("cliques", 6),
++            )
++            for ticks in (12, 24)
++        ]
++
++    def test_removes_startup_and_fixed_sync_using_critical_core_degree(self):
++        base, link = regression.fit_handshake_latency(self.rows(), 1000e-9)
++        self.assertAlmostEqual(base, 17e-9, delta=1e-20)
++        self.assertAlmostEqual(link, 7e-9, delta=1e-20)
++
++    def test_requires_all_three_recurrent_degrees(self):
++        with self.assertRaises(regression.RegressionError):
++            regression.fit_handshake_latency(self.rows()[:4], 1000e-9)
++
++    def test_rejects_negative_processing_cost(self):
++        with self.assertRaises(regression.RegressionError):
++            regression.fit_handshake_latency(self.rows(), 2000e-9)
++
++
++if __name__ == "__main__":
++    unittest.main()

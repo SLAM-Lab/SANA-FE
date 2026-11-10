@@ -193,6 +193,7 @@ struct Scheduler
     size_t max_cores_per_tile;
     size_t max_steps_async; // TODO: make per core?
     double latency_timestep_fixed;
+    double sync_barrier_delay; // Chip-wide size-dependent synchronization cost
 };
 
 // NetworkOnChipState is used by the scheduler to track the high-level state of

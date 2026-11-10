@@ -73,22 +73,27 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         , noc_buffer_size(arch.noc_buffer_size)
         , max_steps_async(arch.max_steps_async)
 {
-    for (const auto &[name, table] : {
-                 std::pair{"energy_timestep_fixed", &energy_timestep_fixed},
-                 std::pair{"latency_timestep_fixed", &latency_timestep_fixed}})
+    for (const auto &[name, cost] : {
+                 std::pair{"energy_timestep_fixed", energy_timestep_fixed},
+                 std::pair{"latency_timestep_fixed", latency_timestep_fixed}})
     {
-        for (const auto &[tiles, cost] : table->values)
+        if (!std::isfinite(cost) || cost < 0.0)
         {
-            if (!std::isfinite(cost) || cost < 0.0)
-            {
-                throw std::invalid_argument(
-                        std::string(name) + " must be finite and nonnegative");
-            }
+            throw std::invalid_argument(
+                    std::string(name) + " must be finite and nonnegative");
         }
     }
     for (const auto &[name, metrics] : {std::pair{"energy_sync", &energy_sync},
                  std::pair{"latency_sync", &latency_sync}})
     {
+        for (const auto &[tiles, cost] : metrics->by_tile_count.values)
+        {
+            if (!std::isfinite(cost) || cost < 0.0)
+            {
+                throw std::invalid_argument(std::string(name) +
+                        " by_tile_count costs must be finite and nonnegative");
+            }
+        }
         for (const double cost : {metrics->per_sending_core,
                      metrics->per_receiving_core, metrics->per_message_sent,
                      metrics->per_message_received})
@@ -632,8 +637,8 @@ void sanafe::SpikingChip::sim_timestep_sync(Scheduler &scheduler) const
     // TODO: in future we may want to have the option of simulating this
     //  dynamically e.g., by modeling synchronization messages in the NoC
 
-    // Select the chip-wide timestep latency for the mapped tile count.
-    scheduler.latency_timestep_fixed = latency_timestep_fixed.get(mapped_tiles);
+    scheduler.latency_timestep_fixed = latency_timestep_fixed;
+    scheduler.sync_barrier_delay = latency_sync.by_tile_count.get(mapped_tiles);
 }
 
 void sanafe::SpikingChip::reset()
@@ -1403,9 +1408,10 @@ void sanafe::SpikingChip::sim_calculate_ts_energy(Timestep &ts)
     ts.dendrite_energy = 0.0;
     ts.soma_energy = 0.0;
     ts.network_energy = 0.0;
-    const double fixed_energy = energy_timestep_fixed.get(mapped_tiles);
-    ts.sync_energy = fixed_energy;
-    ts.total_energy = fixed_energy;
+    const double timestep_energy =
+            energy_timestep_fixed + energy_sync.by_tile_count.get(mapped_tiles);
+    ts.sync_energy = timestep_energy;
+    ts.total_energy = timestep_energy;
 
     for (auto &tile : tiles)
     {

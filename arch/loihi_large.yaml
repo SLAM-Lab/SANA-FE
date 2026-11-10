@@ -11,7 +11,9 @@ architecture:
     link_buffer_size: 16
     #latency_timestep_fixed: 0.0
     # Enable this if simulating with more detailed timing models
-    latency_timestep_fixed: { 1: 0.6e-6, 2: 1.0e-6, 4: 1.4e-6, 29: 1.8e-6 }
+    latency_timestep_fixed: 0.6e-6
+    latency_sync:
+      by_tile_count: {0: 0.0, 2: 0.4e-6, 4: 0.8e-6, 29: 1.2e-6}
   tile:
     - name: loihi_tile[0..1023]  # Equivalent of 32 Loihi chips
       attributes:

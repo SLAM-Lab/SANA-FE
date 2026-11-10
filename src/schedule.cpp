@@ -126,7 +126,8 @@ double sanafe::schedule_messages_timestep_analytical_barrier(
 
     ts_data.sim_time = std::max(max_message_processing, max_neuron_processing);
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts_data.sim_time += scheduler.latency_timestep_fixed;
+    ts_data.sim_time +=
+            scheduler.latency_timestep_fixed + scheduler.sync_barrier_delay;
     scheduler.timesteps_to_write.push(ts);
 
     return ts_data.sim_time;
@@ -194,6 +195,7 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
                 message_processing_latencies[core] + sync_cost - core_latency,
                 0.0, sync_cost);
         updated_times[core] = core_latency + scheduler.latency_timestep_fixed +
+                scheduler.sync_barrier_delay +
                 std::max({prev_time, max_fan_in + sync_delay,
                         max_fan_out + sync_delay});
     }
@@ -292,7 +294,8 @@ double sanafe::schedule_messages_timestep_cycle(
 
     ts_data.sim_time = booksim_time;
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts_data.sim_time += scheduler.latency_timestep_fixed;
+    ts_data.sim_time +=
+            scheduler.latency_timestep_fixed + scheduler.sync_barrier_delay;
     scheduler.timesteps_to_write.push(ts);
 
     return ts_data.sim_time;
@@ -439,7 +442,8 @@ double sanafe::schedule_messages_timestep_semianalytical(
     TRACE1(SCHEDULER, "Scheduler finished.\n");
 
     // Account for fixed costs per timestep e.g., house-keeping or global sync
-    ts_data.sim_time = last_timestamp + scheduler.latency_timestep_fixed;
+    ts_data.sim_time = last_timestamp + scheduler.latency_timestep_fixed +
+            scheduler.sync_barrier_delay;
 
     // Update all messages with delays and timestamps set
     ts_data.messages = std::move(scheduled_messages_per_core);

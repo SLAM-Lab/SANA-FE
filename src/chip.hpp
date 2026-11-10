@@ -104,8 +104,8 @@ public:
     void sim_output_run_summary(const std::filesystem::path &output_dir, const RunData &run_data) const;
 
     std::vector<std::reference_wrapper<Core>> cores();
-    LookupTable<double> latency_timestep_fixed{};
-    LookupTable<double> energy_timestep_fixed{};
+    double latency_timestep_fixed{0.0};
+    double energy_timestep_fixed{0.0};
     SyncMetrics energy_sync{};
     SyncMetrics latency_sync{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};

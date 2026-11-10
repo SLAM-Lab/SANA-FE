@@ -25,9 +25,12 @@ class SyncLatency(unittest.TestCase):
         attrs["energy_timestep_fixed"] = 0.0
         attrs["sync_protocol"] = protocol
         attrs.pop("latency_sync", None)
-        attrs["latency_timestep_fixed"] = {0: fixed, 1: fixed} if table else fixed
+        attrs["latency_timestep_fixed"] = fixed
+        if table:
+            attrs["latency_sync"] = {"by_tile_count": {0: 0.0, 1: fixed}}
+            attrs["latency_timestep_fixed"] = 0.0
         if processing is not None:
-            attrs["latency_sync"] = processing
+            attrs.setdefault("latency_sync", {}).update(processing)
         tile = data["architecture"]["tile"][0]
 
         def clear(value):
@@ -114,7 +117,7 @@ class SyncLatency(unittest.TestCase):
             delta=1e-18,
         )
 
-    def test_scalar_and_table_fixed_sync_remain_independent(self):
+    def test_fixed_and_tile_sync_costs_remain_independent(self):
         for table in (False, True):
             self.assertAlmostEqual(
                 self.run_chip(

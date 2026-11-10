@@ -435,6 +435,24 @@ void yaml_set_optional_value(const ryml::ConstNodeRef node,
     value = sanafe::yaml_optional_field<double>(node, key).value_or(value);
 }
 
+double yaml_parse_fixed_scalar(
+        const ryml::Parser &parser, const ryml::ConstNodeRef node)
+{
+    if (node.invalid())
+    {
+        return 0.0;
+    }
+    if (node.is_map() || node.is_seq())
+    {
+        throw sanafe::YamlDescriptionParsingError(
+                "Fixed timestep cost must be a scalar; use sync.by_tile_count for tables",
+                parser, node);
+    }
+    double value = 0.0;
+    node.load(&value);
+    return value;
+}
+
 sanafe::SyncMetrics yaml_parse_sync_metrics(const ryml::Parser &parser,
         const ryml::ConstNodeRef node, const std::string &name)
 {
@@ -448,6 +466,8 @@ sanafe::SyncMetrics yaml_parse_sync_metrics(const ryml::Parser &parser,
         throw sanafe::YamlDescriptionParsingError(
                 name + " must be a map", parser, node);
     }
+    metrics.by_tile_count = sanafe::yaml_parse_tile_cost(
+            parser, node.find_child("by_tile_count"));
     yaml_set_optional_value(node, "per_sending_core", metrics.per_sending_core);
     yaml_set_optional_value(
             node, "per_receiving_core", metrics.per_receiving_core);
@@ -487,7 +507,7 @@ sanafe::description_parse_noc_configuration_yaml(
         energy_fixed = energy_node.is_map() ? energy_node.find_child("fixed") :
                                               energy_node;
     }
-    noc.energy_timestep_fixed = yaml_parse_fixed_cost(parser, energy_fixed);
+    noc.energy_timestep_fixed = yaml_parse_fixed_scalar(parser, energy_fixed);
     if (!energy_node.invalid() && energy_node.is_map())
     {
         noc.energy_sync =
@@ -502,16 +522,19 @@ sanafe::description_parse_noc_configuration_yaml(
     const auto latency = noc_attributes.find_child("latency_sync");
     const bool latency_metrics = !latency.invalid() && latency.is_map() &&
             (latency.num_children() == 0 ||
+                    latency.has_child("by_tile_count") ||
                     latency.has_child("per_sending_core") ||
                     latency.has_child("per_receiving_core") ||
                     latency.has_child("per_message_sent") ||
                     latency.has_child("per_message_received"));
     auto latency_fixed = noc_attributes.find_child("latency_timestep_fixed");
-    if (latency_fixed.invalid() && !latency_metrics)
+    const bool legacy_latency_table = !latency.invalid() && !latency_metrics &&
+            (latency.is_map() || latency.is_seq());
+    if (latency_fixed.invalid() && !latency_metrics && !legacy_latency_table)
     {
         latency_fixed = latency;
     }
-    noc.latency_timestep_fixed = yaml_parse_fixed_cost(parser, latency_fixed);
+    noc.latency_timestep_fixed = yaml_parse_fixed_scalar(parser, latency_fixed);
     const auto old_latency =
             noc_attributes.find_child("latency_sync_processing");
     if (latency_metrics && !old_latency.invalid())
@@ -522,10 +545,14 @@ sanafe::description_parse_noc_configuration_yaml(
     }
     noc.latency_sync = yaml_parse_sync_metrics(
             parser, latency_metrics ? latency : old_latency, "latency_sync");
+    if (legacy_latency_table)
+    {
+        noc.latency_sync.by_tile_count = yaml_parse_tile_cost(parser, latency);
+    }
     return noc;
 }
 
-sanafe::LookupTable<double> sanafe::yaml_parse_fixed_cost(
+sanafe::LookupTable<double> sanafe::yaml_parse_tile_cost(
         const ryml::Parser &parser, const ryml::ConstNodeRef &node)
 {
     LookupTable<double> table;
@@ -563,7 +590,7 @@ sanafe::LookupTable<double> sanafe::yaml_parse_fixed_cost(
     if (table.values.empty())
     {
         throw YamlDescriptionParsingError(
-                "Fixed timestep cost table must not be empty", parser, node);
+                "Tile-count cost table must not be empty", parser, node);
     }
     return table;
 }

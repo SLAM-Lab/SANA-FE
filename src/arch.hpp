@@ -76,10 +76,12 @@ enum SyncProtocol : uint8_t
     sync_neuroscale, // NeuroScale's async protocol as described in []
 };
 
-// Local synchronization activity costs, in joules or seconds. A nonempty
-// direction incurs its per-core cost, plus the cost for each logical message.
+// Synchronization costs in joules or seconds. The tile-count lookup supplies
+// a chip-wide addition; endpoint fields describe local activity costs.
 struct SyncMetrics
 {
+    // Chip-wide addition selected by mapped tile count, not multiplied by it.
+    LookupTable<double> by_tile_count{{{0UL, 0.0}}};
     double per_sending_core{0.0};
     double per_receiving_core{0.0};
     double per_message_sent{0.0};
@@ -90,8 +92,8 @@ class Architecture
 {
 public:
     std::vector<TileConfiguration> tiles;
-    LookupTable<double> latency_timestep_fixed{{{0UL, 0.0}}};
-    LookupTable<double> energy_timestep_fixed{{{0UL, 0.0}}};
+    double latency_timestep_fixed{0.0};
+    double energy_timestep_fixed{0.0};
     SyncMetrics energy_sync{};
     SyncMetrics latency_sync{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
@@ -119,8 +121,8 @@ Architecture load_arch(const std::filesystem::path &path);
 
 struct NetworkOnChipConfiguration
 {
-    LookupTable<double> latency_timestep_fixed{{{0UL, 0.0}}};
-    LookupTable<double> energy_timestep_fixed{{{0UL, 0.0}}};
+    double latency_timestep_fixed{0.0};
+    double energy_timestep_fixed{0.0};
     SyncMetrics energy_sync{};
     SyncMetrics latency_sync{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
