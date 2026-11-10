@@ -101,7 +101,8 @@ double sanafe::schedule_messages_timestep_analytical_barrier(
     Timestep &ts_data = ts.get();
     const size_t cores = ts_data.messages.size();
     std::vector<double> neuron_processing_latencies(cores, 0.0);
-    std::vector<double> message_processing_latencies(cores, 0.0);
+    std::vector<double> message_processing_latencies =
+            scheduler.core_sync_processing_delays;
     for (size_t sending_core = 0; sending_core < ts_data.messages.size();
             ++sending_core)
     {
@@ -196,10 +197,24 @@ double sanafe::schedule_messages_timestep_analytical_neuroscale(
                             scheduler.max_steps_async - 1UL));
         }
         const double prev_time = scheduler.core_timing_histories[core].at(0UL);
-        const double start_time =
-                std::max({prev_time, max_fan_in, max_fan_out});
-        updated_times[core] =
-                core_latency + start_time + scheduler.timestep_sync_delay;
+        // Control receive work constrains dependency paths. Preserve self
+        // progress when an acyclic core can run ahead within the advance window.
+        const double dependency_latency =
+                std::max(neuron_processing_latencies[core],
+                        message_processing_latencies[core] +
+                                scheduler.core_sync_processing_delays.at(core));
+        double finish_time = prev_time + core_latency;
+        if (!scheduler.core_fan_in.at(core).empty())
+        {
+            finish_time =
+                    std::max(finish_time, max_fan_in + dependency_latency);
+        }
+        if (!scheduler.core_fan_out.at(core).empty())
+        {
+            finish_time =
+                    std::max(finish_time, max_fan_out + dependency_latency);
+        }
+        updated_times[core] = finish_time + scheduler.timestep_sync_delay;
     }
 
     // Update timing for all cores
@@ -305,6 +320,14 @@ double sanafe::schedule_messages_timestep_cycle(
 void sanafe::schedule_create_threads(
         Scheduler &scheduler, const int scheduler_thread_count)
 {
+    if (scheduler.timing_model == TimingModel::timing_model_cycle_accurate &&
+            std::any_of(scheduler.core_sync_processing_delays.begin(),
+                    scheduler.core_sync_processing_delays.end(),
+                    [](double delay) { return delay > 0.0; }))
+    {
+        throw std::invalid_argument(
+                "Sync processing latency requires simple or detailed timing");
+    }
     if ((scheduler.sync_protocol == SyncProtocol::sync_neuroscale) &&
             (scheduler_thread_count > 1))
     {
@@ -366,7 +389,10 @@ double sanafe::schedule_messages_timestep_semianalytical(
     //  of the last scheduled event, i.e., the total time-step delay
     MessagePriorityQueue priority;
     NetworkOnChipState noc(scheduler);
-    double last_timestamp = 0.0;
+    noc.core_finished_receiving = scheduler.core_sync_processing_delays;
+    double last_timestamp =
+            *std::max_element(noc.core_finished_receiving.begin(),
+                    noc.core_finished_receiving.end());
     Timestep &ts_data = ts.get();
 
     auto messages_sent_per_core = schedule_init_message_queues(ts_data, noc);

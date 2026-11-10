@@ -63,6 +63,7 @@ std::atomic<int> sanafe::SpikingChip::chip_count = 0;
 sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         : ts_sync_delay_table(arch.ts_sync_delay_table)
         , energy_sync(arch.energy_sync)
+        , sync_processing_latency(arch.sync_processing_latency)
         , sync_protocol(arch.sync_protocol)
         , core_count(arch.core_count)
         , max_cores_per_tile(arch.max_cores_per_tile)
@@ -79,6 +80,23 @@ sanafe::SpikingChip::SpikingChip(const Architecture &arch)
         if (!std::isfinite(cost) || (cost < 0.0))
         {
             throw std::invalid_argument(std::string("energy_sync ") + name +
+                    " must be finite and nonnegative");
+        }
+    }
+    for (const auto &[name, cost] :
+            {std::pair{"per_sending_core",
+                     sync_processing_latency.per_sending_core},
+                    std::pair{"per_receiving_core",
+                            sync_processing_latency.per_receiving_core},
+                    std::pair{"per_message_sent",
+                            sync_processing_latency.per_message_sent},
+                    std::pair{"per_message_received",
+                            sync_processing_latency.per_message_received}})
+    {
+        if (!std::isfinite(cost) || cost < 0.0)
+        {
+            throw std::invalid_argument(
+                    std::string("latency_sync_processing ") + name +
                     " must be finite and nonnegative");
         }
     }
@@ -517,11 +535,14 @@ sanafe::RunData sanafe::SpikingChip::sim(const long int timesteps,
             core_count, scheduler.max_steps_async); // Tadv in Neuroscale
     scheduler.core_fan_in.resize(core_count);
     scheduler.core_fan_out.resize(core_count);
+    scheduler.core_sync_processing_delays.resize(core_count);
     for (const auto &core_ref : cores())
     {
         const Core &core = core_ref.get();
         scheduler.core_fan_in.at(core.id) = core.fan_in;
         scheduler.core_fan_out.at(core.id) = core.fan_out;
+        scheduler.core_sync_processing_delays.at(core.id) =
+                sync_processing_delay(core);
     }
 
     schedule_create_threads(scheduler, scheduler_thread_count);
@@ -1440,6 +1461,21 @@ sanafe::SyncActivity sanafe::SpikingChip::sync_activity(const Core &core) const
         break;
     }
     return activity;
+}
+
+double sanafe::SpikingChip::sync_processing_delay(const Core &core) const
+{
+    const SyncActivity activity = sync_activity(core);
+    return (activity.messages_sent > 0 ?
+                           sync_processing_latency.per_sending_core :
+                           0.0) +
+            (activity.messages_received > 0 ?
+                            sync_processing_latency.per_receiving_core :
+                            0.0) +
+            static_cast<double>(activity.messages_sent) *
+            sync_processing_latency.per_message_sent +
+            static_cast<double>(activity.messages_received) *
+            sync_processing_latency.per_message_received;
 }
 
 double sanafe::SpikingChip::sim_calculate_core_sync_energy(

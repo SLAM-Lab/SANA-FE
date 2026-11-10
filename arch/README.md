@@ -55,3 +55,36 @@ Units must also have both an `attributes` section and the next hardware units
 in the hierarchy. The attributes section will generate one or more parameters
 that are passed to be parsed by the simulator and the relevant hardware models
 implemented either internally (`models.cpp`) or externally (plugins).
+
+Synchronization processing latency can be specified separately from the fixed
+or table-based `latency_sync` setting:
+
+```yaml
+latency_sync_processing:
+  per_sending_core: 1.731e-08
+  per_receiving_core: 1.731e-08
+  per_message_sent: 7.317e-09
+  per_message_received: 7.317e-09
+```
+
+These optional, finite, nonnegative costs default to zero. They follow the chip
+sync protocol's logical send/receive activity counts. A core pays the first two
+costs when its corresponding direction is nonempty, plus the latter two costs
+multiplied by its respective message counts. Unlike energy, these local endpoint
+costs are not summed over the chip to obtain elapsed time. Source-only cores
+require no active synapse model for this accounting.
+
+Analytical NeuroScale timing overlaps this budget with neuron processing on
+fan-in/fan-out dependency paths. Self progress retains the existing neuron/spike
+processing cost. Zero costs reproduce the existing recurrence, and the async
+history lag is unchanged. This is an aggregate approximation: control packets,
+queue arbitration, shared-resource stalls and hash collisions are not explicitly
+simulated. Detailed barrier timing treats the budget as initial receiver
+occupancy; external cycle-level network timing rejects nonzero budgets.
+
+The example coefficients fit two effective costs using silent, recurrent
+intra-tile groups. Equal sender/receiver values assume symmetry; they are not
+four independently identified coefficients. In the NeuroScale activity model,
+the logical counts represent directed core links rather than separate physical
+done/advance packets. Do not interpret these costs as packet propagation delays
+or derive them from the energy coefficients.

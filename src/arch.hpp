@@ -90,12 +90,24 @@ struct SyncEnergyMetrics
     double per_sync_message{0.0}; // Per sync message (J)
 };
 
+// Per-core synchronization processing work, separate from chip-wide latency_sync.
+// These coefficients describe local endpoint work; energy_sync instead charges
+// each directed message once. All costs default to zero (seconds).
+struct SyncProcessingLatency
+{
+    double per_sending_core{0.0};
+    double per_receiving_core{0.0};
+    double per_message_sent{0.0};
+    double per_message_received{0.0};
+};
+
 class Architecture
 {
 public:
     std::vector<TileConfiguration> tiles;
     LookupTable<double> ts_sync_delay_table{};
     SyncEnergyMetrics energy_sync{};
+    SyncProcessingLatency sync_processing_latency{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     std::string name;
     size_t core_count{0UL};
@@ -123,6 +135,7 @@ struct NetworkOnChipConfiguration
 {
     LookupTable<double> ts_sync_delay_table{};
     SyncEnergyMetrics energy_sync{};
+    SyncProcessingLatency sync_processing_latency{};
     SyncProtocol sync_protocol{SyncProtocol::sync_barrier};
     size_t width_in_tiles{1UL};
     size_t height_in_tiles{1UL};

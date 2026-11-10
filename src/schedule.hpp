@@ -174,6 +174,7 @@ struct Scheduler
     std::vector<std::unordered_set<size_t>> core_fan_in;
     std::vector<std::unordered_set<size_t>> core_fan_out;
     std::vector<TimingHistory> core_timing_histories;
+    std::vector<double> core_sync_processing_delays;
     std::atomic<bool> should_stop{false};
     ThreadSafePriorityQueue<TimestepHandle, std::vector<TimestepHandle>,
             CompareTimesteps>

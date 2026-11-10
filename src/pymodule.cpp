@@ -724,11 +724,14 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
             scheduler.core_count, scheduler.max_steps_async); // Tadv in Neuroscale
     scheduler.core_fan_in.resize(scheduler.core_count);
     scheduler.core_fan_out.resize(scheduler.core_count);
+    scheduler.core_sync_processing_delays.resize(scheduler.core_count);
     for (const auto &core_ref : self->cores())
     {
         const sanafe::Core &core = core_ref.get();
         scheduler.core_fan_in.at(core.id) = core.fan_in;
         scheduler.core_fan_out.at(core.id) = core.fan_out;
+        scheduler.core_sync_processing_delays.at(core.id) =
+                self->sync_processing_delay(core);
     }
     schedule_create_threads(scheduler, scheduler_threads);
 
@@ -768,7 +771,9 @@ pybind11::dict pysim(sanafe::SpikingChip *self, const long int timesteps,
         const pybind11::gil_scoped_release release;
         for (long int timestep = 1; timestep <= timesteps; timestep++)
         {
-            self->step(scheduler);
+            // Asynchronous timestamps are cumulative; contribute elapsed run
+            // time only at the final step, matching SpikingChip::sim.
+            self->step(scheduler, timestep == timesteps);
             const long int total_timesteps = self->get_total_timesteps();
             spikes.record_net_activity(total_timesteps);
             potentials.record_net_activity(total_timesteps);

@@ -486,6 +486,26 @@ sanafe::description_parse_noc_configuration_yaml(
                         .value_or(0.0);
     }
 
+    const auto processing =
+            noc_attributes.find_child("latency_sync_processing");
+    if (!processing.invalid())
+    {
+        if (!processing.is_map())
+        {
+            throw YamlDescriptionParsingError(
+                    "latency_sync_processing must be a map", parser,
+                    processing);
+        }
+        yaml_set_optional_value(processing, "per_sending_core",
+                noc.sync_processing_latency.per_sending_core);
+        yaml_set_optional_value(processing, "per_receiving_core",
+                noc.sync_processing_latency.per_receiving_core);
+        yaml_set_optional_value(processing, "per_message_sent",
+                noc.sync_processing_latency.per_message_sent);
+        yaml_set_optional_value(processing, "per_message_received",
+                noc.sync_processing_latency.per_message_received);
+    }
+
     return noc;
 }
 
