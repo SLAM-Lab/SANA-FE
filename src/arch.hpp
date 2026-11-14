@@ -83,7 +83,7 @@ struct SyncMetrics
     // Energy uses all fields. Timing uses only per_tile; endpoint latency
     // measurements are retained without adding scheduler delays.
     // Chip-wide addition selected by mapped tile count, not multiplied by it.
-    LookupTable<double> per_tile{{{0UL, 0.0}}};
+    LookupTable<double> by_tile_count{{{0UL, 0.0}}};
     double per_sending_core{0.0};
     double per_receiving_core{0.0};
     double per_message_sent{0.0};
